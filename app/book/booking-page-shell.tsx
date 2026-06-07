@@ -1,0 +1,76 @@
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { getSiteSettings } from "@/lib/site";
+import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
+import { themeToCssVars } from "@/lib/theme/tokens";
+import { addDaysToDateKey, getTodayDateKey, getZonedWeekday, parseZonedDateKey } from "@/lib/timezone";
+import { BookingFlow } from "./booking-flow";
+
+type BookingPageShellProps = {
+  initialServiceSlug?: string;
+};
+
+function getDefaultDate(timeZone: string, availableWeekdays: number[]) {
+  const weekdays = new Set(availableWeekdays);
+  let dateKey = addDaysToDateKey(getTodayDateKey(timeZone), 1);
+
+  for (let index = 0; index < 14; index += 1) {
+    const day = parseZonedDateKey(dateKey, timeZone);
+    if (!day || !weekdays.size || weekdays.has(getZonedWeekday(day, timeZone))) {
+      return dateKey;
+    }
+
+    dateKey = addDaysToDateKey(dateKey, 1);
+  }
+
+  return dateKey;
+}
+
+export async function BookingPageShell({ initialServiceSlug }: BookingPageShellProps) {
+  const [settings, services, availability] = await Promise.all([
+    getSiteSettings(),
+    nativeSchedulingAdapter.listActiveServices(),
+    prisma.availabilityRule.findMany({ select: { weekday: true } })
+  ]);
+
+  return (
+    <main className="site-shell" style={themeToCssVars(settings)}>
+      <nav className="site-nav">
+        <Link href="/" className="brand">
+          <span className="brand-mark" />
+          <span>{settings.businessName}</span>
+        </Link>
+        <Link href="/admin" className="button secondary">
+          Admin
+        </Link>
+      </nav>
+
+      <section className="booking-page">
+        <div className="booking-intro">
+          <p className="eyebrow">Booking</p>
+          <h1>Find a time that works.</h1>
+          <p className="lead">Choose the service, pick an opening, and review everything before the request is sent.</p>
+        </div>
+
+        <BookingFlow
+          defaultDate={getDefaultDate(
+            settings.timezone,
+            Array.from(new Set(availability.map((rule) => rule.weekday)))
+          )}
+          initialServiceSlug={initialServiceSlug}
+          services={services.map((service) => ({
+            id: service.id,
+            slug: service.slug,
+            name: service.name,
+            description: service.description,
+            durationMinutes: service.durationMinutes,
+            location: service.location,
+            intakePrompt: service.intakePrompt,
+            policyText: service.policyText,
+            requirePolicy: service.requirePolicy
+          }))}
+        />
+      </section>
+    </main>
+  );
+}

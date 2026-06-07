@@ -1,0 +1,647 @@
+import { CouponType, OrderStatus, ProductStatus, ProductType } from "@prisma/client";
+import { BadgeDollarSign, Boxes, PackagePlus, Tags } from "lucide-react";
+import { formatMoney } from "@/lib/format";
+import { prisma } from "@/lib/prisma";
+import {
+  addProductToCollectionAction,
+  createCollectionAction,
+  createCouponAction,
+  createProductAction,
+  createProductVariantAction,
+  updateProductAction,
+  updateProductStatusAction
+} from "./actions";
+
+export const dynamic = "force-dynamic";
+
+const pageSize = 20;
+const statusFilters = ["all", ...Object.values(ProductStatus).map((status) => status.toLowerCase())] as const;
+
+type ProductsPageProps = {
+  searchParams: Promise<{ saved?: string; error?: string; page?: string; status?: string; product?: string }>;
+};
+
+function normalizeStatusFilter(value?: string) {
+  return statusFilters.includes(value as (typeof statusFilters)[number]) ? value || "all" : "all";
+}
+
+function moneyInput(cents?: number | null) {
+  return typeof cents === "number" ? (cents / 100).toFixed(2) : "";
+}
+
+function tagsToCsv(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").join(", ") : "";
+}
+
+function statusClass(status: ProductStatus) {
+  if (status === ProductStatus.ACTIVE) return "pill success";
+  if (status === ProductStatus.ARCHIVED) return "pill danger";
+  return "pill";
+}
+
+function productTypeLabel(value: ProductType) {
+  return value
+    .toLowerCase()
+    .split("_")
+    .join(" ");
+}
+
+export default async function ProductsPage({ searchParams }: ProductsPageProps) {
+  const params = await searchParams;
+  const page = Math.max(1, Number(params.page || 1) || 1);
+  const statusFilter = normalizeStatusFilter(params.status);
+  const productWhere = statusFilter === "all" ? {} : { status: statusFilter.toUpperCase() as ProductStatus };
+
+  const [products, productCount, activeCount, collections, coupons, orderCount, paidOrderTotal] = await Promise.all([
+    prisma.product.findMany({
+      where: productWhere,
+      include: {
+        variants: { orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] },
+        collectionProducts: {
+          include: { collection: true },
+          orderBy: { createdAt: "asc" }
+        }
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize
+    }),
+    prisma.product.count({ where: productWhere }),
+    prisma.product.count({ where: { status: ProductStatus.ACTIVE } }),
+    prisma.collection.findMany({ orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }] }),
+    prisma.coupon.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
+    prisma.order.count(),
+    prisma.order.aggregate({
+      where: { status: { in: [OrderStatus.PAID, OrderStatus.FULFILLED] } },
+      _sum: { totalCents: true }
+    })
+  ]);
+  const pageCount = Math.max(1, Math.ceil(productCount / pageSize));
+  const selectedProduct = products.find((product) => product.id === params.product) || products[0];
+  const savedMessage = params.saved ? "Commerce changes saved." : null;
+  const errorMessage = params.error || null;
+
+  return (
+    <div className="stack">
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">Products</p>
+          <h1 style={{ fontSize: "2.4rem" }}>Commerce catalog</h1>
+          <p>Products, variants, collections, coupons, and checkout-ready catalog structure.</p>
+        </div>
+      </header>
+
+      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
+      {errorMessage ? <div className="error">{errorMessage}</div> : null}
+
+      <section className="grid-3">
+        <div className="card">
+          <PackagePlus size={22} />
+          <h3>{activeCount} active products</h3>
+          <p className="lead" style={{ fontSize: "0.95rem" }}>
+            Items ready for public catalog or hosted checkout.
+          </p>
+        </div>
+        <div className="card">
+          <Boxes size={22} />
+          <h3>{collections.length} collections</h3>
+          <p className="lead" style={{ fontSize: "0.95rem" }}>
+            Group products for shops, galleries, packages, and featured blocks.
+          </p>
+        </div>
+        <div className="card">
+          <BadgeDollarSign size={22} />
+          <h3>{formatMoney(paidOrderTotal._sum.totalCents || 0)}</h3>
+          <p className="lead" style={{ fontSize: "0.95rem" }}>
+            Paid and fulfilled order total across {orderCount} orders.
+          </p>
+        </div>
+      </section>
+
+      <section className="grid-2">
+        <form action={createProductAction} className="card form-grid">
+          <h2 style={{ fontSize: "1.35rem" }}>Add product</h2>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="name">Name</label>
+              <input id="name" name="name" required />
+            </div>
+            <div className="field">
+              <label htmlFor="slug">Shop URL slug</label>
+              <input id="slug" name="slug" placeholder="starter-package" />
+            </div>
+          </div>
+          <div className="grid-3">
+            <div className="field">
+              <label htmlFor="type">Type</label>
+              <select id="type" name="type" defaultValue={ProductType.PHYSICAL}>
+                {Object.values(ProductType).map((type) => (
+                  <option key={type} value={type}>
+                    {productTypeLabel(type)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="status">Status</label>
+              <select id="status" name="status" defaultValue={ProductStatus.DRAFT}>
+                {Object.values(ProductStatus).map((status) => (
+                  <option key={status} value={status}>
+                    {status.toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="currency">Currency</label>
+              <input id="currency" name="currency" defaultValue="USD" maxLength={3} required />
+            </div>
+          </div>
+          <div className="grid-3">
+            <div className="field">
+              <label htmlFor="basePrice">Price</label>
+              <input id="basePrice" name="basePrice" inputMode="decimal" placeholder="125.00" required />
+            </div>
+            <div className="field">
+              <label htmlFor="compareAtPrice">Compare-at price</label>
+              <input id="compareAtPrice" name="compareAtPrice" inputMode="decimal" />
+            </div>
+            <div className="field">
+              <label htmlFor="sku">SKU</label>
+              <input id="sku" name="sku" />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="summary">Summary</label>
+            <input id="summary" name="summary" />
+          </div>
+          <div className="field">
+            <label htmlFor="description">Description</label>
+            <textarea id="description" name="description" />
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="imageUrl">Image URL</label>
+              <input id="imageUrl" name="imageUrl" placeholder="/hero.svg" />
+            </div>
+            <div className="field">
+              <label htmlFor="tags">Tags</label>
+              <input id="tags" name="tags" placeholder="package, featured" />
+            </div>
+          </div>
+          <div className="grid-2">
+            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <input name="trackInventory" type="checkbox" />
+              Track default variant inventory
+            </label>
+            <div className="field">
+              <label htmlFor="inventoryQuantity">Inventory quantity</label>
+              <input id="inventoryQuantity" name="inventoryQuantity" min="0" type="number" />
+            </div>
+          </div>
+          <p className="lead" style={{ fontSize: "0.9rem" }}>
+            Inventory is governed per variant. This product-level value seeds and mirrors the default variant.
+          </p>
+          <button className="button" type="submit">
+            <PackagePlus size={18} />
+            Add product
+          </button>
+        </form>
+
+        <div className="card">
+          <div className="page-header" style={{ marginBottom: 16 }}>
+            <div>
+              <h2 style={{ fontSize: "1.35rem" }}>Catalog list</h2>
+              <p>{productCount} matching products</p>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {statusFilters.map((filter) => (
+                <a className={filter === statusFilter ? "button" : "button secondary"} href={`/admin/modules/products?status=${filter}`} key={filter}>
+                  {filter}
+                </a>
+              ))}
+            </div>
+          </div>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((product) => (
+                <tr key={product.id}>
+                  <td>
+                    <strong>{product.name}</strong>
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>/shop/{product.slug}</span>
+                  </td>
+                  <td>
+                    {formatMoney(product.basePriceCents, product.currency)}
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>{product.variants.length} variants</span>
+                  </td>
+                  <td>
+                    <span className={statusClass(product.status)}>{product.status.toLowerCase()}</span>
+                  </td>
+                  <td>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      <a className="button secondary" href={`/admin/modules/products?status=${statusFilter}&product=${product.id}`}>
+                        Edit
+                      </a>
+                      <form action={updateProductStatusAction}>
+                        <input type="hidden" name="id" value={product.id} />
+                        <input
+                          type="hidden"
+                          name="status"
+                          value={product.status === ProductStatus.ACTIVE ? ProductStatus.DRAFT : ProductStatus.ACTIVE}
+                        />
+                        <button className="button secondary" type="submit">
+                          {product.status === ProductStatus.ACTIVE ? "Draft" : "Activate"}
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!products.length ? (
+                <tr>
+                  <td colSpan={4}>No products yet.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+            <a className="button secondary" href={`/admin/modules/products?status=${statusFilter}&page=${Math.max(1, page - 1)}`} aria-disabled={page <= 1}>
+              Previous
+            </a>
+            <span className="pill">
+              Page {Math.min(page, pageCount)} of {pageCount}
+            </span>
+            <a
+              className="button secondary"
+              href={`/admin/modules/products?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
+              aria-disabled={page >= pageCount}
+            >
+              Next
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {selectedProduct ? (
+        <section className="grid-2">
+          <form action={updateProductAction} className="card form-grid">
+            <h2 style={{ fontSize: "1.35rem" }}>Edit selected product</h2>
+            <input type="hidden" name="id" value={selectedProduct.id} />
+            <div className="grid-2">
+              <div className="field">
+                <label htmlFor={`product-${selectedProduct.id}-name`}>Name</label>
+                <input id={`product-${selectedProduct.id}-name`} name="name" defaultValue={selectedProduct.name} required />
+              </div>
+              <div className="field">
+                <label htmlFor={`product-${selectedProduct.id}-slug`}>Shop URL slug</label>
+                <input id={`product-${selectedProduct.id}-slug`} name="slug" defaultValue={selectedProduct.slug} />
+              </div>
+            </div>
+            <div className="grid-3">
+              <div className="field">
+                <label htmlFor={`product-${selectedProduct.id}-type`}>Type</label>
+                <select id={`product-${selectedProduct.id}-type`} name="type" defaultValue={selectedProduct.type}>
+                  {Object.values(ProductType).map((type) => (
+                    <option key={type} value={type}>
+                      {productTypeLabel(type)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor={`product-${selectedProduct.id}-status`}>Status</label>
+                <select id={`product-${selectedProduct.id}-status`} name="status" defaultValue={selectedProduct.status}>
+                  {Object.values(ProductStatus).map((status) => (
+                    <option key={status} value={status}>
+                      {status.toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor={`product-${selectedProduct.id}-currency`}>Currency</label>
+                <input id={`product-${selectedProduct.id}-currency`} name="currency" defaultValue={selectedProduct.currency} maxLength={3} required />
+              </div>
+            </div>
+            <div className="grid-3">
+              <div className="field">
+                <label htmlFor={`product-${selectedProduct.id}-base-price`}>Price</label>
+                <input id={`product-${selectedProduct.id}-base-price`} name="basePrice" defaultValue={moneyInput(selectedProduct.basePriceCents)} required />
+              </div>
+              <div className="field">
+                <label htmlFor={`product-${selectedProduct.id}-compare-price`}>Compare-at price</label>
+                <input id={`product-${selectedProduct.id}-compare-price`} name="compareAtPrice" defaultValue={moneyInput(selectedProduct.compareAtPriceCents)} />
+              </div>
+              <div className="field">
+                <label htmlFor={`product-${selectedProduct.id}-sku`}>SKU</label>
+                <input id={`product-${selectedProduct.id}-sku`} name="sku" defaultValue={selectedProduct.sku || ""} />
+              </div>
+            </div>
+            <div className="field">
+              <label htmlFor={`product-${selectedProduct.id}-summary`}>Summary</label>
+              <input id={`product-${selectedProduct.id}-summary`} name="summary" defaultValue={selectedProduct.summary} />
+            </div>
+            <div className="field">
+              <label htmlFor={`product-${selectedProduct.id}-description`}>Description</label>
+              <textarea id={`product-${selectedProduct.id}-description`} name="description" defaultValue={selectedProduct.description} />
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label htmlFor={`product-${selectedProduct.id}-image`}>Image URL</label>
+                <input id={`product-${selectedProduct.id}-image`} name="imageUrl" defaultValue={selectedProduct.imageUrl} />
+              </div>
+              <div className="field">
+                <label htmlFor={`product-${selectedProduct.id}-tags`}>Tags</label>
+                <input id={`product-${selectedProduct.id}-tags`} name="tags" defaultValue={tagsToCsv(selectedProduct.tags)} />
+              </div>
+            </div>
+            <div className="grid-2">
+              <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                <input name="trackInventory" type="checkbox" defaultChecked={selectedProduct.trackInventory} />
+                Track default variant inventory
+              </label>
+              <div className="field">
+                <label htmlFor={`product-${selectedProduct.id}-inventory`}>Inventory quantity</label>
+                <input
+                  id={`product-${selectedProduct.id}-inventory`}
+                  name="inventoryQuantity"
+                  min="0"
+                  type="number"
+                  defaultValue={selectedProduct.inventoryQuantity ?? ""}
+                />
+              </div>
+            </div>
+            <p className="lead" style={{ fontSize: "0.9rem" }}>
+              Inventory is governed per variant. Saving this product syncs price, status, SKU, and inventory to the default variant.
+            </p>
+            <button className="button" type="submit">
+              Save product
+            </button>
+          </form>
+
+          <div className="card stack">
+            <div>
+              <h2 style={{ fontSize: "1.35rem" }}>Variants for {selectedProduct.name}</h2>
+              <p style={{ color: "var(--muted)" }}>Variants let the same product support sizes, packages, print formats, or add-on choices.</p>
+            </div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Option</th>
+                  <th>Price</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedProduct.variants.map((variant) => (
+                  <tr key={variant.id}>
+                    <td>
+                      <strong>{variant.name}</strong>
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>{variant.sku || "No SKU"}</span>
+                    </td>
+                    <td>
+                      {variant.optionName || "Default"}
+                      {variant.optionValue ? `: ${variant.optionValue}` : ""}
+                    </td>
+                    <td>{formatMoney(variant.priceCents ?? selectedProduct.basePriceCents, selectedProduct.currency)}</td>
+                    <td>
+                      <span className={variant.isActive ? "pill success" : "pill danger"}>{variant.isActive ? "active" : "inactive"}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <form action={createProductVariantAction} className="subpanel form-grid">
+              <input type="hidden" name="productId" value={selectedProduct.id} />
+              <h3 style={{ fontSize: "1.05rem" }}>Add variant</h3>
+              <div className="grid-2">
+                <div className="field">
+                  <label htmlFor="variantName">Name</label>
+                  <input id="variantName" name="name" placeholder="Large print" required />
+                </div>
+                <div className="field">
+                  <label htmlFor="variantSku">SKU</label>
+                  <input id="variantSku" name="sku" />
+                </div>
+              </div>
+              <div className="grid-2">
+                <div className="field">
+                  <label htmlFor="optionName">Option name</label>
+                  <input id="optionName" name="optionName" placeholder="Size" />
+                </div>
+                <div className="field">
+                  <label htmlFor="optionValue">Option value</label>
+                  <input id="optionValue" name="optionValue" placeholder="16x20" />
+                </div>
+              </div>
+              <div className="grid-3">
+                <div className="field">
+                  <label htmlFor="variantPrice">Price override</label>
+                  <input id="variantPrice" name="price" inputMode="decimal" />
+                </div>
+                <div className="field">
+                  <label htmlFor="variantCompareAt">Compare-at price</label>
+                  <input id="variantCompareAt" name="compareAtPrice" inputMode="decimal" />
+                </div>
+                <div className="field">
+                  <label htmlFor="variantInventory">Inventory quantity</label>
+                  <input id="variantInventory" name="inventoryQuantity" min="0" type="number" />
+                </div>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+                <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                  <input name="trackInventory" type="checkbox" />
+                  Track inventory
+                </label>
+                <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                  <input name="isDefault" type="checkbox" />
+                  Default
+                </label>
+                <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                  <input name="isActive" type="checkbox" defaultChecked />
+                  Active
+                </label>
+              </div>
+              <button className="button secondary" type="submit">
+                Add variant
+              </button>
+            </form>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="grid-2">
+        <div className="card stack">
+          <h2 style={{ fontSize: "1.35rem" }}>Collections</h2>
+          <form action={createCollectionAction} className="subpanel form-grid">
+            <div className="grid-2">
+              <div className="field">
+                <label htmlFor="collectionName">Name</label>
+                <input id="collectionName" name="name" required />
+              </div>
+              <div className="field">
+                <label htmlFor="collectionSlug">Slug</label>
+                <input id="collectionSlug" name="slug" />
+              </div>
+            </div>
+            <div className="grid-3">
+              <div className="field">
+                <label htmlFor="collectionStatus">Status</label>
+                <select id="collectionStatus" name="status" defaultValue={ProductStatus.DRAFT}>
+                  {Object.values(ProductStatus).map((status) => (
+                    <option key={status} value={status}>
+                      {status.toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="sortOrder">Sort order</label>
+                <input id="sortOrder" name="sortOrder" type="number" defaultValue="0" />
+              </div>
+              <label style={{ alignItems: "center", display: "flex", gap: 8, paddingTop: 27 }}>
+                <input name="isFeatured" type="checkbox" />
+                Featured
+              </label>
+            </div>
+            <div className="field">
+              <label htmlFor="collectionDescription">Description</label>
+              <textarea id="collectionDescription" name="description" />
+            </div>
+            <button className="button secondary" type="submit">
+              <Tags size={18} />
+              Add collection
+            </button>
+          </form>
+          {selectedProduct && collections.length ? (
+            <form action={addProductToCollectionAction} className="subpanel form-grid">
+              <input type="hidden" name="productId" value={selectedProduct.id} />
+              <div className="field">
+                <label htmlFor="collectionId">Add {selectedProduct.name} to collection</label>
+                <select id="collectionId" name="collectionId">
+                  {collections.map((collection) => (
+                    <option key={collection.id} value={collection.id}>
+                      {collection.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button className="button secondary" type="submit">
+                Add to collection
+              </button>
+            </form>
+          ) : null}
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Featured</th>
+              </tr>
+            </thead>
+            <tbody>
+              {collections.map((collection) => (
+                <tr key={collection.id}>
+                  <td>
+                    <strong>{collection.name}</strong>
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>/shop/collections/{collection.slug}</span>
+                  </td>
+                  <td>
+                    <span className={statusClass(collection.status)}>{collection.status.toLowerCase()}</span>
+                  </td>
+                  <td>{collection.isFeatured ? "yes" : "no"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="card stack">
+          <h2 style={{ fontSize: "1.35rem" }}>Coupons</h2>
+          <form action={createCouponAction} className="subpanel form-grid">
+            <div className="grid-3">
+              <div className="field">
+                <label htmlFor="couponCode">Code</label>
+                <input id="couponCode" name="code" placeholder="WELCOME10" required />
+              </div>
+              <div className="field">
+                <label htmlFor="couponType">Type</label>
+                <select id="couponType" name="type" defaultValue={CouponType.PERCENT}>
+                  <option value={CouponType.PERCENT}>percent</option>
+                  <option value={CouponType.FIXED}>fixed amount</option>
+                </select>
+              </div>
+              <label style={{ alignItems: "center", display: "flex", gap: 8, paddingTop: 27 }}>
+                <input name="isActive" type="checkbox" defaultChecked />
+                Active
+              </label>
+            </div>
+            <div className="grid-3">
+              <div className="field">
+                <label htmlFor="percentOff">Percent off</label>
+                <input id="percentOff" name="percentOff" min="0" max="100" type="number" />
+              </div>
+              <div className="field">
+                <label htmlFor="amount">Fixed amount</label>
+                <input id="amount" name="amount" inputMode="decimal" />
+              </div>
+              <div className="field">
+                <label htmlFor="maxRedemptions">Max redemptions</label>
+                <input id="maxRedemptions" name="maxRedemptions" min="0" type="number" />
+              </div>
+            </div>
+            <button className="button secondary" type="submit">
+              Add coupon
+            </button>
+          </form>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Value</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {coupons.map((coupon) => (
+                <tr key={coupon.id}>
+                  <td>
+                    <strong>{coupon.code}</strong>
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>{coupon.redemptionCount} redemptions</span>
+                  </td>
+                  <td>
+                    {coupon.type === CouponType.PERCENT
+                      ? `${coupon.percentOff || 0}%`
+                      : formatMoney(coupon.amountCents || 0)}
+                  </td>
+                  <td>
+                    <span className={coupon.isActive ? "pill success" : "pill danger"}>{coupon.isActive ? "active" : "inactive"}</span>
+                  </td>
+                </tr>
+              ))}
+              {!coupons.length ? (
+                <tr>
+                  <td colSpan={3}>No coupons yet.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
