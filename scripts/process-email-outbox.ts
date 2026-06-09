@@ -1,9 +1,10 @@
 import "dotenv/config";
+import { positiveIntegerEnv } from "../lib/env";
 import { processEmailOutbox } from "../lib/email/process";
 import { prisma } from "../lib/prisma";
 
 async function main() {
-  const limit = Number(process.env.EMAIL_WORKER_LIMIT || 50);
+  const limit = positiveIntegerEnv("EMAIL_WORKER_LIMIT", 50);
   const result = await processEmailOutbox({ limit });
   console.log(JSON.stringify(result));
 }

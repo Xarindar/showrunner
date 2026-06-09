@@ -23,3 +23,19 @@ export function formatMoney(cents: number, currency = "USD") {
     currency
   }).format(cents / 100);
 }
+
+export function enumLabel(value: string) {
+  return value.toLowerCase().split("_").join(" ");
+}
+
+export function stringArrayFromUnknown(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+export function nonEmptyStringArrayFromUnknown(value: unknown) {
+  return stringArrayFromUnknown(value).filter((item) => Boolean(item.trim()));
+}
+
+export function stringArrayCsv(value: unknown) {
+  return stringArrayFromUnknown(value).join(", ");
+}

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
+import { positiveIntegerEnv } from "@/lib/env";
 import type { EmailProvider, SendEmailInput } from "./types";
 
 let transport: nodemailer.Transporter<SMTPTransport.SentMessageInfo> | null = null;
@@ -16,17 +17,17 @@ type PooledSmtpOptions = SMTPTransport.Options & {
 function getTransportConfig(): PooledSmtpOptions | null {
   if (!process.env.SMTP_HOST) return null;
 
-  const port = Number(process.env.SMTP_PORT || 587);
+  const port = positiveIntegerEnv("SMTP_PORT", 587);
 
   return {
     host: process.env.SMTP_HOST,
     port,
     secure: port === 465,
     pool: true,
-    maxConnections: Number(process.env.SMTP_MAX_CONNECTIONS || 3),
-    maxMessages: Number(process.env.SMTP_MAX_MESSAGES || 100),
-    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
-    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 20000),
+    maxConnections: positiveIntegerEnv("SMTP_MAX_CONNECTIONS", 3),
+    maxMessages: positiveIntegerEnv("SMTP_MAX_MESSAGES", 100),
+    connectionTimeout: positiveIntegerEnv("SMTP_CONNECTION_TIMEOUT_MS", 10000),
+    socketTimeout: positiveIntegerEnv("SMTP_SOCKET_TIMEOUT_MS", 20000),
     auth:
       process.env.SMTP_USER && process.env.SMTP_PASSWORD
         ? {

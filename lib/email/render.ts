@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { stringArrayFromUnknown } from "@/lib/format";
 import type { EmailTokens } from "./types";
 
 type StoredTemplate = {
@@ -11,10 +12,6 @@ type StoredTemplate = {
 };
 
 const tokenPattern = /{{\s*([A-Za-z0-9_.-]+)\s*}}/g;
-
-function jsonStringList(value: Prisma.JsonValue) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-}
 
 function escapeHtml(value: string) {
   return value
@@ -49,7 +46,7 @@ function renderHtml(source: string, tokens: EmailTokens) {
 }
 
 export function renderEmailTemplate(template: StoredTemplate, tokens: EmailTokens) {
-  const missing = jsonStringList(template.requiredTokens).filter((key) => tokens[key] === null || tokens[key] === undefined);
+  const missing = stringArrayFromUnknown(template.requiredTokens).filter((key) => tokens[key] === null || tokens[key] === undefined);
 
   if (missing.length) {
     throw new Error(`Missing email template token: ${missing.join(", ")}`);

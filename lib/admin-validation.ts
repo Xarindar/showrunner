@@ -4,7 +4,9 @@ import { BookingStatus, CouponType, MediaDriver, ProductStatus, ProductType } fr
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { formDataObject } from "@/lib/form-data";
 import { timeToMinutes } from "@/lib/format";
+import { isSafeExternalHttpsUrl } from "@/lib/security/urls";
 
 export const maxIntCents = 2_147_483_647;
 export const trimmed = z.string().transform((value) => value.trim());
@@ -40,32 +42,12 @@ export const currencyCode = trimmed
   .transform((value) => value.toUpperCase())
   .pipe(z.string().regex(/^[A-Z]{3}$/));
 
-function isPrivateUrlHostname(hostname: string) {
-  const host = hostname.toLowerCase();
-  if (host === "localhost" || host === "metadata.google.internal" || host.endsWith(".local")) return true;
-  if (host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80")) return true;
-  if (/^127\./.test(host) || /^10\./.test(host) || /^0\./.test(host) || /^169\.254\./.test(host)) return true;
-  if (/^192\.168\./.test(host)) return true;
-
-  const private172 = /^172\.(\d{1,2})\./.exec(host);
-  return Boolean(private172 && Number(private172[1]) >= 16 && Number(private172[1]) <= 31);
-}
-
-function safeExternalHttpsUrlValue(value: string) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && !isPrivateUrlHostname(url.hostname);
-  } catch {
-    return false;
-  }
-}
-
 export const safeExternalHttpsUrl = requiredText.refine(
-  safeExternalHttpsUrlValue,
+  isSafeExternalHttpsUrl,
   "Use an https URL on a public host."
 );
 export const optionalSafeExternalHttpsUrl = trimmed
-  .refine((value) => value === "" || safeExternalHttpsUrlValue(value), "Use an https URL on a public host.")
+  .refine((value) => value === "" || isSafeExternalHttpsUrl(value), "Use an https URL on a public host.")
   .transform((value) => value || undefined);
 
 export function csvList(value: string) {
@@ -76,7 +58,7 @@ export function csvList(value: string) {
 }
 
 export function formObject(formData: FormData) {
-  return Object.fromEntries(formData.entries());
+  return formDataObject(formData);
 }
 
 async function redirectWithValidationError(message: string, fallbackPath: string): Promise<never> {
@@ -154,6 +136,11 @@ export const bookingDetailFormSchema = z.object({
   id,
   adminNotes: optionalStoredText,
   cancellationReason: optionalStoredText
+});
+
+export const bookingRescheduleFormSchema = z.object({
+  id,
+  startsAt: requiredText
 });
 
 export const clientFormSchema = z.object({

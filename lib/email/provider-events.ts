@@ -1,13 +1,10 @@
 import { EmailProviderEventType, EmailSubscriberStatus, EmailSuppressionScope, Prisma } from "@prisma/client";
+import { recordFromUnknown } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import type { ProviderEventInput } from "./types";
 
 function eventTimestamp() {
   return new Date();
-}
-
-function payloadObject(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
 export async function recordProviderEvent(input: ProviderEventInput) {
@@ -29,7 +26,7 @@ export async function recordProviderEvent(input: ProviderEventInput) {
         outboxId: outbox?.id,
         providerMessageId: input.providerMessageId,
         eventType: input.eventType,
-        providerPayload: payloadObject(input.payload)
+        providerPayload: recordFromUnknown(input.payload) as Prisma.InputJsonObject
       }
     });
   } catch (error) {
