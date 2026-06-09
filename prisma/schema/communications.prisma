@@ -93,7 +93,7 @@ enum EmailCampaignStatus {
 
 model MessageTemplate {
   id               String                 @id @default(cuid())
-  siteId           String                 @default("site")
+  siteId           String
   site             Site                   @relation(fields: [siteId], references: [id], onDelete: Cascade)
   key              String?
   name             String
@@ -127,7 +127,7 @@ model MessageTemplate {
 
 model MessageLog {
   id             String           @id @default(cuid())
-  siteId         String           @default("site")
+  siteId         String
   site           Site             @relation(fields: [siteId], references: [id], onDelete: Cascade)
   templateId     String?
   template       MessageTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
@@ -155,7 +155,7 @@ model MessageLog {
 
 model SuppressionListEntry {
   id        String                @id @default(cuid())
-  siteId    String                @default("site")
+  siteId    String
   site      Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
   email     String
   reason    String                @default("")
@@ -169,7 +169,7 @@ model SuppressionListEntry {
 
 model EmailSendingDomain {
   id            String                   @id @default(cuid())
-  siteId        String                   @default("site")
+  siteId        String
   site          Site                     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   domain        String
   status        EmailSendingDomainStatus @default(PENDING)
@@ -187,7 +187,7 @@ model EmailSendingDomain {
 
 model EmailSenderIdentity {
   id              String              @id @default(cuid())
-  siteId          String              @default("site")
+  siteId          String
   site            Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
   sendingDomainId String?
   sendingDomain   EmailSendingDomain? @relation(fields: [sendingDomainId], references: [id], onDelete: SetNull)
@@ -209,7 +209,7 @@ model EmailSenderIdentity {
 
 model EmailRecipientGroup {
   id                     String           @id @default(cuid())
-  siteId                 String           @default("site")
+  siteId                 String
   site                   Site             @relation(fields: [siteId], references: [id], onDelete: Cascade)
   key                    String
   label                  String
@@ -240,7 +240,7 @@ model EmailRecipient {
 
 model EmailOutbox {
   id                String               @id @default(cuid())
-  siteId            String               @default("site")
+  siteId            String
   site              Site                 @relation(fields: [siteId], references: [id], onDelete: Cascade)
   idempotencyKey    String
   templateId        String?
@@ -292,7 +292,7 @@ model EmailOutbox {
 
 model EmailProviderEvent {
   id                String                 @id @default(cuid())
-  siteId            String                 @default("site")
+  siteId            String
   site              Site                   @relation(fields: [siteId], references: [id], onDelete: Cascade)
   eventKey          String
   outboxId          String?
@@ -310,7 +310,7 @@ model EmailProviderEvent {
 
 model EmailSubscriptionList {
   id          String                @id @default(cuid())
-  siteId      String                @default("site")
+  siteId      String
   site        Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
   name        String
   description String                @default("")
@@ -324,7 +324,7 @@ model EmailSubscriptionList {
 
 model EmailSubscriber {
   id               String                @id @default(cuid())
-  siteId           String                @default("site")
+  siteId           String
   site             Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
   email            String
   name             String                @default("")
@@ -362,7 +362,7 @@ model EmailListMembership {
 
 model EmailCampaign {
   id                    String               @id @default(cuid())
-  siteId                String               @default("site")
+  siteId                String
   site                  Site                 @relation(fields: [siteId], references: [id], onDelete: Cascade)
   name                  String
   subject               String

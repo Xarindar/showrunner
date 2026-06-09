@@ -26,7 +26,7 @@ enum PortfolioAccessStatus {
 
 model PortfolioGallery {
   id              String                     @id @default(cuid())
-  siteId          String                     @default("site")
+  siteId          String
   site            Site                       @relation(fields: [siteId], references: [id], onDelete: Cascade)
   slug            String                     @default(cuid())
   title           String
@@ -85,7 +85,7 @@ model PortfolioGalleryItem {
 
 model PortfolioGalleryAccess {
   id             String                @id @default(cuid())
-  siteId         String                @default("site")
+  siteId         String
   site           Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
   galleryId      String
   gallery        PortfolioGallery      @relation(fields: [galleryId], references: [id], onDelete: Cascade)

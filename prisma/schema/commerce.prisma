@@ -50,7 +50,7 @@ enum PaymentProvider {
 
 model Product {
   id                  String              @id @default(cuid())
-  siteId              String              @default("site")
+  siteId              String
   site                Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
   slug                String              @default(cuid())
   name                String
@@ -104,7 +104,7 @@ model ProductVariant {
 
 model Collection {
   id                 String              @id @default(cuid())
-  siteId             String              @default("site")
+  siteId             String
   site               Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
   slug               String              @default(cuid())
   name               String
@@ -136,7 +136,7 @@ model CollectionProduct {
 
 model Coupon {
   id              String     @id @default(cuid())
-  siteId          String     @default("site")
+  siteId          String
   site            Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
   code            String
   type            CouponType
@@ -158,7 +158,7 @@ model Coupon {
 
 model Cart {
   id            String     @id @default(cuid())
-  siteId        String     @default("site")
+  siteId        String
   site          Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
   clientId      String?
   client        Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
@@ -201,7 +201,7 @@ model CartItem {
 
 model Order {
   id            String      @id @default(cuid())
-  siteId        String      @default("site")
+  siteId        String
   site          Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
   orderNumber   String
   clientId      String?

@@ -36,7 +36,7 @@ enum FormDestination {
 
 model Form {
   id                String           @id @default(cuid())
-  siteId            String           @default("site")
+  siteId            String
   site              Site             @relation(fields: [siteId], references: [id], onDelete: Cascade)
   slug              String           @default(cuid())
   name              String

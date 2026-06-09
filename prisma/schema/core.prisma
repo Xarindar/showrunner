@@ -84,7 +84,7 @@ model SiteDomain {
 
 model SiteSettings {
   id              String      @id @default("site")
-  siteId          String      @unique @default("site")
+  siteId          String      @unique
   site            Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
   businessName    String      @default("Showrunner")
   contactEmail    String      @default("admin@example.com")
@@ -104,7 +104,7 @@ model SiteSettings {
 
 model PublicRateLimit {
   id          String   @id @default(cuid())
-  siteId      String   @default("site")
+  siteId      String
   site        Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   key         String
   scope       String

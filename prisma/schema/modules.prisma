@@ -5,7 +5,7 @@
 
 model ModuleInstallation {
   id              String          @id @default(cuid())
-  siteId          String          @default("site")
+  siteId          String
   site            Site            @relation(fields: [siteId], references: [id], onDelete: Cascade)
   moduleId        String
   installed       Boolean         @default(true)
@@ -24,7 +24,7 @@ model ModuleInstallation {
 
 model ModuleSetting {
   id           String             @id @default(cuid())
-  siteId       String             @default("site")
+  siteId       String
   moduleId     String
   key          String
   value        Json

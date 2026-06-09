@@ -7,7 +7,7 @@ enum MediaDriver {
 
 model MediaAsset {
   id           String      @id @default(cuid())
-  siteId       String      @default("site")
+  siteId       String
   site         Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
   driver       MediaDriver
   key          String
