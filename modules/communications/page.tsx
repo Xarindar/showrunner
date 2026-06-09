@@ -1,6 +1,7 @@
 import { EmailOutboxStatus, EmailSuppressionScope, MessageChannel, MessageLogStatus, MessageTemplatePurpose } from "@prisma/client";
 import { Mail, MessageSquareText, Plus, ShieldOff } from "lucide-react";
-import { formatDateTime } from "@/lib/format";
+import { renderEmailTemplate } from "@/lib/email/render";
+import { enumLabel, formatDateTime, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
@@ -8,21 +9,43 @@ import {
   createSuppressionEntryAction,
   deleteSuppressionEntryAction,
   recordMessageLogAction,
+  sendTemplateTestEmailAction,
   updateMessageTemplateStatusAction
 } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 type CommunicationsPageProps = {
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; previewTemplate?: string; tokensJson?: string }>;
 };
 
-function enumLabel(value: string) {
-  return value.toLowerCase().split("_").join(" ");
+function sampleTokensFor(template: { requiredTokens: unknown; optionalTokens: unknown } | null) {
+  const tokenNames = [...stringArrayFromUnknown(template?.requiredTokens), ...stringArrayFromUnknown(template?.optionalTokens)];
+
+  return Object.fromEntries(
+    tokenNames.map((token) => {
+      if (token.toLowerCase().includes("url")) return [token, "https://example.com"];
+      if (token.toLowerCase().includes("total")) return [token, "$125.00"];
+      if (token.toLowerCase().includes("email")) return [token, "client@example.com"];
+      return [token, `Sample ${token}`];
+    })
+  );
 }
 
-function tokensToCsv(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").join(", ") : "";
+function parsePreviewTokens(value: string) {
+  if (!value.trim()) return {};
+
+  const parsed = JSON.parse(value);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Token JSON must be an object.");
+  }
+
+  return Object.fromEntries(
+    Object.entries(parsed).filter((entry): entry is [string, string | number | null] => {
+      const value = entry[1];
+      return typeof value === "string" || typeof value === "number" || value === null;
+    })
+  );
 }
 
 function logStatusClass(status: MessageLogStatus) {
@@ -65,6 +88,18 @@ export default async function CommunicationsPage({ searchParams }: Communication
 
   const savedMessage = params.saved ? "Communications changes saved." : null;
   const errorMessage = params.error || null;
+  const previewTemplate = templates.find((template) => template.id === params.previewTemplate) || templates[0] || null;
+  const previewTokensText =
+    params.tokensJson || (previewTemplate ? JSON.stringify(sampleTokensFor(previewTemplate), null, 2) : "{}");
+  const preview = previewTemplate
+    ? (() => {
+        try {
+          return { rendered: renderEmailTemplate(previewTemplate, parsePreviewTokens(previewTokensText)), error: "" };
+        } catch (error) {
+          return { rendered: null, error: error instanceof Error ? error.message : "Could not render preview." };
+        }
+      })()
+    : null;
 
   return (
     <div className="stack">
@@ -174,7 +209,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                     <strong>{template.name}</strong>
                     <br />
                     <span style={{ color: "var(--muted)" }}>
-                      {template.key ? `System key: ${template.key}` : tokensToCsv(template.tokens) || "No token allowlist"}
+                      {template.key ? `System key: ${template.key}` : stringArrayCsv(template.tokens) || "No token allowlist"}
                     </span>
                   </td>
                   <td>
@@ -207,6 +242,63 @@ export default async function CommunicationsPage({ searchParams }: Communication
               ) : null}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section className="grid-2">
+        <form action="/admin/modules/communications" method="get" className="card form-grid">
+          <h2 style={{ fontSize: "1.35rem" }}>Preview template</h2>
+          <div className="field">
+            <label htmlFor="preview-template">Template</label>
+            <select id="preview-template" name="previewTemplate" defaultValue={previewTemplate?.id || ""}>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="preview-tokens">Token JSON</label>
+            <textarea id="preview-tokens" name="tokensJson" defaultValue={previewTokensText} />
+          </div>
+          <button className="button secondary" type="submit">
+            Render preview
+          </button>
+        </form>
+
+        <div className="card stack">
+          <h2 style={{ fontSize: "1.35rem" }}>Rendered email</h2>
+          {preview?.error ? <div className="error">{preview.error}</div> : null}
+          {preview?.rendered ? (
+            <div className="subpanel stack">
+              <div>
+                <p style={{ color: "var(--muted)", marginBottom: 8 }}>Subject</p>
+                <strong>{preview.rendered.subject || "No subject"}</strong>
+              </div>
+              <div>
+                <p style={{ color: "var(--muted)", marginBottom: 8 }}>Preview text</p>
+                <p>{preview.rendered.previewText || "No preview text"}</p>
+              </div>
+              <div>
+                <p style={{ color: "var(--muted)", marginBottom: 8 }}>Text body</p>
+                <pre style={{ overflow: "auto", whiteSpace: "pre-wrap" }}>{preview.rendered.textBody}</pre>
+              </div>
+            </div>
+          ) : null}
+          {previewTemplate ? (
+            <form action={sendTemplateTestEmailAction} className="subpanel form-grid">
+              <input type="hidden" name="templateId" value={previewTemplate.id} />
+              <input type="hidden" name="tokensJson" value={previewTokensText} />
+              <div className="field">
+                <label htmlFor="test-recipient">Test recipient</label>
+                <input id="test-recipient" name="recipientEmail" type="email" defaultValue={settings.contactEmail} required />
+              </div>
+              <button className="button secondary" type="submit">
+                Queue test email
+              </button>
+            </form>
+          ) : null}
         </div>
       </section>
 

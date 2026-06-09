@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { csvList, optionalEmailStored, optionalStoredText, parseForm, requiredText } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
+import { queueTemplateTestEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 
 const messageTemplateSchema = z
@@ -65,9 +66,34 @@ const suppressionDeleteSchema = z.object({
   confirmDelete: z.literal("on", { error: "Confirm removal before unsuppressing this email." })
 });
 
+const templateTestSendSchema = z.object({
+  templateId: requiredText,
+  recipientEmail: z.email().transform((value) => value.trim().toLowerCase()),
+  tokensJson: optionalStoredText
+});
+
 function refreshCommunications() {
   revalidatePath("/admin");
   revalidatePath("/admin/modules/communications");
+}
+
+function parseTokenJson(value: string) {
+  if (!value.trim()) return {};
+
+  const parsed = JSON.parse(value);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Token JSON must be an object.");
+  }
+
+  return Object.fromEntries(
+    Object.entries(parsed).filter((entry): entry is [string, string | number | null] => {
+      const value = entry[1];
+      return (
+        typeof entry[0] === "string" &&
+        (typeof value === "string" || typeof value === "number" || value === null)
+      );
+    })
+  );
 }
 
 export async function createMessageTemplateAction(formData: FormData) {
@@ -172,4 +198,24 @@ export async function deleteSuppressionEntryAction(formData: FormData) {
 
   refreshCommunications();
   redirect("/admin/modules/communications?saved=unsuppressed");
+}
+
+export async function sendTemplateTestEmailAction(formData: FormData) {
+  await requireAdmin();
+  const input = await parseForm(templateTestSendSchema, formData, "/admin/modules/communications");
+
+  try {
+    await queueTemplateTestEmail({
+      templateId: input.templateId,
+      recipientEmail: input.recipientEmail,
+      tokens: parseTokenJson(input.tokensJson),
+      idempotencyKey: `template-test:${input.templateId}:${input.recipientEmail}:${Date.now()}`
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not queue that test email.";
+    redirect(`/admin/modules/communications?error=${encodeURIComponent(message)}`);
+  }
+
+  refreshCommunications();
+  redirect("/admin/modules/communications?saved=test-email");
 }

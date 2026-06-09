@@ -5,7 +5,7 @@ import { queueBookingCreatedEmails } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { addMinutesToZonedDay, getZonedDayBounds, getZonedWeekday } from "@/lib/timezone";
-import type { BookingRequest, SchedulingAdapter, Slot } from "@/lib/scheduling/types";
+import type { BookingRequest, SchedulingAdapter, Slot, SlotDiagnostic, SlotDiagnosticReason } from "@/lib/scheduling/types";
 
 function overlaps(startA: Date, endA: Date, startB: Date, endB: Date) {
   return startA < endB && endA > startB;
@@ -29,6 +29,10 @@ function getBufferedWindow(startsAt: Date, endsAt: Date, beforeMinutes: number, 
   return { bufferedStart, bufferedEnd };
 }
 
+function makeTimeRangeLabel(startsAt: Date, endsAt: Date, timeZone: string) {
+  return `${makeSlotLabel(startsAt, timeZone)}-${makeSlotLabel(endsAt, timeZone)}`;
+}
+
 export const nativeSchedulingAdapter: SchedulingAdapter = {
   async listActiveServices() {
     return prisma.service.findMany({
@@ -38,31 +42,67 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
   },
 
   async getAvailableSlots(serviceId: string, date: Date): Promise<Slot[]> {
+    const diagnostics = await nativeSchedulingAdapter.getSlotDiagnostics(serviceId, date);
+    if (!diagnostics) return [];
+
+    return diagnostics.slots
+      .filter((slot) => slot.available)
+      .map(({ startsAt, endsAt, label }) => ({ startsAt, endsAt, label }));
+  },
+
+  async getSlotDiagnostics(serviceId: string, date: Date, options?: { excludeBookingId?: string }) {
     const [service, settings] = await Promise.all([
       prisma.service.findUnique({ where: { id: serviceId } }),
       getSiteSettings()
     ]);
-    if (!service || !service.isActive) return [];
-    if (service.durationMinutes < 1) return [];
+
+    if (!service) return null;
+
+    const messages: string[] = [];
+    if (!service.isActive) {
+      messages.push("This service is inactive, so public booking will not offer any slots.");
+    }
+    if (service.durationMinutes < 1) {
+      messages.push("This service needs a positive duration before slots can be generated.");
+    }
 
     const slotInterval = service.slotIntervalMinutes || service.durationMinutes;
-    if (slotInterval < 1) return [];
+    if (slotInterval < 1) {
+      messages.push("This service needs a positive slot interval before slots can be generated.");
+    }
 
     const weekday = getZonedWeekday(date, settings.timezone);
     const rules = await prisma.availabilityRule.findMany({
       where: { weekday },
       orderBy: { startMinutes: "asc" }
     });
-    if (!rules.length) return [];
+    if (!rules.length) {
+      messages.push("No weekly availability rule matches this date.");
+    }
+
+    if (!service.isActive || service.durationMinutes < 1 || slotInterval < 1 || !rules.length) {
+      return {
+        serviceId: service.id,
+        serviceName: service.name,
+        timezone: settings.timezone,
+        ruleCount: rules.length,
+        slotCount: 0,
+        availableCount: 0,
+        messages,
+        slots: []
+      };
+    }
 
     const { start, end } = getZonedDayBounds(date, settings.timezone);
     const [bookings, blocks] = await Promise.all([
       prisma.booking.findMany({
         where: {
+          ...(options?.excludeBookingId ? { id: { not: options.excludeBookingId } } : {}),
           status: { not: BookingStatus.CANCELED },
           startsAt: { lt: end },
           endsAt: { gt: start }
-        }
+        },
+        include: { service: { select: { name: true } } }
       }),
       prisma.blockedTime.findMany({
         where: {
@@ -79,7 +119,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     const latestStart = new Date(now);
     latestStart.setDate(latestStart.getDate() + service.maxAdvanceDays);
 
-    const slots: Slot[] = [];
+    const slots: SlotDiagnostic[] = [];
 
     for (const rule of rules) {
       for (
@@ -97,19 +137,73 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
           service.bufferAfterMinutes
         );
 
-        const unavailable =
-          startsAt < minimumStart ||
-          startsAt > latestStart ||
-          bookings.some((booking) => overlaps(bufferedStart, bufferedEnd, booking.startsAt, booking.endsAt)) ||
-          blocks.some((block) => overlaps(bufferedStart, bufferedEnd, block.startsAt, block.endsAt));
+        const reasons: SlotDiagnosticReason[] = [];
 
-        if (!unavailable) {
-          slots.push({ startsAt, endsAt, label: makeSlotLabel(startsAt, settings.timezone) });
+        if (startsAt < minimumStart) {
+          reasons.push({
+            code: "minimum_notice",
+            message: `Before the ${service.minimumNoticeHours}h minimum notice window.`
+          });
         }
+
+        if (startsAt > latestStart) {
+          reasons.push({
+            code: "max_advance",
+            message: `Beyond the ${service.maxAdvanceDays}d advance booking window.`
+          });
+        }
+
+        for (const booking of bookings) {
+          if (overlaps(bufferedStart, bufferedEnd, booking.startsAt, booking.endsAt)) {
+            reasons.push({
+              code: "booking_conflict",
+              message: `Conflicts with ${booking.service.name} for ${booking.customerName} (${makeTimeRangeLabel(
+                booking.startsAt,
+                booking.endsAt,
+                settings.timezone
+              )}).`
+            });
+          }
+        }
+
+        for (const block of blocks) {
+          if (overlaps(bufferedStart, bufferedEnd, block.startsAt, block.endsAt)) {
+            reasons.push({
+              code: "blockout_conflict",
+              message: `Blocked by ${block.reason || "manual blockout"} (${makeTimeRangeLabel(
+                block.startsAt,
+                block.endsAt,
+                settings.timezone
+              )}).`
+            });
+          }
+        }
+
+        slots.push({
+          startsAt,
+          endsAt,
+          label: makeSlotLabel(startsAt, settings.timezone),
+          available: reasons.length === 0,
+          reasons
+        });
       }
     }
 
-    return slots;
+    const availableCount = slots.filter((slot) => slot.available).length;
+    if (!availableCount && slots.length) {
+      messages.push("Availability rules generated slots, but every slot is blocked by booking rules or conflicts.");
+    }
+
+    return {
+      serviceId: service.id,
+      serviceName: service.name,
+      timezone: settings.timezone,
+      ruleCount: rules.length,
+      slotCount: slots.length,
+      availableCount,
+      messages,
+      slots
+    };
   },
 
   async createBooking(input: BookingRequest) {

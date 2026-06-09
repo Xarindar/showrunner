@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { TestimonialStatus } from "@prisma/client";
 import { MessageSquare, Plus, ShieldCheck, Star } from "lucide-react";
-import { formatDateTime } from "@/lib/format";
+import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { createTestimonialAction, deleteTestimonialAction, updateTestimonialModerationAction } from "./actions";
@@ -14,10 +14,6 @@ const statusFilters = ["all", ...Object.values(TestimonialStatus).map((status) =
 type TestimonialsPageProps = {
   searchParams: Promise<{ saved?: string; error?: string; page?: string; status?: string }>;
 };
-
-function enumLabel(value: string) {
-  return value.toLowerCase().split("_").join(" ");
-}
 
 function normalizeStatusFilter(value?: string) {
   return statusFilters.includes(value as (typeof statusFilters)[number]) ? value || "all" : "all";
@@ -202,6 +198,15 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
                     <span style={{ color: "var(--muted)" }}>
                       {testimonial.authorRole || testimonial.serviceName || "No context"} · {testimonial.rating}/5
                     </span>
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>
+                      Consent:{" "}
+                      {testimonial.permissionGrantedAt
+                        ? formatDateTime(testimonial.permissionGrantedAt, settings.timezone)
+                        : testimonial.permissionGranted
+                          ? "recorded before snapshots"
+                          : "missing"}
+                    </span>
                     {testimonial.client ? (
                       <>
                         <br />
@@ -229,7 +234,7 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
                       <form action={updateTestimonialModerationAction}>
                         <input type="hidden" name="id" value={testimonial.id} />
                         <input type="hidden" name="status" value={TestimonialStatus.APPROVED} />
-                        <button className="button secondary" type="submit">
+                        <button className="button secondary" disabled={!testimonial.permissionGranted} type="submit">
                           Approve
                         </button>
                       </form>
@@ -243,7 +248,11 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
                       <form action={updateTestimonialModerationAction}>
                         <input type="hidden" name="id" value={testimonial.id} />
                         <input type="hidden" name="featured" value={testimonial.featured ? "false" : "true"} />
-                        <button className="button secondary" type="submit">
+                        <button
+                          className="button secondary"
+                          disabled={!testimonial.featured && (!testimonial.permissionGranted || testimonial.status !== TestimonialStatus.APPROVED)}
+                          type="submit"
+                        >
                           {testimonial.featured ? "Unfeature" : "Feature"}
                         </button>
                       </form>

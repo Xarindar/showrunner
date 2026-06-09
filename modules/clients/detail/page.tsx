@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarCheck, Save } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { formatDateTime } from "@/lib/format";
+import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
+import { isRecord } from "@/lib/objects";
 import { getSiteSettings } from "@/lib/site";
 import { addClientNoteAction, updateClientAction } from "../actions";
 
@@ -12,6 +13,36 @@ type ClientDetailPageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ saved?: string; error?: string }>;
 };
+
+type TimelineItem = {
+  id: string;
+  at: Date;
+  badge: string;
+  title: string;
+  detail: string;
+  href?: string;
+};
+
+function truncate(value: string, length = 140) {
+  return value.length > length ? `${value.slice(0, length - 1)}...` : value;
+}
+
+function summarizeSubmission(value: unknown) {
+  if (!isRecord(value)) return "No response data";
+
+  const entries = Object.entries(value)
+    .map(([key, item]) => {
+      if (isRecord(item) && "value" in item) {
+        return [String(item.label || key), item.value] as const;
+      }
+
+      return [key, item] as const;
+    })
+    .filter(([, item]) => String(item || "").trim())
+    .slice(0, 3);
+
+  return entries.length ? truncate(entries.map(([key, item]) => `${key}: ${String(item)}`).join(" | ")) : "No response data";
+}
 
 export default async function ClientDetailPage({ params, searchParams }: ClientDetailPageProps) {
   const [{ id }, { saved, error }] = await Promise.all([params, searchParams]);
@@ -24,6 +55,28 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           include: { service: true },
           orderBy: { startsAt: "desc" },
           take: 40
+        },
+        formSubmissions: {
+          include: { form: { select: { id: true, name: true, slug: true, destination: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 40
+        },
+        testimonials: {
+          orderBy: { submittedAt: "desc" },
+          take: 40
+        },
+        billingDocuments: {
+          orderBy: { updatedAt: "desc" },
+          take: 40
+        },
+        orders: {
+          orderBy: { updatedAt: "desc" },
+          take: 20
+        },
+        messageLogs: {
+          include: { template: { select: { name: true, purpose: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 40
         }
       }
     }),
@@ -31,6 +84,64 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
   ]);
 
   if (!client) notFound();
+
+  const timelineItems: TimelineItem[] = [
+    ...client.bookings.map((booking) => ({
+      id: `booking-${booking.id}`,
+      at: booking.startsAt,
+      badge: "appointment",
+      title: booking.service.name,
+      detail: `${enumLabel(booking.status)} | ${formatDateTime(booking.startsAt, settings.timezone)}`,
+      href: `/admin/appointments/${booking.id}`
+    })),
+    ...client.notes.map((note) => ({
+      id: `note-${note.id}`,
+      at: note.createdAt,
+      badge: "note",
+      title: "Internal note",
+      detail: truncate(note.content)
+    })),
+    ...client.formSubmissions.map((submission) => ({
+      id: `form-${submission.id}`,
+      at: submission.createdAt,
+      badge: "form",
+      title: submission.form.name,
+      detail: `${enumLabel(submission.form.destination)} | ${summarizeSubmission(submission.data)}`,
+      href: `/admin/modules/forms?form=${submission.formId}`
+    })),
+    ...client.testimonials.map((testimonial) => ({
+      id: `testimonial-${testimonial.id}`,
+      at: testimonial.submittedAt,
+      badge: "testimonial",
+      title: testimonial.serviceName || "Testimonial",
+      detail: `${enumLabel(testimonial.status)} | ${testimonial.rating}/5 | ${truncate(testimonial.quote)}`,
+      href: `/admin/modules/testimonials?status=${testimonial.status.toLowerCase()}`
+    })),
+    ...client.billingDocuments.map((document) => ({
+      id: `billing-${document.id}`,
+      at: document.updatedAt,
+      badge: enumLabel(document.type),
+      title: document.documentNumber,
+      detail: `${enumLabel(document.status)} | ${formatMoney(document.totalCents, document.currency)}`,
+      href: `/admin/modules/billing?document=${document.id}`
+    })),
+    ...client.orders.map((order) => ({
+      id: `order-${order.id}`,
+      at: order.placedAt || order.updatedAt,
+      badge: "order",
+      title: order.orderNumber,
+      detail: `${enumLabel(order.status)} | ${formatMoney(order.totalCents, order.currency)}`
+    })),
+    ...client.messageLogs.map((message) => ({
+      id: `message-${message.id}`,
+      at: message.sentAt || message.createdAt,
+      badge: message.channel.toLowerCase(),
+      title: message.subject || message.template?.name || message.purpose,
+      detail: `${enumLabel(message.status)} | ${truncate(message.bodyPreview || message.recipientEmail || "No preview")}`
+    }))
+  ]
+    .sort((first, second) => second.at.getTime() - first.at.getTime())
+    .slice(0, 80);
 
   return (
     <div className="stack">
@@ -99,6 +210,34 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             Save note
           </button>
         </form>
+      </section>
+
+      <section className="card">
+        <div className="page-header" style={{ marginBottom: 16 }}>
+          <div>
+            <h2 style={{ fontSize: "1.35rem" }}>Unified timeline</h2>
+            <p style={{ color: "var(--muted)", margin: 0 }}>
+              Appointments, forms, testimonials, billing, orders, messages, and notes for this client.
+            </p>
+          </div>
+        </div>
+        <div className="stack">
+          {timelineItems.map((item) => (
+            <div className="subpanel" key={item.id}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "space-between" }}>
+                <div>
+                  <span className="pill">{item.badge}</span>
+                  <h3 style={{ fontSize: "1rem", margin: "8px 0 4px" }}>
+                    {item.href ? <Link href={item.href}>{item.title}</Link> : item.title}
+                  </h3>
+                  <p style={{ color: "var(--muted)", margin: 0 }}>{item.detail}</p>
+                </div>
+                <span className="pill">{formatDateTime(item.at, settings.timezone)}</span>
+              </div>
+            </div>
+          ))}
+          {!timelineItems.length ? <p>No timeline activity yet.</p> : null}
+        </div>
       </section>
 
       <section className="grid-2">

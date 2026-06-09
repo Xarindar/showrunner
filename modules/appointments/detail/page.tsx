@@ -1,20 +1,35 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Save } from "lucide-react";
+import { CalendarClock, Save } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/format";
 import { getSiteSettings } from "@/lib/site";
-import { updateBookingDetailAction, updateBookingStatusAction } from "../actions";
+import { rescheduleBookingAction, updateBookingDetailAction, updateBookingStatusAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 type AppointmentDetailPageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string }>;
 };
 
+function formatDateTimeLocalInput(value: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(value);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}`;
+}
+
 export default async function AppointmentDetailPage({ params, searchParams }: AppointmentDetailPageProps) {
-  const [{ id }, { error }] = await Promise.all([params, searchParams]);
+  const [{ id }, { saved, error }] = await Promise.all([params, searchParams]);
   const [booking, settings] = await Promise.all([
     prisma.booking.findUnique({
       where: { id },
@@ -43,6 +58,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
         </Link>
       </header>
 
+      {saved ? <div className="success-message">Appointment updated.</div> : null}
       {error ? <div className="error">{error}</div> : null}
 
       <section className="grid-2">
@@ -114,6 +130,31 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
           </div>
         </div>
       </section>
+
+      <form action={rescheduleBookingAction} className="card form-grid">
+        <input type="hidden" name="id" value={booking.id} />
+        <h2 style={{ fontSize: "1.35rem" }}>Reschedule</h2>
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor="startsAt">New start time</label>
+            <input
+              id="startsAt"
+              name="startsAt"
+              type="datetime-local"
+              defaultValue={formatDateTimeLocalInput(booking.startsAt, settings.timezone)}
+              required
+            />
+          </div>
+          <div className="field">
+            <label>Validation</label>
+            <span className="pill">availability, buffers, blockouts, conflicts</span>
+          </div>
+        </div>
+        <button className="button secondary" type="submit">
+          <CalendarClock size={18} />
+          Reschedule appointment
+        </button>
+      </form>
 
       <form action={updateBookingDetailAction} className="card form-grid">
         <input type="hidden" name="id" value={booking.id} />

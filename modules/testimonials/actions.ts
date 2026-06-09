@@ -60,6 +60,9 @@ const publicTestimonialSchema = z.object({
   permissionGranted: z.literal("on")
 });
 
+const adminPermissionText = "Permission to display this testimonial publicly was recorded by an admin.";
+const publicPermissionText = "I give permission to display this testimonial publicly after review.";
+
 function refreshTestimonials() {
   revalidatePath("/");
   revalidatePath("/testimonials");
@@ -87,7 +90,15 @@ async function findOrCreateClient(authorName: string, authorEmail: string, updat
 export async function createTestimonialAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(testimonialSchema, formData, "/admin/modules/testimonials");
+  if ((input.status === TestimonialStatus.APPROVED || input.featured) && !input.permissionGranted) {
+    redirect(`/admin/modules/testimonials?error=${encodeURIComponent("Permission is required before approving or featuring a testimonial.")}`);
+  }
+  if (input.featured && input.status !== TestimonialStatus.APPROVED) {
+    redirect(`/admin/modules/testimonials?error=${encodeURIComponent("Only approved testimonials can be featured.")}`);
+  }
+
   const clientId = await findOrCreateClient(input.authorName, input.authorEmail, true);
+  const permissionGrantedAt = input.permissionGranted ? new Date() : null;
 
   await prisma.testimonial.create({
     data: {
@@ -102,6 +113,8 @@ export async function createTestimonialAction(formData: FormData) {
       serviceName: input.serviceName,
       productName: input.productName,
       permissionGranted: input.permissionGranted,
+      permissionText: input.permissionGranted ? adminPermissionText : "",
+      permissionGrantedAt,
       status: input.status,
       featured: input.featured
     }
@@ -114,6 +127,24 @@ export async function createTestimonialAction(formData: FormData) {
 export async function updateTestimonialModerationAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(moderationSchema, formData, "/admin/modules/testimonials");
+  const testimonial = await prisma.testimonial.findUnique({
+    where: { id: input.id },
+    select: { permissionGranted: true, status: true }
+  });
+
+  if (!testimonial) {
+    redirect(`/admin/modules/testimonials?error=${encodeURIComponent("Testimonial not found.")}`);
+  }
+
+  const nextStatus = input.status || testimonial.status;
+  const wantsFeatured = input.featured === "true";
+  if ((nextStatus === TestimonialStatus.APPROVED || wantsFeatured) && !testimonial.permissionGranted) {
+    redirect(`/admin/modules/testimonials?error=${encodeURIComponent("Permission is required before approving or featuring a testimonial.")}`);
+  }
+
+  if (wantsFeatured && nextStatus !== TestimonialStatus.APPROVED) {
+    redirect(`/admin/modules/testimonials?error=${encodeURIComponent("Only approved testimonials can be featured.")}`);
+  }
 
   await prisma.testimonial.update({
     where: { id: input.id },
@@ -174,6 +205,8 @@ export async function createPublicTestimonialAction(formData: FormData) {
       source: "first-party",
       serviceName: input.serviceName,
       permissionGranted: true,
+      permissionText: publicPermissionText,
+      permissionGrantedAt: new Date(),
       status: TestimonialStatus.PENDING,
       featured: false
     }
