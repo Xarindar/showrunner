@@ -5,7 +5,8 @@ import {
   PortfolioGalleryVisibility,
   PortfolioItemType
 } from "@prisma/client";
-import { formatDateTime } from "@/lib/format";
+import { cssBackgroundImage } from "@/lib/css";
+import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
@@ -22,10 +23,6 @@ type PortfolioPageProps = {
   searchParams: Promise<{ saved?: string; error?: string; gallery?: string }>;
 };
 
-function enumLabel(value: string) {
-  return value.toLowerCase().split("_").join(" ");
-}
-
 function galleryStatusClass(status: PortfolioGalleryStatus) {
   if (status === PortfolioGalleryStatus.PUBLISHED) return "pill success";
   if (status === PortfolioGalleryStatus.ARCHIVED) return "pill danger";
@@ -38,11 +35,6 @@ function accessStatusClass(status: PortfolioAccessStatus) {
   return "pill";
 }
 
-function safeBackgroundImage(url: string) {
-  if (!url) return undefined;
-  return `url("${url.replaceAll('"', "%22")}")`;
-}
-
 export default async function PortfolioPage({ searchParams }: PortfolioPageProps) {
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const [galleries, mediaAssets, clients, publishedCount, privateCount, itemCount, favoriteCount] = await Promise.all([
@@ -52,6 +44,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
       take: 30
     }),
     prisma.mediaAsset.findMany({
+      where: { deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 60
     }),
@@ -271,7 +264,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               style={{
                 aspectRatio: "16 / 9",
                 backgroundColor: "var(--panel)",
-                backgroundImage: safeBackgroundImage(selectedGallery.coverImageUrl || selectedGallery.items[0]?.imageUrl || ""),
+                backgroundImage: cssBackgroundImage(selectedGallery.coverImageUrl || selectedGallery.items[0]?.imageUrl || ""),
                 backgroundPosition: "center",
                 backgroundSize: "cover",
                 border: "1px solid var(--line)",
@@ -282,7 +275,17 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               <tbody>
                 <tr>
                   <td>Slug</td>
-                  <td>{selectedGallery.slug}</td>
+                  <td>
+                    {selectedGallery.slug}
+                    {selectedGallery.status === PortfolioGalleryStatus.PUBLISHED ? (
+                      <>
+                        <br />
+                        <a href={`/galleries/${selectedGallery.slug}`} style={{ color: "var(--primary-dark)" }}>
+                          Open public gallery
+                        </a>
+                      </>
+                    ) : null}
+                  </td>
                 </tr>
                 <tr>
                   <td>Proofing</td>
@@ -401,7 +404,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                     style={{
                       aspectRatio: "4 / 3",
                       backgroundColor: "var(--panel)",
-                      backgroundImage: safeBackgroundImage(item.thumbnailUrl || item.imageUrl),
+                      backgroundImage: cssBackgroundImage(item.thumbnailUrl || item.imageUrl),
                       backgroundPosition: "center",
                       backgroundSize: "cover",
                       borderRadius: "var(--radius)"
@@ -507,7 +510,13 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                         {access.expiresAt ? `Expires ${formatDateTime(access.expiresAt, settings.timezone)}` : "No expiry"}
                       </span>
                     </td>
-                    <td>{access.accessToken}</td>
+                    <td>
+                      <a href={`/galleries/access/${access.accessToken}`} style={{ color: "var(--primary-dark)" }}>
+                        Open access route
+                      </a>
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>{access.accessToken}</span>
+                    </td>
                     <td>
                       <span className={accessStatusClass(access.status)}>{enumLabel(access.status)}</span>
                     </td>

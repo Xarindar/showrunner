@@ -2,15 +2,25 @@ import "server-only";
 
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/prisma";
+import { slugify } from "@/lib/slug";
 
 const allowedImageTypes = new Map([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
   ["image/webp", "webp"],
-  ["image/gif", "gif"],
-  ["image/svg+xml", "svg"]
+  ["image/gif", "gif"]
 ]);
 const maxUploadBytes = 7 * 1024 * 1024;
+
+export type MediaUploadMetadata = {
+  alt?: string;
+  caption?: string;
+  credit?: string;
+  folder?: string;
+  isDecorative?: boolean;
+  isPrivate?: boolean;
+  tags?: string | string[];
+};
 
 export function isR2Configured() {
   return Boolean(
@@ -33,26 +43,58 @@ function getR2Client() {
   });
 }
 
-export async function uploadMedia(file: File, alt?: string) {
+export function mediaTagsFromInput(value?: string | string[]) {
+  const tags = Array.isArray(value) ? value : (value || "").split(",");
+
+  return Array.from(
+    new Set(
+      tags
+        .map((tag) => String(tag).trim())
+        .filter(Boolean)
+        .slice(0, 20)
+    )
+  );
+}
+
+export function normalizeMediaFolder(value?: string) {
+  const folder = (value || "")
+    .split("/")
+    .map((part) => slugify(part))
+    .filter(Boolean)
+    .slice(0, 4)
+    .join("/");
+
+  return folder;
+}
+
+function assertAccessibleAlt(metadata: MediaUploadMetadata) {
+  const safeAlt = metadata.alt?.trim() || "";
+
+  if (!safeAlt && !metadata.isDecorative) {
+    throw new Error("Add alt text or mark the image decorative before uploading.");
+  }
+
+  return safeAlt;
+}
+
+export async function uploadMedia(file: File, metadata: MediaUploadMetadata = {}) {
   if (!isR2Configured()) {
     throw new Error("R2 media uploads are not configured. Use repo assets or add R2 env vars.");
   }
 
   if (!allowedImageTypes.has(file.type)) {
-    throw new Error("Upload a JPG, PNG, WebP, GIF, or SVG image.");
+    throw new Error("Upload a JPG, PNG, WebP, or GIF image. SVG uploads need a sanitizer before they can be enabled.");
   }
 
   if (file.size > maxUploadBytes) {
     throw new Error("Images must be smaller than 7 MB.");
   }
 
-  const safeAlt = alt?.trim();
-  if (!safeAlt) {
-    throw new Error("Add alt text before uploading an image.");
-  }
-
+  const safeAlt = assertAccessibleAlt(metadata);
   const extension = allowedImageTypes.get(file.type) || "bin";
-  const key = `uploads/${crypto.randomUUID()}.${extension}`;
+  const folder = normalizeMediaFolder(metadata.folder);
+  const folderPrefix = folder ? `${folder}/` : "";
+  const key = `uploads/${folderPrefix}${crypto.randomUUID()}.${extension}`;
   const bytes = Buffer.from(await file.arrayBuffer());
 
   await getR2Client().send(
@@ -60,7 +102,11 @@ export async function uploadMedia(file: File, alt?: string) {
       Bucket: process.env.R2_BUCKET,
       Key: key,
       Body: bytes,
-      ContentType: file.type || "application/octet-stream"
+      ContentType: file.type || "application/octet-stream",
+      Metadata: {
+        decorative: metadata.isDecorative ? "true" : "false",
+        private: metadata.isPrivate ? "true" : "false"
+      }
     })
   );
 
@@ -73,7 +119,15 @@ export async function uploadMedia(file: File, alt?: string) {
       key,
       url,
       filename: file.name,
-      alt: safeAlt
+      mimeType: file.type || "application/octet-stream",
+      sizeBytes: file.size,
+      folder,
+      tags: mediaTagsFromInput(metadata.tags),
+      caption: metadata.caption?.trim() || "",
+      credit: metadata.credit?.trim() || "",
+      alt: metadata.isDecorative ? "" : safeAlt,
+      isDecorative: Boolean(metadata.isDecorative),
+      isPrivate: Boolean(metadata.isPrivate)
     }
   });
 }

@@ -181,9 +181,14 @@ export async function addPortfolioGalleryItemAction(formData: FormData) {
   const asset = input.mediaAssetId
     ? await prisma.mediaAsset.findUnique({
         where: { id: input.mediaAssetId },
-        select: { url: true, alt: true, filename: true }
+        select: { url: true, alt: true, filename: true, deletedAt: true }
       })
     : null;
+
+  if (asset?.deletedAt) {
+    redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Choose an active media asset.")}`);
+  }
+
   const imageUrl = input.imageUrl || asset?.url || "";
   const altText = input.altText || asset?.alt || input.title || asset?.filename || "";
 

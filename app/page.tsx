@@ -1,7 +1,7 @@
 import Link from "next/link";
 import NextImage from "next/image";
-import { CalendarDays, FileText, Image as ImageIcon, LockKeyhole, MessageSquare, Star } from "lucide-react";
-import { FormStatus, TestimonialStatus } from "@prisma/client";
+import { CalendarDays, FileText, Image as ImageIcon, LockKeyhole, MessageSquare, ShoppingBag, Star } from "lucide-react";
+import { FormStatus, PortfolioGalleryStatus, PortfolioGalleryVisibility, TestimonialStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
@@ -11,12 +11,24 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const settings = await getSiteSettings();
   const formsEnabled = settings.enabledModuleIds.includes("forms");
+  const portfolioEnabled = settings.enabledModuleIds.includes("portfolio");
+  const productsEnabled = settings.enabledModuleIds.includes("products");
   const testimonialsEnabled = settings.enabledModuleIds.includes("testimonials");
-  const [forms, testimonials] = await Promise.all([
+  const [forms, publicGalleries, testimonials] = await Promise.all([
     formsEnabled
       ? prisma.form.findMany({
           where: { status: FormStatus.ACTIVE },
           orderBy: { updatedAt: "desc" },
+          take: 3
+        })
+      : Promise.resolve([]),
+    portfolioEnabled
+      ? prisma.portfolioGallery.findMany({
+          where: {
+            status: PortfolioGalleryStatus.PUBLISHED,
+            visibility: PortfolioGalleryVisibility.PUBLIC
+          },
+          orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
           take: 3
         })
       : Promise.resolve([]),
@@ -45,6 +57,12 @@ export default async function HomePage() {
             <CalendarDays size={18} />
             Book
           </Link>
+          {productsEnabled ? (
+            <Link href="/shop" className="button secondary">
+              <ShoppingBag size={18} />
+              Shop
+            </Link>
+          ) : null}
           <Link href="/admin" className="button secondary">
             Admin
           </Link>
@@ -69,6 +87,12 @@ export default async function HomePage() {
               <Link href="/testimonials" className="button secondary">
                 <MessageSquare size={18} />
                 Reviews
+              </Link>
+            ) : null}
+            {productsEnabled ? (
+              <Link href="/shop" className="button secondary">
+                <ShoppingBag size={18} />
+                Shop
               </Link>
             ) : null}
           </div>
@@ -96,6 +120,13 @@ export default async function HomePage() {
               <h3>Media</h3>
               <p>Use stable repo assets or turn on R2 uploads for image-heavy clients.</p>
             </div>
+            {portfolioEnabled ? (
+              <div className="card">
+                <ImageIcon size={22} />
+                <h3>Galleries</h3>
+                <p>Publish portfolio collections with proofing, favorites, and private access links.</p>
+              </div>
+            ) : null}
             {formsEnabled ? (
               <div className="card">
                 <FileText size={22} />
@@ -107,7 +138,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {formsEnabled || testimonialsEnabled ? (
+      {formsEnabled || portfolioEnabled || testimonialsEnabled ? (
         <section className="section" style={{ paddingTop: 0 }}>
           <div className="grid-2" style={{ alignItems: "start" }}>
             {formsEnabled ? (
@@ -123,6 +154,23 @@ export default async function HomePage() {
                     </Link>
                   ))}
                   {!forms.length ? <p className="empty-state">No active forms yet.</p> : null}
+                </div>
+              </div>
+            ) : null}
+
+            {portfolioEnabled ? (
+              <div>
+                <p className="eyebrow">Portfolio</p>
+                <h2>Public galleries</h2>
+                <div className="feature-grid" style={{ gridTemplateColumns: "1fr", marginTop: 18 }}>
+                  {publicGalleries.map((gallery) => (
+                    <Link className="card" href={`/galleries/${gallery.slug}`} key={gallery.id}>
+                      <ImageIcon size={22} />
+                      <h3>{gallery.title}</h3>
+                      <p>{gallery.description || gallery.category || "Open this published gallery."}</p>
+                    </Link>
+                  ))}
+                  {!publicGalleries.length ? <p className="empty-state">No public galleries yet.</p> : null}
                 </div>
               </div>
             ) : null}
