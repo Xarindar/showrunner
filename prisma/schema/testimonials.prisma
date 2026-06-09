@@ -9,6 +9,8 @@ enum TestimonialStatus {
 
 model Testimonial {
   id                  String            @id @default(cuid())
+  siteId              String            @default("site")
+  site                Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
   clientId            String?
   client              Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
   authorName          String
@@ -29,6 +31,7 @@ model Testimonial {
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 
+  @@index([siteId])
   @@index([clientId])
   @@index([status])
   @@index([featured])

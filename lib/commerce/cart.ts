@@ -11,6 +11,7 @@ import {
   ProductStatus
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 
 const maxIntCents = 2_147_483_647;
 const maxCartQuantity = 999;
@@ -24,6 +25,7 @@ type RepriceWarning = {
 
 type RepriceCartOptions = {
   allowedStatuses?: CartStatus[];
+  siteId?: string;
 };
 
 function lineTotal(unitPriceCents: number, quantity: number) {
@@ -55,13 +57,13 @@ function couponDiscountCents(
   return Math.min(subtotalCents, Math.floor((subtotalCents * (coupon.percentOff || 0)) / 100));
 }
 
-async function generateOrderNumber(tx: CommerceTx) {
+async function generateOrderNumber(tx: CommerceTx, siteId: string) {
   const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const candidate = `ORD-${date}-${randomBytes(3).toString("hex").toUpperCase()}`;
-    const existing = await tx.order.findUnique({
-      where: { orderNumber: candidate },
+    const existing = await tx.order.findFirst({
+      where: { siteId, orderNumber: candidate },
       select: { id: true }
     });
     if (!existing) return candidate;
@@ -72,10 +74,11 @@ async function generateOrderNumber(tx: CommerceTx) {
 
 async function resolvePurchasableVariant(
   tx: CommerceTx,
-  input: { productId: string; variantId?: string; quantity: number }
+  input: { productId: string; variantId?: string; quantity: number; siteId?: string }
 ) {
-  const product = await tx.product.findUnique({
-    where: { id: input.productId },
+  const siteId = input.siteId || DEFAULT_SITE_ID;
+  const product = await tx.product.findFirst({
+    where: { id: input.productId, siteId },
     include: {
       variants: {
         where: input.variantId ? { id: input.variantId } : { isDefault: true },
@@ -120,9 +123,10 @@ async function resolvePurchasableVariant(
 
 export async function repriceCart(tx: CommerceTx, cartId: string, options: RepriceCartOptions = {}) {
   const allowedStatuses = options.allowedStatuses || [CartStatus.OPEN];
+  const siteId = options.siteId || DEFAULT_SITE_ID;
   const warnings: RepriceWarning[] = [];
-  const cart = await tx.cart.findUnique({
-    where: { id: cartId },
+  const cart = await tx.cart.findFirst({
+    where: { id: cartId, siteId },
     include: {
       coupon: true,
       items: {
@@ -210,8 +214,8 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
     }
   });
 
-  const updatedCart = await tx.cart.findUnique({
-    where: { id: cartId },
+  const updatedCart = await tx.cart.findFirst({
+    where: { id: cartId, siteId },
     include: {
       coupon: true,
       items: {
@@ -229,8 +233,8 @@ export async function getOpenCart(cartId?: string) {
   if (!cartId) return null;
 
   return prisma.$transaction(async (tx) => {
-    const cart = await tx.cart.findUnique({
-      where: { id: cartId },
+    const cart = await tx.cart.findFirst({
+      where: { id: cartId, siteId: DEFAULT_SITE_ID },
       select: { id: true, status: true }
     });
 
@@ -245,13 +249,14 @@ export async function addCartItem(input: { cartId?: string; productId: string; v
     const resolved = await resolvePurchasableVariant(tx, {
       productId: input.productId,
       variantId: input.variantId,
-      quantity
+      quantity,
+      siteId: DEFAULT_SITE_ID
     });
 
     const cart =
       input.cartId
         ? await tx.cart.findFirst({
-            where: { id: input.cartId, status: CartStatus.OPEN },
+            where: { id: input.cartId, siteId: DEFAULT_SITE_ID, status: CartStatus.OPEN },
             include: { items: { include: { product: true } } }
           })
         : null;
@@ -260,6 +265,7 @@ export async function addCartItem(input: { cartId?: string; productId: string; v
       cart ||
       (await tx.cart.create({
         data: {
+          siteId: DEFAULT_SITE_ID,
           currency: resolved.currency,
           expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14)
         },
@@ -335,8 +341,14 @@ export async function updateCartItem(input: { cartId: string; itemId: string; qu
 
 export async function applyCartCoupon(input: { cartId: string; code: string }) {
   return prisma.$transaction(async (tx) => {
+    const cart = await tx.cart.findFirst({
+      where: { id: input.cartId, siteId: DEFAULT_SITE_ID },
+      select: { siteId: true }
+    });
+    if (!cart) throw new Error("Cart not found.");
+
     const coupon = await tx.coupon.findUnique({
-      where: { code: input.code.trim().toUpperCase() }
+      where: { siteId_code: { siteId: cart.siteId, code: input.code.trim().toUpperCase() } }
     });
 
     if (!coupon || !couponIsUsable(coupon)) {
@@ -353,19 +365,21 @@ export async function applyCartCoupon(input: { cartId: string; code: string }) {
 
 export async function removeCartCoupon(cartId: string) {
   return prisma.$transaction(async (tx) => {
-    await tx.cart.update({ where: { id: cartId }, data: { couponId: null } });
+    const updated = await tx.cart.updateMany({ where: { id: cartId, siteId: DEFAULT_SITE_ID }, data: { couponId: null } });
+    if (updated.count !== 1) throw new Error("Cart not found.");
     await repriceCart(tx, cartId);
   });
 }
 
 async function findOrCreateOrderClient(
   tx: CommerceTx,
-  input: { customerName: string; customerEmail: string }
+  input: { customerName: string; customerEmail: string; siteId: string }
 ) {
   const client = await tx.client.upsert({
-    where: { email: input.customerEmail },
+    where: { siteId_email: { siteId: input.siteId, email: input.customerEmail } },
     update: {},
     create: {
+      siteId: input.siteId,
       name: input.customerName,
       email: input.customerEmail,
       status: "active"
@@ -380,7 +394,7 @@ export async function createCheckoutOrderFromCart(input: { cartId: string; custo
   return prisma.$transaction(async (tx) => {
     const customerEmail = input.customerEmail.trim().toLowerCase();
     const claimedCart = await tx.cart.updateMany({
-      where: { id: input.cartId, status: CartStatus.OPEN },
+      where: { id: input.cartId, siteId: DEFAULT_SITE_ID, status: CartStatus.OPEN },
       data: {
         status: CartStatus.CHECKED_OUT,
         customerEmail
@@ -398,11 +412,13 @@ export async function createCheckoutOrderFromCart(input: { cartId: string; custo
 
     const clientId = await findOrCreateOrderClient(tx, {
       customerName: input.customerName,
-      customerEmail
+      customerEmail,
+      siteId: cart.siteId
     });
-    const orderNumber = await generateOrderNumber(tx);
+    const orderNumber = await generateOrderNumber(tx, cart.siteId);
     const order = await tx.order.create({
       data: {
+        siteId: cart.siteId,
         orderNumber,
         clientId,
         customerName: input.customerName,

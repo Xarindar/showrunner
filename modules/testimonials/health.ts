@@ -4,9 +4,11 @@ import { TestimonialStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { warning, type ModuleHealthCheck } from "@/lib/platform-health";
 
-export const getHealth: ModuleHealthCheck = async () => {
+export const getHealth: ModuleHealthCheck = async ({ settings }) => {
   const warnings = [];
-  const pendingTestimonialCount = await prisma.testimonial.count({ where: { status: TestimonialStatus.PENDING } });
+  const pendingTestimonialCount = await prisma.testimonial.count({
+    where: { siteId: settings.siteId, status: TestimonialStatus.PENDING }
+  });
 
   if (pendingTestimonialCount > 0) {
     warnings.push(

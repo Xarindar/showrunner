@@ -4,16 +4,17 @@ import { EmailCheckStatus, EmailOutboxStatus, EmailSendingDomainStatus } from "@
 import { prisma } from "@/lib/prisma";
 import { envLooksDefault, warning, type ModuleHealthCheck } from "@/lib/platform-health";
 
-export const getHealth: ModuleHealthCheck = async ({ now }) => {
+export const getHealth: ModuleHealthCheck = async ({ settings, now }) => {
   const warnings = [];
   const staleEmailCutoff = new Date(now.getTime() - 15 * 60 * 1000);
 
   const [failedEmailCount, staleQueuedEmailCount, verifiedSenderCount, failingSendingDomainCount] = await Promise.all([
-    prisma.emailOutbox.count({ where: { status: EmailOutboxStatus.FAILED } }),
-    prisma.emailOutbox.count({ where: { status: EmailOutboxStatus.QUEUED, nextAttemptAt: { lt: staleEmailCutoff } } }),
-    prisma.emailSenderIdentity.count({ where: { isVerified: true } }),
+    prisma.emailOutbox.count({ where: { siteId: settings.siteId, status: EmailOutboxStatus.FAILED } }),
+    prisma.emailOutbox.count({ where: { siteId: settings.siteId, status: EmailOutboxStatus.QUEUED, nextAttemptAt: { lt: staleEmailCutoff } } }),
+    prisma.emailSenderIdentity.count({ where: { siteId: settings.siteId, isVerified: true } }),
     prisma.emailSendingDomain.count({
       where: {
+        siteId: settings.siteId,
         OR: [
           { status: EmailSendingDomainStatus.FAILED },
           { spfStatus: EmailCheckStatus.FAIL },

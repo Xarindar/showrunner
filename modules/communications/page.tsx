@@ -64,26 +64,30 @@ export default async function CommunicationsPage({ searchParams }: Communication
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const [templates, outboxRows, manualLogs, suppressions, activeTemplateCount, sentCount, suppressedCount] = await Promise.all([
     prisma.messageTemplate.findMany({
+      where: { siteId: settings.siteId },
       orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
       take: 30
     }),
     prisma.emailOutbox.findMany({
+      where: { siteId: settings.siteId },
       include: { template: true },
       orderBy: { createdAt: "desc" },
       take: 20
     }),
     prisma.messageLog.findMany({
+      where: { siteId: settings.siteId },
       include: { template: true },
       orderBy: { createdAt: "desc" },
       take: 8
     }),
     prisma.suppressionListEntry.findMany({
+      where: { siteId: settings.siteId },
       orderBy: { createdAt: "desc" },
       take: 12
     }),
-    prisma.messageTemplate.count({ where: { isActive: true } }),
-    prisma.emailOutbox.count({ where: { status: EmailOutboxStatus.SENT } }),
-    prisma.suppressionListEntry.count()
+    prisma.messageTemplate.count({ where: { siteId: settings.siteId, isActive: true } }),
+    prisma.emailOutbox.count({ where: { siteId: settings.siteId, status: EmailOutboxStatus.SENT } }),
+    prisma.suppressionListEntry.count({ where: { siteId: settings.siteId } })
   ]);
 
   const savedMessage = params.saved ? "Communications changes saved." : null;

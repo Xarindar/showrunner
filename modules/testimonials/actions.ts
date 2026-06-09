@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getSiteSettings } from "@/lib/site";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 
 const trimmed = z.string().transform((value) => value.trim());
 const requiredText = trimmed.pipe(z.string().min(1));
@@ -71,13 +72,14 @@ function refreshTestimonials() {
   revalidatePath("/admin/modules/clients");
 }
 
-async function findOrCreateClient(authorName: string, authorEmail: string, updateExistingName = false) {
+async function findOrCreateClient(authorName: string, authorEmail: string, updateExistingName = false, siteId = DEFAULT_SITE_ID) {
   if (!authorEmail) return undefined;
 
   const client = await prisma.client.upsert({
-    where: { email: authorEmail },
+    where: { siteId_email: { siteId, email: authorEmail } },
     update: updateExistingName && authorName ? { name: authorName } : {},
     create: {
+      siteId,
       name: authorName || authorEmail,
       email: authorEmail
     },
@@ -102,6 +104,7 @@ export async function createTestimonialAction(formData: FormData) {
 
   await prisma.testimonial.create({
     data: {
+      siteId: DEFAULT_SITE_ID,
       clientId,
       authorName: input.authorName,
       authorEmail: input.authorEmail,
@@ -127,8 +130,8 @@ export async function createTestimonialAction(formData: FormData) {
 export async function updateTestimonialModerationAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(moderationSchema, formData, "/admin/modules/testimonials");
-  const testimonial = await prisma.testimonial.findUnique({
-    where: { id: input.id },
+  const testimonial = await prisma.testimonial.findFirst({
+    where: { id: input.id, siteId: DEFAULT_SITE_ID },
     select: { permissionGranted: true, status: true }
   });
 
@@ -162,8 +165,8 @@ export async function deleteTestimonialAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(deleteTestimonialSchema, formData, "/admin/modules/testimonials");
 
-  await prisma.testimonial.delete({
-    where: { id: input.id }
+  await prisma.testimonial.deleteMany({
+    where: { id: input.id, siteId: DEFAULT_SITE_ID }
   });
 
   refreshTestimonials();
@@ -192,10 +195,11 @@ export async function createPublicTestimonialAction(formData: FormData) {
   }
 
   const input = parsed.data;
-  const clientId = await findOrCreateClient(input.authorName, input.authorEmail, false);
+  const clientId = await findOrCreateClient(input.authorName, input.authorEmail, false, settings.siteId);
 
   await prisma.testimonial.create({
     data: {
+      siteId: settings.siteId,
       clientId,
       authorName: input.authorName,
       authorEmail: input.authorEmail,

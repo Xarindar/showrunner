@@ -22,6 +22,7 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
 
   const testimonials = await prisma.testimonial.findMany({
     where: {
+      siteId: settings.siteId,
       status: TestimonialStatus.APPROVED,
       permissionGranted: true
     },

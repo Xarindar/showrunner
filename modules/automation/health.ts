@@ -4,13 +4,24 @@ import { AutomationStatus, WebhookDeliveryStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { envLooksDefault, warning, type ModuleHealthCheck } from "@/lib/platform-health";
 
-export const getHealth: ModuleHealthCheck = async ({ now }) => {
+export const getHealth: ModuleHealthCheck = async ({ settings, now }) => {
   const warnings = [];
   const [activeAutomationCount, manualAutomationRunCount, pendingWebhookDeliveryCount, failedWebhookDeliveryCount] = await Promise.all([
-    prisma.automation.count({ where: { status: AutomationStatus.ACTIVE } }),
-    prisma.automationRun.count(),
-    prisma.webhookDelivery.count({ where: { status: WebhookDeliveryStatus.PENDING, nextAttemptAt: { lte: now } } }),
-    prisma.webhookDelivery.count({ where: { status: WebhookDeliveryStatus.FAILED } })
+    prisma.automation.count({ where: { siteId: settings.siteId, status: AutomationStatus.ACTIVE } }),
+    prisma.automationRun.count({ where: { automation: { siteId: settings.siteId } } }),
+    prisma.webhookDelivery.count({
+      where: {
+        status: WebhookDeliveryStatus.PENDING,
+        nextAttemptAt: { lte: now },
+        OR: [{ automation: { siteId: settings.siteId } }, { webhookEndpoint: { siteId: settings.siteId } }]
+      }
+    }),
+    prisma.webhookDelivery.count({
+      where: {
+        status: WebhookDeliveryStatus.FAILED,
+        OR: [{ automation: { siteId: settings.siteId } }, { webhookEndpoint: { siteId: settings.siteId } }]
+      }
+    })
   ]);
 
   if (envLooksDefault(process.env.WEBHOOK_WORKER_SECRET || process.env.EMAIL_WORKER_SECRET)) {

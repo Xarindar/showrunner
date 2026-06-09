@@ -4,6 +4,7 @@ import { BookingStatus, Prisma } from "@prisma/client";
 import { queueBookingCreatedEmails } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 import { addMinutesToZonedDay, getZonedDayBounds, getZonedWeekday } from "@/lib/timezone";
 import type { BookingRequest, SchedulingAdapter, Slot, SlotDiagnostic, SlotDiagnosticReason } from "@/lib/scheduling/types";
 
@@ -36,7 +37,7 @@ function makeTimeRangeLabel(startsAt: Date, endsAt: Date, timeZone: string) {
 export const nativeSchedulingAdapter: SchedulingAdapter = {
   async listActiveServices() {
     return prisma.service.findMany({
-      where: { isActive: true },
+      where: { siteId: DEFAULT_SITE_ID, isActive: true },
       orderBy: { createdAt: "asc" }
     });
   },
@@ -52,7 +53,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
 
   async getSlotDiagnostics(serviceId: string, date: Date, options?: { excludeBookingId?: string }) {
     const [service, settings] = await Promise.all([
-      prisma.service.findUnique({ where: { id: serviceId } }),
+      prisma.service.findFirst({ where: { id: serviceId, siteId: DEFAULT_SITE_ID } }),
       getSiteSettings()
     ]);
 
@@ -73,7 +74,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
 
     const weekday = getZonedWeekday(date, settings.timezone);
     const rules = await prisma.availabilityRule.findMany({
-      where: { weekday },
+      where: { siteId: service.siteId, weekday },
       orderBy: { startMinutes: "asc" }
     });
     if (!rules.length) {
@@ -97,6 +98,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     const [bookings, blocks] = await Promise.all([
       prisma.booking.findMany({
         where: {
+          siteId: service.siteId,
           ...(options?.excludeBookingId ? { id: { not: options.excludeBookingId } } : {}),
           status: { not: BookingStatus.CANCELED },
           startsAt: { lt: end },
@@ -106,6 +108,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
       }),
       prisma.blockedTime.findMany({
         where: {
+          siteId: service.siteId,
           startsAt: { lt: end },
           endsAt: { gt: start }
         }
@@ -207,7 +210,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
   },
 
   async createBooking(input: BookingRequest) {
-    const service = await prisma.service.findUnique({ where: { id: input.serviceId } });
+    const service = await prisma.service.findFirst({ where: { id: input.serviceId, siteId: DEFAULT_SITE_ID } });
     if (!service || !service.isActive) {
       throw new Error("That service is not available.");
     }
@@ -246,6 +249,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
           const [conflictingBooking, conflictingBlock] = await Promise.all([
             tx.booking.findFirst({
               where: {
+                siteId: service.siteId,
                 status: { not: BookingStatus.CANCELED },
                 startsAt: { lt: bufferedEnd },
                 endsAt: { gt: bufferedStart }
@@ -253,6 +257,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
             }),
             tx.blockedTime.findFirst({
               where: {
+                siteId: service.siteId,
                 startsAt: { lt: bufferedEnd },
                 endsAt: { gt: bufferedStart }
               }
@@ -264,12 +269,13 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
           }
 
           const client = await tx.client.upsert({
-            where: { email: input.customerEmail.toLowerCase() },
+            where: { siteId_email: { siteId: service.siteId, email: input.customerEmail.toLowerCase() } },
             update: {
               name: input.customerName,
               phone: input.customerPhone || undefined
             },
             create: {
+              siteId: service.siteId,
               name: input.customerName,
               email: input.customerEmail.toLowerCase(),
               phone: input.customerPhone
@@ -278,6 +284,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
 
           return tx.booking.create({
             data: {
+              siteId: service.siteId,
               clientId: client.id,
               serviceId: input.serviceId,
               startsAt: input.startsAt,

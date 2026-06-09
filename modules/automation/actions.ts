@@ -24,6 +24,7 @@ import {
 import { requireAdmin } from "@/lib/auth";
 import { moduleEventNames } from "@/lib/events/catalog";
 import { prisma } from "@/lib/prisma";
+import { getSiteSettings } from "@/lib/site";
 
 const automationEvent = z.enum(moduleEventNames);
 
@@ -127,9 +128,11 @@ function automationWebhookSecret(action: AutomationAction, currentSecret?: strin
 export async function createAutomationAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(automationSchema, formData, "/admin/modules/automation");
+  const settings = await getSiteSettings();
 
   await prisma.automation.create({
     data: {
+      siteId: settings.siteId,
       name: input.name,
       status: input.status,
       trigger: input.trigger,
@@ -150,9 +153,10 @@ export async function createAutomationAction(formData: FormData) {
 export async function updateAutomationStatusAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(automationStatusSchema, formData, "/admin/modules/automation");
+  const settings = await getSiteSettings();
 
-  await prisma.automation.update({
-    where: { id: input.id },
+  await prisma.automation.updateMany({
+    where: { id: input.id, siteId: settings.siteId },
     data: { status: input.status }
   });
 
@@ -162,10 +166,15 @@ export async function updateAutomationStatusAction(formData: FormData) {
 export async function updateAutomationAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(automationUpdateSchema, formData, "/admin/modules/automation");
-  const current = await prisma.automation.findUnique({
-    where: { id: input.id },
+  const settings = await getSiteSettings();
+  const current = await prisma.automation.findFirst({
+    where: { id: input.id, siteId: settings.siteId },
     select: { webhookSigningSecret: true }
   });
+
+  if (!current) {
+    redirect(`/admin/modules/automation?error=${encodeURIComponent("Automation not found.")}`);
+  }
 
   await prisma.automation.update({
     where: { id: input.id },
@@ -190,9 +199,10 @@ export async function updateAutomationAction(formData: FormData) {
 export async function deleteAutomationAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(deleteAutomationSchema, formData, "/admin/modules/automation");
+  const settings = await getSiteSettings();
 
-  await prisma.automation.delete({
-    where: { id: input.id }
+  await prisma.automation.deleteMany({
+    where: { id: input.id, siteId: settings.siteId }
   });
 
   refreshAutomation();
@@ -202,6 +212,15 @@ export async function deleteAutomationAction(formData: FormData) {
 export async function recordAutomationRunAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(automationRunSchema, formData, "/admin/modules/automation");
+  const settings = await getSiteSettings();
+  const automation = await prisma.automation.findFirst({
+    where: { id: input.automationId, siteId: settings.siteId },
+    select: { id: true }
+  });
+
+  if (!automation) {
+    redirect(`/admin/modules/automation?error=${encodeURIComponent("Automation not found.")}`);
+  }
 
   await prisma.$transaction([
     prisma.automationRun.create({
@@ -227,9 +246,11 @@ export async function recordAutomationRunAction(formData: FormData) {
 export async function createWebhookEndpointAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(webhookEndpointSchema, formData, "/admin/modules/automation");
+  const settings = await getSiteSettings();
 
   await prisma.webhookEndpoint.create({
     data: {
+      siteId: settings.siteId,
       name: input.name,
       url: input.url,
       signingSecret: input.signingSecret || generateSigningSecret(),
@@ -245,10 +266,15 @@ export async function createWebhookEndpointAction(formData: FormData) {
 export async function updateWebhookEndpointAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(webhookEndpointUpdateSchema, formData, "/admin/modules/automation");
-  const current = await prisma.webhookEndpoint.findUnique({
-    where: { id: input.id },
+  const settings = await getSiteSettings();
+  const current = await prisma.webhookEndpoint.findFirst({
+    where: { id: input.id, siteId: settings.siteId },
     select: { signingSecret: true }
   });
+
+  if (!current) {
+    redirect(`/admin/modules/automation?error=${encodeURIComponent("Webhook endpoint not found.")}`);
+  }
 
   await prisma.webhookEndpoint.update({
     where: { id: input.id },
@@ -268,9 +294,10 @@ export async function updateWebhookEndpointAction(formData: FormData) {
 export async function deleteWebhookEndpointAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(deleteWebhookEndpointSchema, formData, "/admin/modules/automation");
+  const settings = await getSiteSettings();
 
-  await prisma.webhookEndpoint.delete({
-    where: { id: input.id }
+  await prisma.webhookEndpoint.deleteMany({
+    where: { id: input.id, siteId: settings.siteId }
   });
 
   refreshAutomation();
@@ -280,6 +307,15 @@ export async function deleteWebhookEndpointAction(formData: FormData) {
 export async function recordWebhookDeliveryAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(webhookDeliverySchema, formData, "/admin/modules/automation");
+  const settings = await getSiteSettings();
+  const endpoint = await prisma.webhookEndpoint.findFirst({
+    where: { id: input.webhookEndpointId, siteId: settings.siteId },
+    select: { id: true }
+  });
+
+  if (!endpoint) {
+    redirect(`/admin/modules/automation?error=${encodeURIComponent("Webhook endpoint not found.")}`);
+  }
 
   await prisma.webhookDelivery.create({
     data: {

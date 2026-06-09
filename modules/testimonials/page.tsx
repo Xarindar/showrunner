@@ -29,7 +29,8 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
-  const testimonialWhere = statusFilter === "all" ? {} : { status: statusFilter.toUpperCase() as TestimonialStatus };
+  const testimonialWhere =
+    statusFilter === "all" ? { siteId: settings.siteId } : { siteId: settings.siteId, status: statusFilter.toUpperCase() as TestimonialStatus };
 
   const [testimonials, testimonialCount, approvedCount, pendingCount, featuredCount] = await Promise.all([
     prisma.testimonial.findMany({
@@ -40,9 +41,9 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
       take: pageSize
     }),
     prisma.testimonial.count({ where: testimonialWhere }),
-    prisma.testimonial.count({ where: { status: TestimonialStatus.APPROVED } }),
-    prisma.testimonial.count({ where: { status: TestimonialStatus.PENDING } }),
-    prisma.testimonial.count({ where: { status: TestimonialStatus.APPROVED, featured: true } })
+    prisma.testimonial.count({ where: { siteId: settings.siteId, status: TestimonialStatus.APPROVED } }),
+    prisma.testimonial.count({ where: { siteId: settings.siteId, status: TestimonialStatus.PENDING } }),
+    prisma.testimonial.count({ where: { siteId: settings.siteId, status: TestimonialStatus.APPROVED, featured: true } })
   ]);
   const pageCount = Math.max(1, Math.ceil(testimonialCount / pageSize));
   const savedMessage = params.saved ? "Testimonial changes saved." : null;

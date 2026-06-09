@@ -16,18 +16,20 @@ type ClientsPageProps = {
 
 export default async function ClientsPage({ searchParams }: ClientsPageProps = {}) {
   const params = searchParams ? await searchParams : {};
+  const settings = await getSiteSettings();
   const page = Math.max(1, Number(params.page || 1) || 1);
   const query = String(params.q || "").trim();
   const where: Prisma.ClientWhereInput = query
     ? {
+        siteId: settings.siteId,
         OR: [
           { name: { contains: query, mode: "insensitive" } },
           { email: { contains: query, mode: "insensitive" } },
           { phone: { contains: query, mode: "insensitive" } }
         ]
       }
-    : {};
-  const [clients, clientCount, settings] = await Promise.all([
+    : { siteId: settings.siteId };
+  const [clients, clientCount] = await Promise.all([
     prisma.client.findMany({
       where,
       include: {
@@ -38,8 +40,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
       skip: (page - 1) * pageSize,
       take: pageSize
     }),
-    prisma.client.count({ where }),
-    getSiteSettings()
+    prisma.client.count({ where })
   ]);
   const pageCount = Math.max(1, Math.ceil(clientCount / pageSize));
 

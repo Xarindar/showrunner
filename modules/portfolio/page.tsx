@@ -39,31 +39,33 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const [galleries, mediaAssets, clients, publishedCount, privateCount, itemCount, favoriteCount] = await Promise.all([
     prisma.portfolioGallery.findMany({
+      where: { siteId: settings.siteId },
       include: { _count: { select: { items: true, accesses: true, favorites: true } } },
       orderBy: [{ status: "asc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
       take: 30
     }),
     prisma.mediaAsset.findMany({
-      where: { deletedAt: null },
+      where: { siteId: settings.siteId, deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 60
     }),
     prisma.client.findMany({
+      where: { siteId: settings.siteId },
       orderBy: { updatedAt: "desc" },
       take: 50
     }),
-    prisma.portfolioGallery.count({ where: { status: PortfolioGalleryStatus.PUBLISHED } }),
+    prisma.portfolioGallery.count({ where: { siteId: settings.siteId, status: PortfolioGalleryStatus.PUBLISHED } }),
     prisma.portfolioGallery.count({
-      where: { visibility: { in: [PortfolioGalleryVisibility.PRIVATE, PortfolioGalleryVisibility.PASSWORD] } }
+      where: { siteId: settings.siteId, visibility: { in: [PortfolioGalleryVisibility.PRIVATE, PortfolioGalleryVisibility.PASSWORD] } }
     }),
-    prisma.portfolioGalleryItem.count(),
-    prisma.portfolioGalleryFavorite.count()
+    prisma.portfolioGalleryItem.count({ where: { gallery: { siteId: settings.siteId } } }),
+    prisma.portfolioGalleryFavorite.count({ where: { gallery: { siteId: settings.siteId } } })
   ]);
 
   const selectedGalleryId = params.gallery || galleries[0]?.id;
   const selectedGallery = selectedGalleryId
-    ? await prisma.portfolioGallery.findUnique({
-        where: { id: selectedGalleryId },
+    ? await prisma.portfolioGallery.findFirst({
+        where: { id: selectedGalleryId, siteId: settings.siteId },
         include: {
           items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
           accesses: { orderBy: { createdAt: "desc" }, take: 20 },

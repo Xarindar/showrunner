@@ -7,7 +7,7 @@ import { warning, type ModuleHealthCheck } from "@/lib/platform-health";
 
 export const getHealth: ModuleHealthCheck = async ({ settings }) => {
   const warnings = [];
-  const mediaAssetCount = await prisma.mediaAsset.count();
+  const mediaAssetCount = await prisma.mediaAsset.count({ where: { siteId: settings.siteId } });
 
   if (settings.mediaDriver === MediaDriver.R2 && !isR2Configured()) {
     warnings.push(

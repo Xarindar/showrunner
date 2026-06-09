@@ -1,6 +1,7 @@
 import { EmailCategory, EmailOutboxStatus, EmailSuppressionScope, MessageChannel, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 import { getAdminRecipients } from "./recipients";
 import { renderEmailTemplate } from "./render";
 import { resolveSender } from "./sender";
@@ -8,6 +9,7 @@ import { cleanError, cleanHeaders, normalizeEmail } from "./shared";
 import type { QueueAdminEmailInput, QueueEmailInput } from "./types";
 
 type QueueTemplateTestEmailInput = {
+  siteId?: string;
   templateId: string;
   recipientEmail: string;
   tokens: Record<string, string | number | Date | null | undefined>;
@@ -46,8 +48,8 @@ function marketingHeaders(input: QueueEmailInput) {
   };
 }
 
-async function suppressionReason(email: string, category: EmailCategory) {
-  const entry = await prisma.suppressionListEntry.findUnique({ where: { email } });
+async function suppressionReason(email: string, category: EmailCategory, siteId = DEFAULT_SITE_ID) {
+  const entry = await prisma.suppressionListEntry.findUnique({ where: { siteId_email: { siteId, email } } });
   if (!entry) return "";
 
   const blocks =
@@ -75,6 +77,7 @@ export async function recordQueueFailure(input: QueueFailureInput) {
   const reason = input.reason.slice(0, 1000);
 
   await createOutboxRow({
+    site: { connect: { id: settings.siteId } },
     idempotencyKey: input.idempotencyKey,
     templateKey: input.templateKey,
     recipientEmail: input.recipientEmail ? normalizeEmail(input.recipientEmail) : "",
@@ -110,6 +113,7 @@ export async function queueEmail(input: QueueEmailInput) {
   try {
   const template = await prisma.messageTemplate.findFirst({
     where: {
+      siteId: DEFAULT_SITE_ID,
       key: input.templateKey,
       channel: MessageChannel.EMAIL,
       isActive: true
@@ -126,10 +130,11 @@ export async function queueEmail(input: QueueEmailInput) {
     templateSenderIdentityId: template.senderIdentityId
   });
   const rendered = renderEmailTemplate(template, input.tokens);
-  const reason = await suppressionReason(recipientEmail, input.category);
+  const reason = await suppressionReason(recipientEmail, input.category, template.siteId);
   const status = reason ? EmailOutboxStatus.SUPPRESSED : EmailOutboxStatus.QUEUED;
 
   await createOutboxRow({
+    site: { connect: { id: template.siteId } },
     idempotencyKey: input.idempotencyKey,
     template: { connect: { id: template.id } },
     templateKey: template.key || input.templateKey,
@@ -202,9 +207,10 @@ export async function queueAdminEmail(input: QueueAdminEmailInput) {
 export async function queueTemplateTestEmail(input: QueueTemplateTestEmailInput) {
   const recipientEmail = normalizeEmail(input.recipientEmail);
   if (!recipientEmail) throw new Error("Email recipient is required.");
+  const siteId = input.siteId || DEFAULT_SITE_ID;
 
-  const template = await prisma.messageTemplate.findUnique({
-    where: { id: input.templateId }
+  const template = await prisma.messageTemplate.findFirst({
+    where: { id: input.templateId, siteId }
   });
 
   if (!template || template.channel !== MessageChannel.EMAIL) {
@@ -217,10 +223,11 @@ export async function queueTemplateTestEmail(input: QueueTemplateTestEmailInput)
     templateSenderIdentityId: template.senderIdentityId
   });
   const rendered = renderEmailTemplate(template, input.tokens);
-  const reason = await suppressionReason(recipientEmail, EmailCategory.ADMIN);
+  const reason = await suppressionReason(recipientEmail, EmailCategory.ADMIN, siteId);
   const status = reason ? EmailOutboxStatus.SUPPRESSED : EmailOutboxStatus.QUEUED;
 
   await createOutboxRow({
+    site: { connect: { id: template.siteId } },
     idempotencyKey: input.idempotencyKey,
     template: { connect: { id: template.id } },
     templateKey: template.key || "",

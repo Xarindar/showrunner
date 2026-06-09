@@ -27,10 +27,10 @@ function getDefaultDate(timeZone: string, availableWeekdays: number[]) {
 }
 
 export async function BookingPageShell({ initialServiceSlug }: BookingPageShellProps) {
-  const [settings, services, availability] = await Promise.all([
-    getSiteSettings(),
+  const settings = await getSiteSettings();
+  const [services, availability] = await Promise.all([
     nativeSchedulingAdapter.listActiveServices(),
-    prisma.availabilityRule.findMany({ select: { weekday: true } })
+    prisma.availabilityRule.findMany({ where: { siteId: settings.siteId }, select: { weekday: true } })
   ]);
 
   return (

@@ -4,6 +4,7 @@ import { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { emitModuleEvent } from "@/lib/events/emit";
 import { queueOrderReceiptEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 
 type CommerceTx = Prisma.TransactionClient;
 
@@ -142,10 +143,11 @@ async function releasePendingCouponRedemption(tx: CommerceTx, order: { couponId:
   });
 }
 
-export async function updateOrderStatus(input: { orderId: string; status: OrderStatus }) {
+export async function updateOrderStatus(input: { orderId: string; status: OrderStatus; siteId?: string }) {
+  const siteId = input.siteId || DEFAULT_SITE_ID;
   const result = await prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id: input.orderId },
+    const order = await tx.order.findFirst({
+      where: { id: input.orderId, siteId },
       include: {
         items: {
           include: {

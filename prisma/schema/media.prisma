@@ -7,6 +7,8 @@ enum MediaDriver {
 
 model MediaAsset {
   id           String      @id @default(cuid())
+  siteId       String      @default("site")
+  site         Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
   driver       MediaDriver
   key          String
   url          String
@@ -24,7 +26,7 @@ model MediaAsset {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  @@index([folder])
+  @@index([siteId, folder])
   @@index([isPrivate])
   @@index([deletedAt])
 }

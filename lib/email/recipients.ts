@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 import { normalizeEmail } from "./shared";
 
 export type EmailRecipientAddress = {
@@ -27,7 +28,7 @@ export async function getAdminRecipients(groupKey: string, overrideEmail?: strin
   }
 
   const group = await prisma.emailRecipientGroup.findUnique({
-    where: { key: groupKey },
+    where: { siteId_key: { siteId: DEFAULT_SITE_ID, key: groupKey } },
     include: {
       recipients: {
         where: { isActive: true },

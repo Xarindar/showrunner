@@ -46,10 +46,10 @@ function summarizeSubmission(value: unknown) {
 
 export default async function ClientDetailPage({ params, searchParams }: ClientDetailPageProps) {
   const [{ id }, { saved, error }] = await Promise.all([params, searchParams]);
-  const [client, settings] = await Promise.all([
-    prisma.client.findUnique({
-      where: { id },
-      include: {
+  const settings = await getSiteSettings();
+  const client = await prisma.client.findFirst({
+    where: { id, siteId: settings.siteId },
+    include: {
         notes: { orderBy: { createdAt: "desc" } },
         bookings: {
           include: { service: true },
@@ -79,9 +79,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           take: 40
         }
       }
-    }),
-    getSiteSettings()
-  ]);
+  });
 
   if (!client) notFound();
 

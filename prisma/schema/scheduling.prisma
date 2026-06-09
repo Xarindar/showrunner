@@ -9,7 +9,9 @@ enum BookingStatus {
 
 model Service {
   id                  String    @id @default(cuid())
-  slug                String    @unique @default(cuid())
+  siteId              String    @default("site")
+  site                Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  slug                String    @default(cuid())
   name                String
   description         String?
   durationMinutes     Int
@@ -26,27 +28,40 @@ model Service {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   bookings            Booking[]
+
+  @@unique([siteId, slug])
+  @@index([siteId])
 }
 
 model AvailabilityRule {
   id           String   @id @default(cuid())
+  siteId       String   @default("site")
+  site         Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   weekday      Int
   startMinutes Int
   endMinutes   Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([siteId])
 }
 
 model BlockedTime {
   id        String   @id @default(cuid())
+  siteId    String   @default("site")
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   startsAt  DateTime
   endsAt    DateTime
   reason    String?
   createdAt DateTime @default(now())
+
+  @@index([siteId, startsAt, endsAt])
 }
 
 model Booking {
   id                 String        @id @default(cuid())
+  siteId             String        @default("site")
+  site               Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
   serviceId          String
   service            Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   clientId           String?
@@ -65,7 +80,7 @@ model Booking {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  @@index([startsAt, endsAt])
+  @@index([siteId, startsAt, endsAt])
   @@index([serviceId, startsAt])
   @@index([clientId])
 }

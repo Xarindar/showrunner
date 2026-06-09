@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { EmailListMembershipStatus, EmailSubscriberStatus, EmailSuppressionScope } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 import { normalizeEmail } from "./shared";
 
 type SubscribeInput = {
@@ -17,7 +18,7 @@ function unsubscribeToken() {
 
 async function getDefaultListId() {
   const list = await prisma.emailSubscriptionList.findFirst({
-    where: { isDefault: true },
+    where: { siteId: DEFAULT_SITE_ID, isDefault: true },
     orderBy: { createdAt: "asc" }
   });
   return list?.id;
@@ -30,7 +31,7 @@ export async function subscribeToList(input: SubscribeInput) {
   const listId = input.listId || (await getDefaultListId());
   const now = new Date();
   const subscriber = await prisma.emailSubscriber.upsert({
-    where: { email },
+    where: { siteId_email: { siteId: DEFAULT_SITE_ID, email } },
     update: {
       name: input.name?.trim() || undefined,
       clientId: input.clientId || undefined,
@@ -40,6 +41,7 @@ export async function subscribeToList(input: SubscribeInput) {
       unsubscribedAt: null
     },
     create: {
+      siteId: DEFAULT_SITE_ID,
       email,
       name: input.name?.trim() || "",
       clientId: input.clientId,
@@ -72,6 +74,7 @@ export async function subscribeToList(input: SubscribeInput) {
 
   await prisma.suppressionListEntry.deleteMany({
     where: {
+      siteId: DEFAULT_SITE_ID,
       email,
       scope: EmailSuppressionScope.MARKETING
     }
@@ -105,13 +108,14 @@ export async function unsubscribeByToken(token: string) {
       }
     }),
     prisma.suppressionListEntry.upsert({
-      where: { email: subscriber.email },
+      where: { siteId_email: { siteId: subscriber.siteId, email: subscriber.email } },
       update: {
         scope: EmailSuppressionScope.MARKETING,
         reason: "Unsubscribed.",
         source: "unsubscribe"
       },
       create: {
+        siteId: subscriber.siteId,
         email: subscriber.email,
         scope: EmailSuppressionScope.MARKETING,
         reason: "Unsubscribed.",

@@ -641,6 +641,19 @@ adds (a) persistent install/enable state and (b) build-time module exclusion for
 
 - **Tenant/site boundary** (`Tenant`, `Site`, `SiteDomain`) and composite uniques — see `docs/roadmap.md`
   foundation items and the per-module tenancy notes. Prerequisite for true multi-site.
+  > **🛠 ENGINEER · [06-09-26]:** Closed the default tenant/site boundary by adding `Tenant`, `Site`, and
+  > `SiteDomain`, backfilling the default `site`, scoping site-owned Prisma models and composite uniques by
+  > `siteId`, and routing settings, module enablement, public rate limits, slugs, access tokens, health checks,
+  > admin queries/mutations, public routes, and seed data through that default site. Key files: `prisma/schema/*`,
+  > `prisma/migrations/20260609120000_tenant_site_boundary/migration.sql`, `lib/site.ts`,
+  > `lib/site-boundary.ts`, per-module actions/pages/health files, and `prisma/seed.ts`. Deliberate follow-up:
+  > hostname/domain site resolution and a true multi-site admin UI remain additive future work.
+  >
+  > Verification: `npx prisma validate`; `npx prisma migrate deploy`; `npx prisma migrate status`;
+  > `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema --exit-code`;
+  > `npx prisma generate`; `npx tsc --noEmit`; `npm run seed`; `npm run build`.
+  >
+  > **Status: `READY-FOR-AUDIT`**
 - **Bundle tree-shaking** — make build-time exclusion actually drop module code from the compiled output.
 - **Wire `visibleToPublic` / `beta` / `ModuleSetting`** — columns persist on `ModuleInstallation`/`ModuleSetting`
   (P5) but no UI reads them yet. Deferred from P5 (Patcher, 06-08-26): needs a public-visibility toggle, beta

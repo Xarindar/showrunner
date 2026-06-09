@@ -91,11 +91,12 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
   if (!settings.enabledModuleIds.includes("portfolio")) return lockedGallery(settings);
 
   const queryAccessToken = accessToken || firstParam(searchParams, "access") || firstParam(searchParams, "token");
-  const access = queryAccessToken ? await findActiveGalleryAccess(queryAccessToken) : null;
+  const access = queryAccessToken ? await findActiveGalleryAccess(queryAccessToken, undefined, settings.siteId) : null;
   const gallerySlug = slug || access?.gallery.slug || "";
   const gallery = gallerySlug
     ? await prisma.portfolioGallery.findFirst({
         where: {
+          siteId: settings.siteId,
           slug: gallerySlug,
           status: PortfolioGalleryStatus.PUBLISHED
         },
@@ -111,13 +112,13 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
   if (gallery.visibility !== PortfolioGalleryVisibility.PUBLIC && access?.galleryId !== gallery.id) return lockedGallery(settings);
 
   if (access) {
-    await markGalleryAccessViewed(access.id);
+    await markGalleryAccessViewed(access.id, settings.siteId);
   }
 
   const mediaIds = gallery.items.map((item) => item.mediaAssetId).filter((id): id is string => Boolean(id));
   const mediaAssets = mediaIds.length
     ? await prisma.mediaAsset.findMany({
-        where: { id: { in: mediaIds } },
+        where: { siteId: settings.siteId, id: { in: mediaIds } },
         select: { deletedAt: true, id: true, isPrivate: true }
       })
     : [];

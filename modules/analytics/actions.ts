@@ -8,6 +8,7 @@ import { parseForm } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
 import { enumLabel } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { getSiteSettings } from "@/lib/site";
 import { slugify } from "@/lib/slug";
 
 const maxIntCents = 2_147_483_647;
@@ -100,9 +101,11 @@ function refreshAnalytics() {
 export async function recordAnalyticsEventAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(eventSchema, formData, "/admin/modules/analytics");
+  const settings = await getSiteSettings();
 
   await prisma.analyticsEvent.create({
     data: {
+      siteId: settings.siteId,
       eventType: input.eventType,
       eventName: input.eventName,
       source: input.source,
@@ -130,10 +133,12 @@ export async function recordAnalyticsEventAction(formData: FormData) {
 export async function createAnalyticsGoalAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(goalSchema, formData, "/admin/modules/analytics");
+  const settings = await getSiteSettings();
 
   try {
     await prisma.analyticsGoal.create({
       data: {
+        siteId: settings.siteId,
         key: input.key,
         name: input.name,
         eventType: input.eventType,
@@ -159,9 +164,10 @@ export async function createAnalyticsGoalAction(formData: FormData) {
 export async function updateAnalyticsGoalStatusAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(goalStatusSchema, formData, "/admin/modules/analytics");
+  const settings = await getSiteSettings();
 
-  await prisma.analyticsGoal.update({
-    where: { id: input.id },
+  await prisma.analyticsGoal.updateMany({
+    where: { id: input.id, siteId: settings.siteId },
     data: { isActive: input.isActive }
   });
 

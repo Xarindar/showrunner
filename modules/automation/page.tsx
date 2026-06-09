@@ -50,28 +50,33 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const [automations, endpoints, recentDeliveries, activeCount, runCount] = await Promise.all([
     prisma.automation.findMany({
+      where: { siteId: settings.siteId },
       include: { _count: { select: { runs: true } } },
       orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
       take: 30
     }),
     prisma.webhookEndpoint.findMany({
+      where: { siteId: settings.siteId },
       include: { _count: { select: { deliveries: true } } },
       orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
       take: 20
     }),
     prisma.webhookDelivery.findMany({
+      where: {
+        OR: [{ automation: { siteId: settings.siteId } }, { webhookEndpoint: { siteId: settings.siteId } }]
+      },
       include: { automation: true, webhookEndpoint: true },
       orderBy: { createdAt: "desc" },
       take: 10
     }),
-    prisma.automation.count({ where: { status: AutomationStatus.ACTIVE } }),
-    prisma.automationRun.count()
+    prisma.automation.count({ where: { siteId: settings.siteId, status: AutomationStatus.ACTIVE } }),
+    prisma.automationRun.count({ where: { automation: { siteId: settings.siteId } } })
   ]);
 
   const selectedAutomationId = params.automation || automations[0]?.id;
   const selectedAutomation = selectedAutomationId
-    ? await prisma.automation.findUnique({
-        where: { id: selectedAutomationId },
+    ? await prisma.automation.findFirst({
+        where: { id: selectedAutomationId, siteId: settings.siteId },
         include: { runs: { orderBy: { createdAt: "desc" }, take: 10 } }
       })
     : null;

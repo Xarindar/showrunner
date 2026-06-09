@@ -1,11 +1,14 @@
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { csvDocument } from "@/lib/api/csv";
+import { getSiteSettings } from "@/lib/site";
 
 export async function GET() {
   await requireAdmin();
+  const settings = await getSiteSettings();
 
   const events = await prisma.analyticsEvent.findMany({
+    where: { siteId: settings.siteId },
     orderBy: { occurredAt: "desc" },
     take: 10000
   });

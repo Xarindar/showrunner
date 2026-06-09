@@ -170,7 +170,7 @@ export default async function HelpPage() {
         <div className="foundation-list">
           {platformFoundationItems.map((item) => (
             <div className="foundation-row" key={item.key}>
-              <span className="pill warning">{item.status.replaceAll("-", " ")}</span>
+              <span className={item.status === "schema-ready" ? "pill success" : "pill warning"}>{item.status.replaceAll("-", " ")}</span>
               <span>
                 <strong>{item.title}</strong>
                 <small>{item.detail}</small>

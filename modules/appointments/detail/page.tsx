@@ -30,16 +30,14 @@ function formatDateTimeLocalInput(value: Date, timeZone: string) {
 
 export default async function AppointmentDetailPage({ params, searchParams }: AppointmentDetailPageProps) {
   const [{ id }, { saved, error }] = await Promise.all([params, searchParams]);
-  const [booking, settings] = await Promise.all([
-    prisma.booking.findUnique({
-      where: { id },
-      include: {
-        service: true,
-        client: true
-      }
-    }),
-    getSiteSettings()
-  ]);
+  const settings = await getSiteSettings();
+  const booking = await prisma.booking.findFirst({
+    where: { id, siteId: settings.siteId },
+    include: {
+      service: true,
+      client: true
+    }
+  });
 
   if (!booking) notFound();
 

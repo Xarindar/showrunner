@@ -60,6 +60,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
   await prisma.billingDocument.updateMany({
     where: {
+      siteId: settings.siteId,
       status: { in: [BillingDocumentStatus.SENT, BillingDocumentStatus.ACCEPTED] },
       dueAt: { lt: new Date() }
     },
@@ -68,6 +69,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
   const [documents, clients, documentCount, paidTotals, openTotals] = await Promise.all([
     prisma.billingDocument.findMany({
+      where: { siteId: settings.siteId },
       include: {
         client: true,
         _count: { select: { lineItems: true, attachments: true } }
@@ -76,26 +78,27 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       take: 25
     }),
     prisma.client.findMany({
+      where: { siteId: settings.siteId },
       orderBy: { updatedAt: "desc" },
       take: 40
     }),
-    prisma.billingDocument.count(),
+    prisma.billingDocument.count({ where: { siteId: settings.siteId } }),
     prisma.billingDocument.groupBy({
       by: ["currency"],
-      where: { status: BillingDocumentStatus.PAID },
+      where: { siteId: settings.siteId, status: BillingDocumentStatus.PAID },
       _sum: { totalCents: true }
     }),
     prisma.billingDocument.groupBy({
       by: ["currency"],
-      where: { status: { in: [BillingDocumentStatus.SENT, BillingDocumentStatus.ACCEPTED, BillingDocumentStatus.OVERDUE] } },
+      where: { siteId: settings.siteId, status: { in: [BillingDocumentStatus.SENT, BillingDocumentStatus.ACCEPTED, BillingDocumentStatus.OVERDUE] } },
       _sum: { totalCents: true }
     })
   ]);
 
   const selectedDocumentId = params.document || documents[0]?.id;
   const selectedDocument = selectedDocumentId
-    ? await prisma.billingDocument.findUnique({
-        where: { id: selectedDocumentId },
+    ? await prisma.billingDocument.findFirst({
+        where: { id: selectedDocumentId, siteId: settings.siteId },
         include: {
           client: true,
           lineItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },

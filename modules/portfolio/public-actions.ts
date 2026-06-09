@@ -59,6 +59,7 @@ export async function favoriteGalleryItemAction(formData: FormData) {
 
   const gallery = await prisma.portfolioGallery.findFirst({
     where: {
+      siteId: settings.siteId,
       id: input.galleryId,
       status: PortfolioGalleryStatus.PUBLISHED
     },
@@ -79,7 +80,7 @@ export async function favoriteGalleryItemAction(formData: FormData) {
     galleryRedirect(input.slug, input.accessToken, "error", "Proofing is not enabled for this gallery.");
   }
 
-  const access = input.accessToken ? await findActiveGalleryAccess(input.accessToken, gallery.id) : null;
+  const access = input.accessToken ? await findActiveGalleryAccess(input.accessToken, gallery.id, settings.siteId) : null;
   if (gallery.visibility !== PortfolioGalleryVisibility.PUBLIC && !access) {
     galleryRedirect(input.slug, input.accessToken, "error", "This gallery needs an active access link.");
   }
@@ -105,8 +106,8 @@ export async function favoriteGalleryItemAction(formData: FormData) {
   }
 
   if (item.mediaAssetId) {
-    const asset = await prisma.mediaAsset.findUnique({
-      where: { id: item.mediaAssetId },
+    const asset = await prisma.mediaAsset.findFirst({
+      where: { id: item.mediaAssetId, siteId: settings.siteId },
       select: { deletedAt: true, isPrivate: true }
     });
 

@@ -25,13 +25,16 @@ export async function createServiceAction(formData: FormData) {
   await requireAdmin();
 
   const input = await parseForm(serviceFormSchema, formData);
+  const settings = await getSiteSettings();
   const slug = await generateUniqueServiceSlug(prisma, {
     name: input.name,
-    slug: input.slug || ""
+    slug: input.slug || "",
+    siteId: settings.siteId
   });
 
   await prisma.service.create({
     data: {
+      siteId: settings.siteId,
       slug,
       name: input.name,
       description: input.description,
@@ -58,8 +61,10 @@ export async function toggleServiceAction(formData: FormData) {
 
   const id = String(formData.get("id") || "");
   const isActive = String(formData.get("isActive") || "") === "true";
-  await prisma.service.update({
-    where: { id },
+  const settings = await getSiteSettings();
+
+  await prisma.service.updateMany({
+    where: { id, siteId: settings.siteId },
     data: { isActive }
   });
 
@@ -69,9 +74,10 @@ export async function toggleServiceAction(formData: FormData) {
 export async function updateServiceAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(serviceUpdateFormSchema, formData);
+  const settings = await getSiteSettings();
 
-  await prisma.service.update({
-    where: { id: input.id },
+  await prisma.service.updateMany({
+    where: { id: input.id, siteId: settings.siteId },
     data: {
       name: input.name,
       description: input.description,
@@ -96,9 +102,11 @@ export async function updateServiceAction(formData: FormData) {
 export async function createAvailabilityAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(availabilityFormSchema, formData);
+  const settings = await getSiteSettings();
 
   await prisma.availabilityRule.create({
     data: {
+      siteId: settings.siteId,
       weekday: input.weekday,
       startMinutes: input.startTime,
       endMinutes: input.endTime
@@ -111,9 +119,10 @@ export async function createAvailabilityAction(formData: FormData) {
 
 export async function deleteAvailabilityAction(formData: FormData) {
   await requireAdmin();
+  const settings = await getSiteSettings();
 
-  await prisma.availabilityRule.delete({
-    where: { id: String(formData.get("id") || "") }
+  await prisma.availabilityRule.deleteMany({
+    where: { id: String(formData.get("id") || ""), siteId: settings.siteId }
   });
 
   refreshScheduling();
@@ -132,6 +141,7 @@ export async function createBlockoutAction(formData: FormData) {
 
   await prisma.blockedTime.create({
     data: {
+      siteId: settings.siteId,
       startsAt,
       endsAt,
       reason: input.reason
@@ -144,9 +154,10 @@ export async function createBlockoutAction(formData: FormData) {
 
 export async function deleteBlockoutAction(formData: FormData) {
   await requireAdmin();
+  const settings = await getSiteSettings();
 
-  await prisma.blockedTime.delete({
-    where: { id: String(formData.get("id") || "") }
+  await prisma.blockedTime.deleteMany({
+    where: { id: String(formData.get("id") || ""), siteId: settings.siteId }
   });
 
   refreshScheduling();

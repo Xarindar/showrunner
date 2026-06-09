@@ -130,20 +130,19 @@ function renderField(field: FormField) {
 
 export default async function PublicFormPage({ params, searchParams }: PublicFormPageProps) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
-  const [settings, form] = await Promise.all([
-    getSiteSettings(),
-    prisma.form.findFirst({
-      where: {
-        slug,
-        status: FormStatus.ACTIVE
-      },
-      include: {
-        fields: {
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
-        }
+  const settings = await getSiteSettings();
+  const form = await prisma.form.findFirst({
+    where: {
+      siteId: settings.siteId,
+      slug,
+      status: FormStatus.ACTIVE
+    },
+    include: {
+      fields: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
       }
-    })
-  ]);
+    }
+  });
 
   if (!settings.enabledModuleIds.includes("forms")) notFound();
   if (!form) notFound();

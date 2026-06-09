@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { recordFromUnknown } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { csvDocument } from "@/lib/api/csv";
+import { getSiteSettings } from "@/lib/site";
 
 function dataValue(data: unknown, fieldId: string) {
   const record = recordFromUnknown(data);
@@ -28,6 +29,7 @@ function fieldLabel(data: unknown, fieldId: string) {
 
 export async function GET(request: Request) {
   await requireAdmin();
+  const settings = await getSiteSettings();
 
   const { searchParams } = new URL(request.url);
   const formId = searchParams.get("formId") || "";
@@ -36,8 +38,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing formId." }, { status: 400 });
   }
 
-  const form = await prisma.form.findUnique({
-    where: { id: formId },
+  const form = await prisma.form.findFirst({
+    where: { id: formId, siteId: settings.siteId },
     include: {
       fields: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
       submissions: {

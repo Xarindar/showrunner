@@ -21,6 +21,7 @@ import {
 import { updateOrderStatus } from "@/lib/commerce/orders";
 import { generateUniqueCommerceSlug } from "@/lib/commerce/slugs";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 
 const orderStatusFormSchema = z.object({
   id: requiredText,
@@ -102,6 +103,7 @@ export async function createProductAction(formData: FormData) {
 
   const product = await prisma.product.create({
     data: {
+      siteId: DEFAULT_SITE_ID,
       slug,
       name: input.name,
       summary: input.summary,
@@ -138,17 +140,24 @@ export async function createProductAction(formData: FormData) {
 export async function updateProductAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(productUpdateFormSchema, formData);
-  const currentProduct = await prisma.product.findUnique({
-    where: { id: input.id },
-    select: { slug: true }
+  const currentProduct = await prisma.product.findFirst({
+    where: { id: input.id, siteId: DEFAULT_SITE_ID },
+    select: { siteId: true, slug: true }
   });
+
+  if (!currentProduct) {
+    redirect(`/admin/modules/products?error=${encodeURIComponent("Product not found.")}`);
+  }
+
+  const siteId = currentProduct?.siteId || DEFAULT_SITE_ID;
   const slug = input.slug
     ? await generateUniqueCommerceSlug(prisma, "product", {
         name: input.name,
         slug: input.slug,
+        siteId,
         exceptId: input.id
       })
-    : currentProduct?.slug || (await generateUniqueCommerceSlug(prisma, "product", { name: input.name, exceptId: input.id }));
+    : currentProduct?.slug || (await generateUniqueCommerceSlug(prisma, "product", { name: input.name, siteId, exceptId: input.id }));
 
   await prisma.$transaction(async (tx) => {
     await tx.product.update({
@@ -191,10 +200,12 @@ export async function updateProductStatusAction(formData: FormData) {
   const input = await parseForm(productStatusFormSchema, formData);
 
   await prisma.$transaction(async (tx) => {
-    await tx.product.update({
-      where: { id: input.id },
+    const updated = await tx.product.updateMany({
+      where: { id: input.id, siteId: DEFAULT_SITE_ID },
       data: { status: input.status }
     });
+
+    if (updated.count !== 1) throw new Error("Product not found.");
 
     await tx.productVariant.updateMany({
       where: { productId: input.id, isDefault: true },
@@ -208,6 +219,14 @@ export async function updateProductStatusAction(formData: FormData) {
 export async function createProductVariantAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(productVariantFormSchema, formData);
+  const product = await prisma.product.findFirst({
+    where: { id: input.productId, siteId: DEFAULT_SITE_ID },
+    select: { id: true }
+  });
+
+  if (!product) {
+    redirect(`/admin/modules/products?error=${encodeURIComponent("Product not found.")}`);
+  }
 
   if (input.isDefault) {
     await prisma.productVariant.updateMany({
@@ -246,6 +265,7 @@ export async function createCollectionAction(formData: FormData) {
 
   await prisma.collection.create({
     data: {
+      siteId: DEFAULT_SITE_ID,
       slug,
       name: input.name,
       description: input.description,
@@ -262,6 +282,14 @@ export async function createCollectionAction(formData: FormData) {
 export async function addProductToCollectionAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(collectionProductFormSchema, formData);
+  const [collection, product] = await Promise.all([
+    prisma.collection.findFirst({ where: { id: input.collectionId, siteId: DEFAULT_SITE_ID }, select: { id: true } }),
+    prisma.product.findFirst({ where: { id: input.productId, siteId: DEFAULT_SITE_ID }, select: { id: true } })
+  ]);
+
+  if (!collection || !product) {
+    redirect(`/admin/modules/products?error=${encodeURIComponent("Product or collection not found.")}`);
+  }
 
   await prisma.collectionProduct.upsert({
     where: {
@@ -288,6 +316,7 @@ export async function createCouponAction(formData: FormData) {
   try {
     await prisma.coupon.create({
       data: {
+        siteId: DEFAULT_SITE_ID,
         code: input.code,
         type: input.type,
         amountCents: input.amount,
@@ -315,7 +344,8 @@ export async function updateCommerceOrderStatusAction(formData: FormData) {
   try {
     await updateOrderStatus({
       orderId: input.id,
-      status: input.status
+      status: input.status,
+      siteId: DEFAULT_SITE_ID
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not update that order.";
@@ -332,8 +362,8 @@ export async function setCommerceOrderCheckoutLinkAction(formData: FormData) {
 
   try {
     await prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({
-        where: { id: input.id },
+      const order = await tx.order.findFirst({
+        where: { id: input.id, siteId: DEFAULT_SITE_ID },
         select: {
           id: true,
           status: true,
@@ -393,8 +423,8 @@ export async function clearCommerceOrderCheckoutLinkAction(formData: FormData) {
 
   try {
     await prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({
-        where: { id: input.id },
+      const order = await tx.order.findFirst({
+        where: { id: input.id, siteId: DEFAULT_SITE_ID },
         select: { id: true, status: true }
       });
 

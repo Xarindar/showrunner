@@ -29,8 +29,9 @@ function countBy<T>(items: T[], getKey: (item: T) => string) {
     .sort((left, right) => right.count - left.count);
 }
 
-function goalWhere(goal: { eventType: AnalyticsEventType; eventName: string }): Prisma.AnalyticsEventWhereInput {
+function goalWhere(goal: { eventType: AnalyticsEventType; eventName: string }, siteId: string): Prisma.AnalyticsEventWhereInput {
   return {
+    siteId,
     eventType: goal.eventType,
     eventName: goal.eventName || undefined
   };
@@ -52,23 +53,25 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     paidRevenue
   ] = await Promise.all([
     prisma.analyticsEvent.findMany({
+      where: { siteId: settings.siteId },
       orderBy: { occurredAt: "desc" },
       take: 250
     }),
     prisma.analyticsGoal.findMany({
+      where: { siteId: settings.siteId },
       orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
       take: 30
     }),
-    prisma.analyticsEvent.count(),
-    prisma.booking.count(),
-    prisma.booking.count({ where: { status: BookingStatus.COMPLETED } }),
-    prisma.formSubmission.count(),
-    prisma.portfolioGallery.count({ where: { status: PortfolioGalleryStatus.PUBLISHED } }),
-    prisma.analyticsEvent.count({ where: { eventType: AnalyticsEventType.GALLERY_VIEWED } }),
-    prisma.portfolioGalleryFavorite.count(),
-    prisma.order.count({ where: { status: OrderStatus.PAID } }),
+    prisma.analyticsEvent.count({ where: { siteId: settings.siteId } }),
+    prisma.booking.count({ where: { siteId: settings.siteId } }),
+    prisma.booking.count({ where: { siteId: settings.siteId, status: BookingStatus.COMPLETED } }),
+    prisma.formSubmission.count({ where: { form: { siteId: settings.siteId } } }),
+    prisma.portfolioGallery.count({ where: { siteId: settings.siteId, status: PortfolioGalleryStatus.PUBLISHED } }),
+    prisma.analyticsEvent.count({ where: { siteId: settings.siteId, eventType: AnalyticsEventType.GALLERY_VIEWED } }),
+    prisma.portfolioGalleryFavorite.count({ where: { gallery: { siteId: settings.siteId } } }),
+    prisma.order.count({ where: { siteId: settings.siteId, status: OrderStatus.PAID } }),
     prisma.order.aggregate({
-      where: { status: OrderStatus.PAID },
+      where: { siteId: settings.siteId, status: OrderStatus.PAID },
       _sum: { totalCents: true }
     })
   ]);
@@ -76,7 +79,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const goalProgress = await Promise.all(
     goals.map(async (goal) => {
       const progress = await prisma.analyticsEvent.aggregate({
-        where: goalWhere(goal),
+        where: goalWhere(goal, settings.siteId),
         _count: { _all: true },
         _sum: { valueCents: true }
       });

@@ -9,8 +9,83 @@ model AdminUser {
   updatedAt    DateTime @updatedAt
 }
 
+model Tenant {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sites     Site[]
+}
+
+model Site {
+  id                         String                 @id @default(cuid())
+  tenantId                   String
+  tenant                     Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  slug                       String
+  name                       String
+  isDefault                  Boolean                @default(false)
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+  domains                    SiteDomain[]
+  settings                   SiteSettings?
+  moduleInstallations        ModuleInstallation[]
+  publicRateLimits           PublicRateLimit[]
+  services                   Service[]
+  availabilityRules          AvailabilityRule[]
+  blockedTimes               BlockedTime[]
+  bookings                   Booking[]
+  clients                    Client[]
+  mediaAssets                MediaAsset[]
+  forms                      Form[]
+  testimonials               Testimonial[]
+  portfolioGalleries         PortfolioGallery[]
+  portfolioGalleryAccesses   PortfolioGalleryAccess[]
+  products                   Product[]
+  collections                Collection[]
+  coupons                    Coupon[]
+  carts                      Cart[]
+  orders                     Order[]
+  billingDocuments           BillingDocument[]
+  messageTemplates           MessageTemplate[]
+  messageLogs                MessageLog[]
+  suppressionListEntries     SuppressionListEntry[]
+  emailSendingDomains        EmailSendingDomain[]
+  emailSenderIdentities      EmailSenderIdentity[]
+  emailRecipientGroups       EmailRecipientGroup[]
+  emailOutboxes              EmailOutbox[]
+  emailProviderEvents        EmailProviderEvent[]
+  emailSubscriptionLists     EmailSubscriptionList[]
+  emailSubscribers           EmailSubscriber[]
+  emailCampaigns             EmailCampaign[]
+  automations                Automation[]
+  webhookEndpoints           WebhookEndpoint[]
+  analyticsEvents            AnalyticsEvent[]
+  analyticsGoals             AnalyticsGoal[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([isDefault])
+}
+
+model SiteDomain {
+  id         String    @id @default(cuid())
+  siteId     String
+  site       Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  hostname   String    @unique
+  isPrimary  Boolean   @default(false)
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([siteId])
+  @@index([isPrimary])
+}
+
 model SiteSettings {
   id              String      @id @default("site")
+  siteId          String      @unique @default("site")
+  site            Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
   businessName    String      @default("Showrunner")
   contactEmail    String      @default("admin@example.com")
   timezone        String      @default("America/Chicago")
@@ -29,7 +104,9 @@ model SiteSettings {
 
 model PublicRateLimit {
   id          String   @id @default(cuid())
-  key         String   @unique
+  siteId      String   @default("site")
+  site        Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  key         String
   scope       String
   identifier  String
   count       Int      @default(0)
@@ -37,6 +114,7 @@ model PublicRateLimit {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@index([scope, identifier])
+  @@unique([siteId, key])
+  @@index([siteId, scope, identifier])
   @@index([windowStart])
 }

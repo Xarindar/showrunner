@@ -1,11 +1,13 @@
 // Module installation/deployment state. Part of the merged Prisma schema (prismaSchemaFolder).
 // One ModuleInstallation row per installed module records install/enable/visibility/beta state and
 // per-module config, replacing the single SiteSettings.enabledModules JSON array as the richer source
-// of deployment truth. Single-site for now; a tenant/site scope is a separate foundation item.
+// of deployment truth.
 
 model ModuleInstallation {
   id              String          @id @default(cuid())
-  moduleId        String          @unique
+  siteId          String          @default("site")
+  site            Site            @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  moduleId        String
   installed       Boolean         @default(true)
   enabled         Boolean         @default(false)
   visibleToPublic Boolean         @default(false)
@@ -16,18 +18,20 @@ model ModuleInstallation {
   updatedAt       DateTime        @updatedAt
   moduleSettings  ModuleSetting[]
 
-  @@index([enabled])
+  @@unique([siteId, moduleId])
+  @@index([siteId, enabled])
 }
 
 model ModuleSetting {
   id           String             @id @default(cuid())
+  siteId       String             @default("site")
   moduleId     String
   key          String
   value        Json
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
-  installation ModuleInstallation @relation(fields: [moduleId], references: [moduleId], onDelete: Cascade)
+  installation ModuleInstallation @relation(fields: [siteId, moduleId], references: [siteId, moduleId], onDelete: Cascade)
 
-  @@unique([moduleId, key])
-  @@index([moduleId])
+  @@unique([siteId, moduleId, key])
+  @@index([siteId, moduleId])
 }

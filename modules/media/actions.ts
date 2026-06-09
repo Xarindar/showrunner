@@ -7,6 +7,7 @@ import { optionalStoredText, parseForm, requiredText } from "@/lib/admin-validat
 import { requireAdmin } from "@/lib/auth";
 import { mediaTagsFromInput, normalizeMediaFolder, uploadMedia } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 
 const mediaMetadataSchema = z
   .object({
@@ -75,8 +76,8 @@ export async function updateMediaAssetAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(mediaUpdateSchema, formData, "/admin/modules/media");
 
-  await prisma.mediaAsset.update({
-    where: { id: input.id },
+  await prisma.mediaAsset.updateMany({
+    where: { id: input.id, siteId: DEFAULT_SITE_ID },
     data: {
       alt: input.isDecorative ? "" : input.alt,
       caption: input.caption,
@@ -96,8 +97,8 @@ export async function archiveMediaAssetAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(mediaArchiveSchema, formData, "/admin/modules/media");
 
-  await prisma.mediaAsset.update({
-    where: { id: input.id },
+  await prisma.mediaAsset.updateMany({
+    where: { id: input.id, siteId: DEFAULT_SITE_ID },
     data: { deletedAt: new Date() }
   });
 
@@ -109,8 +110,8 @@ export async function restoreMediaAssetAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(mediaRestoreSchema, formData, "/admin/modules/media");
 
-  await prisma.mediaAsset.update({
-    where: { id: input.id },
+  await prisma.mediaAsset.updateMany({
+    where: { id: input.id, siteId: DEFAULT_SITE_ID },
     data: { deletedAt: null }
   });
 
@@ -123,7 +124,7 @@ export async function setHeroImageAction(formData: FormData) {
 
   const url = String(formData.get("url") || "/hero.svg");
   await prisma.siteSettings.update({
-    where: { id: "site" },
+    where: { siteId: DEFAULT_SITE_ID },
     data: { heroImageUrl: url }
   });
 

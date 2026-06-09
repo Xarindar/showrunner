@@ -42,6 +42,8 @@ enum WebhookDeliveryStatus {
 
 model Automation {
   id                   String            @id @default(cuid())
+  siteId               String            @default("site")
+  site                 Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
   name                 String
   status               AutomationStatus  @default(DRAFT)
   trigger              AutomationTrigger @default(MANUAL)
@@ -58,7 +60,7 @@ model Automation {
   runs                 AutomationRun[]
   webhookDeliveries    WebhookDelivery[]
 
-  @@index([status])
+  @@index([siteId, status])
   @@index([trigger])
 }
 
@@ -79,6 +81,8 @@ model AutomationRun {
 
 model WebhookEndpoint {
   id            String            @id @default(cuid())
+  siteId        String            @default("site")
+  site          Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
   name          String
   url           String
   signingSecret String            @default("")
@@ -88,7 +92,7 @@ model WebhookEndpoint {
   updatedAt     DateTime          @updatedAt
   deliveries    WebhookDelivery[]
 
-  @@index([status])
+  @@index([siteId, status])
 }
 
 model WebhookDelivery {

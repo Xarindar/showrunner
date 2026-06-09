@@ -14,12 +14,11 @@ type SchedulingPageProps = {
 };
 
 export default async function SchedulingPage({ searchParams }: SchedulingPageProps) {
-  const [params, services, availability, blockouts, settings] = await Promise.all([
-    searchParams,
-    prisma.service.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.availabilityRule.findMany({ orderBy: [{ weekday: "asc" }, { startMinutes: "asc" }] }),
-    prisma.blockedTime.findMany({ orderBy: { startsAt: "asc" }, take: 20 }),
-    getSiteSettings()
+  const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
+  const [services, availability, blockouts] = await Promise.all([
+    prisma.service.findMany({ where: { siteId: settings.siteId }, orderBy: { createdAt: "asc" } }),
+    prisma.availabilityRule.findMany({ where: { siteId: settings.siteId }, orderBy: [{ weekday: "asc" }, { startMinutes: "asc" }] }),
+    prisma.blockedTime.findMany({ where: { siteId: settings.siteId }, orderBy: { startsAt: "asc" }, take: 20 })
   ]);
   const selectedServiceId = services.some((service) => service.id === params.diagnosticServiceId)
     ? String(params.diagnosticServiceId)

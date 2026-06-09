@@ -35,25 +35,25 @@ function fileSizeLabel(bytes: number) {
 
 export default async function MediaPage({ searchParams }: MediaPageProps) {
   const params = await searchParams;
+  const settings = await getSiteSettings();
   const page = Math.max(1, Number(params.page || 1) || 1);
-  const [settings, mediaAssets, assetCount, archivedAssets, archivedCount, folderGroups] = await Promise.all([
-    getSiteSettings(),
+  const [mediaAssets, assetCount, archivedAssets, archivedCount, folderGroups] = await Promise.all([
     prisma.mediaAsset.findMany({
-      where: { deletedAt: null },
+      where: { siteId: settings.siteId, deletedAt: null },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize
     }),
-    prisma.mediaAsset.count({ where: { deletedAt: null } }),
+    prisma.mediaAsset.count({ where: { siteId: settings.siteId, deletedAt: null } }),
     prisma.mediaAsset.findMany({
-      where: { deletedAt: { not: null } },
+      where: { siteId: settings.siteId, deletedAt: { not: null } },
       orderBy: { deletedAt: "desc" },
       take: 8
     }),
-    prisma.mediaAsset.count({ where: { deletedAt: { not: null } } }),
+    prisma.mediaAsset.count({ where: { siteId: settings.siteId, deletedAt: { not: null } } }),
     prisma.mediaAsset.groupBy({
       by: ["folder"],
-      where: { deletedAt: null },
+      where: { siteId: settings.siteId, deletedAt: null },
       _count: { _all: true },
       orderBy: { folder: "asc" },
       take: 8

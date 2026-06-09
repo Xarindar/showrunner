@@ -3,6 +3,7 @@ import { BadgeDollarSign, Boxes, CreditCard, PackagePlus, ReceiptText, Tags } fr
 import { nextOrderStatuses } from "@/lib/commerce/orders";
 import { enumLabel, formatDateTime, formatMoney, stringArrayCsv } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { getSiteSettings } from "@/lib/site";
 import {
   addProductToCollectionAction,
   clearCommerceOrderCheckoutLinkAction,
@@ -51,10 +52,10 @@ function currencyTotalsLabel(totals: { currency: string; _sum: { totalCents: num
 }
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
-  const params = await searchParams;
+  const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
-  const productWhere = statusFilter === "all" ? {} : { status: statusFilter.toUpperCase() as ProductStatus };
+  const productWhere = statusFilter === "all" ? { siteId: settings.siteId } : { siteId: settings.siteId, status: statusFilter.toUpperCase() as ProductStatus };
 
   const [products, productCount, activeCount, collections, coupons, orderCount, paidOrderTotals, openCartCount, orders] = await Promise.all([
     prisma.product.findMany({
@@ -71,17 +72,18 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       take: pageSize
     }),
     prisma.product.count({ where: productWhere }),
-    prisma.product.count({ where: { status: ProductStatus.ACTIVE } }),
-    prisma.collection.findMany({ orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }] }),
-    prisma.coupon.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
-    prisma.order.count(),
+    prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.ACTIVE } }),
+    prisma.collection.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }] }),
+    prisma.coupon.findMany({ where: { siteId: settings.siteId }, orderBy: { createdAt: "desc" }, take: 12 }),
+    prisma.order.count({ where: { siteId: settings.siteId } }),
     prisma.order.groupBy({
       by: ["currency"],
-      where: { status: { in: [OrderStatus.PAID, OrderStatus.FULFILLED] } },
+      where: { siteId: settings.siteId, status: { in: [OrderStatus.PAID, OrderStatus.FULFILLED] } },
       _sum: { totalCents: true }
     }),
-    prisma.cart.count({ where: { status: CartStatus.OPEN } }),
+    prisma.cart.count({ where: { siteId: settings.siteId, status: CartStatus.OPEN } }),
     prisma.order.findMany({
+      where: { siteId: settings.siteId },
       include: {
         client: true,
         payments: { orderBy: { createdAt: "desc" }, take: 2 },
@@ -95,8 +97,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const selectedProduct = products.find((product) => product.id === params.product) || products[0];
   const selectedOrderId = params.order || orders[0]?.id;
   const selectedOrder = selectedOrderId
-    ? await prisma.order.findUnique({
-        where: { id: selectedOrderId },
+    ? await prisma.order.findFirst({
+        where: { id: selectedOrderId, siteId: settings.siteId },
         include: {
           client: true,
           items: {

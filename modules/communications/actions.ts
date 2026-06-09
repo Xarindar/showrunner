@@ -8,6 +8,7 @@ import { csvList, optionalEmailStored, optionalStoredText, parseForm, requiredTe
 import { requireAdmin } from "@/lib/auth";
 import { queueTemplateTestEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { getSiteSettings } from "@/lib/site";
 
 const messageTemplateSchema = z
   .object({
@@ -99,9 +100,11 @@ function parseTokenJson(value: string) {
 export async function createMessageTemplateAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(messageTemplateSchema, formData, "/admin/modules/communications");
+  const settings = await getSiteSettings();
 
   await prisma.messageTemplate.create({
     data: {
+      siteId: settings.siteId,
       name: input.name,
       purpose: input.purpose,
       channel: input.channel,
@@ -119,11 +122,16 @@ export async function createMessageTemplateAction(formData: FormData) {
 export async function updateMessageTemplateStatusAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(templateStatusSchema, formData, "/admin/modules/communications");
+  const settings = await getSiteSettings();
 
-  const template = await prisma.messageTemplate.findUnique({
-    where: { id: input.id },
+  const template = await prisma.messageTemplate.findFirst({
+    where: { id: input.id, siteId: settings.siteId },
     select: { key: true }
   });
+
+  if (!template) {
+    redirect(`/admin/modules/communications?error=${encodeURIComponent("Template not found.")}`);
+  }
 
   if (template?.key) {
     redirect(`/admin/modules/communications?error=${encodeURIComponent("System templates are read-only from this catalog.")}`);
@@ -140,10 +148,12 @@ export async function updateMessageTemplateStatusAction(formData: FormData) {
 export async function recordMessageLogAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(messageLogSchema, formData, "/admin/modules/communications");
+  const settings = await getSiteSettings();
   const sentAt = input.status === MessageLogStatus.SENT ? new Date() : undefined;
 
   await prisma.messageLog.create({
     data: {
+      siteId: settings.siteId,
       templateId: input.templateId || undefined,
       channel: input.channel,
       purpose: input.purpose || "general",
@@ -166,10 +176,12 @@ export async function recordMessageLogAction(formData: FormData) {
 export async function createSuppressionEntryAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(suppressionSchema, formData, "/admin/modules/communications");
+  const settings = await getSiteSettings();
 
   try {
     await prisma.suppressionListEntry.create({
       data: {
+        siteId: settings.siteId,
         email: input.email,
         reason: input.reason,
         source: input.source || "admin",
@@ -191,9 +203,10 @@ export async function createSuppressionEntryAction(formData: FormData) {
 export async function deleteSuppressionEntryAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(suppressionDeleteSchema, formData, "/admin/modules/communications");
+  const settings = await getSiteSettings();
 
-  await prisma.suppressionListEntry.delete({
-    where: { id: input.id }
+  await prisma.suppressionListEntry.deleteMany({
+    where: { id: input.id, siteId: settings.siteId }
   });
 
   refreshCommunications();
@@ -203,9 +216,11 @@ export async function deleteSuppressionEntryAction(formData: FormData) {
 export async function sendTemplateTestEmailAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(templateTestSendSchema, formData, "/admin/modules/communications");
+  const settings = await getSiteSettings();
 
   try {
     await queueTemplateTestEmail({
+      siteId: settings.siteId,
       templateId: input.templateId,
       recipientEmail: input.recipientEmail,
       tokens: parseTokenJson(input.tokensJson),

@@ -2,13 +2,15 @@ import "server-only";
 
 import { PortfolioAccessStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 
-export async function findActiveGalleryAccess(accessToken: string, galleryId?: string) {
+export async function findActiveGalleryAccess(accessToken: string, galleryId?: string, siteId = DEFAULT_SITE_ID) {
   const token = accessToken.trim();
   if (!token) return null;
 
   return prisma.portfolioGalleryAccess.findFirst({
     where: {
+      siteId,
       accessToken: token,
       galleryId,
       status: PortfolioAccessStatus.ACTIVE,
@@ -20,9 +22,9 @@ export async function findActiveGalleryAccess(accessToken: string, galleryId?: s
   });
 }
 
-export async function markGalleryAccessViewed(accessId: string) {
-  await prisma.portfolioGalleryAccess.update({
-    where: { id: accessId },
+export async function markGalleryAccessViewed(accessId: string, siteId = DEFAULT_SITE_ID) {
+  await prisma.portfolioGalleryAccess.updateMany({
+    where: { id: accessId, siteId },
     data: { lastViewedAt: new Date() }
   });
 }

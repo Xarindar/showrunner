@@ -24,10 +24,14 @@ function parseAddress(value: string | undefined) {
 }
 
 export async function resolveSender(input: ResolveSenderInput) {
+  const settings = await getSiteSettings();
   const requestedId = input.senderIdentityId || input.templateSenderIdentityId || undefined;
   const sender = requestedId
-    ? await prisma.emailSenderIdentity.findUnique({ where: { id: requestedId } })
-    : await prisma.emailSenderIdentity.findFirst({ where: { isDefault: true }, orderBy: { createdAt: "asc" } });
+    ? await prisma.emailSenderIdentity.findFirst({ where: { id: requestedId, siteId: settings.siteId } })
+    : await prisma.emailSenderIdentity.findFirst({
+        where: { siteId: settings.siteId, isDefault: true },
+        orderBy: { createdAt: "asc" }
+      });
 
   if (sender) {
     if (input.category === EmailCategory.MARKETING && !sender.isVerified) {
@@ -42,7 +46,6 @@ export async function resolveSender(input: ResolveSenderInput) {
     };
   }
 
-  const settings = await getSiteSettings();
   const envSender = parseAddress(process.env.SMTP_FROM);
   const fromEmail = envSender?.email || settings.contactEmail;
 

@@ -2,6 +2,7 @@ import "server-only";
 
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 import { slugify } from "@/lib/slug";
 
 const allowedImageTypes = new Map([
@@ -115,6 +116,7 @@ export async function uploadMedia(file: File, metadata: MediaUploadMetadata = {}
 
   return prisma.mediaAsset.create({
     data: {
+      siteId: DEFAULT_SITE_ID,
       driver: "R2",
       key,
       url,

@@ -17,10 +17,12 @@ enum BillingDocumentStatus {
 
 model BillingDocument {
   id                       String                @id @default(cuid())
-  documentNumber           String                @unique
+  siteId                   String                @default("site")
+  site                     Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  documentNumber           String
   type                     BillingDocumentType   @default(INVOICE)
   status                   BillingDocumentStatus @default(DRAFT)
-  publicAccessToken        String?               @unique
+  publicAccessToken        String?
   clientId                 String?
   client                   Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
   customerName             String
@@ -45,8 +47,10 @@ model BillingDocument {
   lineItems                BillingLineItem[]
   attachments              BillingAttachment[]
 
+  @@unique([siteId, documentNumber])
+  @@unique([siteId, publicAccessToken])
   @@index([clientId])
-  @@index([type, status])
+  @@index([siteId, type, status])
   @@index([customerEmail])
 }
 

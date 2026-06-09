@@ -17,7 +17,7 @@ export default async function HomePage() {
   const [forms, publicGalleries, testimonials] = await Promise.all([
     formsEnabled
       ? prisma.form.findMany({
-          where: { status: FormStatus.ACTIVE },
+          where: { siteId: settings.siteId, status: FormStatus.ACTIVE },
           orderBy: { updatedAt: "desc" },
           take: 3
         })
@@ -25,6 +25,7 @@ export default async function HomePage() {
     portfolioEnabled
       ? prisma.portfolioGallery.findMany({
           where: {
+            siteId: settings.siteId,
             status: PortfolioGalleryStatus.PUBLISHED,
             visibility: PortfolioGalleryVisibility.PUBLIC
           },
@@ -35,6 +36,7 @@ export default async function HomePage() {
     testimonialsEnabled
       ? prisma.testimonial.findMany({
           where: {
+            siteId: settings.siteId,
             status: TestimonialStatus.APPROVED,
             permissionGranted: true,
             featured: true

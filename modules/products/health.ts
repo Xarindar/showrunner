@@ -4,12 +4,13 @@ import { OrderStatus, ProductStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { warning, type ModuleHealthCheck } from "@/lib/platform-health";
 
-export const getHealth: ModuleHealthCheck = async () => {
+export const getHealth: ModuleHealthCheck = async ({ settings }) => {
   const warnings = [];
   const [activeProductCount, pendingCheckoutCount] = await Promise.all([
-    prisma.product.count({ where: { status: ProductStatus.ACTIVE } }),
+    prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.ACTIVE } }),
     prisma.order.count({
       where: {
+        siteId: settings.siteId,
         status: OrderStatus.PENDING,
         OR: [{ checkoutUrl: null }, { checkoutUrl: "" }]
       }

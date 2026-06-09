@@ -39,7 +39,7 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
   if (!settings.enabledModuleIds.includes("billing")) notFound();
 
   const document = await prisma.billingDocument.findUnique({
-    where: { publicAccessToken: token },
+    where: { siteId_publicAccessToken: { siteId: settings.siteId, publicAccessToken: token } },
     include: {
       lineItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
       attachments: { orderBy: { createdAt: "desc" } }

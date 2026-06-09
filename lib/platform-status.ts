@@ -37,7 +37,7 @@ export type PlatformStatus = {
 export type PlatformFoundationItem = {
   key: string;
   title: string;
-  status: "planned" | "schema-needed" | "policy-needed";
+  status: "planned" | "schema-needed" | "schema-ready" | "policy-needed";
   detail: string;
   models: string[];
 };
@@ -46,8 +46,8 @@ export const platformFoundationItems: PlatformFoundationItem[] = [
   {
     key: "site-tenant",
     title: "Site and tenant boundary",
-    status: "schema-needed",
-    detail: "Add Tenant, Site, and SiteDomain so slugs, coupons, domains, public keys, and access tokens can be scoped before multi-site rollout.",
+    status: "schema-ready",
+    detail: "Tenant, Site, and SiteDomain exist with a default site; site-owned records carry siteId and composite uniques. Domain resolution and multi-site UI remain future work.",
     models: ["Tenant", "Site", "SiteDomain"]
   },
   {

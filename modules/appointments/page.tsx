@@ -21,16 +21,18 @@ function normalizeStatusFilter(value?: string) {
 export default async function AppointmentsPage({ searchParams }: AppointmentsPageProps = {}) {
   const now = new Date();
   const params = searchParams ? await searchParams : {};
+  const settings = await getSiteSettings();
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
-  const bookingWhere: Prisma.BookingWhereInput =
+  const statusWhere: Prisma.BookingWhereInput =
     statusFilter === "upcoming"
       ? { status: { not: BookingStatus.CANCELED }, startsAt: { gte: now } }
       : statusFilter === "all"
         ? {}
         : { status: statusFilter.toUpperCase() as BookingStatus };
+  const bookingWhere: Prisma.BookingWhereInput = { siteId: settings.siteId, ...statusWhere };
 
-  const [bookings, bookingCount, pendingCount, upcomingCount, settings] = await Promise.all([
+  const [bookings, bookingCount, pendingCount, upcomingCount] = await Promise.all([
     prisma.booking.findMany({
       where: bookingWhere,
       include: { service: true },
@@ -39,14 +41,14 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
       take: pageSize
     }),
     prisma.booking.count({ where: bookingWhere }),
-    prisma.booking.count({ where: { status: "PENDING" } }),
+    prisma.booking.count({ where: { siteId: settings.siteId, status: "PENDING" } }),
     prisma.booking.count({
       where: {
+        siteId: settings.siteId,
         status: { not: "CANCELED" },
         startsAt: { gte: now }
       }
-    }),
-    getSiteSettings()
+    })
   ]);
   const pageCount = Math.max(1, Math.ceil(bookingCount / pageSize));
 

@@ -28,7 +28,7 @@ function moneySnapshot(cents: number, currency: string) {
 export async function ensureBillingPublicToken(tx: BillingTx, documentId: string) {
   const document = await tx.billingDocument.findUnique({
     where: { id: documentId },
-    select: { publicAccessToken: true }
+    select: { publicAccessToken: true, siteId: true }
   });
 
   if (!document) throw new Error("Billing document not found.");
@@ -36,8 +36,8 @@ export async function ensureBillingPublicToken(tx: BillingTx, documentId: string
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const publicAccessToken = generateBillingPublicToken();
-    const existing = await tx.billingDocument.findUnique({
-      where: { publicAccessToken },
+    const existing = await tx.billingDocument.findFirst({
+      where: { siteId: document.siteId, publicAccessToken },
       select: { id: true }
     });
 

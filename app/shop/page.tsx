@@ -17,7 +17,7 @@ export default async function ShopPage() {
 
   const [products, collections] = await Promise.all([
     prisma.product.findMany({
-      where: { status: ProductStatus.ACTIVE },
+      where: { siteId: settings.siteId, status: ProductStatus.ACTIVE },
       include: {
         variants: {
           where: { isActive: true },
@@ -27,7 +27,7 @@ export default async function ShopPage() {
       orderBy: { createdAt: "desc" }
     }),
     prisma.collection.findMany({
-      where: { status: ProductStatus.ACTIVE, isFeatured: true },
+      where: { siteId: settings.siteId, status: ProductStatus.ACTIVE, isFeatured: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       take: 6
     })

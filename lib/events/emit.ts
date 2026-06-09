@@ -12,6 +12,7 @@ import { cookies, headers } from "next/headers";
 import { moduleEventCatalog, type ModuleEventName } from "@/lib/events/catalog";
 import { queueWebhookDelivery } from "@/lib/events/webhook-delivery";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -171,6 +172,7 @@ async function recordAnalyticsEvent(envelope: EventEnvelope, dedupeWindowMinutes
     if (identityWhere) {
       const existing = await prisma.analyticsEvent.findFirst({
         where: {
+          siteId: DEFAULT_SITE_ID,
           ...identityWhere,
           eventName: definition.analyticsEventName,
           eventType: definition.analyticsEventType,
@@ -188,6 +190,7 @@ async function recordAnalyticsEvent(envelope: EventEnvelope, dedupeWindowMinutes
 
   await prisma.analyticsEvent.create({
     data: {
+      siteId: DEFAULT_SITE_ID,
       eventType: definition.analyticsEventType,
       eventName: definition.analyticsEventName,
       source: envelope.source || "",
@@ -238,6 +241,7 @@ async function recordMatchedAutomationRuns(envelope: EventEnvelope) {
   const definition = moduleEventCatalog[envelope.name];
   const automations = await prisma.automation.findMany({
     where: {
+      siteId: DEFAULT_SITE_ID,
       status: AutomationStatus.ACTIVE,
       trigger: definition.automationTrigger
     }
@@ -309,7 +313,7 @@ function endpointEvents(value: Prisma.JsonValue) {
 
 async function queueSubscribedWebhookEndpoints(envelope: EventEnvelope) {
   const endpoints = await prisma.webhookEndpoint.findMany({
-    where: { status: AutomationStatus.ACTIVE }
+    where: { siteId: DEFAULT_SITE_ID, status: AutomationStatus.ACTIVE }
   });
   const subscribed = endpoints.filter((endpoint) => endpointEvents(endpoint.events).includes(envelope.name));
   const body = JSON.stringify(envelope);

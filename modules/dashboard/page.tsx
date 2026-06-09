@@ -23,10 +23,12 @@ function warningPillClassName(severity: PlatformWarningSeverity) {
 }
 
 export default async function AdminDashboardPage() {
-  const [bookings, upcomingCount, pendingCount, activeServiceCount, mediaCount, clientCount, settings] = await Promise.all([
+  const settings = await getSiteSettings();
+  const [bookings, upcomingCount, pendingCount, activeServiceCount, mediaCount, clientCount] = await Promise.all([
     prisma.booking.findMany({
       include: { service: true },
       where: {
+        siteId: settings.siteId,
         status: { in: ["PENDING", "CONFIRMED"] },
         startsAt: { gte: new Date() }
       },
@@ -35,23 +37,25 @@ export default async function AdminDashboardPage() {
     }),
     prisma.booking.count({
       where: {
+        siteId: settings.siteId,
         status: { in: ["PENDING", "CONFIRMED"] },
         startsAt: { gte: new Date() }
       }
     }),
     prisma.booking.count({
       where: {
+        siteId: settings.siteId,
         status: "PENDING"
       }
     }),
     prisma.service.count({
       where: {
+        siteId: settings.siteId,
         isActive: true
       }
     }),
-    prisma.mediaAsset.count(),
-    prisma.client.count(),
-    getSiteSettings()
+    prisma.mediaAsset.count({ where: { siteId: settings.siteId } }),
+    prisma.client.count({ where: { siteId: settings.siteId } })
   ]);
   const platformStatus = await getPlatformStatus(settings);
   const warningPriority = { critical: 0, warning: 1, info: 2 } satisfies Record<PlatformWarningSeverity, number>;

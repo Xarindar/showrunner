@@ -26,7 +26,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   if (!settings.enabledModuleIds.includes("products")) notFound();
 
   const product = await prisma.product.findUnique({
-    where: { slug },
+    where: { siteId_slug: { siteId: settings.siteId, slug } },
     include: {
       variants: {
         where: { isActive: true },

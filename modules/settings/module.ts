@@ -15,13 +15,14 @@ export const manifest = {
     level: "partial",
     mode: "mixed",
     summary: "Single-site business, theme, media, and module toggles are live.",
-    primaryGap: "Tenant/site tables, module installation records, policies, roles, and audit logs are still pending."
+    primaryGap: "Tenant/site boundary and module installation records are in place; policies, roles, and audit logs remain pending."
   },
   capabilities: [
     { label: "Business identity", status: "live" },
     { label: "Theme and media settings", status: "live" },
     { label: "Module toggles", status: "live" },
-    { label: "Tenant and policy settings", status: "planned" }
+    { label: "Tenant/site boundary", status: "foundation" },
+    { label: "Policy, roles, and audit controls", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/settings"],
   dependencies: ["dashboard"],

@@ -38,6 +38,7 @@ export async function GET(request: NextRequest, { params }: GalleryMediaRoutePro
     where: {
       id: itemId,
       gallery: {
+        siteId: settings.siteId,
         slug,
         status: PortfolioGalleryStatus.PUBLISHED
       }
@@ -55,11 +56,11 @@ export async function GET(request: NextRequest, { params }: GalleryMediaRoutePro
   if (!item?.mediaAssetId) return notFound();
 
   const accessToken = request.nextUrl.searchParams.get("access") || request.nextUrl.searchParams.get("token") || "";
-  const access = accessToken ? await findActiveGalleryAccess(accessToken, item.gallery.id) : null;
+  const access = accessToken ? await findActiveGalleryAccess(accessToken, item.gallery.id, settings.siteId) : null;
   if (item.gallery.visibility !== PortfolioGalleryVisibility.PUBLIC && !access) return notFound();
 
-  const asset = await prisma.mediaAsset.findUnique({
-    where: { id: item.mediaAssetId },
+  const asset = await prisma.mediaAsset.findFirst({
+    where: { id: item.mediaAssetId, siteId: settings.siteId },
     select: {
       deletedAt: true,
       filename: true,

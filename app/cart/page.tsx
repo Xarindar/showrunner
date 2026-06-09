@@ -41,7 +41,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
   const cartResult = await getOpenCart(cartId);
   const preparedOrder = query.order
     ? await prisma.order.findUnique({
-        where: { orderNumber: query.order },
+        where: { siteId_orderNumber: { siteId: settings.siteId, orderNumber: query.order } },
         include: { payments: { orderBy: { createdAt: "desc" }, take: 1 } }
       })
     : null;

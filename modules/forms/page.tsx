@@ -85,7 +85,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
-  const formWhere = statusFilter === "all" ? {} : { status: statusFilter.toUpperCase() as FormStatus };
+  const formWhere = statusFilter === "all" ? { siteId: settings.siteId } : { siteId: settings.siteId, status: statusFilter.toUpperCase() as FormStatus };
 
   const [forms, formCount, activeCount, submissionCount, fieldCount] = await Promise.all([
     prisma.form.findMany({
@@ -98,15 +98,15 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
       take: pageSize
     }),
     prisma.form.count({ where: formWhere }),
-    prisma.form.count({ where: { status: FormStatus.ACTIVE } }),
-    prisma.formSubmission.count(),
-    prisma.formField.count()
+    prisma.form.count({ where: { siteId: settings.siteId, status: FormStatus.ACTIVE } }),
+    prisma.formSubmission.count({ where: { form: { siteId: settings.siteId } } }),
+    prisma.formField.count({ where: { form: { siteId: settings.siteId } } })
   ]);
 
   const selectedFormId = params.form || forms[0]?.id;
   const selectedForm = selectedFormId
-    ? await prisma.form.findUnique({
-        where: { id: selectedFormId },
+    ? await prisma.form.findFirst({
+        where: { id: selectedFormId, siteId: settings.siteId },
         include: {
           fields: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
           submissions: {

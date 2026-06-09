@@ -93,7 +93,9 @@ enum EmailCampaignStatus {
 
 model MessageTemplate {
   id               String                 @id @default(cuid())
-  key              String?                @unique
+  siteId           String                 @default("site")
+  site             Site                   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  key              String?
   name             String
   description      String                 @default("")
   purpose          MessageTemplatePurpose @default(GENERAL)
@@ -116,7 +118,8 @@ model MessageTemplate {
   logs             MessageLog[]
   outbox           EmailOutbox[]
 
-  @@index([purpose])
+  @@unique([siteId, key])
+  @@index([siteId, purpose])
   @@index([channel])
   @@index([isActive])
   @@index([senderIdentityId])
@@ -124,6 +127,8 @@ model MessageTemplate {
 
 model MessageLog {
   id             String           @id @default(cuid())
+  siteId         String           @default("site")
+  site           Site             @relation(fields: [siteId], references: [id], onDelete: Cascade)
   templateId     String?
   template       MessageTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   clientId       String?
@@ -144,22 +149,29 @@ model MessageLog {
 
   @@index([templateId])
   @@index([clientId])
-  @@index([status])
+  @@index([siteId, status])
   @@index([recipientEmail])
 }
 
 model SuppressionListEntry {
   id        String                @id @default(cuid())
-  email     String                @unique
+  siteId    String                @default("site")
+  site      Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  email     String
   reason    String                @default("")
   source    String                @default("admin")
   scope     EmailSuppressionScope @default(MARKETING)
   createdAt DateTime              @default(now())
+
+  @@unique([siteId, email])
+  @@index([siteId])
 }
 
 model EmailSendingDomain {
   id            String                   @id @default(cuid())
-  domain        String                   @unique
+  siteId        String                   @default("site")
+  site          Site                     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  domain        String
   status        EmailSendingDomainStatus @default(PENDING)
   spfStatus     EmailCheckStatus         @default(UNKNOWN)
   dkimStatus    EmailCheckStatus         @default(UNKNOWN)
@@ -168,10 +180,15 @@ model EmailSendingDomain {
   createdAt     DateTime                 @default(now())
   updatedAt     DateTime                 @updatedAt
   senders       EmailSenderIdentity[]
+
+  @@unique([siteId, domain])
+  @@index([siteId])
 }
 
 model EmailSenderIdentity {
   id              String              @id @default(cuid())
+  siteId          String              @default("site")
+  site            Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
   sendingDomainId String?
   sendingDomain   EmailSendingDomain? @relation(fields: [sendingDomainId], references: [id], onDelete: SetNull)
   name            String
@@ -185,20 +202,25 @@ model EmailSenderIdentity {
   outbox          EmailOutbox[]
   campaigns       EmailCampaign[]
 
-  @@index([sendingDomainId])
+  @@index([siteId, sendingDomainId])
   @@index([isDefault])
   @@index([fromEmail])
 }
 
 model EmailRecipientGroup {
   id                     String           @id @default(cuid())
-  key                    String           @unique
+  siteId                 String           @default("site")
+  site                   Site             @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  key                    String
   label                  String
   fallbackToContactEmail Boolean          @default(true)
   isActive               Boolean          @default(true)
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
   recipients             EmailRecipient[]
+
+  @@unique([siteId, key])
+  @@index([siteId])
 }
 
 model EmailRecipient {
@@ -218,7 +240,9 @@ model EmailRecipient {
 
 model EmailOutbox {
   id                String               @id @default(cuid())
-  idempotencyKey    String               @unique
+  siteId            String               @default("site")
+  site              Site                 @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  idempotencyKey    String
   templateId        String?
   template          MessageTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
   templateKey       String               @default("")
@@ -255,7 +279,8 @@ model EmailOutbox {
   updatedAt         DateTime             @updatedAt
   providerEvents    EmailProviderEvent[]
 
-  @@index([templateId])
+  @@unique([siteId, idempotencyKey])
+  @@index([siteId, templateId])
   @@index([senderIdentityId])
   @@index([campaignId])
   @@index([subscriberId])
@@ -267,7 +292,9 @@ model EmailOutbox {
 
 model EmailProviderEvent {
   id                String                 @id @default(cuid())
-  eventKey          String                 @unique
+  siteId            String                 @default("site")
+  site              Site                   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  eventKey          String
   outboxId          String?
   outbox            EmailOutbox?           @relation(fields: [outboxId], references: [id], onDelete: SetNull)
   providerMessageId String                 @default("")
@@ -275,13 +302,16 @@ model EmailProviderEvent {
   providerPayload   Json                   @default("{}")
   createdAt         DateTime               @default(now())
 
-  @@index([outboxId])
+  @@unique([siteId, eventKey])
+  @@index([siteId, outboxId])
   @@index([providerMessageId])
   @@index([eventType])
 }
 
 model EmailSubscriptionList {
   id          String                @id @default(cuid())
+  siteId      String                @default("site")
+  site        Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
   name        String
   description String                @default("")
   isDefault   Boolean               @default(false)
@@ -289,12 +319,14 @@ model EmailSubscriptionList {
   updatedAt   DateTime              @updatedAt
   memberships EmailListMembership[]
 
-  @@index([isDefault])
+  @@index([siteId, isDefault])
 }
 
 model EmailSubscriber {
   id               String                @id @default(cuid())
-  email            String                @unique
+  siteId           String                @default("site")
+  site             Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  email            String
   name             String                @default("")
   clientId         String?
   client           Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
@@ -308,8 +340,9 @@ model EmailSubscriber {
   memberships      EmailListMembership[]
   outbox           EmailOutbox[]
 
+  @@unique([siteId, email])
   @@index([clientId])
-  @@index([status])
+  @@index([siteId, status])
 }
 
 model EmailListMembership {
@@ -329,6 +362,8 @@ model EmailListMembership {
 
 model EmailCampaign {
   id                    String               @id @default(cuid())
+  siteId                String               @default("site")
+  site                  Site                 @relation(fields: [siteId], references: [id], onDelete: Cascade)
   name                  String
   subject               String
   previewText           String               @default("")
@@ -349,6 +384,6 @@ model EmailCampaign {
   updatedAt             DateTime             @updatedAt
   outbox                EmailOutbox[]
 
-  @@index([senderIdentityId])
-  @@index([status])
+  @@index([siteId, senderIdentityId])
+  @@index([siteId, status])
 }

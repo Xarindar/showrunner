@@ -3,11 +3,11 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { warning, type ModuleHealthCheck } from "@/lib/platform-health";
 
-export const getHealth: ModuleHealthCheck = async () => {
+export const getHealth: ModuleHealthCheck = async ({ settings }) => {
   const warnings = [];
   const [activeServiceCount, availabilityRuleCount] = await Promise.all([
-    prisma.service.count({ where: { isActive: true } }),
-    prisma.availabilityRule.count()
+    prisma.service.count({ where: { siteId: settings.siteId, isActive: true } }),
+    prisma.availabilityRule.count({ where: { siteId: settings.siteId } })
   ]);
 
   if (activeServiceCount === 0) {

@@ -4,11 +4,11 @@ import { PortfolioAccessStatus, PortfolioGalleryStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { warning, type ModuleHealthCheck } from "@/lib/platform-health";
 
-export const getHealth: ModuleHealthCheck = async () => {
+export const getHealth: ModuleHealthCheck = async ({ settings }) => {
   const warnings = [];
   const [publishedGalleryCount, activeGalleryAccessCount] = await Promise.all([
-    prisma.portfolioGallery.count({ where: { status: PortfolioGalleryStatus.PUBLISHED } }),
-    prisma.portfolioGalleryAccess.count({ where: { status: PortfolioAccessStatus.ACTIVE } })
+    prisma.portfolioGallery.count({ where: { siteId: settings.siteId, status: PortfolioGalleryStatus.PUBLISHED } }),
+    prisma.portfolioGalleryAccess.count({ where: { siteId: settings.siteId, status: PortfolioAccessStatus.ACTIVE } })
   ]);
 
   if (publishedGalleryCount > 0 || activeGalleryAccessCount > 0) {

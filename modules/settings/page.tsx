@@ -22,7 +22,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <div>
           <p className="eyebrow">Settings</p>
           <h1 style={{ fontSize: "2.4rem" }}>Client configuration</h1>
-          <p>Business details, visual basics, media mode, module state, and the platform foundations still needed before multi-site rollout.</p>
+          <p>Business details, visual basics, media mode, module state, and platform foundations for multi-site, roles, audit, and policy controls.</p>
         </div>
       </header>
 
@@ -40,7 +40,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </div>
         <div className="card">
           <h2 style={{ fontSize: "1.2rem" }}>Security and data</h2>
-          <p>{platformFoundationItems.length} foundation items identified for roles, audit logs, site scoping, and policy controls.</p>
+          <p>{platformFoundationItems.length} foundation items tracked for roles, audit logs, site scoping, and policy controls.</p>
         </div>
       </section>
 
@@ -129,12 +129,12 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <section className="subpanel form-grid">
           <div>
             <h2 style={{ fontSize: "1.2rem" }}>Security and data foundations</h2>
-            <p>These schema and policy items are identified, but not migrated in this pass.</p>
+            <p>These schema and policy items track what is in place and what remains before multi-site rollout.</p>
           </div>
           <div className="foundation-list">
             {platformFoundationItems.map((item) => (
               <div className="foundation-row" key={item.key}>
-                <span className="pill warning">{item.status.replaceAll("-", " ")}</span>
+                <span className={item.status === "schema-ready" ? "pill success" : "pill warning"}>{item.status.replaceAll("-", " ")}</span>
                 <span>
                   <strong>{item.title}</strong>
                   <small>{item.detail}</small>

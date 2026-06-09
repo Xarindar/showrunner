@@ -24,6 +24,13 @@ import {
 } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
+import {
+  DEFAULT_SITE_ID,
+  DEFAULT_SITE_NAME,
+  DEFAULT_SITE_SLUG,
+  DEFAULT_TENANT_ID,
+  DEFAULT_TENANT_SLUG
+} from "../lib/site-boundary";
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/showrunner"
@@ -53,7 +60,7 @@ const enabledModules = [
   "help"
 ];
 
-async function seedEmailCore(businessName: string, contactEmail: string) {
+async function seedEmailCore(businessName: string, contactEmail: string, siteId = DEFAULT_SITE_ID) {
   const sender = await prisma.emailSenderIdentity.upsert({
     where: { id: "email-sender-default" },
     update: {
@@ -63,6 +70,7 @@ async function seedEmailCore(businessName: string, contactEmail: string) {
     },
     create: {
       id: "email-sender-default",
+      siteId,
       name: businessName,
       fromEmail: contactEmail,
       replyToEmail: contactEmail,
@@ -79,9 +87,9 @@ async function seedEmailCore(businessName: string, contactEmail: string) {
     { id: "email-group-system", key: "system", label: "System" }
   ]) {
     await prisma.emailRecipientGroup.upsert({
-      where: { key: group.key },
+      where: { siteId_key: { siteId, key: group.key } },
       update: { label: group.label, fallbackToContactEmail: true, isActive: true },
-      create: { ...group, fallbackToContactEmail: true, isActive: true }
+      create: { ...group, siteId, fallbackToContactEmail: true, isActive: true }
     });
   }
 
@@ -96,9 +104,10 @@ async function seedEmailCore(businessName: string, contactEmail: string) {
   await prisma.emailSubscriptionList.upsert({
     where: { id: "email-list-newsletter" },
     update: { isDefault: true },
-    create: {
-      id: "email-list-newsletter",
-      name: "Newsletter",
+      create: {
+        id: "email-list-newsletter",
+        siteId,
+        name: "Newsletter",
       description: "Default marketing list for site updates and announcements.",
       isDefault: true
     }
@@ -299,10 +308,11 @@ async function seedEmailCore(businessName: string, contactEmail: string) {
 
   for (const template of templates) {
     await prisma.messageTemplate.upsert({
-      where: { key: template.key },
+      where: { siteId_key: { siteId, key: template.key } },
       update: { senderIdentityId: sender.id },
       create: {
         id: template.id,
+        siteId,
         key: template.key,
         name: template.name,
         description: template.description,
@@ -330,18 +340,41 @@ async function main() {
   const passwordHash = await bcrypt.hash(password, 12);
   const resetAdminPassword = process.env.RESET_ADMIN_PASSWORD === "true";
 
+  await prisma.tenant.upsert({
+    where: { id: DEFAULT_TENANT_ID },
+    update: {},
+    create: {
+      id: DEFAULT_TENANT_ID,
+      slug: DEFAULT_TENANT_SLUG,
+      name: "Default tenant"
+    }
+  });
+
+  await prisma.site.upsert({
+    where: { id: DEFAULT_SITE_ID },
+    update: {},
+    create: {
+      id: DEFAULT_SITE_ID,
+      tenantId: DEFAULT_TENANT_ID,
+      slug: DEFAULT_SITE_SLUG,
+      name: DEFAULT_SITE_NAME,
+      isDefault: true
+    }
+  });
+
   const settings = await prisma.siteSettings.upsert({
-    where: { id: "site" },
+    where: { siteId: DEFAULT_SITE_ID },
     update: { businessName: "Showrunner", enabledModules },
     create: {
-      id: "site",
+      id: DEFAULT_SITE_ID,
+      siteId: DEFAULT_SITE_ID,
       businessName: "Showrunner",
       themePreset: "clean",
       enabledModules
     }
   });
 
-  await seedEmailCore(settings.businessName, settings.contactEmail);
+  await seedEmailCore(settings.businessName, settings.contactEmail, settings.siteId);
 
   await prisma.adminUser.upsert({
     where: { email },
@@ -368,6 +401,7 @@ async function main() {
     },
     create: {
       id: "seed-consultation",
+      siteId: settings.siteId,
       slug: "consultation",
       name: "Consultation",
       description: "A focused appointment to understand the project and next steps.",
@@ -385,10 +419,11 @@ async function main() {
     }
   });
 
-  const hasAvailability = await prisma.availabilityRule.count();
+  const hasAvailability = await prisma.availabilityRule.count({ where: { siteId: settings.siteId } });
   if (!hasAvailability) {
     await prisma.availabilityRule.createMany({
       data: [1, 2, 3, 4, 5].map((weekday) => ({
+        siteId: settings.siteId,
         weekday,
         startMinutes: 9 * 60,
         endMinutes: 17 * 60
@@ -400,12 +435,13 @@ async function main() {
   console.log(`Default service: ${consultation.name}`);
 
   const starterCollection = await prisma.collection.upsert({
-    where: { slug: "featured" },
+    where: { siteId_slug: { siteId: settings.siteId, slug: "featured" } },
     update: {
       status: ProductStatus.ACTIVE,
       isFeatured: true
     },
     create: {
+      siteId: settings.siteId,
       slug: "featured",
       name: "Featured",
       description: "Starter collection for highlighted products, packages, or print sales.",
@@ -415,11 +451,12 @@ async function main() {
   });
 
   const starterProduct = await prisma.product.upsert({
-    where: { slug: "starter-package" },
+    where: { siteId_slug: { siteId: settings.siteId, slug: "starter-package" } },
     update: {
       status: ProductStatus.ACTIVE
     },
     create: {
+      siteId: settings.siteId,
       slug: "starter-package",
       name: "Starter Package",
       summary: "A sample commerce item for package, deposit, or product sales.",
@@ -461,9 +498,10 @@ async function main() {
   });
 
   await prisma.coupon.upsert({
-    where: { code: "WELCOME10" },
+    where: { siteId_code: { siteId: settings.siteId, code: "WELCOME10" } },
     update: {},
     create: {
+      siteId: settings.siteId,
       code: "WELCOME10",
       type: CouponType.PERCENT,
       percentOff: 10,
@@ -474,12 +512,13 @@ async function main() {
   console.log(`Starter product: ${starterProduct.name}`);
 
   const inquiryForm = await prisma.form.upsert({
-    where: { slug: "contact-inquiry" },
+    where: { siteId_slug: { siteId: settings.siteId, slug: "contact-inquiry" } },
     update: {
       status: FormStatus.ACTIVE,
       destination: FormDestination.INQUIRY
     },
     create: {
+      siteId: settings.siteId,
       slug: "contact-inquiry",
       name: "Contact inquiry",
       description: "A public lead form for the example front end.",
@@ -525,12 +564,13 @@ async function main() {
   }
 
   const intakeForm = await prisma.form.upsert({
-    where: { slug: "booking-intake" },
+    where: { siteId_slug: { siteId: settings.siteId, slug: "booking-intake" } },
     update: {
       status: FormStatus.ACTIVE,
       destination: FormDestination.BOOKING
     },
     create: {
+      siteId: settings.siteId,
       slug: "booking-intake",
       name: "Booking intake",
       description: "Starter intake questions that can attach to a booking workflow later.",
@@ -576,6 +616,7 @@ async function main() {
     },
     create: {
       id: "seed-testimonial-1",
+      siteId: settings.siteId,
       authorName: "Jordan Lee",
       authorRole: "Studio client",
       quote: "The booking flow felt simple, and the follow-up was organized from the first request.",
@@ -591,12 +632,13 @@ async function main() {
   console.log(`Starter forms: ${inquiryForm.name}, ${intakeForm.name}`);
 
   const starterGallery = await prisma.portfolioGallery.upsert({
-    where: { slug: "starter-portfolio" },
+    where: { siteId_slug: { siteId: settings.siteId, slug: "starter-portfolio" } },
     update: {
       status: PortfolioGalleryStatus.PUBLISHED,
       visibility: PortfolioGalleryVisibility.PUBLIC
     },
     create: {
+      siteId: settings.siteId,
       slug: "starter-portfolio",
       title: "Starter Portfolio",
       description: "A sample gallery for auditing portfolio layout, proofing records, and gallery access.",
@@ -640,12 +682,13 @@ async function main() {
   });
 
   await prisma.portfolioGalleryAccess.upsert({
-    where: { accessToken: "seed-gallery-access" },
+    where: { siteId_accessToken: { siteId: settings.siteId, accessToken: "seed-gallery-access" } },
     update: {
       galleryId: starterGallery.id,
       recipientEmail: "client@example.com"
     },
     create: {
+      siteId: settings.siteId,
       galleryId: starterGallery.id,
       recipientEmail: "client@example.com",
       accessToken: "seed-gallery-access"
@@ -653,11 +696,12 @@ async function main() {
   });
 
   await prisma.analyticsGoal.upsert({
-    where: { key: "booking-completions" },
+    where: { siteId_key: { siteId: settings.siteId, key: "booking-completions" } },
     update: {
       isActive: true
     },
     create: {
+      siteId: settings.siteId,
       key: "booking-completions",
       name: "Booking completions",
       eventType: AnalyticsEventType.BOOKING_COMPLETED,
@@ -678,6 +722,7 @@ async function main() {
     },
     create: {
       id: "seed-analytics-event-gallery-view",
+      siteId: settings.siteId,
       eventType: AnalyticsEventType.GALLERY_VIEWED,
       eventName: "gallery viewed",
       source: "direct",
@@ -698,6 +743,7 @@ async function main() {
     },
     create: {
       id: "seed-message-template-booking-confirmation",
+      siteId: settings.siteId,
       name: "Booking confirmation",
       purpose: MessageTemplatePurpose.BOOKING_CONFIRMATION,
       channel: MessageChannel.EMAIL,
@@ -709,13 +755,14 @@ async function main() {
   });
 
   const starterBillingDocument = await prisma.billingDocument.upsert({
-    where: { documentNumber: "INV-SEED-0001" },
+    where: { siteId_documentNumber: { siteId: settings.siteId, documentNumber: "INV-SEED-0001" } },
     update: {
       status: BillingDocumentStatus.DRAFT,
       subtotalCents: 12500,
       totalCents: 12500
     },
     create: {
+      siteId: settings.siteId,
       documentNumber: "INV-SEED-0001",
       type: BillingDocumentType.INVOICE,
       status: BillingDocumentStatus.DRAFT,
@@ -755,6 +802,7 @@ async function main() {
     },
     create: {
       id: "seed-automation-form-admin-notice",
+      siteId: settings.siteId,
       name: "Notify admin on form submission",
       status: AutomationStatus.DRAFT,
       trigger: AutomationTrigger.FORM_SUBMITTED,
@@ -773,6 +821,7 @@ async function main() {
     },
     create: {
       id: "seed-webhook-endpoint",
+      siteId: settings.siteId,
       name: "Starter outbound webhook",
       url: "https://example.com/showrunner-webhook",
       signingSecret: generateSigningSecret(),

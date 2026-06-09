@@ -3,9 +3,9 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { warning, type ModuleHealthCheck } from "@/lib/platform-health";
 
-export const getHealth: ModuleHealthCheck = async () => {
+export const getHealth: ModuleHealthCheck = async ({ settings }) => {
   const warnings = [];
-  const manualAnalyticsEventCount = await prisma.analyticsEvent.count();
+  const manualAnalyticsEventCount = await prisma.analyticsEvent.count({ where: { siteId: settings.siteId } });
 
   if (manualAnalyticsEventCount > 0) {
     warnings.push(

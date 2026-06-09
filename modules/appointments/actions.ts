@@ -21,14 +21,17 @@ function refreshAppointments() {
 export async function updateBookingStatusAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(bookingStatusFormSchema, formData);
+  const settings = await getSiteSettings();
 
-  const current = await prisma.booking.findUnique({
-    where: { id: input.id },
+  const current = await prisma.booking.findFirst({
+    where: { id: input.id, siteId: settings.siteId },
     include: { service: true }
   });
 
+  if (!current) return;
+
   const updated = await prisma.booking.update({
-    where: { id: input.id },
+    where: { id: current.id },
     data: { status: input.status as BookingStatus },
     include: { service: true }
   });
@@ -54,9 +57,10 @@ export async function updateBookingStatusAction(formData: FormData) {
 export async function updateBookingDetailAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(bookingDetailFormSchema, formData);
+  const settings = await getSiteSettings();
 
-  await prisma.booking.update({
-    where: { id: input.id },
+  await prisma.booking.updateMany({
+    where: { id: input.id, siteId: settings.siteId },
     data: {
       adminNotes: input.adminNotes,
       cancellationReason: input.cancellationReason
@@ -71,14 +75,12 @@ export async function rescheduleBookingAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(bookingRescheduleFormSchema, formData);
   const detailPath = `/admin/appointments/${input.id}`;
+  const settings = await getSiteSettings();
 
-  const [booking, settings] = await Promise.all([
-    prisma.booking.findUnique({
-      where: { id: input.id },
-      include: { service: true }
-    }),
-    getSiteSettings()
-  ]);
+  const booking = await prisma.booking.findFirst({
+    where: { id: input.id, siteId: settings.siteId },
+    include: { service: true }
+  });
 
   if (!booking) {
     redirect(`${detailPath}?error=${encodeURIComponent("Appointment not found.")}`);

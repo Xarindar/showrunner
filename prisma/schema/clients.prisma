@@ -2,8 +2,10 @@
 
 model Client {
   id               String            @id @default(cuid())
+  siteId           String            @default("site")
+  site             Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
   name             String
-  email            String            @unique
+  email            String
   phone            String?
   status           String            @default("active")
   privateNotes     String?
@@ -18,6 +20,9 @@ model Client {
   billingDocuments BillingDocument[]
   messageLogs      MessageLog[]
   emailSubscribers EmailSubscriber[]
+
+  @@unique([siteId, email])
+  @@index([siteId])
 }
 
 model ClientNote {

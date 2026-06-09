@@ -1,6 +1,7 @@
 import { EmailProviderEventType, EmailSubscriberStatus, EmailSuppressionScope, Prisma } from "@prisma/client";
 import { recordFromUnknown } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 import type { ProviderEventInput } from "./types";
 
 function eventTimestamp() {
@@ -14,7 +15,7 @@ export async function recordProviderEvent(input: ProviderEventInput) {
 
   const eventKey = input.eventKey || `${input.providerMessageId}:${input.eventType}`;
   const outbox = await prisma.emailOutbox.findFirst({
-    where: { providerMessageId: input.providerMessageId },
+    where: { siteId: DEFAULT_SITE_ID, providerMessageId: input.providerMessageId },
     orderBy: { createdAt: "desc" }
   });
   const now = eventTimestamp();
@@ -22,6 +23,7 @@ export async function recordProviderEvent(input: ProviderEventInput) {
   try {
     await prisma.emailProviderEvent.create({
       data: {
+        siteId: outbox?.siteId || DEFAULT_SITE_ID,
         eventKey,
         outboxId: outbox?.id,
         providerMessageId: input.providerMessageId,
@@ -64,13 +66,14 @@ export async function recordProviderEvent(input: ProviderEventInput) {
       input.eventType === EmailProviderEventType.BOUNCED ? EmailSuppressionScope.ALL : EmailSuppressionScope.MARKETING;
 
     await prisma.suppressionListEntry.upsert({
-      where: { email: outbox.recipientEmail },
+      where: { siteId_email: { siteId: outbox.siteId, email: outbox.recipientEmail } },
       update: {
         scope: suppressionScope,
         reason: input.eventType === EmailProviderEventType.BOUNCED ? "Provider bounce." : "Provider complaint.",
         source: "provider"
       },
       create: {
+        siteId: outbox.siteId,
         email: outbox.recipientEmail,
         scope: suppressionScope,
         reason: input.eventType === EmailProviderEventType.BOUNCED ? "Provider bounce." : "Provider complaint.",

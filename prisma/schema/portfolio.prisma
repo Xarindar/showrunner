@@ -26,7 +26,9 @@ enum PortfolioAccessStatus {
 
 model PortfolioGallery {
   id              String                     @id @default(cuid())
-  slug            String                     @unique @default(cuid())
+  siteId          String                     @default("site")
+  site            Site                       @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  slug            String                     @default(cuid())
   title           String
   description     String                     @default("")
   status          PortfolioGalleryStatus     @default(DRAFT)
@@ -49,7 +51,8 @@ model PortfolioGallery {
   accesses        PortfolioGalleryAccess[]
   favorites       PortfolioGalleryFavorite[]
 
-  @@index([status])
+  @@unique([siteId, slug])
+  @@index([siteId, status])
   @@index([visibility])
   @@index([category])
   @@index([sortOrder])
@@ -82,18 +85,21 @@ model PortfolioGalleryItem {
 
 model PortfolioGalleryAccess {
   id             String                @id @default(cuid())
+  siteId         String                @default("site")
+  site           Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
   galleryId      String
   gallery        PortfolioGallery      @relation(fields: [galleryId], references: [id], onDelete: Cascade)
   clientId       String?
   recipientEmail String
-  accessToken    String                @unique
+  accessToken    String
   status         PortfolioAccessStatus @default(ACTIVE)
   expiresAt      DateTime?
   lastViewedAt   DateTime?
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
-  @@index([galleryId])
+  @@unique([siteId, accessToken])
+  @@index([siteId, galleryId])
   @@index([recipientEmail])
   @@index([status])
 }

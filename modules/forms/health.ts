@@ -4,9 +4,9 @@ import { FormStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { warning, type ModuleHealthCheck } from "@/lib/platform-health";
 
-export const getHealth: ModuleHealthCheck = async () => {
+export const getHealth: ModuleHealthCheck = async ({ settings }) => {
   const warnings = [];
-  const activeFormCount = await prisma.form.count({ where: { status: FormStatus.ACTIVE } });
+  const activeFormCount = await prisma.form.count({ where: { siteId: settings.siteId, status: FormStatus.ACTIVE } });
 
   if (activeFormCount === 0) {
     warnings.push(

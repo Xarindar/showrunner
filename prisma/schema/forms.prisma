@@ -36,7 +36,9 @@ enum FormDestination {
 
 model Form {
   id                String           @id @default(cuid())
-  slug              String           @unique @default(cuid())
+  siteId            String           @default("site")
+  site              Site             @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  slug              String           @default(cuid())
   name              String
   description       String           @default("")
   status            FormStatus       @default(DRAFT)
@@ -49,7 +51,8 @@ model Form {
   fields            FormField[]
   submissions       FormSubmission[]
 
-  @@index([status])
+  @@unique([siteId, slug])
+  @@index([siteId, status])
   @@index([destination])
 }
 

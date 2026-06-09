@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { snapshotBillingDocument } from "@/lib/billing/documents";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 
 const acceptSchema = z.object({
   token: z.string().trim().min(1)
@@ -25,7 +26,7 @@ export async function acceptPublicBillingDocumentAction(formData: FormData) {
   try {
     await prisma.$transaction(async (tx) => {
       const document = await tx.billingDocument.findUnique({
-        where: { publicAccessToken: token },
+        where: { siteId_publicAccessToken: { siteId: DEFAULT_SITE_ID, publicAccessToken: token } },
         select: { id: true, type: true, status: true, acceptedAt: true }
       });
 

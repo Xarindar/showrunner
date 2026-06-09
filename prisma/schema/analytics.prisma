@@ -17,6 +17,8 @@ enum AnalyticsEventType {
 
 model AnalyticsEvent {
   id          String             @id @default(cuid())
+  siteId      String             @default("site")
+  site        Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
   eventType   AnalyticsEventType @default(CUSTOM)
   eventName   String
   source      String             @default("")
@@ -36,7 +38,7 @@ model AnalyticsEvent {
   occurredAt  DateTime           @default(now())
   createdAt   DateTime           @default(now())
 
-  @@index([eventType])
+  @@index([siteId, eventType])
   @@index([eventName])
   @@index([occurredAt])
   @@index([source])
@@ -46,7 +48,9 @@ model AnalyticsEvent {
 
 model AnalyticsGoal {
   id               String             @id @default(cuid())
-  key              String             @unique
+  siteId           String             @default("site")
+  site             Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  key              String
   name             String
   eventType        AnalyticsEventType @default(CUSTOM)
   eventName        String             @default("")
@@ -57,6 +61,7 @@ model AnalyticsGoal {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
-  @@index([isActive])
+  @@unique([siteId, key])
+  @@index([siteId, isActive])
   @@index([eventType])
 }
