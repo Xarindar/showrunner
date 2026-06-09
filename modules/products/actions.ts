@@ -1,25 +1,49 @@
 "use server";
 
-import { Prisma, ProductStatus } from "@prisma/client";
+import { OrderStatus, PaymentProvider, Prisma, ProductStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import {
   collectionFormSchema,
   collectionProductFormSchema,
   couponFormSchema,
+  optionalStoredText,
   parseForm,
   productFormSchema,
   productStatusFormSchema,
   productUpdateFormSchema,
-  productVariantFormSchema
+  productVariantFormSchema,
+  requiredText,
+  safeExternalHttpsUrl
 } from "@/lib/admin-validation";
+import { updateOrderStatus } from "@/lib/commerce/orders";
 import { generateUniqueCommerceSlug } from "@/lib/commerce/slugs";
 import { prisma } from "@/lib/prisma";
+
+const orderStatusFormSchema = z.object({
+  id: requiredText,
+  status: z.enum(OrderStatus)
+});
+
+const orderCheckoutLinkSchema = z.object({
+  id: requiredText,
+  checkoutUrl: safeExternalHttpsUrl,
+  externalCheckoutSession: optionalStoredText
+});
+
+const orderCheckoutClearSchema = z.object({
+  id: requiredText,
+  confirmClear: z.literal("on", { error: "Confirm before clearing the hosted checkout link." })
+});
 
 function refreshProducts() {
   revalidatePath("/admin");
   revalidatePath("/admin/modules/products");
+  revalidatePath("/admin/modules/clients");
+  revalidatePath("/cart");
+  revalidatePath("/shop");
 }
 
 async function syncDefaultVariant(
@@ -282,4 +306,120 @@ export async function createCouponAction(formData: FormData) {
 
   refreshProducts();
   redirect("/admin/modules/products?saved=coupon");
+}
+
+export async function updateCommerceOrderStatusAction(formData: FormData) {
+  await requireAdmin();
+  const input = await parseForm(orderStatusFormSchema, formData, "/admin/modules/products");
+
+  try {
+    await updateOrderStatus({
+      orderId: input.id,
+      status: input.status
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not update that order.";
+    redirect(`/admin/modules/products?order=${input.id}&error=${encodeURIComponent(message)}`);
+  }
+
+  refreshProducts();
+  redirect(`/admin/modules/products?saved=order&order=${input.id}`);
+}
+
+export async function setCommerceOrderCheckoutLinkAction(formData: FormData) {
+  await requireAdmin();
+  const input = await parseForm(orderCheckoutLinkSchema, formData, "/admin/modules/products");
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          status: true,
+          currency: true,
+          totalCents: true
+        }
+      });
+
+      if (!order) throw new Error("Order not found.");
+      if (order.status !== OrderStatus.DRAFT && order.status !== OrderStatus.PENDING) {
+        throw new Error("Hosted checkout links can only be changed before payment.");
+      }
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: { checkoutUrl: input.checkoutUrl }
+      });
+
+      const payment = await tx.payment.findFirst({
+        where: { orderId: order.id, provider: PaymentProvider.STRIPE },
+        orderBy: { createdAt: "desc" },
+        select: { id: true }
+      });
+      const paymentData = {
+        externalCheckoutSession: input.externalCheckoutSession || input.checkoutUrl
+      };
+
+      if (payment) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: paymentData
+        });
+      } else {
+        await tx.payment.create({
+          data: {
+            orderId: order.id,
+            provider: PaymentProvider.STRIPE,
+            amountCents: order.totalCents,
+            currency: order.currency,
+            ...paymentData
+          }
+        });
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not save the hosted checkout link.";
+    redirect(`/admin/modules/products?order=${input.id}&error=${encodeURIComponent(message)}`);
+  }
+
+  refreshProducts();
+  redirect(`/admin/modules/products?saved=checkout&order=${input.id}`);
+}
+
+export async function clearCommerceOrderCheckoutLinkAction(formData: FormData) {
+  await requireAdmin();
+  const input = await parseForm(orderCheckoutClearSchema, formData, "/admin/modules/products");
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: input.id },
+        select: { id: true, status: true }
+      });
+
+      if (!order) throw new Error("Order not found.");
+      if (order.status !== OrderStatus.DRAFT && order.status !== OrderStatus.PENDING) {
+        throw new Error("Hosted checkout links can only be changed before payment.");
+      }
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: { checkoutUrl: "" }
+      });
+      await tx.payment.updateMany({
+        where: {
+          orderId: order.id,
+          provider: PaymentProvider.STRIPE
+        },
+        data: { externalCheckoutSession: "" }
+      });
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not clear the hosted checkout link.";
+    redirect(`/admin/modules/products?order=${input.id}&error=${encodeURIComponent(message)}`);
+  }
+
+  refreshProducts();
+  redirect(`/admin/modules/products?saved=checkout-clear&order=${input.id}`);
 }

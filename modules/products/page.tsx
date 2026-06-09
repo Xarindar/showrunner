@@ -1,13 +1,17 @@
-import { CouponType, OrderStatus, ProductStatus, ProductType } from "@prisma/client";
-import { BadgeDollarSign, Boxes, PackagePlus, Tags } from "lucide-react";
-import { enumLabel, formatMoney, stringArrayCsv } from "@/lib/format";
+import { CartStatus, CouponType, OrderStatus, ProductStatus, ProductType } from "@prisma/client";
+import { BadgeDollarSign, Boxes, CreditCard, PackagePlus, ReceiptText, Tags } from "lucide-react";
+import { nextOrderStatuses } from "@/lib/commerce/orders";
+import { enumLabel, formatDateTime, formatMoney, stringArrayCsv } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import {
   addProductToCollectionAction,
+  clearCommerceOrderCheckoutLinkAction,
   createCollectionAction,
   createCouponAction,
   createProductAction,
   createProductVariantAction,
+  setCommerceOrderCheckoutLinkAction,
+  updateCommerceOrderStatusAction,
   updateProductAction,
   updateProductStatusAction
 } from "./actions";
@@ -18,7 +22,7 @@ const pageSize = 20;
 const statusFilters = ["all", ...Object.values(ProductStatus).map((status) => status.toLowerCase())] as const;
 
 type ProductsPageProps = {
-  searchParams: Promise<{ saved?: string; error?: string; page?: string; status?: string; product?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; page?: string; status?: string; product?: string; order?: string }>;
 };
 
 function normalizeStatusFilter(value?: string) {
@@ -29,10 +33,21 @@ function moneyInput(cents?: number | null) {
   return typeof cents === "number" ? (cents / 100).toFixed(2) : "";
 }
 
-function statusClass(status: ProductStatus) {
+function productStatusClass(status: ProductStatus) {
   if (status === ProductStatus.ACTIVE) return "pill success";
   if (status === ProductStatus.ARCHIVED) return "pill danger";
   return "pill";
+}
+
+function orderStatusClass(status: OrderStatus) {
+  if (status === OrderStatus.PAID || status === OrderStatus.FULFILLED) return "pill success";
+  if (status === OrderStatus.CANCELED || status === OrderStatus.REFUNDED) return "pill danger";
+  return "pill";
+}
+
+function currencyTotalsLabel(totals: { currency: string; _sum: { totalCents: number | null } }[]) {
+  if (!totals.length) return formatMoney(0);
+  return totals.map((row) => formatMoney(row._sum.totalCents || 0, row.currency)).join(" / ");
 }
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
@@ -41,7 +56,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const statusFilter = normalizeStatusFilter(params.status);
   const productWhere = statusFilter === "all" ? {} : { status: statusFilter.toUpperCase() as ProductStatus };
 
-  const [products, productCount, activeCount, collections, coupons, orderCount, paidOrderTotal] = await Promise.all([
+  const [products, productCount, activeCount, collections, coupons, orderCount, paidOrderTotals, openCartCount, orders] = await Promise.all([
     prisma.product.findMany({
       where: productWhere,
       include: {
@@ -60,13 +75,42 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     prisma.collection.findMany({ orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }] }),
     prisma.coupon.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
     prisma.order.count(),
-    prisma.order.aggregate({
+    prisma.order.groupBy({
+      by: ["currency"],
       where: { status: { in: [OrderStatus.PAID, OrderStatus.FULFILLED] } },
       _sum: { totalCents: true }
+    }),
+    prisma.cart.count({ where: { status: CartStatus.OPEN } }),
+    prisma.order.findMany({
+      include: {
+        client: true,
+        payments: { orderBy: { createdAt: "desc" }, take: 2 },
+        _count: { select: { items: true } }
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 25
     })
   ]);
   const pageCount = Math.max(1, Math.ceil(productCount / pageSize));
   const selectedProduct = products.find((product) => product.id === params.product) || products[0];
+  const selectedOrderId = params.order || orders[0]?.id;
+  const selectedOrder = selectedOrderId
+    ? await prisma.order.findUnique({
+        where: { id: selectedOrderId },
+        include: {
+          client: true,
+          items: {
+            include: {
+              product: true,
+              variant: true
+            },
+            orderBy: { createdAt: "asc" }
+          },
+          payments: { orderBy: { createdAt: "desc" } }
+        }
+      })
+    : null;
+  const selectedOrderNextStatuses = selectedOrder ? nextOrderStatuses(selectedOrder.status) : [];
   const savedMessage = params.saved ? "Commerce changes saved." : null;
   const errorMessage = params.error || null;
 
@@ -100,9 +144,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </div>
         <div className="card">
           <BadgeDollarSign size={22} />
-          <h3>{formatMoney(paidOrderTotal._sum.totalCents || 0)}</h3>
+          <h3>{currencyTotalsLabel(paidOrderTotals)}</h3>
           <p className="lead" style={{ fontSize: "0.95rem" }}>
-            Paid and fulfilled order total across {orderCount} order records.
+            Paid and fulfilled total across {orderCount} order records and {openCartCount} open carts.
           </p>
         </div>
       </section>
@@ -234,7 +278,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     <span style={{ color: "var(--muted)" }}>{product.variants.length} variants</span>
                   </td>
                   <td>
-                    <span className={statusClass(product.status)}>{product.status.toLowerCase()}</span>
+                    <span className={productStatusClass(product.status)}>{product.status.toLowerCase()}</span>
                   </td>
                   <td>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -473,6 +517,242 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
       <section className="grid-2">
         <div className="card stack">
+          <div className="page-header" style={{ marginBottom: 16 }}>
+            <div>
+              <h2 style={{ fontSize: "1.35rem" }}>Orders and payments</h2>
+              <p>{orders.length} recent orders from storefront cart checkout prep.</p>
+            </div>
+            <ReceiptText size={22} />
+          </div>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Total</th>
+                <th>State</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((order) => (
+                <tr key={order.id}>
+                  <td>
+                    <a href={`/admin/modules/products?order=${order.id}`}>
+                      <strong>{order.orderNumber}</strong>
+                    </a>
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>
+                      {order._count.items} items - {formatDateTime(order.placedAt || order.createdAt)}
+                    </span>
+                  </td>
+                  <td>
+                    <strong>{order.customerName}</strong>
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>{order.customerEmail}</span>
+                  </td>
+                  <td>{formatMoney(order.totalCents, order.currency)}</td>
+                  <td>
+                    <span className={orderStatusClass(order.status)}>{enumLabel(order.status)}</span>
+                  </td>
+                </tr>
+              ))}
+              {!orders.length ? (
+                <tr>
+                  <td colSpan={4}>No orders yet.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+
+        {selectedOrder ? (
+          <div className="card stack">
+            <div className="page-header" style={{ marginBottom: 16 }}>
+              <div>
+                <h2 style={{ fontSize: "1.35rem" }}>{selectedOrder.orderNumber}</h2>
+                <p>
+                  {selectedOrder.customerName} - {selectedOrder.customerEmail}
+                </p>
+              </div>
+              <span className={orderStatusClass(selectedOrder.status)}>{enumLabel(selectedOrder.status)}</span>
+            </div>
+
+            <table className="table">
+              <tbody>
+                <tr>
+                  <td>Subtotal</td>
+                  <td>{formatMoney(selectedOrder.subtotalCents, selectedOrder.currency)}</td>
+                </tr>
+                <tr>
+                  <td>Discount</td>
+                  <td>{formatMoney(selectedOrder.discountCents, selectedOrder.currency)}</td>
+                </tr>
+                <tr>
+                  <td>Tax</td>
+                  <td>{formatMoney(selectedOrder.taxCents, selectedOrder.currency)}</td>
+                </tr>
+                <tr>
+                  <td>Shipping</td>
+                  <td>{formatMoney(selectedOrder.shippingCents, selectedOrder.currency)}</td>
+                </tr>
+                <tr>
+                  <td>Total</td>
+                  <td>
+                    <strong>{formatMoney(selectedOrder.totalCents, selectedOrder.currency)}</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Client</td>
+                  <td>
+                    {selectedOrder.client ? (
+                      <a href={`/admin/clients/${selectedOrder.client.id}`}>{selectedOrder.client.name}</a>
+                    ) : (
+                      "No linked client"
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {selectedOrderNextStatuses.map((status) => (
+                <form action={updateCommerceOrderStatusAction} key={status}>
+                  <input type="hidden" name="id" value={selectedOrder.id} />
+                  <input type="hidden" name="status" value={status} />
+                  <button className="button secondary" type="submit">
+                    Mark {enumLabel(status)}
+                  </button>
+                </form>
+              ))}
+              {!selectedOrderNextStatuses.length ? <span className="pill">Final state</span> : null}
+            </div>
+
+            <div className="subpanel form-grid">
+              <div className="page-header" style={{ marginBottom: 0, minHeight: 0 }}>
+                <div>
+                  <h3 style={{ fontSize: "1.05rem" }}>Hosted checkout</h3>
+                  <p>{selectedOrder.checkoutUrl ? "Stripe Checkout link attached." : "No Stripe Checkout link attached."}</p>
+                </div>
+                {selectedOrder.checkoutUrl ? (
+                  <a className="button secondary" href={selectedOrder.checkoutUrl} target="_blank" rel="noreferrer">
+                    <CreditCard size={18} />
+                    Open link
+                  </a>
+                ) : null}
+              </div>
+              {selectedOrder.status === OrderStatus.DRAFT || selectedOrder.status === OrderStatus.PENDING ? (
+                <form action={setCommerceOrderCheckoutLinkAction} className="form-grid">
+                  <input type="hidden" name="id" value={selectedOrder.id} />
+                  <div className="grid-2">
+                    <div className="field">
+                      <label htmlFor={`order-${selectedOrder.id}-checkout`}>Stripe Checkout URL</label>
+                      <input
+                        id={`order-${selectedOrder.id}-checkout`}
+                        name="checkoutUrl"
+                        placeholder="https://checkout.stripe.com/..."
+                        defaultValue={selectedOrder.checkoutUrl || ""}
+                        required
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor={`order-${selectedOrder.id}-session`}>Stripe session/reference</label>
+                      <input
+                        id={`order-${selectedOrder.id}-session`}
+                        name="externalCheckoutSession"
+                        placeholder="cs_test_..."
+                        defaultValue={selectedOrder.payments[0]?.externalCheckoutSession || ""}
+                      />
+                    </div>
+                  </div>
+                  <button className="button secondary" type="submit">
+                    Save checkout link
+                  </button>
+                </form>
+              ) : null}
+              {selectedOrder.checkoutUrl && (selectedOrder.status === OrderStatus.DRAFT || selectedOrder.status === OrderStatus.PENDING) ? (
+                <form action={clearCommerceOrderCheckoutLinkAction} className="form-grid">
+                  <input type="hidden" name="id" value={selectedOrder.id} />
+                  <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                    <input name="confirmClear" type="checkbox" required />
+                    Clear this hosted checkout link.
+                  </label>
+                  <button className="button danger" type="submit">
+                    Clear checkout link
+                  </button>
+                </form>
+              ) : null}
+            </div>
+
+            <div className="subpanel">
+              <h3 style={{ fontSize: "1.05rem" }}>Items</h3>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedOrder.items.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <strong>{item.name}</strong>
+                        <br />
+                        <span style={{ color: "var(--muted)" }}>{item.sku || item.product.sku || "No SKU"}</span>
+                      </td>
+                      <td>{item.quantity}</td>
+                      <td>{formatMoney(item.lineTotalCents, selectedOrder.currency)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="subpanel">
+              <h3 style={{ fontSize: "1.05rem" }}>Payment records</h3>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Provider</th>
+                    <th>Status</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedOrder.payments.map((payment) => (
+                    <tr key={payment.id}>
+                      <td>
+                        <strong>{enumLabel(payment.provider)}</strong>
+                        <br />
+                        <span style={{ color: "var(--muted)" }}>{payment.externalCheckoutSession || payment.externalPaymentId || "No reference"}</span>
+                      </td>
+                      <td>{enumLabel(payment.status)}</td>
+                      <td>{formatMoney(payment.amountCents, payment.currency)}</td>
+                    </tr>
+                  ))}
+                  {!selectedOrder.payments.length ? (
+                    <tr>
+                      <td colSpan={3}>No payment records yet.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="card">
+            <ReceiptText size={22} />
+            <h2 style={{ fontSize: "1.35rem" }}>No selected order</h2>
+            <p className="lead" style={{ fontSize: "0.95rem" }}>
+              Orders appear here after a public cart is prepared for hosted checkout.
+            </p>
+          </div>
+        )}
+      </section>
+
+      <section className="grid-2">
+        <div className="card stack">
           <h2 style={{ fontSize: "1.35rem" }}>Collections</h2>
           <form action={createCollectionAction} className="subpanel form-grid">
             <div className="grid-2">
@@ -549,7 +829,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     <span style={{ color: "var(--muted)" }}>/shop/collections/{collection.slug}</span>
                   </td>
                   <td>
-                    <span className={statusClass(collection.status)}>{collection.status.toLowerCase()}</span>
+                    <span className={productStatusClass(collection.status)}>{collection.status.toLowerCase()}</span>
                   </td>
                   <td>{collection.isFeatured ? "yes" : "no"}</td>
                 </tr>

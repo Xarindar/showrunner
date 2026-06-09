@@ -6,7 +6,7 @@ import { z } from "zod";
 import {
   addCartItem,
   applyCartCoupon,
-  createDraftOrderFromCart,
+  createCheckoutOrderFromCart,
   removeCartCoupon,
   updateCartItem
 } from "@/lib/commerce/cart";
@@ -49,6 +49,11 @@ async function setCartId(cartId: string) {
     path: "/",
     maxAge: 60 * 60 * 24 * 14
   });
+}
+
+async function clearCartId() {
+  const cookieStore = await cookies();
+  cookieStore.delete(cartCookieName);
 }
 
 function cartError(message: string): never {
@@ -157,13 +162,14 @@ export async function preparePublicCheckoutAction(formData: FormData) {
   }
 
   try {
-    const order = await createDraftOrderFromCart({
+    const order = await createCheckoutOrderFromCart({
       cartId,
       customerName: parsed.data.customerName,
       customerEmail: parsed.data.customerEmail
     });
 
     await queueOrderCheckoutEmail(order);
+    await clearCartId();
     redirect(`/cart?order=${encodeURIComponent(order.orderNumber)}`);
   } catch (error) {
     cartError(error instanceof Error ? error.message : "Could not prepare checkout.");

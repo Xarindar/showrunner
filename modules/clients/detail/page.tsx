@@ -130,7 +130,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
       at: order.placedAt || order.updatedAt,
       badge: "order",
       title: order.orderNumber,
-      detail: `${enumLabel(order.status)} | ${formatMoney(order.totalCents, order.currency)}`
+      detail: `${enumLabel(order.status)} | ${formatMoney(order.totalCents, order.currency)}`,
+      href: `/admin/modules/products?order=${order.id}`
     })),
     ...client.messageLogs.map((message) => ({
       id: `message-${message.id}`,

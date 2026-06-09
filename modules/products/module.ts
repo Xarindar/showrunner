@@ -11,18 +11,19 @@ export const manifest = {
   status: "active",
   enabledByDefault: true,
   readiness: {
-    level: "admin-foundation",
-    mode: "admin-only",
-    summary: "Catalog admin for products, variants, collections, and coupons is live.",
-    primaryGap: "Cart, order creation, hosted checkout, payment webhooks, fulfillment, and storefront routes are pending."
+    level: "partial",
+    mode: "mixed",
+    summary: "Catalog admin, public storefront/cart, order creation, and hosted checkout handoff records are live.",
+    primaryGap: "Automatic Stripe session creation, payment webhooks, shipping/tax, refunds, and fulfillment exports are pending."
   },
   capabilities: [
     { label: "Catalog admin", status: "foundation" },
     { label: "Coupon admin", status: "foundation" },
-    { label: "Checkout/storefront", status: "planned" }
+    { label: "Checkout/storefront", status: "foundation" },
+    { label: "Order dashboard", status: "foundation" }
   ],
   adminRoutes: ["/admin/modules/products"],
-  publicRoutes: [],
+  publicRoutes: ["/shop", "/shop/[slug]", "/cart"],
   widgetRoutes: [],
   dependencies: ["media", "billing"],
   dataModels: ["Product", "ProductVariant", "Collection", "Coupon", "Cart", "Order", "Payment"],

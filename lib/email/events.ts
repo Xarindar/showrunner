@@ -253,3 +253,30 @@ export async function queueOrderCheckoutEmail(order: OrderForEmail) {
     })
   );
 }
+
+export async function queueOrderReceiptEmail(order: OrderForEmail) {
+  const settings = await getSiteSettings();
+  const tokens: EmailTokens = {
+    businessName: settings.businessName,
+    customerName: order.customerName,
+    customerEmail: order.customerEmail,
+    orderNumber: order.orderNumber,
+    orderTotal: formatMoney(order.totalCents, order.currency),
+    paymentProvider: "Stripe Checkout",
+    paymentStatus: "paid",
+    receiptUrl: ""
+  };
+
+  await logQueueError("order-receipt-customer", () =>
+    queueEmail({
+      templateKey: "order.receipt.customer",
+      recipientEmail: order.customerEmail,
+      recipientName: order.customerName,
+      category: EmailCategory.TRANSACTIONAL,
+      relatedType: "order",
+      relatedId: order.id,
+      tokens,
+      idempotencyKey: `order:${order.id}:receipt:customer`
+    })
+  );
+}

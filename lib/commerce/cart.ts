@@ -22,6 +22,10 @@ type RepriceWarning = {
   message: string;
 };
 
+type RepriceCartOptions = {
+  allowedStatuses?: CartStatus[];
+};
+
 function lineTotal(unitPriceCents: number, quantity: number) {
   const total = unitPriceCents * quantity;
   if (total > maxIntCents) throw new Error("Line total is too high.");
@@ -114,7 +118,8 @@ async function resolvePurchasableVariant(
   };
 }
 
-export async function repriceCart(tx: CommerceTx, cartId: string) {
+export async function repriceCart(tx: CommerceTx, cartId: string, options: RepriceCartOptions = {}) {
+  const allowedStatuses = options.allowedStatuses || [CartStatus.OPEN];
   const warnings: RepriceWarning[] = [];
   const cart = await tx.cart.findUnique({
     where: { id: cartId },
@@ -128,7 +133,7 @@ export async function repriceCart(tx: CommerceTx, cartId: string) {
   });
 
   if (!cart) throw new Error("Cart not found.");
-  if (cart.status !== CartStatus.OPEN) throw new Error("This cart is no longer open.");
+  if (!allowedStatuses.includes(cart.status)) throw new Error("This cart is no longer open.");
 
   let currency = cart.currency || "USD";
   let subtotalCents = 0;
@@ -353,18 +358,56 @@ export async function removeCartCoupon(cartId: string) {
   });
 }
 
-export async function createDraftOrderFromCart(input: { cartId: string; customerName: string; customerEmail: string }) {
+async function findOrCreateOrderClient(
+  tx: CommerceTx,
+  input: { customerName: string; customerEmail: string }
+) {
+  const client = await tx.client.upsert({
+    where: { email: input.customerEmail },
+    update: {},
+    create: {
+      name: input.customerName,
+      email: input.customerEmail,
+      status: "active"
+    },
+    select: { id: true }
+  });
+
+  return client.id;
+}
+
+export async function createCheckoutOrderFromCart(input: { cartId: string; customerName: string; customerEmail: string }) {
   return prisma.$transaction(async (tx) => {
-    const { cart } = await repriceCart(tx, input.cartId);
+    const customerEmail = input.customerEmail.trim().toLowerCase();
+    const claimedCart = await tx.cart.updateMany({
+      where: { id: input.cartId, status: CartStatus.OPEN },
+      data: {
+        status: CartStatus.CHECKED_OUT,
+        customerEmail
+      }
+    });
+
+    if (claimedCart.count !== 1) {
+      throw new Error("This cart has already been prepared for checkout.");
+    }
+
+    const { cart } = await repriceCart(tx, input.cartId, {
+      allowedStatuses: [CartStatus.CHECKED_OUT]
+    });
     if (!cart.items.length) throw new Error("Add at least one item before preparing checkout.");
 
+    const clientId = await findOrCreateOrderClient(tx, {
+      customerName: input.customerName,
+      customerEmail
+    });
     const orderNumber = await generateOrderNumber(tx);
     const order = await tx.order.create({
       data: {
         orderNumber,
+        clientId,
         customerName: input.customerName,
-        customerEmail: input.customerEmail.trim().toLowerCase(),
-        status: OrderStatus.DRAFT,
+        customerEmail,
+        status: OrderStatus.PENDING,
         currency: cart.currency,
         subtotalCents: cart.subtotalCents,
         discountCents: cart.discountCents,
@@ -372,7 +415,8 @@ export async function createDraftOrderFromCart(input: { cartId: string; customer
         shippingCents: 0,
         totalCents: cart.totalCents,
         couponId: cart.couponId,
-        notes: "Draft order prepared from public cart. Stripe Checkout session creation and payment webhook are still pending.",
+        notes: "Order prepared from public cart. Hosted checkout URL and payment webhook confirmation are still pending.",
+        placedAt: new Date(),
         items: {
           create: cart.items.map((item) => ({
             productId: item.productId,
@@ -403,6 +447,13 @@ export async function createDraftOrderFromCart(input: { cartId: string; customer
       },
       include: { payments: true }
     });
+
+    if (cart.couponId) {
+      await tx.coupon.update({
+        where: { id: cart.couponId },
+        data: { redemptionCount: { increment: 1 } }
+      });
+    }
 
     return order;
   });

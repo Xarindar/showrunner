@@ -3,7 +3,8 @@ export {
   queueBookingCreatedEmails,
   queueBookingStatusEmail,
   queueFormSubmittedEmail,
-  queueOrderCheckoutEmail
+  queueOrderCheckoutEmail,
+  queueOrderReceiptEmail
 } from "./events";
 export { processEmailOutbox } from "./process";
 export { recordProviderEvent } from "./provider-events";

@@ -76,8 +76,8 @@ export default async function CartPage({ searchParams }: CartPageProps) {
           {query.error ? <div className="error">{query.error}</div> : null}
           {preparedOrder ? (
             <div className="success-message">
-              Draft order {preparedOrder.orderNumber} is prepared with a pending Stripe payment record for{" "}
-              {formatMoney(preparedOrder.totalCents, preparedOrder.currency)}. Stripe Checkout session creation and webhooks are still pending.
+              Order {preparedOrder.orderNumber} is prepared with a pending Stripe payment record for{" "}
+              {formatMoney(preparedOrder.totalCents, preparedOrder.currency)}. Attach the hosted checkout link from the admin order queue.
             </div>
           ) : null}
 
