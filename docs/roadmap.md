@@ -40,7 +40,7 @@ Authoritative current state. `§` = Architecture-Roadmap section number; `—` =
 |---|---|---|---|---|
 | 3 | Commerce — catalog (product/variant/collection/coupon) | ✅ CONFIRMED | — | 06-07-26 |
 | 3 | Commerce — cart / order / payment | ⬜ PENDING | schema only, no write paths | 06-06-26 |
-| 4 | Photography Portfolio — gallery/admin foundation | 🔵 READY-FOR-AUDIT | — | 06-07-26 |
+| 4 | Photography Portfolio — gallery/admin foundation | 🛠 RESOLVED | public proofing live; comments/approvals/widgets/signed variants pending | 06-08-26 |
 | 7 | Forms — field + form builder CRUD | ✅ CONFIRMED | — | 06-07-26 |
 | 7 | Forms — destinations / public client linking | ✅ CONFIRMED | — | 06-07-26 |
 | 7 | Forms — templates · signatures · automations | ✅ CONFIRMED | clone + notify confirmed; template catalog / booking attach / binding e-sign remain future work | 06-07-26 |
@@ -50,8 +50,8 @@ Authoritative current state. `§` = Architecture-Roadmap section number; `—` =
 | 8 | Testimonials — anti-abuse | ✅ CONFIRMED | full moderation audit trail still pending | 06-07-26 |
 | 10 | Communications module (admin) | ✅ CONFIRMED | auto-send + template editor still pending | 06-07-26 |
 | 11 | Billing / Invoices / Documents | ✅ CONFIRMED | public accept/pay, PDF, partial payments still pending | 06-07-26 |
-| 12 | Automation module | ✅ CONFIRMED | execution engine + signed dispatch still pending | 06-07-26 |
-| 13 | Analytics & Reporting | 🔵 READY-FOR-AUDIT | — | 06-07-26 |
+| 12 | Automation module | 🛠 RESOLVED | non-webhook executors, replay/dead-letter UI, and worker provisioning pending | 06-08-26 |
+| 13 | Analytics & Reporting | 🛠 RESOLVED | client adapters, retention controls, and full ecommerce mappings pending | 06-08-26 |
 | — | Email controller (`lib/email` outbox) — full report in `Claude Audit - Email Controller 06-07-26.md` | ✅ CONFIRMED | code confirmed; Railway cron remains deploy config to provision | 06-07-26 |
 
 ### Cross-Cutting Email Controller Audit Log
@@ -195,8 +195,8 @@ Photography needs more than a generic gallery because proofing, privacy, and sal
 
 Implementation status:
 
-- Portfolio/gallery admin foundation, Prisma models, starter seed data, module registration, gallery status/visibility controls, item records, proofing/download flags, private access links, and favorites records are ready for audit as of 06-07-26.
-- Public gallery pages/widgets/lightbox, real client proofing portal, comments/approvals/revision rounds, selected-image export, download bundles, print/lab workflows, upload batch tooling, and booking/commerce tie-ins remain pending.
+- Portfolio/gallery admin foundation, Prisma models, starter seed data, module registration, gallery status/visibility controls, item records, proofing/download flags, private access links, public gallery/access-token routes, downloads, and favorites capture are partially live as of 06-08-26.
+- Gallery widgets/lightbox, comments/approvals/revision rounds, selected-image export, download bundles, print/lab workflows, upload batch tooling, fully signed/private object delivery, and booking/commerce tie-ins remain pending.
 
 - Portfolio collections: featured galleries, categories, cover images, captions, location/date metadata, and SEO-ready image pages.
 - Client proofing: private galleries, password or magic-link access, favorites, comments, approvals, revision rounds, and selected-image export.
@@ -444,8 +444,8 @@ Implementation status:
 
 Implementation status:
 
-- Trigger/action rule admin, conditions metadata, explicitly manual run records, webhook endpoint registry, manual delivery records, starter seed data, and module registration are audited with fixes applied as of 06-07-26.
-- Background execution, signed webhook dispatch, retries, event emission from live modules, Zapier/Make connector support, and scheduled jobs remain pending.
+- Trigger/action rule admin, conditions metadata, explicitly manual run records, webhook endpoint registry, manual delivery records, starter seed data, module registration, event catalog/emitter, rule matching, queued signed webhook dispatch, retry tracking, and worker route/script are partially live as of 06-08-26.
+- Non-webhook action executors, replay/dead-letter UI, worker provisioning, Zapier/Make connector support, and scheduled jobs remain pending.
 
 > **🔍 AUDIT · Claude [06-07-26]:**
 >
@@ -479,8 +479,8 @@ Implementation status:
 
 Implementation status:
 
-- Analytics/admin foundation, Prisma event and goal models, starter seed data, module registration, manual event recording, source attribution summaries, top-event reporting, module metric cards, and conversion-goal progress are ready for audit as of 06-07-26.
-- Automatic event emission from public widgets/modules, UTM capture middleware, consent-mode script gating, GA4/Meta/Google Ads/Search Console adapters, server-side conversion hooks, CSV export, and retention controls remain pending.
+- Analytics/admin foundation, Prisma event and goal models, starter seed data, module registration, manual event recording, source attribution summaries, top-event reporting, module metric cards, conversion-goal progress, CSV export, server-side event emission, and first-party UTM/session capture are partially live as of 06-08-26.
+- Consent UI/script gating, GA4/Meta/Google Ads/Search Console adapters, server-side conversion hooks, full ecommerce mappings, and retention controls remain pending.
 
 - Dashboard metrics by module: bookings, conversion, revenue, open invoices, top services/products, gallery engagement, client growth.
 - Source attribution: UTM capture, referral source, campaign, landing page, first/last touch.
@@ -546,8 +546,8 @@ Goal: make it useful for real client operations, not just appointments.
 Goal: support portfolio and proofing sites.
 
 - Expand media library metadata and folders.
-- Add gallery model, public gallery pages, gallery widgets, and lightbox. Gallery model/admin foundation ready for audit as of 06-07-26; public pages, widgets, and lightbox remain pending.
-- Add private gallery access. Admin access-link foundation ready for audit as of 06-07-26; public/magic-link delivery remains pending.
+- Add gallery model, public gallery pages, gallery widgets, and lightbox. Gallery model/admin foundation and public pages are partially live as of 06-08-26; widgets and lightbox remain pending.
+- Add private gallery access. Admin access-link foundation and access-token public delivery are partially live as of 06-08-26; password UX and fully signed/private object delivery remain pending.
 - Add favorites/comments/approvals. Favorite records are ready for audit as of 06-07-26; comments and approvals remain pending.
 - Add R2/Cloudflare Images transformation strategy.
 - Add digital delivery permissions and expiring links.
@@ -580,11 +580,11 @@ Goal: support more business models without bloating the base install.
 
   > **AUDIT/RESOLUTION:** Full notes under §10. System templates are read-only, admin-created templates are labeled manual, actual delivery status reads `EmailOutbox`, manual notes are separated, suppressions have scope, and unsuppress is available.
 
-- Automation builder and webhook delivery logs. audited with fixes applied 06-07-26
+- Automation builder and webhook delivery logs. partially live with queued dispatch as of 06-08-26
 
-  > **AUDIT/RESOLUTION:** Full notes under §12. Run/delivery records are explicitly manual, webhook secrets are generated and masked, URLs are public-HTTPS validated, event names use a known catalog, and automations/endpoints now have edit/delete controls.
+  > **AUDIT/RESOLUTION:** Full notes under section 12. Run/delivery records are explicitly manual, webhook secrets are generated and masked, URLs are public-HTTPS validated, event names use a known catalog, automations/endpoints have edit/delete controls, and live module events now queue signed webhook deliveries for worker processing.
 
-- Analytics event/goal admin foundation. ready for audit
+- Analytics event/goal admin foundation. partially live with CSV export and server event emission as of 06-08-26
 
 ## Data Model Expansion
 

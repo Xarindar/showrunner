@@ -14,6 +14,10 @@ modules/
     module.ts
     page.tsx
     actions.ts
+    events.ts            # optional: module-owned event-catalog slice
+    health.ts            # optional: module-owned platform health checks
+    api/                 # optional: HTTP endpoint behavior (route files re-export from here)
+      export.ts
     components/
       example-table.tsx
 ```
@@ -36,7 +40,23 @@ export const manifest = {
   description: "Short description for settings and internal docs.",
   layout: "standard",
   status: "active",
-  enabledByDefault: false
+  enabledByDefault: false,
+  readiness: {
+    level: "admin-foundation",
+    mode: "admin-only",
+    summary: "Admin records are ready; public/runtime delivery is not live yet.",
+    primaryGap: "Public route, widget delivery, export, and audit log support are pending."
+  },
+  capabilities: [
+    { label: "Admin screen", status: "foundation" },
+    { label: "Public route", status: "planned" }
+  ],
+  adminRoutes: ["/admin/modules/example"],
+  publicRoutes: [],
+  dataModels: ["ExampleRecord"],
+  permissions: ["example.read", "example.write"],
+  settingsSections: ["Example"],
+  healthChecks: ["example-setup"]
 } satisfies ShellModule;
 ```
 
@@ -51,6 +71,11 @@ Manifest fields:
 - `layout`: shell layout request.
 - `status`: `active` or `future`.
 - `enabledByDefault`: whether new deployments should enable it automatically.
+- `required`: optional; use only for platform modules that must remain enabled for the admin shell.
+- `readiness`: required status metadata for Dashboard, Help, and Settings. Use `level` values `live`, `partial`, `admin-foundation`, `manual`, or `planned`; use `mode` values `live`, `mixed`, `manual`, `admin-only`, or `planned`.
+- `capabilities`: optional list of feature slices with `live`, `manual`, `foundation`, `planned`, or `missing` status.
+- `adminRoutes`, `publicRoutes`, `widgetRoutes`: declared surfaces. These do not create routes; they make readiness visible.
+- `dependencies`, `dataModels`, `permissions`, `settingsSections`, `healthChecks`: optional capability-manifest fields used for platform status and future install/permission work.
 
 Available icon names:
 
@@ -62,10 +87,13 @@ ClipboardList
 Gauge
 Image
 LayoutTemplate
+Mail
+ReceiptText
 Settings
 ShoppingBag
 Star
 Users
+Workflow
 ```
 
 If a new icon is needed, add it to `shell/module-types.ts` and `shell/modules.ts`.
@@ -151,22 +179,19 @@ const registeredModules = [
 
 The sidebar and Settings module list are built from this registry.
 
-## Add It To The Module Route
+Required modules such as Dashboard, Settings, and Help stay enabled even if the submitted module checkbox list is empty. Do not mark normal business modules as `required`.
 
-Add the module page to `app/admin/(protected)/modules/[moduleId]/page.tsx`.
+## Add It To The Module Page Loader
 
-```tsx
-import ExamplePage from "@/modules/example/page";
-```
-
-Then add a switch case:
+Add the module page to `shell/module-pages.ts`.
 
 ```tsx
-case "example":
-  return <ExamplePage searchParams={searchParams} />;
+const modulePageLoaders = {
+  example: () => import("@/modules/example/page")
+};
 ```
 
-If the page does not use `searchParams`, you can render `<ExamplePage />`.
+Keep this as a loader function. Do not eagerly import module pages into the shared admin route.
 
 ## URL Rules
 
@@ -227,10 +252,23 @@ Small modules can use existing Prisma models.
 
 If the module needs new tables:
 
-1. Update `prisma/schema.prisma`.
+1. Add models/enums to your module's schema file `prisma/schema/<module>.prisma` (or create that file). The Prisma schema is a folder (`prismaSchemaFolder`); every `*.prisma` in it is merged, so relations can cross files freely. Datasource and generator stay in `prisma/schema/schema.prisma`.
 2. Create a migration with `npm run prisma:migrate`.
 3. Keep queries and writes in the module folder or in a clearly named library under `lib/`.
 4. Seed only starter data that is useful for local development or first deploy.
+
+## API Endpoints
+
+Endpoint behavior belongs to the module that owns it, under `modules/<id>/api/`. App Router route files under `app/**/route.ts` should stay thin and re-export handlers from the module.
+
+```ts
+// modules/example/api/export.ts  ->  endpoint behavior
+// app/admin/(protected)/modules/example/export/route.ts:
+export const dynamic = "force-dynamic";
+export { GET } from "@/modules/example/api/export";
+```
+
+Use `lib/api/` for API-specific helpers (CSV output, request-body parsing, timing-safe secret checks). Use `lib/` for domain services and utilities shared by modules, scripts, public pages, and API endpoints. Do not duplicate helpers such as environment parsing, FormData conversion, record guards, public URL validation, CSV generation, or enum label formatting inside modules.
 
 ## Compatibility Routes
 
@@ -255,6 +293,7 @@ Before handing off a module change:
 3. Confirm `/admin/modules/<id>` renders.
 4. Confirm the sidebar label, icon, active state, and Settings checkbox work.
 5. Confirm any form action calls `requireAdmin()`.
-6. Run `npm run lint`.
-7. Run `npx tsc --noEmit`.
-8. Run `npm run build` for routing changes.
+6. Confirm any route handler re-exports from `modules/<id>/api/`.
+7. Run `npm run lint`.
+8. Run `npx tsc --noEmit`.
+9. Run `npm run build` for routing changes.

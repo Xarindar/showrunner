@@ -38,6 +38,8 @@ The initial schema migration lives in `prisma/migrations/20260606190000_init/mig
 
 Modules live in `modules/` and publish a `module.ts` manifest. The admin shell reads those manifests from `shell/modules.ts` to build sidebar navigation and settings controls. Use `docs/module-dev-guide.md` when building a module, and `docs/module-system.md` for the short architecture contract.
 
+API endpoint behavior lives in each module's own `modules/<id>/api/` folder. Next.js route files under `app/**/route.ts` should stay thin and re-export handlers from there. Shared API helpers (CSV, request-body parsing, secret checks) live in `lib/api/`, and shared non-HTTP services and utilities live in `lib/`.
+
 The v1 enabled modules are:
 
 - Dashboard
