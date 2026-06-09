@@ -46,7 +46,7 @@ Authoritative current state. `P` = Phase number below.
 | 2 | Single-source module icons (collapse the type↔map duplication) | 🔵 READY-FOR-AUDIT | — | 06-08-26 |
 | 3 | Module-owned health checks + events (retire the central if-ladder and catalog) | 🔵 READY-FOR-AUDIT | parity of warning/event output needs audit re-verify | 06-08-26 |
 | 4 | Co-locate each module's API surface inside `modules/<id>/api` | 🔵 READY-FOR-AUDIT | central `api/` tree removed; needs audit re-verify | 06-08-26 |
-| 5 | Real deployment boundary (`ModuleInstallation`/`ModuleSetting`, build-time selection) | ⬜ PENDING | schema + tenancy work; not started | 06-08-26 |
+| 5 | Real deployment boundary (`ModuleInstallation`/`ModuleSetting`, build-time selection) | 🔵 READY-FOR-AUDIT | schema foundation added; runtime install/selection work remains | 06-08-26 |
 | 6 | Per-module Prisma schema split (`prismaSchemaFolder`) | 🔵 READY-FOR-AUDIT | folder split done; migrations unchanged; needs audit re-verify | 06-08-26 |
 
 ## Audit Stats (baseline, pre-refactor — 06-08-26)
@@ -205,13 +205,13 @@ require fishing handlers out of a shared `api/` folder.
 > the same HTTP verbs as before, that worker endpoints keep their secret checks, and that no orphaned
 > `@/api/...` import remains anywhere.
 
-## Phase 5 — Real Deployment Boundary — ⬜ PENDING
+## Phase 5 — Real Deployment Boundary — 🔵 READY-FOR-AUDIT
 
 `enabledModuleIds` is a string array in `SiteSettings` that only hides sidebar nav; all 16 modules are
 always compiled into every client. "Modular deployment" today means *ship everything, hide some*.
-`lib/platform-status.ts` already lists the needed foundation (`ModuleInstallation`, `ModuleSetting`,
-tenant scoping) as "schema-needed." The convention registry from P1 is the prerequisite that makes
-build-time module selection / tree-shaking possible. Deferred behind P1–P3.
+`ModuleInstallation` and `ModuleSetting` now exist as schema foundation tables. Runtime code still uses
+`SiteSettings.enabledModules`, and tenant/site scoping plus build-time module selection remain pending.
+The convention registry from P1 is the prerequisite that makes build-time module selection / tree-shaking possible.
 
 ## Phase 6 — Per-Module Prisma Schema Split — 🔵 READY-FOR-AUDIT
 
