@@ -256,6 +256,7 @@ Authoritative current state. `§` = Architecture-Roadmap section number; `—` =
 | 8 | Testimonials — public module toggle | ✅ CONFIRMED | — | 06-07-26 |
 | 8 | Testimonials — anti-abuse | ✅ CONFIRMED | full moderation audit trail still pending | 06-07-26 |
 | 10 | Communications module (admin) | ✅ CONFIRMED | auto-send + template editor still pending | 06-07-26 |
+| 10/12 | Visual email template library + automation template picker | 🔵 READY-FOR-AUDIT · SPIKE-BLOCKED | direct `usewaypoint/email-builder-js` adoption blocked by React 19/Zod 4 peer/type gaps and packaged-editor gap; see `docs/email-builder-compatibility-spike-2026-06-09.md` | 06-09-26 |
 | 11 | Billing / Invoices / Documents | ✅ CONFIRMED | public accept/pay, PDF, partial payments still pending | 06-07-26 |
 | 12 | Automation module | 🛠 RESOLVED | non-webhook executors, replay/dead-letter UI, and worker provisioning pending | 06-08-26 |
 | 13 | Analytics & Reporting | 🛠 RESOLVED | client adapters, retention controls, and full ecommerce mappings pending | 06-08-26 |
@@ -612,6 +613,7 @@ Implementation status:
 
 - Message template editor, allowed-token metadata, real outbox delivery visibility, manual delivery notes, scoped suppression-list entries, starter seed data, and admin module registration are audited with fixes applied as of 06-07-26.
 - Automatic template rendering/sending is not yet wired into booking/order/form flows beyond the existing booking SMTP path. SMS adapters, provider delivery callbacks, bounce handling, retries, unsubscribe enforcement, and quiet hours remain pending.
+- Proposed 06-09-26: adopt `usewaypoint/email-builder-js` for a client-friendly visual email builder if the compatibility spike passes. The repo is MIT-licensed, block-based, JSON-backed, and can render email-builder JSON to HTML; its self-hosting example is Vite + MUI. Caveat: the published `@usewaypoint/email-builder@0.0.9` package currently declares React 16-18 and Zod 1-3 peer ranges, while this app is React 19 and Zod 4, so do a small Next/App Router spike before installing it broadly.
 
 > **🔍 AUDIT · Claude [06-07-26]:**
 >
@@ -635,7 +637,11 @@ Implementation status:
 
 Next requirements:
 
-- Email template editor with tokens and preview.
+- Visual email template library/editor with tokens and preview. Prefer `usewaypoint/email-builder-js` if the spike confirms React 19/Zod 4 compatibility, Next client-only behavior, bundle size, and email-client output quality. Persist the builder document JSON on `MessageTemplate`, generate `htmlBody` for sending, keep `textBody` as a required fallback, and validate every subject/body token against the template's allowed token metadata.
+- Template library UX for non-technical clients: starter templates by workflow (booking created, booking confirmed, booking canceled, form submitted, invoice notice, order receipt, gallery access, reminder, review request), clone/customize from library, clear system-vs-custom labeling, version/restore, preview with sample event data, and test send through `EmailOutbox`.
+- Automation template picker: replace the current freeform `subjectTemplate`/`bodyTemplate` path for `SEND_EMAIL` rules with an active `MessageTemplate` dropdown filtered by trigger/purpose/token compatibility, e.g. `When appointment booked send [Booking confirmation]`. Keep legacy freeform fields only as migration fallback until existing rows are converted.
+- Template delivery wiring: when a trigger fires, queue the selected template through `lib/email`/`EmailOutbox` with sender identity, suppression scope, idempotency key, related record, and token validation instead of creating a parallel mailer.
+- Builder safety and QA: restrict or sanitize raw HTML blocks, validate image URLs, preserve unsubscribe/compliance blocks for marketing templates, render mobile and desktop previews, and run smoke sends against Gmail/Apple Mail/Outlook before client-ready status.
 - Transactional emails: booking, order, invoice, gallery, form, password/magic link, reminders.
 - Marketing email guardrails: opt-in state, unsubscribe link, suppression list, sender identity, and campaign logging.
 - SMS adapter: reminders, confirmations, two-way cancellation/reschedule, consent capture, and quiet hours.
@@ -743,7 +749,7 @@ Goal: make the current app dependable enough to reuse.
 - Add module manifest schema and migrate current registry to it.
 - Add audit log model.
 - Add admin roles.
-- Add booking email template settings.
+- Add booking email template settings, then graduate those settings into the shared template library/editor instead of one-off textareas.
 
   > **🛠 ENGINEER · 06-09-26:** Built the booking email template settings foundation inside the Communications module. Booking-related system templates now have guarded subject, preview, text body, HTML body, and sender controls while keeping system template keys/status locked (`modules/communications/page.tsx`, `modules/communications/actions.ts`, `modules/communications/booking-templates.ts`). Token extraction is shared through `lib/email/render.ts`, and the Communications manifest now advertises booking template settings as live while leaving the broader visual template editor/library as future work. Verification: `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed. Browser route check was attempted but blocked by the local database server being unavailable at `127.0.0.1:55432`.
   >
@@ -819,6 +825,12 @@ Goal: support more business models without bloating the base install.
 
   > **AUDIT/RESOLUTION:** Full notes under §10. System templates are read-only, admin-created templates are labeled manual, actual delivery status reads `EmailOutbox`, manual notes are separated, suppressions have scope, and unsuppress is available.
 
+- Visual email template library/editor and automation template picker. Spike `usewaypoint/email-builder-js`; if compatible, add the builder on top of `MessageTemplate`, seed workflow templates, and wire automation `SEND_EMAIL` rules to pick a template from the library.
+
+  > **🛠 ENGINEER · 06-09-26:** Completed the `usewaypoint/email-builder-js` compatibility spike against this app's Next 16, React 19, Zod 4, and TypeScript 6 stack. Direct adoption is blocked: `@usewaypoint/email-builder@0.0.9` fails normal npm peer resolution, forced runtime rendering works only with `--legacy-peer-deps`, its declarations fail against Zod 4 when checked, the visual editor is a Vite/MUI React 18/Zod 3 example rather than a packaged Next-ready builder, and the forced dependency tree reports a moderate `insane` ReDoS advisory. No app dependency, schema change, or editor UI was added. Full spike notes live in `docs/email-builder-compatibility-spike-2026-06-09.md`.
+  >
+  > **Status: `READY-FOR-AUDIT`**
+
 - Automation builder and webhook delivery logs. partially live with queued dispatch as of 06-08-26
 
   > **AUDIT/RESOLUTION:** Full notes under section 12. Run/delivery records are explicitly manual, webhook secrets are generated and masked, URLs are public-HTTPS validated, event names use a known catalog, automations/endpoints have edit/delete controls, and live module events now queue signed webhook deliveries for worker processing.
@@ -837,8 +849,8 @@ Likely new models:
 - `AnalyticsEvent`, `AnalyticsGoal` added 06-07-26; external adapter and consent models remain pending.
 - `PublicRateLimit` added 06-07-26 for DB-backed public form/testimonial throttling.
 - `Invoice`, `Quote`, `Document`, `Subscription`, `PackageCredit`, `GiftCard`
-- `Automation`, `AutomationRun`, `WebhookEndpoint`, `WebhookDelivery`
-- `MessageTemplate`, `MessageLog`, `SuppressionListEntry`
+- `Automation`, `AutomationRun`, `WebhookEndpoint`, `WebhookDelivery`; add a `messageTemplateId`/template-key association for `SEND_EMAIL` rules so automations can select a reusable template instead of storing freeform subject/body text.
+- `MessageTemplate`, `MessageLog`, `SuppressionListEntry`; extend `MessageTemplate` with email-builder document JSON, builder/version metadata, library/system flags, and optional source-template linkage before adding a separate template-version table.
 
 ## Integration Adapter Contracts
 
@@ -848,7 +860,7 @@ Use small contracts so each module can support native and third-party backends.
 - Payment adapter: create checkout session, verify webhook, refund, create customer portal/session, retrieve payment status.
 - Commerce adapter: sync products, create cart, get checkout URL, sync order, sync inventory.
 - Media adapter: upload, delete, generate variant URL, sign private URL, list asset metadata.
-- Messaging adapter: send email/SMS, template variables, delivery callback, suppression handling.
+- Messaging adapter: send email/SMS, template variables, visual template JSON-to-HTML rendering, event-compatible template selection, delivery callback, suppression handling.
 - Analytics adapter: emit client event, emit server event, consent gating, debug mode.
 
 ## Non-Negotiable Quality Gates
