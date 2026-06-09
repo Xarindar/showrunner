@@ -8,12 +8,12 @@ export type LoginState = {
 };
 
 export async function loginAction(_state: LoginState, formData: FormData): Promise<LoginState> {
-  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const identifier = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
 
-  const user = await verifyAdminLogin(email, password);
+  const user = await verifyAdminLogin(identifier, password);
   if (!user) {
-    return { error: "Email or password is incorrect." };
+    return { error: "Username or password is incorrect." };
   }
 
   await createSession(user.id);

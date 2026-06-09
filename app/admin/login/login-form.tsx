@@ -22,8 +22,8 @@ export function LoginForm() {
       {state.error ? <div className="error">{state.error}</div> : null}
 
       <div className="field">
-        <label htmlFor="email">Email</label>
-        <input id="email" name="email" type="email" autoComplete="email" required />
+        <label htmlFor="username">Username</label>
+        <input id="username" name="email" type="text" autoComplete="username" required />
       </div>
 
       <div className="field">
