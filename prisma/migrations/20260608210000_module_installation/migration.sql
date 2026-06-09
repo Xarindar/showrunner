@@ -1,4 +1,4 @@
--- Create module installation and per-module setting state tables.
+-- CreateTable
 CREATE TABLE "ModuleInstallation" (
     "id" TEXT NOT NULL,
     "moduleId" TEXT NOT NULL,
@@ -14,6 +14,7 @@ CREATE TABLE "ModuleInstallation" (
     CONSTRAINT "ModuleInstallation_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
 CREATE TABLE "ModuleSetting" (
     "id" TEXT NOT NULL,
     "moduleId" TEXT NOT NULL,
@@ -25,9 +26,17 @@ CREATE TABLE "ModuleSetting" (
     CONSTRAINT "ModuleSetting_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateIndex
 CREATE UNIQUE INDEX "ModuleInstallation_moduleId_key" ON "ModuleInstallation"("moduleId");
+
+-- CreateIndex
 CREATE INDEX "ModuleInstallation_enabled_idx" ON "ModuleInstallation"("enabled");
-CREATE UNIQUE INDEX "ModuleSetting_moduleId_key_key" ON "ModuleSetting"("moduleId", "key");
+
+-- CreateIndex
 CREATE INDEX "ModuleSetting_moduleId_idx" ON "ModuleSetting"("moduleId");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "ModuleSetting_moduleId_key_key" ON "ModuleSetting"("moduleId", "key");
+
+-- AddForeignKey
 ALTER TABLE "ModuleSetting" ADD CONSTRAINT "ModuleSetting_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "ModuleInstallation"("moduleId") ON DELETE CASCADE ON UPDATE CASCADE;

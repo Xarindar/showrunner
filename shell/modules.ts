@@ -38,11 +38,27 @@ const registeredModules = [
   analyticsModule
 ] as const satisfies readonly ShellModule[];
 
-const shellModules: readonly ShellModule[] = registeredModules;
+export type ModuleId = (typeof registeredModules)[number]["id"];
+
+// Build-time module selection. Set NEXT_PUBLIC_SHOWRUNNER_DISABLED_MODULES to a comma-separated list of
+// module ids at build to exclude them from a client deployment. Excluded modules drop out of the registry
+// entirely: no sidebar entry, no route (getModule returns undefined, then 404), no enablement, so a per-client
+// build ships only the modules that client bought. Required platform modules can never be build-excluded.
+// NEXT_PUBLIC_ is used so the same value is inlined on both server and client and the two never disagree.
+const buildDisabledModuleIds = new Set(
+  (process.env.NEXT_PUBLIC_SHOWRUNNER_DISABLED_MODULES ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
+
+function isBuildEnabled(module: ShellModule) {
+  return Boolean(module.required) || !buildDisabledModuleIds.has(module.id);
+}
+
+const shellModules: readonly ShellModule[] = registeredModules.filter(isBuildEnabled);
 
 export const moduleRegistry = [...shellModules].sort((left, right) => left.order - right.order);
-
-export type ModuleId = (typeof registeredModules)[number]["id"];
 
 export const requiredModuleIds: ModuleId[] = shellModules
   .filter((item) => item.required && item.status === "active")
