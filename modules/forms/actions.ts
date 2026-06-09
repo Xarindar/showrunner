@@ -8,6 +8,7 @@ import { z } from "zod";
 import { csvList, optionalEmail, optionalStoredText, parseForm, requiredText } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
 import { queueFormSubmittedEmail } from "@/lib/email";
+import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
 import { prisma } from "@/lib/prisma";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getSiteSettings } from "@/lib/site";
@@ -433,6 +434,20 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
       data
     }
   );
+
+  await emitModuleEvent("form.submitted", {
+    ...(await requestAttribution(undefined, `/forms/${form.slug}`)),
+    actorEmail: submitterEmail,
+    metadata: {
+      clientId,
+      destination: form.destination,
+      formId: form.id,
+      formName: form.name,
+      formSlug: form.slug
+    },
+    relatedId: submission.id,
+    relatedType: "form_submission"
+  });
 
   refreshForms(form.slug);
   if (clientId) revalidatePath("/admin/modules/clients");

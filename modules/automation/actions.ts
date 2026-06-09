@@ -22,20 +22,10 @@ import {
   safeExternalHttpsUrl
 } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
+import { moduleEventNames } from "@/lib/events/catalog";
 import { prisma } from "@/lib/prisma";
 
-const automationEvents = [
-  "automation.manual",
-  "booking.created",
-  "booking.canceled",
-  "order.paid",
-  "form.submitted",
-  "gallery.approved",
-  "client.tagged",
-  "invoice.overdue"
-] as const;
-
-const automationEvent = z.enum(automationEvents);
+const automationEvent = z.enum(moduleEventNames);
 
 const automationSchema = z
   .object({
@@ -97,7 +87,7 @@ const webhookEndpointSchema = z
     events: csvList(value.events)
   }))
   .refine((value) => value.events.every((event) => automationEvent.safeParse(event).success), {
-    message: `Use known event names: ${automationEvents.join(", ")}.`,
+    message: `Use known event names: ${moduleEventNames.join(", ")}.`,
     path: ["events"]
   });
 
@@ -111,7 +101,7 @@ const deleteWebhookEndpointSchema = z.object({
 const webhookDeliverySchema = z.object({
   webhookEndpointId: requiredText,
   event: automationEvent,
-  status: z.enum(WebhookDeliveryStatus).catch(WebhookDeliveryStatus.PENDING),
+  status: z.enum([WebhookDeliveryStatus.DELIVERED, WebhookDeliveryStatus.FAILED]).catch(WebhookDeliveryStatus.DELIVERED),
   statusCode: optionalNonNegativeInt,
   errorMessage: optionalStoredText
 });
@@ -129,6 +119,11 @@ function missingSigningSecret(value?: string | null) {
   return !value || value === "replace-before-production";
 }
 
+function automationWebhookSecret(action: AutomationAction, currentSecret?: string | null) {
+  if (action !== AutomationAction.SEND_WEBHOOK) return undefined;
+  return missingSigningSecret(currentSecret) ? generateSigningSecret() : currentSecret || undefined;
+}
+
 export async function createAutomationAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(automationSchema, formData, "/admin/modules/automation");
@@ -141,6 +136,7 @@ export async function createAutomationAction(formData: FormData) {
       action: input.action,
       targetEmail: input.targetEmail,
       webhookUrl: input.webhookUrl,
+      webhookSigningSecret: automationWebhookSecret(input.action) || "",
       subjectTemplate: input.subjectTemplate,
       bodyTemplate: input.bodyTemplate,
       conditions: input.conditions
@@ -166,6 +162,10 @@ export async function updateAutomationStatusAction(formData: FormData) {
 export async function updateAutomationAction(formData: FormData) {
   await requireAdmin();
   const input = await parseForm(automationUpdateSchema, formData, "/admin/modules/automation");
+  const current = await prisma.automation.findUnique({
+    where: { id: input.id },
+    select: { webhookSigningSecret: true }
+  });
 
   await prisma.automation.update({
     where: { id: input.id },
@@ -176,6 +176,7 @@ export async function updateAutomationAction(formData: FormData) {
       action: input.action,
       targetEmail: input.targetEmail,
       webhookUrl: input.webhookUrl,
+      webhookSigningSecret: automationWebhookSecret(input.action, current?.webhookSigningSecret) || "",
       subjectTemplate: input.subjectTemplate,
       bodyTemplate: input.bodyTemplate,
       conditions: input.conditions

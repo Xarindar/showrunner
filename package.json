@@ -12,6 +12,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "email:process": "tsx scripts/process-email-outbox.ts",
+    "webhooks:process": "tsx scripts/process-webhook-deliveries.ts",
     "seed": "tsx prisma/seed.ts"
   },
   "prisma": {

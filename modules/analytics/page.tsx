@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { AnalyticsEventType, BookingStatus, OrderStatus, PortfolioGalleryStatus, Prisma } from "@prisma/client";
 import { BarChart3, CheckCircle2, MousePointerClick, Plus, TrendingUp } from "lucide-react";
-import { formatDateTime, formatMoney } from "@/lib/format";
+import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { createAnalyticsGoalAction, recordAnalyticsEventAction, updateAnalyticsGoalStatusAction } from "./actions";
@@ -10,10 +11,6 @@ export const dynamic = "force-dynamic";
 type AnalyticsPageProps = {
   searchParams: Promise<{ saved?: string; error?: string }>;
 };
-
-function enumLabel(value: string) {
-  return value.toLowerCase().split("_").join(" ");
-}
 
 function eventDisplayName(eventType: AnalyticsEventType, eventName: string) {
   return eventName || enumLabel(eventType);
@@ -106,6 +103,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           <h1 style={{ fontSize: "2.4rem" }}>Events, attribution, and reporting</h1>
           <p>Track standard events, summarize module performance, and define conversion goals for future widgets and automations.</p>
         </div>
+        <Link className="button secondary" href="/admin/modules/analytics/export">
+          Export CSV
+        </Link>
       </header>
 
       {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
@@ -116,7 +116,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           <MousePointerClick size={22} />
           <h3>{eventCount} events</h3>
           <p className="lead" style={{ fontSize: "0.95rem" }}>
-            Captured analytics rows across public pages, manual records, and future embedded widgets.
+            Captured analytics rows across public pages, server events, manual records, and future embedded widgets.
           </p>
         </div>
         <div className="card">
@@ -165,7 +165,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
       <section className="grid-2">
         <form action={recordAnalyticsEventAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Record event</h2>
+          <h2 style={{ fontSize: "1.35rem" }}>Record manual event</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="event-type">Event type</label>
@@ -252,7 +252,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           </div>
           <button className="button" type="submit">
             <Plus size={18} />
-            Record event
+            Record manual event
           </button>
         </form>
 

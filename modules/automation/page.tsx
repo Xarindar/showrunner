@@ -6,7 +6,8 @@ import {
   WebhookDeliveryStatus
 } from "@prisma/client";
 import { Play, Plus, Webhook, Workflow } from "lucide-react";
-import { formatDateTime } from "@/lib/format";
+import { moduleEventNames } from "@/lib/events/catalog";
+import { enumLabel, formatDateTime, stringArrayCsv } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
@@ -26,25 +27,6 @@ export const dynamic = "force-dynamic";
 type AutomationPageProps = {
   searchParams: Promise<{ saved?: string; error?: string; automation?: string }>;
 };
-
-const automationEvents = [
-  "automation.manual",
-  "booking.created",
-  "booking.canceled",
-  "order.paid",
-  "form.submitted",
-  "gallery.approved",
-  "client.tagged",
-  "invoice.overdue"
-];
-
-function enumLabel(value: string) {
-  return value.toLowerCase().split("_").join(" ");
-}
-
-function csvToText(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").join(", ") : "";
-}
 
 function automationStatusClass(status: AutomationStatus) {
   if (status === AutomationStatus.ACTIVE) return "pill success";
@@ -78,7 +60,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
       take: 20
     }),
     prisma.webhookDelivery.findMany({
-      include: { webhookEndpoint: true },
+      include: { automation: true, webhookEndpoint: true },
       orderBy: { createdAt: "desc" },
       take: 10
     }),
@@ -119,9 +101,9 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
         </div>
         <div className="card">
           <Play size={22} />
-          <h3>{runCount} manual run records</h3>
+          <h3>{runCount} run records</h3>
           <p className="lead" style={{ fontSize: "0.95rem" }}>
-            Operator-entered run notes until the background engine is wired.
+            Live event matches plus operator-entered test notes.
           </p>
         </div>
         <div className="card">
@@ -339,7 +321,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
               <div>
                 <h2 style={{ fontSize: "1.35rem" }}>{selectedAutomation.name}</h2>
                 <p>
-                  {enumLabel(selectedAutomation.trigger)} → {enumLabel(selectedAutomation.action)}
+                  {enumLabel(selectedAutomation.trigger)} -&gt; {enumLabel(selectedAutomation.action)}
                 </p>
               </div>
               <span className={automationStatusClass(selectedAutomation.status)}>{enumLabel(selectedAutomation.status)}</span>
@@ -405,7 +387,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
           </div>
 
           <div className="card stack">
-            <h2 style={{ fontSize: "1.35rem" }}>Manual run history</h2>
+            <h2 style={{ fontSize: "1.35rem" }}>Run history</h2>
             <table className="table">
               <thead>
                 <tr>
@@ -469,7 +451,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
             </div>
             <div className="field">
               <label htmlFor="webhook-events">Events</label>
-              <input id="webhook-events" name="events" placeholder={automationEvents.join(", ")} />
+              <input id="webhook-events" name="events" placeholder={moduleEventNames.join(", ")} />
             </div>
           </div>
           <button className="button secondary" type="submit">
@@ -482,7 +464,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
           <table className="table">
             <thead>
               <tr>
-                <th>Endpoint</th>
+                <th>Target</th>
                 <th>Events</th>
                 <th>State</th>
                 <th>Actions</th>
@@ -496,7 +478,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                     <br />
                     <span style={{ color: "var(--muted)" }}>{endpoint.url}</span>
                   </td>
-                  <td>{csvToText(endpoint.events) || "No events"}</td>
+                  <td>{stringArrayCsv(endpoint.events) || "No events"}</td>
                   <td>
                     <span className={automationStatusClass(endpoint.status)}>{enumLabel(endpoint.status)}</span>
                   </td>
@@ -531,7 +513,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                         </div>
                         <div className="field">
                           <label htmlFor={`webhook-${endpoint.id}-events`}>Events</label>
-                          <input id={`webhook-${endpoint.id}-events`} name="events" defaultValue={csvToText(endpoint.events)} />
+                          <input id={`webhook-${endpoint.id}-events`} name="events" defaultValue={stringArrayCsv(endpoint.events)} />
                         </div>
                         <button className="button secondary" type="submit">
                           Save endpoint
@@ -578,7 +560,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
             <div className="field">
               <label htmlFor="delivery-status">Status</label>
               <select id="delivery-status" name="status" defaultValue={WebhookDeliveryStatus.DELIVERED}>
-                {Object.values(WebhookDeliveryStatus).map((status) => (
+                {[WebhookDeliveryStatus.DELIVERED, WebhookDeliveryStatus.FAILED].map((status) => (
                   <option key={status} value={status}>
                     {enumLabel(status)}
                   </option>
@@ -590,7 +572,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
             <div className="field">
               <label htmlFor="delivery-event">Event</label>
               <select id="delivery-event" name="event" defaultValue="form.submitted">
-                {automationEvents.map((event) => (
+                {moduleEventNames.map((event) => (
                   <option key={event} value={event}>
                     {event}
                   </option>
@@ -612,11 +594,11 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
         </form>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Manual webhook delivery records</h2>
+          <h2 style={{ fontSize: "1.35rem" }}>Webhook delivery records</h2>
           <table className="table">
             <thead>
               <tr>
-                <th>Endpoint</th>
+                <th>Target</th>
                 <th>Event</th>
                 <th>Status</th>
                 <th>Created</th>
@@ -625,7 +607,13 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
             <tbody>
               {recentDeliveries.map((delivery) => (
                 <tr key={delivery.id}>
-                  <td>{delivery.webhookEndpoint.name}</td>
+                  <td>
+                    {delivery.webhookEndpoint?.name || delivery.automation?.name || "Manual delivery"}
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>
+                      {delivery.targetUrl || delivery.webhookEndpoint?.url || delivery.automation?.webhookUrl || "No target URL"}
+                    </span>
+                  </td>
                   <td>{delivery.event}</td>
                   <td>
                     <span className={runStatusClass(delivery.status)}>{enumLabel(delivery.status)}</span>

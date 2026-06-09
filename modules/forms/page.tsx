@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { FormDestination, FormFieldRole, FormFieldType, FormStatus } from "@prisma/client";
 import { ClipboardList, FileText, Inbox, Plus } from "lucide-react";
-import { formatDateTime } from "@/lib/format";
+import { enumLabel, formatDateTime, stringArrayCsv } from "@/lib/format";
+import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
@@ -25,10 +26,6 @@ type FormsPageProps = {
   searchParams: Promise<{ saved?: string; error?: string; page?: string; status?: string; form?: string }>;
 };
 
-function enumLabel(value: string) {
-  return value.toLowerCase().split("_").join(" ");
-}
-
 function normalizeStatusFilter(value?: string) {
   return statusFilters.includes(value as (typeof statusFilters)[number]) ? value || "all" : "all";
 }
@@ -37,14 +34,6 @@ function statusClass(status: FormStatus) {
   if (status === FormStatus.ACTIVE) return "pill success";
   if (status === FormStatus.ARCHIVED) return "pill danger";
   return "pill";
-}
-
-function optionsToCsv(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").join(", ") : "";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 function summarizeSubmission(value: unknown) {
@@ -62,6 +51,28 @@ function summarizeSubmission(value: unknown) {
     .slice(0, 4);
 
   return entries.length ? entries.map(([key, item]) => `${key}: ${String(item)}`).join(" | ") : "No response data";
+}
+
+function submissionEntries(value: unknown) {
+  if (!isRecord(value)) return [];
+
+  return Object.entries(value).map(([key, item]) => {
+    if (isRecord(item) && "value" in item) {
+      return {
+        id: key,
+        label: String(item.label || key),
+        type: String(item.type || "field"),
+        value: String(item.value || "")
+      };
+    }
+
+    return {
+      id: key,
+      label: key,
+      type: "field",
+      value: String(item || "")
+    };
+  });
 }
 
 function destinationOptions(current?: FormDestination) {
@@ -465,7 +476,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                       <span style={{ color: "var(--muted)" }}>{field.helpText || field.placeholder || "No helper text"}</span>
                     </td>
                     <td>{enumLabel(field.type)}</td>
-                    <td>{optionsToCsv(field.options) || "None"}</td>
+                    <td>{stringArrayCsv(field.options) || "None"}</td>
                     <td>
                       <span className="pill">{field.isRequired ? "required" : "optional"}</span>{" "}
                       {field.isHidden ? <span className="pill">hidden</span> : null}
@@ -515,7 +526,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                           </div>
                           <div className="field">
                             <label htmlFor={`field-${field.id}-options`}>Options</label>
-                            <input id={`field-${field.id}-options`} name="options" defaultValue={optionsToCsv(field.options)} />
+                            <input id={`field-${field.id}-options`} name="options" defaultValue={stringArrayCsv(field.options)} />
                           </div>
                           <div className="field">
                             <label htmlFor={`field-${field.id}-help`}>Help text</label>
@@ -568,9 +579,14 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               <h2 style={{ fontSize: "1.35rem" }}>Recent submissions</h2>
               <p>Newest responses for {selectedForm.name}.</p>
             </div>
-            <Link className="button secondary" href={`/forms/${selectedForm.slug}`}>
-              Open public form
-            </Link>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <Link className="button secondary" href={`/admin/modules/forms/export?formId=${selectedForm.id}`}>
+                Export CSV
+              </Link>
+              <Link className="button secondary" href={`/forms/${selectedForm.slug}`}>
+                Open public form
+              </Link>
+            </div>
           </div>
           <table className="table">
             <thead>
@@ -589,7 +605,25 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                     <br />
                     <span style={{ color: "var(--muted)" }}>{submission.submitterEmail || "No email"}</span>
                   </td>
-                  <td>{summarizeSubmission(submission.data)}</td>
+                  <td>
+                    {summarizeSubmission(submission.data)}
+                    <details style={{ marginTop: 8 }}>
+                      <summary>View response</summary>
+                      <div className="subpanel" style={{ marginTop: 8 }}>
+                        {submissionEntries(submission.data).map((entry) => (
+                          <div key={entry.id} style={{ marginBottom: 10 }}>
+                            <strong>{entry.label}</strong>{" "}
+                            <span className="pill">{entry.type.toLowerCase()}</span>
+                            <p style={{ color: "var(--muted)", margin: "4px 0 0" }}>{entry.value || "No answer"}</p>
+                          </div>
+                        ))}
+                        {!submissionEntries(submission.data).length ? <p>No response data.</p> : null}
+                        <p style={{ color: "var(--muted)", marginBottom: 0 }}>
+                          Submission data stores field IDs with submission-time labels and field types.
+                        </p>
+                      </div>
+                    </details>
+                  </td>
                   <td>
                     {submission.client ? (
                       <Link href={`/admin/clients/${submission.client.id}`}>{submission.client.name}</Link>

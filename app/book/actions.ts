@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 
 const bookingSchema = z.object({
@@ -37,7 +38,7 @@ export async function createPublicBookingAction(_state: BookingFormState, formDa
   }
 
   try {
-    await nativeSchedulingAdapter.createBooking({
+    const booking = await nativeSchedulingAdapter.createBooking({
       serviceId: parsed.data.serviceId,
       startsAt: new Date(parsed.data.startsAt),
       customerName: parsed.data.customerName,
@@ -46,6 +47,16 @@ export async function createPublicBookingAction(_state: BookingFormState, formDa
       notes: parsed.data.notes,
       intakeResponse: parsed.data.intakeResponse,
       policyAccepted: parsed.data.policyAccepted === "on"
+    });
+    await emitModuleEvent("booking.created", {
+      ...(await requestAttribution(undefined, "/book")),
+      actorEmail: parsed.data.customerEmail,
+      metadata: {
+        serviceId: parsed.data.serviceId,
+        startsAt: parsed.data.startsAt
+      },
+      relatedId: booking.id,
+      relatedType: "booking"
     });
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to create booking." };

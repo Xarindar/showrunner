@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { parseForm } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
+import { enumLabel } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 
@@ -40,10 +41,6 @@ const optionalDateTime = trimmed.transform((value, context) => {
 
   return date;
 });
-
-function enumLabel(value: string) {
-  return value.toLowerCase().split("_").join(" ");
-}
 
 const eventSchema = z
   .object({
