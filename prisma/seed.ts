@@ -85,7 +85,7 @@ async function seedEmailCore(businessName: string, contactEmail: string) {
     });
   }
 
-  for (const groupId of ["email-group-bookings", "email-group-forms"]) {
+  for (const groupId of ["email-group-bookings", "email-group-forms", "email-group-billing"]) {
     await prisma.emailRecipient.upsert({
       where: { groupId_email: { groupId, email: contactEmail } },
       update: { name: businessName, isActive: true },
@@ -225,6 +225,75 @@ async function seedEmailCore(businessName: string, contactEmail: string) {
         "<p>A form was submitted.</p><p><strong>Form:</strong> {{formName}}</p><p><strong>Name:</strong> {{submitterName}}</p><p><strong>Email:</strong> {{submitterEmail}}</p><p>{{submissionSummary}}</p>",
       requiredTokens: ["formName", "submissionSummary"],
       optionalTokens: ["businessName", "submitterName", "submitterEmail"]
+    },
+    {
+      id: "email-template-billing-document-customer",
+      key: "billing.document.customer",
+      name: "Billing document notice",
+      description: "Sent to customers with a public invoice, quote, or contract link.",
+      purpose: MessageTemplatePurpose.INVOICE_NOTICE,
+      subject: "{{businessName}} {{documentType}} {{documentNumber}}",
+      previewText: "{{documentTotal}} due for {{documentNumber}}.",
+      textBody: [
+        "Hi {{customerName}},",
+        "",
+        "{{businessName}} sent {{documentType}} {{documentNumber}}.",
+        "",
+        "Total: {{documentTotal}}",
+        "Due: {{documentDueAt}}",
+        "",
+        "View document: {{publicDocumentUrl}}",
+        "Payment link: {{paymentUrl}}",
+        "",
+        "{{publicMemo}}"
+      ].join("\n"),
+      htmlBody:
+        "<p>Hi {{customerName}},</p><p>{{businessName}} sent {{documentType}} {{documentNumber}}.</p><p><strong>Total:</strong> {{documentTotal}}<br /><strong>Due:</strong> {{documentDueAt}}</p><p><a href=\"{{publicDocumentUrl}}\">View document</a></p><p><a href=\"{{paymentUrl}}\">Payment link</a></p><p>{{publicMemo}}</p>",
+      requiredTokens: ["businessName", "customerName", "documentType", "documentNumber", "documentTotal", "publicDocumentUrl"],
+      optionalTokens: ["customerEmail", "documentStatus", "documentDueAt", "paymentUrl", "checkoutProvider", "publicMemo"]
+    },
+    {
+      id: "email-template-order-checkout-customer",
+      key: "order.checkout.customer",
+      name: "Order checkout prepared",
+      description: "Sent after a public cart is converted into a draft order and hosted checkout handoff record.",
+      purpose: MessageTemplatePurpose.ORDER_RECEIPT,
+      subject: "{{businessName}} order {{orderNumber}}",
+      previewText: "Your order is prepared for hosted checkout.",
+      textBody: [
+        "Hi {{customerName}},",
+        "",
+        "Order {{orderNumber}} is prepared with {{paymentProvider}} payment status {{paymentStatus}}.",
+        "",
+        "Total: {{orderTotal}}",
+        "",
+        "{{businessName}} will complete payment collection through hosted checkout. No card details are collected by this site."
+      ].join("\n"),
+      htmlBody:
+        "<p>Hi {{customerName}},</p><p>Order {{orderNumber}} is prepared with {{paymentProvider}} payment status {{paymentStatus}}.</p><p><strong>Total:</strong> {{orderTotal}}</p><p>{{businessName}} will complete payment collection through hosted checkout. No card details are collected by this site.</p>",
+      requiredTokens: ["businessName", "customerName", "orderNumber", "orderTotal", "paymentProvider", "paymentStatus"],
+      optionalTokens: ["customerEmail"]
+    },
+    {
+      id: "email-template-order-receipt-customer",
+      key: "order.receipt.customer",
+      name: "Order receipt",
+      description: "Reserved for paid-order receipts after payment webhooks mark orders paid.",
+      purpose: MessageTemplatePurpose.ORDER_RECEIPT,
+      subject: "Receipt for {{businessName}} order {{orderNumber}}",
+      previewText: "{{orderTotal}} paid for {{orderNumber}}.",
+      textBody: [
+        "Hi {{customerName}},",
+        "",
+        "Payment was received for order {{orderNumber}}.",
+        "",
+        "Total paid: {{orderTotal}}",
+        "Receipt: {{receiptUrl}}"
+      ].join("\n"),
+      htmlBody:
+        "<p>Hi {{customerName}},</p><p>Payment was received for order {{orderNumber}}.</p><p><strong>Total paid:</strong> {{orderTotal}}</p><p><a href=\"{{receiptUrl}}\">Receipt</a></p>",
+      requiredTokens: ["businessName", "customerName", "orderNumber", "orderTotal"],
+      optionalTokens: ["customerEmail", "receiptUrl"]
     }
   ];
 

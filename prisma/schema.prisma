@@ -183,6 +183,8 @@ enum AutomationTrigger {
   BOOKING_CANCELED
   ORDER_PAID
   FORM_SUBMITTED
+  GALLERY_VIEWED
+  FAVORITE_ADDED
   GALLERY_APPROVED
   CLIENT_TAGGED
   INVOICE_OVERDUE
@@ -381,13 +383,27 @@ model Booking {
 }
 
 model MediaAsset {
-  id        String      @id @default(cuid())
-  driver    MediaDriver
-  key       String
-  url       String
-  filename  String
-  alt       String?
-  createdAt DateTime    @default(now())
+  id           String      @id @default(cuid())
+  driver       MediaDriver
+  key          String
+  url          String
+  filename     String
+  mimeType     String      @default("")
+  sizeBytes    Int         @default(0)
+  folder       String      @default("")
+  tags         Json        @default("[]")
+  caption      String      @default("")
+  credit       String      @default("")
+  alt          String?
+  isDecorative Boolean     @default(false)
+  isPrivate    Boolean     @default(false)
+  deletedAt    DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([folder])
+  @@index([isPrivate])
+  @@index([deletedAt])
 }
 
 model Client {
@@ -892,28 +908,34 @@ model EmailCampaign {
 }
 
 model BillingDocument {
-  id             String                @id @default(cuid())
-  documentNumber String                @unique
-  type           BillingDocumentType   @default(INVOICE)
-  status         BillingDocumentStatus @default(DRAFT)
-  clientId       String?
-  client         Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  customerName   String
-  customerEmail  String
-  currency       String                @default("USD")
-  subtotalCents  Int                   @default(0)
-  discountCents  Int                   @default(0)
-  taxCents       Int                   @default(0)
-  totalCents     Int                   @default(0)
-  dueAt          DateTime?
-  acceptedAt     DateTime?
-  paidAt         DateTime?
-  notes          String                @default("")
-  publicMemo     String                @default("")
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
-  lineItems      BillingLineItem[]
-  attachments    BillingAttachment[]
+  id                       String                @id @default(cuid())
+  documentNumber           String                @unique
+  type                     BillingDocumentType   @default(INVOICE)
+  status                   BillingDocumentStatus @default(DRAFT)
+  publicAccessToken        String?               @unique
+  clientId                 String?
+  client                   Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  customerName             String
+  customerEmail            String
+  currency                 String                @default("USD")
+  subtotalCents            Int                   @default(0)
+  discountCents            Int                   @default(0)
+  taxCents                 Int                   @default(0)
+  totalCents               Int                   @default(0)
+  dueAt                    DateTime?
+  acceptedAt               DateTime?
+  paidAt                   DateTime?
+  notes                    String                @default("")
+  publicMemo               String                @default("")
+  snapshot                 Json                  @default("{}")
+  snapshotAt               DateTime?
+  checkoutProvider         PaymentProvider?
+  checkoutUrl              String                @default("")
+  paymentExternalReference String                @default("")
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  lineItems                BillingLineItem[]
+  attachments              BillingAttachment[]
 
   @@index([clientId])
   @@index([type, status])
@@ -947,20 +969,22 @@ model BillingAttachment {
 }
 
 model Automation {
-  id              String            @id @default(cuid())
-  name            String
-  status          AutomationStatus  @default(DRAFT)
-  trigger         AutomationTrigger @default(MANUAL)
-  action          AutomationAction  @default(NOTIFY_ADMIN)
-  targetEmail     String?
-  webhookUrl      String?
-  subjectTemplate String            @default("")
-  bodyTemplate    String            @default("")
-  conditions      Json              @default("{}")
-  lastRunAt       DateTime?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  runs            AutomationRun[]
+  id                   String            @id @default(cuid())
+  name                 String
+  status               AutomationStatus  @default(DRAFT)
+  trigger              AutomationTrigger @default(MANUAL)
+  action               AutomationAction  @default(NOTIFY_ADMIN)
+  targetEmail          String?
+  webhookUrl           String?
+  webhookSigningSecret String            @default("")
+  subjectTemplate      String            @default("")
+  bodyTemplate         String            @default("")
+  conditions           Json              @default("{}")
+  lastRunAt            DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  runs                 AutomationRun[]
+  webhookDeliveries    WebhookDelivery[]
 
   @@index([status])
   @@index([trigger])
@@ -997,18 +1021,26 @@ model WebhookEndpoint {
 
 model WebhookDelivery {
   id                String                @id @default(cuid())
-  webhookEndpointId String
-  webhookEndpoint   WebhookEndpoint       @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
+  webhookEndpointId String?
+  webhookEndpoint   WebhookEndpoint?      @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
+  automationId      String?
+  automation        Automation?           @relation(fields: [automationId], references: [id], onDelete: Cascade)
   event             String
+  targetUrl         String                @default("")
   payload           Json                  @default("{}")
   status            WebhookDeliveryStatus @default(PENDING)
   statusCode        Int?
   errorMessage      String                @default("")
+  attemptCount      Int                   @default(0)
+  lastAttemptAt     DateTime?
+  nextAttemptAt     DateTime              @default(now())
   deliveredAt       DateTime?
   createdAt         DateTime              @default(now())
 
   @@index([webhookEndpointId])
+  @@index([automationId])
   @@index([status])
+  @@index([nextAttemptAt])
 }
 
 model Form {
@@ -1082,24 +1114,26 @@ model PublicRateLimit {
 }
 
 model Testimonial {
-  id                String            @id @default(cuid())
-  clientId          String?
-  client            Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  authorName        String
-  authorEmail       String            @default("")
-  authorRole        String            @default("")
-  quote             String
-  rating            Int               @default(5)
-  source            String            @default("first-party")
-  sourceUrl         String            @default("")
-  serviceName       String            @default("")
-  productName       String            @default("")
-  permissionGranted Boolean           @default(false)
-  status            TestimonialStatus @default(PENDING)
-  featured          Boolean           @default(false)
-  submittedAt       DateTime          @default(now())
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  id                  String            @id @default(cuid())
+  clientId            String?
+  client              Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  authorName          String
+  authorEmail         String            @default("")
+  authorRole          String            @default("")
+  quote               String
+  rating              Int               @default(5)
+  source              String            @default("first-party")
+  sourceUrl           String            @default("")
+  serviceName         String            @default("")
+  productName         String            @default("")
+  permissionGranted   Boolean           @default(false)
+  permissionText      String            @default("")
+  permissionGrantedAt DateTime?
+  status              TestimonialStatus @default(PENDING)
+  featured            Boolean           @default(false)
+  submittedAt         DateTime          @default(now())
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   @@index([clientId])
   @@index([status])
