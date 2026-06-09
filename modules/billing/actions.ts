@@ -1,10 +1,17 @@
 "use server";
 
 import { randomBytes } from "crypto";
-import { BillingDocumentStatus, BillingDocumentType, Prisma } from "@prisma/client";
+import { BillingDocumentStatus, BillingDocumentType, PaymentProvider, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import {
+  ensureBillingPublicToken,
+  generateBillingPublicToken,
+  publicBillingUrl,
+  snapshotBillingDocument
+} from "@/lib/billing/documents";
 import {
   currencyCode,
   maxIntCents,
@@ -17,6 +24,7 @@ import {
   zeroableMoneyCents
 } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
+import { queueBillingDocumentEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 
 const optionalDate = z
@@ -109,6 +117,21 @@ const billingAttachmentSchema = z.object({
   notes: optionalStoredText
 });
 
+const billingCheckoutSchema = z.object({
+  id: requiredText,
+  checkoutUrl: safeExternalHttpsUrl,
+  paymentExternalReference: optionalStoredText
+});
+
+const billingCheckoutClearSchema = z.object({
+  id: requiredText,
+  confirmClear: z.literal("on", { error: "Confirm before clearing the hosted checkout link." })
+});
+
+const billingEmailSchema = z.object({
+  id: requiredText
+});
+
 function refreshBilling() {
   revalidatePath("/admin");
   revalidatePath("/admin/modules/billing");
@@ -134,6 +157,13 @@ async function generateDocumentNumber(type: BillingDocumentType) {
   }
 
   throw new Error("Could not generate a unique document number.");
+}
+
+async function requestOrigin() {
+  const headerStore = await headers();
+  const host = headerStore.get("host") || "localhost:3000";
+  const protocol = headerStore.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
+  return `${protocol}://${host}`;
 }
 
 async function recomputeDocumentTotals(tx: Prisma.TransactionClient, billingDocumentId: string) {
@@ -214,6 +244,7 @@ export async function createBillingDocumentAction(formData: FormData) {
       const created = await tx.billingDocument.create({
         data: {
           documentNumber: await generateDocumentNumber(input.type),
+          publicAccessToken: generateBillingPublicToken(),
           type: input.type,
           status: input.status,
           clientId: input.clientId,
@@ -238,6 +269,9 @@ export async function createBillingDocumentAction(formData: FormData) {
       });
 
       await recomputeDocumentTotals(tx, created.id);
+      if (input.status !== BillingDocumentStatus.DRAFT) {
+        await snapshotBillingDocument(tx, created.id);
+      }
       return created;
     });
   } catch (error) {
@@ -314,6 +348,10 @@ export async function updateBillingDocumentStatusAction(formData: FormData) {
           paidAt: input.status === BillingDocumentStatus.PAID ? now : undefined
         }
       });
+
+      if (input.status !== BillingDocumentStatus.DRAFT) {
+        await snapshotBillingDocument(tx, input.id);
+      }
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not update that billing status.";
@@ -321,6 +359,130 @@ export async function updateBillingDocumentStatusAction(formData: FormData) {
   }
 
   refreshBilling();
+}
+
+export async function setBillingCheckoutLinkAction(formData: FormData) {
+  await requireAdmin();
+  const input = await parseForm(billingCheckoutSchema, formData, "/admin/modules/billing");
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const document = await tx.billingDocument.findUnique({
+        where: { id: input.id },
+        select: { status: true }
+      });
+
+      if (!document) throw new Error("Billing document not found.");
+      if (document.status === BillingDocumentStatus.DRAFT) {
+        throw new Error("Send the document before attaching a hosted payment link.");
+      }
+      if (document.status === BillingDocumentStatus.PAID || document.status === BillingDocumentStatus.VOID) {
+        throw new Error("Finalized billing documents cannot receive a payment link.");
+      }
+
+      await tx.billingDocument.update({
+        where: { id: input.id },
+        data: {
+          checkoutProvider: PaymentProvider.STRIPE,
+          checkoutUrl: input.checkoutUrl,
+          paymentExternalReference: input.paymentExternalReference
+        }
+      });
+      await snapshotBillingDocument(tx, input.id);
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not save the hosted checkout link.";
+    redirect(`/admin/modules/billing?document=${input.id}&error=${encodeURIComponent(message)}`);
+  }
+
+  refreshBilling();
+  redirect(`/admin/modules/billing?saved=checkout&document=${input.id}`);
+}
+
+export async function clearBillingCheckoutLinkAction(formData: FormData) {
+  await requireAdmin();
+  const input = await parseForm(billingCheckoutClearSchema, formData, "/admin/modules/billing");
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const document = await tx.billingDocument.findUnique({
+        where: { id: input.id },
+        select: { status: true }
+      });
+
+      if (!document) throw new Error("Billing document not found.");
+      if (document.status === BillingDocumentStatus.PAID || document.status === BillingDocumentStatus.VOID) {
+        throw new Error("Finalized billing documents cannot be changed.");
+      }
+
+      await tx.billingDocument.update({
+        where: { id: input.id },
+        data: {
+          checkoutProvider: null,
+          checkoutUrl: "",
+          paymentExternalReference: ""
+        }
+      });
+      if (document.status !== BillingDocumentStatus.DRAFT) {
+        await snapshotBillingDocument(tx, input.id);
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not clear the hosted checkout link.";
+    redirect(`/admin/modules/billing?document=${input.id}&error=${encodeURIComponent(message)}`);
+  }
+
+  refreshBilling();
+  redirect(`/admin/modules/billing?saved=checkout-clear&document=${input.id}`);
+}
+
+export async function queueBillingDocumentEmailAction(formData: FormData) {
+  await requireAdmin();
+  const input = await parseForm(billingEmailSchema, formData, "/admin/modules/billing");
+
+  try {
+    const origin = await requestOrigin();
+    const document = await prisma.$transaction(async (tx) => {
+      const publicAccessToken = await ensureBillingPublicToken(tx, input.id);
+      await snapshotBillingDocument(tx, input.id);
+
+      return tx.billingDocument.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          documentNumber: true,
+          type: true,
+          status: true,
+          customerName: true,
+          customerEmail: true,
+          currency: true,
+          totalCents: true,
+          dueAt: true,
+          publicMemo: true,
+          checkoutProvider: true,
+          checkoutUrl: true,
+          publicAccessToken: true
+        }
+      }).then((row) => (row ? { ...row, publicAccessToken } : null));
+    });
+
+    if (!document) throw new Error("Billing document not found.");
+    if (document.status === BillingDocumentStatus.DRAFT) {
+      throw new Error("Send the document before emailing the customer link.");
+    }
+
+    await queueBillingDocumentEmail({
+      document,
+      publicUrl: publicBillingUrl(origin, document.publicAccessToken),
+      idempotencyKey: `billing:${document.id}:notice:${document.status}:${Date.now()}`
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not queue that billing email.";
+    redirect(`/admin/modules/billing?document=${input.id}&error=${encodeURIComponent(message)}`);
+  }
+
+  refreshBilling();
+  redirect(`/admin/modules/billing?saved=email&document=${input.id}`);
 }
 
 export async function addBillingLineItemAction(formData: FormData) {

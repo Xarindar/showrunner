@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { BillingDocumentStatus, BillingDocumentType } from "@prisma/client";
 import { FileText, Plus, ReceiptText, WalletCards } from "lucide-react";
-import { formatDateTime, formatMoney } from "@/lib/format";
+import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
   addBillingAttachmentAction,
   addBillingLineItemAction,
+  clearBillingCheckoutLinkAction,
   createBillingDocumentAction,
   deleteBillingLineItemAction,
+  queueBillingDocumentEmailAction,
+  setBillingCheckoutLinkAction,
   updateBillingDocumentAction,
   updateBillingLineItemAction,
   updateBillingDocumentStatusAction
@@ -19,10 +22,6 @@ export const dynamic = "force-dynamic";
 type BillingPageProps = {
   searchParams: Promise<{ saved?: string; error?: string; document?: string }>;
 };
-
-function enumLabel(value: string) {
-  return value.toLowerCase().split("_").join(" ");
-}
 
 function statusClass(status: BillingDocumentStatus) {
   if (status === BillingDocumentStatus.PAID || status === BillingDocumentStatus.ACCEPTED) return "pill success";
@@ -107,6 +106,8 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   const savedMessage = params.saved ? "Billing changes saved." : null;
   const errorMessage = params.error || null;
   const selectedDocumentIsDraft = selectedDocument?.status === BillingDocumentStatus.DRAFT;
+  const selectedDocumentIsFinal =
+    selectedDocument?.status === BillingDocumentStatus.PAID || selectedDocument?.status === BillingDocumentStatus.VOID;
 
   return (
     <div className="stack">
@@ -257,7 +258,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                     <Link href={`/admin/modules/billing?document=${document.id}`}>{document.documentNumber}</Link>
                     <br />
                     <span style={{ color: "var(--muted)" }}>
-                      {enumLabel(document.type)} · {document._count.lineItems} lines · {document._count.attachments} files
+                      {enumLabel(document.type)} - {document._count.lineItems} lines - {document._count.attachments} files
                     </span>
                   </td>
                   <td>
@@ -332,6 +333,92 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
               {!nextStatuses(selectedDocument.status).length ? (
                 <span className="pill">Final state</span>
               ) : null}
+            </div>
+            <div className="subpanel form-grid">
+              <h3 style={{ fontSize: "1.05rem" }}>Client link and payment handoff</h3>
+              <div className="grid-2">
+                <div>
+                  <p style={{ color: "var(--muted)", marginBottom: 8 }}>Public document</p>
+                  {selectedDocument.publicAccessToken && !selectedDocumentIsDraft ? (
+                    <a className="button secondary" href={`/billing/${selectedDocument.publicAccessToken}`} target="_blank" rel="noreferrer">
+                      Open client view
+                    </a>
+                  ) : (
+                    <span className="pill">Available after send</span>
+                  )}
+                </div>
+                <div>
+                  <p style={{ color: "var(--muted)", marginBottom: 8 }}>Customer notice</p>
+                  {!selectedDocumentIsDraft ? (
+                    <form action={queueBillingDocumentEmailAction}>
+                      <input type="hidden" name="id" value={selectedDocument.id} />
+                      <button className="button secondary" type="submit">
+                        Queue email
+                      </button>
+                    </form>
+                  ) : (
+                    <span className="pill">Send first</span>
+                  )}
+                </div>
+              </div>
+              <div className="subpanel form-grid">
+                <div className="page-header" style={{ marginBottom: 0, minHeight: 0 }}>
+                  <div>
+                    <h3 style={{ fontSize: "1.05rem" }}>Stripe Checkout link</h3>
+                    <p>
+                      {selectedDocument.checkoutUrl
+                        ? "Hosted payment link is attached."
+                        : "No hosted payment link is attached."}
+                    </p>
+                  </div>
+                  {selectedDocument.checkoutUrl ? (
+                    <a className="button secondary" href={selectedDocument.checkoutUrl} target="_blank" rel="noreferrer">
+                      Open link
+                    </a>
+                  ) : null}
+                </div>
+                {!selectedDocumentIsDraft && !selectedDocumentIsFinal ? (
+                  <form action={setBillingCheckoutLinkAction} className="form-grid">
+                    <input type="hidden" name="id" value={selectedDocument.id} />
+                    <div className="grid-2">
+                      <div className="field">
+                        <label htmlFor={`billing-${selectedDocument.id}-checkout`}>Stripe Checkout URL</label>
+                        <input
+                          id={`billing-${selectedDocument.id}-checkout`}
+                          name="checkoutUrl"
+                          placeholder="https://checkout.stripe.com/..."
+                          defaultValue={selectedDocument.checkoutUrl}
+                          required
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`billing-${selectedDocument.id}-payment-ref`}>Stripe reference</label>
+                        <input
+                          id={`billing-${selectedDocument.id}-payment-ref`}
+                          name="paymentExternalReference"
+                          placeholder="cs_test_..."
+                          defaultValue={selectedDocument.paymentExternalReference}
+                        />
+                      </div>
+                    </div>
+                    <button className="button secondary" type="submit">
+                      Save hosted payment link
+                    </button>
+                  </form>
+                ) : null}
+                {selectedDocument.checkoutUrl && !selectedDocumentIsFinal ? (
+                  <form action={clearBillingCheckoutLinkAction} className="form-grid">
+                    <input type="hidden" name="id" value={selectedDocument.id} />
+                    <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                      <input name="confirmClear" type="checkbox" required />
+                      Clear this hosted payment link.
+                    </label>
+                    <button className="button danger" type="submit">
+                      Clear payment link
+                    </button>
+                  </form>
+                ) : null}
+              </div>
             </div>
             {selectedDocumentIsDraft ? (
               <form action={updateBillingDocumentAction} className="subpanel form-grid">

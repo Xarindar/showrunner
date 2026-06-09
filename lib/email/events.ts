@@ -1,5 +1,6 @@
 import { BookingStatus, EmailCategory } from "@prisma/client";
-import { formatDateTime } from "@/lib/format";
+import type { BillingDocumentEmailInput } from "@/lib/billing/documents";
+import { formatDateTime, formatMoney } from "@/lib/format";
 import { getSiteSettings } from "@/lib/site";
 import { queueAdminEmail, queueEmail } from "./queue";
 import type { EmailTokens } from "./types";
@@ -28,6 +29,15 @@ type FormSubmissionForEmail = {
   submitterName: string;
   submitterEmail: string;
   data: Record<string, unknown>;
+};
+
+type OrderForEmail = {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  currency: string;
+  totalCents: number;
 };
 
 function endTime(value: Date, timeZone: string) {
@@ -178,6 +188,68 @@ export async function queueFormSubmittedEmail(form: FormForEmail, submission: Fo
       relatedId: submission.id,
       tokens,
       idempotencyKeyBase: `form:${submission.id}:submitted`
+    })
+  );
+}
+
+export async function queueBillingDocumentEmail(input: {
+  document: BillingDocumentEmailInput;
+  publicUrl: string;
+  idempotencyKey: string;
+}) {
+  const settings = await getSiteSettings();
+  const dueAt = input.document.dueAt ? formatDateTime(input.document.dueAt, settings.timezone) : "No due date";
+  const tokens: EmailTokens = {
+    businessName: settings.businessName,
+    customerName: input.document.customerName,
+    customerEmail: input.document.customerEmail,
+    documentNumber: input.document.documentNumber,
+    documentType: input.document.type.toLowerCase(),
+    documentStatus: input.document.status.toLowerCase(),
+    documentTotal: formatMoney(input.document.totalCents, input.document.currency),
+    documentDueAt: dueAt,
+    publicDocumentUrl: input.publicUrl,
+    paymentUrl: input.document.checkoutUrl || "",
+    checkoutProvider: input.document.checkoutProvider || "STRIPE",
+    publicMemo: input.document.publicMemo
+  };
+
+  await logQueueError("billing-document-customer", () =>
+    queueEmail({
+      templateKey: "billing.document.customer",
+      recipientEmail: input.document.customerEmail,
+      recipientName: input.document.customerName,
+      category: EmailCategory.TRANSACTIONAL,
+      relatedType: "billingDocument",
+      relatedId: input.document.id,
+      tokens,
+      idempotencyKey: input.idempotencyKey
+    })
+  );
+}
+
+export async function queueOrderCheckoutEmail(order: OrderForEmail) {
+  const settings = await getSiteSettings();
+  const tokens: EmailTokens = {
+    businessName: settings.businessName,
+    customerName: order.customerName,
+    customerEmail: order.customerEmail,
+    orderNumber: order.orderNumber,
+    orderTotal: formatMoney(order.totalCents, order.currency),
+    paymentProvider: "Stripe Checkout",
+    paymentStatus: "pending"
+  };
+
+  await logQueueError("order-checkout-customer", () =>
+    queueEmail({
+      templateKey: "order.checkout.customer",
+      recipientEmail: order.customerEmail,
+      recipientName: order.customerName,
+      category: EmailCategory.TRANSACTIONAL,
+      relatedType: "order",
+      relatedId: order.id,
+      tokens,
+      idempotencyKey: `order:${order.id}:checkout-prepared:customer`
     })
   );
 }

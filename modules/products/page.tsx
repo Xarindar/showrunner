@@ -1,6 +1,6 @@
 import { CouponType, OrderStatus, ProductStatus, ProductType } from "@prisma/client";
 import { BadgeDollarSign, Boxes, PackagePlus, Tags } from "lucide-react";
-import { formatMoney } from "@/lib/format";
+import { enumLabel, formatMoney, stringArrayCsv } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import {
   addProductToCollectionAction,
@@ -29,21 +29,10 @@ function moneyInput(cents?: number | null) {
   return typeof cents === "number" ? (cents / 100).toFixed(2) : "";
 }
 
-function tagsToCsv(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").join(", ") : "";
-}
-
 function statusClass(status: ProductStatus) {
   if (status === ProductStatus.ACTIVE) return "pill success";
   if (status === ProductStatus.ARCHIVED) return "pill danger";
   return "pill";
-}
-
-function productTypeLabel(value: ProductType) {
-  return value
-    .toLowerCase()
-    .split("_")
-    .join(" ");
 }
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
@@ -87,7 +76,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         <div>
           <p className="eyebrow">Products</p>
           <h1 style={{ fontSize: "2.4rem" }}>Commerce catalog</h1>
-          <p>Products, variants, collections, coupons, and checkout-ready catalog structure.</p>
+          <p>Products, variants, collections, coupons, storefront cart math, and hosted payment handoff records.</p>
         </div>
       </header>
 
@@ -99,7 +88,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           <PackagePlus size={22} />
           <h3>{activeCount} active products</h3>
           <p className="lead" style={{ fontSize: "0.95rem" }}>
-            Items ready for public catalog or hosted checkout.
+            Items available to the public storefront and cart.
           </p>
         </div>
         <div className="card">
@@ -113,7 +102,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           <BadgeDollarSign size={22} />
           <h3>{formatMoney(paidOrderTotal._sum.totalCents || 0)}</h3>
           <p className="lead" style={{ fontSize: "0.95rem" }}>
-            Paid and fulfilled order total across {orderCount} orders.
+            Paid and fulfilled order total across {orderCount} order records.
           </p>
         </div>
       </section>
@@ -137,7 +126,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               <select id="type" name="type" defaultValue={ProductType.PHYSICAL}>
                 {Object.values(ProductType).map((type) => (
                   <option key={type} value={type}>
-                    {productTypeLabel(type)}
+                    {enumLabel(type)}
                   </option>
                 ))}
               </select>
@@ -313,7 +302,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 <select id={`product-${selectedProduct.id}-type`} name="type" defaultValue={selectedProduct.type}>
                   {Object.values(ProductType).map((type) => (
                     <option key={type} value={type}>
-                      {productTypeLabel(type)}
+                      {enumLabel(type)}
                     </option>
                   ))}
                 </select>
@@ -362,7 +351,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               </div>
               <div className="field">
                 <label htmlFor={`product-${selectedProduct.id}-tags`}>Tags</label>
-                <input id={`product-${selectedProduct.id}-tags`} name="tags" defaultValue={tagsToCsv(selectedProduct.tags)} />
+                <input id={`product-${selectedProduct.id}-tags`} name="tags" defaultValue={stringArrayCsv(selectedProduct.tags)} />
               </div>
             </div>
             <div className="grid-2">

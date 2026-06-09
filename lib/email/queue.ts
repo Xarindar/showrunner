@@ -7,6 +7,13 @@ import { resolveSender } from "./sender";
 import { cleanError, cleanHeaders, normalizeEmail } from "./shared";
 import type { QueueAdminEmailInput, QueueEmailInput } from "./types";
 
+type QueueTemplateTestEmailInput = {
+  templateId: string;
+  recipientEmail: string;
+  tokens: Record<string, string | number | Date | null | undefined>;
+  idempotencyKey: string;
+};
+
 type QueueFailureInput = {
   templateKey: string;
   recipientEmail?: string;
@@ -22,10 +29,19 @@ type QueueFailureInput = {
 function marketingHeaders(input: QueueEmailInput) {
   if (input.category !== EmailCategory.MARKETING) return cleanHeaders(input.headers);
   if (!input.unsubscribeUrl) throw new Error("Marketing email requires an unsubscribe URL.");
+  const unsubscribeUrl = new URL(input.unsubscribeUrl);
+  const localhostDevUrl =
+    process.env.NODE_ENV !== "production" &&
+    unsubscribeUrl.protocol === "http:" &&
+    (unsubscribeUrl.hostname === "localhost" || unsubscribeUrl.hostname === "127.0.0.1");
+
+  if (unsubscribeUrl.protocol !== "https:" && !localhostDevUrl) {
+    throw new Error("Marketing unsubscribe URL must be absolute HTTPS.");
+  }
 
   return {
     ...cleanHeaders(input.headers),
-    "List-Unsubscribe": `<${input.unsubscribeUrl}>`,
+    "List-Unsubscribe": `<${unsubscribeUrl.toString()}>`,
     "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
   };
 }
@@ -181,4 +197,47 @@ export async function queueAdminEmail(input: QueueAdminEmailInput) {
       })
     )
   );
+}
+
+export async function queueTemplateTestEmail(input: QueueTemplateTestEmailInput) {
+  const recipientEmail = normalizeEmail(input.recipientEmail);
+  if (!recipientEmail) throw new Error("Email recipient is required.");
+
+  const template = await prisma.messageTemplate.findUnique({
+    where: { id: input.templateId }
+  });
+
+  if (!template || template.channel !== MessageChannel.EMAIL) {
+    throw new Error("Email template not found.");
+  }
+
+  const sender = await resolveSender({
+    category: EmailCategory.ADMIN,
+    senderIdentityId: undefined,
+    templateSenderIdentityId: template.senderIdentityId
+  });
+  const rendered = renderEmailTemplate(template, input.tokens);
+  const reason = await suppressionReason(recipientEmail, EmailCategory.ADMIN);
+  const status = reason ? EmailOutboxStatus.SUPPRESSED : EmailOutboxStatus.QUEUED;
+
+  await createOutboxRow({
+    idempotencyKey: input.idempotencyKey,
+    template: { connect: { id: template.id } },
+    templateKey: template.key || "",
+    senderIdentity: sender.senderIdentityId ? { connect: { id: sender.senderIdentityId } } : undefined,
+    recipientEmail,
+    fromName: sender.fromName,
+    fromEmail: sender.fromEmail,
+    replyToEmail: sender.replyToEmail,
+    subject: rendered.subject,
+    previewText: rendered.previewText,
+    htmlBody: rendered.htmlBody,
+    textBody: rendered.textBody,
+    purpose: "template_test",
+    category: EmailCategory.ADMIN,
+    relatedType: "messageTemplate",
+    relatedId: template.id,
+    status,
+    lastError: reason
+  });
 }
