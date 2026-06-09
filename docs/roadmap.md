@@ -6,6 +6,213 @@ Last researched: June 6, 2026 · Last audit pass: June 7, 2026
 
 This file is both a roadmap and an audit ledger. Every buildable item moves through one lifecycle. **Agents: treat the Status Index below as the source of truth, and _append_ to an item's log blocks rather than rewriting them.**
 
+<!--
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  AGENT INSTRUCTIONS — READ YOUR ROLE ONLY, THEN STOP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The user will assign you one of the roles below. Read that
+section only. Do not read the others — skipping them is
+not laziness, it is correct behavior that keeps token usage
+lean and your focus sharp.
+
+Roles: ENGINEER · LINTER · REVIEWER · PATCHER · VALIDATOR
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SHARED RULES — ALL ROLES MUST INTERNALIZE THESE FIRST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MODULAR DESIGN IS THE PRIME DIRECTIVE.
+This project is built to be modular. Every piece of work
+you produce must respect that. This is non-negotiable.
+
+Before creating anything new:
+  1. Look for an existing resource that already does the job.
+  2. If one exists — use it. Always. A working existing
+     resource beats a new one unless using it would
+     meaningfully degrade the user experience.
+  3. If nothing suitable exists, create the new resource
+     so it can be shared. Place it with like resources.
+     Name it clearly. Build it to be reused, not used once.
+
+Never:
+  - Duplicate logic that already exists elsewhere
+  - Create a new endpoint, action, component, or utility
+    in isolation when a home for it already exists
+  - Use AI-sounding names (e.g. SmartHandler, AIProcessor,
+    IntelligentForm) — name things plainly and accurately
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ROLE: ENGINEER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your job is to implement the milestone or task the user
+points you to in this document.
+
+Build it:
+  - To high, production-quality standards
+  - Following the Shared Rules above without exception
+  - Consistent with the patterns already established in
+    the codebase — if something is done a certain way
+    elsewhere, match it
+
+When you are done, mark your work in the roadmap inline
+by appending the following block directly beneath the
+relevant bullet or section:
+
+  > **🛠 ENGINEER · [date]:** [Brief summary of what was
+  > built, key files/locations touched, and any decisions
+  > worth calling out for the next role.]
+  >
+  > **Status: `READY-FOR-AUDIT`**
+
+Do not self-approve. Do not move the status forward.
+Your job ends at READY-FOR-AUDIT.
+
+Before marking READY-FOR-AUDIT, commit your work:
+  - Stage only the files relevant to this task
+  - Write a clear, descriptive commit message that explains
+    what was built and why — not just what files changed
+  - Do not add Co-authored-by lines or any AI attribution
+    to the commit
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ROLE: LINTER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your job is to audit all items currently marked
+`READY-FOR-AUDIT` in this document.
+
+For each item, examine the implementation and verify it
+against the Shared Rules. Flag issues by severity:
+
+  🔴 Critical — broken, insecure, or blocks other work
+  🟠 Significant — wrong pattern, duplication, or a choice
+     that will cause pain later
+  🟡 Minor — naming, inconsistency, or a missed polish item
+
+Also: if you encounter something clearly broken or badly
+misaligned that is NOT tagged for audit, note it in a
+brief sidebar — do not let it derail your audit, but do
+not silently ignore it either.
+
+When done, append inline beneath the item:
+
+  > **🔍 LINTER · [date]:** [Findings in priority order.
+  > Each finding references the exact file and line where
+  > possible. Be specific — the Patcher will work from this.]
+  >
+  > **Status: `READY-FOR-REVIEW`**
+
+Do not propose fixes. Do not implement anything.
+Your job is to see clearly and report accurately.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ROLE: REVIEWER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your job is to sanity-check all items marked
+`READY-FOR-REVIEW` in this document.
+
+Read the Linter's findings. Then look at the code yourself.
+You are not rubber-stamping — you are a second set of eyes.
+
+You will do one of two things:
+
+  APPROVE — The Linter's findings are accurate and complete.
+  Nothing significant was missed. Append:
+
+    > **✅ REVIEWER · [date]:** Findings confirmed. No gaps.
+    >
+    > **Status: `APPROVED-FOR-PATCH`**
+
+  FLAG — The Linter missed something, overstated something,
+  or a finding doesn't align with project direction. Append:
+
+    > **⚠️ REVIEWER · [date]:** [What was missed or
+    > mis-called, with file/line references. Be direct.]
+    >
+    > **Status: `READY-FOR-REVIEW`** ← returns to Linter
+
+Do not implement fixes. Do not approve work you have doubts
+about to keep things moving — a flag now is cheaper than a
+bad patch later.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ROLE: PATCHER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your job is to fix all items marked `APPROVED-FOR-PATCH`
+in this document.
+
+Work from the Linter's findings and the Reviewer's
+confirmation. Fix every flagged issue. Follow the Shared
+Rules — if a fix requires a new resource, make sure it
+lives in the right place and is built to be reused.
+
+When done, append inline beneath the item:
+
+  > **🔧 PATCHER · [date]:** [What was fixed, file by file.
+  > Reference the finding it addresses. Note any edge cases
+  > or follow-up concerns.]
+  >
+  > **Status: `READY-FOR-CONFIRM`**
+
+Do not mark your own work confirmed.
+Do not skip a finding because it seems minor.
+
+Before marking READY-FOR-CONFIRM, commit your work:
+  - One commit per logical fix where possible — do not
+    bundle unrelated changes
+  - Write a clear commit message that references what was
+    patched and which finding it addresses
+  - Do not add Co-authored-by lines or any AI attribution
+    to the commit
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ROLE: VALIDATOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your job is to confirm all items marked `READY-FOR-CONFIRM`
+in this document.
+
+Check the Patcher's work against every finding the Linter
+raised. Verify the fix is actually in the code — with file
+and line references. Do not take the Patcher's word for it.
+
+If everything checks out, append:
+
+  > **✅ VALIDATOR · [date]:** [Confirmed fixes, each
+  > referenced by file and line. Note any residual concerns
+  > or forward-looking callouts for future work.]
+  >
+  > **Status: `CONFIRMED`**
+
+If something wasn't actually fixed or introduced a new
+problem, append:
+
+  > **🔴 VALIDATOR · [date]:** [What is still broken or
+  > newly broken, with references.]
+  >
+  > **Status: `READY-FOR-PATCH`** ← returns to Patcher
+
+You are the last gate. Be thorough.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STATUS FLOW (reference)
+
+  READY-FOR-AUDIT
+    → READY-FOR-REVIEW     (Linter done)
+    → APPROVED-FOR-PATCH   (Reviewer approved)
+    → READY-FOR-CONFIRM    (Patcher done)
+    → CONFIRMED            (Validator done)
+
+  Loop-backs:
+    READY-FOR-REVIEW       (Reviewer flagged gaps → Linter)
+    READY-FOR-PATCH        (Validator found failures → Patcher)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-->
+
 **Lifecycle:** `⬜ PENDING → 🔵 READY-FOR-AUDIT → 🔍 AUDITED → 🛠 RESOLVED → ✅ CONFIRMED`, with `⚠️ FLAGGED` as the branch for an audited/resolved item that still has an open blocker or a fix that did not fully land.
 
 | Token | State | Meaning |
@@ -39,7 +246,7 @@ Authoritative current state. `§` = Architecture-Roadmap section number; `—` =
 | § | Item | Status | Open findings | Updated |
 |---|---|---|---|---|
 | 3 | Commerce — catalog (product/variant/collection/coupon) | ✅ CONFIRMED | — | 06-07-26 |
-| 3 | Commerce — cart / order / payment | 🔵 READY-FOR-AUDIT | manual Stripe Checkout link attachment; provider session creation/webhooks require deploy config | 06-09-26 |
+| 3 | Commerce — cart / order / payment | READY-FOR-REVIEW | checkout redirect swallowed; admin-paid orders not payment-confirmed; public cart actions bypass module gate; coupon redemption race; empty receipt URL | 06-09-26 |
 | 4 | Photography Portfolio — gallery/admin foundation | 🛠 RESOLVED | public proofing live; comments/approvals/widgets/signed variants pending | 06-08-26 |
 | 7 | Forms — field + form builder CRUD | ✅ CONFIRMED | — | 06-07-26 |
 | 7 | Forms — destinations / public client linking | ✅ CONFIRMED | — | 06-07-26 |
@@ -188,6 +395,19 @@ Core requirements:
   > **🛠 ENGINEER · 06-09-26:** Built the cart/order/payment foundation for audit: public cart checkout prep now claims carts once, reprices before order creation, links/creates clients, records pending Stripe payment rows, increments/release coupon redemptions, and clears the cart cookie (`lib/commerce/cart.ts`, `app/cart/actions.ts`). Added a reusable order lifecycle with guarded status transitions, paid-order inventory decrement, payment status sync, `order.paid` event emission, and receipt queueing (`lib/commerce/orders.ts`, `lib/email/events.ts`). Added an admin order/payment dashboard with manual hosted Checkout link attach/clear controls, grouped multi-currency paid totals, client timeline links, and updated module manifest/health messaging (`modules/products/*`, `modules/clients/detail/page.tsx`). Conflict flagged: automatic Stripe Checkout session creation and payment webhooks require deploy-time Stripe credentials/webhook secrets and were left manual rather than represented as live.
   >
   > **Status: `READY-FOR-AUDIT`**
+  >
+  > **🔍 LINTER · 06-09-26:** Findings in priority order:
+  > 🔴 Critical — successful checkout-prep is routed through an error path because `preparePublicCheckoutAction` calls `redirect()` inside the `try` block; Next redirects throw, so the catch at `app/cart/actions.ts:174-175` can convert a successful order/email/cookie-clear path at `app/cart/actions.ts:164-173` into `/cart?error=...`.
+  > 🔴 Critical — admin status controls can mark an order paid without confirming hosted payment collection. `PENDING -> PAID` is exposed by `lib/commerce/orders.ts:21-24` and rendered as a `Mark Paid` form at `modules/products/page.tsx:617-625`; `updateOrderStatus` then sets pending Stripe payments to `PAID`, decrements inventory, queues a receipt, and emits `order.paid` at `lib/commerce/orders.ts:100-108,162-193`, with no checkout-link/session/webhook confirmation checked.
+  > 🟠 Significant — public cart mutations bypass the products module gate. The public pages check `enabledModuleIds` at `app/shop/page.tsx:15-16` and `app/cart/page.tsx:37-38`, but the public server actions in `app/cart/actions.ts:63-176` do not check module enablement before creating carts, applying coupons, or creating checkout orders.
+  > 🟠 Significant — coupon max-redemption accounting is racy. Usability is read from `redemptionCount < maxRedemptions` at `lib/commerce/cart.ts:35-47,192-194`, but checkout creation increments the same coupon unconditionally at `lib/commerce/cart.ts:451-455`, so concurrent last-redemption checkouts can exceed the configured cap.
+  > 🟡 Minor — paid-order receipt emails render an empty receipt link. `queueOrderReceiptEmail` always passes `receiptUrl: ""` at `lib/email/events.ts:257-268`, while the seeded receipt template renders `Receipt: {{receiptUrl}}` / an empty anchor at `prisma/seed.ts:285-294`.
+  >
+  > **Status: `READY-FOR-REVIEW`**
+  >
+  > **⚠️ REVIEWER · 06-09-26:** Linter findings confirmed, but three gaps should be added before patching: 🟠 Significant — public checkout prep has no public abuse throttle while it can create `Client`/`Order`/`Payment` rows and queue mail (`app/cart/actions.ts:151-173`, `lib/commerce/cart.ts:399-449`); sibling public write paths gate and throttle with `publicRateLimitMessage` (`modules/forms/actions.ts:331-357`, `modules/testimonials/actions.ts:173-185`). 🟠 Significant — coupon redemption accounting also consumes limited coupons before payment, not just under concurrency: checkout prep increments `redemptionCount` for `PENDING` orders (`lib/commerce/cart.ts:451-455`), and only explicit cancellation releases it (`lib/commerce/orders.ts:132-142,169-170`), so unpaid prepared orders can exhaust `maxRedemptions`. 🟠 Significant — the provider-confirmation issue also exists on refunds: `PAID`/`FULFILLED → REFUNDED` is exposed (`lib/commerce/orders.ts:24-25`, `modules/products/page.tsx:617-625`) and marks payments `REFUNDED` without Stripe refund/webhook confirmation (`lib/commerce/orders.ts:111-118`).
+  >
+  > **Status: `READY-FOR-REVIEW`**
 - Digital products: secure downloads, expiring links, license notes, proof galleries, and file delivery tracking.
 - Service-commerce crossover: sell deposits, packages, retainers, class passes, paid add-ons, and booking bundles.
 - Subscriptions: recurring billing, plan changes, cancellation, renewal reminders, failed payment recovery, consent snapshots, and audit logs.

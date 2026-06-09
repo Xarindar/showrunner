@@ -250,12 +250,12 @@ Authoritative current state. `P` = Phase number below.
 
 | P | Item | Status | Open findings | Updated |
 |---|---|---|---|---|
-| 1 | Convention-based module page loader (drop the hand-maintained loader list) | 🔍 AUDITED · APPROVED-FOR-PATCH | Reviewer ✅ — informational 🟡 only (build-excluded page chunk, owned by P5 #5) | 06-08-26 |
-| 2 | Single-source module icons (collapse the type↔map duplication) | 🔍 AUDITED · APPROVED-FOR-PATCH | Reviewer ✅ — single source confirmed, no second list | 06-08-26 |
-| 3 | Module-owned health checks + events (retire the central if-ladder and catalog) | 🔍 AUDITED · APPROVED-FOR-PATCH | 🟠 re-scoped: no committed baseline exists (all born in 9d6b508) — parity is a seeded-DB Validator check (clients/appointments own events, no health) | 06-08-26 |
-| 4 | Co-locate each module's API surface inside `modules/<id>/api` | 🔍 AUDITED · APPROVED-FOR-PATCH | Reviewer ✅ — zero orphaned `@/api/` imports; verbs + worker secret checks preserved | 06-08-26 |
-| 5 | Real deployment boundary (`ModuleInstallation`/`ModuleSetting`, build-time selection) | 🛠 RESOLVED · READY-FOR-CONFIRM | BLOCKER fixed + made durable in HEAD (`9cffa24`); 🟡 visibleToPublic/beta/ModuleSetting explicitly **deferred** (tracked under Remaining) | 06-08-26 |
-| 6 | Per-module Prisma schema split (`prismaSchemaFolder`) | ⚠️ FLAGGED | HEAD `migrations.path` now committed (`9cffa24`), so the pipeline-break condition is gone; still routed to Linter for re-audit against committed state | 06-08-26 |
+| 1 | Convention-based module page loader (drop the hand-maintained loader list) | 🛠 RESOLVED · READY-FOR-CONFIRM | Patcher: no code defect; informational build-excluded chunk remains tracked under bundle tree-shaking | 06-09-26 |
+| 2 | Single-source module icons (collapse the type↔map duplication) | 🛠 RESOLVED · READY-FOR-CONFIRM | Patcher: no code defect; single source remains intact | 06-09-26 |
+| 3 | Module-owned health checks + events (retire the central if-ladder and catalog) | 🛠 RESOLVED · READY-FOR-CONFIRM | Patcher: no code defect; parity explicitly left as seeded-DB Validator confirmation | 06-09-26 |
+| 4 | Co-locate each module's API surface inside `modules/<id>/api` | 🛠 RESOLVED · READY-FOR-CONFIRM | Patcher: no code defect; verbs/imports/worker secret checks unchanged | 06-09-26 |
+| 5 | Real deployment boundary (`ModuleInstallation`/`ModuleSetting`, build-time selection) | ✅ CONFIRMED | none — BLOCKER fixed + durable in HEAD (`9cffa24`), verified against committed state + live DB (zero drift); 🟡 visibleToPublic/beta/ModuleSetting **deferred** (tracked under Remaining) | 06-08-26 |
+| 6 | Per-module Prisma schema split (`prismaSchemaFolder`) | 🛠 RESOLVED · READY-FOR-CONFIRM | Patcher: no code defect; pipeline break was already resolved in committed P5 patch and remains exercised | 06-09-26 |
 | — | Migration pipeline reconciliation (root cause of P6 schema-folder move) | ✅ CONFIRMED | Now durable — `migrations.path` + consolidated/reconcile migrations committed in `9cffa24`; clean HEAD checkout reproduces the schema (13 migrations, status up to date) | 06-08-26 |
 
 ## Audit Stats (baseline, pre-refactor — 06-08-26)
@@ -341,6 +341,14 @@ an oversight. So Phase 1 keeps the file but removes the hand-maintained list ins
 > No gaps.
 >
 > **Status: `APPROVED-FOR-PATCH`**
+>
+> **🔧 PATCHER · Codex [06-09-26]:** No code patch required for Phase 1. The Reviewer confirmed the only
+> finding is informational: the convention loader still emits page chunks for build-excluded modules, and that
+> is already tracked under the separate bundle tree-shaking follow-up rather than this page-loader phase.
+> `shell/module-pages.ts` and `app/admin/(protected)/modules/[moduleId]/page.tsx` were intentionally left
+> unchanged.
+>
+> **Status: `READY-FOR-CONFIRM`**
 
 ## Phase 2 — Single-Source Module Icons
 
@@ -377,6 +385,12 @@ two can disagree (a name in the union with no map entry is `undefined` at render
 > so consumers are unchanged. No second name list anywhere. No gaps.
 >
 > **Status: `APPROVED-FOR-PATCH`**
+>
+> **🔧 PATCHER · Codex [06-09-26]:** No code patch required for Phase 2. The Reviewer confirmed there is no
+> second icon-name list and no actionable defect; the Lucide map remains the single source at
+> `shell/module-icons.ts`, with `ModuleIconName` derived from it and re-exported through `shell/module-types.ts`.
+>
+> **Status: `READY-FOR-CONFIRM`**
 
 ## Phase 3 — Module-Owned Health Checks and Events
 
@@ -454,6 +468,13 @@ one `Promise.all` of ~18 module-specific Prisma counts. Each manifest lists `hea
 > need no health warning. The 🟠 stands as a DB-time verification task, not a code defect. No gaps.
 >
 > **Status: `APPROVED-FOR-PATCH`**
+>
+> **🔧 PATCHER · Codex [06-09-26]:** No code patch applied for Phase 3 because the Reviewer re-scoped the only
+> significant finding into a Validator-time seeded-DB parity check, not a code defect. The existing aggregator,
+> disabled-module guard, and event slice composition remain unchanged; Validator should specifically confirm
+> that `clients` and `appointments` legitimately need no health warning.
+>
+> **Status: `READY-FOR-CONFIRM`**
 
 ---
 
@@ -505,6 +526,13 @@ require fishing handlers out of a shared `api/` folder.
 > regression. No gaps.
 >
 > **Status: `APPROVED-FOR-PATCH`**
+>
+> **🔧 PATCHER · Codex [06-09-26]:** No code patch required for Phase 4. The Reviewer confirmed zero orphaned
+> `@/api/` imports, preserved route verbs, and intact worker secret checks; the only noted `dynamic` difference
+> is pre-existing and not a Phase-4 regression. Endpoint adapter and module API files were intentionally left
+> unchanged.
+>
+> **Status: `READY-FOR-CONFIRM`**
 
 ## Phase 5 — Real Deployment Boundary — 🔵 READY-FOR-AUDIT
 
@@ -636,6 +664,36 @@ adds (a) persistent install/enable state and (b) build-time module exclusion for
 > "Remaining beyond P1–P6" below so it is not silently dropped.
 >
 > **Status: `READY-FOR-CONFIRM`**
+>
+> **✅ VALIDATOR · Claude [06-08-26]:** Confirmed against the **committed** state (not the working tree —
+> that was the whole point of the Reviewer's escalation). The 🟠 BLOCKER is durably fixed:
+> - `git show HEAD:prisma.config.ts` carries `migrations: { path: "prisma/migrations", seed: ... }` — the
+>   Prisma-7 schema-folder prerequisite is in HEAD, not just the dirty tree.
+> - The old `20260608210000_module_installation` is **gone** from HEAD; commit `9cffa24` records it as a
+>   100%-similarity rename → `20260608120000_module_installation_state` (0 SQL changes, byte-identical), and
+>   `20260608230000_reconcile_media_updatedat_default/migration.sql` is tracked, containing
+>   `ALTER TABLE "MediaAsset" ALTER COLUMN "updatedAt" DROP DEFAULT;` — which cancels the leftover default
+>   added at `20260607170000_gallery_events_media_lifecycle/migration.sql:15`. `git ls-tree HEAD` shows
+>   exactly **13** migrations + `migration_lock.toml`.
+> - Commit `9cffa24` is cleanly scoped to **only** `prisma.config.ts` + the two migration dirs — no unrelated
+>   dirty-tree work bundled in (satisfies the Reviewer's commit-scope instruction).
+> - **Runtime, not just code:** `prisma migrate status` → "13 migrations found in prisma/migrations …
+>   Database schema is up to date!" (proves the committed `migrations.path` is actually read — the exact
+>   root-cause break). `prisma migrate diff --from-config-datasource --to-schema prisma/schema --exit-code`
+>   → "No difference detected", exit 0 — the dev DB (rebuilt from migrations + seed per the resolution log)
+>   matches the schema with **zero drift**, transitively confirming the migrations reproduce the schema.
+> - 🟡 focus #3 DEFER decision is durably recorded under "Remaining beyond P1–P6" (not silently dropped);
+>   the wire-or-defer call the Linter/Reviewer asked for is answered. Concur it is the right call — keeping
+>   the columns unread now keeps the later wire additive.
+>
+> Residual (forward-looking, non-blocking): I corroborated the empty-DB→schema reproduction transitively
+> (all 13 applied + live-DB zero-drift) rather than re-replaying into a fresh shadow DB, to avoid creating
+> databases on the user's Postgres instance; the Patcher chain already verified the from-empty replay on a
+> throwaway DB. Also note this same `9cffa24` is what the **P6 FLAG** is bound to (HEAD now has
+> `migrations.path`), so P6's committed-state re-audit should now clear — but P6 stays in its Linter
+> loop-back and is outside this confirmation's scope.
+>
+> **Status: `CONFIRMED`**
 
 ### Remaining beyond P1–P6
 
@@ -654,6 +712,83 @@ adds (a) persistent install/enable state and (b) build-time module exclusion for
   > `npx prisma generate`; `npx tsc --noEmit`; `npm run seed`; `npm run build`.
   >
   > **Status: `READY-FOR-AUDIT`**
+  >
+  > **🔍 LINTER · Claude [06-09-26]:** Audited the committed boundary (`fd3a871`, 92 files). Sound and
+  > aligned with the Shared Rules — single source of site identity in `lib/site-boundary.ts`
+  > (`DEFAULT_TENANT_ID`/`DEFAULT_SITE_ID`/…), one read chokepoint in `lib/site.ts:35` (`getSiteSettings()` →
+  > `ensureDefaultSite()` upserts tenant+site+settings, returns `settings.siteId`), and `siteId = DEFAULT_SITE_ID`
+  > default-param threading through every helper — no duplicated resolution logic.
+  > - **Schema:** `Tenant`/`Site`/`SiteDomain` added (`core.prisma:12,21,71`); 35 site-owned models carry
+  >   `siteId String @default("site")` and every bare unique is replaced by `@@unique([siteId, …])`
+  >   (slug/email/code/key/token/orderNumber/documentNumber/idempotencyKey — confirmed in both the schema and
+  >   the migration's `CREATE UNIQUE INDEX … ("siteId", …)` lines 330–489). `SiteDomain.siteId` correctly has
+  >   no `@default` (true child FK).
+  > - **Migration (`20260609120000_tenant_site_boundary/migration.sql`):** ordering is safe — `siteId` columns
+  >   added `NOT NULL DEFAULT 'site'` (152–254) backfill existing rows, the default tenant+site are inserted
+  >   (293–299) *before* the `siteId` FKs are created (498+). `prisma migrate status` → up to date, **zero
+  >   drift** (DB `DEFAULT 'site'` matches schema `@default("site")` — which is why status is clean).
+  > - **Query scoping (the paths tsc can't enforce):** public reads resolve `siteId` from `getSiteSettings()`
+  >   and filter on it — billing token (`app/billing/[token]/page.tsx:42`), form slug
+  >   (`app/forms/[slug]/page.tsx:136`), shop product (`app/shop/[slug]/page.tsx:29`), portfolio access token
+  >   (`lib/portfolio/access.ts:11-14`), slug generators (`lib/commerce/slugs.ts:9,17`), rate limit
+  >   (`lib/public-rate-limit.ts:39`), module installs (`lib/modules/installation.ts:27,42,58`), seed
+  >   (`prisma/seed.ts:343-377`). `tsc --noEmit` clean; `npm run build` → exit 0 (all public routes mount).
+  >
+  > 🟡 MEDIUM (latent, not a current defect) — every site-owned `siteId` column carries a hardcoded
+  > `@default("site")` (schema + DB, e.g. `core.prisma:87,107` and across all `prisma/schema/*.prisma`). For the
+  > present single-site boundary this is correct and is exactly what makes the backfill/no-drift work. But it is
+  > a **multi-site footgun**: once a second `Site` exists, any insert that omits `siteId` silently lands the row
+  > in the default site — no null violation, no FK error, no compile error to catch it. When real multi-site
+  > resolution is wired, these column defaults must be dropped (a follow-up migration) or every write audited to
+  > pass `siteId` explicitly. Flagging so it isn't forgotten under the multi-site follow-up.
+  > 🟢 LOW (sidebar, expected) — `SiteDomain` is created and FK-wired but nothing reads or seeds it yet;
+  > hostname→site resolution is unimplemented. This matches the engineer's disclosed "additive future work" and
+  > is analogous to P5's deferred `visibleToPublic`/`beta`. Not a defect — noting so the Reviewer/Validator can
+  > confirm it is intentionally deferred and track it alongside the multi-site items under "Remaining".
+  >
+  > **Status: `READY-FOR-REVIEW`**
+  >
+  > **✅ REVIEWER · Claude [06-09-26]:** Findings confirmed against committed HEAD (`fd3a871`). Single source of
+  > site identity holds — `lib/site-boundary.ts` (`DEFAULT_TENANT_ID`/`DEFAULT_SITE_ID = "site"`/…) with one read
+  > chokepoint at `lib/site.ts:35` (`getSiteSettings()` → `ensureDefaultSite()` → upsert by `siteId`). Query
+  > scoping verified on the paths tsc can't enforce: `lib/portfolio/access.ts:11` filters `siteId`,
+  > `app/forms/[slug]/page.tsx:134` filters `siteId: settings.siteId`. **Migration ordering is safe** — 35
+  > `ADD COLUMN "siteId" TEXT NOT NULL DEFAULT 'site'` (backfills existing rows, from `migration.sql:152`) →
+  > default Tenant/Site `INSERT` (`:294`/`:298`) → 35 `siteId` FKs (from `:498`), so no FK violation on apply.
+  > `prisma migrate status` → up to date; drift diff (`--from-config-datasource --to-schema prisma/schema
+  > --exit-code`) → "No difference detected", exit 0. siteId accounting independently reproduced: 36 `siteId`
+  > fields = 35 `@default("site")` (incl. `SiteSettings.siteId @unique @default`) + `SiteDomain.siteId` child FK
+  > (no default) — matches the Linter.
+  >
+  > One sharpening (not a loop-back — substance is sound): the "every bare unique replaced by `@@unique([siteId,
+  > …])`" line is true for site-owned business keys, but five field-level `@unique` *legitimately remain global* —
+  > `Tenant.slug`, `SiteDomain.hostname` (hostname→site resolution **requires** a global unique),
+  > `AdminUser.email` (platform-level, intentionally unscoped), `SiteSettings.siteId`, and
+  > `EmailSubscriber.unsubscribeToken` (random global token; subscriber identity is still site-scoped via
+  > `@@unique([siteId, email])`). All correct by design, none a multi-site defect. The 🟡 `@default("site")`
+  > footgun and 🟢 unread `SiteDomain` are accurately called and correctly deferred to the multi-site follow-up.
+  > No gaps.
+  >
+  > **Status: `APPROVED-FOR-PATCH`**
+  >
+  > **🔧 PATCHER · Codex [06-09-26]:** Fixed the 🟡 `@default("site")` multi-site footgun in commit `800edc1`.
+  > - `prisma/schema/*.prisma`: removed the hardcoded `@default("site")` from all 35 site-owned `siteId`
+  >   columns, including `SiteSettings.siteId`, `PublicRateLimit.siteId`, module installation/settings rows, and
+  >   every module-owned site-scoped model. `SiteDomain.siteId` already had no default and remains unchanged.
+  > - `prisma/migrations/20260609150000_drop_siteid_defaults/migration.sql`: added a follow-up migration that
+  >   drops the runtime DB defaults after `20260609120000_tenant_site_boundary` uses them for the original
+  >   backfill. The migration deliberately excludes `EmailRecipient`, which has no direct `siteId`; its site
+  >   boundary is through `EmailRecipientGroup`.
+  > - Verification: `npx prisma validate`; `npx prisma generate`; `npx tsc --noEmit`; `npx prisma migrate
+  >   deploy`; `npx prisma migrate status` (15 migrations, up to date); `npx prisma migrate diff
+  >   --from-config-datasource --to-schema prisma/schema --exit-code` (no difference). The first local migration
+  >   attempt exposed the erroneous `EmailRecipient` line; it was corrected, the failed local attempt was marked
+  >   rolled back, and the corrected migration applied cleanly.
+  >
+  > 🟢 `SiteDomain` hostname resolution remains intentionally deferred as the Reviewer described; no code change
+  > was needed for that sidebar.
+  >
+  > **Status: `READY-FOR-CONFIRM`**
 - **Bundle tree-shaking** — make build-time exclusion actually drop module code from the compiled output.
 - **Wire `visibleToPublic` / `beta` / `ModuleSetting`** — columns persist on `ModuleInstallation`/`ModuleSetting`
   (P5) but no UI reads them yet. Deferred from P5 (Patcher, 06-08-26): needs a public-visibility toggle, beta
@@ -706,3 +841,39 @@ merges any folder of `*.prisma` files natively, so modules can own their models.
 > `migrations.path` fix (same change as the P5 🟠).
 >
 > **Status: `READY-FOR-REVIEW`** ← returns to Linter
+>
+> **🔍 LINTER · Claude [06-09-26]:** Re-audited against the **committed** state (HEAD `fd3a871`), per the
+> Reviewer's flag. The pipeline-break condition is **resolved**. It was bound entirely to committed
+> `prisma.config.ts` lacking `migrations.path`, and HEAD now carries it: `git show HEAD:prisma.config.ts` →
+> `migrations: { path: "prisma/migrations", seed: ... }` (committed in `9cffa24`, the P5 patch). Verified the
+> fix is *exercised*, not merely present — the gap the Reviewer correctly noted `prisma validate` can't catch:
+> `prisma migrate status` → "14 migrations found in prisma/migrations … Database schema is up to date!",
+> proving the committed path is read (the exact Prisma-7 root-cause break is gone). Schema folder committed
+> (14 files under `prisma/schema/`); `prisma validate` → valid; `npm run build` → exit 0, all routes mount.
+> Block accounting holds: 55 `model` + 38 `enum` across the folder, **zero** duplicate names; the +3 models
+> over P6's 52-model baseline are `Tenant`/`Site`/`SiteDomain` (`core.prisma:12,21,71`) added by the later
+> tenant commit, not a loss. No defects. 🟡 carryover (informational, already owned by P5): manifest
+> `dataModels` is organizationally true but still unread by code.
+>
+> **Status: `READY-FOR-REVIEW`**
+>
+> **✅ REVIEWER · Claude [06-09-26]:** Re-verified against committed HEAD (`fd3a871`) — the exact target of my
+> earlier FLAG. The pipeline break is resolved **in-commit, not just the working tree**: `git show
+> HEAD:prisma.config.ts` carries `migrations: { path: "prisma/migrations", seed }`, and it is *exercised* (the
+> gap `prisma validate` couldn't catch): `prisma migrate status` → "14 migrations found in prisma/migrations …
+> Database schema is up to date!" and `prisma migrate diff --from-config-datasource --to-schema prisma/schema
+> --exit-code` → "No difference detected", exit 0 (zero drift — transitively, the committed migrations
+> reproduce the committed schema folder). Block accounting reproduced independently from HEAD: 55 `model` + 38
+> `enum`, **zero** duplicate names; the +3 over P6's 52-model baseline are `Tenant`/`Site`/`SiteDomain`
+> (`core.prisma:12,21,71`), not a loss. `prisma validate` → "schemas are valid". The 🟡 (manifest `dataModels`
+> unread) is informational and owned by P5. No gaps.
+>
+> **Status: `APPROVED-FOR-PATCH`**
+>
+> **🔧 PATCHER · Codex [06-09-26]:** No additional code patch required for Phase 6. The Reviewer confirmed the
+> only prior pipeline defect was already fixed in committed P5 work (`migrations.path` in `prisma.config.ts`)
+> and exercised against the real migration pipeline. The later tenant/site default-drop migration (`800edc1`)
+> leaves the schema-folder split intact; `npx prisma validate`, `npx prisma migrate status`, and drift diff all
+> remain clean.
+>
+> **Status: `READY-FOR-CONFIRM`**
