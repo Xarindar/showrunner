@@ -1,0 +1,9 @@
+// Datasource and generator. Part of the merged Prisma schema (prismaSchemaFolder).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}

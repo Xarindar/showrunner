@@ -1,0 +1,30 @@
+// Media module models and enums.
+
+enum MediaDriver {
+  REPO
+  R2
+}
+
+model MediaAsset {
+  id           String      @id @default(cuid())
+  driver       MediaDriver
+  key          String
+  url          String
+  filename     String
+  mimeType     String      @default("")
+  sizeBytes    Int         @default(0)
+  folder       String      @default("")
+  tags         Json        @default("[]")
+  caption      String      @default("")
+  credit       String      @default("")
+  alt          String?
+  isDecorative Boolean     @default(false)
+  isPrivate    Boolean     @default(false)
+  deletedAt    DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([folder])
+  @@index([isPrivate])
+  @@index([deletedAt])
+}

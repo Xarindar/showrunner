@@ -1,0 +1,115 @@
+// Portfolio module models and enums.
+
+enum PortfolioGalleryStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PortfolioGalleryVisibility {
+  PUBLIC
+  PRIVATE
+  PASSWORD
+}
+
+enum PortfolioItemType {
+  IMAGE
+  VIDEO
+  FILE
+}
+
+enum PortfolioAccessStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+model PortfolioGallery {
+  id              String                     @id @default(cuid())
+  slug            String                     @unique @default(cuid())
+  title           String
+  description     String                     @default("")
+  status          PortfolioGalleryStatus     @default(DRAFT)
+  visibility      PortfolioGalleryVisibility @default(PUBLIC)
+  category        String                     @default("")
+  coverImageUrl   String                     @default("")
+  location        String                     @default("")
+  shotAt          DateTime?
+  seoTitle        String                     @default("")
+  seoDescription  String                     @default("")
+  proofingEnabled Boolean                    @default(false)
+  downloadEnabled Boolean                    @default(false)
+  accessCodeHash  String                     @default("")
+  rightsNotes     String                     @default("")
+  sortOrder       Int                        @default(0)
+  publishedAt     DateTime?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  items           PortfolioGalleryItem[]
+  accesses        PortfolioGalleryAccess[]
+  favorites       PortfolioGalleryFavorite[]
+
+  @@index([status])
+  @@index([visibility])
+  @@index([category])
+  @@index([sortOrder])
+}
+
+model PortfolioGalleryItem {
+  id             String                     @id @default(cuid())
+  galleryId      String
+  gallery        PortfolioGallery           @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  mediaAssetId   String?
+  type           PortfolioItemType          @default(IMAGE)
+  title          String                     @default("")
+  caption        String                     @default("")
+  altText        String                     @default("")
+  imageUrl       String                     @default("")
+  thumbnailUrl   String                     @default("")
+  sortOrder      Int                        @default(0)
+  isCover        Boolean                    @default(false)
+  isDownloadable Boolean                    @default(false)
+  isWatermarked  Boolean                    @default(false)
+  licenseNotes   String                     @default("")
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  favorites      PortfolioGalleryFavorite[]
+
+  @@index([galleryId])
+  @@index([mediaAssetId])
+  @@index([isCover])
+}
+
+model PortfolioGalleryAccess {
+  id             String                @id @default(cuid())
+  galleryId      String
+  gallery        PortfolioGallery      @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  clientId       String?
+  recipientEmail String
+  accessToken    String                @unique
+  status         PortfolioAccessStatus @default(ACTIVE)
+  expiresAt      DateTime?
+  lastViewedAt   DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([galleryId])
+  @@index([recipientEmail])
+  @@index([status])
+}
+
+model PortfolioGalleryFavorite {
+  id          String               @id @default(cuid())
+  galleryId   String
+  gallery     PortfolioGallery     @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  itemId      String
+  item        PortfolioGalleryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  clientId    String?
+  viewerEmail String               @default("")
+  notes       String               @default("")
+  createdAt   DateTime             @default(now())
+
+  @@index([galleryId])
+  @@index([itemId])
+  @@index([viewerEmail])
+}

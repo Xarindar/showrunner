@@ -1,0 +1,42 @@
+// Platform core models. Part of the merged Prisma schema (prismaSchemaFolder).
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model SiteSettings {
+  id              String      @id @default("site")
+  businessName    String      @default("Showrunner")
+  contactEmail    String      @default("admin@example.com")
+  timezone        String      @default("America/Chicago")
+  themePreset     String      @default("clean")
+  themePrimary    String      @default("#116466")
+  heroImageUrl    String      @default("/hero.svg")
+  heroHeadline    String      @default("Book services without the back-and-forth")
+  heroSubheadline String      @default("A client-ready website and admin panel for service appointments.")
+  introTitle      String      @default("A calm, capable client site")
+  introBody       String      @default("Update the headline, hero image, core copy, services, hours, and bookings from one protected admin area.")
+  mediaDriver     MediaDriver @default(REPO)
+  enabledModules  Json
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model PublicRateLimit {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  scope       String
+  identifier  String
+  count       Int      @default(0)
+  windowStart DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([scope, identifier])
+  @@index([windowStart])
+}

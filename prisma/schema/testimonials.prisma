@@ -1,0 +1,35 @@
+// Testimonials module models and enums.
+
+enum TestimonialStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+model Testimonial {
+  id                  String            @id @default(cuid())
+  clientId            String?
+  client              Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  authorName          String
+  authorEmail         String            @default("")
+  authorRole          String            @default("")
+  quote               String
+  rating              Int               @default(5)
+  source              String            @default("first-party")
+  sourceUrl           String            @default("")
+  serviceName         String            @default("")
+  productName         String            @default("")
+  permissionGranted   Boolean           @default(false)
+  permissionText      String            @default("")
+  permissionGrantedAt DateTime?
+  status              TestimonialStatus @default(PENDING)
+  featured            Boolean           @default(false)
+  submittedAt         DateTime          @default(now())
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+  @@index([featured])
+}

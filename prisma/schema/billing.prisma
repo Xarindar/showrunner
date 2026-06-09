@@ -1,0 +1,77 @@
+// Billing module models and enums.
+
+enum BillingDocumentType {
+  INVOICE
+  QUOTE
+  CONTRACT
+}
+
+enum BillingDocumentStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  PAID
+  VOID
+  OVERDUE
+}
+
+model BillingDocument {
+  id                       String                @id @default(cuid())
+  documentNumber           String                @unique
+  type                     BillingDocumentType   @default(INVOICE)
+  status                   BillingDocumentStatus @default(DRAFT)
+  publicAccessToken        String?               @unique
+  clientId                 String?
+  client                   Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  customerName             String
+  customerEmail            String
+  currency                 String                @default("USD")
+  subtotalCents            Int                   @default(0)
+  discountCents            Int                   @default(0)
+  taxCents                 Int                   @default(0)
+  totalCents               Int                   @default(0)
+  dueAt                    DateTime?
+  acceptedAt               DateTime?
+  paidAt                   DateTime?
+  notes                    String                @default("")
+  publicMemo               String                @default("")
+  snapshot                 Json                  @default("{}")
+  snapshotAt               DateTime?
+  checkoutProvider         PaymentProvider?
+  checkoutUrl              String                @default("")
+  paymentExternalReference String                @default("")
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  lineItems                BillingLineItem[]
+  attachments              BillingAttachment[]
+
+  @@index([clientId])
+  @@index([type, status])
+  @@index([customerEmail])
+}
+
+model BillingLineItem {
+  id                String          @id @default(cuid())
+  billingDocumentId String
+  billingDocument   BillingDocument @relation(fields: [billingDocumentId], references: [id], onDelete: Cascade)
+  description       String
+  quantity          Int             @default(1)
+  unitPriceCents    Int
+  lineTotalCents    Int
+  sortOrder         Int             @default(0)
+  createdAt         DateTime        @default(now())
+
+  @@index([billingDocumentId])
+}
+
+model BillingAttachment {
+  id                String          @id @default(cuid())
+  billingDocumentId String
+  billingDocument   BillingDocument @relation(fields: [billingDocumentId], references: [id], onDelete: Cascade)
+  title             String
+  url               String
+  notes             String          @default("")
+  createdAt         DateTime        @default(now())
+
+  @@index([billingDocumentId])
+}

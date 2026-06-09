@@ -1,0 +1,91 @@
+// Forms module models and enums.
+
+enum FormStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum FormFieldType {
+  TEXT
+  TEXTAREA
+  EMAIL
+  PHONE
+  SELECT
+  CHECKBOX
+  RADIO
+  DATE
+  SIGNATURE
+  HIDDEN
+}
+
+enum FormFieldRole {
+  NONE
+  SUBMITTER_NAME
+  SUBMITTER_EMAIL
+}
+
+enum FormDestination {
+  STANDALONE_LEAD
+  CLIENT
+  BOOKING
+  ORDER
+  GALLERY
+  INQUIRY
+}
+
+model Form {
+  id                String           @id @default(cuid())
+  slug              String           @unique @default(cuid())
+  name              String
+  description       String           @default("")
+  status            FormStatus       @default(DRAFT)
+  destination       FormDestination  @default(STANDALONE_LEAD)
+  submitButtonLabel String           @default("Submit")
+  successMessage    String           @default("Thanks. Your form was submitted.")
+  notificationEmail String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  fields            FormField[]
+  submissions       FormSubmission[]
+
+  @@index([status])
+  @@index([destination])
+}
+
+model FormField {
+  id          String        @id @default(cuid())
+  formId      String
+  form        Form          @relation(fields: [formId], references: [id], onDelete: Cascade)
+  label       String
+  type        FormFieldType
+  fieldRole   FormFieldRole @default(NONE)
+  placeholder String        @default("")
+  helpText    String        @default("")
+  options     Json          @default("[]")
+  isRequired  Boolean       @default(false)
+  isHidden    Boolean       @default(false)
+  sortOrder   Int           @default(0)
+  createdAt   DateTime      @default(now())
+
+  @@index([formId])
+  @@index([type])
+  @@index([fieldRole])
+}
+
+model FormSubmission {
+  id             String   @id @default(cuid())
+  formId         String
+  form           Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  clientId       String?
+  client         Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  submitterName  String   @default("")
+  submitterEmail String   @default("")
+  data           Json     @default("{}")
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  @@index([formId])
+  @@index([clientId])
+  @@index([submitterEmail])
+}

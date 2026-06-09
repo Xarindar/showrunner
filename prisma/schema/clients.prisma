@@ -1,0 +1,31 @@
+// Clients module models.
+
+model Client {
+  id               String            @id @default(cuid())
+  name             String
+  email            String            @unique
+  phone            String?
+  status           String            @default("active")
+  privateNotes     String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  bookings         Booking[]
+  notes            ClientNote[]
+  carts            Cart[]
+  orders           Order[]
+  formSubmissions  FormSubmission[]
+  testimonials     Testimonial[]
+  billingDocuments BillingDocument[]
+  messageLogs      MessageLog[]
+  emailSubscribers EmailSubscriber[]
+}
+
+model ClientNote {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+}

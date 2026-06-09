@@ -1,0 +1,71 @@
+// Scheduling module models and enums.
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELED
+  COMPLETED
+}
+
+model Service {
+  id                  String    @id @default(cuid())
+  slug                String    @unique @default(cuid())
+  name                String
+  description         String?
+  durationMinutes     Int
+  location            String?
+  bufferBeforeMinutes Int       @default(0)
+  bufferAfterMinutes  Int       @default(0)
+  minimumNoticeHours  Int       @default(12)
+  maxAdvanceDays      Int       @default(60)
+  slotIntervalMinutes Int       @default(30)
+  intakePrompt        String?
+  policyText          String?
+  requirePolicy       Boolean   @default(false)
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  bookings            Booking[]
+}
+
+model AvailabilityRule {
+  id           String   @id @default(cuid())
+  weekday      Int
+  startMinutes Int
+  endMinutes   Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model BlockedTime {
+  id        String   @id @default(cuid())
+  startsAt  DateTime
+  endsAt    DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+}
+
+model Booking {
+  id                 String        @id @default(cuid())
+  serviceId          String
+  service            Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  clientId           String?
+  client             Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  customerName       String
+  customerEmail      String
+  customerPhone      String?
+  notes              String?
+  intakeResponse     String?
+  policyAccepted     Boolean       @default(false)
+  adminNotes         String?
+  cancellationReason String?
+  startsAt           DateTime
+  endsAt             DateTime
+  status             BookingStatus @default(PENDING)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([startsAt, endsAt])
+  @@index([serviceId, startsAt])
+  @@index([clientId])
+}

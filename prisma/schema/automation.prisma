@@ -1,0 +1,116 @@
+// Automation/webhooks module models and enums.
+
+enum AutomationStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+enum AutomationTrigger {
+  BOOKING_CREATED
+  BOOKING_CANCELED
+  ORDER_PAID
+  FORM_SUBMITTED
+  GALLERY_VIEWED
+  FAVORITE_ADDED
+  GALLERY_APPROVED
+  CLIENT_TAGGED
+  INVOICE_OVERDUE
+  MANUAL
+}
+
+enum AutomationAction {
+  SEND_EMAIL
+  NOTIFY_ADMIN
+  CREATE_INVOICE
+  REQUEST_REVIEW
+  SEND_WEBHOOK
+}
+
+enum AutomationRunStatus {
+  QUEUED
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+model Automation {
+  id                   String            @id @default(cuid())
+  name                 String
+  status               AutomationStatus  @default(DRAFT)
+  trigger              AutomationTrigger @default(MANUAL)
+  action               AutomationAction  @default(NOTIFY_ADMIN)
+  targetEmail          String?
+  webhookUrl           String?
+  webhookSigningSecret String            @default("")
+  subjectTemplate      String            @default("")
+  bodyTemplate         String            @default("")
+  conditions           Json              @default("{}")
+  lastRunAt            DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  runs                 AutomationRun[]
+  webhookDeliveries    WebhookDelivery[]
+
+  @@index([status])
+  @@index([trigger])
+}
+
+model AutomationRun {
+  id           String              @id @default(cuid())
+  automationId String
+  automation   Automation          @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  status       AutomationRunStatus @default(QUEUED)
+  triggerKey   String              @default("")
+  relatedType  String              @default("")
+  relatedId    String              @default("")
+  summary      String              @default("")
+  createdAt    DateTime            @default(now())
+
+  @@index([automationId])
+  @@index([status])
+}
+
+model WebhookEndpoint {
+  id            String            @id @default(cuid())
+  name          String
+  url           String
+  signingSecret String            @default("")
+  status        AutomationStatus  @default(DRAFT)
+  events        Json              @default("[]")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  deliveries    WebhookDelivery[]
+
+  @@index([status])
+}
+
+model WebhookDelivery {
+  id                String                @id @default(cuid())
+  webhookEndpointId String?
+  webhookEndpoint   WebhookEndpoint?      @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
+  automationId      String?
+  automation        Automation?           @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  event             String
+  targetUrl         String                @default("")
+  payload           Json                  @default("{}")
+  status            WebhookDeliveryStatus @default(PENDING)
+  statusCode        Int?
+  errorMessage      String                @default("")
+  attemptCount      Int                   @default(0)
+  lastAttemptAt     DateTime?
+  nextAttemptAt     DateTime              @default(now())
+  deliveredAt       DateTime?
+  createdAt         DateTime              @default(now())
+
+  @@index([webhookEndpointId])
+  @@index([automationId])
+  @@index([status])
+  @@index([nextAttemptAt])
+}

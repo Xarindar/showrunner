@@ -1,0 +1,354 @@
+// Communications/email module models and enums.
+
+enum MessageChannel {
+  EMAIL
+  SMS
+}
+
+enum MessageTemplatePurpose {
+  BOOKING_CONFIRMATION
+  BOOKING_REMINDER
+  ORDER_RECEIPT
+  INVOICE_NOTICE
+  FORM_SUBMISSION
+  GALLERY_ACCESS
+  PASSWORD_MAGIC_LINK
+  ADMIN_DIGEST
+  MARKETING
+  GENERAL
+}
+
+enum MessageLogStatus {
+  DRAFT
+  QUEUED
+  SENT
+  FAILED
+  SUPPRESSED
+}
+
+enum EmailSendingDomainStatus {
+  PENDING
+  VERIFIED
+  FAILED
+}
+
+enum EmailCheckStatus {
+  UNKNOWN
+  PASS
+  FAIL
+}
+
+enum EmailSuppressionScope {
+  MARKETING
+  TRANSACTIONAL
+  ALL
+}
+
+enum EmailCategory {
+  TRANSACTIONAL
+  ADMIN
+  MARKETING
+}
+
+enum EmailOutboxStatus {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  SUPPRESSED
+  CANCELED
+}
+
+enum EmailProviderEventType {
+  ACCEPTED
+  DELIVERED
+  DELIVERY_DELAYED
+  BOUNCED
+  COMPLAINED
+  OPENED
+  CLICKED
+  UNSUBSCRIBED
+}
+
+enum EmailSubscriberStatus {
+  ACTIVE
+  UNSUBSCRIBED
+  PENDING
+  BOUNCED
+}
+
+enum EmailListMembershipStatus {
+  ACTIVE
+  UNSUBSCRIBED
+  PENDING
+}
+
+enum EmailCampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  CANCELED
+}
+
+model MessageTemplate {
+  id               String                 @id @default(cuid())
+  key              String?                @unique
+  name             String
+  description      String                 @default("")
+  purpose          MessageTemplatePurpose @default(GENERAL)
+  channel          MessageChannel         @default(EMAIL)
+  subject          String                 @default("")
+  previewText      String                 @default("")
+  body             String
+  htmlBody         String                 @default("")
+  textBody         String                 @default("")
+  tokens           Json                   @default("[]")
+  requiredTokens   Json                   @default("[]")
+  optionalTokens   Json                   @default("[]")
+  version          Int                    @default(1)
+  senderIdentityId String?
+  senderIdentity   EmailSenderIdentity?   @relation(fields: [senderIdentityId], references: [id], onDelete: SetNull)
+  isMarketing      Boolean                @default(false)
+  isActive         Boolean                @default(true)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  logs             MessageLog[]
+  outbox           EmailOutbox[]
+
+  @@index([purpose])
+  @@index([channel])
+  @@index([isActive])
+  @@index([senderIdentityId])
+}
+
+model MessageLog {
+  id             String           @id @default(cuid())
+  templateId     String?
+  template       MessageTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  clientId       String?
+  client         Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  channel        MessageChannel   @default(EMAIL)
+  purpose        String           @default("general")
+  recipientEmail String           @default("")
+  recipientPhone String           @default("")
+  subject        String           @default("")
+  bodyPreview    String           @default("")
+  status         MessageLogStatus @default(QUEUED)
+  errorMessage   String           @default("")
+  relatedType    String           @default("")
+  relatedId      String           @default("")
+  sentAt         DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([templateId])
+  @@index([clientId])
+  @@index([status])
+  @@index([recipientEmail])
+}
+
+model SuppressionListEntry {
+  id        String                @id @default(cuid())
+  email     String                @unique
+  reason    String                @default("")
+  source    String                @default("admin")
+  scope     EmailSuppressionScope @default(MARKETING)
+  createdAt DateTime              @default(now())
+}
+
+model EmailSendingDomain {
+  id            String                   @id @default(cuid())
+  domain        String                   @unique
+  status        EmailSendingDomainStatus @default(PENDING)
+  spfStatus     EmailCheckStatus         @default(UNKNOWN)
+  dkimStatus    EmailCheckStatus         @default(UNKNOWN)
+  dmarcStatus   EmailCheckStatus         @default(UNKNOWN)
+  lastCheckedAt DateTime?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  senders       EmailSenderIdentity[]
+}
+
+model EmailSenderIdentity {
+  id              String              @id @default(cuid())
+  sendingDomainId String?
+  sendingDomain   EmailSendingDomain? @relation(fields: [sendingDomainId], references: [id], onDelete: SetNull)
+  name            String
+  fromEmail       String
+  replyToEmail    String              @default("")
+  isDefault       Boolean             @default(false)
+  isVerified      Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  templates       MessageTemplate[]
+  outbox          EmailOutbox[]
+  campaigns       EmailCampaign[]
+
+  @@index([sendingDomainId])
+  @@index([isDefault])
+  @@index([fromEmail])
+}
+
+model EmailRecipientGroup {
+  id                     String           @id @default(cuid())
+  key                    String           @unique
+  label                  String
+  fallbackToContactEmail Boolean          @default(true)
+  isActive               Boolean          @default(true)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  recipients             EmailRecipient[]
+}
+
+model EmailRecipient {
+  id        String              @id @default(cuid())
+  groupId   String
+  group     EmailRecipientGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  email     String
+  name      String              @default("")
+  isActive  Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@unique([groupId, email])
+  @@index([email])
+  @@index([isActive])
+}
+
+model EmailOutbox {
+  id                String               @id @default(cuid())
+  idempotencyKey    String               @unique
+  templateId        String?
+  template          MessageTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  templateKey       String               @default("")
+  senderIdentityId  String?
+  senderIdentity    EmailSenderIdentity? @relation(fields: [senderIdentityId], references: [id], onDelete: SetNull)
+  campaignId        String?
+  campaign          EmailCampaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  subscriberId      String?
+  subscriber        EmailSubscriber?     @relation(fields: [subscriberId], references: [id], onDelete: SetNull)
+  recipientEmail    String
+  recipientName     String               @default("")
+  fromName          String
+  fromEmail         String
+  replyToEmail      String               @default("")
+  subject           String
+  previewText       String               @default("")
+  htmlBody          String
+  textBody          String
+  headers           Json                 @default("{}")
+  purpose           String               @default("general")
+  category          EmailCategory        @default(TRANSACTIONAL)
+  relatedType       String               @default("")
+  relatedId         String               @default("")
+  status            EmailOutboxStatus    @default(QUEUED)
+  attemptCount      Int                  @default(0)
+  nextAttemptAt     DateTime             @default(now())
+  lastError         String               @default("")
+  providerMessageId String               @default("")
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  bouncedAt         DateTime?
+  complainedAt      DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  providerEvents    EmailProviderEvent[]
+
+  @@index([templateId])
+  @@index([senderIdentityId])
+  @@index([campaignId])
+  @@index([subscriberId])
+  @@index([status, nextAttemptAt])
+  @@index([recipientEmail])
+  @@index([providerMessageId])
+  @@index([relatedType, relatedId])
+}
+
+model EmailProviderEvent {
+  id                String                 @id @default(cuid())
+  eventKey          String                 @unique
+  outboxId          String?
+  outbox            EmailOutbox?           @relation(fields: [outboxId], references: [id], onDelete: SetNull)
+  providerMessageId String                 @default("")
+  eventType         EmailProviderEventType
+  providerPayload   Json                   @default("{}")
+  createdAt         DateTime               @default(now())
+
+  @@index([outboxId])
+  @@index([providerMessageId])
+  @@index([eventType])
+}
+
+model EmailSubscriptionList {
+  id          String                @id @default(cuid())
+  name        String
+  description String                @default("")
+  isDefault   Boolean               @default(false)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  memberships EmailListMembership[]
+
+  @@index([isDefault])
+}
+
+model EmailSubscriber {
+  id               String                @id @default(cuid())
+  email            String                @unique
+  name             String                @default("")
+  clientId         String?
+  client           Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  status           EmailSubscriberStatus @default(ACTIVE)
+  consentSource    String                @default("")
+  consentedAt      DateTime?
+  unsubscribedAt   DateTime?
+  unsubscribeToken String                @unique
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  memberships      EmailListMembership[]
+  outbox           EmailOutbox[]
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model EmailListMembership {
+  id           String                    @id @default(cuid())
+  subscriberId String
+  subscriber   EmailSubscriber           @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  listId       String
+  list         EmailSubscriptionList     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  status       EmailListMembershipStatus @default(ACTIVE)
+  joinedAt     DateTime                  @default(now())
+  leftAt       DateTime?
+
+  @@unique([subscriberId, listId])
+  @@index([listId])
+  @@index([status])
+}
+
+model EmailCampaign {
+  id                    String               @id @default(cuid())
+  name                  String
+  subject               String
+  previewText           String               @default("")
+  htmlBody              String
+  textBody              String
+  senderIdentityId      String?
+  senderIdentity        EmailSenderIdentity? @relation(fields: [senderIdentityId], references: [id], onDelete: SetNull)
+  status                EmailCampaignStatus  @default(DRAFT)
+  scheduledAt           DateTime?
+  sentAt                DateTime?
+  targetListIds         Json                 @default("[]")
+  postalAddressSnapshot String               @default("")
+  queuedCount           Int                  @default(0)
+  sentCount             Int                  @default(0)
+  failedCount           Int                  @default(0)
+  suppressedCount       Int                  @default(0)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  outbox                EmailOutbox[]
+
+  @@index([senderIdentityId])
+  @@index([status])
+}

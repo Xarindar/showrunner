@@ -1,0 +1,62 @@
+// Analytics module models and enums.
+
+enum AnalyticsEventType {
+  BOOKING_STARTED
+  BOOKING_COMPLETED
+  LEAD_SUBMITTED
+  GALLERY_VIEWED
+  FAVORITE_ADDED
+  VIEW_ITEM
+  ADD_TO_CART
+  BEGIN_CHECKOUT
+  PURCHASE
+  REFUND
+  INVOICE_PAID
+  CUSTOM
+}
+
+model AnalyticsEvent {
+  id          String             @id @default(cuid())
+  eventType   AnalyticsEventType @default(CUSTOM)
+  eventName   String
+  source      String             @default("")
+  medium      String             @default("")
+  campaign    String             @default("")
+  landingPage String             @default("")
+  referrer    String             @default("")
+  pathname    String             @default("")
+  sessionId   String             @default("")
+  visitorId   String             @default("")
+  clientEmail String             @default("")
+  relatedType String             @default("")
+  relatedId   String             @default("")
+  valueCents  Int?
+  currency    String             @default("USD")
+  metadata    Json               @default("{}")
+  occurredAt  DateTime           @default(now())
+  createdAt   DateTime           @default(now())
+
+  @@index([eventType])
+  @@index([eventName])
+  @@index([occurredAt])
+  @@index([source])
+  @@index([campaign])
+  @@index([relatedType, relatedId])
+}
+
+model AnalyticsGoal {
+  id               String             @id @default(cuid())
+  key              String             @unique
+  name             String
+  eventType        AnalyticsEventType @default(CUSTOM)
+  eventName        String             @default("")
+  targetCount      Int                @default(1)
+  targetValueCents Int?
+  currency         String             @default("USD")
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([isActive])
+  @@index([eventType])
+}
