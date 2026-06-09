@@ -39,7 +39,7 @@ Authoritative current state. `§` = Architecture-Roadmap section number; `—` =
 | § | Item | Status | Open findings | Updated |
 |---|---|---|---|---|
 | 3 | Commerce — catalog (product/variant/collection/coupon) | ✅ CONFIRMED | — | 06-07-26 |
-| 3 | Commerce — cart / order / payment | ⬜ PENDING | schema only, no write paths | 06-06-26 |
+| 3 | Commerce — cart / order / payment | 🔵 READY-FOR-AUDIT | manual Stripe Checkout link attachment; provider session creation/webhooks require deploy config | 06-09-26 |
 | 4 | Photography Portfolio — gallery/admin foundation | 🛠 RESOLVED | public proofing live; comments/approvals/widgets/signed variants pending | 06-08-26 |
 | 7 | Forms — field + form builder CRUD | ✅ CONFIRMED | — | 06-07-26 |
 | 7 | Forms — destinations / public client linking | ✅ CONFIRMED | — | 06-07-26 |
@@ -184,6 +184,10 @@ Core requirements:
   > **🔍 AUDIT · Claude [06-06-26]:** `Order`/`OrderItem`/`Payment` tables, indexes, and the snapshot pattern are sound, but there is **no order create/read surface** — orders are only read by the Products dashboard stats (`order.count` / `aggregate`), which return zero because nothing writes orders. Before this is real: implement collision-safe `orderNumber` generation, the totals recompute, and an order list/detail UI. `OrderStatus` has both `DRAFT` and `PENDING` — document the intended lifecycle so statuses aren't used inconsistently.
 - Payment adapters: Stripe Checkout first, then Square, Shopify checkout handoff, WooCommerce sync, and manual invoice/pay-later. Provider/status/external checkout fields are audited 06-06-26; live adapters remain pending.
   > **🔍 AUDIT · Claude [06-06-26]:** Record shape is correct for hosted checkout — `PaymentProvider` (MANUAL/STRIPE/SHOPIFY/SQUARE/WOOCOMMERCE) and `PaymentStatus` enums are ready, with external id/session/receipt fields and **no card data**. ✔ No adapter, no checkout-session creation, and no webhook handler exist yet. When adding webhooks: verify signatures, make handlers idempotent (key off `externalPaymentId`/session), and **sanitize provider payloads before storing in `rawSummary`** so no PII/PAN lands in the DB.
+
+  > **🛠 ENGINEER · 06-09-26:** Built the cart/order/payment foundation for audit: public cart checkout prep now claims carts once, reprices before order creation, links/creates clients, records pending Stripe payment rows, increments/release coupon redemptions, and clears the cart cookie (`lib/commerce/cart.ts`, `app/cart/actions.ts`). Added a reusable order lifecycle with guarded status transitions, paid-order inventory decrement, payment status sync, `order.paid` event emission, and receipt queueing (`lib/commerce/orders.ts`, `lib/email/events.ts`). Added an admin order/payment dashboard with manual hosted Checkout link attach/clear controls, grouped multi-currency paid totals, client timeline links, and updated module manifest/health messaging (`modules/products/*`, `modules/clients/detail/page.tsx`). Conflict flagged: automatic Stripe Checkout session creation and payment webhooks require deploy-time Stripe credentials/webhook secrets and were left manual rather than represented as live.
+  >
+  > **Status: `READY-FOR-AUDIT`**
 - Digital products: secure downloads, expiring links, license notes, proof galleries, and file delivery tracking.
 - Service-commerce crossover: sell deposits, packages, retainers, class passes, paid add-ons, and booking bundles.
 - Subscriptions: recurring billing, plan changes, cancellation, renewal reminders, failed payment recovery, consent snapshots, and audit logs.
