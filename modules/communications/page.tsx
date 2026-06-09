@@ -1,5 +1,5 @@
 import { EmailOutboxStatus, EmailSuppressionScope, MessageChannel, MessageLogStatus, MessageTemplatePurpose } from "@prisma/client";
-import { Mail, MessageSquareText, Plus, ShieldOff } from "lucide-react";
+import { Mail, MessageSquareText, Plus, Save, ShieldOff } from "lucide-react";
 import { renderEmailTemplate } from "@/lib/email/render";
 import { enumLabel, formatDateTime, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -10,8 +10,10 @@ import {
   deleteSuppressionEntryAction,
   recordMessageLogAction,
   sendTemplateTestEmailAction,
+  updateBookingTemplateSettingsAction,
   updateMessageTemplateStatusAction
 } from "./actions";
+import { bookingTemplateKeys, bookingTemplateSortIndex } from "./booking-templates";
 
 export const dynamic = "force-dynamic";
 
@@ -62,11 +64,32 @@ function outboxStatusClass(status: EmailOutboxStatus) {
 
 export default async function CommunicationsPage({ searchParams }: CommunicationsPageProps) {
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [templates, outboxRows, manualLogs, suppressions, activeTemplateCount, sentCount, suppressedCount] = await Promise.all([
+  const [
+    templates,
+    bookingTemplatesRaw,
+    senderIdentities,
+    outboxRows,
+    manualLogs,
+    suppressions,
+    activeTemplateCount,
+    sentCount,
+    suppressedCount
+  ] = await Promise.all([
     prisma.messageTemplate.findMany({
       where: { siteId: settings.siteId },
       orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
       take: 30
+    }),
+    prisma.messageTemplate.findMany({
+      where: {
+        siteId: settings.siteId,
+        key: { in: [...bookingTemplateKeys] },
+        channel: MessageChannel.EMAIL
+      }
+    }),
+    prisma.emailSenderIdentity.findMany({
+      where: { siteId: settings.siteId },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }]
     }),
     prisma.emailOutbox.findMany({
       where: { siteId: settings.siteId },
@@ -90,6 +113,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
     prisma.suppressionListEntry.count({ where: { siteId: settings.siteId } })
   ]);
 
+  const bookingTemplates = bookingTemplatesRaw.sort((a, b) => bookingTemplateSortIndex(a.key) - bookingTemplateSortIndex(b.key));
   const savedMessage = params.saved ? "Communications changes saved." : null;
   const errorMessage = params.error || null;
   const previewTemplate = templates.find((template) => template.id === params.previewTemplate) || templates[0] || null;
@@ -139,6 +163,74 @@ export default async function CommunicationsPage({ searchParams }: Communication
           <p className="lead" style={{ fontSize: "0.95rem" }}>
             Contacts that should not receive marketing or nonessential messages.
           </p>
+        </div>
+      </section>
+
+      <section className="card stack">
+        <div>
+          <h2 style={{ fontSize: "1.35rem" }}>Booking email settings</h2>
+          <p>Customer and staff templates used by the live booking workflow.</p>
+        </div>
+        <div className="grid-2">
+          {bookingTemplates.map((template, index) => {
+            const availableTokens = stringArrayCsv([
+              ...new Set([...stringArrayFromUnknown(template.requiredTokens), ...stringArrayFromUnknown(template.optionalTokens)])
+            ]);
+
+            return (
+              <details key={template.id} className="subpanel" open={index === 0}>
+                <summary style={{ alignItems: "center", cursor: "pointer", display: "flex", gap: 12, justifyContent: "space-between" }}>
+                  <span>
+                    <strong>{template.name}</strong>
+                    <br />
+                    <small style={{ color: "var(--muted)" }}>{template.description || template.key}</small>
+                  </span>
+                  <span className="pill">{template.key}</span>
+                </summary>
+                <form action={updateBookingTemplateSettingsAction} className="form-grid" style={{ marginTop: 16 }}>
+                  <input type="hidden" name="id" value={template.id} />
+                  <div className="field">
+                    <label htmlFor={`booking-template-subject-${template.id}`}>Subject</label>
+                    <input id={`booking-template-subject-${template.id}`} name="subject" defaultValue={template.subject} required />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`booking-template-preview-${template.id}`}>Preview text</label>
+                    <input id={`booking-template-preview-${template.id}`} name="previewText" defaultValue={template.previewText} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`booking-template-sender-${template.id}`}>Sender</label>
+                    <select id={`booking-template-sender-${template.id}`} name="senderIdentityId" defaultValue={template.senderIdentityId || ""}>
+                      <option value="">Default sender</option>
+                      {senderIdentities.map((sender) => (
+                        <option key={sender.id} value={sender.id}>
+                          {sender.name} &lt;{sender.fromEmail}&gt;
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`booking-template-text-${template.id}`}>Text body</label>
+                    <textarea
+                      id={`booking-template-text-${template.id}`}
+                      name="textBody"
+                      defaultValue={template.textBody || template.body}
+                      required
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`booking-template-html-${template.id}`}>HTML body</label>
+                    <textarea id={`booking-template-html-${template.id}`} name="htmlBody" defaultValue={template.htmlBody} />
+                  </div>
+                  <small style={{ color: "var(--muted)" }}>Available tokens: {availableTokens || "none"}</small>
+                  <button className="button secondary" type="submit">
+                    <Save size={18} />
+                    Save booking template
+                  </button>
+                </form>
+              </details>
+            );
+          })}
+          {!bookingTemplates.length ? <div className="subpanel">No booking templates found.</div> : null}
         </div>
       </section>
 
@@ -226,7 +318,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                   </td>
                   <td>
                     {template.key ? (
-                      <span className="pill">System read-only</span>
+                      <span className="pill">Status locked</span>
                     ) : (
                       <form action={updateMessageTemplateStatusAction}>
                         <input type="hidden" name="id" value={template.id} />

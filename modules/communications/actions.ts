@@ -7,8 +7,11 @@ import { z } from "zod";
 import { csvList, optionalEmailStored, optionalStoredText, parseForm, requiredText } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
 import { queueTemplateTestEmail } from "@/lib/email";
+import { extractEmailTemplateTokens } from "@/lib/email/render";
+import { stringArrayFromUnknown } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
+import { bookingTemplateKeySet } from "./booking-templates";
 
 const messageTemplateSchema = z
   .object({
@@ -35,6 +38,15 @@ const templateStatusSchema = z
     id: value.id,
     isActive: value.isActive === "true"
   }));
+
+const bookingTemplateSettingsSchema = z.object({
+  id: requiredText,
+  subject: requiredText,
+  previewText: optionalStoredText,
+  textBody: requiredText,
+  htmlBody: optionalStoredText,
+  senderIdentityId: optionalStoredText
+});
 
 const messageLogSchema = z
   .object({
@@ -76,6 +88,10 @@ const templateTestSendSchema = z.object({
 function refreshCommunications() {
   revalidatePath("/admin");
   revalidatePath("/admin/modules/communications");
+}
+
+function communicationsError(message: string): never {
+  redirect(`/admin/modules/communications?error=${encodeURIComponent(message)}`);
 }
 
 function parseTokenJson(value: string) {
@@ -143,6 +159,71 @@ export async function updateMessageTemplateStatusAction(formData: FormData) {
   });
 
   refreshCommunications();
+}
+
+export async function updateBookingTemplateSettingsAction(formData: FormData) {
+  await requireAdmin();
+  const input = await parseForm(bookingTemplateSettingsSchema, formData, "/admin/modules/communications");
+  const settings = await getSiteSettings();
+
+  const template = await prisma.messageTemplate.findFirst({
+    where: {
+      id: input.id,
+      siteId: settings.siteId,
+      channel: MessageChannel.EMAIL
+    },
+    select: {
+      id: true,
+      key: true,
+      requiredTokens: true,
+      optionalTokens: true,
+      tokens: true
+    }
+  });
+
+  if (!template || !template.key || !bookingTemplateKeySet.has(template.key)) {
+    communicationsError("Booking template not found.");
+  }
+
+  if (input.senderIdentityId) {
+    const sender = await prisma.emailSenderIdentity.findFirst({
+      where: { id: input.senderIdentityId, siteId: settings.siteId },
+      select: { id: true }
+    });
+
+    if (!sender) {
+      communicationsError("Sender identity not found.");
+    }
+  }
+
+  const allowedTokens = new Set([
+    ...stringArrayFromUnknown(template.tokens),
+    ...stringArrayFromUnknown(template.requiredTokens),
+    ...stringArrayFromUnknown(template.optionalTokens)
+  ]);
+  const usedTokens = new Set(
+    [input.subject, input.previewText, input.textBody, input.htmlBody].flatMap((value) => extractEmailTemplateTokens(value))
+  );
+  const unsupportedTokens = Array.from(usedTokens).filter((token) => !allowedTokens.has(token));
+
+  if (unsupportedTokens.length) {
+    communicationsError(`Unsupported token${unsupportedTokens.length === 1 ? "" : "s"}: ${unsupportedTokens.join(", ")}.`);
+  }
+
+  await prisma.messageTemplate.update({
+    where: { id: template.id },
+    data: {
+      subject: input.subject,
+      previewText: input.previewText,
+      body: input.textBody,
+      textBody: input.textBody,
+      htmlBody: input.htmlBody,
+      senderIdentityId: input.senderIdentityId || null
+    }
+  });
+
+  refreshCommunications();
+  redirect("/admin/modules/communications?saved=booking-template");
 }
 
 export async function recordMessageLogAction(formData: FormData) {

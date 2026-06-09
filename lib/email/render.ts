@@ -13,6 +13,15 @@ type StoredTemplate = {
 
 const tokenPattern = /{{\s*([A-Za-z0-9_.-]+)\s*}}/g;
 
+export function extractEmailTemplateTokens(value: string) {
+  const tokens = new Set<string>();
+  for (const match of value.matchAll(tokenPattern)) {
+    tokens.add(match[1]);
+  }
+
+  return Array.from(tokens);
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")

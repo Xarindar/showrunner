@@ -744,6 +744,10 @@ Goal: make the current app dependable enough to reuse.
 - Add audit log model.
 - Add admin roles.
 - Add booking email template settings.
+
+  > **🛠 ENGINEER · 06-09-26:** Built the booking email template settings foundation inside the Communications module. Booking-related system templates now have guarded subject, preview, text body, HTML body, and sender controls while keeping system template keys/status locked (`modules/communications/page.tsx`, `modules/communications/actions.ts`, `modules/communications/booking-templates.ts`). Token extraction is shared through `lib/email/render.ts`, and the Communications manifest now advertises booking template settings as live while leaving the broader visual template editor/library as future work. Verification: `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed. Browser route check was attempted but blocked by the local database server being unavailable at `127.0.0.1:55432`.
+  >
+  > **Status: `READY-FOR-AUDIT`**
 - Add test coverage for availability conflicts, blockouts, buffers, and slug generation.
 - Add import/export for services, bookings, clients, and site settings.
 
