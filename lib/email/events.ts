@@ -38,6 +38,8 @@ type OrderForEmail = {
   customerEmail: string;
   currency: string;
   totalCents: number;
+  checkoutUrl?: string | null;
+  receiptUrl?: string | null;
 };
 
 function endTime(value: Date, timeZone: string) {
@@ -256,6 +258,7 @@ export async function queueOrderCheckoutEmail(order: OrderForEmail) {
 
 export async function queueOrderReceiptEmail(order: OrderForEmail) {
   const settings = await getSiteSettings();
+  const receiptUrl = order.receiptUrl || order.checkoutUrl || `/cart?order=${encodeURIComponent(order.orderNumber)}`;
   const tokens: EmailTokens = {
     businessName: settings.businessName,
     customerName: order.customerName,
@@ -264,7 +267,7 @@ export async function queueOrderReceiptEmail(order: OrderForEmail) {
     orderTotal: formatMoney(order.totalCents, order.currency),
     paymentProvider: "Stripe Checkout",
     paymentStatus: "paid",
-    receiptUrl: ""
+    receiptUrl
   };
 
   await logQueueError("order-receipt-customer", () =>

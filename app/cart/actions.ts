@@ -11,6 +11,8 @@ import {
   updateCartItem
 } from "@/lib/commerce/cart";
 import { queueOrderCheckoutEmail } from "@/lib/email";
+import { publicRateLimitMessage } from "@/lib/public-rate-limit";
+import { getSiteSettings } from "@/lib/site";
 
 const cartCookieName = "commerce_cart_id";
 
@@ -60,7 +62,16 @@ function cartError(message: string): never {
   redirect(`/cart?error=${encodeURIComponent(message)}`);
 }
 
+async function requirePublicProductsModule() {
+  const settings = await getSiteSettings();
+  if (!settings.enabledModuleIds.includes("products")) {
+    cartError("Storefront is not available.");
+  }
+}
+
 export async function addToCartAction(formData: FormData) {
+  await requirePublicProductsModule();
+
   const parsed = addToCartSchema.safeParse({
     productId: formData.get("productId"),
     variantId: formData.get("variantId") || undefined,
@@ -88,6 +99,8 @@ export async function addToCartAction(formData: FormData) {
 }
 
 export async function updatePublicCartItemAction(formData: FormData) {
+  await requirePublicProductsModule();
+
   const cartId = await currentCartId();
   if (!cartId) cartError("Cart not found.");
 
@@ -114,6 +127,8 @@ export async function updatePublicCartItemAction(formData: FormData) {
 }
 
 export async function applyPublicCartCouponAction(formData: FormData) {
+  await requirePublicProductsModule();
+
   const cartId = await currentCartId();
   if (!cartId) cartError("Cart not found.");
 
@@ -136,6 +151,8 @@ export async function applyPublicCartCouponAction(formData: FormData) {
 
 export async function removePublicCartCouponAction(_formData: FormData) {
   void _formData;
+  await requirePublicProductsModule();
+
   const cartId = await currentCartId();
   if (!cartId) cartError("Cart not found.");
 
@@ -149,6 +166,8 @@ export async function removePublicCartCouponAction(_formData: FormData) {
 }
 
 export async function preparePublicCheckoutAction(formData: FormData) {
+  await requirePublicProductsModule();
+
   const cartId = await currentCartId();
   if (!cartId) cartError("Cart not found.");
 
@@ -161,6 +180,13 @@ export async function preparePublicCheckoutAction(formData: FormData) {
     cartError(parsed.error.issues[0]?.message || "Add your checkout details.");
   }
 
+  const rateLimitMessage = await publicRateLimitMessage("checkout_prepare", { limit: 6, windowMinutes: 10 });
+  if (rateLimitMessage) {
+    cartError(rateLimitMessage);
+  }
+
+  let orderNumber = "";
+
   try {
     const order = await createCheckoutOrderFromCart({
       cartId,
@@ -170,8 +196,10 @@ export async function preparePublicCheckoutAction(formData: FormData) {
 
     await queueOrderCheckoutEmail(order);
     await clearCartId();
-    redirect(`/cart?order=${encodeURIComponent(order.orderNumber)}`);
+    orderNumber = order.orderNumber;
   } catch (error) {
     cartError(error instanceof Error ? error.message : "Could not prepare checkout.");
   }
+
+  redirect(`/cart?order=${encodeURIComponent(orderNumber)}`);
 }

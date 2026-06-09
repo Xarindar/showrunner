@@ -464,13 +464,6 @@ export async function createCheckoutOrderFromCart(input: { cartId: string; custo
       include: { payments: true }
     });
 
-    if (cart.couponId) {
-      await tx.coupon.update({
-        where: { id: cart.couponId },
-        data: { redemptionCount: { increment: 1 } }
-      });
-    }
-
     return order;
   });
 }

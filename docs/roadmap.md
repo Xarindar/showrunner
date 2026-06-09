@@ -246,7 +246,7 @@ Authoritative current state. `§` = Architecture-Roadmap section number; `—` =
 | § | Item | Status | Open findings | Updated |
 |---|---|---|---|---|
 | 3 | Commerce — catalog (product/variant/collection/coupon) | ✅ CONFIRMED | — | 06-07-26 |
-| 3 | Commerce — cart / order / payment | READY-FOR-REVIEW | checkout redirect swallowed; admin-paid orders not payment-confirmed; public cart actions bypass module gate; coupon redemption race; empty receipt URL | 06-09-26 |
+| 3 | Commerce — cart / order / payment | 🛠 RESOLVED · READY-FOR-CONFIRM | provider-confirmed paid/refund transitions intentionally enforced until Stripe webhook confirmation flow is wired | 06-09-26 |
 | 4 | Photography Portfolio — gallery/admin foundation | 🛠 RESOLVED | public proofing live; comments/approvals/widgets/signed variants pending | 06-08-26 |
 | 7 | Forms — field + form builder CRUD | ✅ CONFIRMED | — | 06-07-26 |
 | 7 | Forms — destinations / public client linking | ✅ CONFIRMED | — | 06-07-26 |
@@ -408,6 +408,17 @@ Core requirements:
   > **⚠️ REVIEWER · 06-09-26:** Linter findings confirmed, but three gaps should be added before patching: 🟠 Significant — public checkout prep has no public abuse throttle while it can create `Client`/`Order`/`Payment` rows and queue mail (`app/cart/actions.ts:151-173`, `lib/commerce/cart.ts:399-449`); sibling public write paths gate and throttle with `publicRateLimitMessage` (`modules/forms/actions.ts:331-357`, `modules/testimonials/actions.ts:173-185`). 🟠 Significant — coupon redemption accounting also consumes limited coupons before payment, not just under concurrency: checkout prep increments `redemptionCount` for `PENDING` orders (`lib/commerce/cart.ts:451-455`), and only explicit cancellation releases it (`lib/commerce/orders.ts:132-142,169-170`), so unpaid prepared orders can exhaust `maxRedemptions`. 🟠 Significant — the provider-confirmation issue also exists on refunds: `PAID`/`FULFILLED → REFUNDED` is exposed (`lib/commerce/orders.ts:24-25`, `modules/products/page.tsx:617-625`) and marks payments `REFUNDED` without Stripe refund/webhook confirmation (`lib/commerce/orders.ts:111-118`).
   >
   > **Status: `READY-FOR-REVIEW`**
+  >
+  > **🔧 PATCHER · Codex [06-09-26]:** Applied all reviewer-confirmed patches for cart/order/payment hardening.
+  > - `app/cart/actions.ts`: fixed redirect-throw handling by moving success redirect outside the `try` block; added server-side products-module gating on all public cart mutations; added checkout-prep public throttle via `publicRateLimitMessage("checkout_prepare", { limit: 6, windowMinutes: 10 })`.
+  > - `lib/commerce/orders.ts`: restricted `PAID` and `REFUNDED` transitions to provider-confirmed flows only (admin transition path now blocks these without provider confirmation), which removes manual mark-paid/refund side effects (payment-status mutation, inventory decrement, receipt/event emit) from unconfirmed admin actions.
+  > - `lib/commerce/cart.ts`: removed coupon redemption increment from checkout preparation so unpaid pending orders no longer consume limited coupon capacity.
+  > - `lib/commerce/orders.ts`: moved coupon redemption consumption to paid confirmation with optimistic concurrency guards, preventing last-redemption races under concurrent confirmation attempts.
+  > - `lib/email/events.ts`: replaced the hardcoded empty `receiptUrl` token with a non-empty fallback chain (`receiptUrl || checkoutUrl || /cart?order=<orderNumber>`), so receipt emails no longer render an empty link token.
+  >
+  > Validation: `npx tsc --noEmit` and targeted diagnostics checks are clean.
+  >
+  > **Status: `READY-FOR-CONFIRM`**
 - Digital products: secure downloads, expiring links, license notes, proof galleries, and file delivery tracking.
 - Service-commerce crossover: sell deposits, packages, retainers, class passes, paid add-ons, and booking bundles.
 - Subscriptions: recurring billing, plan changes, cancellation, renewal reminders, failed payment recovery, consent snapshots, and audit logs.
