@@ -46,7 +46,7 @@ Authoritative current state. `P` = Phase number below.
 | 2 | Single-source module icons (collapse the type↔map duplication) | 🔵 READY-FOR-AUDIT | — | 06-08-26 |
 | 3 | Module-owned health checks + events (retire the central if-ladder and catalog) | 🔵 READY-FOR-AUDIT | parity of warning/event output needs audit re-verify | 06-08-26 |
 | 4 | Co-locate each module's API surface inside `modules/<id>/api` | 🔵 READY-FOR-AUDIT | central `api/` tree removed; needs audit re-verify | 06-08-26 |
-| 5 | Real deployment boundary (`ModuleInstallation`/`ModuleSetting`, build-time selection) | 🔵 READY-FOR-AUDIT | schema foundation added; runtime install/selection work remains | 06-08-26 |
+| 5 | Real deployment boundary (`ModuleInstallation`/`ModuleSetting`, build-time selection) | 🔵 READY-FOR-AUDIT | install records + build-time exclusion live; ⚠️ pre-existing migration drift flagged | 06-08-26 |
 | 6 | Per-module Prisma schema split (`prismaSchemaFolder`) | 🔵 READY-FOR-AUDIT | folder split done; migrations unchanged; needs audit re-verify | 06-08-26 |
 
 ## Audit Stats (baseline, pre-refactor — 06-08-26)
@@ -66,8 +66,8 @@ Measured against the tree at the start of this refactor.
 **Honest carve-outs (not over-claiming):**
 
 - The manifest `healthChecks: string[]` / `dataModels: string[]` arrays are still descriptive — health is
-  wired by *file convention* (`modules/<id>/health.ts`), not by reading those arrays. Making the arrays
-  themselves load-bearing is deferred to P5 (module installation records).
+  wired by *file convention* (`modules/<id>/health.ts`), not by reading those arrays. P5 added install
+  records but did **not** make these arrays load-bearing; that remains open (see P5 audit focus #3).
 - Events still need **one** central line: registering the module's slice in `lib/events/catalog.ts`. The
   *definitions* are co-located in the module; only the composition is central. Removing that last line
   would require the same convention-import pattern and is a fast follow if wanted.
@@ -207,11 +207,59 @@ require fishing handlers out of a shared `api/` folder.
 
 ## Phase 5 — Real Deployment Boundary — 🔵 READY-FOR-AUDIT
 
-`enabledModuleIds` is a string array in `SiteSettings` that only hides sidebar nav; all 16 modules are
-always compiled into every client. "Modular deployment" today means *ship everything, hide some*.
-`ModuleInstallation` and `ModuleSetting` now exist as schema foundation tables. Runtime code still uses
-`SiteSettings.enabledModules`, and tenant/site scoping plus build-time module selection remain pending.
-The convention registry from P1 is the prerequisite that makes build-time module selection / tree-shaking possible.
+`enabledModuleIds` was a string array in `SiteSettings` that only hid sidebar nav; all 16 modules were
+always compiled into every client. "Modular deployment" meant *ship everything, hide some*. This phase
+adds (a) persistent install/enable state and (b) build-time module exclusion for per-client builds.
+
+> **🛠 RESOLVED · Claude [06-08-26]:**
+>
+> **Install state.** Added `prisma/schema/modules.prisma` with `ModuleInstallation` (one row per module:
+> `installed`/`enabled`/`visibleToPublic`/`beta`/`settings` JSON/`configuredAt`) and `ModuleSetting`
+> (per-module key/value, FK to installation, cascade). Migration
+> `prisma/migrations/20260608210000_module_installation/` was generated via `prisma migrate diff` and
+> applied to the dev DB (`prisma db execute`) — **only the two new tables** (see drift FLAG below).
+> `lib/modules/installation.ts` is the service: `ensureModuleInstallations` (seed one row per registered
+> module, create-side only, never overwriting admin choices), `setModuleEnablement` (upsert enabled flags
+> for the settings form), and `resolveEnabledModuleIds` (read enabled rows; **fall back to the legacy
+> `SiteSettings.enabledModules` JSON** if the table is missing/unseeded). `lib/site.ts` now derives
+> `enabledModuleIds` from installations; `modules/settings/actions.ts` dual-writes the JSON column and the
+> installation rows. Net: enablement is now persisted module state, but the app still works whether or not
+> the migration is applied.
+>
+> **Build-time selection.** `shell/modules.ts` filters the registry by `NEXT_PUBLIC_SHOWRUNNER_DISABLED_MODULES`
+> (comma-separated ids, inlined for client+server so they can't disagree). Excluded modules leave the
+> registry entirely — no sidebar entry, no route (`getModule` → undefined → 404), no enablement. Required
+> platform modules can never be excluded. Documented in `.env.example`.
+>
+> Verified: `npx tsc --noEmit` clean; `npm run lint` clean; `npm run build` passed; `prisma generate` +
+> `prisma validate` clean. Runtime checks against the dev DB: seeding created 16 installation rows,
+> `resolveEnabledModuleIds` read them back correctly with required modules always present; build exclusion
+> of `billing,products,settings` yielded a 14-module registry with required `settings` retained.
+>
+> **🟠 FLAG · Claude [06-08-26]:** Pre-existing migration drift discovered while generating this migration.
+> `prisma migrate diff` (live dev DB → schema) reports deltas unrelated to this phase: `EmailProviderEvent.eventKey`
+> (a `NOT NULL` column **missing from the DB**), `MediaAsset.updatedAt` default, and `SiteSettings.businessName`
+> default. Combined with a **missing `prisma/migrations/migration_lock.toml`** (added in this phase), this means
+> the migration pipeline was broken — a fresh `prisma migrate deploy` would **not** reproduce the current schema,
+> which breaks the "reusable per-client template" promise. This phase deliberately did **not** bundle that drift
+> into its migration. Recommend a separate `prisma migrate diff`-based reconciliation migration + verifying
+> `_prisma_migrations` history before the next client deploy.
+>
+> **🔵 READY-FOR-AUDIT · Claude [06-08-26]:** Audit focus — (1) confirm dual-write keeps the JSON column and
+> installation rows in agreement, and that disabling the install table (drop) cleanly falls back. (2) Decide
+> whether to retire `SiteSettings.enabledModules` once installations are authoritative. (3) `visibleToPublic`,
+> `beta`, and `ModuleSetting` are persisted but not yet read by any UI — wire or defer explicitly.
+> (4) Tenant/site scoping (multi-site) is still out of scope; installations are single-site. (5) Build-time
+> exclusion makes modules inert but does not yet tree-shake their code out of the bundle — true per-client
+> bundle slimming is a follow-up.
+
+### Remaining beyond P1–P6
+
+- **Tenant/site boundary** (`Tenant`, `Site`, `SiteDomain`) and composite uniques — see `docs/roadmap.md`
+  foundation items and the per-module tenancy notes. Prerequisite for true multi-site.
+- **Migration pipeline reconciliation** — resolve the drift FLAG above so `prisma migrate deploy` reproduces
+  the schema from zero.
+- **Bundle tree-shaking** — make build-time exclusion actually drop module code from the compiled output.
 
 ## Phase 6 — Per-Module Prisma Schema Split — 🔵 READY-FOR-AUDIT
 
