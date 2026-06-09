@@ -1,152 +1,184 @@
 import Link from "next/link";
-import {
-  BookOpen,
-  CalendarCheck,
-  CalendarDays,
-  Gauge,
-  Image,
-  LayoutTemplate,
-  Mail,
-  ReceiptText,
-  Settings,
-  Users,
-  Workflow
-} from "lucide-react";
+import { getPlatformStatus, platformFoundationItems, type PlatformWarningSeverity } from "@/lib/platform-status";
+import { getSiteSettings } from "@/lib/site";
+import { moduleIcons } from "@/shell/modules";
 
 export const dynamic = "force-dynamic";
 
-const guideSections = [
+function warningPillClassName(severity: PlatformWarningSeverity) {
+  if (severity === "critical") return "pill danger";
+  if (severity === "warning") return "pill warning";
+  return "pill";
+}
+
+const commonWorkflows = [
   {
-    title: "Dashboard",
-    icon: BookOpen,
-    body: "Use the dashboard as the quick overview for upcoming appointments and shortcuts into daily admin work."
+    label: "Add or edit bookable time",
+    href: "/admin/modules/scheduling",
+    detail: "Update services, availability, or blockouts."
   },
   {
-    title: "Appointments",
-    icon: CalendarCheck,
-    body: "Appointments are the day-to-day queue. Open an appointment to review customer details, intake answers, policy acceptance, internal notes, and status actions."
+    label: "Manage a new booking",
+    href: "/admin/modules/appointments",
+    detail: "Open the customer, then confirm, cancel, complete, or add internal notes."
   },
   {
-    title: "Clients",
-    icon: Users,
-    body: "Clients are long-term records. Public bookings create or update clients by email, then store appointment history and internal notes."
+    label: "Review a returning client",
+    href: "/admin/modules/clients",
+    detail: "Open the client record, then review notes and appointment history."
   },
   {
-    title: "Scheduling",
-    icon: CalendarDays,
-    body: "Scheduling controls services, availability, blockouts, buffers, minimum notice, booking windows, intake prompts, and policies."
+    label: "Change homepage copy",
+    href: "/admin/modules/content",
+    detail: "Edit homepage text and hero image fields, then check the public homepage."
   },
   {
-    title: "Content",
-    icon: LayoutTemplate,
-    body: "Content changes simple public-site copy and hero imagery without exposing full site design controls."
+    label: "Create a client gallery",
+    href: "/admin/modules/portfolio",
+    detail: "Create and publish the gallery, add media-backed items, issue access links, then open the public gallery or token route."
   },
   {
-    title: "Media",
-    icon: Image,
-    body: "Media uses repo assets by default. R2 uploads become available when the site is configured for upload-heavy clients."
-  },
-  {
-    title: "Portfolio",
-    icon: Image,
-    body: "Portfolio manages photography galleries, image records, proofing options, private access links, and rights notes."
-  },
-  {
-    title: "Communications",
-    icon: Mail,
-    body: "Communications manages message templates, delivery records, and suppression entries for email and future SMS flows."
-  },
-  {
-    title: "Billing",
-    icon: ReceiptText,
-    body: "Billing creates quotes, invoices, contracts, line items, attachments, and status records for money-related workflows."
-  },
-  {
-    title: "Automation",
-    icon: Workflow,
-    body: "Automation defines trigger-action rules, run records, and webhook endpoints that future background jobs can execute."
-  },
-  {
-    title: "Analytics",
-    icon: Gauge,
-    body: "Analytics records standard events, source attribution, module metrics, and conversion goals for reporting."
-  },
-  {
-    title: "Settings",
-    icon: Settings,
-    body: "Settings controls business identity, contact email, timezone, theme color, media mode, and enabled modules."
+    label: "Review conversion activity",
+    href: "/admin/modules/analytics",
+    detail: "Review automatic and manual events, attribution, goals, and CSV export; adapters and retention controls remain pending."
   }
 ];
 
-export default function HelpPage() {
+export default async function HelpPage() {
+  const settings = await getSiteSettings();
+  const platformStatus = await getPlatformStatus(settings);
+  const warningPriority = { critical: 0, warning: 1, info: 2 } satisfies Record<PlatformWarningSeverity, number>;
+  const warnings = [...platformStatus.warnings].sort((left, right) => warningPriority[left.severity] - warningPriority[right.severity]);
+  const enabledModules = platformStatus.modules.filter((item) => item.enabled);
+
   return (
     <div className="stack">
       <header className="page-header">
         <div>
           <p className="eyebrow">Help</p>
           <h1 style={{ fontSize: "2.4rem" }}>Admin user guide</h1>
-          <p>Plain-language operating notes for the business owner or staff member using this admin panel.</p>
+          <p>Operating notes, setup status, and readiness context for the modules currently enabled in this admin.</p>
         </div>
+        <Link className="button secondary" href="/admin/modules/settings">
+          Settings
+        </Link>
       </header>
 
-      <section className="grid-2">
-        {guideSections.map((section) => {
-          const Icon = section.icon;
+      <section className="dashboard-stat-grid" aria-label="Help readiness snapshot">
+        <Link className="dashboard-stat" href="/admin/modules/settings">
+          <span>Enabled</span>
+          <strong>{platformStatus.enabledCount}</strong>
+          <small>modules in the shell</small>
+        </Link>
+        <Link className="dashboard-stat" href="/admin/modules/help">
+          <span>Runtime</span>
+          <strong>{platformStatus.liveCount}</strong>
+          <small>live or mixed modules</small>
+        </Link>
+        <Link className="dashboard-stat" href="/admin/modules/help">
+          <span>Manual</span>
+          <strong>{platformStatus.manualCount}</strong>
+          <small>manual-mode modules</small>
+        </Link>
+        <Link className="dashboard-stat" href="/admin/modules/help">
+          <span>Warnings</span>
+          <strong>{warnings.length}</strong>
+          <small>setup and operations notes</small>
+        </Link>
+      </section>
 
-          return (
-            <div className="card" key={section.title}>
-              <Icon size={22} />
-              <h2 style={{ fontSize: "1.35rem" }}>{section.title}</h2>
-              <p className="lead" style={{ fontSize: "0.95rem" }}>
-                {section.body}
-              </p>
-            </div>
-          );
-        })}
+      <section className="card">
+        <div className="page-header">
+          <div>
+            <h2 style={{ fontSize: "1.35rem" }}>Current setup notes</h2>
+            <p>Warnings combine manifest readiness with live configuration and data checks.</p>
+          </div>
+        </div>
+        {warnings.length ? (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Severity</th>
+                <th>Area</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {warnings.map((item) => (
+                <tr key={`${item.moduleId || "platform"}-${item.title}`}>
+                  <td>
+                    <span className={warningPillClassName(item.severity)}>{item.severity}</span>
+                  </td>
+                  <td>{item.title}</td>
+                  <td>{item.href ? <Link href={item.href}>{item.detail}</Link> : item.detail}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="empty-state">No setup warnings are active.</p>
+        )}
+      </section>
+
+      <section className="stack" aria-label="Enabled module guide">
+        <div className="page-header">
+          <div>
+            <h2 style={{ fontSize: "1.5rem" }}>Enabled modules</h2>
+            <p>Live, manual, and admin-foundation status for the modules visible in the sidebar.</p>
+          </div>
+        </div>
+
+        <div className="module-readiness-grid">
+          {enabledModules.map((item) => {
+            const Icon = moduleIcons[item.module.icon];
+
+            return (
+              <Link className="module-readiness-card" href={item.module.href} key={item.module.id}>
+                <span className={item.pillClassName}>{item.readinessLabel}</span>
+                <strong>
+                  <Icon size={18} aria-hidden="true" /> {item.module.label}
+                </strong>
+                <small>{item.modeLabel}</small>
+                <p>{item.module.readiness.summary}</p>
+                <span className="module-readiness-meta">
+                  {item.module.readiness.primaryGap || (item.hasPublicRoute ? "Public route declared." : "Admin-only surface.")}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </section>
 
       <section className="card">
         <h2 style={{ fontSize: "1.35rem" }}>Common workflows</h2>
         <table className="table">
           <tbody>
-            <tr>
-              <td>Add or edit bookable time</td>
-              <td>
-                Go to <Link href="/admin/modules/scheduling">Scheduling</Link>, then update services, availability, or blockouts.
-              </td>
-            </tr>
-            <tr>
-              <td>Manage a new booking</td>
-              <td>
-                Go to <Link href="/admin/modules/appointments">Appointments</Link>, open the customer, then confirm, cancel, or complete it.
-              </td>
-            </tr>
-            <tr>
-              <td>Review a returning client</td>
-              <td>
-                Go to <Link href="/admin/modules/clients">Clients</Link>, open the client, then review notes and appointment history.
-              </td>
-            </tr>
-            <tr>
-              <td>Change homepage copy</td>
-              <td>
-                Go to <Link href="/admin/modules/content">Content</Link>, edit the fields, save, and check the public homepage.
-              </td>
-            </tr>
-            <tr>
-              <td>Create a client gallery</td>
-              <td>
-                Go to <Link href="/admin/modules/portfolio">Portfolio</Link>, create the gallery, add image records, then issue access links if it is private.
-              </td>
-            </tr>
-            <tr>
-              <td>Review conversion activity</td>
-              <td>
-                Go to <Link href="/admin/modules/analytics">Analytics</Link>, review event volume, source attribution, and conversion goal progress.
-              </td>
-            </tr>
+            {commonWorkflows.map((workflow) => (
+              <tr key={workflow.label}>
+                <td>{workflow.label}</td>
+                <td>
+                  Go to <Link href={workflow.href}>{workflow.href.replace("/admin/modules/", "")}</Link>. {workflow.detail}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
+      </section>
+
+      <section className="card">
+        <h2 style={{ fontSize: "1.35rem" }}>Security and compliance foundations</h2>
+        <div className="foundation-list">
+          {platformFoundationItems.map((item) => (
+            <div className="foundation-row" key={item.key}>
+              <span className="pill warning">{item.status.replaceAll("-", " ")}</span>
+              <span>
+                <strong>{item.title}</strong>
+                <small>{item.detail}</small>
+                <small>Models: {item.models.join(", ")}</small>
+              </span>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="card">

@@ -1,5 +1,6 @@
 import { Save } from "lucide-react";
 import { getSiteSettings } from "@/lib/site";
+import { manifest } from "./module";
 import { updateContentAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +58,19 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
           Save content
         </button>
       </form>
+
+      <section className="grid-2" aria-label="Content readiness">
+        <div className="card">
+          <span className="pill warning">Partial</span>
+          <h2 style={{ fontSize: "1.2rem" }}>Current content scope</h2>
+          <p>{manifest.readiness.summary}</p>
+        </div>
+        <div className="card">
+          <span className="pill">Planned</span>
+          <h2 style={{ fontSize: "1.2rem" }}>SEO foundation</h2>
+          <p>{manifest.readiness.primaryGap}</p>
+        </div>
+      </section>
     </div>
   );
 }

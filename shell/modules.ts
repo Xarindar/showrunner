@@ -1,20 +1,4 @@
-import {
-  BookOpen,
-  CalendarCheck,
-  CalendarDays,
-  ClipboardList,
-  Gauge,
-  Image,
-  LayoutTemplate,
-  Mail,
-  ReceiptText,
-  Settings,
-  ShoppingBag,
-  Star,
-  Users,
-  Workflow,
-  type LucideIcon
-} from "lucide-react";
+import { moduleIcons } from "@/shell/module-icons";
 import type { ShellModule } from "@/shell/module-types";
 import { manifest as appointmentsModule } from "@/modules/appointments/module";
 import { manifest as analyticsModule } from "@/modules/analytics/module";
@@ -33,22 +17,7 @@ import { manifest as schedulingModule } from "@/modules/scheduling/module";
 import { manifest as settingsModule } from "@/modules/settings/module";
 import { manifest as testimonialsModule } from "@/modules/testimonials/module";
 
-export const moduleIcons = {
-  BookOpen,
-  CalendarCheck,
-  CalendarDays,
-  ClipboardList,
-  Gauge,
-  Image,
-  LayoutTemplate,
-  Mail,
-  ReceiptText,
-  Settings,
-  ShoppingBag,
-  Star,
-  Users,
-  Workflow
-} satisfies Record<string, LucideIcon>;
+export { moduleIcons };
 
 const registeredModules = [
   dashboardModule,
@@ -69,23 +38,34 @@ const registeredModules = [
   analyticsModule
 ] as const satisfies readonly ShellModule[];
 
-export const moduleRegistry = [...registeredModules].sort((left, right) => left.order - right.order);
+const shellModules: readonly ShellModule[] = registeredModules;
+
+export const moduleRegistry = [...shellModules].sort((left, right) => left.order - right.order);
 
 export type ModuleId = (typeof registeredModules)[number]["id"];
 
-export const defaultEnabledModules: ModuleId[] = registeredModules
-  .filter((item) => item.enabledByDefault && item.status === "active")
-  .map((item) => item.id);
+export const requiredModuleIds: ModuleId[] = shellModules
+  .filter((item) => item.required && item.status === "active")
+  .map((item) => item.id as ModuleId);
+
+export const defaultEnabledModules: ModuleId[] = shellModules
+  .filter((item) => (item.enabledByDefault || item.required) && item.status === "active")
+  .map((item) => item.id as ModuleId);
 
 export function getModule(moduleId: string) {
-  return registeredModules.find((item) => item.id === moduleId);
+  return shellModules.find((item) => item.id === moduleId);
+}
+
+export function isRequiredModule(moduleId: string) {
+  return requiredModuleIds.includes(moduleId as ModuleId);
 }
 
 export function normalizeModules(value: unknown): ModuleId[] {
   if (!Array.isArray(value)) return defaultEnabledModules;
 
-  const knownIds = new Set(registeredModules.map((item) => item.id));
+  const knownIds = new Set(shellModules.filter((item) => item.status === "active").map((item) => item.id));
   const modules = value.filter((item): item is ModuleId => typeof item === "string" && knownIds.has(item as ModuleId));
+  const selectedModules = modules.length ? modules : defaultEnabledModules;
 
-  return modules.length ? modules : defaultEnabledModules;
+  return Array.from(new Set([...requiredModuleIds, ...selectedModules]));
 }

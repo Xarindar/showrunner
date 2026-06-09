@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { modulePages } from "@/shell/module-pages";
+import { loadModulePage } from "@/shell/module-pages";
 import { getModule } from "@/shell/modules";
 import { getSiteSettings } from "@/lib/site";
 
@@ -17,7 +17,7 @@ export default async function AdminModulePage({ params, searchParams }: AdminMod
   if (!selectedModule || selectedModule.status !== "active") notFound();
   if (selectedModule.id !== "settings" && !settings.enabledModuleIds.includes(selectedModule.id)) notFound();
 
-  const ModulePage = modulePages[selectedModule.id];
+  const ModulePage = await loadModulePage(selectedModule.id);
   if (!ModulePage) notFound();
 
   return <ModulePage searchParams={searchParams} />;
