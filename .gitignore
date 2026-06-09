@@ -9,3 +9,4 @@ prisma/dev.db
 prisma/dev.db-journal
 .dev-postgres
 .dev-server.*.log
+.next-dev*.log
