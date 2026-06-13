@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { FormAttachmentTargetType } from "@prisma/client";
 import { z } from "zod";
 import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
 import { bookingSelfServicePath } from "@/lib/bookings/self-service";
+import { getPublicFormAttachments, publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { icsCalendarAdapter } from "@/lib/scheduling/calendar";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 
@@ -22,6 +24,12 @@ const bookingSchema = z.object({
 
 export type BookingFormState = {
   calendarUrl?: string;
+  formLinks?: Array<{
+    description: string;
+    href: string;
+    isRequired: boolean;
+    name: string;
+  }>;
   manageUrl?: string;
   ok?: boolean;
   error?: string;
@@ -75,8 +83,23 @@ export async function createPublicBookingAction(_state: BookingFormState, formDa
     revalidatePath("/admin/modules/clients");
     revalidatePath("/admin/modules/scheduling");
     revalidatePath("/book");
+    const formAttachments = await getPublicFormAttachments({
+      siteId: booking.siteId,
+      targetId: booking.id,
+      targetType: FormAttachmentTargetType.BOOKING
+    });
     return {
       calendarUrl: icsCalendarAdapter.bookingPath({ bookingId: booking.id, siteId: booking.siteId }),
+      formLinks: formAttachments.map((attachment) => ({
+        description: attachment.form.description,
+        href: publicFormAttachmentHref({
+          formSlug: attachment.form.slug,
+          targetId: attachment.targetId,
+          targetType: attachment.targetType
+        }),
+        isRequired: attachment.isRequired,
+        name: attachment.form.name
+      })),
       manageUrl: bookingSelfServicePath({ bookingId: booking.id, customerEmail: booking.customerEmail, siteId: booking.siteId }),
       ok: true
     };

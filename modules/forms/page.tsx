@@ -1,16 +1,19 @@
 import Link from "next/link";
-import { FormDestination, FormFieldRole, FormFieldType, FormStatus } from "@prisma/client";
-import { ClipboardList, CopyPlus, FileText, Inbox, Plus } from "lucide-react";
-import { getAccessibleFormSubmissionWhere, requireAdmin } from "@/lib/auth";
+import { FormAttachmentTargetType, FormDestination, FormFieldRole, FormFieldType, FormStatus } from "@prisma/client";
+import { ClipboardList, CopyPlus, FileText, Inbox, Paperclip, Plus, Trash2 } from "lucide-react";
+import { getAccessibleBookingWhere, getAccessibleFormSubmissionWhere, getAccessibleGalleryWhere, requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime, stringArrayCsv } from "@/lib/format";
+import { publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
+  createFormAttachmentAction,
   createFormAction,
   createFormFromTemplateAction,
   createFormFieldAction,
   deleteFormAction,
+  deleteFormAttachmentAction,
   deleteFormFieldAction,
   duplicateFormAction,
   updateFormAction,
@@ -23,7 +26,7 @@ export const dynamic = "force-dynamic";
 
 const pageSize = 20;
 const statusFilters = ["all", ...Object.values(FormStatus).map((status) => status.toLowerCase())] as const;
-const supportedDestinations: FormDestination[] = [FormDestination.STANDALONE_LEAD, FormDestination.CLIENT, FormDestination.INQUIRY];
+const supportedDestinations = Object.values(FormDestination);
 
 type FormsPageProps = {
   searchParams: Promise<{ saved?: string; error?: string; page?: string; status?: string; form?: string }>;
@@ -84,6 +87,10 @@ function destinationOptions(current?: FormDestination) {
   return options;
 }
 
+function targetKey(targetType: FormAttachmentTargetType, targetId: string) {
+  return `${targetType}:${targetId}`;
+}
+
 export default async function FormsPage({ searchParams }: FormsPageProps) {
   const user = await requireAdmin("forms:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
@@ -91,8 +98,10 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
   const statusFilter = normalizeStatusFilter(params.status);
   const formWhere = statusFilter === "all" ? { siteId: settings.siteId } : { siteId: settings.siteId, status: statusFilter.toUpperCase() as FormStatus };
   const submissionWhere = await getAccessibleFormSubmissionWhere(user, settings.siteId);
+  const bookingTargetWhere = await getAccessibleBookingWhere(user, settings.siteId);
+  const galleryTargetWhere = await getAccessibleGalleryWhere(user, settings.siteId);
 
-  const [forms, formCount, activeCount, submissionCount, fieldCount] = await Promise.all([
+  const [forms, formCount, activeCount, submissionCount, fieldCount, bookingTargets, orderTargets, galleryTargets] = await Promise.all([
     prisma.form.findMany({
       where: formWhere,
       include: {
@@ -105,7 +114,25 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
     prisma.form.count({ where: formWhere }),
     prisma.form.count({ where: { siteId: settings.siteId, status: FormStatus.ACTIVE } }),
     prisma.formSubmission.count({ where: submissionWhere }),
-    prisma.formField.count({ where: { form: { siteId: settings.siteId } } })
+    prisma.formField.count({ where: { form: { siteId: settings.siteId } } }),
+    prisma.booking.findMany({
+      where: bookingTargetWhere,
+      include: { service: { select: { name: true } } },
+      orderBy: { startsAt: "desc" },
+      take: 50
+    }),
+    prisma.order.findMany({
+      where: { siteId: settings.siteId },
+      orderBy: { updatedAt: "desc" },
+      select: { customerEmail: true, customerName: true, id: true, orderNumber: true, updatedAt: true },
+      take: 50
+    }),
+    prisma.portfolioGallery.findMany({
+      where: galleryTargetWhere,
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, slug: true, title: true, updatedAt: true },
+      take: 50
+    })
   ]);
 
   const selectedFormId = params.form || forms[0]?.id;
@@ -113,6 +140,10 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
     ? await prisma.form.findFirst({
         where: { id: selectedFormId, siteId: settings.siteId },
         include: {
+          attachments: {
+            include: { _count: { select: { submissions: true } } },
+            orderBy: [{ targetType: "asc" }, { createdAt: "desc" }]
+          },
           fields: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
           submissions: {
             where: submissionWhere,
@@ -126,6 +157,43 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
   const pageCount = Math.max(1, Math.ceil(formCount / pageSize));
   const savedMessage = params.saved ? "Form changes saved." : null;
   const errorMessage = params.error || null;
+  const targetGroups = [
+    {
+      emptyLabel: "No recent bookings.",
+      label: "Booking",
+      targetType: FormAttachmentTargetType.BOOKING,
+      targets: bookingTargets.map((booking) => ({
+        id: booking.id,
+        label: `${booking.customerName} - ${booking.service.name}`,
+        meta: formatDateTime(booking.startsAt, settings.timezone)
+      }))
+    },
+    {
+      emptyLabel: "No recent orders.",
+      label: "Order",
+      targetType: FormAttachmentTargetType.ORDER,
+      targets: orderTargets.map((order) => ({
+        id: order.id,
+        label: `${order.orderNumber} - ${order.customerName}`,
+        meta: order.customerEmail
+      }))
+    },
+    {
+      emptyLabel: "No recent galleries.",
+      label: "Gallery",
+      targetType: FormAttachmentTargetType.GALLERY,
+      targets: galleryTargets.map((gallery) => ({
+        id: gallery.id,
+        label: gallery.title,
+        meta: `/galleries/${gallery.slug}`
+      }))
+    }
+  ];
+  const targetLabelByKey = new Map(
+    targetGroups.flatMap((group) =>
+      group.targets.map((target) => [targetKey(group.targetType, target.id), `${group.label}: ${target.label}`] as const)
+    )
+  );
 
   return (
     <div className="stack">
@@ -422,6 +490,97 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                 Delete form
               </button>
             </form>
+          </div>
+
+          <div className="card stack">
+            <div>
+              <h2 style={{ fontSize: "1.35rem" }}>Attachments</h2>
+              <p style={{ color: "var(--muted)" }}>Attach this form to a booking, order, or gallery and mark it required when it blocks follow-up.</p>
+            </div>
+            <div className="grid-3">
+              {targetGroups.map((group) => (
+                <form action={createFormAttachmentAction} className="subpanel form-grid" key={group.targetType}>
+                  <input type="hidden" name="formId" value={selectedForm.id} />
+                  <input type="hidden" name="targetType" value={group.targetType} />
+                  <div className="field">
+                    <label htmlFor={`attachment-${selectedForm.id}-${group.targetType}`}>{group.label}</label>
+                    <select
+                      id={`attachment-${selectedForm.id}-${group.targetType}`}
+                      name="targetId"
+                      required
+                      defaultValue={group.targets[0]?.id || ""}
+                    >
+                      {!group.targets.length ? <option value="">{group.emptyLabel}</option> : null}
+                      {group.targets.map((target) => (
+                        <option key={target.id} value={target.id}>
+                          {target.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {group.targets[0]?.meta ? <p style={{ color: "var(--muted)", margin: 0 }}>{group.targets[0].meta}</p> : null}
+                  <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                    <input name="isRequired" type="checkbox" />
+                    Required
+                  </label>
+                  <button className="button secondary" disabled={!group.targets.length} type="submit">
+                    <Paperclip size={16} />
+                    Attach
+                  </button>
+                </form>
+              ))}
+            </div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Target</th>
+                  <th>Rule</th>
+                  <th>Submissions</th>
+                  <th>Public link</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedForm.attachments.map((attachment) => (
+                  <tr key={attachment.id}>
+                    <td>
+                      <strong>{targetLabelByKey.get(targetKey(attachment.targetType, attachment.targetId)) || enumLabel(attachment.targetType)}</strong>
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>{attachment.targetId}</span>
+                    </td>
+                    <td>
+                      <span className={attachment.isRequired ? "pill success" : "pill"}>{attachment.isRequired ? "required" : "optional"}</span>
+                    </td>
+                    <td>{attachment._count.submissions}</td>
+                    <td>
+                      <Link
+                        href={publicFormAttachmentHref({
+                          formSlug: selectedForm.slug,
+                          targetId: attachment.targetId,
+                          targetType: attachment.targetType
+                        })}
+                      >
+                        Open form link
+                      </Link>
+                    </td>
+                    <td>
+                      <form action={deleteFormAttachmentAction}>
+                        <input type="hidden" name="id" value={attachment.id} />
+                        <input type="hidden" name="formId" value={selectedForm.id} />
+                        <button className="button secondary" type="submit" aria-label={`Remove attachment ${attachment.id}`}>
+                          <Trash2 size={16} />
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+                {!selectedForm.attachments.length ? (
+                  <tr>
+                    <td colSpan={5}>No attachments yet.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
           </div>
 
           <div className="card stack">

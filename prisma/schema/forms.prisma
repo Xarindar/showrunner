@@ -34,6 +34,12 @@ enum FormDestination {
   INQUIRY
 }
 
+enum FormAttachmentTargetType {
+  BOOKING
+  ORDER
+  GALLERY
+}
+
 model Form {
   id                String           @id @default(cuid())
   siteId            String
@@ -50,6 +56,7 @@ model Form {
   updatedAt         DateTime         @updatedAt
   fields            FormField[]
   submissions       FormSubmission[]
+  attachments       FormAttachment[]
 
   @@unique([siteId, slug])
   @@index([siteId, status])
@@ -77,18 +84,40 @@ model FormField {
 }
 
 model FormSubmission {
-  id             String   @id @default(cuid())
-  formId         String
-  form           Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
-  clientId       String?
-  client         Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  submitterName  String   @default("")
-  submitterEmail String   @default("")
-  data           Json     @default("{}")
-  metadata       Json     @default("{}")
-  createdAt      DateTime @default(now())
+  id               String          @id @default(cuid())
+  formId           String
+  form             Form            @relation(fields: [formId], references: [id], onDelete: Cascade)
+  formAttachmentId String?
+  formAttachment   FormAttachment? @relation(fields: [formAttachmentId], references: [id], onDelete: SetNull)
+  clientId         String?
+  client           Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  submitterName    String          @default("")
+  submitterEmail   String          @default("")
+  data             Json            @default("{}")
+  metadata         Json            @default("{}")
+  createdAt        DateTime        @default(now())
 
   @@index([formId])
+  @@index([formAttachmentId])
   @@index([clientId])
   @@index([submitterEmail])
+}
+
+model FormAttachment {
+  id          String                   @id @default(cuid())
+  siteId      String
+  site        Site                     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  formId      String
+  form        Form                     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  targetType  FormAttachmentTargetType
+  targetId    String
+  isRequired  Boolean                  @default(false)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  submissions FormSubmission[]
+
+  @@unique([formId, targetType, targetId])
+  @@index([siteId, targetType, targetId])
+  @@index([formId])
+  @@index([isRequired])
 }

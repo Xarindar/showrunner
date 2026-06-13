@@ -1,6 +1,6 @@
 "use server";
 
-import { FormDestination, FormFieldRole, FormFieldType, FormStatus, Prisma } from "@prisma/client";
+import { FormAttachmentTargetType, FormDestination, FormFieldRole, FormFieldType, FormStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -15,7 +15,12 @@ import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
 import { slugify } from "@/lib/slug";
 import { findFormTemplate } from "./templates";
 
-const supportedDestinations = [FormDestination.STANDALONE_LEAD, FormDestination.CLIENT, FormDestination.INQUIRY] as const;
+const supportedDestinations = Object.values(FormDestination) as [FormDestination, ...FormDestination[]];
+const formAttachmentQueryKeyByType: Record<FormAttachmentTargetType, string> = {
+  [FormAttachmentTargetType.BOOKING]: "booking",
+  [FormAttachmentTargetType.ORDER]: "order",
+  [FormAttachmentTargetType.GALLERY]: "gallery"
+};
 const hiddenHoneypotField = "companyWebsite";
 
 const formSchema = z
@@ -53,6 +58,18 @@ const duplicateFormSchema = z.object({
 
 const templateFormSchema = z.object({
   templateKey: requiredText
+});
+
+const attachmentSchema = z.object({
+  formId: requiredText,
+  targetType: z.enum(FormAttachmentTargetType),
+  targetId: requiredText,
+  isRequired: z.literal("on").optional()
+});
+
+const attachmentDeleteSchema = z.object({
+  id: requiredText,
+  formId: requiredText
 });
 
 const fieldSchema = z
@@ -111,7 +128,26 @@ function refreshForms(slug?: string) {
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/modules/forms");
+  revalidatePath("/admin/modules/appointments");
+  revalidatePath("/admin/modules/products");
+  revalidatePath("/admin/modules/portfolio");
+  revalidatePath("/book");
+  revalidatePath("/cart");
+  revalidatePath("/galleries");
   if (slug) revalidatePath(`/forms/${slug}`);
+}
+
+function publicFormPath(
+  slug: string,
+  attachmentContext?: { targetId: string; targetType: FormAttachmentTargetType },
+  query?: Record<string, string>
+) {
+  const params = new URLSearchParams();
+  if (attachmentContext) params.set(formAttachmentQueryKeyByType[attachmentContext.targetType], attachmentContext.targetId);
+  for (const [key, value] of Object.entries(query || {})) params.set(key, value);
+  const serialized = params.toString();
+
+  return `/forms/${slug}${serialized ? `?${serialized}` : ""}`;
 }
 
 export async function createFormAction(formData: FormData) {
@@ -411,12 +447,87 @@ export async function deleteFormFieldAction(formData: FormData) {
   redirect(`/admin/modules/forms?saved=field-delete&form=${input.formId}`);
 }
 
+async function assertAttachmentTargetExists(targetType: FormAttachmentTargetType, targetId: string, siteId: string) {
+  if (targetType === FormAttachmentTargetType.BOOKING) {
+    return prisma.booking.findFirst({ where: { id: targetId, siteId }, select: { id: true } });
+  }
+
+  if (targetType === FormAttachmentTargetType.ORDER) {
+    return prisma.order.findFirst({ where: { id: targetId, siteId }, select: { id: true } });
+  }
+
+  return prisma.portfolioGallery.findFirst({ where: { id: targetId, siteId }, select: { id: true } });
+}
+
+export async function createFormAttachmentAction(formData: FormData) {
+  await requireAdmin("forms:manage");
+  const input = await parseForm(attachmentSchema, formData, "/admin/modules/forms");
+  const siteId = await getCurrentSiteId();
+  const form = await prisma.form.findFirst({
+    where: { id: input.formId, siteId },
+    select: { id: true, slug: true }
+  });
+
+  if (!form) {
+    redirect(`/admin/modules/forms?error=${encodeURIComponent("Form not found.")}`);
+  }
+
+  const target = await assertAttachmentTargetExists(input.targetType, input.targetId, siteId);
+  if (!target) {
+    redirect(`/admin/modules/forms?form=${input.formId}&error=${encodeURIComponent("Attachment target not found.")}`);
+  }
+
+  try {
+    await prisma.formAttachment.create({
+      data: {
+        formId: input.formId,
+        isRequired: input.isRequired === "on",
+        siteId,
+        targetId: input.targetId,
+        targetType: input.targetType
+      }
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      redirect(`/admin/modules/forms?form=${input.formId}&error=${encodeURIComponent("That form is already attached to the selected record.")}`);
+    }
+
+    throw error;
+  }
+
+  refreshForms(form.slug);
+  redirect(`/admin/modules/forms?saved=attachment&form=${input.formId}`);
+}
+
+export async function deleteFormAttachmentAction(formData: FormData) {
+  await requireAdmin("forms:manage");
+  const input = await parseForm(attachmentDeleteSchema, formData, "/admin/modules/forms");
+  const siteId = await getCurrentSiteId();
+  const attachment = await prisma.formAttachment.findFirst({
+    where: { id: input.id, formId: input.formId, siteId },
+    include: { form: { select: { slug: true } } }
+  });
+
+  if (!attachment) {
+    redirect(`/admin/modules/forms?form=${input.formId}&error=${encodeURIComponent("Attachment not found.")}`);
+  }
+
+  await prisma.formAttachment.delete({ where: { id: input.id } });
+
+  refreshForms(attachment.form.slug);
+  redirect(`/admin/modules/forms?saved=attachment-delete&form=${input.formId}`);
+}
+
 function publicFieldName(fieldId: string) {
   return `field-${fieldId}`;
 }
 
-function redirectWithPublicError(slug: string, message: string): never {
-  redirect(`/forms/${slug}?error=${encodeURIComponent(message)}`);
+function redirectWithPublicError(
+  slug: string,
+  message: string,
+  attachmentContext?: { targetId: string; targetType: FormAttachmentTargetType }
+): never {
+  redirect(publicFormPath(slug, attachmentContext, { error: message }));
 }
 
 export async function createPublicFormSubmissionAction(formData: FormData) {
@@ -441,13 +552,42 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
 
   if (!form) redirect("/");
 
+  const attachmentTargetType = String(formData.get("attachmentTargetType") || "");
+  const attachmentTargetId = String(formData.get("attachmentTargetId") || "").trim();
+  const hasAttachmentContext = Boolean(attachmentTargetType || attachmentTargetId);
+  const parsedAttachmentType = z.enum(FormAttachmentTargetType).safeParse(attachmentTargetType);
+  const attachmentContext =
+    hasAttachmentContext && parsedAttachmentType.success && attachmentTargetId
+      ? { targetId: attachmentTargetId, targetType: parsedAttachmentType.data }
+      : undefined;
+
+  if (hasAttachmentContext && !attachmentContext) {
+    redirectWithPublicError(form.slug, "This form link is missing its attachment context.");
+  }
+
+  const formAttachment = attachmentContext
+    ? await prisma.formAttachment.findFirst({
+        where: {
+          formId: form.id,
+          siteId: settings.siteId,
+          targetId: attachmentContext.targetId,
+          targetType: attachmentContext.targetType
+        },
+        select: { id: true, isRequired: true, targetId: true, targetType: true }
+      })
+    : null;
+
+  if (attachmentContext && !formAttachment) {
+    redirectWithPublicError(form.slug, "This form is not attached to that record.", attachmentContext);
+  }
+
   if (String(formData.get(hiddenHoneypotField) || "").trim()) {
-    redirect(`/forms/${form.slug}?submitted=1`);
+    redirect(publicFormPath(form.slug, attachmentContext, { submitted: "1" }));
   }
 
   const rateLimitMessage = await publicRateLimitMessage("form_submission");
   if (rateLimitMessage) {
-    redirectWithPublicError(form.slug, rateLimitMessage);
+    redirectWithPublicError(form.slug, rateLimitMessage, attachmentContext);
   }
 
   const data: Record<string, { label: string; type: FormFieldType; value: string }> = {};
@@ -460,11 +600,11 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
     const value = field.type === FormFieldType.HIDDEN ? field.placeholder : rawValue;
 
     if (field.isRequired && !value) {
-      redirectWithPublicError(form.slug, `Complete ${field.label}.`);
+      redirectWithPublicError(form.slug, `Complete ${field.label}.`, attachmentContext);
     }
 
     if (field.type === FormFieldType.EMAIL && value && !z.email().safeParse(value).success) {
-      redirectWithPublicError(form.slug, "Use a valid email address.");
+      redirectWithPublicError(form.slug, "Use a valid email address.", attachmentContext);
     }
 
     data[field.id] = {
@@ -504,15 +644,25 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
   }
 
   const headerStore = await headers();
+  const attachmentMetadata = formAttachment
+    ? {
+        attachmentTargetId: formAttachment.targetId,
+        attachmentTargetType: formAttachment.targetType,
+        formAttachmentId: formAttachment.id,
+        isRequiredAttachment: formAttachment.isRequired
+      }
+    : {};
 
   const submission = await prisma.formSubmission.create({
     data: {
       formId: form.id,
+      formAttachmentId: formAttachment?.id,
       clientId,
       submitterName,
       submitterEmail,
       data,
       metadata: {
+        ...attachmentMetadata,
         destination: form.destination,
         userAgent: headerStore.get("user-agent") || ""
       }
@@ -533,6 +683,7 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
     ...(await requestAttribution(undefined, `/forms/${form.slug}`)),
     actorEmail: submitterEmail,
     metadata: {
+      ...attachmentMetadata,
       clientId,
       destination: form.destination,
       formId: form.id,
@@ -545,5 +696,5 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
 
   refreshForms(form.slug);
   if (clientId) revalidatePath("/admin/modules/clients");
-  redirect(`/forms/${form.slug}?submitted=1`);
+  redirect(publicFormPath(form.slug, attachmentContext, { submitted: "1" }));
 }

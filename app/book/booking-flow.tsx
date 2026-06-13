@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
-import { CalendarCheck, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, MapPin } from "lucide-react";
+import { CalendarCheck, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, FileText, MapPin } from "lucide-react";
 import { slugify } from "@/lib/slug";
 import { createPublicBookingAction, type BookingFormState } from "./actions";
 
@@ -141,6 +141,18 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
             <CalendarCheck size={18} />
             Manage appointment
           </a>
+        ) : null}
+        {state.formLinks?.length ? (
+          <div className="subpanel form-grid" style={{ marginTop: 16, textAlign: "left" }}>
+            <h2 style={{ fontSize: "1.2rem", margin: 0 }}>Appointment forms</h2>
+            {state.formLinks.map((formLink) => (
+              <a className={formLink.isRequired ? "button" : "button secondary"} href={formLink.href} key={formLink.href}>
+                <FileText size={18} />
+                {formLink.isRequired ? "Required: " : ""}
+                {formLink.name}
+              </a>
+            ))}
+          </div>
         ) : null}
       </div>
     );

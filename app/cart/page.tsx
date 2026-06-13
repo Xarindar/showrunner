@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { CreditCard, ShoppingBag, Trash2 } from "lucide-react";
+import { CreditCard, FileText, ShoppingBag, Trash2 } from "lucide-react";
+import { FormAttachmentTargetType } from "@prisma/client";
 import {
   applyPublicCartCouponAction,
   preparePublicCheckoutAction,
@@ -11,6 +12,7 @@ import {
 } from "./actions";
 import { getOpenCart } from "@/lib/commerce/cart";
 import { formatMoney } from "@/lib/format";
+import { getPublicFormAttachments, publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
@@ -46,6 +48,13 @@ export default async function CartPage({ searchParams }: CartPageProps) {
         include: { payments: { orderBy: { createdAt: "desc" }, take: 1 } }
       })
     : null;
+  const orderFormAttachments = preparedOrder
+    ? await getPublicFormAttachments({
+        siteId: settings.siteId,
+        targetId: preparedOrder.id,
+        targetType: FormAttachmentTargetType.ORDER
+      })
+    : [];
 
   return (
     <main className="site-shell" style={themeToCssVars(settings)}>
@@ -96,6 +105,28 @@ export default async function CartPage({ searchParams }: CartPageProps) {
             <div className="success-message" role="status" aria-live="polite">
               Order {preparedOrder.orderNumber} is prepared with a pending Stripe payment record for{" "}
               {formatMoney(preparedOrder.totalCents, preparedOrder.currency)}. Attach the hosted checkout link from the admin order queue.
+            </div>
+          ) : null}
+          {orderFormAttachments.length ? (
+            <div className="card stack">
+              <h2 style={{ fontSize: "1.35rem" }}>Order forms</h2>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {orderFormAttachments.map((attachment) => (
+                  <Link
+                    className={attachment.isRequired ? "button" : "button secondary"}
+                    href={publicFormAttachmentHref({
+                      formSlug: attachment.form.slug,
+                      targetId: attachment.targetId,
+                      targetType: attachment.targetType
+                    })}
+                    key={attachment.id}
+                  >
+                    <FileText size={18} />
+                    {attachment.isRequired ? "Required: " : ""}
+                    {attachment.form.name}
+                  </Link>
+                ))}
+              </div>
             </div>
           ) : null}
 

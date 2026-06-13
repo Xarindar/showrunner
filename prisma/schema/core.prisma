@@ -61,6 +61,7 @@ model Site {
   clientSegments           ClientSegment[]
   mediaAssets              MediaAsset[]
   forms                    Form[]
+  formAttachments          FormAttachment[]
   testimonials             Testimonial[]
   portfolioGalleries       PortfolioGallery[]
   portfolioGalleryAccesses PortfolioGalleryAccess[]

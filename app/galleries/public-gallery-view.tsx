@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Download, Heart, LockKeyhole } from "lucide-react";
-import { PortfolioGalleryLayout, PortfolioGalleryStatus, PortfolioGalleryVisibility } from "@prisma/client";
+import { FormAttachmentTargetType, PortfolioGalleryLayout, PortfolioGalleryStatus, PortfolioGalleryVisibility } from "@prisma/client";
 import { cssBackgroundImage } from "@/lib/css";
 import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
+import { getPublicFormAttachments, publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { findActiveGalleryAccess, markGalleryAccessViewed } from "@/lib/portfolio/access";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -173,6 +174,11 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
       : firstVisibleImage || "/hero.svg";
   const favorited = firstParam(searchParams, "favorited");
   const error = firstParam(searchParams, "error");
+  const galleryFormAttachments = await getPublicFormAttachments({
+    siteId: settings.siteId,
+    targetId: gallery.id,
+    targetType: FormAttachmentTargetType.GALLERY
+  });
 
   return (
     <main className="site-shell public-gallery-shell" style={themeToCssVars(settings)}>
@@ -204,6 +210,32 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
       <section className="section public-gallery-section">
         {favorited ? <div className="success-message">Favorite saved.</div> : null}
         {error ? <div className="error">{decodeURIComponent(error)}</div> : null}
+        {galleryFormAttachments.length ? (
+          <div className="subpanel" style={{ marginBottom: 18 }}>
+            <div className="page-header" style={{ marginBottom: 12 }}>
+              <div>
+                <p className="eyebrow">Gallery forms</p>
+                <h2 style={{ fontSize: "1.4rem" }}>Forms for this gallery</h2>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {galleryFormAttachments.map((attachment) => (
+                <Link
+                  className={attachment.isRequired ? "button" : "button secondary"}
+                  href={publicFormAttachmentHref({
+                    formSlug: attachment.form.slug,
+                    targetId: attachment.targetId,
+                    targetType: attachment.targetType
+                  })}
+                  key={attachment.id}
+                >
+                  {attachment.isRequired ? "Required: " : ""}
+                  {attachment.form.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div
           aria-label={`${gallery.layout.toLowerCase().replaceAll("_", " ")} gallery layout`}

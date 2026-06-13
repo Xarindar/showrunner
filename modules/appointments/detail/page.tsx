@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarClock, Save } from "lucide-react";
+import { FormAttachmentTargetType } from "@prisma/client";
 import { getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/format";
+import { publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { getSiteSettings } from "@/lib/site";
 import { rescheduleBookingAction, updateBookingDetailAction, updateBookingStatusAction } from "../actions";
 
@@ -44,6 +46,18 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
   });
 
   if (!booking) notFound();
+  const formAttachments = await prisma.formAttachment.findMany({
+    where: {
+      siteId: settings.siteId,
+      targetId: booking.id,
+      targetType: FormAttachmentTargetType.BOOKING
+    },
+    include: {
+      _count: { select: { submissions: true } },
+      form: { select: { name: true, slug: true, status: true } }
+    },
+    orderBy: [{ isRequired: "desc" }, { createdAt: "asc" }]
+  });
 
   return (
     <div className="stack">
@@ -140,6 +154,48 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
           </div>
         </div>
       </section>
+
+      {formAttachments.length ? (
+        <section className="card stack">
+          <h2 style={{ fontSize: "1.35rem" }}>Attached forms</h2>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Form</th>
+                <th>Rule</th>
+                <th>Submissions</th>
+                <th>Link</th>
+              </tr>
+            </thead>
+            <tbody>
+              {formAttachments.map((attachment) => (
+                <tr key={attachment.id}>
+                  <td>
+                    <strong>{attachment.form.name}</strong>
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>{attachment.form.status.toLowerCase()}</span>
+                  </td>
+                  <td>
+                    <span className={attachment.isRequired ? "pill success" : "pill"}>{attachment.isRequired ? "required" : "optional"}</span>
+                  </td>
+                  <td>{attachment._count.submissions}</td>
+                  <td>
+                    <Link
+                      href={publicFormAttachmentHref({
+                        formSlug: attachment.form.slug,
+                        targetId: attachment.targetId,
+                        targetType: attachment.targetType
+                      })}
+                    >
+                      Open public form
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
 
       <form action={rescheduleBookingAction} className="card form-grid">
         <input type="hidden" name="id" value={booking.id} />

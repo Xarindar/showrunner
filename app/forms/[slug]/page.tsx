@@ -4,6 +4,7 @@ import { FormFieldType, FormStatus, type FormField } from "@prisma/client";
 import { CalendarDays, MessageSquare } from "lucide-react";
 import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/structured-data";
+import { parseFormAttachmentTarget } from "@/lib/forms/attachments";
 import { buildBreadcrumbJsonLd, buildPageMetadata, getCanonicalBaseUrl } from "@/lib/seo";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 type PublicFormPageProps = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ submitted?: string; error?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined> & { submitted?: string; error?: string }>;
 };
 
 export async function generateMetadata({ params }: PublicFormPageProps): Promise<Metadata> {
@@ -175,6 +176,7 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   const settings = await getSiteSettings();
   const baseUrl = await getCanonicalBaseUrl(settings.siteId);
+  const attachmentTarget = parseFormAttachmentTarget(query);
   const form = await prisma.form.findFirst({
     where: {
       siteId: settings.siteId,
@@ -190,6 +192,18 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
 
   if (!settings.enabledModuleIds.includes("forms")) notFound();
   if (!form) notFound();
+  const attachment = attachmentTarget
+    ? await prisma.formAttachment.findFirst({
+        where: {
+          formId: form.id,
+          siteId: settings.siteId,
+          targetId: attachmentTarget.targetId,
+          targetType: attachmentTarget.targetType
+        },
+        select: { id: true, isRequired: true, targetId: true, targetType: true }
+      })
+    : null;
+  if (attachmentTarget && !attachment) notFound();
   const testimonialsEnabled = settings.enabledModuleIds.includes("testimonials");
 
   return (
@@ -227,6 +241,11 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
           <p className="eyebrow">Form</p>
           <h1>{form.name}</h1>
           {form.description ? <p className="lead">{form.description}</p> : null}
+          {attachment ? (
+            <p className={attachment.isRequired ? "pill success" : "pill"}>
+              {attachment.isRequired ? "Required" : "Optional"} attached form
+            </p>
+          ) : null}
         </div>
 
         {query.submitted ? (
@@ -242,6 +261,12 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
 
         <form action={createPublicFormSubmissionAction} className="card form-grid">
           <input type="hidden" name="formId" value={form.id} />
+          {attachment ? (
+            <>
+              <input type="hidden" name="attachmentTargetType" value={attachment.targetType} />
+              <input type="hidden" name="attachmentTargetId" value={attachment.targetId} />
+            </>
+          ) : null}
           <input
             aria-hidden="true"
             autoComplete="off"
