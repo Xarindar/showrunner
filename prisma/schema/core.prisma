@@ -133,6 +133,14 @@ model SiteSettings {
   searchConsoleVerification String @default("")
   analyticsRetentionDays Int  @default(365)
   checkoutProvider PaymentProvider @default(STRIPE)
+  commerceTaxEnabled Boolean @default(false)
+  commerceTaxLabel String @default("Sales tax")
+  commerceTaxRateBps Int @default(0)
+  commerceTaxAppliesToShipping Boolean @default(false)
+  commerceShippingEnabled Boolean @default(false)
+  commerceShippingLabel String @default("Standard shipping")
+  commerceShippingFlatCents Int @default(0)
+  commerceFreeShippingThresholdCents Int?
   enabledModules  Json
   dataScopeConfig Json        @default("{}")
   createdAt       DateTime    @default(now())

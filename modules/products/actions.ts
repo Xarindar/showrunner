@@ -11,6 +11,7 @@ import {
   collectionProductFormSchema,
   couponFormSchema,
   moneyCents,
+  optionalMoneyCents,
   optionalStoredText,
   parseForm,
   productFormSchema,
@@ -18,7 +19,8 @@ import {
   productUpdateFormSchema,
   productVariantFormSchema,
   requiredText,
-  safeExternalHttpsUrl
+  safeExternalHttpsUrl,
+  zeroableMoneyCents
 } from "@/lib/admin-validation";
 import { updateOrderStatus } from "@/lib/commerce/orders";
 import { generateUniqueCommerceSlug } from "@/lib/commerce/slugs";
@@ -46,6 +48,31 @@ const orderRefundSchema = z.object({
   paymentId: requiredText,
   amount: moneyCents
 });
+
+const percentRateBps = z
+  .string()
+  .transform((value) => value.trim())
+  .refine((value) => value === "" || /^\d+(\.\d{1,2})?$/.test(value), "Use a percentage such as 8.25.")
+  .transform((value) => (value === "" ? 0 : Math.round(Number(value) * 100)))
+  .refine((value) => value >= 0 && value <= 10_000, "Use a percentage from 0 to 100.");
+
+const commerceCheckoutSettingsSchema = z
+  .object({
+    commerceTaxEnabled: z.literal("on").optional(),
+    commerceTaxLabel: requiredText,
+    commerceTaxRate: percentRateBps,
+    commerceTaxAppliesToShipping: z.literal("on").optional(),
+    commerceShippingEnabled: z.literal("on").optional(),
+    commerceShippingLabel: requiredText,
+    commerceShippingFlat: zeroableMoneyCents,
+    commerceFreeShippingThreshold: optionalMoneyCents
+  })
+  .transform((value) => ({
+    ...value,
+    commerceShippingEnabled: value.commerceShippingEnabled === "on",
+    commerceTaxAppliesToShipping: value.commerceTaxAppliesToShipping === "on",
+    commerceTaxEnabled: value.commerceTaxEnabled === "on"
+  }));
 
 function refreshProducts() {
   revalidatePath("/admin");
@@ -225,6 +252,68 @@ export async function updateProductStatusAction(formData: FormData) {
   });
 
   refreshProducts();
+}
+
+export async function updateCommerceCheckoutSettingsAction(formData: FormData) {
+  const user = await requireAdmin("products:manage");
+  const input = await parseForm(commerceCheckoutSettingsSchema, formData, "/admin/modules/products");
+  const siteId = await getCurrentSiteId();
+  const before = await prisma.siteSettings.findUnique({
+    where: { siteId },
+    select: {
+      commerceFreeShippingThresholdCents: true,
+      commerceShippingEnabled: true,
+      commerceShippingFlatCents: true,
+      commerceShippingLabel: true,
+      commerceTaxAppliesToShipping: true,
+      commerceTaxEnabled: true,
+      commerceTaxLabel: true,
+      commerceTaxRateBps: true,
+      id: true
+    }
+  });
+
+  if (!before) {
+    redirect(`/admin/modules/products?error=${encodeURIComponent("Site settings not found.")}`);
+  }
+
+  const after = await prisma.siteSettings.update({
+    where: { siteId },
+    data: {
+      commerceFreeShippingThresholdCents: input.commerceFreeShippingThreshold,
+      commerceShippingEnabled: input.commerceShippingEnabled,
+      commerceShippingFlatCents: input.commerceShippingFlat,
+      commerceShippingLabel: input.commerceShippingLabel,
+      commerceTaxAppliesToShipping: input.commerceTaxAppliesToShipping,
+      commerceTaxEnabled: input.commerceTaxEnabled,
+      commerceTaxLabel: input.commerceTaxLabel,
+      commerceTaxRateBps: input.commerceTaxRate
+    },
+    select: {
+      commerceFreeShippingThresholdCents: true,
+      commerceShippingEnabled: true,
+      commerceShippingFlatCents: true,
+      commerceShippingLabel: true,
+      commerceTaxAppliesToShipping: true,
+      commerceTaxEnabled: true,
+      commerceTaxLabel: true,
+      commerceTaxRateBps: true,
+      id: true
+    }
+  });
+
+  await recordAuditLog({
+    action: "commerce.checkout_settings.updated",
+    actor: user,
+    metadata: { after, before },
+    siteId,
+    targetId: after.id,
+    targetLabel: "Commerce checkout settings",
+    targetType: "site_settings"
+  });
+
+  refreshProducts();
+  redirect("/admin/modules/products?saved=checkout-settings");
 }
 
 export async function createProductVariantAction(formData: FormData) {

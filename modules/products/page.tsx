@@ -12,6 +12,7 @@ import {
   createCouponAction,
   createProductAction,
   createProductVariantAction,
+  updateCommerceCheckoutSettingsAction,
   setCommerceOrderCheckoutLinkAction,
   refundCommercePaymentAction,
   updateCommerceOrderStatusAction,
@@ -34,6 +35,10 @@ function normalizeStatusFilter(value?: string) {
 
 function moneyInput(cents?: number | null) {
   return typeof cents === "number" ? (cents / 100).toFixed(2) : "";
+}
+
+function percentInput(basisPoints?: number | null) {
+  return typeof basisPoints === "number" ? (basisPoints / 100).toFixed(2) : "";
 }
 
 function productStatusClass(status: ProductStatus) {
@@ -159,6 +164,76 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             Paid and fulfilled total across {orderCount} order records and {openCartCount} open carts.
           </p>
         </div>
+      </section>
+
+      <section className="card form-grid">
+        <div className="page-header" style={{ marginBottom: 0, minHeight: 0 }}>
+          <div>
+            <h2 style={{ fontSize: "1.35rem" }}>Checkout totals</h2>
+            <p>Configure the per-site tax rule and standard shipping option used by cart, orders, and hosted checkout.</p>
+          </div>
+          <CreditCard size={22} />
+        </div>
+        <form action={updateCommerceCheckoutSettingsAction} className="form-grid">
+          <div className="grid-2">
+            <div className="subpanel form-grid">
+              <h3 style={{ fontSize: "1.05rem" }}>Tax</h3>
+              <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                <input name="commerceTaxEnabled" type="checkbox" defaultChecked={settings.commerceTaxEnabled} />
+                Enable tax
+              </label>
+              <div className="grid-2">
+                <div className="field">
+                  <label htmlFor="commerceTaxLabel">Tax label</label>
+                  <input id="commerceTaxLabel" name="commerceTaxLabel" defaultValue={settings.commerceTaxLabel} required />
+                </div>
+                <div className="field">
+                  <label htmlFor="commerceTaxRate">Tax rate %</label>
+                  <input id="commerceTaxRate" name="commerceTaxRate" inputMode="decimal" defaultValue={percentInput(settings.commerceTaxRateBps)} />
+                </div>
+              </div>
+              <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                <input name="commerceTaxAppliesToShipping" type="checkbox" defaultChecked={settings.commerceTaxAppliesToShipping} />
+                Tax shipping
+              </label>
+            </div>
+
+            <div className="subpanel form-grid">
+              <h3 style={{ fontSize: "1.05rem" }}>Shipping</h3>
+              <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                <input name="commerceShippingEnabled" type="checkbox" defaultChecked={settings.commerceShippingEnabled} />
+                Enable standard shipping
+              </label>
+              <div className="grid-2">
+                <div className="field">
+                  <label htmlFor="commerceShippingLabel">Shipping label</label>
+                  <input id="commerceShippingLabel" name="commerceShippingLabel" defaultValue={settings.commerceShippingLabel} required />
+                </div>
+                <div className="field">
+                  <label htmlFor="commerceShippingFlat">Flat amount</label>
+                  <input
+                    id="commerceShippingFlat"
+                    name="commerceShippingFlat"
+                    inputMode="decimal"
+                    defaultValue={moneyInput(settings.commerceShippingFlatCents)}
+                  />
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="commerceFreeShippingThreshold">Free shipping threshold</label>
+                <input
+                  id="commerceFreeShippingThreshold"
+                  name="commerceFreeShippingThreshold"
+                  inputMode="decimal"
+                  defaultValue={moneyInput(settings.commerceFreeShippingThresholdCents)}
+                />
+              </div>
+            </div>
+          </div>
+          <button className="button" type="submit">
+            Save checkout totals
+          </button>
+        </form>
       </section>
 
       <section className="grid-2">

@@ -8,7 +8,8 @@ import {
   PaymentProvider,
   PaymentStatus,
   Prisma,
-  ProductStatus
+  ProductStatus,
+  ProductType
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
@@ -26,6 +27,15 @@ type RepriceWarning = {
 type RepriceCartOptions = {
   allowedStatuses?: CartStatus[];
   siteId?: string;
+};
+
+type CommerceCheckoutSettings = {
+  commerceFreeShippingThresholdCents: number | null;
+  commerceShippingEnabled: boolean;
+  commerceShippingFlatCents: number;
+  commerceTaxAppliesToShipping: boolean;
+  commerceTaxEnabled: boolean;
+  commerceTaxRateBps: number;
 };
 
 function lineTotal(unitPriceCents: number, quantity: number) {
@@ -57,6 +67,62 @@ function couponDiscountCents(
   return Math.min(subtotalCents, Math.floor((subtotalCents * (coupon.percentOff || 0)) / 100));
 }
 
+async function getCommerceCheckoutSettings(tx: CommerceTx, siteId: string): Promise<CommerceCheckoutSettings> {
+  const settings = await tx.siteSettings.findUnique({
+    where: { siteId },
+    select: {
+      commerceFreeShippingThresholdCents: true,
+      commerceShippingEnabled: true,
+      commerceShippingFlatCents: true,
+      commerceTaxAppliesToShipping: true,
+      commerceTaxEnabled: true,
+      commerceTaxRateBps: true
+    }
+  });
+
+  return {
+    commerceFreeShippingThresholdCents: settings?.commerceFreeShippingThresholdCents ?? null,
+    commerceShippingEnabled: settings?.commerceShippingEnabled ?? false,
+    commerceShippingFlatCents: settings?.commerceShippingFlatCents ?? 0,
+    commerceTaxAppliesToShipping: settings?.commerceTaxAppliesToShipping ?? false,
+    commerceTaxEnabled: settings?.commerceTaxEnabled ?? false,
+    commerceTaxRateBps: settings?.commerceTaxRateBps ?? 0
+  };
+}
+
+function calculateCheckoutTotals(input: {
+  discountCents: number;
+  hasShippableItems: boolean;
+  settings: CommerceCheckoutSettings;
+  subtotalCents: number;
+}) {
+  const discountedSubtotalCents = Math.max(0, input.subtotalCents - input.discountCents);
+  const freeShippingThresholdCents = input.settings.commerceFreeShippingThresholdCents;
+  const freeShipping =
+    freeShippingThresholdCents !== null &&
+    freeShippingThresholdCents >= 0 &&
+    discountedSubtotalCents >= freeShippingThresholdCents;
+  const shippingCents =
+    input.hasShippableItems &&
+    input.settings.commerceShippingEnabled &&
+    !freeShipping
+      ? Math.max(0, input.settings.commerceShippingFlatCents)
+      : 0;
+  const taxableCents =
+    discountedSubtotalCents + (input.settings.commerceTaxAppliesToShipping ? shippingCents : 0);
+  const taxCents =
+    input.settings.commerceTaxEnabled && input.settings.commerceTaxRateBps > 0
+      ? Math.round((taxableCents * input.settings.commerceTaxRateBps) / 10_000)
+      : 0;
+  const totalCents = discountedSubtotalCents + shippingCents + taxCents;
+  if (totalCents > maxIntCents) throw new Error("Cart total is too high.");
+
+  return {
+    shippingCents,
+    taxCents,
+    totalCents
+  };
+}
 async function generateOrderNumber(tx: CommerceTx, siteId: string) {
   const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
 
@@ -141,6 +207,7 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
 
   let currency = cart.currency || "USD";
   let subtotalCents = 0;
+  let hasShippableItems = false;
 
   for (const item of cart.items) {
     const productUnavailable = item.product.status !== ProductStatus.ACTIVE;
@@ -169,6 +236,7 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
 
     if (subtotalCents === 0) currency = item.product.currency;
     if (item.product.currency !== currency) throw new Error("A cart can only contain one currency.");
+    if (item.product.type === ProductType.PHYSICAL) hasShippableItems = true;
 
     const unitPriceCents = item.variant?.priceCents ?? item.product.basePriceCents;
     const nextLineTotalCents = lineTotal(unitPriceCents, nextQuantity);
@@ -202,13 +270,21 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
     }
   }
 
-  const totalCents = Math.max(0, subtotalCents - discountCents);
+  const checkoutSettings = await getCommerceCheckoutSettings(tx, siteId);
+  const { shippingCents, taxCents, totalCents } = calculateCheckoutTotals({
+    discountCents,
+    hasShippableItems,
+    settings: checkoutSettings,
+    subtotalCents
+  });
   await tx.cart.update({
     where: { id: cartId },
     data: {
       currency,
       subtotalCents,
       discountCents,
+      shippingCents,
+      taxCents,
       totalCents,
       couponId
     }
@@ -427,8 +503,8 @@ export async function createCheckoutOrderFromCart(input: { cartId: string; custo
         currency: cart.currency,
         subtotalCents: cart.subtotalCents,
         discountCents: cart.discountCents,
-        taxCents: 0,
-        shippingCents: 0,
+        taxCents: cart.taxCents,
+        shippingCents: cart.shippingCents,
         totalCents: cart.totalCents,
         couponId: cart.couponId,
         notes: "Order prepared from public cart. Hosted checkout URL and payment webhook confirmation are still pending.",
@@ -456,6 +532,8 @@ export async function createCheckoutOrderFromCart(input: { cartId: string; custo
             rawSummary: {
               strategy: "stripe_checkout",
               sourceCartId: cart.id,
+              shippingCents: cart.shippingCents,
+              taxCents: cart.taxCents,
               pciScope: "Hosted/tokenized collection only. No raw card data is stored."
             }
           }

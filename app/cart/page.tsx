@@ -175,6 +175,14 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                       <td>{formatMoney(cartResult.cart.discountCents, cartResult.cart.currency)}</td>
                     </tr>
                     <tr>
+                      <td>{settings.commerceShippingLabel}</td>
+                      <td>{formatMoney(cartResult.cart.shippingCents, cartResult.cart.currency)}</td>
+                    </tr>
+                    <tr>
+                      <td>{settings.commerceTaxLabel}</td>
+                      <td>{formatMoney(cartResult.cart.taxCents, cartResult.cart.currency)}</td>
+                    </tr>
+                    <tr>
                       <td>Total</td>
                       <td>
                         <strong>{formatMoney(cartResult.cart.totalCents, cartResult.cart.currency)}</strong>
@@ -225,7 +233,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                 </form>
 
                 <form action={preparePublicCheckoutAction} className="subpanel form-grid">
-                  <h3>Prepare hosted checkout</h3>
+                  <h3>Checkout</h3>
                   <div className="field">
                     <label htmlFor="checkout-name">Name</label>
                     <input id="checkout-name" name="customerName" required />
@@ -236,7 +244,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                   </div>
                   <button className="button" type="submit">
                     <CreditCard size={18} />
-                    Prepare Stripe handoff
+                    Continue to checkout
                   </button>
                 </form>
               </div>

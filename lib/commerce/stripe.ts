@@ -107,9 +107,29 @@ function assertStripeCurrency(currency: string) {
 
 function stripeLineItems(order: {
   currency: string;
+  discountCents: number;
   items: { lineTotalCents: number; name: string; quantity: number; unitPriceCents: number }[];
+  orderNumber: string;
+  shippingCents: number;
+  taxCents: number;
+  totalCents: number;
 }) {
-  return order.items.map((item) => {
+  if (order.discountCents > 0) {
+    return [
+      {
+        price_data: {
+          currency: assertStripeCurrency(order.currency),
+          product_data: {
+            name: `Order ${order.orderNumber}`.slice(0, 250)
+          },
+          unit_amount: order.totalCents
+        },
+        quantity: 1
+      }
+    ] satisfies Stripe.Checkout.SessionCreateParams.LineItem[];
+  }
+
+  const lineItems = order.items.map((item) => {
     if (item.quantity <= 0 || item.unitPriceCents <= 0 || item.lineTotalCents <= 0) {
       throw new Error("Stripe Checkout requires positive line item amounts.");
     }
@@ -125,6 +145,25 @@ function stripeLineItems(order: {
       quantity: item.quantity
     } satisfies Stripe.Checkout.SessionCreateParams.LineItem;
   });
+
+  for (const adjustment of [
+    { amountCents: order.shippingCents, name: "Shipping" },
+    { amountCents: order.taxCents, name: "Tax" }
+  ]) {
+    if (adjustment.amountCents <= 0) continue;
+    lineItems.push({
+      price_data: {
+        currency: assertStripeCurrency(order.currency),
+        product_data: {
+          name: adjustment.name
+        },
+        unit_amount: adjustment.amountCents
+      },
+      quantity: 1
+    });
+  }
+
+  return lineItems;
 }
 
 function stripeBillingLineItems(input: { amountCents: number; currency: string; documentNumber: string }) {
