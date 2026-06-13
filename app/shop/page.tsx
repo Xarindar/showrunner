@@ -98,7 +98,7 @@ export default async function ShopPage() {
               <article className="card stack" key={product.id}>
                 {product.imageUrl ? (
                   <NextImage
-                    alt=""
+                    alt={product.name}
                     src={product.imageUrl}
                     width={720}
                     height={450}
@@ -120,7 +120,7 @@ export default async function ShopPage() {
                       <input type="hidden" name="productId" value={product.id} />
                       <input type="hidden" name="variantId" value={variant.id} />
                       <input type="hidden" name="quantity" value="1" />
-                      <button className="button" type="submit">
+                      <button className="button" type="submit" aria-label={`Add ${product.name} to cart`}>
                         <ShoppingCart size={18} />
                         Add
                       </button>

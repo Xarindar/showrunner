@@ -122,7 +122,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           <div className="card">
             {product.imageUrl ? (
               <NextImage
-                alt=""
+                alt={product.name}
                 src={product.imageUrl}
                 width={1000}
                 height={720}
@@ -173,7 +173,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     <input id="quantity" name="quantity" type="number" min="1" max="999" defaultValue="1" required />
                   </div>
                 </div>
-                <button className="button" type="submit">
+                <button className="button" type="submit" aria-label={`Add ${product.name} to cart`}>
                   <ShoppingCart size={18} />
                   Add to cart
                 </button>

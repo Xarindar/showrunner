@@ -71,11 +71,23 @@ export default async function CartPage({ searchParams }: CartPageProps) {
             </div>
           </div>
 
-          {query.added ? <div className="success-message">Item added to cart.</div> : null}
-          {query.saved ? <div className="success-message">Cart updated.</div> : null}
-          {query.error ? <div className="error">{query.error}</div> : null}
+          {query.added ? (
+            <div className="success-message" role="status" aria-live="polite">
+              Item added to cart.
+            </div>
+          ) : null}
+          {query.saved ? (
+            <div className="success-message" role="status" aria-live="polite">
+              Cart updated.
+            </div>
+          ) : null}
+          {query.error ? (
+            <div className="error" role="alert">
+              {query.error}
+            </div>
+          ) : null}
           {preparedOrder ? (
-            <div className="success-message">
+            <div className="success-message" role="status" aria-live="polite">
               Order {preparedOrder.orderNumber} is prepared with a pending Stripe payment record for{" "}
               {formatMoney(preparedOrder.totalCents, preparedOrder.currency)}. Attach the hosted checkout link from the admin order queue.
             </div>
