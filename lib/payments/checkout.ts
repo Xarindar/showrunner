@@ -1,5 +1,5 @@
 import { PaymentProvider, Prisma } from "@prisma/client";
-import { getPaymentGateway } from "./registry";
+import { getPaymentGateway, resolvePaymentProviderForSite } from "./registry";
 
 type OrderCheckoutResult = Prisma.OrderGetPayload<{ include: { payments: true } }>;
 
@@ -8,7 +8,8 @@ export async function createPaymentCheckoutSessionForOrder(input: {
   provider?: PaymentProvider;
   siteId?: string;
 }): Promise<OrderCheckoutResult> {
-  const gateway = getPaymentGateway(input.provider || PaymentProvider.STRIPE);
+  const provider = input.siteId ? await resolvePaymentProviderForSite(input.siteId, input.provider) : input.provider || PaymentProvider.STRIPE;
+  const gateway = getPaymentGateway(provider);
   const session = await gateway.createCheckoutSession({
     kind: "order",
     orderId: input.orderId,
@@ -25,7 +26,8 @@ export async function createPaymentCheckoutSessionForBillingDocument(input: {
   provider?: PaymentProvider;
   siteId?: string;
 }) {
-  const gateway = getPaymentGateway(input.provider || PaymentProvider.STRIPE);
+  const provider = input.siteId ? await resolvePaymentProviderForSite(input.siteId, input.provider) : input.provider || PaymentProvider.STRIPE;
+  const gateway = getPaymentGateway(provider);
   const session = await gateway.createCheckoutSession({
     amountCents: input.amountCents,
     billingDocumentId: input.billingDocumentId,

@@ -131,6 +131,7 @@ model SiteSettings {
   metaPixelId      String     @default("")
   searchConsoleVerification String @default("")
   analyticsRetentionDays Int  @default(365)
+  checkoutProvider PaymentProvider @default(STRIPE)
   enabledModules  Json
   dataScopeConfig Json        @default("{}")
   createdAt       DateTime    @default(now())

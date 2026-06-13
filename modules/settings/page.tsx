@@ -1,13 +1,15 @@
 import { CreditCard, Save } from "lucide-react";
+import { PaymentGatewayConnectionStatus, PaymentProvider } from "@prisma/client";
 import { dataScopePresets, parseDataScopeConfig, requireAdmin, scopableModules } from "@/lib/auth";
 import { enumLabel } from "@/lib/format";
+import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { getStripePaymentMethodSettings } from "@/lib/payments/methods";
 import { isRequiredModule } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
 import { getPlatformStatus, platformFoundationItems } from "@/lib/platform-status";
 import { getSiteSettings } from "@/lib/site";
 import { normalizeThemePreset, themePresetOptions } from "@/lib/theme/tokens";
-import { updateSettingsAction, updateStripePaymentMethodsAction } from "./actions";
+import { updateCheckoutProviderAction, updateSettingsAction, updateStripePaymentMethodsAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -18,14 +20,16 @@ type SettingsPageProps = {
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   await requireAdmin("settings:update");
   const [{ saved, error }, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [platformStatus, stripePaymentMethods] = await Promise.all([
+  const [platformStatus, stripePaymentMethods, squareCredential] = await Promise.all([
     getPlatformStatus(settings),
-    getStripePaymentMethodSettings(settings.siteId)
+    getStripePaymentMethodSettings(settings.siteId),
+    getConnectedGatewayCredential(settings.siteId, PaymentProvider.SQUARE)
   ]);
   const dataScopeConfig = parseDataScopeConfig(settings.dataScopeConfig);
   const dataScopeModules = scopableModules();
   const stripeCredential = stripePaymentMethods.credential;
   const stripeConnected = stripePaymentMethods.connected;
+  const squareConnected = squareCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(squareCredential.merchantId);
 
   return (
     <div className="stack">
@@ -59,16 +63,68 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <div className="grid-2">
           <div>
             <h2 style={{ fontSize: "1.2rem" }}>Payments</h2>
-            <p>Stripe account connection for hosted checkout and refunds.</p>
+            <p>Connected payment accounts, hosted checkout routing, and refunds.</p>
           </div>
-          <div style={{ alignItems: "center", display: "flex", gap: 12, justifyContent: "flex-end" }}>
+          <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "flex-end" }}>
             <span className={stripeConnected ? "pill success" : "pill warning"}>{stripeConnected ? "Connected" : "Not connected"}</span>
             <a className="button" href="/api/payments/stripe/connect/start">
               <CreditCard size={18} />
               {stripeConnected ? "Reconnect Stripe" : "Connect Stripe"}
             </a>
+            <span className={squareConnected ? "pill success" : "pill warning"}>{squareConnected ? "Connected" : "Not connected"}</span>
+            <a className="button secondary" href="/api/payments/square/connect/start">
+              <CreditCard size={18} />
+              {squareConnected ? "Reconnect Square" : "Connect Square"}
+            </a>
           </div>
         </div>
+        <form action={updateCheckoutProviderAction} className="subpanel form-grid">
+          <div>
+            <h3 style={{ fontSize: "1rem" }}>Checkout provider</h3>
+            <p style={{ color: "var(--muted)", margin: 0 }}>Choose which connected provider creates new public checkout sessions.</p>
+          </div>
+          <div className="module-toggle-grid">
+            <label className="module-toggle-row">
+              <input
+                name="checkoutProvider"
+                type="radio"
+                value={PaymentProvider.STRIPE}
+                defaultChecked={settings.checkoutProvider === PaymentProvider.STRIPE}
+              />
+              <span className="module-toggle-main">
+                <span>
+                  <strong>Stripe</strong>
+                  <span className={stripeConnected ? "pill success" : "pill warning"}>{stripeConnected ? "Connected account" : "Platform fallback"}</span>
+                </span>
+                <small>Hosted Stripe Checkout with connected-account settlement when Stripe is connected.</small>
+              </span>
+            </label>
+            <label className="module-toggle-row">
+              <input
+                disabled={!squareConnected}
+                name="checkoutProvider"
+                type="radio"
+                value={PaymentProvider.SQUARE}
+                defaultChecked={settings.checkoutProvider === PaymentProvider.SQUARE}
+              />
+              <span className="module-toggle-main">
+                <span>
+                  <strong>Square</strong>
+                  <span className={squareConnected ? "pill success" : "pill warning"}>{squareConnected ? "Connected account" : "Connect first"}</span>
+                </span>
+                <small>
+                  {squareConnected
+                    ? `Merchant ${squareCredential?.merchantId}, location ${squareCredential?.displayName || "connected"}.`
+                    : "Connect Square before using it for public checkout."}
+                </small>
+              </span>
+            </label>
+          </div>
+          <button className="button secondary" type="submit">
+            <CreditCard size={18} />
+            Save checkout provider
+          </button>
+        </form>
         {stripeConnected ? (
           <>
             <div className="subpanel">

@@ -2,10 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { PaymentGatewayConnectionStatus, PaymentProvider } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
 import { applyDataScopePreset, dataScopeConfigFromFormData, dataScopePresets, requireAdmin, type DataScopePreset } from "@/lib/auth";
 import { parseForm, settingsFormSchema } from "@/lib/admin-validation";
 import { setModuleEnablement } from "@/lib/modules/installation";
+import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { updateStripePaymentMethodSettings } from "@/lib/payments/methods";
 import { normalizeModules } from "@/shell/modules";
 import { prisma } from "@/lib/prisma";
@@ -112,6 +114,56 @@ export async function updateStripePaymentMethodsAction(formData: FormData) {
     metadata: {
       enabledMethods,
       provider: "STRIPE"
+    },
+    siteId: site.id,
+    targetId: site.id,
+    targetLabel: site.name,
+    targetType: "payment_gateway"
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/admin/modules/settings?saved=payments");
+}
+
+function parseCheckoutProvider(value: FormDataEntryValue | null) {
+  const provider = String(value || "").trim().toUpperCase();
+  if (provider === PaymentProvider.STRIPE || provider === PaymentProvider.SQUARE) return provider;
+  throw new Error("Choose a supported checkout provider.");
+}
+
+export async function updateCheckoutProviderAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+
+  let provider: PaymentProvider;
+  try {
+    provider = parseCheckoutProvider(formData.get("checkoutProvider"));
+    if (provider === PaymentProvider.SQUARE) {
+      const squareCredential = await getConnectedGatewayCredential(site.id, PaymentProvider.SQUARE);
+      if (squareCredential?.status !== PaymentGatewayConnectionStatus.CONNECTED) {
+        throw new Error("Connect Square before making it the checkout provider.");
+      }
+    }
+
+    await prisma.siteSettings.upsert({
+      where: { siteId: site.id },
+      update: { checkoutProvider: provider },
+      create: {
+        checkoutProvider: provider,
+        enabledModules: normalizeModules([]),
+        siteId: site.id
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not update checkout provider.";
+    redirect(`/admin/modules/settings?error=${encodeURIComponent(message)}`);
+  }
+
+  await recordAuditLog({
+    action: "settings.checkout_provider.updated",
+    actor: user,
+    metadata: {
+      provider
     },
     siteId: site.id,
     targetId: site.id,
