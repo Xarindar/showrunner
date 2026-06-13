@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { DragEvent } from "react";
 import { useMemo, useState, useTransition } from "react";
-import { AlertTriangle, CalendarDays, GripVertical, ListChecks } from "lucide-react";
-import { rescheduleBookingFromCalendarAction } from "../actions";
+import { AlertTriangle, Ban, CalendarDays, Check, GripVertical, ListChecks } from "lucide-react";
+import { rescheduleBookingFromCalendarAction, updateBookingStatusAction } from "../actions";
 
 export type AppointmentCalendarBooking = {
   customerName: string;
@@ -22,6 +22,7 @@ export type AppointmentCalendarBooking = {
   startsAt: string;
   status: string;
   timeLabel: string;
+  warnings: string[];
 };
 
 export type AppointmentCalendarDay = {
@@ -68,6 +69,16 @@ function canDrag(booking: AppointmentCalendarBooking) {
   return booking.status !== "CANCELED" && booking.status !== "COMPLETED";
 }
 
+function quickStatuses(booking: AppointmentCalendarBooking) {
+  if (booking.status === "CANCELED" || booking.status === "COMPLETED") return [];
+
+  return [
+    ...(booking.status === "PENDING" ? [{ icon: Check, label: "Confirm", status: "CONFIRMED" as const }] : []),
+    { icon: Ban, label: "Cancel", status: "CANCELED" as const },
+    { icon: ListChecks, label: "Complete", status: "COMPLETED" as const }
+  ];
+}
+
 function AppointmentCard({
   booking,
   compact = false,
@@ -77,11 +88,12 @@ function AppointmentCard({
   compact?: boolean;
   onDragStart: (booking: AppointmentCalendarBooking) => void;
 }) {
+  const actions = compact ? [] : quickStatuses(booking);
+
   return (
-    <Link
+    <article
       className={compact ? "appointment-calendar-event compact" : "appointment-calendar-event"}
       draggable={canDrag(booking)}
-      href={`/admin/appointments/${booking.id}`}
       onDragStart={(event) => {
         if (!canDrag(booking)) {
           event.preventDefault();
@@ -92,16 +104,42 @@ function AppointmentCard({
         onDragStart(booking);
       }}
     >
-      <span>
-        {canDrag(booking) ? <GripVertical size={14} /> : null}
-        {booking.timeLabel}
-      </span>
-      <strong>{booking.customerName}</strong>
-      <small>
-        {booking.serviceName}
-        {booking.staffName ? ` | ${booking.staffName}` : ""}
-      </small>
-    </Link>
+      <Link href={`/admin/appointments/${booking.id}`}>
+        <span>
+          {canDrag(booking) ? <GripVertical size={14} /> : null}
+          {booking.timeLabel}
+        </span>
+        <strong>{booking.customerName}</strong>
+        <small>
+          {booking.serviceName}
+          {booking.staffName ? ` | ${booking.staffName}` : ""}
+        </small>
+      </Link>
+      {booking.warnings.length ? (
+        <div className="appointment-conflict-warning">
+          <AlertTriangle size={14} />
+          {booking.warnings[0]}
+          {booking.warnings.length > 1 ? ` +${booking.warnings.length - 1} more` : ""}
+        </div>
+      ) : null}
+      {actions.length ? (
+        <div className="appointment-calendar-event-actions">
+          {actions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <form action={updateBookingStatusAction} key={action.status}>
+                <input name="id" type="hidden" value={booking.id} />
+                <input name="status" type="hidden" value={action.status} />
+                <button className={action.status === "CANCELED" ? "button danger" : "button secondary"} type="submit">
+                  <Icon size={14} />
+                  {action.label}
+                </button>
+              </form>
+            );
+          })}
+        </div>
+      ) : null}
+    </article>
   );
 }
 

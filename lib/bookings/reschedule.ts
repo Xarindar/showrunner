@@ -1,18 +1,9 @@
 import "server-only";
 
 import { BookingStatus, Prisma } from "@prisma/client";
+import { blockoutConflictWhere, bookingConflictWhere } from "@/lib/bookings/conflicts";
 import { prisma } from "@/lib/prisma";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
-
-function getBufferedWindow(startsAt: Date, endsAt: Date, beforeMinutes: number, afterMinutes: number) {
-  const bufferedStart = new Date(startsAt);
-  bufferedStart.setMinutes(bufferedStart.getMinutes() - beforeMinutes);
-
-  const bufferedEnd = new Date(endsAt);
-  bufferedEnd.setMinutes(bufferedEnd.getMinutes() + afterMinutes);
-
-  return { bufferedStart, bufferedEnd };
-}
 
 export async function rescheduleBookingWithAvailability(input: { bookingId: string; siteId: string; startsAt: Date }) {
   const booking = await prisma.booking.findFirst({
@@ -50,46 +41,31 @@ export async function rescheduleBookingWithAvailability(input: { bookingId: stri
   }
 
   const requiredResourceIds = matchingSlot.resourceIds;
-  const { bufferedStart, bufferedEnd } = getBufferedWindow(
-    matchingSlot.startsAt,
-    matchingSlot.endsAt,
-    booking.service.bufferBeforeMinutes,
-    booking.service.bufferAfterMinutes
-  );
 
   return prisma.$transaction(
     async (tx) => {
-      const conflictScopes: Prisma.BookingWhereInput[] = [];
-      if (booking.staffId) {
-        conflictScopes.push({ OR: [{ staffId: null }, { staffId: booking.staffId }] });
-      }
-      if (requiredResourceIds.length) {
-        conflictScopes.push({
-          OR: [
-            { resources: { some: { resourceId: { in: requiredResourceIds } } } },
-            { service: { resourceAssignments: { some: { resourceId: { in: requiredResourceIds } } } } }
-          ]
-        });
-      }
-
       const [conflictingBooking, conflictingBlock] = await Promise.all([
         tx.booking.findFirst({
-          where: {
-            id: { not: booking.id },
+          where: bookingConflictWhere({
+            bufferAfterMinutes: booking.service.bufferAfterMinutes,
+            bufferBeforeMinutes: booking.service.bufferBeforeMinutes,
+            endsAt: matchingSlot.endsAt,
+            excludeBookingId: booking.id,
+            resourceIds: requiredResourceIds,
             siteId: booking.siteId,
-            status: { not: BookingStatus.CANCELED },
-            ...(conflictScopes.length ? { OR: conflictScopes } : {}),
-            startsAt: { lt: bufferedEnd },
-            endsAt: { gt: bufferedStart }
-          }
+            staffId: booking.staffId,
+            startsAt: matchingSlot.startsAt
+          })
         }),
         tx.blockedTime.findFirst({
-          where: {
+          where: blockoutConflictWhere({
+            bufferAfterMinutes: booking.service.bufferAfterMinutes,
+            bufferBeforeMinutes: booking.service.bufferBeforeMinutes,
+            endsAt: matchingSlot.endsAt,
+            resourceIds: requiredResourceIds,
             siteId: booking.siteId,
-            OR: requiredResourceIds.length ? [{ resourceId: null }, { resourceId: { in: requiredResourceIds } }] : [{ resourceId: null }],
-            startsAt: { lt: bufferedEnd },
-            endsAt: { gt: bufferedStart }
-          }
+            startsAt: matchingSlot.startsAt
+          })
         })
       ]);
 

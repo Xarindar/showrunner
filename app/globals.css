@@ -1165,8 +1165,20 @@ button.button:disabled,
   padding: 8px;
 }
 
+.appointment-calendar-event:has(.appointment-conflict-warning) {
+  background: color-mix(in srgb, var(--danger) 7%, var(--panel));
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--line));
+}
+
 .appointment-calendar-event[draggable="true"] {
   cursor: grab;
+}
+
+.appointment-calendar-event > a {
+  color: inherit;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
 }
 
 .appointment-calendar-event span {
@@ -1199,6 +1211,29 @@ button.button:disabled,
 .appointment-calendar-event.compact {
   min-height: 52px;
   padding: 7px;
+}
+
+.appointment-conflict-warning {
+  align-items: center;
+  color: var(--danger);
+  display: flex;
+  font-size: 0.76rem;
+  font-weight: 610;
+  gap: 5px;
+  line-height: 1.25;
+}
+
+.appointment-calendar-event-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 3px;
+}
+
+.appointment-calendar-event-actions .button {
+  font-size: 0.75rem;
+  min-height: 30px;
+  padding: 0 7px;
 }
 
 .appointment-agenda-day {

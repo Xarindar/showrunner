@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BookingStatus, Prisma } from "@prisma/client";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Filter, ListChecks } from "lucide-react";
 import { getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
+import { bookingConflictWarnings } from "@/lib/bookings/conflicts";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { addDaysToDateKey, getTodayDateKey, parseZonedDateKey } from "@/lib/timezone";
@@ -202,7 +203,11 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
   const [bookings, bookingCount, pendingCount, upcomingCount, calendarBookings, staff, resources] = await Promise.all([
     prisma.booking.findMany({
       where: bookingWhere,
-      include: { resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } }, service: true, staff: true },
+      include: {
+        resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
+        service: { include: { resourceAssignments: { select: { resourceId: true } } } },
+        staff: true
+      },
       orderBy: { startsAt: statusFilter === "upcoming" ? "asc" : "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize
@@ -217,7 +222,11 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
     }),
     prisma.booking.findMany({
       where: calendarWhere,
-      include: { resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } }, service: true, staff: true },
+      include: {
+        resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
+        service: { include: { resourceAssignments: { select: { resourceId: true } } } },
+        staff: true
+      },
       orderBy: { startsAt: "asc" },
       take: 500
     }),
@@ -225,6 +234,12 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
     prisma.resource.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] })
   ]);
   const pageCount = Math.max(1, Math.ceil(bookingCount / pageSize));
+  const warningsByBookingId = new Map<string, string[]>();
+  for (const warning of bookingConflictWarnings(calendarBookings)) {
+    const messages = warningsByBookingId.get(warning.bookingId) || [];
+    messages.push(warning.message);
+    warningsByBookingId.set(warning.bookingId, messages);
+  }
   const days = dayList({
     activeMonth: calendarRange.activeMonth,
     endKey: calendarRange.endKey,
@@ -248,7 +263,8 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
       staffName: booking.staff?.name || "",
       startsAt: booking.startsAt.toISOString(),
       status: booking.status,
-      timeLabel: parts.timeLabel
+      timeLabel: parts.timeLabel,
+      warnings: warningsByBookingId.get(booking.id) || []
     };
   });
   const calendarHours = Array.from(
