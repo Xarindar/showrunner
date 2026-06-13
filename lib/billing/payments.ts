@@ -5,15 +5,18 @@ import { snapshotBillingDocument } from "@/lib/billing/documents";
 import { prisma } from "@/lib/prisma";
 
 const PAID_STATUSES = [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] satisfies PaymentStatus[];
+const PENDING_PAYMENT_RESERVATION_MS = 30 * 60 * 1000;
 
 export type BillingPaymentSummary = {
   paidCents: number;
+  reservedCents: number;
   remainingCents: number;
 };
 
 export async function getBillingPaymentSummary(
   tx: Prisma.TransactionClient,
-  billingDocumentId: string
+  billingDocumentId: string,
+  options: { reservePending?: boolean; now?: Date } = {}
 ): Promise<BillingPaymentSummary> {
   const document = await tx.billingDocument.findUnique({
     where: { id: billingDocumentId },
@@ -29,10 +32,24 @@ export async function getBillingPaymentSummary(
     },
     _sum: { amountCents: true }
   });
+  const pending = options.reservePending
+    ? await tx.billingPayment.aggregate({
+        where: {
+          billingDocumentId,
+          status: PaymentStatus.PENDING,
+          createdAt: {
+            gte: new Date((options.now || new Date()).getTime() - PENDING_PAYMENT_RESERVATION_MS)
+          }
+        },
+        _sum: { amountCents: true }
+      })
+    : null;
 
   const paidCents = paid._sum.amountCents || 0;
+  const reservedCents = paidCents + (pending?._sum.amountCents || 0);
   return {
     paidCents,
+    reservedCents,
     remainingCents: Math.max(0, document.totalCents - paidCents)
   };
 }
@@ -55,6 +72,33 @@ export async function settleBillingPayment(input: {
     });
 
     if (!payment) throw new Error("Billing payment target not found.");
+    if (payment.status === PaymentStatus.PAID || payment.status === PaymentStatus.AUTHORIZED) {
+      return getBillingPaymentSummary(tx, payment.billingDocumentId);
+    }
+    if (payment.status === PaymentStatus.REFUNDED || payment.status === PaymentStatus.FAILED) {
+      throw new Error("Billing payment cannot be settled from its current state.");
+    }
+
+    const beforeSettle = await getBillingPaymentSummary(tx, payment.billingDocumentId);
+    if (beforeSettle.remainingCents <= 0 || payment.amountCents > beforeSettle.remainingCents) {
+      await tx.billingPayment.update({
+        where: { id: payment.id },
+        data: {
+          externalCheckoutSession: input.externalCheckoutSession || payment.externalCheckoutSession,
+          externalPaymentId: input.externalPaymentId || payment.externalPaymentId,
+          hostedReceiptUrl: input.hostedReceiptUrl || payment.hostedReceiptUrl,
+          rawSummary: {
+            ...(typeof input.rawSummary === "object" && input.rawSummary && !Array.isArray(input.rawSummary) ? input.rawSummary : {}),
+            rejectedReason: "payment_would_exceed_remaining_balance",
+            remainingCentsBeforeSettle: beforeSettle.remainingCents,
+            attemptedAmountCents: payment.amountCents
+          },
+          status: PaymentStatus.FAILED
+        }
+      });
+
+      throw new Error("Billing payment would exceed the remaining document balance.");
+    }
 
     await tx.billingPayment.update({
       where: { id: payment.id },
@@ -89,7 +133,7 @@ export async function settleBillingPayment(input: {
     }
 
     return summary;
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function markBillingPaymentFailed(input: {

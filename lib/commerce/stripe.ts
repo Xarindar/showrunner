@@ -258,9 +258,10 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
       throw new Error("Finalized billing documents cannot receive another payment.");
     }
 
-    const summary = await getBillingPaymentSummary(tx, document.id);
-    if (summary.remainingCents <= 0) throw new Error("This document has no remaining balance.");
-    if (input.amountCents <= 0 || input.amountCents > summary.remainingCents) {
+    const summary = await getBillingPaymentSummary(tx, document.id, { reservePending: true });
+    const availableCents = Math.max(0, document.totalCents - summary.reservedCents);
+    if (availableCents <= 0) throw new Error("This document has no remaining balance.");
+    if (input.amountCents <= 0 || input.amountCents > availableCents) {
       throw new Error("Payment amount must be greater than zero and no more than the remaining balance.");
     }
 
