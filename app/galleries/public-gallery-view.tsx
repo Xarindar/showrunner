@@ -1,5 +1,4 @@
 import Link from "next/link";
-import NextImage from "next/image";
 import { Download, Heart, LockKeyhole } from "lucide-react";
 import { PortfolioGalleryLayout, PortfolioGalleryStatus, PortfolioGalleryVisibility } from "@prisma/client";
 import { cssBackgroundImage } from "@/lib/css";
@@ -8,6 +7,7 @@ import { findActiveGalleryAccess, markGalleryAccessViewed } from "@/lib/portfoli
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
+import { PublicGalleryLightbox } from "./public-gallery-lightbox";
 import { favoriteGalleryItemAction } from "@/modules/portfolio/public-actions";
 
 type GallerySearchParams = Record<string, string | string[] | undefined>;
@@ -214,16 +214,24 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
             const isFavorited = favoriteItemIds.has(item.id) || favorited === item.id;
             const imageSrc = galleryItemSource(item, gallery.slug, queryAccessToken);
             const downloadHref = galleryDownloadHref(item, gallery.slug, queryAccessToken, gallery.visibility);
+            const previousItem = visibleItems[index - 1] || visibleItems[visibleItems.length - 1];
+            const nextItem = visibleItems[index + 1] || visibleItems[0];
+            const itemAlt = safeAlt(item);
 
             return (
               <article className="public-gallery-item" key={item.id}>
-                <NextImage
-                  src={imageSrc}
-                  alt={safeAlt(item)}
-                  width={1200}
+                <PublicGalleryLightbox
+                  alt={itemAlt}
+                  caption={item.caption}
+                  fullImageSrc={imageSrc}
                   height={900}
-                  sizes="(max-width: 860px) 100vw, 33vw"
-                  unoptimized
+                  itemId={item.id}
+                  nextItemId={nextItem.id}
+                  positionLabel={`${index + 1} / ${visibleItems.length}`}
+                  previousItemId={previousItem.id}
+                  thumbnailSrc={imageSrc}
+                  title={item.title || gallery.title}
+                  width={1200}
                 />
                 <div className="public-gallery-item-body">
                   <div>
