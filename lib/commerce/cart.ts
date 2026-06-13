@@ -74,6 +74,10 @@ function normalizeGiftCardCode(code: string) {
   return code.trim().toUpperCase();
 }
 
+function normalizeGiftCardEmail(email?: string) {
+  return email?.trim().toLowerCase() || "";
+}
+
 function giftCardIsUsable(giftCard: {
   balanceCents: number;
   currency: string;
@@ -360,16 +364,35 @@ export async function getOpenCart(cartId?: string) {
   });
 }
 
-export async function addCartItem(input: { cartId?: string; productId: string; variantId?: string; quantity: number }) {
+export async function addCartItem(input: {
+  cartId?: string;
+  giftCardMessage?: string;
+  giftCardRecipientEmail?: string;
+  giftCardRecipientName?: string;
+  productId: string;
+  variantId?: string;
+  quantity: number;
+}) {
   const siteId = await getCurrentSiteId();
   return prisma.$transaction(async (tx) => {
-    const quantity = Math.min(Math.max(1, input.quantity), maxCartQuantity);
+    let quantity = Math.min(Math.max(1, input.quantity), maxCartQuantity);
     const resolved = await resolvePurchasableVariant(tx, {
       productId: input.productId,
       variantId: input.variantId,
       quantity,
       siteId
     });
+    const isGiftCardSale = resolved.product.type === ProductType.GIFT_CARD;
+    const giftCardRecipientEmail = normalizeGiftCardEmail(input.giftCardRecipientEmail);
+    const giftCardRecipientName = input.giftCardRecipientName?.trim() || "";
+    const giftCardMessage = input.giftCardMessage?.trim() || "";
+
+    if (isGiftCardSale) {
+      quantity = 1;
+      if (!giftCardRecipientEmail) {
+        throw new Error("Add a recipient email for the gift card.");
+      }
+    }
 
     const cart =
       input.cartId
@@ -395,13 +418,15 @@ export async function addCartItem(input: { cartId?: string; productId: string; v
       throw new Error("A cart can only contain one currency.");
     }
 
-    const existing = await tx.cartItem.findFirst({
-      where: {
-        cartId: openCart.id,
-        productId: resolved.product.id,
-        variantId: resolved.variant?.id || null
-      }
-    });
+    const existing = isGiftCardSale
+      ? null
+      : await tx.cartItem.findFirst({
+          where: {
+            cartId: openCart.id,
+            productId: resolved.product.id,
+            variantId: resolved.variant?.id || null
+          }
+        });
     const nextQuantity = Math.min((existing?.quantity || 0) + quantity, maxCartQuantity);
     const totalCents = lineTotal(resolved.unitPriceCents, nextQuantity);
 
@@ -420,6 +445,9 @@ export async function addCartItem(input: { cartId?: string; productId: string; v
           cartId: openCart.id,
           productId: resolved.product.id,
           variantId: resolved.variant?.id,
+          giftCardMessage,
+          giftCardRecipientEmail,
+          giftCardRecipientName,
           quantity,
           unitPriceCents: resolved.unitPriceCents,
           lineTotalCents: lineTotal(resolved.unitPriceCents, quantity)
@@ -655,6 +683,9 @@ export async function createCheckoutOrderFromCart(input: { cartId: string; custo
                 ? `${item.product.name} - ${item.variant.name}`
                 : item.product.name,
             sku: item.variant?.sku || item.product.sku,
+            giftCardMessage: item.giftCardMessage,
+            giftCardRecipientEmail: item.giftCardRecipientEmail,
+            giftCardRecipientName: item.giftCardRecipientName,
             quantity: item.quantity,
             unitPriceCents: item.unitPriceCents,
             lineTotalCents: item.lineTotalCents

@@ -1,7 +1,9 @@
 import "server-only";
 
-import { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
+import { randomBytes } from "crypto";
+import { GiftCardStatus, OrderStatus, PaymentStatus, Prisma, ProductType } from "@prisma/client";
 import { buildPurchaseEvent } from "@/lib/analytics/ecommerce";
+import { recordAuditLog } from "@/lib/audit";
 import { emitModuleEvent } from "@/lib/events/emit";
 import { queueOrderReceiptEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
@@ -23,6 +25,15 @@ type OrderWithItems = Prisma.OrderGetPayload<{
 
 type OrderTransitionOptions = {
   providerConfirmed?: boolean;
+};
+
+type IssuedPurchasedGiftCard = {
+  amountCents: number;
+  code: string;
+  currency: string;
+  giftCardId: string;
+  orderItemId: string;
+  recipientEmail: string;
 };
 
 function providerConfirmedStatus(status: OrderStatus) {
@@ -204,6 +215,74 @@ async function restoreGiftCardRedemptionsForCanceledOrder(
   }
 }
 
+function randomGiftCardSegment() {
+  return randomBytes(3).toString("hex").slice(0, 4).toUpperCase();
+}
+
+async function generatePurchasedGiftCardCode(tx: CommerceTx, siteId: string) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const code = `GC-${randomGiftCardSegment()}-${randomGiftCardSegment()}`;
+    const existing = await tx.giftCard.findUnique({
+      where: { siteId_code: { siteId, code } },
+      select: { id: true }
+    });
+    if (!existing) return code;
+  }
+
+  throw new Error("Could not generate a unique gift card code.");
+}
+
+async function issueGiftCardsForPaidOrder(tx: CommerceTx, order: OrderWithItems): Promise<IssuedPurchasedGiftCard[]> {
+  const issued: IssuedPurchasedGiftCard[] = [];
+
+  for (const item of order.items) {
+    if (item.product.type !== ProductType.GIFT_CARD || item.lineTotalCents <= 0) continue;
+
+    const existing = await tx.giftCard.findUnique({
+      where: { saleOrderItemId: item.id },
+      select: { id: true }
+    });
+    if (existing) continue;
+
+    const recipientEmail = item.giftCardRecipientEmail || order.customerEmail;
+    const giftCard = await tx.giftCard.create({
+      data: {
+        balanceCents: item.lineTotalCents,
+        code: await generatePurchasedGiftCardCode(tx, order.siteId),
+        currency: order.currency,
+        initialAmountCents: item.lineTotalCents,
+        note: item.giftCardMessage,
+        purchaserEmail: order.customerEmail,
+        purchaserName: order.customerName,
+        recipientEmail,
+        recipientName: item.giftCardRecipientName || order.customerName,
+        saleOrderItemId: item.id,
+        siteId: order.siteId,
+        status: GiftCardStatus.ACTIVE
+      },
+      select: {
+        balanceCents: true,
+        code: true,
+        currency: true,
+        id: true,
+        recipientEmail: true,
+        saleOrderItemId: true
+      }
+    });
+
+    issued.push({
+      amountCents: giftCard.balanceCents,
+      code: giftCard.code,
+      currency: giftCard.currency,
+      giftCardId: giftCard.id,
+      orderItemId: giftCard.saleOrderItemId || item.id,
+      recipientEmail: giftCard.recipientEmail
+    });
+  }
+
+  return issued;
+}
+
 export async function updateOrderStatus(input: {
   orderId: string;
   status: OrderStatus;
@@ -242,6 +321,8 @@ export async function updateOrderStatus(input: {
       await restoreGiftCardRedemptionsForCanceledOrder(tx, order.giftCardRedemptions);
     }
 
+    const issuedGiftCards = becamePaid ? await issueGiftCardsForPaidOrder(tx, order) : [];
+
     const updatedOrder = await tx.order.update({
       where: { id: order.id },
       data: {
@@ -255,6 +336,7 @@ export async function updateOrderStatus(input: {
 
     return {
       becamePaid,
+      issuedGiftCards,
       order: updatedOrder,
       sourceOrder: order
     };
@@ -263,6 +345,24 @@ export async function updateOrderStatus(input: {
   if (result.becamePaid) {
     await Promise.all([
       queueOrderReceiptEmail(result.order),
+      ...result.issuedGiftCards.map((giftCard) =>
+        recordAuditLog({
+          action: "gift_card.issued",
+          actor: null,
+          metadata: {
+            amountCents: giftCard.amountCents,
+            code: giftCard.code,
+            currency: giftCard.currency,
+            orderNumber: result.order.orderNumber,
+            recipientEmail: giftCard.recipientEmail,
+            source: "paid_order"
+          },
+          siteId: result.order.siteId,
+          targetId: giftCard.giftCardId,
+          targetLabel: giftCard.code,
+          targetType: "gift_card"
+        })
+      ),
       emitModuleEvent("order.paid", {
         actorEmail: result.order.customerEmail,
         currency: result.order.currency,

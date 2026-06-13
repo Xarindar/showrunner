@@ -10,6 +10,7 @@ enum ProductType {
   PHYSICAL
   DIGITAL
   SERVICE_PACKAGE
+  GIFT_CARD
 }
 
 enum CouponType {
@@ -201,6 +202,8 @@ model GiftCard {
   purchaserName      String                 @default("")
   purchaserEmail     String                 @default("")
   note               String                 @default("")
+  saleOrderItemId    String?                @unique
+  saleOrderItem      OrderItem?             @relation("GiftCardSaleOrderItem", fields: [saleOrderItemId], references: [id], onDelete: SetNull)
   issuedAt           DateTime               @default(now())
   expiresAt          DateTime?
   createdAt          DateTime               @default(now())
@@ -259,6 +262,9 @@ model CartItem {
   quantity       Int             @default(1)
   unitPriceCents Int
   lineTotalCents Int
+  giftCardRecipientName String    @default("")
+  giftCardRecipientEmail String   @default("")
+  giftCardMessage String          @default("")
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -328,11 +334,15 @@ model OrderItem {
   product        Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
   variantId      String?
   variant        ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  issuedGiftCard GiftCard?       @relation("GiftCardSaleOrderItem")
   name           String
   sku            String?
   quantity       Int             @default(1)
   unitPriceCents Int
   lineTotalCents Int
+  giftCardRecipientName String    @default("")
+  giftCardRecipientEmail String   @default("")
+  giftCardMessage String          @default("")
   createdAt      DateTime        @default(now())
 
   @@index([orderId])

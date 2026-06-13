@@ -26,6 +26,14 @@ import { getSiteSettings } from "@/lib/site";
 const cartCookieName = "commerce_cart_id";
 
 const addToCartSchema = z.object({
+  giftCardMessage: z.string().trim().max(500).optional(),
+  giftCardRecipientEmail: z
+    .string()
+    .trim()
+    .transform((value) => value.toLowerCase())
+    .refine((value) => value === "" || z.email().safeParse(value).success, "Add a valid recipient email.")
+    .optional(),
+  giftCardRecipientName: z.string().trim().max(120).optional(),
   productId: z.string().trim().min(1),
   variantId: z.string().trim().optional(),
   quantity: z.coerce.number().int().min(1).max(999),
@@ -95,6 +103,9 @@ export async function addToCartAction(formData: FormData) {
 
   const parsed = addToCartSchema.safeParse({
     productId: formData.get("productId"),
+    giftCardMessage: String(formData.get("giftCardMessage") || ""),
+    giftCardRecipientEmail: String(formData.get("giftCardRecipientEmail") || ""),
+    giftCardRecipientName: String(formData.get("giftCardRecipientName") || ""),
     variantId: formData.get("variantId") || undefined,
     quantity: formData.get("quantity"),
     returnTo: formData.get("returnTo") || undefined
@@ -107,6 +118,9 @@ export async function addToCartAction(formData: FormData) {
   try {
     const cart = await addCartItem({
       cartId: await currentCartId(),
+      giftCardMessage: parsed.data.giftCardMessage,
+      giftCardRecipientEmail: parsed.data.giftCardRecipientEmail,
+      giftCardRecipientName: parsed.data.giftCardRecipientName,
       productId: parsed.data.productId,
       variantId: parsed.data.variantId,
       quantity: parsed.data.quantity

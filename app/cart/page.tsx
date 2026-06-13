@@ -183,6 +183,12 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                           <strong>{itemName(item)}</strong>
                           <br />
                           <span style={{ color: "var(--muted)" }}>{formatMoney(item.unitPriceCents, cartResult.cart.currency)} each</span>
+                          {item.giftCardRecipientEmail ? (
+                            <>
+                              <br />
+                              <span style={{ color: "var(--muted)" }}>Gift for {item.giftCardRecipientEmail}</span>
+                            </>
+                          ) : null}
                         </td>
                         <td>
                           <form action={updatePublicCartItemAction} style={{ display: "flex", gap: 8 }}>
