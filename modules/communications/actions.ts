@@ -1,6 +1,6 @@
 "use server";
 
-import { EmailSuppressionScope, MessageChannel, MessageLogStatus, MessageTemplatePurpose, Prisma } from "@prisma/client";
+import { EmailOutboxStatus, EmailSuppressionScope, MessageChannel, MessageLogStatus, MessageTemplatePurpose, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -85,6 +85,10 @@ const templateTestSendSchema = z.object({
   tokensJson: optionalStoredText
 });
 
+const outboxResendSchema = z.object({
+  id: requiredText
+});
+
 function refreshCommunications() {
   revalidatePath("/admin");
   revalidatePath("/admin/modules/communications");
@@ -111,6 +115,22 @@ function parseTokenJson(value: string) {
       );
     })
   );
+}
+
+function outboxJsonInput(value: Prisma.JsonValue) {
+  return value === null ? Prisma.JsonNull : (value as Prisma.InputJsonValue);
+}
+
+async function outboxSuppressionReason(input: { category: string; email: string; siteId: string }) {
+  const entry = await prisma.suppressionListEntry.findUnique({ where: { siteId_email: { siteId: input.siteId, email: input.email } } });
+  if (!entry) return "";
+
+  const blocks =
+    entry.scope === EmailSuppressionScope.ALL ||
+    (entry.scope === EmailSuppressionScope.MARKETING && input.category === "MARKETING") ||
+    (entry.scope === EmailSuppressionScope.TRANSACTIONAL && input.category === "TRANSACTIONAL");
+
+  return blocks ? entry.reason || `Suppressed by ${entry.source || "admin"}.` : "";
 }
 
 export async function createMessageTemplateAction(formData: FormData) {
@@ -314,4 +334,60 @@ export async function sendTemplateTestEmailAction(formData: FormData) {
 
   refreshCommunications();
   redirect("/admin/modules/communications?saved=test-email");
+}
+
+export async function resendEmailOutboxAction(formData: FormData) {
+  await requireAdmin("communications:manage");
+  const input = await parseForm(outboxResendSchema, formData, "/admin/modules/communications");
+  const settings = await getSiteSettings();
+  const row = await prisma.emailOutbox.findFirst({
+    where: { id: input.id, siteId: settings.siteId }
+  });
+
+  if (!row) {
+    communicationsError("Outbox row not found.");
+  }
+
+  if (row.status === EmailOutboxStatus.QUEUED || row.status === EmailOutboxStatus.SENDING) {
+    communicationsError("That email is already queued or sending.");
+  }
+
+  const suppressionReason = await outboxSuppressionReason({
+    category: row.category,
+    email: row.recipientEmail,
+    siteId: row.siteId
+  });
+  const now = new Date();
+
+  await prisma.emailOutbox.create({
+    data: {
+      siteId: row.siteId,
+      idempotencyKey: `${row.idempotencyKey}:resend:${now.getTime()}`,
+      templateId: row.templateId,
+      templateKey: row.templateKey,
+      senderIdentityId: row.senderIdentityId,
+      campaignId: row.campaignId,
+      subscriberId: row.subscriberId,
+      recipientEmail: row.recipientEmail,
+      recipientName: row.recipientName,
+      fromName: row.fromName,
+      fromEmail: row.fromEmail,
+      replyToEmail: row.replyToEmail,
+      subject: row.subject,
+      previewText: row.previewText,
+      htmlBody: row.htmlBody,
+      textBody: row.textBody,
+      headers: outboxJsonInput(row.headers),
+      purpose: row.purpose,
+      category: row.category,
+      relatedType: row.relatedType,
+      relatedId: row.relatedId,
+      status: suppressionReason ? EmailOutboxStatus.SUPPRESSED : EmailOutboxStatus.QUEUED,
+      nextAttemptAt: now,
+      lastError: suppressionReason
+    }
+  });
+
+  refreshCommunications();
+  redirect("/admin/modules/communications?saved=resend");
 }

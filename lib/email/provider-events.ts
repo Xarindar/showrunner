@@ -1,11 +1,58 @@
-import { EmailProviderEventType, EmailSubscriberStatus, EmailSuppressionScope, Prisma } from "@prisma/client";
+import { EmailOutboxStatus, EmailProviderEventType, EmailSubscriberStatus, EmailSuppressionScope, Prisma } from "@prisma/client";
 import { recordFromUnknown } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getCurrentSiteId } from "@/lib/site";
 import type { ProviderEventInput } from "./types";
 
 function eventTimestamp() {
   return new Date();
+}
+
+function providerFailureReason(eventType: EmailProviderEventType) {
+  if (eventType === EmailProviderEventType.BOUNCED) return "Provider bounce.";
+  if (eventType === EmailProviderEventType.COMPLAINED) return "Provider complaint.";
+  if (eventType === EmailProviderEventType.UNSUBSCRIBED) return "Provider unsubscribe.";
+  if (eventType === EmailProviderEventType.DELIVERY_DELAYED) return "Provider delivery delayed.";
+  return "";
+}
+
+async function suppressRecipient(input: {
+  email: string;
+  eventType: EmailProviderEventType;
+  now: Date;
+  siteId: string;
+  subscriberId: string | null;
+}) {
+  const complaint = input.eventType === EmailProviderEventType.COMPLAINED;
+  const bounced = input.eventType === EmailProviderEventType.BOUNCED;
+  const reason = providerFailureReason(input.eventType);
+  const scope = bounced ? EmailSuppressionScope.ALL : EmailSuppressionScope.MARKETING;
+
+  if (input.subscriberId) {
+    await prisma.emailSubscriber.update({
+      where: { id: input.subscriberId },
+      data: {
+        status: bounced ? EmailSubscriberStatus.BOUNCED : EmailSubscriberStatus.UNSUBSCRIBED,
+        unsubscribedAt: complaint || input.eventType === EmailProviderEventType.UNSUBSCRIBED ? input.now : undefined
+      }
+    });
+  }
+
+  await prisma.suppressionListEntry.upsert({
+    where: { siteId_email: { siteId: input.siteId, email: input.email } },
+    update: {
+      scope,
+      reason,
+      source: "provider"
+    },
+    create: {
+      siteId: input.siteId,
+      email: input.email,
+      scope,
+      reason,
+      source: "provider"
+    }
+  });
 }
 
 export async function recordProviderEvent(input: ProviderEventInput) {
@@ -15,15 +62,16 @@ export async function recordProviderEvent(input: ProviderEventInput) {
 
   const eventKey = input.eventKey || `${input.providerMessageId}:${input.eventType}`;
   const outbox = await prisma.emailOutbox.findFirst({
-    where: { siteId: DEFAULT_SITE_ID, providerMessageId: input.providerMessageId },
+    where: { providerMessageId: input.providerMessageId },
     orderBy: { createdAt: "desc" }
   });
+  const siteId = outbox?.siteId || (await getCurrentSiteId());
   const now = eventTimestamp();
 
   try {
     await prisma.emailProviderEvent.create({
       data: {
-        siteId: outbox?.siteId || DEFAULT_SITE_ID,
+        siteId,
         eventKey,
         outboxId: outbox?.id,
         providerMessageId: input.providerMessageId,
@@ -41,7 +89,15 @@ export async function recordProviderEvent(input: ProviderEventInput) {
   if (input.eventType === EmailProviderEventType.DELIVERED) {
     await prisma.emailOutbox.update({
       where: { id: outbox.id },
-      data: { deliveredAt: now }
+      data: { deliveredAt: now, lastError: "", status: EmailOutboxStatus.SENT }
+    });
+    return;
+  }
+
+  if (input.eventType === EmailProviderEventType.DELIVERY_DELAYED) {
+    await prisma.emailOutbox.update({
+      where: { id: outbox.id },
+      data: { lastError: providerFailureReason(input.eventType) }
     });
     return;
   }
@@ -49,36 +105,34 @@ export async function recordProviderEvent(input: ProviderEventInput) {
   if (input.eventType === EmailProviderEventType.BOUNCED || input.eventType === EmailProviderEventType.COMPLAINED) {
     await prisma.emailOutbox.update({
       where: { id: outbox.id },
-      data: input.eventType === EmailProviderEventType.BOUNCED ? { bouncedAt: now } : { complainedAt: now }
+      data:
+        input.eventType === EmailProviderEventType.BOUNCED
+          ? { bouncedAt: now, lastError: providerFailureReason(input.eventType), status: EmailOutboxStatus.FAILED }
+          : { complainedAt: now, lastError: providerFailureReason(input.eventType), status: EmailOutboxStatus.FAILED }
     });
 
-    if (outbox.subscriberId) {
-      await prisma.emailSubscriber.update({
-        where: { id: outbox.subscriberId },
-        data: {
-          status: input.eventType === EmailProviderEventType.BOUNCED ? EmailSubscriberStatus.BOUNCED : EmailSubscriberStatus.UNSUBSCRIBED,
-          unsubscribedAt: input.eventType === EmailProviderEventType.COMPLAINED ? now : undefined
-        }
-      });
-    }
+    await suppressRecipient({
+      email: outbox.recipientEmail,
+      eventType: input.eventType,
+      now,
+      siteId: outbox.siteId,
+      subscriberId: outbox.subscriberId
+    });
+    return;
+  }
 
-    const suppressionScope =
-      input.eventType === EmailProviderEventType.BOUNCED ? EmailSuppressionScope.ALL : EmailSuppressionScope.MARKETING;
+  if (input.eventType === EmailProviderEventType.UNSUBSCRIBED) {
+    await prisma.emailOutbox.update({
+      where: { id: outbox.id },
+      data: { lastError: providerFailureReason(input.eventType) }
+    });
 
-    await prisma.suppressionListEntry.upsert({
-      where: { siteId_email: { siteId: outbox.siteId, email: outbox.recipientEmail } },
-      update: {
-        scope: suppressionScope,
-        reason: input.eventType === EmailProviderEventType.BOUNCED ? "Provider bounce." : "Provider complaint.",
-        source: "provider"
-      },
-      create: {
-        siteId: outbox.siteId,
-        email: outbox.recipientEmail,
-        scope: suppressionScope,
-        reason: input.eventType === EmailProviderEventType.BOUNCED ? "Provider bounce." : "Provider complaint.",
-        source: "provider"
-      }
+    await suppressRecipient({
+      email: outbox.recipientEmail,
+      eventType: input.eventType,
+      now,
+      siteId: outbox.siteId,
+      subscriberId: outbox.subscriberId
     });
   }
 }

@@ -10,6 +10,7 @@ import {
   createSuppressionEntryAction,
   deleteSuppressionEntryAction,
   recordMessageLogAction,
+  resendEmailOutboxAction,
   sendTemplateTestEmailAction,
   updateBookingTemplateSettingsAction,
   updateMessageTemplateStatusAction
@@ -63,6 +64,10 @@ function outboxStatusClass(status: EmailOutboxStatus) {
   return "pill";
 }
 
+function canResendStatus(status: EmailOutboxStatus) {
+  return status !== EmailOutboxStatus.QUEUED && status !== EmailOutboxStatus.SENDING;
+}
+
 function relatedRecordHref(type: string, id: string) {
   if (!type || !id) return "";
   if (type === "booking") return `/admin/appointments/${id}`;
@@ -102,7 +107,13 @@ export default async function CommunicationsPage({ searchParams }: Communication
     }),
     prisma.emailOutbox.findMany({
       where: { siteId: settings.siteId },
-      include: { template: true },
+      include: {
+        providerEvents: {
+          orderBy: { createdAt: "desc" },
+          take: 3
+        },
+        template: true
+      },
       orderBy: { createdAt: "desc" },
       take: 20
     }),
@@ -495,12 +506,15 @@ export default async function CommunicationsPage({ searchParams }: Communication
                 <th>Template</th>
                 <th>Status</th>
                 <th>Related</th>
+                <th>Provider</th>
                 <th>Updated</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {outboxRows.map((row) => {
                 const relatedHref = relatedRecordHref(row.relatedType, row.relatedId);
+                const latestProviderEvent = row.providerEvents[0];
 
                 return (
                   <tr key={row.id}>
@@ -512,6 +526,12 @@ export default async function CommunicationsPage({ searchParams }: Communication
                     <td>{row.template?.name || row.templateKey || "Template removed"}</td>
                     <td>
                       <span className={outboxStatusClass(row.status)}>{enumLabel(row.status)}</span>
+                      {row.lastError ? (
+                        <>
+                          <br />
+                          <span style={{ color: "var(--muted)" }}>{row.lastError}</span>
+                        </>
+                      ) : null}
                     </td>
                     <td>
                       {relatedHref ? (
@@ -524,13 +544,36 @@ export default async function CommunicationsPage({ searchParams }: Communication
                         "None"
                       )}
                     </td>
+                    <td>
+                      {latestProviderEvent ? (
+                        <>
+                          <span className="pill">{enumLabel(latestProviderEvent.eventType)}</span>
+                          <br />
+                          <span style={{ color: "var(--muted)" }}>{formatDateTime(latestProviderEvent.createdAt, settings.timezone)}</span>
+                        </>
+                      ) : (
+                        "None"
+                      )}
+                    </td>
                     <td>{formatDateTime(row.sentAt || row.updatedAt, settings.timezone)}</td>
+                    <td>
+                      {canResendStatus(row.status) ? (
+                        <form action={resendEmailOutboxAction}>
+                          <input type="hidden" name="id" value={row.id} />
+                          <button className="button secondary" type="submit">
+                            Resend
+                          </button>
+                        </form>
+                      ) : (
+                        <span className="pill">Active</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
               {!outboxRows.length ? (
                 <tr>
-                  <td colSpan={5}>No outbox rows yet.</td>
+                  <td colSpan={7}>No outbox rows yet.</td>
                 </tr>
               ) : null}
             </tbody>
