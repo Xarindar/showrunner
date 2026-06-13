@@ -40,11 +40,6 @@ enum FormAttachmentTargetType {
   GALLERY
 }
 
-enum FormSignatureCaptureType {
-  TYPED
-  DRAWN
-}
-
 model Form {
   id                String           @id @default(cuid())
   siteId            String
@@ -62,7 +57,6 @@ model Form {
   fields            FormField[]
   submissions       FormSubmission[]
   attachments       FormAttachment[]
-  signatures        FormSignature[]
 
   @@unique([siteId, slug])
   @@index([siteId, status])
@@ -83,7 +77,6 @@ model FormField {
   isHidden    Boolean       @default(false)
   sortOrder   Int           @default(0)
   createdAt   DateTime      @default(now())
-  signatures  FormSignature[]
 
   @@index([formId])
   @@index([type])
@@ -103,39 +96,11 @@ model FormSubmission {
   data             Json            @default("{}")
   metadata         Json            @default("{}")
   createdAt        DateTime        @default(now())
-  signatures       FormSignature[]
 
   @@index([formId])
   @@index([formAttachmentId])
   @@index([clientId])
   @@index([submitterEmail])
-}
-
-model FormSignature {
-  id                String                   @id @default(cuid())
-  siteId            String
-  site              Site                     @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  formId            String
-  form              Form                     @relation(fields: [formId], references: [id], onDelete: Cascade)
-  formFieldId       String
-  formField         FormField                @relation(fields: [formFieldId], references: [id], onDelete: Restrict)
-  formSubmissionId  String
-  formSubmission    FormSubmission           @relation(fields: [formSubmissionId], references: [id], onDelete: Cascade)
-  captureType       FormSignatureCaptureType
-  capturedSignature String
-  signerName        String
-  signerEmail       String                   @default("")
-  consentStatement  String
-  ipAddress         String                   @default("")
-  userAgent         String                   @default("")
-  signedAt          DateTime                 @default(now())
-  createdAt         DateTime                 @default(now())
-
-  @@unique([formSubmissionId, formFieldId])
-  @@index([siteId, formId])
-  @@index([formFieldId])
-  @@index([signerEmail])
-  @@index([signedAt])
 }
 
 model FormAttachment {

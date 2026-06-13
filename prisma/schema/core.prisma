@@ -62,7 +62,6 @@ model Site {
   mediaAssets              MediaAsset[]
   forms                    Form[]
   formAttachments          FormAttachment[]
-  formSignatures           FormSignature[]
   testimonials             Testimonial[]
   portfolioGalleries       PortfolioGallery[]
   portfolioGalleryAccesses PortfolioGalleryAccess[]

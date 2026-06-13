@@ -1,5 +1,4 @@
 import Link from "next/link";
-import NextImage from "next/image";
 import { FormAttachmentTargetType, FormDestination, FormFieldRole, FormFieldType, FormStatus } from "@prisma/client";
 import { ClipboardList, CopyPlus, FileText, Inbox, Paperclip, Plus, Trash2 } from "lucide-react";
 import { getAccessibleBookingWhere, getAccessibleFormSubmissionWhere, getAccessibleGalleryWhere, requireAdmin } from "@/lib/auth";
@@ -148,13 +147,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
           fields: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
           submissions: {
             where: submissionWhere,
-            include: {
-              client: true,
-              signatures: {
-                include: { formField: { select: { label: true } } },
-                orderBy: { signedAt: "asc" }
-              }
-            },
+            include: { client: true },
             orderBy: { createdAt: "desc" },
             take: 10
           }
@@ -818,44 +811,6 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                           </div>
                         ))}
                         {!submissionEntries(submission.data).length ? <p>No response data.</p> : null}
-                        {submission.signatures.length ? (
-                          <div style={{ marginTop: 12 }}>
-                            <h4 style={{ fontSize: "1rem", margin: "0 0 8px" }}>Signatures</h4>
-                            {submission.signatures.map((signature) => (
-                              <div key={signature.id} style={{ marginBottom: 12 }}>
-                                <strong>{signature.formField.label}</strong>{" "}
-                                <span className="pill">{enumLabel(signature.captureType)}</span>
-                                <p style={{ color: "var(--muted)", margin: "4px 0" }}>
-                                  Signed by {signature.signerName}
-                                  {signature.signerEmail ? ` (${signature.signerEmail})` : ""} on{" "}
-                                  {formatDateTime(signature.signedAt, settings.timezone)}
-                                </p>
-                                {signature.captureType === "DRAWN" ? (
-                                  <NextImage
-                                    alt={`Signature for ${signature.signerName}`}
-                                    height={120}
-                                    unoptimized
-                                    width={360}
-                                    src={signature.capturedSignature}
-                                    style={{
-                                      background: "var(--panel)",
-                                      border: "1px solid var(--line)",
-                                      borderRadius: "var(--radius)",
-                                      height: "auto",
-                                      maxHeight: 120,
-                                      maxWidth: "100%"
-                                    }}
-                                  />
-                                ) : (
-                                  <p style={{ fontFamily: "cursive", fontSize: "1.4rem", margin: "4px 0" }}>
-                                    {signature.capturedSignature}
-                                  </p>
-                                )}
-                                <small style={{ color: "var(--muted)" }}>{signature.consentStatement}</small>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
                         <p style={{ color: "var(--muted)", marginBottom: 0 }}>
                           Submission data stores field IDs with submission-time labels and field types.
                         </p>

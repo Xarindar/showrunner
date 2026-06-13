@@ -1,20 +1,11 @@
 "use server";
 
-import {
-  FormAttachmentTargetType,
-  FormDestination,
-  FormFieldRole,
-  FormFieldType,
-  FormSignatureCaptureType,
-  FormStatus,
-  Prisma
-} from "@prisma/client";
+import { FormAttachmentTargetType, FormDestination, FormFieldRole, FormFieldType, FormStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { csvList, optionalEmail, optionalStoredText, parseForm, requiredText } from "@/lib/admin-validation";
-import { recordAuditLog } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth";
 import { queueFormSubmittedEmail } from "@/lib/email";
 import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
@@ -79,16 +70,6 @@ const attachmentSchema = z.object({
 const attachmentDeleteSchema = z.object({
   id: requiredText,
   formId: requiredText
-});
-
-const signatureConsentStatement =
-  "I agree that this electronic signature is the legal equivalent of my handwritten signature and that the information submitted with this form is accurate.";
-
-const signaturePayloadSchema = z.object({
-  capturedSignature: z.string().trim().max(200000),
-  consentStatement: z.string().trim().max(1000).optional(),
-  signerName: z.string().trim().max(240),
-  type: z.enum(FormSignatureCaptureType)
 });
 
 const fieldSchema = z
@@ -541,44 +522,6 @@ function publicFieldName(fieldId: string) {
   return `field-${fieldId}`;
 }
 
-function firstForwardedIp(value: string | null) {
-  return value?.split(",")[0]?.trim() || "";
-}
-
-function publicFieldConsentName(fieldId: string) {
-  return `${publicFieldName(fieldId)}-consent`;
-}
-
-function parseSignaturePayload(rawValue: string) {
-  if (!rawValue) return null;
-
-  try {
-    const parsed = signaturePayloadSchema.safeParse(JSON.parse(rawValue));
-    if (!parsed.success) return null;
-
-    const capturedSignature = parsed.data.capturedSignature.trim();
-    const signerName = parsed.data.signerName.trim();
-    if (!capturedSignature && !signerName) return null;
-
-    return {
-      captureType: parsed.data.type,
-      capturedSignature,
-      consentStatement: parsed.data.consentStatement?.trim() || signatureConsentStatement,
-      signerName
-    };
-  } catch {
-    return null;
-  }
-}
-
-function validSignaturePayload(signature: NonNullable<ReturnType<typeof parseSignaturePayload>>) {
-  if (!signature.signerName) return false;
-  if (!signature.capturedSignature) return false;
-  if (signature.captureType === FormSignatureCaptureType.DRAWN) return signature.capturedSignature.startsWith("data:image/png;base64,");
-
-  return signature.capturedSignature === signature.signerName;
-}
-
 function redirectWithPublicError(
   slug: string,
   message: string,
@@ -648,14 +591,6 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
   }
 
   const data: Record<string, { label: string; type: FormFieldType; value: string }> = {};
-  const signatureRecords: Array<{
-    captureType: FormSignatureCaptureType;
-    capturedSignature: string;
-    consentStatement: string;
-    fieldId: string;
-    label: string;
-    signerName: string;
-  }> = [];
   let submitterName = "";
   let submitterEmail = "";
 
@@ -663,42 +598,6 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
     const key = publicFieldName(field.id);
     const rawValue = field.type === FormFieldType.CHECKBOX ? (formData.get(key) === "on" ? "yes" : "") : String(formData.get(key) || "").trim();
     const value = field.type === FormFieldType.HIDDEN ? field.placeholder : rawValue;
-
-    if (field.type === FormFieldType.SIGNATURE) {
-      const signature = parseSignaturePayload(rawValue);
-      const consentAccepted = formData.get(publicFieldConsentName(field.id)) === "on";
-
-      if (field.isRequired && (!signature || !validSignaturePayload(signature))) {
-        redirectWithPublicError(form.slug, `Complete ${field.label}.`, attachmentContext);
-      }
-
-      if (signature && !validSignaturePayload(signature)) {
-        redirectWithPublicError(form.slug, `Complete ${field.label}.`, attachmentContext);
-      }
-
-      if (signature && !consentAccepted) {
-        redirectWithPublicError(form.slug, "Accept the electronic signature consent statement.", attachmentContext);
-      }
-
-      if (signature) {
-        signatureRecords.push({
-          captureType: signature.captureType,
-          capturedSignature: signature.capturedSignature,
-          consentStatement: signature.consentStatement,
-          fieldId: field.id,
-          label: field.label,
-          signerName: signature.signerName
-        });
-      }
-
-      data[field.id] = {
-        label: field.label,
-        type: field.type,
-        value: signature ? `Signed (${signature.captureType.toLowerCase()}) by ${signature.signerName}` : ""
-      };
-
-      continue;
-    }
 
     if (field.isRequired && !value) {
       redirectWithPublicError(form.slug, `Complete ${field.label}.`, attachmentContext);
@@ -745,12 +644,6 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
   }
 
   const headerStore = await headers();
-  const ipAddress =
-    firstForwardedIp(headerStore.get("x-forwarded-for")) ||
-    headerStore.get("x-real-ip")?.trim() ||
-    headerStore.get("cf-connecting-ip")?.trim() ||
-    "";
-  const userAgent = headerStore.get("user-agent") || "";
   const attachmentMetadata = formAttachment
     ? {
         attachmentTargetId: formAttachment.targetId,
@@ -771,49 +664,10 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
       metadata: {
         ...attachmentMetadata,
         destination: form.destination,
-        userAgent
+        userAgent: headerStore.get("user-agent") || ""
       }
     }
   });
-
-  if (signatureRecords.length) {
-    await prisma.formSignature.createMany({
-      data: signatureRecords.map((signature) => ({
-        captureType: signature.captureType,
-        capturedSignature: signature.capturedSignature,
-        consentStatement: signature.consentStatement,
-        formFieldId: signature.fieldId,
-        formId: form.id,
-        formSubmissionId: submission.id,
-        ipAddress,
-        signerEmail: submitterEmail,
-        signerName: signature.signerName,
-        siteId: settings.siteId,
-        userAgent
-      }))
-    });
-
-    await recordAuditLog({
-      action: "form.signature_captured",
-      metadata: {
-        formId: form.id,
-        formName: form.name,
-        formSlug: form.slug,
-        signatureCount: signatureRecords.length,
-        signatures: signatureRecords.map((signature) => ({
-          captureType: signature.captureType,
-          fieldId: signature.fieldId,
-          label: signature.label,
-          signerName: signature.signerName
-        })),
-        submissionId: submission.id
-      },
-      siteId: settings.siteId,
-      targetId: submission.id,
-      targetLabel: form.name,
-      targetType: "form_submission"
-    });
-  }
 
   await queueFormSubmittedEmail(
     { id: form.id, name: form.name, notificationEmail: form.notificationEmail },
