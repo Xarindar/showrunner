@@ -21,6 +21,22 @@ type PayPalPartnerReferralResponse = {
   links?: PayPalLink[];
 };
 
+type PayPalMerchantIntegration = {
+  merchant_id?: string;
+  payments_receivable?: boolean;
+  primary_email_confirmed?: boolean;
+  products?: {
+    name?: string;
+    status?: string;
+  }[];
+  tracking_id?: string;
+};
+
+type PayPalMerchantIntegrationsResponse = {
+  merchant_integrations?: PayPalMerchantIntegration[];
+  partner_merchant_id?: string;
+};
+
 function paypalEnvironment() {
   return (process.env.PAYPAL_ENVIRONMENT || "sandbox").trim().toLowerCase() === "live" ? "live" : "sandbox";
 }
@@ -47,6 +63,12 @@ function requirePayPalClientSecret() {
 
 export function paypalPartnerAttributionId() {
   return process.env.PAYPAL_PARTNER_ATTRIBUTION_ID || "";
+}
+
+function requirePayPalPartnerMerchantId() {
+  const partnerMerchantId = process.env.PAYPAL_PARTNER_MERCHANT_ID || "";
+  if (!partnerMerchantId) throw new Error("PAYPAL_PARTNER_MERCHANT_ID is required before PayPal onboarding can complete.");
+  return partnerMerchantId;
 }
 
 function isWeakProductionSecret(value: string) {
@@ -214,6 +236,31 @@ function queryValue(params: URLSearchParams, names: string[]) {
   return "";
 }
 
+async function getMerchantIntegrationByTrackingId(trackingId: string) {
+  const partnerMerchantId = requirePayPalPartnerMerchantId();
+  const response = await paypalFetch<PayPalMerchantIntegrationsResponse>(
+    `/v1/customer/partners/${encodeURIComponent(partnerMerchantId)}/merchant-integrations?tracking_id=${encodeURIComponent(trackingId)}`,
+    {
+      merchantId: partnerMerchantId,
+      method: "GET",
+      requestId: `paypal_merchant_status_${trackingId}`
+    }
+  );
+  const integration = response.merchant_integrations?.find((item) => item.tracking_id === trackingId) || response.merchant_integrations?.[0];
+  if (!integration?.merchant_id) throw new Error("PayPal merchant integration status was not found for this onboarding attempt.");
+  if (integration.tracking_id && integration.tracking_id !== trackingId) {
+    throw new Error("PayPal merchant integration status does not match this onboarding attempt.");
+  }
+  if (integration.payments_receivable !== true) {
+    throw new Error("PayPal merchant cannot receive payments yet.");
+  }
+  if (integration.primary_email_confirmed !== true) {
+    throw new Error("PayPal merchant must confirm their primary email before checkout can be enabled.");
+  }
+
+  return integration;
+}
+
 export async function completePayPalConnectOnboarding(input: {
   expectedSiteId?: string;
   searchParams: URLSearchParams;
@@ -230,19 +277,25 @@ export async function completePayPalConnectOnboarding(input: {
     throw new Error("PayPal permissions were not granted.");
   }
 
-  const merchantId = queryValue(input.searchParams, ["merchantIdInPayPal", "merchant_id", "merchantId"]);
-  if (!merchantId) throw new Error("PayPal Connect did not return a merchant id.");
+  const returnedMerchantId = queryValue(input.searchParams, ["merchantIdInPayPal", "merchant_id"]);
+  const integration = await getMerchantIntegrationByTrackingId(trackingId);
+  if (returnedMerchantId && returnedMerchantId !== integration.merchant_id) {
+    throw new Error("PayPal Connect merchant does not match the verified merchant integration.");
+  }
 
   await upsertConnectedGatewayCredential({
-    displayName: merchantId,
+    displayName: integration.merchant_id,
     encryptedMetadata: {
       consentStatus,
       environment: paypalEnvironment(),
+      paymentsReceivable: integration.payments_receivable,
       permissionsGranted,
+      primaryEmailConfirmed: integration.primary_email_confirmed,
+      products: integration.products || [],
       trackingId
     } satisfies Prisma.InputJsonObject,
-    externalAccountId: merchantId,
-    merchantId,
+    externalAccountId: integration.merchant_id,
+    merchantId: integration.merchant_id,
     provider: PaymentProvider.PAYPAL,
     siteId,
     supportedWallets: []
