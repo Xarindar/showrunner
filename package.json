@@ -17,6 +17,7 @@
     "webhooks:process": "tsx scripts/process-webhook-deliveries.ts",
     "analytics:process": "tsx scripts/process-analytics-retention.ts",
     "booking-reminders:process": "tsx scripts/process-booking-reminders.ts",
+    "abandoned-carts:process": "tsx scripts/process-abandoned-carts.ts",
     "seed": "tsx prisma/seed.ts"
   },
   "prisma": {

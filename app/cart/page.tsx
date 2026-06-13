@@ -6,6 +6,7 @@ import {
   applyPublicCartCouponAction,
   preparePublicCheckoutAction,
   removePublicCartCouponAction,
+  saveCartForRecoveryAction,
   updatePublicCartItemAction
 } from "./actions";
 import { getOpenCart } from "@/lib/commerce/cart";
@@ -17,7 +18,7 @@ import { themeToCssVars } from "@/lib/theme/tokens";
 export const dynamic = "force-dynamic";
 
 type CartPageProps = {
-  searchParams: Promise<{ added?: string; saved?: string; error?: string; order?: string }>;
+  searchParams: Promise<{ added?: string; recovered?: string; saved?: string; error?: string; order?: string }>;
 };
 
 const cartCookieName = "commerce_cart_id";
@@ -78,7 +79,12 @@ export default async function CartPage({ searchParams }: CartPageProps) {
           ) : null}
           {query.saved ? (
             <div className="success-message" role="status" aria-live="polite">
-              Cart updated.
+              {query.saved === "recovery" ? "Your cart reminder is set." : "Cart updated."}
+            </div>
+          ) : null}
+          {query.recovered ? (
+            <div className="success-message" role="status" aria-live="polite">
+              Your saved cart is ready.
             </div>
           ) : null}
           {query.error ? (
@@ -198,6 +204,25 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                     </form>
                   )}
                 </div>
+
+                <form action={saveCartForRecoveryAction} className="subpanel form-grid">
+                  <h3>Save this cart</h3>
+                  <div className="field">
+                    <label htmlFor="recovery-name">Name</label>
+                    <input id="recovery-name" name="customerName" />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="recovery-email">Email</label>
+                    <input id="recovery-email" name="customerEmail" type="email" required />
+                  </div>
+                  <label className="checkbox-row">
+                    <input name="marketingConsent" type="checkbox" required />
+                    <span>Email me only about this saved cart if I do not finish checkout.</span>
+                  </label>
+                  <button className="button secondary" type="submit">
+                    Save cart
+                  </button>
+                </form>
 
                 <form action={preparePublicCheckoutAction} className="subpanel form-grid">
                   <h3>Prepare hosted checkout</h3>

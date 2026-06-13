@@ -198,12 +198,17 @@ model Cart {
   coupon        Coupon?    @relation(fields: [couponId], references: [id], onDelete: SetNull)
   checkoutUrl   String?
   expiresAt     DateTime?
+  abandonedAt            DateTime?
+  recoveryEmailQueuedAt DateTime?
+  recoveryAttemptCount  Int        @default(0)
+  recoveryLastError     String     @default("")
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   items         CartItem[]
 
   @@index([clientId])
   @@index([siteId, status])
+  @@index([siteId, status, updatedAt])
 }
 
 model CartItem {

@@ -320,6 +320,33 @@ async function seedEmailCore(businessName: string, contactEmail: string, siteId 
         "<p>Hi {{customerName}},</p><p>Payment was received for order {{orderNumber}}.</p><p><strong>Total paid:</strong> {{orderTotal}}</p><p><a href=\"{{receiptUrl}}\">Receipt</a></p>",
       requiredTokens: ["businessName", "customerName", "orderNumber", "orderTotal"],
       optionalTokens: ["customerEmail", "receiptUrl"]
+    },
+    {
+      id: "email-template-cart-recovery-customer",
+      key: "cart.recovery.customer",
+      name: "Cart recovery",
+      description: "Sent to subscribed customers when an open cart has been idle.",
+      purpose: MessageTemplatePurpose.MARKETING,
+      subject: "Still interested in {{businessName}}?",
+      previewText: "Your saved cart is waiting.",
+      textBody: [
+        "Hi {{customerName}},",
+        "",
+        "You left items in your {{businessName}} cart.",
+        "",
+        "{{itemSummary}}",
+        "",
+        "Cart total: {{cartTotal}}",
+        "",
+        "Return to your cart: {{cartUrl}}",
+        "",
+        "Unsubscribe: {{unsubscribeUrl}}"
+      ].join("\n"),
+      htmlBody:
+        '<p>Hi {{customerName}},</p><p>You left items in your {{businessName}} cart.</p><p>{{itemSummary}}</p><p><strong>Cart total:</strong> {{cartTotal}}</p><p><a href="{{cartUrl}}">Return to your cart</a></p><p><a href="{{unsubscribeUrl}}">Unsubscribe</a></p>',
+      requiredTokens: ["businessName", "customerName", "cartTotal", "cartUrl", "itemSummary", "unsubscribeUrl"],
+      optionalTokens: ["customerEmail"],
+      isMarketing: true
     }
   ];
 
@@ -344,7 +371,7 @@ async function seedEmailCore(businessName: string, contactEmail: string, siteId 
         requiredTokens: template.requiredTokens,
         optionalTokens: template.optionalTokens,
         senderIdentityId: sender.id,
-        isMarketing: false,
+        isMarketing: "isMarketing" in template ? template.isMarketing : false,
         isActive: true
       }
     });

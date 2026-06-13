@@ -13,13 +13,14 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Catalog admin, public storefront/cart, order creation, and hosted checkout handoff records are live.",
+    summary: "Catalog admin, public storefront/cart, order creation, hosted checkout handoff records, and abandoned-cart recovery are live.",
     primaryGap: "Automatic Stripe session creation, payment webhooks, shipping/tax, refunds, and fulfillment exports are pending."
   },
   capabilities: [
     { label: "Catalog admin", status: "foundation" },
     { label: "Coupon admin", status: "foundation" },
     { label: "Checkout/storefront", status: "foundation" },
+    { label: "Abandoned-cart recovery", status: "live" },
     { label: "Order dashboard", status: "foundation" }
   ],
   adminRoutes: ["/admin/modules/products"],

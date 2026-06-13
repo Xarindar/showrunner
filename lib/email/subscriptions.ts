@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { EmailListMembershipStatus, EmailSubscriberStatus, EmailSuppressionScope } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getCurrentSiteId } from "@/lib/site";
 import { normalizeEmail } from "./shared";
 
 type SubscribeInput = {
@@ -10,15 +10,17 @@ type SubscribeInput = {
   listId?: string;
   clientId?: string;
   consentSource: string;
+  siteId?: string;
+  skipDefaultList?: boolean;
 };
 
 function unsubscribeToken() {
   return crypto.randomBytes(24).toString("hex");
 }
 
-async function getDefaultListId() {
+async function getDefaultListId(siteId: string) {
   const list = await prisma.emailSubscriptionList.findFirst({
-    where: { siteId: DEFAULT_SITE_ID, isDefault: true },
+    where: { siteId, isDefault: true },
     orderBy: { createdAt: "asc" }
   });
   return list?.id;
@@ -28,10 +30,11 @@ export async function subscribeToList(input: SubscribeInput) {
   const email = normalizeEmail(input.email);
   if (!email) throw new Error("Email is required.");
 
-  const listId = input.listId || (await getDefaultListId());
+  const siteId = input.siteId || (await getCurrentSiteId());
+  const listId = input.skipDefaultList ? undefined : input.listId || (await getDefaultListId(siteId));
   const now = new Date();
   const subscriber = await prisma.emailSubscriber.upsert({
-    where: { siteId_email: { siteId: DEFAULT_SITE_ID, email } },
+    where: { siteId_email: { siteId, email } },
     update: {
       name: input.name?.trim() || undefined,
       clientId: input.clientId || undefined,
@@ -41,7 +44,7 @@ export async function subscribeToList(input: SubscribeInput) {
       unsubscribedAt: null
     },
     create: {
-      siteId: DEFAULT_SITE_ID,
+      siteId,
       email,
       name: input.name?.trim() || "",
       clientId: input.clientId,
@@ -74,7 +77,7 @@ export async function subscribeToList(input: SubscribeInput) {
 
   await prisma.suppressionListEntry.deleteMany({
     where: {
-      siteId: DEFAULT_SITE_ID,
+      siteId,
       email,
       scope: EmailSuppressionScope.MARKETING
     }

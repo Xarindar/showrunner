@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { AnalyticsEventType } from "@prisma/client";
+import { AnalyticsEventType, CartStatus } from "@prisma/client";
 import { z } from "zod";
 import { buildAddToCartEvent, buildBeginCheckoutEvent } from "@/lib/analytics/ecommerce";
 import {
@@ -13,8 +13,10 @@ import {
   updateCartItem
 } from "@/lib/commerce/cart";
 import { queueOrderCheckoutEmail } from "@/lib/email";
+import { subscribeToList } from "@/lib/email/subscriptions";
 import { emitAnalyticsEvent, requestAttribution } from "@/lib/events/emit";
 import { createPaymentCheckoutSessionForOrder } from "@/lib/payments/checkout";
+import { prisma } from "@/lib/prisma";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getSiteSettings } from "@/lib/site";
 
@@ -39,6 +41,14 @@ const couponSchema = z.object({
 const draftOrderSchema = z.object({
   customerName: z.string().trim().min(2, "Add your name."),
   customerEmail: z.email("Add a valid email.").transform((value) => value.trim().toLowerCase())
+});
+
+const cartRecoverySignupSchema = z.object({
+  customerName: z.string().trim().optional(),
+  customerEmail: z.email("Add a valid email.").transform((value) => value.trim().toLowerCase()),
+  marketingConsent: z.union([z.literal("on"), z.literal("true")], {
+    error: "Agree to receive the cart reminder before saving your cart."
+  })
 });
 
 async function currentCartId() {
@@ -185,6 +195,76 @@ export async function removePublicCartCouponAction(_formData: FormData) {
   }
 
   redirect("/cart?saved=coupon-removed");
+}
+
+export async function saveCartForRecoveryAction(formData: FormData) {
+  await requirePublicProductsModule();
+
+  const cartId = await currentCartId();
+  if (!cartId) cartError("Cart not found.");
+
+  const parsed = cartRecoverySignupSchema.safeParse({
+    customerName: formData.get("customerName") || undefined,
+    customerEmail: formData.get("customerEmail"),
+    marketingConsent: formData.get("marketingConsent")
+  });
+
+  if (!parsed.success) {
+    cartError(parsed.error.issues[0]?.message || "Add your email to save this cart.");
+  }
+
+  const rateLimitMessage = await publicRateLimitMessage("cart_recovery_signup", { limit: 4, windowMinutes: 10 });
+  if (rateLimitMessage) {
+    cartError(rateLimitMessage);
+  }
+
+  try {
+    const settings = await getSiteSettings();
+    const client = await prisma.client.upsert({
+      where: { siteId_email: { siteId: settings.siteId, email: parsed.data.customerEmail } },
+      update: {
+        name: parsed.data.customerName || undefined
+      },
+      create: {
+        siteId: settings.siteId,
+        email: parsed.data.customerEmail,
+        name: parsed.data.customerName || parsed.data.customerEmail,
+        status: "lead"
+      },
+      select: { id: true }
+    });
+
+    const updated = await prisma.cart.updateMany({
+      where: {
+        id: cartId,
+        siteId: settings.siteId,
+        status: CartStatus.OPEN,
+        items: { some: {} }
+      },
+      data: {
+        clientId: client.id,
+        customerEmail: parsed.data.customerEmail,
+        recoveryLastError: ""
+      }
+    });
+
+    if (updated.count !== 1) {
+      cartError("Cart not found.");
+    }
+
+    await subscribeToList({
+      siteId: settings.siteId,
+      email: parsed.data.customerEmail,
+      name: parsed.data.customerName,
+      clientId: client.id,
+      consentSource: "cart_recovery_signup",
+      skipDefaultList: true
+    });
+  } catch (error) {
+    cartError(error instanceof Error ? error.message : "Could not save that cart.");
+  }
+
+  redirect("/cart?saved=recovery");
 }
 
 export async function preparePublicCheckoutAction(formData: FormData) {
