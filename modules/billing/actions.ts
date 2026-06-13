@@ -12,6 +12,7 @@ import {
   publicBillingUrl,
   snapshotBillingDocument
 } from "@/lib/billing/documents";
+import { updateBillingDocumentStatus } from "@/lib/billing/status";
 import {
   currencyCode,
   maxIntCents,
@@ -26,7 +27,7 @@ import {
 import { requireAdmin } from "@/lib/auth";
 import { queueBillingDocumentEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getCurrentSiteId } from "@/lib/site";
 
 const optionalDate = z
   .string()
@@ -144,7 +145,7 @@ function documentPrefix(type: BillingDocumentType) {
   return "INV";
 }
 
-async function generateDocumentNumber(type: BillingDocumentType, siteId = DEFAULT_SITE_ID) {
+async function generateDocumentNumber(type: BillingDocumentType, siteId: string) {
   const today = new Date().toISOString().slice(0, 10).replaceAll("-", "");
   const prefix = documentPrefix(type);
 
@@ -167,7 +168,7 @@ async function requestOrigin() {
   return `${protocol}://${host}`;
 }
 
-async function recomputeDocumentTotals(tx: Prisma.TransactionClient, billingDocumentId: string, siteId = DEFAULT_SITE_ID) {
+async function recomputeDocumentTotals(tx: Prisma.TransactionClient, billingDocumentId: string, siteId: string) {
   const [document, lineItems] = await Promise.all([
     tx.billingDocument.findFirst({
       where: { id: billingDocumentId, siteId },
@@ -191,7 +192,7 @@ async function recomputeDocumentTotals(tx: Prisma.TransactionClient, billingDocu
   });
 }
 
-async function requireDraftDocument(tx: Prisma.TransactionClient, billingDocumentId: string, siteId = DEFAULT_SITE_ID) {
+async function requireDraftDocument(tx: Prisma.TransactionClient, billingDocumentId: string, siteId: string) {
   const document = await tx.billingDocument.findFirst({
     where: { id: billingDocumentId, siteId },
     select: { status: true }
@@ -203,7 +204,7 @@ async function requireDraftDocument(tx: Prisma.TransactionClient, billingDocumen
   }
 }
 
-async function validateClientId(clientId?: string, siteId = DEFAULT_SITE_ID) {
+async function validateClientId(clientId: string | undefined, siteId: string) {
   if (!clientId) return;
 
   const client = await prisma.client.findFirst({
@@ -216,27 +217,11 @@ async function validateClientId(clientId?: string, siteId = DEFAULT_SITE_ID) {
   }
 }
 
-function assertAllowedStatusTransition(current: BillingDocumentStatus, next: BillingDocumentStatus) {
-  if (current === next) return;
-
-  const allowed: Record<BillingDocumentStatus, BillingDocumentStatus[]> = {
-    [BillingDocumentStatus.DRAFT]: [BillingDocumentStatus.SENT, BillingDocumentStatus.VOID],
-    [BillingDocumentStatus.SENT]: [BillingDocumentStatus.ACCEPTED, BillingDocumentStatus.PAID, BillingDocumentStatus.VOID, BillingDocumentStatus.OVERDUE],
-    [BillingDocumentStatus.ACCEPTED]: [BillingDocumentStatus.PAID, BillingDocumentStatus.VOID, BillingDocumentStatus.OVERDUE],
-    [BillingDocumentStatus.OVERDUE]: [BillingDocumentStatus.PAID, BillingDocumentStatus.VOID],
-    [BillingDocumentStatus.PAID]: [],
-    [BillingDocumentStatus.VOID]: []
-  };
-
-  if (!allowed[current].includes(next)) {
-    throw new Error(`Cannot change ${current.toLowerCase()} to ${next.toLowerCase()}.`);
-  }
-}
-
 export async function createBillingDocumentAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("billing:manage");
   const input = await parseForm(billingDocumentSchema, formData, "/admin/modules/billing");
-  await validateClientId(input.clientId, DEFAULT_SITE_ID);
+  const siteId = await getCurrentSiteId();
+  await validateClientId(input.clientId, siteId);
   const lineTotalCents = input.quantity * input.unitPrice;
 
   let document;
@@ -244,8 +229,8 @@ export async function createBillingDocumentAction(formData: FormData) {
     document = await prisma.$transaction(async (tx) => {
       const created = await tx.billingDocument.create({
         data: {
-          siteId: DEFAULT_SITE_ID,
-          documentNumber: await generateDocumentNumber(input.type, DEFAULT_SITE_ID),
+          siteId,
+          documentNumber: await generateDocumentNumber(input.type, siteId),
           publicAccessToken: generateBillingPublicToken(),
           type: input.type,
           status: input.status,
@@ -270,7 +255,7 @@ export async function createBillingDocumentAction(formData: FormData) {
         }
       });
 
-      await recomputeDocumentTotals(tx, created.id, DEFAULT_SITE_ID);
+      await recomputeDocumentTotals(tx, created.id, siteId);
       if (input.status !== BillingDocumentStatus.DRAFT) {
         await snapshotBillingDocument(tx, created.id);
       }
@@ -290,13 +275,14 @@ export async function createBillingDocumentAction(formData: FormData) {
 }
 
 export async function updateBillingDocumentAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("billing:manage");
   const input = await parseForm(billingDocumentUpdateSchema, formData, "/admin/modules/billing");
-  await validateClientId(input.clientId, DEFAULT_SITE_ID);
+  const siteId = await getCurrentSiteId();
+  await validateClientId(input.clientId, siteId);
 
   try {
     await prisma.$transaction(async (tx) => {
-      await requireDraftDocument(tx, input.id, DEFAULT_SITE_ID);
+      await requireDraftDocument(tx, input.id, siteId);
 
       await tx.billingDocument.update({
         where: { id: input.id },
@@ -313,7 +299,7 @@ export async function updateBillingDocumentAction(formData: FormData) {
         }
       });
 
-      await recomputeDocumentTotals(tx, input.id, DEFAULT_SITE_ID);
+      await recomputeDocumentTotals(tx, input.id, siteId);
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not update that billing document.";
@@ -325,36 +311,12 @@ export async function updateBillingDocumentAction(formData: FormData) {
 }
 
 export async function updateBillingDocumentStatusAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("billing:manage");
   const input = await parseForm(billingStatusSchema, formData, "/admin/modules/billing");
-  const now = new Date();
+  const siteId = await getCurrentSiteId();
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const document = await tx.billingDocument.findFirst({
-        where: { id: input.id, siteId: DEFAULT_SITE_ID },
-        select: { status: true, acceptedAt: true }
-      });
-
-      if (!document) throw new Error("Billing document not found.");
-      assertAllowedStatusTransition(document.status, input.status);
-
-      await tx.billingDocument.update({
-        where: { id: input.id },
-        data: {
-          status: input.status,
-          acceptedAt:
-            input.status === BillingDocumentStatus.ACCEPTED || input.status === BillingDocumentStatus.PAID
-              ? document.acceptedAt || now
-              : undefined,
-          paidAt: input.status === BillingDocumentStatus.PAID ? now : undefined
-        }
-      });
-
-      if (input.status !== BillingDocumentStatus.DRAFT) {
-        await snapshotBillingDocument(tx, input.id);
-      }
-    });
+    await updateBillingDocumentStatus({ billingDocumentId: input.id, status: input.status, siteId });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not update that billing status.";
     redirect(`/admin/modules/billing?document=${input.id}&error=${encodeURIComponent(message)}`);
@@ -364,13 +326,14 @@ export async function updateBillingDocumentStatusAction(formData: FormData) {
 }
 
 export async function setBillingCheckoutLinkAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("billing:manage");
   const input = await parseForm(billingCheckoutSchema, formData, "/admin/modules/billing");
+  const siteId = await getCurrentSiteId();
 
   try {
     await prisma.$transaction(async (tx) => {
       const document = await tx.billingDocument.findFirst({
-        where: { id: input.id, siteId: DEFAULT_SITE_ID },
+        where: { id: input.id, siteId },
         select: { status: true }
       });
 
@@ -402,13 +365,14 @@ export async function setBillingCheckoutLinkAction(formData: FormData) {
 }
 
 export async function clearBillingCheckoutLinkAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("billing:manage");
   const input = await parseForm(billingCheckoutClearSchema, formData, "/admin/modules/billing");
+  const siteId = await getCurrentSiteId();
 
   try {
     await prisma.$transaction(async (tx) => {
       const document = await tx.billingDocument.findFirst({
-        where: { id: input.id, siteId: DEFAULT_SITE_ID },
+        where: { id: input.id, siteId },
         select: { status: true }
       });
 
@@ -439,14 +403,15 @@ export async function clearBillingCheckoutLinkAction(formData: FormData) {
 }
 
 export async function queueBillingDocumentEmailAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("billing:manage");
   const input = await parseForm(billingEmailSchema, formData, "/admin/modules/billing");
+  const siteId = await getCurrentSiteId();
 
   try {
     const origin = await requestOrigin();
     const document = await prisma.$transaction(async (tx) => {
       const owned = await tx.billingDocument.findFirst({
-        where: { id: input.id, siteId: DEFAULT_SITE_ID },
+        where: { id: input.id, siteId },
         select: { id: true }
       });
 
@@ -495,13 +460,14 @@ export async function queueBillingDocumentEmailAction(formData: FormData) {
 }
 
 export async function addBillingLineItemAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("billing:manage");
   const input = await parseForm(billingLineItemSchema, formData, "/admin/modules/billing");
+  const siteId = await getCurrentSiteId();
   const lineTotalCents = input.quantity * input.unitPrice;
 
   try {
     await prisma.$transaction(async (tx) => {
-      await requireDraftDocument(tx, input.billingDocumentId, DEFAULT_SITE_ID);
+      await requireDraftDocument(tx, input.billingDocumentId, siteId);
 
       const currentSubtotal = await tx.billingLineItem.aggregate({
         where: { billingDocumentId: input.billingDocumentId },
@@ -527,7 +493,7 @@ export async function addBillingLineItemAction(formData: FormData) {
         }
       });
 
-      await recomputeDocumentTotals(tx, input.billingDocumentId, DEFAULT_SITE_ID);
+      await recomputeDocumentTotals(tx, input.billingDocumentId, siteId);
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not add that line item.";
@@ -539,13 +505,14 @@ export async function addBillingLineItemAction(formData: FormData) {
 }
 
 export async function updateBillingLineItemAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("billing:manage");
   const input = await parseForm(billingLineItemUpdateSchema, formData, "/admin/modules/billing");
+  const siteId = await getCurrentSiteId();
   const lineTotalCents = input.quantity * input.unitPrice;
 
   try {
     await prisma.$transaction(async (tx) => {
-      await requireDraftDocument(tx, input.billingDocumentId, DEFAULT_SITE_ID);
+      await requireDraftDocument(tx, input.billingDocumentId, siteId);
 
       await tx.billingLineItem.updateMany({
         where: { id: input.id, billingDocumentId: input.billingDocumentId },
@@ -558,7 +525,7 @@ export async function updateBillingLineItemAction(formData: FormData) {
         }
       });
 
-      await recomputeDocumentTotals(tx, input.billingDocumentId, DEFAULT_SITE_ID);
+      await recomputeDocumentTotals(tx, input.billingDocumentId, siteId);
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not update that line item.";
@@ -570,18 +537,19 @@ export async function updateBillingLineItemAction(formData: FormData) {
 }
 
 export async function deleteBillingLineItemAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("billing:manage");
   const input = await parseForm(billingLineItemDeleteSchema, formData, "/admin/modules/billing");
+  const siteId = await getCurrentSiteId();
 
   try {
     await prisma.$transaction(async (tx) => {
-      await requireDraftDocument(tx, input.billingDocumentId, DEFAULT_SITE_ID);
+      await requireDraftDocument(tx, input.billingDocumentId, siteId);
 
       await tx.billingLineItem.deleteMany({
         where: { id: input.id, billingDocumentId: input.billingDocumentId }
       });
 
-      await recomputeDocumentTotals(tx, input.billingDocumentId, DEFAULT_SITE_ID);
+      await recomputeDocumentTotals(tx, input.billingDocumentId, siteId);
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not delete that line item.";
@@ -593,12 +561,13 @@ export async function deleteBillingLineItemAction(formData: FormData) {
 }
 
 export async function addBillingAttachmentAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("billing:manage");
   const input = await parseForm(billingAttachmentSchema, formData, "/admin/modules/billing");
+  const siteId = await getCurrentSiteId();
 
   try {
     await prisma.$transaction(async (tx) => {
-      await requireDraftDocument(tx, input.billingDocumentId, DEFAULT_SITE_ID);
+      await requireDraftDocument(tx, input.billingDocumentId, siteId);
 
       await tx.billingAttachment.create({
         data: {
