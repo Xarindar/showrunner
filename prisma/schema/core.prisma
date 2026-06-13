@@ -54,6 +54,7 @@ model Site {
   bookings                 Booking[]
   bookingResources         BookingResource[]
   bookingReminders         BookingReminder[]
+  schedulingCalendarConnections SchedulingCalendarConnection[]
   clients                  Client[]
   clientTags               ClientTag[]
   clientFiles              ClientFile[]

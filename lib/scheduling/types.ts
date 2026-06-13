@@ -11,7 +11,7 @@ export type Slot = {
 };
 
 export type SlotDiagnosticReason = {
-  code: "minimum_notice" | "max_advance" | "booking_conflict" | "blockout_conflict";
+  code: "minimum_notice" | "max_advance" | "booking_conflict" | "blockout_conflict" | "google_calendar_conflict" | "google_calendar_unavailable";
   message: string;
 };
 

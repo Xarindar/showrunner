@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { absoluteCalendarUrl, icsCalendarAdapter, requestBaseUrl } from "@/lib/scheduling/calendar";
+import { getGoogleCalendarConnections } from "@/lib/scheduling/google-calendar";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import { getSiteSettings } from "@/lib/site";
 import { getTodayDateKey, parseZonedDateKey } from "@/lib/timezone";
@@ -30,7 +31,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   await requireAdmin("scheduling:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const baseUrl = await requestBaseUrl();
-  const [services, staff, resources, availability, blockouts, schedulingSettings] = await Promise.all([
+  const [services, staff, resources, availability, blockouts, schedulingSettings, googleCalendarConnections] = await Promise.all([
     prisma.service.findMany({
       where: { siteId: settings.siteId },
       include: {
@@ -47,7 +48,8 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       orderBy: [{ staffId: "asc" }, { resourceId: "asc" }, { weekday: "asc" }, { startMinutes: "asc" }]
     }),
     prisma.blockedTime.findMany({ where: { siteId: settings.siteId }, include: { resource: true }, orderBy: { startsAt: "asc" }, take: 20 }),
-    prisma.schedulingSettings.findUnique({ where: { siteId: settings.siteId } })
+    prisma.schedulingSettings.findUnique({ where: { siteId: settings.siteId } }),
+    getGoogleCalendarConnections(settings.siteId)
   ]);
   const staffIdsWithAvailability = new Set(
     availability.flatMap((rule) => (rule.staffId ? [rule.staffId] : []))
@@ -104,6 +106,11 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
           staff: member,
           url: absoluteCalendarUrl(baseUrl, icsCalendarAdapter.feedPath({ siteId: settings.siteId, staffId: member.id }))
         }))}
+        googleConnections={googleCalendarConnections.map((connection) => ({
+          connection,
+          staff: staff.find((member) => member.id === connection.ownerId) || null
+        }))}
+        staff={staff}
       />
       <ResourcesPanel resources={resources} assignedResourceIds={assignedResourceIds} resourceIdsWithAvailability={resourceIdsWithAvailability} />
       <ServicesPanel resources={resources} services={services} staff={staff} />

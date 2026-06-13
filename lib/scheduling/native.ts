@@ -1,8 +1,9 @@
 import "server-only";
 
-import { BookingStatus, Prisma } from "@prisma/client";
+import { BookingStatus, Prisma, SchedulingCalendarOwnerType } from "@prisma/client";
 import { queueBookingCreatedEmails } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
 import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
 import { addMinutesToZonedDay, getZonedDayBounds, getZonedWeekday } from "@/lib/timezone";
 import type { BookingRequest, SchedulingAdapter, Slot, SlotDiagnostic, SlotDiagnosticReason } from "@/lib/scheduling/types";
@@ -198,7 +199,8 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     }
 
     const { start, end } = getZonedDayBounds(date, settings.timezone);
-    const [bookings, blocks] = await Promise.all([
+    const slotOwners = slotStaff.length ? slotStaff : [{ id: "", name: "" }];
+    const [bookings, blocks, googleCalendarBusy] = await Promise.all([
       prisma.booking.findMany({
         where: {
           siteId: service.siteId,
@@ -223,6 +225,13 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
           startsAt: { lt: end },
           endsAt: { gt: start }
         }
+      }),
+      listGoogleBusyWindows({
+        end,
+        siteId: service.siteId,
+        staffIds: slotOwners.map((owner) => owner.id).filter(Boolean),
+        start,
+        timeZone: settings.timezone
       })
     ]);
 
@@ -234,8 +243,6 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     latestStart.setDate(latestStart.getDate() + service.maxAdvanceDays);
 
     const slots: SlotDiagnostic[] = [];
-
-    const slotOwners = slotStaff.length ? slotStaff : [{ id: "", name: "" }];
 
     for (const owner of slotOwners) {
       const ownerRules = owner.id
@@ -316,6 +323,34 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
                 block.endsAt,
                 settings.timezone
               )}).`
+            });
+          }
+        }
+
+        for (const unavailable of googleCalendarBusy.unavailable) {
+          const appliesToSlot =
+            unavailable.ownerType === SchedulingCalendarOwnerType.SITE ||
+            (owner.id && unavailable.ownerType === SchedulingCalendarOwnerType.STAFF && unavailable.ownerId === owner.id);
+          if (appliesToSlot) {
+            reasons.push({
+              code: "google_calendar_unavailable",
+              message: `${unavailable.ownerType === SchedulingCalendarOwnerType.STAFF ? owner.name : "The business"} Google Calendar could not be checked: ${
+                unavailable.message
+              }`
+            });
+          }
+        }
+
+        for (const busy of googleCalendarBusy.busy) {
+          const appliesToSlot =
+            busy.ownerType === SchedulingCalendarOwnerType.SITE ||
+            (owner.id && busy.ownerType === SchedulingCalendarOwnerType.STAFF && busy.ownerId === owner.id);
+          if (appliesToSlot && overlaps(startsAt, endsAt, busy.start, busy.end)) {
+            reasons.push({
+              code: "google_calendar_conflict",
+              message: `${
+                busy.ownerType === SchedulingCalendarOwnerType.STAFF ? owner.name : "The business"
+              } is busy on Google Calendar (${makeTimeRangeLabel(busy.start, busy.end, settings.timezone)}).`
             });
           }
         }

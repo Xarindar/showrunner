@@ -13,8 +13,8 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Native public booking is live with multi-staff service assignment, resource requirements, scoped availability, reminders, ICS feeds, and staff/resource-aware conflict checks.",
-    primaryGap: "Google/Cal.com calendar sync, capacity groups, reschedule/cancel links, and paid booking are pending."
+    summary: "Native public booking is live with multi-staff service assignment, resource requirements, scoped availability, reminders, ICS feeds, Google free/busy checks, and staff/resource-aware conflict checks.",
+    primaryGap: "Cal.com calendar sync, capacity groups, reschedule/cancel links, and paid booking are pending."
   },
   capabilities: [
     { label: "Native availability", status: "live" },
@@ -23,10 +23,21 @@ export const manifest = {
     { label: "Bookable resources", status: "live" },
     { label: "Booking reminders", status: "live" },
     { label: "ICS calendar feeds", status: "live" },
-    { label: "Google/Cal.com calendar sync", status: "planned" }
+    { label: "Google Calendar free/busy", status: "live" },
+    { label: "Cal.com calendar sync", status: "planned" }
   ],
-  adminRoutes: ["/admin/modules/scheduling"],
-  publicRoutes: ["/book", "/book/[serviceSlug]", "/api/availability", "/api/calendar/feed.ics", "/api/calendar/booking.ics"],
+  adminRoutes: [
+    "/admin/modules/scheduling",
+    "/api/scheduling/google-calendar/connect/start",
+    "/api/scheduling/google-calendar/connect/callback"
+  ],
+  publicRoutes: [
+    "/book",
+    "/book/[serviceSlug]",
+    "/api/availability",
+    "/api/calendar/feed.ics",
+    "/api/calendar/booking.ics"
+  ],
   widgetRoutes: [],
   dependencies: ["appointments", "clients", "communications"],
   dataModels: [
@@ -40,6 +51,7 @@ export const manifest = {
     "Booking",
     "BookingResource",
     "BookingReminder",
+    "SchedulingCalendarConnection",
     "SchedulingSettings"
   ],
   permissions: ["scheduling:manage"],
