@@ -168,12 +168,20 @@ export async function GET(request: Request) {
   ]);
   const csv = csvDocument([header, ...rows], { preventFormulaInjection: true });
   await recordAuditLog({
-    action: "clients.exported",
+    action: "client.exported",
     actor: user,
-    metadata: { rowCount: clients.length },
+    metadata: {
+      after: {
+        clientIds: clientIds.slice(0, 100),
+        truncatedClientIds: clientIds.length > 100
+      },
+      before: null,
+      rowCount: clients.length
+    },
     request,
     siteId: settings.siteId,
     targetId: settings.siteId,
+    targetLabel: `${clients.length} clients exported`,
     targetType: "client_export"
   });
 

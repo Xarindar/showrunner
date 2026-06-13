@@ -164,7 +164,7 @@ function csvListValue(value: string) {
 }
 
 function mergeStringArray(first: unknown, second: unknown) {
-  const values = [...(Array.isArray(first) ? first : []), ...(Array.isArray(second) ? second : [])]
+const values = [...(Array.isArray(first) ? first : []), ...(Array.isArray(second) ? second : [])]
     .filter((item): item is string => typeof item === "string")
     .map((item) => item.trim())
     .filter(Boolean);
@@ -193,6 +193,30 @@ function mergePreferences(first: Prisma.JsonValue, second: Prisma.JsonValue) {
 
 function fillBlank(current: string | null | undefined, fallback: string | null | undefined) {
   return current?.trim() ? current : fallback || "";
+}
+
+const auditSnapshotLimit = 100;
+
+function clientAuditSnapshot(client: {
+  alternateEmails?: unknown;
+  email: string;
+  familyName?: string | null;
+  id: string;
+  name: string;
+  pipelineStage: ClientPipelineStage;
+  status: string;
+  tags?: Array<{ label: string }>;
+}) {
+  return {
+    alternateEmails: mergeStringArray(client.alternateEmails, []),
+    email: client.email,
+    familyName: client.familyName || "",
+    id: client.id,
+    name: client.name,
+    pipelineStage: client.pipelineStage,
+    status: client.status,
+    tags: client.tags?.map((tag) => tag.label).sort() || []
+  };
 }
 
 async function syncClientTags(clientId: string, labels: string[], siteId: string) {
@@ -524,7 +548,7 @@ export async function deleteClientSegmentAction(formData: FormData) {
 }
 
 export async function importClientsCsvAction(formData: FormData) {
-  await requireAdmin("clients:manage");
+  const user = await requireAdmin("clients:manage");
   const input = await parseForm(clientCsvImportFormSchema, formData, "/admin/modules/clients");
   const siteId = await getCurrentSiteId();
   const text = await input.file.text();
@@ -537,6 +561,7 @@ export async function importClientsCsvAction(formData: FormData) {
   const headers = rows[0].map(normalizeHeader);
   let imported = 0;
   let skipped = 0;
+  const importedClients: ReturnType<typeof clientAuditSnapshot>[] = [];
 
   for (const values of rows.slice(1)) {
     const row = Object.fromEntries(headers.map((header, index) => [header, values[index] || ""]));
@@ -591,9 +616,33 @@ export async function importClientsCsvAction(formData: FormData) {
       }
     });
 
-    await syncClientTags(client.id, csvListValue(rowValue(row, ["tags", "tag"])), siteId);
+    const tags = csvListValue(rowValue(row, ["tags", "tag"]));
+    await syncClientTags(client.id, tags, siteId);
+    importedClients.push(clientAuditSnapshot({ ...client, tags: tags.map((label) => ({ label })) }));
     imported += 1;
   }
+
+  await recordAuditLog({
+    action: "client.imported",
+    actor: user,
+    metadata: {
+      after: {
+        clients: importedClients.slice(0, auditSnapshotLimit),
+        truncatedClients: importedClients.length > auditSnapshotLimit
+      },
+      before: null,
+      fileName: input.file.name,
+      fileSize: input.file.size,
+      headerCount: headers.length,
+      importedCount: imported,
+      rowCount: rows.length - 1,
+      skippedCount: skipped
+    },
+    siteId,
+    targetId: siteId,
+    targetLabel: `${imported} clients imported`,
+    targetType: "client_import"
+  });
 
   revalidatePath("/admin/modules/clients");
   redirect(`/admin/modules/clients?saved=imported&imported=${imported}&skipped=${skipped}`);
@@ -630,6 +679,11 @@ export async function mergeClientsAction(formData: FormData) {
   if (!survivor || !duplicate) {
     redirect(`/admin/modules/clients?error=${encodeURIComponent("Both clients must exist before merging.")}`);
   }
+
+  const before = {
+    duplicate: clientAuditSnapshot(duplicate),
+    survivor: clientAuditSnapshot(survivor)
+  };
 
   await prisma.$transaction(async (tx) => {
     const survivorLabels = new Set(survivor.tags.map((tag) => tag.label.toLowerCase()));
@@ -693,6 +747,26 @@ export async function mergeClientsAction(formData: FormData) {
     await tx.portfolioProofApproval.updateMany({ where: { clientId: duplicate.id }, data: { clientId: survivor.id } });
     await tx.portfolioProofItemDecision.updateMany({ where: { clientId: duplicate.id }, data: { clientId: survivor.id } });
     await tx.client.delete({ where: { id: duplicate.id } });
+  });
+
+  const mergedSurvivor = await prisma.client.findFirst({
+    where: survivorWhere,
+    include: { tags: true }
+  });
+
+  await recordAuditLog({
+    action: "client.merged",
+    actor: user,
+    metadata: {
+      after: mergedSurvivor ? clientAuditSnapshot(mergedSurvivor) : null,
+      before,
+      duplicateClientId: duplicate.id,
+      survivorClientId: survivor.id
+    },
+    siteId,
+    targetId: survivor.id,
+    targetLabel: survivor.name,
+    targetType: "client"
   });
 
   revalidatePath("/admin/modules/clients");
