@@ -42,6 +42,18 @@ const orderFulfillmentSchema = z.object({
   trackingNumber: optionalStoredText
 });
 
+const orderFulfillmentExportSchema = z.object({
+  exportBatch: optionalStoredText,
+  id: requiredText
+});
+
+const orderPrintLabHandoffSchema = z.object({
+  id: requiredText,
+  labName: requiredText,
+  notes: optionalStoredText,
+  reference: optionalStoredText
+});
+
 const orderCheckoutLinkSchema = z.object({
   id: requiredText,
   checkoutUrl: safeExternalHttpsUrl,
@@ -613,6 +625,121 @@ export async function fulfillCommerceOrderAction(formData: FormData) {
 
   refreshProducts();
   redirect(`/admin/modules/products?saved=fulfilled&order=${input.id}`);
+}
+
+export async function markCommerceOrderFulfillmentExportedAction(formData: FormData) {
+  const user = await requireAdmin("products:manage");
+  const input = await parseForm(orderFulfillmentExportSchema, formData, "/admin/modules/products");
+  const siteId = await getCurrentSiteId();
+
+  try {
+    const order = await prisma.order.findFirst({
+      where: { id: input.id, siteId },
+      include: {
+        items: {
+          include: { product: true }
+        }
+      }
+    });
+
+    if (!order) throw new Error("Order not found.");
+    if (order.status !== OrderStatus.PAID) {
+      throw new Error("Only paid physical orders can be marked exported.");
+    }
+    const physicalItemCount = order.items.filter((item) => item.product.type === ProductType.PHYSICAL).length;
+    if (!physicalItemCount) {
+      throw new Error("Only orders with physical products can be marked exported.");
+    }
+
+    const exportedAt = new Date();
+    const updatedOrder = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        fulfillmentExportBatch: input.exportBatch,
+        fulfillmentExportedAt: exportedAt
+      }
+    });
+
+    await recordAuditLog({
+      action: "order.fulfillment_exported",
+      actor: user,
+      metadata: {
+        exportBatch: updatedOrder.fulfillmentExportBatch,
+        exportedAt: exportedAt.toISOString(),
+        orderNumber: order.orderNumber,
+        physicalItemCount
+      },
+      siteId,
+      targetId: order.id,
+      targetLabel: order.orderNumber,
+      targetType: "order"
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not mark that order exported.";
+    redirect(`/admin/modules/products?order=${input.id}&error=${encodeURIComponent(message)}`);
+  }
+
+  refreshProducts();
+  redirect(`/admin/modules/products?saved=fulfillment-export&order=${input.id}`);
+}
+
+export async function recordCommerceOrderPrintLabHandoffAction(formData: FormData) {
+  const user = await requireAdmin("products:manage");
+  const input = await parseForm(orderPrintLabHandoffSchema, formData, "/admin/modules/products");
+  const siteId = await getCurrentSiteId();
+
+  try {
+    const order = await prisma.order.findFirst({
+      where: { id: input.id, siteId },
+      include: {
+        items: {
+          include: { product: true }
+        }
+      }
+    });
+
+    if (!order) throw new Error("Order not found.");
+    if (order.status !== OrderStatus.PAID && order.status !== OrderStatus.FULFILLED) {
+      throw new Error("Only paid or fulfilled physical orders can be handed off to a print lab.");
+    }
+    const physicalItemCount = order.items.filter((item) => item.product.type === ProductType.PHYSICAL).length;
+    if (!physicalItemCount) {
+      throw new Error("Only orders with physical products can be handed off to a print lab.");
+    }
+
+    const handedOffAt = new Date();
+    await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        printLabHandoffAt: handedOffAt,
+        printLabName: input.labName,
+        printLabNotes: input.notes,
+        printLabReference: input.reference
+      }
+    });
+
+    await recordAuditLog({
+      action: "order.print_lab_handoff",
+      actor: user,
+      metadata: {
+        handedOffAt: handedOffAt.toISOString(),
+        labName: input.labName,
+        orderNumber: order.orderNumber,
+        physicalItemCount,
+        reference: input.reference
+      },
+      siteId,
+      targetId: order.id,
+      targetLabel: order.orderNumber,
+      targetType: "order"
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not record that print lab handoff.";
+    redirect(`/admin/modules/products?order=${input.id}&error=${encodeURIComponent(message)}`);
+  }
+
+  refreshProducts();
+  redirect(`/admin/modules/products?saved=print-lab&order=${input.id}`);
 }
 
 export async function setCommerceOrderCheckoutLinkAction(formData: FormData) {

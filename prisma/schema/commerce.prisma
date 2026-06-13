@@ -300,6 +300,12 @@ model Order {
   fulfilledAt   DateTime?
   fulfillmentCarrier String @default("")
   fulfillmentTrackingNumber String @default("")
+  fulfillmentExportedAt DateTime?
+  fulfillmentExportBatch String @default("")
+  printLabName String @default("")
+  printLabReference String @default("")
+  printLabHandoffAt DateTime?
+  printLabNotes String @default("")
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   items         OrderItem[]
@@ -309,6 +315,8 @@ model Order {
   @@unique([siteId, orderNumber])
   @@index([clientId])
   @@index([siteId, status])
+  @@index([siteId, fulfillmentExportedAt])
+  @@index([siteId, printLabHandoffAt])
   @@index([customerEmail])
 }
 

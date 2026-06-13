@@ -1,5 +1,6 @@
 import { CartStatus, CouponType, GiftCardStatus, OrderStatus, PaymentStatus, ProductStatus, ProductType } from "@prisma/client";
-import { BadgeDollarSign, Boxes, CreditCard, PackagePlus, ReceiptText, Tags, Truck } from "lucide-react";
+import { BadgeDollarSign, Boxes, CreditCard, Download, PackagePlus, ReceiptText, Tags, Truck } from "lucide-react";
+import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { nextOrderStatuses } from "@/lib/commerce/orders";
 import { enumLabel, formatDateTime, formatMoney, stringArrayCsv } from "@/lib/format";
@@ -14,6 +15,8 @@ import {
   createProductAction,
   createProductVariantAction,
   fulfillCommerceOrderAction,
+  markCommerceOrderFulfillmentExportedAction,
+  recordCommerceOrderPrintLabHandoffAction,
   updateCommerceCheckoutSettingsAction,
   setCommerceOrderCheckoutLinkAction,
   refundCommercePaymentAction,
@@ -132,6 +135,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const selectedOrderNextStatuses = selectedOrder ? nextOrderStatuses(selectedOrder.status) : [];
   const selectedOrderHasPhysicalItems = selectedOrder?.items.some((item) => item.product.type === ProductType.PHYSICAL) ?? false;
   const selectedOrderCanFulfill = Boolean(selectedOrder && selectedOrder.status === OrderStatus.PAID && selectedOrderHasPhysicalItems);
+  const selectedOrderCanMarkFulfillmentExported = Boolean(selectedOrder && selectedOrder.status === OrderStatus.PAID && selectedOrderHasPhysicalItems);
+  const selectedOrderCanRecordPrintLabHandoff = Boolean(
+    selectedOrder && (selectedOrder.status === OrderStatus.PAID || selectedOrder.status === OrderStatus.FULFILLED) && selectedOrderHasPhysicalItems
+  );
   const savedMessage = params.saved ? "Commerce changes saved." : null;
   const errorMessage = params.error || null;
 
@@ -613,7 +620,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               <h2 style={{ fontSize: "1.35rem" }}>Orders and payments</h2>
               <p>{orders.length} recent orders from storefront cart checkout prep.</p>
             </div>
-            <ReceiptText size={22} />
+            <Link className="button secondary" href="/admin/modules/products/fulfillment-export">
+              <Download size={18} />
+              Export fulfillment CSV
+            </Link>
           </div>
           <table className="table">
             <thead>
@@ -729,6 +739,112 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               ))}
               {!selectedOrderNextStatuses.filter((status) => status !== OrderStatus.FULFILLED).length && !selectedOrderCanFulfill ? (
                 <span className="pill">Final state</span>
+              ) : null}
+            </div>
+
+            <div className="subpanel form-grid">
+              <div className="page-header" style={{ marginBottom: 0, minHeight: 0 }}>
+                <div>
+                  <h3 style={{ fontSize: "1.05rem" }}>Fulfillment export and print lab</h3>
+                  <p>
+                    {selectedOrderHasPhysicalItems
+                      ? "Track CSV handoff batches and print lab references for physical items."
+                      : "No physical products need fulfillment export or lab handoff."}
+                  </p>
+                </div>
+                <Boxes size={22} />
+              </div>
+              {selectedOrderHasPhysicalItems ? (
+                <table className="table">
+                  <tbody>
+                    <tr>
+                      <td>Exported</td>
+                      <td>
+                        {selectedOrder.fulfillmentExportedAt
+                          ? formatDateTime(selectedOrder.fulfillmentExportedAt, settings.timezone)
+                          : "Not marked exported"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Export batch</td>
+                      <td>{selectedOrder.fulfillmentExportBatch || "Not recorded"}</td>
+                    </tr>
+                    <tr>
+                      <td>Print lab</td>
+                      <td>{selectedOrder.printLabName || "Not recorded"}</td>
+                    </tr>
+                    <tr>
+                      <td>Lab reference</td>
+                      <td>{selectedOrder.printLabReference || "Not recorded"}</td>
+                    </tr>
+                    <tr>
+                      <td>Lab handoff</td>
+                      <td>
+                        {selectedOrder.printLabHandoffAt
+                          ? formatDateTime(selectedOrder.printLabHandoffAt, settings.timezone)
+                          : "Not handed off"}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              ) : null}
+              {selectedOrderCanMarkFulfillmentExported ? (
+                <form action={markCommerceOrderFulfillmentExportedAction} className="form-grid">
+                  <input type="hidden" name="id" value={selectedOrder.id} />
+                  <div className="field">
+                    <label htmlFor={`order-${selectedOrder.id}-export-batch`}>Export batch</label>
+                    <input
+                      id={`order-${selectedOrder.id}-export-batch`}
+                      name="exportBatch"
+                      placeholder="Batch, vendor job, or CSV reference"
+                      defaultValue={selectedOrder.fulfillmentExportBatch}
+                    />
+                  </div>
+                  <button className="button secondary" type="submit">
+                    <Download size={18} />
+                    Mark exported
+                  </button>
+                </form>
+              ) : null}
+              {selectedOrderCanRecordPrintLabHandoff ? (
+                <form action={recordCommerceOrderPrintLabHandoffAction} className="form-grid">
+                  <input type="hidden" name="id" value={selectedOrder.id} />
+                  <div className="grid-2">
+                    <div className="field">
+                      <label htmlFor={`order-${selectedOrder.id}-lab-name`}>Print lab</label>
+                      <input
+                        id={`order-${selectedOrder.id}-lab-name`}
+                        name="labName"
+                        placeholder="White House Custom Colour"
+                        defaultValue={selectedOrder.printLabName}
+                        required
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor={`order-${selectedOrder.id}-lab-reference`}>Lab reference</label>
+                      <input
+                        id={`order-${selectedOrder.id}-lab-reference`}
+                        name="reference"
+                        placeholder="Lab job, PO, or ticket"
+                        defaultValue={selectedOrder.printLabReference}
+                      />
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`order-${selectedOrder.id}-lab-notes`}>Lab notes</label>
+                    <textarea
+                      id={`order-${selectedOrder.id}-lab-notes`}
+                      name="notes"
+                      placeholder="Production notes, paper substitutions, or client-specific print instructions."
+                      rows={3}
+                      defaultValue={selectedOrder.printLabNotes}
+                    />
+                  </div>
+                  <button className="button secondary" type="submit">
+                    <Boxes size={18} />
+                    Record lab handoff
+                  </button>
+                </form>
               ) : null}
             </div>
 
