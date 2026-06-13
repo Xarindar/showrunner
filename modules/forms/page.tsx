@@ -8,6 +8,7 @@ import { publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
+import { formAnalyticsEvents, formFunnelEventNames } from "./analytics";
 import { conditionalActions, conditionalOperators, normalizeConditionalLogic } from "./conditional-logic";
 import {
   createFormAttachmentAction,
@@ -49,6 +50,12 @@ type BuilderField = {
   conditionalLogic: unknown;
   id: string;
   label: string;
+};
+
+type FormFunnelMetrics = {
+  starts: number;
+  submits: number;
+  views: number;
 };
 
 function normalizeStatusFilter(value?: string) {
@@ -108,6 +115,19 @@ function destinationOptions(current?: FormDestination) {
 
 function targetKey(targetType: FormAttachmentTargetType, targetId: string) {
   return `${targetType}:${targetId}`;
+}
+
+function emptyFunnelMetrics(): FormFunnelMetrics {
+  return {
+    starts: 0,
+    submits: 0,
+    views: 0
+  };
+}
+
+function conversionRate(metrics: FormFunnelMetrics) {
+  if (!metrics.views) return "0%";
+  return `${Math.round((metrics.submits / metrics.views) * 100)}%`;
 }
 
 function conditionNeedsValue(operator: keyof typeof conditionOperatorLabels) {
@@ -255,6 +275,28 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
         }
       })
     : null;
+  const formIdsForFunnel = Array.from(new Set([...forms.map((form) => form.id), selectedForm?.id].filter((id): id is string => Boolean(id))));
+  const funnelRows = formIdsForFunnel.length
+    ? await prisma.analyticsEvent.groupBy({
+        by: ["relatedId", "eventName"],
+        where: {
+          siteId: settings.siteId,
+          eventName: { in: [...formFunnelEventNames] },
+          relatedId: { in: formIdsForFunnel },
+          relatedType: "form"
+        },
+        _count: { _all: true }
+      })
+    : [];
+  const funnelByFormId = new Map<string, FormFunnelMetrics>();
+  for (const row of funnelRows) {
+    const metrics = funnelByFormId.get(row.relatedId) || emptyFunnelMetrics();
+    if (row.eventName === formAnalyticsEvents.view) metrics.views += row._count._all;
+    if (row.eventName === formAnalyticsEvents.start) metrics.starts += row._count._all;
+    if (row.eventName === formAnalyticsEvents.submit) metrics.submits += row._count._all;
+    funnelByFormId.set(row.relatedId, metrics);
+  }
+  const selectedFunnel = selectedForm ? funnelByFormId.get(selectedForm.id) || emptyFunnelMetrics() : null;
   const pageCount = Math.max(1, Math.ceil(formCount / pageSize));
   const savedMessage = params.saved ? "Form changes saved." : null;
   const errorMessage = params.error || null;
@@ -449,43 +491,55 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               <tr>
                 <th>Form</th>
                 <th>Destination</th>
+                <th>Funnel</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {forms.map((form) => (
-                <tr key={form.id}>
-                  <td>
-                    <strong>{form.name}</strong>
-                    <br />
-                    <span style={{ color: "var(--muted)" }}>
-                      /forms/{form.slug} · {form._count.fields} fields · {form._count.submissions} submissions
-                    </span>
-                  </td>
-                  <td>{enumLabel(form.destination)}</td>
-                  <td>
-                    <span className={statusClass(form.status)}>{enumLabel(form.status)}</span>
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      <Link className="button secondary" href={`/admin/modules/forms?status=${statusFilter}&form=${form.id}`}>
-                        Edit
-                      </Link>
-                      <form action={updateFormStatusAction}>
-                        <input type="hidden" name="id" value={form.id} />
-                        <input type="hidden" name="status" value={form.status === FormStatus.ACTIVE ? FormStatus.DRAFT : FormStatus.ACTIVE} />
-                        <button className="button secondary" type="submit">
-                          {form.status === FormStatus.ACTIVE ? "Draft" : "Activate"}
-                        </button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {forms.map((form) => {
+                const funnel = funnelByFormId.get(form.id) || emptyFunnelMetrics();
+
+                return (
+                  <tr key={form.id}>
+                    <td>
+                      <strong>{form.name}</strong>
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>
+                        /forms/{form.slug} · {form._count.fields} fields · {form._count.submissions} submissions
+                      </span>
+                    </td>
+                    <td>{enumLabel(form.destination)}</td>
+                    <td>
+                      <strong>{conversionRate(funnel)}</strong>
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>
+                        {funnel.views} views · {funnel.starts} starts · {funnel.submits} submits
+                      </span>
+                    </td>
+                    <td>
+                      <span className={statusClass(form.status)}>{enumLabel(form.status)}</span>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        <Link className="button secondary" href={`/admin/modules/forms?status=${statusFilter}&form=${form.id}`}>
+                          Edit
+                        </Link>
+                        <form action={updateFormStatusAction}>
+                          <input type="hidden" name="id" value={form.id} />
+                          <input type="hidden" name="status" value={form.status === FormStatus.ACTIVE ? FormStatus.DRAFT : FormStatus.ACTIVE} />
+                          <button className="button secondary" type="submit">
+                            {form.status === FormStatus.ACTIVE ? "Draft" : "Activate"}
+                          </button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {!forms.length ? (
                 <tr>
-                  <td colSpan={4}>No forms yet.</td>
+                  <td colSpan={5}>No forms yet.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -574,6 +628,15 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
 
           <div className="card stack">
             <h2 style={{ fontSize: "1.35rem" }}>Form actions</h2>
+            {selectedFunnel ? (
+              <div className="subpanel">
+                <span className="pill">Conversion {conversionRate(selectedFunnel)}</span>
+                <h3 style={{ fontSize: "1.05rem", marginBottom: 6 }}>Submission funnel</h3>
+                <p style={{ color: "var(--muted)", margin: 0 }}>
+                  {selectedFunnel.views} views · {selectedFunnel.starts} starts · {selectedFunnel.submits} submits
+                </p>
+              </div>
+            ) : null}
             <form action={duplicateFormAction} className="subpanel form-grid">
               <input type="hidden" name="id" value={selectedForm.id} />
               <p style={{ color: "var(--muted)", margin: 0 }}>Clone this form and its fields into a draft template you can edit safely.</p>

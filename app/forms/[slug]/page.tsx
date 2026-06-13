@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { FormFieldType, FormStatus, type FormField } from "@prisma/client";
+import { AnalyticsEventType, FormFieldType, FormStatus, type FormField } from "@prisma/client";
 import { CalendarDays, MessageSquare } from "lucide-react";
 import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/structured-data";
+import { emitAnalyticsEvent, requestAttribution } from "@/lib/events/emit";
 import { parseFormAttachmentTarget } from "@/lib/forms/attachments";
 import { buildBreadcrumbJsonLd, buildPageMetadata, getCanonicalBaseUrl } from "@/lib/seo";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
 import { prisma } from "@/lib/prisma";
 import { createPublicFormSubmissionAction } from "@/modules/forms/actions";
+import { formAnalyticsEvents } from "@/modules/forms/analytics";
 import { PublicFormBehavior } from "./public-form-behavior";
 import { SignatureField } from "./signature-field";
 
@@ -230,6 +232,25 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
     : null;
   if (attachmentTarget && !attachment) notFound();
   const testimonialsEnabled = settings.enabledModuleIds.includes("testimonials");
+  if (!query.submitted) {
+    await emitAnalyticsEvent({
+      ...(await requestAttribution(query, `/forms/${form.slug}`)),
+      dedupeWindowMinutes: 60,
+      eventName: formAnalyticsEvents.view,
+      eventType: AnalyticsEventType.CUSTOM,
+      metadata: {
+        attachmentTargetId: attachment?.targetId,
+        attachmentTargetType: attachment?.targetType,
+        destination: form.destination,
+        formId: form.id,
+        formName: form.name,
+        formSlug: form.slug,
+        isRequiredAttachment: attachment?.isRequired
+      },
+      relatedId: form.id,
+      relatedType: "form"
+    });
+  }
 
   return (
     <main className="site-shell" style={themeToCssVars(settings)}>
@@ -304,6 +325,8 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
           {!form.fields.length ? <p className="empty-state">This form does not have fields yet.</p> : null}
           <PublicFormBehavior
             enableSteps={form.enableSteps}
+            formId={form.id}
+            formPath={`/forms/${form.slug}`}
             fields={form.fields.map((field) => ({
               conditionalLogic: field.conditionalLogic,
               id: field.id,

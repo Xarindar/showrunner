@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  AnalyticsEventType,
   FormAttachmentTargetType,
   FormDestination,
   FormFieldRole,
@@ -17,11 +18,12 @@ import { csvList, optionalEmail, optionalStoredText, parseForm, requiredText } f
 import { recordAuditLog } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth";
 import { queueFormSubmittedEmail } from "@/lib/email";
-import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
+import { emitAnalyticsEvent, emitModuleEvent, requestAttribution } from "@/lib/events/emit";
 import { prisma } from "@/lib/prisma";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
 import { slugify } from "@/lib/slug";
+import { formAnalyticsEvents } from "./analytics";
 import { computeVisibleFieldIds, conditionalActions, conditionalOperators, normalizeConditionalLogic } from "./conditional-logic";
 import { findFormTemplate } from "./templates";
 
@@ -669,6 +671,37 @@ function conditionSourceAllowed(input: { conditionalLogic: unknown; id?: string 
   return !logic.enabled || (fieldIds.has(logic.sourceFieldId) && logic.sourceFieldId !== input.id);
 }
 
+export async function recordPublicFormStartAction(formId: string, pathname: string) {
+  const settings = await getSiteSettings();
+  if (!settings.enabledModuleIds.includes("forms")) return;
+
+  const form = await prisma.form.findFirst({
+    where: {
+      id: formId,
+      siteId: settings.siteId,
+      status: FormStatus.ACTIVE
+    },
+    select: { destination: true, id: true, name: true, slug: true }
+  });
+
+  if (!form) return;
+
+  await emitAnalyticsEvent({
+    ...(await requestAttribution(undefined, pathname || `/forms/${form.slug}`)),
+    dedupeWindowMinutes: 60,
+    eventName: formAnalyticsEvents.start,
+    eventType: AnalyticsEventType.CUSTOM,
+    metadata: {
+      destination: form.destination,
+      formId: form.id,
+      formName: form.name,
+      formSlug: form.slug
+    },
+    relatedId: form.id,
+    relatedType: "form"
+  });
+}
+
 export async function createPublicFormSubmissionAction(formData: FormData) {
   const settings = await getSiteSettings();
   if (!settings.enabledModuleIds.includes("forms")) {
@@ -937,6 +970,23 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
     },
     relatedId: submission.id,
     relatedType: "form_submission"
+  });
+  await emitAnalyticsEvent({
+    ...(await requestAttribution(undefined, `/forms/${form.slug}`)),
+    actorEmail: submitterEmail,
+    eventName: formAnalyticsEvents.submit,
+    eventType: AnalyticsEventType.LEAD_SUBMITTED,
+    metadata: {
+      ...attachmentMetadata,
+      clientId,
+      destination: form.destination,
+      formId: form.id,
+      formName: form.name,
+      formSlug: form.slug,
+      submissionId: submission.id
+    },
+    relatedId: form.id,
+    relatedType: "form"
   });
 
   refreshForms(form.slug);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { recordPublicFormStartAction } from "@/modules/forms/actions";
 import { computeVisibleFieldIds } from "@/modules/forms/conditional-logic";
 
 type PublicFormFieldBehavior = {
@@ -13,6 +14,8 @@ type PublicFormFieldBehavior = {
 
 type PublicFormBehaviorProps = {
   enableSteps: boolean;
+  formId: string;
+  formPath: string;
   fields: PublicFormFieldBehavior[];
   submitButtonLabel: string;
 };
@@ -49,8 +52,9 @@ function setFieldEnabled(wrapper: HTMLElement, enabled: boolean, forceHidden: bo
   }
 }
 
-export function PublicFormBehavior({ enableSteps, fields, submitButtonLabel }: PublicFormBehaviorProps) {
+export function PublicFormBehavior({ enableSteps, fields, formId, formPath, submitButtonLabel }: PublicFormBehaviorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const startedRef = useRef(false);
   const pages = useMemo(
     () => Array.from(new Set(fields.map((field) => Math.max(1, field.pageNumber || 1)))).sort((left, right) => left - right),
     [fields]
@@ -93,17 +97,26 @@ export function PublicFormBehavior({ enableSteps, fields, submitButtonLabel }: P
       }
     }
 
+    function recordStartAndApplyVisibility() {
+      if (!startedRef.current) {
+        startedRef.current = true;
+        void recordPublicFormStartAction(formId, formPath);
+      }
+
+      applyVisibility();
+    }
+
     applyVisibility();
-    form.addEventListener("input", applyVisibility);
-    form.addEventListener("change", applyVisibility);
+    form.addEventListener("input", recordStartAndApplyVisibility);
+    form.addEventListener("change", recordStartAndApplyVisibility);
     form.addEventListener("submit", enableVisibleFieldsForSubmit);
 
     return () => {
-      form.removeEventListener("input", applyVisibility);
-      form.removeEventListener("change", applyVisibility);
+      form.removeEventListener("input", recordStartAndApplyVisibility);
+      form.removeEventListener("change", recordStartAndApplyVisibility);
       form.removeEventListener("submit", enableVisibleFieldsForSubmit);
     };
-  }, [activePage, fields, hasSteps]);
+  }, [activePage, fields, formId, formPath, hasSteps]);
 
   function goToNextPage() {
     const form = containerRef.current?.closest("form");
