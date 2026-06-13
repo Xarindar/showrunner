@@ -10,6 +10,7 @@ import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
 import { prisma } from "@/lib/prisma";
 import { createPublicFormSubmissionAction } from "@/modules/forms/actions";
+import { SignatureField } from "./signature-field";
 
 export const dynamic = "force-dynamic";
 
@@ -155,14 +156,27 @@ function renderField(field: FormField) {
     );
   }
 
+  if (field.type === FormFieldType.SIGNATURE) {
+    return (
+      <SignatureField
+        fieldId={field.id}
+        helpText={field.helpText}
+        isRequired={field.isRequired}
+        key={field.id}
+        label={field.label}
+        name={name}
+        placeholder={field.placeholder}
+      />
+    );
+  }
+
   const inputType =
     field.type === FormFieldType.EMAIL ? "email" : field.type === FormFieldType.PHONE ? "tel" : field.type === FormFieldType.DATE ? "date" : "text";
-  const placeholder = field.type === FormFieldType.SIGNATURE ? field.placeholder || "Type your full name" : field.placeholder;
 
   return (
     <div className="field" key={field.id}>
       <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
-      <input {...commonProps} placeholder={placeholder} type={inputType} />
+      <input {...commonProps} placeholder={field.placeholder} type={inputType} />
       {field.helpText ? (
         <small id={helpId} style={{ color: "var(--muted)" }}>
           {field.helpText}
