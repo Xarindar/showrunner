@@ -41,7 +41,7 @@ export const manifest = {
   ],
   adminRoutes: ["/admin/modules/appointments", "/admin/appointments/[id]"],
   dataModels: ["Booking", "Client", "Service"],
-  permissions: ["appointments.read", "appointments.write"],
+  permissions: ["appointments:manage"],
   healthChecks: ["pending-bookings"]
 } satisfies ShellModule;
 ```
@@ -51,6 +51,10 @@ The shell reads these manifests to build navigation and settings controls. Modul
 The `status` field remains the route/sidebar gate and still uses `active` or `future`. The newer readiness fields do not change navigation behavior; they describe whether a module is live, partial, admin-foundation, manual, or planned. Dashboard, Help, and Settings use this metadata with live checks from `lib/platform-status.ts`.
 
 Required platform modules can set `required: true`. The registry keeps those modules enabled even if a settings form submission omits them.
+
+Modules should declare their admin permissions in `permissions`. Server actions must enforce the matching explicit permission with `requireAdmin("<permission>")`; the admin shell uses the same permission metadata to keep navigation role-aware, but server-side checks remain the enforcement boundary.
+
+Some modules also declare data-scope metadata for owner-configurable record access. That manifest data tells the shared scope engine which roles can be scoped and which Prisma field represents ownership. Treat configurable data scope as audit-tracked until the roadmap marks 14b confirmed; do not document a module as fully own-data scoped unless the ledger confirms it.
 
 Module pages are lazy-loaded by `shell/module-pages.ts`. Keep that registry as loader functions instead of eager imports so a runtime problem in one module does not break unrelated module routes.
 
@@ -75,6 +79,17 @@ Shared helpers should have one owner:
 - `lib/objects.ts`: record guards and unknown-object normalization.
 - `lib/security/urls.ts`: public URL safety checks.
 - `lib/format.ts`: common display formatting.
+
+## Workers And Scheduled Tasks
+
+Long-running or repeated work should live behind a module API handler or shared library function, with a thin script under `scripts/` for scheduler execution.
+
+Confirmed scheduled workers:
+
+- `npm run email:process`: drains the email outbox. Requires `EMAIL_WORKER_SECRET` for the internal HTTP route.
+- `npm run analytics:process`: runs analytics retention sweeps outside the event emit hot path. It may use `ANALYTICS_WORKER_SECRET` when configured, otherwise the internal route can fall back to `EMAIL_WORKER_SECRET`.
+
+Provision these as separate Railway cron services. Do not rely on the web service process to run cron work.
 
 ## Styling
 

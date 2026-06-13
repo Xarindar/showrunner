@@ -9,6 +9,9 @@ Use this before handing the admin panel to a client.
 - Set a temporary `ADMIN_PASSWORD`.
 - Ask the client to store the password securely.
 - Confirm `/admin` login works.
+- Create any additional admin users in Users.
+- Confirm owner-only access is retained and at least one owner remains.
+- Assign roles intentionally; verify restricted roles see only the modules they need.
 
 ## Business Settings
 
@@ -18,6 +21,8 @@ Use this before handing the admin panel to a client.
 - Pick the closest style preset.
 - Set primary theme color.
 - Enable only the modules this client should use.
+- Review analytics retention settings.
+- Review role/audit settings if this is a team site.
 
 ## Scheduling
 
@@ -28,6 +33,8 @@ Use this before handing the admin panel to a client.
 - Add booking policy text.
 - Decide whether policy acceptance is required.
 - Add weekly availability.
+- If the business has staff-specific services, create staff members, assign staff to services, and add per-staff availability.
+- Confirm staff assigned to a service do not show bookable times until their personal availability exists.
 - Add known holidays, closures, or private-event blockouts.
 - Submit one test booking.
 - Test at least one direct service link such as `/book/consultation`.
@@ -61,10 +68,25 @@ Use this before handing the admin panel to a client.
 - Confirm booking emails go to the business and customer.
 - Confirm dev-only console logging is not being used in production.
 
+## Commerce And Billing
+
+- Configure `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` before enabling live checkout.
+- Complete a Stripe test-mode checkout and confirm the order/payment status updates through the webhook.
+- Confirm Products is disabled if the client is not selling through the site.
+- Treat public billing accept/pay, PDF rendering, and partial payments as in-progress until the roadmap marks them confirmed.
+
+## Analytics
+
+- Configure analytics adapter IDs only when the client has approved tracking.
+- Create a Railway cron service that runs `npm run analytics:process` on the required retention schedule.
+- Use `ANALYTICS_WORKER_SECRET` if configured; otherwise confirm `EMAIL_WORKER_SECRET` is set because the analytics worker route can fall back to it.
+- For any EU, UK, or EEA launch, revisit consent defaults and add the required consent UI before go-live.
+
 ## Final Review
 
 - Public homepage loads.
 - Public booking page loads.
+- Public shop/cart pages load when Products is enabled.
 - Admin dashboard loads.
-- Appointments, Clients, Scheduling, Content, Media, Settings, and Help all open.
-- Railway deployment has `DATABASE_URL`, `AUTH_SECRET`, admin credentials, and SMTP/R2 variables as needed.
+- Appointments, Clients, Scheduling, Content, Media, Products, Billing, Communications, Automation, Analytics, Settings, Users, and Help open when enabled for the signed-in role.
+- Railway deployment has `DATABASE_URL`, `AUTH_SECRET`, admin credentials, SMTP, Stripe, R2/Cloudflare Images, and worker-secret variables as needed.

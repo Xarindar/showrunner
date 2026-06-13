@@ -146,7 +146,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 
 export async function saveExampleAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("example:manage");
 
   const title = String(formData.get("title") || "");
 
@@ -157,7 +157,7 @@ export async function saveExampleAction(formData: FormData) {
 }
 ```
 
-Always call `requireAdmin()` before admin mutations.
+Always call `requireAdmin("<permission>")` before admin mutations. Do not use `requireAuthenticatedAdmin()` for a mutation or export; it is for the protected shell/session boundary only. The repository also has `npm run auth:check` to catch accidental bare admin guards in server-action files.
 
 ## Register The Module
 
@@ -292,8 +292,9 @@ Before handing off a module change:
 2. Confirm it is registered in `shell/modules.ts`.
 3. Confirm `/admin/modules/<id>` renders.
 4. Confirm the sidebar label, icon, active state, and Settings checkbox work.
-5. Confirm any form action calls `requireAdmin()`.
+5. Confirm any form action calls `requireAdmin("<permission>")`.
 6. Confirm any route handler re-exports from `modules/<id>/api/`.
-7. Run `npm run lint`.
-8. Run `npx tsc --noEmit`.
-9. Run `npm run build` for routing changes.
+7. Run `npm run auth:check` for admin action changes.
+8. Run `npm run lint`.
+9. Run `npx tsc --noEmit`.
+10. Run `npm run build` for routing changes.

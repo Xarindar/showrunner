@@ -2,7 +2,7 @@
 
 This document defines the email system that sits underneath the Communications module. The admin screen can stay simple while this core handles transactional emails, admin routing, newsletters, delivery records, retries, and provider changes.
 
-The first implementation is for one client site per deployment. Model names and service contracts should leave room for a future `siteId`, but do not build agency multi-tenant behavior until the platform has a real tenant model.
+The implementation is still deployed as one client site per project, but the data layer now has a real site boundary. Email helpers should accept and preserve an explicit `siteId` when running outside a request, especially in workers and automation paths.
 
 ## Principles
 
@@ -228,6 +228,16 @@ export type EmailProvider = {
 - `SMTP_FROM` as a fallback only
 
 When `SMTP_HOST` is missing, the provider should log a compact development message and mark the outbox item as sent with a `dev:` provider id. Production should require SMTP configuration.
+
+## Worker Operations
+
+Email sending is not performed inline by user-facing actions. User-facing writes enqueue email and the scheduled worker drains the outbox.
+
+- Run `npm run email:process` from a Railway cron service every 5-15 minutes.
+- Set `EMAIL_WORKER_SECRET` for the internal worker route.
+- Keep `EMAIL_WORKER_LIMIT` modest so one worker run cannot monopolize the deployment.
+- Failed queue attempts and missing recipients should be visible as failed or suppressed `EmailOutbox` rows, not only as console output.
+- Worker code must pass explicit `siteId` values into template lookup, sender resolution, recipient routing, suppression checks, and failure rows because it does not have a browser request host to resolve the site from.
 
 For marketing email, the provider input must include:
 

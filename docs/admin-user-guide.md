@@ -6,9 +6,11 @@ This guide is for the business owner or staff member who will use the admin pane
 
 1. Go to `/admin`.
 2. Enter the admin email and password provided during handoff.
-3. Use the sidebar to move between Dashboard, Appointments, Clients, Scheduling, Content, Media, Forms, Testimonials, Products, Settings, and Help. On a phone, tap the menu button in the top bar to open the admin navigation.
+3. Use the sidebar to move between the modules enabled for your role and site. Common modules include Dashboard, Appointments, Clients, Scheduling, Content, Media, Forms, Testimonials, Products, Billing, Communications, Automation, Analytics, Settings, Users, and Help. On a phone, tap the menu button in the top bar to open the admin navigation.
 
 Keep the admin password private. If the password is exposed, ask the site maintainer to rotate it.
+
+Some teams have multiple admin roles. Owners can manage admin users and roles in Users. Staff, photographers, accountants, viewers, and other roles may see fewer modules or records depending on the site's permission setup.
 
 ## Dashboard
 
@@ -35,6 +37,7 @@ Use Appointments to:
 - see customer notes and intake answers
 - store private appointment notes
 - record a cancellation reason
+- see assigned staff when a service is staff-specific
 
 Status meanings:
 
@@ -67,6 +70,7 @@ Services define what can be booked. Each service can include:
 - booking URL slug
 - appointment duration
 - location
+- assigned staff
 - buffer before or after appointments
 - minimum notice before someone can book
 - maximum advance booking window
@@ -75,7 +79,7 @@ Services define what can be booked. Each service can include:
 - booking policy
 - required policy acceptance
 
-Availability rules define normal weekly bookable hours.
+Availability rules define normal weekly bookable hours. Services without assigned staff use business-wide availability. Services with assigned staff use that staff member's personal availability; assigned staff with no personal hours are not bookable until hours are added.
 
 Blockouts are one-time unavailable periods, such as vacations, private events, holidays, or closures.
 
@@ -100,6 +104,82 @@ Media controls images and assets.
 Repo asset mode uses images included with the site code. This is simplest for low-maintenance sites.
 
 R2 mode enables uploads when Cloudflare R2 credentials are configured. Use this for clients who need to change images often.
+
+Private media delivery must go through the app's signed delivery routes. Do not paste private bucket URLs into public pages.
+
+## Portfolio
+
+Portfolio controls client galleries and proofing.
+
+Use Portfolio to:
+
+- create and manage galleries
+- issue client access links
+- review proofing favorites, comments, and approvals
+- publish gallery widgets and lightbox views
+- prepare ZIP delivery bundles when enabled
+
+Signed image variants are still an audit-tracked item. Treat them as in-progress until the roadmap marks them confirmed.
+
+## Products
+
+Products controls the shop catalog and commerce records.
+
+Use Products to:
+
+- manage products, variants, collections, and coupons
+- review carts, orders, and payment records
+- use hosted Stripe Checkout when Stripe credentials and webhooks are configured
+
+The app uses hosted checkout to avoid storing card data.
+
+## Billing
+
+Billing controls invoices, estimates, and billing documents.
+
+Use Billing to:
+
+- create billing documents for clients
+- add line items
+- rely on server-side totals rather than manual total entry
+- send or manage document status from the admin flow
+
+Client-facing accept/pay, PDF rendering, and partial-payment depth are active roadmap work until the roadmap marks them confirmed.
+
+## Communications
+
+Communications controls transactional email templates and delivery records.
+
+Use Communications to:
+
+- review the email outbox
+- adjust booking email template settings
+- manage sender and recipient configuration
+- manage suppressions
+- use the visual template builder where enabled
+
+## Automation
+
+Automation controls event-based rules.
+
+Use Automation to:
+
+- create rules for supported events
+- send queued webhook deliveries
+- run supported non-webhook actions
+- review replay and dead-letter records
+
+## Analytics
+
+Analytics controls reporting and event records.
+
+Use Analytics to:
+
+- review module and event reporting
+- export analytics data to CSV
+- manage analytics adapter settings and retention controls
+
+Tracking consent requirements vary by launch jurisdiction. The current roadmap treats US-only launch consent UI as deferred; revisit consent defaults before launching in the EU, UK, or EEA.
 
 ## Forms
 
@@ -136,6 +216,8 @@ Settings controls business-level configuration:
 - theme color
 - media mode
 - enabled admin modules
+- role and audit controls
+- analytics retention settings
 
 Be careful when disabling modules. Disabled modules are hidden from the sidebar.
 
@@ -228,3 +310,9 @@ If emails do not send, check:
 - SMTP settings are configured
 - the contact email is correct in Settings
 - development mode may log emails to the server console instead of sending them
+- the `email:process` worker or cron is running in production
+
+If analytics retention is not running, check:
+
+- the `analytics:process` worker or cron is provisioned
+- the analytics worker secret or email worker secret is configured

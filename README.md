@@ -5,10 +5,11 @@ Showrunner is a reusable per-client website/admin template for service businesse
 ## Stack
 
 - Next.js, TypeScript, Prisma, Postgres
-- Simple email/password admin auth
-- Native service appointment scheduling
-- SMTP email notifications with dev console fallback
+- Email/password admin auth with role-based permissions
+- Native service appointment scheduling with multi-staff support
+- SMTP email outbox with worker processing and dev console fallback
 - Repo media by default, Cloudflare R2 uploads when configured
+- Stripe Checkout for hosted commerce payments
 - Theme tokens with client-safe style presets
 
 ## Local Setup
@@ -43,31 +44,43 @@ API endpoint behavior lives in each module's own `modules/<id>/api/` folder. Nex
 The v1 enabled modules are:
 
 - Dashboard
-- Content
 - Appointments
+- Analytics
+- Automation
+- Billing
 - Clients
-- Scheduling
-- Media
+- Communications
+- Content
 - Forms
-- Testimonials
-- Products
-- Settings
 - Help
+- Media
+- Portfolio
+- Products
+- Scheduling
+- Settings
+- Testimonials
+- Users
 
-Future modules such as Galleries, Staff, contracts, and advanced commerce surfaces can be added by registering a sidebar item, creating a route, and adding the needed Prisma models/actions.
+Future modules such as contracts and deeper client self-service surfaces can be added by registering a manifest, creating a route, and adding the needed Prisma models/actions.
 
 ## Current Admin Flow
 
 - Dashboard: mobile-friendly operations overview with snapshot metrics, consistent shortcut cards, upcoming appointments, and hamburger navigation on compact screens.
 - Appointments: day-to-day queue, appointment details, statuses, intake answers, and internal appointment notes.
-- Clients: long-term client book with profile data, private notes, timeline notes, and appointment history.
-- Scheduling: setup for services, availability, blockouts, booking rules, intake prompts, and policies.
+- Analytics: module reporting, server event records, CSV export, client adapters, and retention controls.
+- Automation: rule matching, queued webhooks, non-webhook executors, replay, and dead-letter handling.
+- Billing: document admin with server-side totals. Public accept/pay, PDFs, and partial payments are active roadmap work until confirmed in `docs/roadmap.md`.
+- Clients: long-term client book with profile data, private notes, timeline notes, saved segments, lead pipeline, consent/preferences, CSV import/export, duplicate merge, and appointment history.
+- Communications: transactional outbox, booking template settings, visual template builder, sender/recipient controls, and suppressions.
+- Scheduling: setup for services, assigned staff, per-staff availability, blockouts, booking rules, intake prompts, and policies.
 - Content: controlled public-site copy and hero image edits.
-- Media: repo assets by default, R2 uploads when configured.
+- Media: repo assets by default, R2/Cloudflare Images uploads when configured, folders/tags/focal points, archive lifecycle, and signed delivery foundation. Sharp/R2 image variants are in audit until confirmed in `docs/roadmap.md`.
+- Portfolio: gallery admin, access-link delivery, proofing favorites/comments/approvals, public widgets/lightbox, and ZIP bundles. Signed image variants are in audit until confirmed in `docs/roadmap.md`.
 - Forms: reusable public forms, intake questions, and a submission inbox.
 - Testimonials: review collection, approval workflow, featured quotes, and public proof pages.
-- Products: commerce catalog setup for products, variants, collections, coupons, and checkout-ready records.
-- Settings: business details, theme basics, media mode, and enabled modules.
+- Products: commerce catalog, variants, collections, coupons, storefront cart/order flow, hosted Stripe Checkout, and order dashboard foundation.
+- Settings: business details, theme basics, media mode, enabled modules, tenant/site foundation, and role/audit controls.
+- Users: owner-only admin user creation, role assignment, and last-owner protection.
 - Help: in-app user guide for day-to-day admin use.
 
 ## Theme Tokens
@@ -84,6 +97,8 @@ Email platform planning lives in `docs/email-core.md`. Use it before changing bo
 
 The email outbox is drained by `npm run email:process`. On Railway, create a separate cron service from this repo with that command and a schedule such as `*/5 * * * *`. Railway cron schedules are configured in the service settings, not in this single web-service `railway.json`.
 
+Analytics retention is drained by `npm run analytics:process`. Provision it as a separate scheduled worker as well; the internal HTTP route can use `ANALYTICS_WORKER_SECRET` when configured, otherwise it falls back to `EMAIL_WORKER_SECRET`.
+
 ## Scheduling
 
 The first scheduling engine is native and intentionally small. The adapter contract lives in `lib/scheduling/types.ts`, and the implementation lives in `lib/scheduling/native.ts`. This keeps room for a future Google Calendar or Cal.diy-backed adapter without rewriting the admin shell.
@@ -91,6 +106,7 @@ The first scheduling engine is native and intentionally small. The adapter contr
 Scheduling owns the rules that create bookable time:
 
 - service duration and location
+- optional assigned staff
 - buffer before/after appointments
 - minimum notice
 - max advance booking window
@@ -98,6 +114,7 @@ Scheduling owns the rules that create bookable time:
 - intake prompt
 - booking policy and required policy acceptance
 - weekly availability and blockouts
+- per-staff availability for staff-assigned services
 
 ## Appointments
 
