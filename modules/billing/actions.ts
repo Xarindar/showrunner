@@ -625,6 +625,20 @@ function billingPaymentAuditSnapshot(payment: {
   };
 }
 
+async function rollbackBillingRefundReservation(input: {
+  amountCents: number;
+  paymentId: string;
+  status: PaymentStatus;
+}) {
+  await prisma.billingPayment.update({
+    where: { id: input.paymentId },
+    data: {
+      refundedCents: { decrement: input.amountCents },
+      status: input.status
+    }
+  });
+}
+
 export async function refundBillingPaymentAction(formData: FormData) {
   const user = await requireAdmin("billing:manage");
   const input = await parseForm(billingRefundSchema, formData, "/admin/modules/billing");
@@ -652,20 +666,44 @@ export async function refundBillingPaymentAction(formData: FormData) {
     }
 
     const before = billingPaymentAuditSnapshot(payment);
-    await refundPaymentGatewayPayment({
-      amountCents: input.amount,
-      paymentId: payment.id,
-      provider: payment.provider,
-      siteId
-    });
-
-    const nextRefundedCents = Math.min(payment.amountCents, payment.refundedCents + input.amount);
-    await prisma.billingPayment.update({
-      where: { id: payment.id },
+    const reserved = await prisma.billingPayment.updateMany({
+      where: {
+        id: payment.id,
+        billingDocument: { siteId },
+        status: { in: [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] },
+        refundedCents: { lte: payment.amountCents - input.amount }
+      },
       data: {
-        refundedCents: nextRefundedCents,
-        status: nextRefundedCents >= payment.amountCents ? PaymentStatus.REFUNDED : payment.status
+        refundedCents: { increment: input.amount }
       }
+    });
+    if (reserved.count !== 1) {
+      throw new Error("Refund amount is no longer available. Reload and try again.");
+    }
+
+    try {
+      await refundPaymentGatewayPayment({
+        amountCents: input.amount,
+        paymentId: payment.id,
+        provider: payment.provider,
+        siteId
+      });
+    } catch (refundError) {
+      await rollbackBillingRefundReservation({
+        amountCents: input.amount,
+        paymentId: payment.id,
+        status: payment.status
+      });
+      throw refundError;
+    }
+
+    await prisma.billingPayment.updateMany({
+      where: {
+        id: payment.id,
+        refundedCents: { gte: payment.amountCents },
+        status: { in: [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] }
+      },
+      data: { status: PaymentStatus.REFUNDED }
     });
 
     const afterPayment = await prisma.billingPayment.findUniqueOrThrow({

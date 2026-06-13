@@ -504,6 +504,20 @@ function orderPaymentAuditSnapshot(payment: {
   };
 }
 
+async function rollbackCommerceRefundReservation(input: {
+  amountCents: number;
+  paymentId: string;
+  status: PaymentStatus;
+}) {
+  await prisma.payment.update({
+    where: { id: input.paymentId },
+    data: {
+      refundedCents: { decrement: input.amountCents },
+      status: input.status
+    }
+  });
+}
+
 export async function refundCommercePaymentAction(formData: FormData) {
   const user = await requireAdmin("orders:manage");
   const input = await parseForm(orderRefundSchema, formData, "/admin/modules/products");
@@ -531,26 +545,55 @@ export async function refundCommercePaymentAction(formData: FormData) {
     }
 
     const before = orderPaymentAuditSnapshot(payment);
-    await refundPaymentGatewayPayment({
-      amountCents: input.amount,
-      paymentId: payment.id,
-      provider: payment.provider,
-      siteId
-    });
-
-    const nextRefundedCents = Math.min(payment.amountCents, payment.refundedCents + input.amount);
-    const fullyRefunded = nextRefundedCents >= payment.amountCents;
-    await prisma.payment.update({
-      where: { id: payment.id },
+    const reserved = await prisma.payment.updateMany({
+      where: {
+        id: payment.id,
+        order: { siteId },
+        status: { in: [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] },
+        refundedCents: { lte: payment.amountCents - input.amount }
+      },
       data: {
-        refundedCents: nextRefundedCents,
-        status: fullyRefunded ? PaymentStatus.REFUNDED : payment.status
+        refundedCents: { increment: input.amount }
       }
     });
+    if (reserved.count !== 1) {
+      throw new Error("Refund amount is no longer available. Reload and try again.");
+    }
+
+    try {
+      await refundPaymentGatewayPayment({
+        amountCents: input.amount,
+        paymentId: payment.id,
+        provider: payment.provider,
+        siteId
+      });
+    } catch (refundError) {
+      await rollbackCommerceRefundReservation({
+        amountCents: input.amount,
+        paymentId: payment.id,
+        status: payment.status
+      });
+      throw refundError;
+    }
+
+    await prisma.payment.updateMany({
+      where: {
+        id: payment.id,
+        refundedCents: { gte: payment.amountCents },
+        status: { in: [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] }
+      },
+      data: { status: PaymentStatus.REFUNDED }
+    });
+
+    const afterPayment = await prisma.payment.findUniqueOrThrow({
+      where: { id: payment.id },
+      include: { order: true }
+    });
+    const fullyRefunded = afterPayment.refundedCents >= afterPayment.amountCents;
 
     if (
       fullyRefunded &&
-      (payment.order.status === OrderStatus.PAID || payment.order.status === OrderStatus.FULFILLED)
+      (afterPayment.order.status === OrderStatus.PAID || afterPayment.order.status === OrderStatus.FULFILLED)
     ) {
       await updateOrderStatus({
         orderId: payment.orderId,
@@ -560,10 +603,6 @@ export async function refundCommercePaymentAction(formData: FormData) {
       });
     }
 
-    const afterPayment = await prisma.payment.findUniqueOrThrow({
-      where: { id: payment.id },
-      include: { order: true }
-    });
     await recordAuditLog({
       action: "order.payment_refunded",
       actor: user,
