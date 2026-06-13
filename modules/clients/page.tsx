@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { Plus, Users } from "lucide-react";
+import { clientPortalPath } from "@/lib/clients/portal-token";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/format";
 import { getSiteSettings } from "@/lib/site";
@@ -123,6 +124,13 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                   </Link>
                   <br />
                   <span style={{ color: "var(--muted)" }}>{client.email}</span>
+                  <br />
+                  <Link
+                    href={clientPortalPath({ clientId: client.id, email: client.email, siteId: settings.siteId })}
+                    style={{ color: "var(--primary-dark)" }}
+                  >
+                    Client portal
+                  </Link>
                 </td>
                 <td>
                   {client._count.bookings} appointments, {client._count.notes} notes
