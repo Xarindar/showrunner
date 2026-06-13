@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getSiteSettings } from "@/lib/site";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
 import { normalizeEmail } from "./shared";
 
 export type EmailRecipientAddress = {
@@ -22,13 +21,15 @@ function dedupeRecipients(recipients: EmailRecipientAddress[]) {
   return output;
 }
 
-export async function getAdminRecipients(groupKey: string, overrideEmail?: string | null) {
+export async function getAdminRecipients(groupKey: string, overrideEmail?: string | null, siteId?: string) {
   if (overrideEmail?.trim()) {
     return dedupeRecipients([{ email: overrideEmail }]);
   }
 
+  const settings = siteId ? await getSiteSettingsForSite(siteId) : await getSiteSettings();
+  const currentSiteId = settings.siteId;
   const group = await prisma.emailRecipientGroup.findUnique({
-    where: { siteId_key: { siteId: DEFAULT_SITE_ID, key: groupKey } },
+    where: { siteId_key: { siteId: currentSiteId, key: groupKey } },
     include: {
       recipients: {
         where: { isActive: true },
@@ -47,6 +48,5 @@ export async function getAdminRecipients(groupKey: string, overrideEmail?: strin
   if (groupRecipients.length) return dedupeRecipients(groupRecipients);
   if (group && !group.fallbackToContactEmail) return [];
 
-  const settings = await getSiteSettings();
   return dedupeRecipients([{ email: settings.contactEmail, name: settings.businessName }]);
 }

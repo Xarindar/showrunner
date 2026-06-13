@@ -1,9 +1,10 @@
 import { EmailCategory } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getSiteSettings } from "@/lib/site";
+import { getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
 
 type ResolveSenderInput = {
   category: EmailCategory;
+  siteId?: string;
   senderIdentityId?: string;
   templateSenderIdentityId?: string | null;
 };
@@ -24,12 +25,13 @@ function parseAddress(value: string | undefined) {
 }
 
 export async function resolveSender(input: ResolveSenderInput) {
-  const settings = await getSiteSettings();
+  const settings = input.siteId ? await getSiteSettingsForSite(input.siteId) : await getSiteSettings();
+  const siteId = settings.siteId;
   const requestedId = input.senderIdentityId || input.templateSenderIdentityId || undefined;
   const sender = requestedId
-    ? await prisma.emailSenderIdentity.findFirst({ where: { id: requestedId, siteId: settings.siteId } })
+    ? await prisma.emailSenderIdentity.findFirst({ where: { id: requestedId, siteId } })
     : await prisma.emailSenderIdentity.findFirst({
-        where: { siteId: settings.siteId, isDefault: true },
+        where: { siteId, isDefault: true },
         orderBy: { createdAt: "asc" }
       });
 

@@ -1,4 +1,5 @@
 import type { SiteSettings } from "@prisma/client";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { resolveEnabledModuleIds } from "@/lib/modules/installation";
 import { DEFAULT_SITE_ID, DEFAULT_SITE_NAME, DEFAULT_SITE_SLUG, DEFAULT_TENANT_ID, DEFAULT_TENANT_SLUG } from "@/lib/site-boundary";
@@ -7,6 +8,34 @@ import { defaultEnabledModules, normalizeModules } from "@/shell/modules";
 export type SiteSettingsWithModules = SiteSettings & {
   enabledModuleIds: ReturnType<typeof normalizeModules>;
 };
+
+function normalizeHostname(value: string) {
+  return value
+    .split(",")[0]
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .split("/")[0]
+    .replace(/:\d+$/, "");
+}
+
+function configuredDefaultHostname() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+  try {
+    return normalizeHostname(new URL(appUrl).hostname);
+  } catch {
+    return "";
+  }
+}
+
+async function requestHostname() {
+  try {
+    const headerStore = await headers();
+    return normalizeHostname(headerStore.get("x-forwarded-host") || headerStore.get("host") || "");
+  } catch {
+    return "";
+  }
+}
 
 export async function ensureDefaultSite() {
   await prisma.tenant.upsert({
@@ -19,7 +48,7 @@ export async function ensureDefaultSite() {
     }
   });
 
-  return prisma.site.upsert({
+  const site = await prisma.site.upsert({
     where: { id: DEFAULT_SITE_ID },
     update: {},
     create: {
@@ -30,17 +59,49 @@ export async function ensureDefaultSite() {
       isDefault: true
     }
   });
+
+  const defaultHostname = configuredDefaultHostname();
+  if (defaultHostname && defaultHostname !== "localhost") {
+    await prisma.siteDomain.upsert({
+      where: { hostname: defaultHostname },
+      update: { siteId: site.id, isPrimary: true },
+      create: {
+        siteId: site.id,
+        hostname: defaultHostname,
+        isPrimary: true
+      }
+    });
+  }
+
+  return site;
 }
 
-export async function getSiteSettings(): Promise<SiteSettingsWithModules> {
-  await ensureDefaultSite();
+export async function resolveCurrentSite() {
+  const defaultSite = await ensureDefaultSite();
+  const hostname = await requestHostname();
 
+  if (!hostname || hostname === "localhost" || hostname === "127.0.0.1") return defaultSite;
+
+  const domain = await prisma.siteDomain.findUnique({
+    where: { hostname },
+    include: { site: true }
+  });
+
+  return domain?.site || defaultSite;
+}
+
+export async function getCurrentSiteId() {
+  const site = await resolveCurrentSite();
+  return site.id;
+}
+
+export async function getSiteSettingsForSite(siteId: string): Promise<SiteSettingsWithModules> {
+  if (siteId === DEFAULT_SITE_ID) await ensureDefaultSite();
   const settings = await prisma.siteSettings.upsert({
-    where: { siteId: DEFAULT_SITE_ID },
+    where: { siteId },
     update: {},
     create: {
-      id: DEFAULT_SITE_ID,
-      siteId: DEFAULT_SITE_ID,
+      siteId,
       enabledModules: defaultEnabledModules
     }
   });
@@ -53,4 +114,9 @@ export async function getSiteSettings(): Promise<SiteSettingsWithModules> {
     ...settings,
     enabledModuleIds
   };
+}
+
+export async function getSiteSettings(): Promise<SiteSettingsWithModules> {
+  const site = await resolveCurrentSite();
+  return getSiteSettingsForSite(site.id);
 }
