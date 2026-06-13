@@ -38,6 +38,7 @@ Use Appointments to:
 - store private appointment notes
 - record a cancellation reason
 - see assigned staff when a service is staff-specific
+- see reserved rooms or equipment when a service requires resources
 
 Status meanings:
 
@@ -57,8 +58,12 @@ Public bookings automatically create or update a client record by email address.
 - review appointment history
 - see service history over time
 - mark clients as active, lead, VIP, or inactive
+- import or export client records by CSV when enabled
+- merge duplicate client records
 
 The client notes area is for internal business context. Do not store sensitive medical, financial, or legal information unless the business has a proper policy for that data.
+
+Client CSV imports, CSV exports, and duplicate merges are audit-logged with the acting admin and the affected records.
 
 ## Scheduling
 
@@ -71,6 +76,7 @@ Services define what can be booked. Each service can include:
 - appointment duration
 - location
 - assigned staff
+- required resources such as rooms or equipment
 - buffer before or after appointments
 - minimum notice before someone can book
 - maximum advance booking window
@@ -81,7 +87,11 @@ Services define what can be booked. Each service can include:
 
 Availability rules define normal weekly bookable hours. Services without assigned staff use business-wide availability. Services with assigned staff use that staff member's personal availability; assigned staff with no personal hours are not bookable until hours are added.
 
+Resources define shared rooms, studios, or equipment. A service can require one or more resources. Required resources need their own availability, and overlapping resource reservations or resource blockouts remove that slot from public booking.
+
 Blockouts are one-time unavailable periods, such as vacations, private events, holidays, or closures.
+
+Booking reminders are implemented but still pre-audit. Do not rely on reminder delivery as a shipped feature until the roadmap marks it confirmed.
 
 ## Content
 
@@ -119,7 +129,7 @@ Use Portfolio to:
 - publish gallery widgets and lightbox views
 - prepare ZIP delivery bundles when enabled
 
-Signed image variants are still an audit-tracked item. Treat them as in-progress until the roadmap marks them confirmed.
+Signed image variants are live for R2-backed image delivery. Public delivery routes are rate-limited, GIFs are not flattened into static WebP variants, and private media should still be delivered only through signed app routes.
 
 ## Products
 
@@ -130,8 +140,9 @@ Use Products to:
 - manage products, variants, collections, and coupons
 - review carts, orders, and payment records
 - use hosted Stripe Checkout when Stripe credentials and webhooks are configured
+- control which connected Stripe payment methods appear at checkout
 
-The app uses hosted checkout to avoid storing card data.
+The app uses hosted checkout to avoid storing card data. When a site has connected Stripe credentials, owners can enable or disable card checkout, card-backed Apple Pay and Google Pay, Cash App Pay, Klarna, and Affirm. Apple Pay on a client's own custom domain depends on the custom-domain milestone because Apple verifies the checkout domain.
 
 ## Billing
 
@@ -144,7 +155,7 @@ Use Billing to:
 - rely on server-side totals rather than manual total entry
 - send or manage document status from the admin flow
 
-Client-facing accept/pay, PDF rendering, and partial-payment depth are active roadmap work until the roadmap marks them confirmed.
+Client-facing accept/pay, PDF rendering, and partial-payment depth are implemented but still audit-gated until the roadmap marks them confirmed.
 
 ## Communications
 
@@ -218,8 +229,11 @@ Settings controls business-level configuration:
 - enabled admin modules
 - role and audit controls
 - analytics retention settings
+- data-access scope presets and per-role module scope
 
 Be careful when disabling modules. Disabled modules are hidden from the sidebar.
+
+Data-access scope controls whether supported roles can see all records in a module or only their own records. Team sites can use OWN scope for staff/photographer workflows; solo sites can use ALL scope so the owner sees everything.
 
 ## Common Workflows
 
@@ -316,3 +330,11 @@ If analytics retention is not running, check:
 
 - the `analytics:process` worker or cron is provisioned
 - the analytics worker secret or email worker secret is configured
+
+If a staff member, photographer, room, or piece of equipment does not appear as bookable, check:
+
+- it is active
+- it is assigned to the service
+- it has availability for the requested time
+- it is not blocked out
+- another booking has not already reserved it

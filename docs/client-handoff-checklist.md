@@ -23,6 +23,7 @@ Use this before handing the admin panel to a client.
 - Enable only the modules this client should use.
 - Review analytics retention settings.
 - Review role/audit settings if this is a team site.
+- Apply the right data-access preset: single-person sites usually use ALL scope; team sites should review OWN scope for staff and photographer roles.
 
 ## Scheduling
 
@@ -35,9 +36,12 @@ Use this before handing the admin panel to a client.
 - Add weekly availability.
 - If the business has staff-specific services, create staff members, assign staff to services, and add per-staff availability.
 - Confirm staff assigned to a service do not show bookable times until their personal availability exists.
+- If the business needs rooms or equipment, create resources, assign them to services, and add resource availability.
+- Submit overlapping test bookings to confirm the same room/equipment cannot be double-booked.
 - Add known holidays, closures, or private-event blockouts.
 - Submit one test booking.
 - Test at least one direct service link such as `/book/consultation`.
+- Treat booking reminders as in-progress until the roadmap marks them confirmed; do not promise reminder delivery during handoff yet.
 
 ## Appointments
 
@@ -52,6 +56,7 @@ Use this before handing the admin panel to a client.
 - Open the client detail page.
 - Add a test note.
 - Review appointment history.
+- If using CSV import/export or duplicate merge, confirm the action creates an audit-log entry.
 
 ## Content And Media
 
@@ -72,8 +77,12 @@ Use this before handing the admin panel to a client.
 
 - Configure `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` before enabling live checkout.
 - Complete a Stripe test-mode checkout and confirm the order/payment status updates through the webhook.
+- If the site uses a connected Stripe account, connect or reconnect it in Settings -> Payments before live checkout.
+- Review the Stripe payment-method toggles in Settings -> Payments and test each enabled method the client plans to offer.
+- Treat Apple Pay on client-owned custom domains as dependent on the custom-domain milestone; the current registration uses the platform URL.
 - Confirm Products is disabled if the client is not selling through the site.
-- Treat public billing accept/pay, PDF rendering, and partial payments as in-progress until the roadmap marks them confirmed.
+- Treat public billing accept/pay, PDF rendering, and partial payments as audit-gated until the roadmap marks them confirmed.
+- Treat Square and PayPal as roadmap work until confirmed.
 
 ## Analytics
 
@@ -86,6 +95,7 @@ Use this before handing the admin panel to a client.
 
 - Public homepage loads.
 - Public booking page loads.
+- Resource-required booking services cannot double-book the same resource.
 - Public shop/cart pages load when Products is enabled.
 - Admin dashboard loads.
 - Appointments, Clients, Scheduling, Content, Media, Products, Billing, Communications, Automation, Analytics, Settings, Users, and Help open when enabled for the signed-in role.

@@ -54,7 +54,9 @@ Required platform modules can set `required: true`. The registry keeps those mod
 
 Modules should declare their admin permissions in `permissions`. Server actions must enforce the matching explicit permission with `requireAdmin("<permission>")`; the admin shell uses the same permission metadata to keep navigation role-aware, but server-side checks remain the enforcement boundary.
 
-Some modules also declare data-scope metadata for owner-configurable record access. That manifest data tells the shared scope engine which roles can be scoped and which Prisma field represents ownership. Treat configurable data scope as audit-tracked until the roadmap marks 14b confirmed; do not document a module as fully own-data scoped unless the ledger confirms it.
+Some modules also declare data-scope metadata for owner-configurable record access. That manifest data tells the shared scope engine which roles can be scoped and which Prisma field or relation represents ownership. The confirmed ownership link is durable: staff-backed ownership uses `StaffMember.adminUserId`, not email string matching. Supported roles can be configured per module as `ALL` or `OWN` from Settings.
+
+Request/site ownership is part of the module contract. Admin actions should resolve the current site with `getCurrentSiteId()` or an equivalent request-aware helper and thread that `siteId` into reads, writes, slug generation, and ownership checks. Do not add new hardcoded `DEFAULT_SITE_ID` write paths.
 
 Module pages are lazy-loaded by `shell/module-pages.ts`. Keep that registry as loader functions instead of eager imports so a runtime problem in one module does not break unrelated module routes.
 
@@ -89,7 +91,19 @@ Confirmed scheduled workers:
 - `npm run email:process`: drains the email outbox. Requires `EMAIL_WORKER_SECRET` for the internal HTTP route.
 - `npm run analytics:process`: runs analytics retention sweeps outside the event emit hot path. It may use `ANALYTICS_WORKER_SECRET` when configured, otherwise the internal route can fall back to `EMAIL_WORKER_SECRET`.
 
+In-progress scheduled workers:
+
+- `npm run booking-reminders:process`: sweeps upcoming bookings and queues reminder email through the outbox. This worker exists in code but is pre-audit until the roadmap confirms booking reminders.
+
 Provision these as separate Railway cron services. Do not rely on the web service process to run cron work.
+
+## Payments Boundary
+
+Payment provider work should route through the shared payment gateway facade under `lib/payments/`. The confirmed Stripe path supports hosted Checkout, per-site Stripe Connect credentials, and owner-controlled payment-method toggles for card checkout, card-backed Apple Pay and Google Pay, Cash App Pay, Klarna, and Affirm. Apple Pay domain registration currently uses the platform URL, so per-site custom domains are a hard dependency before promising Apple Pay verification on owner domains. Square and PayPal are still roadmap work until confirmed; do not document them as shipped checkout options.
+
+## Audit Logging
+
+Use the shared audit helper in `lib/audit.ts` for admin actions that need a durable record. Clients CSV import/export and duplicate merge now use this shared audit trail with actor, target, and bounded before/after context where applicable. Do not add module-local parallel audit tables or ad hoc logging for actions that belong in the shared `AuditLog`.
 
 ## Styling
 
