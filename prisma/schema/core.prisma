@@ -41,6 +41,7 @@ model Site {
   updatedAt                DateTime                     @updatedAt
   domains                  SiteDomain[]
   settings                 SiteSettings?
+  schedulingSettings       SchedulingSettings?
   moduleInstallations      ModuleInstallation[]
   publicRateLimits         PublicRateLimit[]
   services                 Service[]
@@ -52,6 +53,7 @@ model Site {
   blockedTimes             BlockedTime[]
   bookings                 Booking[]
   bookingResources         BookingResource[]
+  bookingReminders         BookingReminder[]
   clients                  Client[]
   clientTags               ClientTag[]
   clientFiles              ClientFile[]

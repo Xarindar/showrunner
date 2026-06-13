@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { warning, type ModuleHealthCheck } from "@/lib/platform-health";
+import { envLooksDefault, warning, type ModuleHealthCheck } from "@/lib/platform-health";
 
 export const getHealth: ModuleHealthCheck = async ({ settings }) => {
   const warnings = [];
@@ -52,6 +52,18 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
         `${resourceAssignmentsWithoutHours.map((assignment) => assignment.resource.name).join(", ")} ${
           resourceAssignmentsWithoutHours.length === 1 ? "is" : "are"
         } required by a service but has no resource availability rules.`,
+        "warning",
+        "scheduling",
+        "/admin/modules/scheduling"
+      )
+    );
+  }
+
+  if (envLooksDefault(process.env.BOOKING_REMINDER_WORKER_SECRET || process.env.EMAIL_WORKER_SECRET)) {
+    warnings.push(
+      warning(
+        "Booking reminder worker secret needs setup",
+        "Set BOOKING_REMINDER_WORKER_SECRET and provision the scheduled reminder sweep (npm run booking-reminders:process) before relying on appointment reminders.",
         "warning",
         "scheduling",
         "/admin/modules/scheduling"

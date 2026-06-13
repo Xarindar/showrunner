@@ -16,6 +16,7 @@
     "automation:process": "tsx scripts/process-automation-runs.ts",
     "webhooks:process": "tsx scripts/process-webhook-deliveries.ts",
     "analytics:process": "tsx scripts/process-analytics-retention.ts",
+    "booking-reminders:process": "tsx scripts/process-booking-reminders.ts",
     "seed": "tsx prisma/seed.ts"
   },
   "prisma": {

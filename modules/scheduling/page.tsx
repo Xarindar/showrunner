@@ -5,6 +5,7 @@ import { getSiteSettings } from "@/lib/site";
 import { getTodayDateKey, parseZonedDateKey } from "@/lib/timezone";
 import { AvailabilityPanel } from "./components/availability-panel";
 import { BlockoutsPanel } from "./components/blockouts-panel";
+import { RemindersPanel } from "./components/reminders-panel";
 import { ResourcesPanel } from "./components/resources-panel";
 import { ServicesPanel } from "./components/services-panel";
 import { SlotDiagnosticsPanel } from "./components/slot-diagnostics-panel";
@@ -26,7 +27,7 @@ type SchedulingPageProps = {
 export default async function SchedulingPage({ searchParams }: SchedulingPageProps) {
   await requireAdmin("scheduling:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [services, staff, resources, availability, blockouts] = await Promise.all([
+  const [services, staff, resources, availability, blockouts, schedulingSettings] = await Promise.all([
     prisma.service.findMany({
       where: { siteId: settings.siteId },
       include: {
@@ -42,7 +43,8 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       include: { resource: true, staff: true },
       orderBy: [{ staffId: "asc" }, { resourceId: "asc" }, { weekday: "asc" }, { startMinutes: "asc" }]
     }),
-    prisma.blockedTime.findMany({ where: { siteId: settings.siteId }, include: { resource: true }, orderBy: { startsAt: "asc" }, take: 20 })
+    prisma.blockedTime.findMany({ where: { siteId: settings.siteId }, include: { resource: true }, orderBy: { startsAt: "asc" }, take: 20 }),
+    prisma.schedulingSettings.findUnique({ where: { siteId: settings.siteId } })
   ]);
   const staffIdsWithAvailability = new Set(
     availability.flatMap((rule) => (rule.staffId ? [rule.staffId] : []))
@@ -89,6 +91,10 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       ) : null}
 
       <StaffPanel staff={staff} assignedStaffIds={assignedStaffIds} staffIdsWithAvailability={staffIdsWithAvailability} />
+      <RemindersPanel
+        enabled={schedulingSettings?.bookingReminderEnabled ?? true}
+        leadMinutes={schedulingSettings?.bookingReminderLeadMinutes ?? 1440}
+      />
       <ResourcesPanel resources={resources} assignedResourceIds={assignedResourceIds} resourceIdsWithAvailability={resourceIdsWithAvailability} />
       <ServicesPanel resources={resources} services={services} staff={staff} />
       <SlotDiagnosticsPanel

@@ -39,6 +39,11 @@ const resourceFormSchema = z.object({
   isActive: z.literal("on").optional()
 });
 
+const reminderSettingsFormSchema = z.object({
+  enabled: z.literal("on").optional(),
+  leadHours: z.coerce.number().int().min(1, "Use at least 1 hour.").max(720, "Use 720 hours or fewer.")
+});
+
 function refreshScheduling() {
   revalidatePath("/admin");
   revalidatePath("/admin/modules/scheduling");
@@ -337,6 +342,35 @@ export async function updateResourceAction(formData: FormData) {
 
   refreshScheduling();
   redirect("/admin/modules/scheduling?saved=resource");
+}
+
+export async function updateReminderSettingsAction(formData: FormData) {
+  await requireAdmin("scheduling:manage");
+  const parsed = reminderSettingsFormSchema.safeParse({
+    enabled: formData.get("enabled") || undefined,
+    leadHours: formData.get("leadHours") || 24
+  });
+  if (!parsed.success) {
+    redirect(`/admin/modules/scheduling?error=${encodeURIComponent(parsed.error.issues[0]?.message || "Check reminder settings.")}`);
+  }
+  const settings = await getSiteSettings();
+  const leadMinutes = parsed.data.leadHours * 60;
+
+  await prisma.schedulingSettings.upsert({
+    where: { siteId: settings.siteId },
+    update: {
+      bookingReminderEnabled: parsed.data.enabled === "on",
+      bookingReminderLeadMinutes: leadMinutes
+    },
+    create: {
+      siteId: settings.siteId,
+      bookingReminderEnabled: parsed.data.enabled === "on",
+      bookingReminderLeadMinutes: leadMinutes
+    }
+  });
+
+  refreshScheduling();
+  redirect("/admin/modules/scheduling?saved=reminders");
 }
 
 export async function createAvailabilityAction(formData: FormData) {

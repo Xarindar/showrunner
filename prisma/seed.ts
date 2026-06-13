@@ -166,6 +166,20 @@ async function seedEmailCore(businessName: string, contactEmail: string, siteId 
       optionalTokens: ["customerEmail", "timezone"]
     },
     {
+      id: "email-template-booking-reminder-customer",
+      key: "booking.reminder.customer",
+      name: "Booking reminder",
+      description: "Sent to the customer before an upcoming appointment.",
+      purpose: MessageTemplatePurpose.BOOKING_REMINDER,
+      subject: "Reminder: {{serviceName}} with {{businessName}}",
+      previewText: "Your appointment is coming up.",
+      textBody: ["Hi {{customerName}},", "", "This is a reminder for your {{serviceName}} appointment with {{businessName}}.", "", "Time: {{appointmentTime}}"].join("\n"),
+      htmlBody:
+        "<p>Hi {{customerName}},</p><p>This is a reminder for your {{serviceName}} appointment with {{businessName}}.</p><p><strong>Time:</strong> {{appointmentTime}}</p>",
+      requiredTokens: ["businessName", "customerName", "serviceName", "appointmentTime"],
+      optionalTokens: ["customerEmail", "timezone", "bookingStatus"]
+    },
+    {
       id: "email-template-booking-canceled-customer",
       key: "booking.canceled.customer",
       name: "Booking canceled",

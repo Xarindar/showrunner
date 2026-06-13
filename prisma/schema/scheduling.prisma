@@ -7,6 +7,22 @@ enum BookingStatus {
   COMPLETED
 }
 
+enum BookingReminderStatus {
+  CLAIMED
+  QUEUED
+  FAILED
+}
+
+model SchedulingSettings {
+  id                         String   @id @default(cuid())
+  siteId                     String   @unique
+  site                       Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  bookingReminderEnabled     Boolean  @default(true)
+  bookingReminderLeadMinutes Int      @default(1440)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
 model Service {
   id                  String    @id @default(cuid())
   siteId              String
@@ -170,11 +186,33 @@ model Booking {
   status             BookingStatus @default(PENDING)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
+  reminders          BookingReminder[]
 
   @@index([siteId, startsAt, endsAt])
   @@index([serviceId, startsAt])
   @@index([staffId, startsAt])
   @@index([clientId])
+}
+
+model BookingReminder {
+  id           String                @id @default(cuid())
+  siteId       String
+  site         Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  bookingId    String
+  booking      Booking               @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  leadMinutes  Int
+  scheduledFor DateTime
+  status       BookingReminderStatus @default(CLAIMED)
+  claimedAt    DateTime?
+  queuedAt     DateTime?
+  failedAt     DateTime?
+  lastError    String                @default("")
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@unique([bookingId])
+  @@index([siteId, scheduledFor])
+  @@index([siteId, status])
 }
 
 model BookingResource {
