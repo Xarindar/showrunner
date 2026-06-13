@@ -13,6 +13,8 @@ type AbandonedCart = {
   id: string;
   siteId: string;
   status: CartStatus;
+  abandonedAt: Date | null;
+  recoveryAttemptCount: number;
   customerEmail: string | null;
   currency: string;
   totalCents: number;
@@ -77,27 +79,19 @@ async function markRecoverySkipped(cartId: string, reason: string) {
 }
 
 async function claimCartForRecovery(cart: AbandonedCart, now: Date) {
-  const data =
-    cart.status === CartStatus.ABANDONED
-      ? {
-          recoveryAttemptCount: { increment: 1 },
-          recoveryLastError: ""
-        }
-      : {
-          status: CartStatus.ABANDONED,
-          abandonedAt: now,
-          recoveryAttemptCount: { increment: 1 },
-          recoveryLastError: ""
-        };
   const claimed = await prisma.cart.updateMany({
     where: {
       id: cart.id,
       siteId: cart.siteId,
-      status: { in: [CartStatus.OPEN, CartStatus.ABANDONED] },
+      status: CartStatus.OPEN,
       recoveryEmailQueuedAt: null,
-      recoveryAttemptCount: { lt: MAX_RECOVERY_ATTEMPTS }
+      recoveryAttemptCount: cart.recoveryAttemptCount
     },
-    data
+    data: {
+      abandonedAt: cart.abandonedAt ?? now,
+      recoveryAttemptCount: { increment: 1 },
+      recoveryLastError: ""
+    }
   });
 
   return claimed.count === 1;
@@ -185,7 +179,8 @@ export async function sweepAbandonedCarts(now = new Date()): Promise<AbandonedCa
                 updatedAt: { lte: idleBefore }
               },
               {
-                status: CartStatus.ABANDONED
+                status: CartStatus.OPEN,
+                abandonedAt: { not: null }
               }
             ]
           }
