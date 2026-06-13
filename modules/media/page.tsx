@@ -1,7 +1,9 @@
 import NextImage from "next/image";
 import { Archive, Folder, ImagePlus, RotateCcw, Star, Tag } from "lucide-react";
+import { MediaDriver, MediaVariantType, type Prisma } from "@prisma/client";
+import { getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
 import { nonEmptyStringArrayFromUnknown, stringArrayCsv } from "@/lib/format";
-import { isR2Configured } from "@/lib/media";
+import { isCloudflareImagesConfigured, isR2Configured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
@@ -33,27 +35,37 @@ function fileSizeLabel(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function canUploadWithDriver(driver: MediaDriver) {
+  if (driver === MediaDriver.R2) return isR2Configured();
+  if (driver === MediaDriver.CLOUDFLARE_IMAGES) return isCloudflareImagesConfigured();
+  return false;
+}
+
 export default async function MediaPage({ searchParams }: MediaPageProps) {
+  const user = await requireAdmin("media:manage");
   const params = await searchParams;
   const settings = await getSiteSettings();
   const page = Math.max(1, Number(params.page || 1) || 1);
+  const activeMediaWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: null });
+  const archivedMediaWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: { not: null } });
   const [mediaAssets, assetCount, archivedAssets, archivedCount, folderGroups] = await Promise.all([
     prisma.mediaAsset.findMany({
-      where: { siteId: settings.siteId, deletedAt: null },
+      where: activeMediaWhere,
+      include: { variants: { orderBy: { type: "asc" } } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize
     }),
-    prisma.mediaAsset.count({ where: { siteId: settings.siteId, deletedAt: null } }),
+    prisma.mediaAsset.count({ where: activeMediaWhere }),
     prisma.mediaAsset.findMany({
-      where: { siteId: settings.siteId, deletedAt: { not: null } },
+      where: archivedMediaWhere,
       orderBy: { deletedAt: "desc" },
       take: 8
     }),
-    prisma.mediaAsset.count({ where: { siteId: settings.siteId, deletedAt: { not: null } } }),
+    prisma.mediaAsset.count({ where: archivedMediaWhere }),
     prisma.mediaAsset.groupBy({
       by: ["folder"],
-      where: { siteId: settings.siteId, deletedAt: null },
+      where: activeMediaWhere,
       _count: { _all: true },
       orderBy: { folder: "asc" },
       take: 8
@@ -62,7 +74,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
   const pageCount = Math.max(1, Math.ceil(assetCount / pageSize));
   const errorMessage = params.error === "missing-file" ? "Choose a file before uploading." : params.error;
 
-  const canUpload = settings.mediaDriver === "R2" && isR2Configured();
+  const canUpload = canUploadWithDriver(settings.mediaDriver);
 
   return (
     <div className="stack">
@@ -81,7 +93,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
         <form action={uploadMediaAction} className="card form-grid">
           <h2 style={{ fontSize: "1.35rem" }}>Upload to R2</h2>
           <p className="lead" style={{ fontSize: "0.95rem" }}>
-            Current media mode: <strong>{settings.mediaDriver}</strong>. Uploads require the R2 env vars in `.env`.
+            Current media mode: <strong>{settings.mediaDriver}</strong>. Uploads require the matching storage env vars in `.env`.
           </p>
           <div className="field">
             <label htmlFor="file">Image file</label>
@@ -113,6 +125,20 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
             <label htmlFor="credit">Credit</label>
             <input id="credit" name="credit" disabled={!canUpload} />
           </div>
+          <div className="field">
+            <label htmlFor="usageContext">Usage context</label>
+            <input id="usageContext" name="usageContext" placeholder="homepage, proofing, product" disabled={!canUpload} />
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="focalPointX">Focal X</label>
+              <input id="focalPointX" name="focalPointX" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
+            </div>
+            <div className="field">
+              <label htmlFor="focalPointY">Focal Y</label>
+              <input id="focalPointY" name="focalPointY" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
+            </div>
+          </div>
           <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
             <input name="isPrivate" type="checkbox" disabled={!canUpload} />
             Private delivery asset
@@ -123,7 +149,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
           </button>
           {!canUpload ? (
             <p className="lead" style={{ fontSize: "0.9rem" }}>
-              Switch media mode to R2 in Settings and add R2 credentials to enable uploads.
+              Switch media mode to R2 or Cloudflare Images in Settings and add credentials to enable uploads.
             </p>
           ) : null}
         </form>
@@ -172,11 +198,17 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
         <div className="grid-3">
           {mediaAssets.map((asset) => (
             <div key={asset.id} className="asset-tile">
-              <NextImage src={asset.url} alt={asset.isDecorative ? "" : asset.alt || asset.filename} width={500} height={375} unoptimized />
+              <NextImage
+                src={mediaAssetDisplayUrl(asset, MediaVariantType.CARD)}
+                alt={asset.isDecorative ? "" : asset.alt || asset.filename}
+                width={500}
+                height={375}
+                unoptimized
+              />
               <div style={{ display: "grid", gap: 8 }}>
                 <strong>{asset.filename}</strong>
                 <span style={{ color: "var(--muted)" }}>
-                  {asset.mimeType || "image"} - {fileSizeLabel(asset.sizeBytes)}
+                  {asset.mimeType || "image"} - {fileSizeLabel(asset.sizeBytes)} - {asset.driver}
                 </span>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {asset.folder ? (
@@ -187,6 +219,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                   ) : null}
                   {asset.isPrivate ? <span className="pill danger">private</span> : null}
                   {asset.isDecorative ? <span className="pill">decorative</span> : null}
+                  {asset.usageContext ? <span className="pill">{asset.usageContext}</span> : null}
                   {nonEmptyStringArrayFromUnknown(asset.tags).map((tag) => (
                     <span className="pill" key={tag}>
                       <Tag size={14} />
@@ -201,16 +234,21 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                     {asset.credit}
                   </p>
                 ) : null}
+                <span style={{ color: "var(--muted)" }}>
+                  Focal point {asset.focalPointX.toFixed(2)}, {asset.focalPointY.toFixed(2)} - {asset.variants.length} variants
+                </span>
               </div>
-              <div className="page-header" style={{ marginBottom: 0, marginTop: 0, minHeight: 0 }}>
+              {!asset.isPrivate ? (
+                <div className="page-header" style={{ marginBottom: 0, marginTop: 0, minHeight: 0 }}>
                 <form action={setHeroImageAction}>
-                  <input type="hidden" name="url" value={asset.url} />
+                  <input type="hidden" name="url" value={mediaAssetDisplayUrl(asset, MediaVariantType.HERO)} />
                   <button className="button secondary" type="submit">
                     <Star size={16} />
                     Use hero
                   </button>
                 </form>
-              </div>
+                </div>
+              ) : null}
               <details className="subpanel">
                 <summary>Edit metadata</summary>
                 <form action={updateMediaAssetAction} className="form-grid" style={{ marginTop: 12 }}>
@@ -236,6 +274,20 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                   <div className="field">
                     <label htmlFor={`asset-${asset.id}-credit`}>Credit</label>
                     <input id={`asset-${asset.id}-credit`} name="credit" defaultValue={asset.credit} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`asset-${asset.id}-usageContext`}>Usage context</label>
+                    <input id={`asset-${asset.id}-usageContext`} name="usageContext" defaultValue={asset.usageContext} />
+                  </div>
+                  <div className="grid-2">
+                    <div className="field">
+                      <label htmlFor={`asset-${asset.id}-focalPointX`}>Focal X</label>
+                      <input id={`asset-${asset.id}-focalPointX`} name="focalPointX" defaultValue={asset.focalPointX} inputMode="decimal" />
+                    </div>
+                    <div className="field">
+                      <label htmlFor={`asset-${asset.id}-focalPointY`}>Focal Y</label>
+                      <input id={`asset-${asset.id}-focalPointY`} name="focalPointY" defaultValue={asset.focalPointY} inputMode="decimal" />
+                    </div>
                   </div>
                   <div className="grid-2">
                     <label style={{ alignItems: "center", display: "flex", gap: 8 }}>

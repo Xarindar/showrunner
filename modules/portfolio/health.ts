@@ -15,7 +15,7 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
     warnings.push(
       warning(
         "Portfolio proofing is partial",
-        "Public gallery and access-token proofing routes are live; comments, approvals, generated variants, and fully signed storage delivery are still pending.",
+        "Public gallery, access-token proofing, comments, approvals, signed variants, and delivery routes are live; print/lab workflow and watermark controls are still pending.",
         "info",
         "portfolio",
         "/admin/modules/portfolio"

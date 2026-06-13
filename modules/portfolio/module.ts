@@ -1,3 +1,4 @@
+import { AdminRole } from "@prisma/client";
 import type { ShellModule } from "@/shell/module-types";
 
 export const manifest = {
@@ -13,21 +14,29 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Public galleries, access-token proofing, downloads, and favorite capture are live on top of the gallery admin records.",
-    primaryGap: "Comments, approvals, gallery widgets, generated variants, and fully signed storage delivery are still pending."
+    summary: "Public galleries, access-token proofing, signed image variants, downloads, ZIP delivery bundles, favorite capture, widgets, and lightbox viewing are live.",
+    primaryGap: "Print/lab workflows, batch upload tooling, and watermark controls remain pending."
   },
   capabilities: [
     { label: "Gallery admin", status: "foundation" },
     { label: "Access-token delivery", status: "live" },
     { label: "Proofing favorites", status: "live" },
-    { label: "Comments and approvals", status: "planned" }
+    { label: "Comments and approvals", status: "live" },
+    { label: "Gallery widgets and lightbox", status: "live" },
+    { label: "Signed image variants", status: "live" },
+    { label: "ZIP delivery bundles", status: "live" }
   ],
   adminRoutes: ["/admin/modules/portfolio"],
   publicRoutes: ["/galleries/[slug]", "/galleries/access/[token]"],
-  widgetRoutes: [],
+  widgetRoutes: ["/galleries/[slug]#gallery-grid"],
   dependencies: ["media", "clients"],
   dataModels: ["PortfolioGallery", "PortfolioGalleryItem", "PortfolioGalleryAccess", "PortfolioGalleryFavorite"],
-  permissions: ["portfolio.read", "portfolio.write"],
+  permissions: ["portfolio:manage"],
   settingsSections: ["Portfolio", "Media"],
-  healthChecks: ["published-galleries", "private-access-records"]
+  healthChecks: ["published-galleries", "private-access-records"],
+  dataScope: {
+    ownerKind: "staff-field",
+    ownerField: "photographerId",
+    scopableRoles: [AdminRole.PHOTOGRAPHER]
+  }
 } satisfies ShellModule;
