@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { recordPublicFormStartAction } from "@/modules/forms/actions";
 import { computeVisibleFieldIds } from "@/modules/forms/conditional-logic";
-import { validateFormFieldValue } from "@/modules/forms/validation-rules";
+import { validateUploadedFile } from "@/modules/forms/upload-fields";
+import { normalizeValidationRules, validateFormFieldValue } from "@/modules/forms/validation-rules";
 
 type PublicFormFieldBehavior = {
   conditionalLogic: unknown;
@@ -40,6 +41,11 @@ function fieldControlValue(form: HTMLFormElement, field: PublicFormFieldBehavior
     return checked?.value.trim() || "";
   }
 
+  if (field.type === "FILE") {
+    const fileControl = namedControls.find((control): control is HTMLInputElement => control instanceof HTMLInputElement && control.type === "file");
+    return fileControl?.files?.[0]?.name.trim() || "";
+  }
+
   return namedControls[0]?.value.trim() || "";
 }
 
@@ -73,6 +79,19 @@ function setFieldCustomValidity(form: HTMLFormElement, field: PublicFormFieldBeh
   for (const control of controls) control.setCustomValidity("");
 
   if (field.type === "SIGNATURE") return;
+
+  if (field.type === "FILE") {
+    const fileControl = firstControl instanceof HTMLInputElement && firstControl.type === "file" ? firstControl : null;
+    const validationMessage = validateUploadedFile({
+      fieldLabel: field.label,
+      file: fileControl?.files?.[0] || null,
+      isRequired: field.isRequired,
+      requiredMessage: normalizeValidationRules(field.validationRules).requiredMessage,
+      rules: field.validationRules
+    });
+    firstControl.setCustomValidity(validationMessage);
+    return;
+  }
 
   const validationMessage = validateFormFieldValue({
     fieldLabel: field.label,

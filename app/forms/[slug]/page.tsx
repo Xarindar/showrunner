@@ -13,6 +13,7 @@ import { themeToCssVars } from "@/lib/theme/tokens";
 import { prisma } from "@/lib/prisma";
 import { createPublicFormSubmissionAction } from "@/modules/forms/actions";
 import { formAnalyticsEvents } from "@/modules/forms/analytics";
+import { normalizeUploadRules } from "@/modules/forms/upload-fields";
 import { normalizeValidationRules } from "@/modules/forms/validation-rules";
 import { PublicFormBehavior } from "./public-form-behavior";
 import { SignatureField } from "./signature-field";
@@ -194,6 +195,22 @@ function renderField(field: FormField) {
     );
   }
 
+  if (field.type === FormFieldType.FILE) {
+    const uploadRules = normalizeUploadRules(field.validationRules);
+
+    return wrapField(
+      <div className="field">
+        <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
+        <input {...commonProps} accept={uploadRules.allowedMimeTypes.join(",")} type="file" />
+        {field.helpText ? (
+          <small id={helpId} style={{ color: "var(--muted)" }}>
+            {field.helpText}
+          </small>
+        ) : null}
+      </div>
+    );
+  }
+
   if (field.type === FormFieldType.SIGNATURE) {
     return wrapField(
       <SignatureField
@@ -330,7 +347,7 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
           </div>
         ) : null}
 
-        <form action={createPublicFormSubmissionAction} className="card form-grid">
+        <form action={createPublicFormSubmissionAction} className="card form-grid" encType="multipart/form-data">
           <input type="hidden" name="formId" value={form.id} />
           {attachment ? (
             <>

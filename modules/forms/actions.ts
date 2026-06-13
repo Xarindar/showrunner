@@ -19,6 +19,7 @@ import { recordAuditLog } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth";
 import { queueFormSubmittedEmail } from "@/lib/email";
 import { emitAnalyticsEvent, emitModuleEvent, requestAttribution } from "@/lib/events/emit";
+import { uploadMedia } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
@@ -26,6 +27,7 @@ import { slugify } from "@/lib/slug";
 import { formAnalyticsEvents } from "./analytics";
 import { computeVisibleFieldIds, conditionalActions, conditionalOperators, normalizeConditionalLogic } from "./conditional-logic";
 import { findFormTemplate } from "./templates";
+import { normalizeUploadRules, validateUploadedFile } from "./upload-fields";
 import { normalizeValidationRules, validateFormFieldValue } from "./validation-rules";
 
 const supportedDestinations = Object.values(FormDestination) as [FormDestination, ...FormDestination[]];
@@ -120,7 +122,9 @@ const fieldSchema = z
     validationMinLength: optionalStoredText,
     validationMinValue: optionalStoredText,
     validationPattern: optionalStoredText,
-    validationRequiredMessage: optionalStoredText
+    validationRequiredMessage: optionalStoredText,
+    uploadAllowedMimeTypes: optionalStoredText,
+    uploadMaxSizeMb: optionalStoredText
   })
   .transform((value) => ({
     ...value,
@@ -143,14 +147,22 @@ const fieldSchema = z
         : {},
     isRequired: value.isRequired === "on",
     isHidden: value.type === FormFieldType.HIDDEN || value.isHidden === "on",
-    validationRules: normalizeValidationRules({
-      maxLength: value.validationMaxLength,
-      maxValue: value.validationMaxValue,
-      minLength: value.validationMinLength,
-      minValue: value.validationMinValue,
-      pattern: value.validationPattern,
-      requiredMessage: value.validationRequiredMessage
-    })
+    validationRules: {
+      ...normalizeValidationRules({
+        maxLength: value.validationMaxLength,
+        maxValue: value.validationMaxValue,
+        minLength: value.validationMinLength,
+        minValue: value.validationMinValue,
+        pattern: value.validationPattern,
+        requiredMessage: value.validationRequiredMessage
+      }),
+      ...(value.type === FormFieldType.FILE
+        ? {
+            fileAllowedMimeTypes: normalizeUploadRules({ allowedMimeTypes: value.uploadAllowedMimeTypes }).allowedMimeTypes,
+            fileMaxSizeBytes: normalizeUploadRules({ fileMaxSizeMb: value.uploadMaxSizeMb }).maxSizeBytes
+          }
+        : {})
+    }
   }));
 
 const fieldUpdateSchema = fieldSchema.and(z.object({ id: requiredText }));
@@ -638,6 +650,11 @@ function publicFieldName(fieldId: string) {
   return `field-${fieldId}`;
 }
 
+function publicFileFromFormData(formData: FormData, fieldId: string) {
+  const value = formData.get(publicFieldName(fieldId));
+  return value instanceof File && value.size > 0 ? value : null;
+}
+
 function firstForwardedIp(value: string | null) {
   return value?.split(",")[0]?.trim() || "";
 }
@@ -780,7 +797,20 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
     redirectWithPublicError(form.slug, rateLimitMessage, attachmentContext);
   }
 
-  const data: Record<string, { label: string; type: FormFieldType; value: string }> = {};
+  const data: Record<
+    string,
+    {
+      file?: {
+        assetId: string;
+        filename: string;
+        mimeType: string;
+        sizeBytes: number;
+      };
+      label: string;
+      type: FormFieldType;
+      value: string;
+    }
+  > = {};
   const signatureRecords: Array<{
     captureType: FormSignatureCaptureType;
     capturedSignature: string;
@@ -795,7 +825,14 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
 
   for (const field of form.fields) {
     const key = publicFieldName(field.id);
-    const rawValue = field.type === FormFieldType.CHECKBOX ? (formData.get(key) === "on" ? "yes" : "") : String(formData.get(key) || "").trim();
+    const rawValue =
+      field.type === FormFieldType.CHECKBOX
+        ? formData.get(key) === "on"
+          ? "yes"
+          : ""
+        : field.type === FormFieldType.FILE
+          ? publicFileFromFormData(formData, field.id)?.name.trim() || ""
+          : String(formData.get(key) || "").trim();
     submittedValues[field.id] = field.type === FormFieldType.HIDDEN ? field.placeholder : rawValue;
   }
 
@@ -853,6 +890,68 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
         label: field.label,
         type: field.type,
         value: signature ? `Signed (${signature.captureType.toLowerCase()}) by ${signature.signerName}` : ""
+      };
+
+      continue;
+    }
+
+    if (field.type === FormFieldType.FILE) {
+      const file = publicFileFromFormData(formData, field.id);
+      const uploadMessage = validateUploadedFile({
+        fieldLabel: field.label,
+        file,
+        isRequired: field.isRequired,
+        requiredMessage: normalizeValidationRules(field.validationRules).requiredMessage,
+        rules: field.validationRules
+      });
+      if (uploadMessage) {
+        redirectWithPublicError(form.slug, uploadMessage, attachmentContext);
+      }
+
+      if (!file) {
+        data[field.id] = {
+          label: field.label,
+          type: field.type,
+          value: ""
+        };
+        continue;
+      }
+
+      const uploadRules = normalizeUploadRules(field.validationRules);
+      let asset;
+      try {
+        asset = await uploadMedia(
+          file,
+          {
+            folder: `forms/${form.id}`,
+            isDecorative: true,
+            isPrivate: true,
+            tags: ["forms", form.slug],
+            usageContext: `form:${form.id}:field:${field.id}`
+          },
+          settings.mediaDriver,
+          settings.siteId,
+          {
+            allowedMimeTypes: uploadRules.allowedMimeTypes,
+            maxBytes: uploadRules.maxSizeBytes,
+            requireImage: false
+          }
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Upload failed.";
+        redirectWithPublicError(form.slug, message, attachmentContext);
+      }
+
+      data[field.id] = {
+        file: {
+          assetId: asset.id,
+          filename: asset.filename,
+          mimeType: asset.mimeType,
+          sizeBytes: asset.sizeBytes
+        },
+        label: field.label,
+        type: field.type,
+        value: asset.filename
       };
 
       continue;

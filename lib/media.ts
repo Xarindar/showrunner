@@ -16,9 +16,12 @@ const allowedImageTypes = new Map([
   ["image/webp", "webp"],
   ["image/gif", "gif"]
 ]);
+const allowedPrivateFileTypes = new Map([...allowedImageTypes, ["application/pdf", "pdf"]]);
 const maxUploadBytes = 12 * 1024 * 1024;
 const signedUrlTtlSeconds = 15 * 60;
 const generatedVariantContentType = "image/webp";
+
+export const privateMediaUploadMimeTypes = Array.from(allowedPrivateFileTypes.keys());
 
 export const mediaVariantPresets = {
   [MediaVariantType.THUMBNAIL]: { width: 320, height: 240, fit: "cover" },
@@ -44,6 +47,12 @@ export type MediaUploadMetadata = {
   tags?: string | string[];
   uploadedByStaffId?: string;
   usageContext?: string;
+};
+
+export type MediaUploadValidationOptions = {
+  allowedMimeTypes?: readonly string[];
+  maxBytes?: number;
+  requireImage?: boolean;
 };
 
 type MediaStoredObject = {
@@ -132,6 +141,10 @@ function assertAccessibleAlt(metadata: MediaUploadMetadata) {
   return safeAlt;
 }
 
+function mimeTypeExtension(mimeType: string) {
+  return allowedPrivateFileTypes.get(mimeType) || "bin";
+}
+
 function isWeakProductionSecret(value: string) {
   const normalized = value.trim().toLowerCase();
   return normalized.length < 32 || normalized.includes("replace-with") || normalized.includes("local-dev") || normalized.includes("change-me");
@@ -148,7 +161,7 @@ async function runVirusScanHook(file: File) {
   };
 }
 
-async function detectImageMimeType(file: File) {
+async function detectUploadMimeType(file: File) {
   const bytes = new Uint8Array(await file.slice(0, 16).arrayBuffer());
   const ascii = String.fromCharCode(...bytes);
 
@@ -158,25 +171,38 @@ async function detectImageMimeType(file: File) {
   }
   if (ascii.startsWith("GIF87a") || ascii.startsWith("GIF89a")) return "image/gif";
   if (ascii.startsWith("RIFF") && ascii.slice(8, 12) === "WEBP") return "image/webp";
+  if (ascii.startsWith("%PDF-")) return "application/pdf";
 
   return "";
 }
 
-async function assertUploadFile(file: File, metadata: MediaUploadMetadata) {
-  if (!allowedImageTypes.has(file.type)) {
-    throw new Error("Upload a JPG, PNG, WebP, or GIF image. SVG uploads need a sanitizer before they can be enabled.");
+async function assertUploadFile(file: File, metadata: MediaUploadMetadata, validation: MediaUploadValidationOptions = {}) {
+  const requireImage = validation.requireImage !== false;
+  const allowedMimeTypes = new Set(
+    (validation.allowedMimeTypes?.length ? validation.allowedMimeTypes : requireImage ? Array.from(allowedImageTypes.keys()) : privateMediaUploadMimeTypes)
+      .map((type) => type.toLowerCase())
+      .filter((type) => (requireImage ? allowedImageTypes.has(type) : allowedPrivateFileTypes.has(type)))
+  );
+
+  if (!allowedMimeTypes.has(file.type.toLowerCase())) {
+    throw new Error(
+      requireImage
+        ? "Upload a JPG, PNG, WebP, or GIF image. SVG uploads need a sanitizer before they can be enabled."
+        : "Upload a supported file type."
+    );
   }
 
-  if (file.size > maxUploadBytes) {
-    throw new Error("Images must be smaller than 12 MB.");
+  const maxBytes = Math.min(Math.max(1, validation.maxBytes || maxUploadBytes), 25 * 1024 * 1024);
+  if (file.size > maxBytes) {
+    throw new Error(`Files must be smaller than ${Math.round(maxBytes / (1024 * 1024))} MB.`);
   }
 
-  const detectedMimeType = await detectImageMimeType(file);
+  const detectedMimeType = await detectUploadMimeType(file);
   if (detectedMimeType !== file.type) {
-    throw new Error("The uploaded file contents do not match the selected image type.");
+    throw new Error("The uploaded file contents do not match the selected file type.");
   }
 
-  return assertAccessibleAlt(metadata);
+  return requireImage ? assertAccessibleAlt(metadata) : metadata.alt?.trim() || file.name;
 }
 
 function mediaSigningSecret() {
@@ -253,7 +279,7 @@ const r2Adapter: MediaAdapter = {
       throw new Error("R2 media uploads are not configured. Use repo assets or add R2 env vars.");
     }
 
-    const extension = allowedImageTypes.get(file.type) || "bin";
+    const extension = mimeTypeExtension(file.type);
     const folder = normalizeMediaFolder(metadata.folder);
     const folderPrefix = folder ? `${folder}/` : "";
     const key = `uploads/${folderPrefix}${randomUUID()}.${extension}`;
@@ -382,12 +408,18 @@ export function mediaAssetDisplayUrl(
   return getMediaAdapter(asset.driver).generateVariantUrl(asset, type);
 }
 
-export async function uploadMedia(file: File, metadata: MediaUploadMetadata = {}, driver: MediaDriver = MediaDriver.R2, siteId?: string) {
+export async function uploadMedia(
+  file: File,
+  metadata: MediaUploadMetadata = {},
+  driver: MediaDriver = MediaDriver.R2,
+  siteId?: string,
+  validation: MediaUploadValidationOptions = {}
+) {
   if (metadata.isPrivate && driver !== MediaDriver.R2) {
     throw new Error("Private media delivery is currently supported only for R2 assets.");
   }
 
-  const safeAlt = await assertUploadFile(file, metadata);
+  const safeAlt = await assertUploadFile(file, metadata, validation);
   const scanResult = await runVirusScanHook(file);
   const adapter = getMediaAdapter(driver);
   const stored = await adapter.upload(file, metadata);

@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { formAnalyticsEvents, formFunnelEventNames } from "./analytics";
 import { conditionalActions, conditionalOperators, normalizeConditionalLogic } from "./conditional-logic";
+import { formatUploadSize, normalizeUploadRules } from "./upload-fields";
 import { normalizeValidationRules } from "./validation-rules";
 import {
   createFormAttachmentAction,
@@ -51,6 +52,7 @@ type BuilderField = {
   conditionalLogic: unknown;
   id: string;
   label: string;
+  type: FormFieldType;
   validationRules: unknown;
 };
 
@@ -92,7 +94,17 @@ function submissionEntries(value: unknown) {
 
   return Object.entries(value).map(([key, item]) => {
     if (isRecord(item) && "value" in item) {
+      const file = isRecord(item.file)
+        ? {
+            assetId: String(item.file.assetId || ""),
+            filename: String(item.file.filename || item.value || ""),
+            mimeType: String(item.file.mimeType || ""),
+            sizeBytes: Number(item.file.sizeBytes || 0)
+          }
+        : null;
+
       return {
+        file: file?.assetId ? file : null,
         id: key,
         label: String(item.label || key),
         type: String(item.type || "field"),
@@ -101,6 +113,7 @@ function submissionEntries(value: unknown) {
     }
 
     return {
+      file: null,
       id: key,
       label: key,
       type: "field",
@@ -222,6 +235,12 @@ function validationSummary(field: BuilderField) {
   return parts.join(" · ");
 }
 
+function uploadSummary(field: BuilderField) {
+  if (field.type !== FormFieldType.FILE) return "";
+  const rules = normalizeUploadRules(field.validationRules);
+  return `${formatUploadSize(rules.maxSizeBytes)} max · ${rules.allowedMimeTypes.join(", ")}`;
+}
+
 function validationControls(input: { field?: BuilderField; idPrefix: string }) {
   const rules = normalizeValidationRules(input.field?.validationRules);
 
@@ -260,6 +279,39 @@ function validationControls(input: { field?: BuilderField; idPrefix: string }) {
             name="validationRequiredMessage"
             defaultValue={rules.requiredMessage || ""}
             placeholder="Enter your project code."
+          />
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function uploadControls(input: { field?: BuilderField; idPrefix: string }) {
+  const rules = normalizeUploadRules(input.field?.validationRules);
+
+  return (
+    <details>
+      <summary>File upload config</summary>
+      <div className="form-grid" style={{ marginTop: 12 }}>
+        <div className="field">
+          <label htmlFor={`${input.idPrefix}-upload-mime-types`}>Allowed MIME types</label>
+          <input
+            id={`${input.idPrefix}-upload-mime-types`}
+            name="uploadAllowedMimeTypes"
+            defaultValue={rules.allowedMimeTypes.join(", ")}
+            placeholder="image/jpeg, image/png, application/pdf"
+          />
+        </div>
+        <div className="field">
+          <label htmlFor={`${input.idPrefix}-upload-max-size`}>Max size (MB)</label>
+          <input
+            id={`${input.idPrefix}-upload-max-size`}
+            name="uploadMaxSizeMb"
+            type="number"
+            min={1}
+            max={25}
+            step={0.5}
+            defaultValue={Math.round((rules.maxSizeBytes / (1024 * 1024)) * 10) / 10}
           />
         </div>
       </div>
@@ -819,7 +871,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
           <div className="card stack">
             <div>
               <h2 style={{ fontSize: "1.35rem" }}>Fields for {selectedForm.name}</h2>
-              <p style={{ color: "var(--muted)" }}>Choice fields use comma-separated options. Hidden fields store their placeholder as metadata.</p>
+              <p style={{ color: "var(--muted)" }}>Choice fields use comma-separated options. File fields store private uploads for gated admin download.</p>
             </div>
             <form action={createFormFieldAction} className="subpanel form-grid">
               <input type="hidden" name="formId" value={selectedForm.id} />
@@ -885,6 +937,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               </div>
               {conditionalControls({ fields: selectedForm.fields, idPrefix: "field-new" })}
               {validationControls({ idPrefix: "field-new" })}
+              {uploadControls({ idPrefix: "field-new" })}
               <button className="button secondary" type="submit">
                 Add field
               </button>
@@ -927,6 +980,12 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                         <>
                           <br />
                           <span style={{ color: "var(--muted)" }}>{validationSummary(field)}</span>
+                        </>
+                      ) : null}
+                      {uploadSummary(field) ? (
+                        <>
+                          <br />
+                          <span style={{ color: "var(--muted)" }}>{uploadSummary(field)}</span>
                         </>
                       ) : null}
                     </td>
@@ -994,6 +1053,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                           </div>
                           {conditionalControls({ field, fields: selectedForm.fields, idPrefix: `field-${field.id}` })}
                           {validationControls({ field, idPrefix: `field-${field.id}` })}
+                          {uploadControls({ field, idPrefix: `field-${field.id}` })}
                           <button className="button secondary" type="submit">
                             Save field
                           </button>
@@ -1066,7 +1126,17 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                           <div key={entry.id} style={{ marginBottom: 10 }}>
                             <strong>{entry.label}</strong>{" "}
                             <span className="pill">{entry.type.toLowerCase()}</span>
-                            <p style={{ color: "var(--muted)", margin: "4px 0 0" }}>{entry.value || "No answer"}</p>
+                            {entry.file ? (
+                              <p style={{ color: "var(--muted)", margin: "4px 0 0" }}>
+                                <a href={`/admin/modules/forms/submissions/${submission.id}/files/${entry.file.assetId}`}>
+                                  {entry.file.filename || entry.value || "Download file"}
+                                </a>{" "}
+                                {entry.file.mimeType ? <span className="pill">{entry.file.mimeType}</span> : null}{" "}
+                                {entry.file.sizeBytes ? <span>{formatUploadSize(entry.file.sizeBytes)}</span> : null}
+                              </p>
+                            ) : (
+                              <p style={{ color: "var(--muted)", margin: "4px 0 0" }}>{entry.value || "No answer"}</p>
+                            )}
                           </div>
                         ))}
                         {!submissionEntries(submission.data).length ? <p>No response data.</p> : null}
