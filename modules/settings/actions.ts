@@ -6,6 +6,7 @@ import { recordAuditLog } from "@/lib/audit";
 import { applyDataScopePreset, dataScopeConfigFromFormData, dataScopePresets, requireAdmin, type DataScopePreset } from "@/lib/auth";
 import { parseForm, settingsFormSchema } from "@/lib/admin-validation";
 import { setModuleEnablement } from "@/lib/modules/installation";
+import { updateStripePaymentMethodSettings } from "@/lib/payments/methods";
 import { normalizeModules } from "@/shell/modules";
 import { prisma } from "@/lib/prisma";
 import { resolveCurrentSite } from "@/lib/site";
@@ -88,4 +89,36 @@ export async function updateSettingsAction(formData: FormData) {
 
   revalidatePath("/", "layout");
   redirect("/admin/modules/settings?saved=1");
+}
+
+export async function updateStripePaymentMethodsAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+  const enabledMethods = formData.getAll("stripePaymentMethods").map(String);
+
+  try {
+    await updateStripePaymentMethodSettings({
+      enabledKeys: enabledMethods,
+      siteId: site.id
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not update Stripe checkout methods.";
+    redirect(`/admin/modules/settings?error=${encodeURIComponent(message)}`);
+  }
+
+  await recordAuditLog({
+    action: "settings.payment_methods.updated",
+    actor: user,
+    metadata: {
+      enabledMethods,
+      provider: "STRIPE"
+    },
+    siteId: site.id,
+    targetId: site.id,
+    targetLabel: site.name,
+    targetType: "payment_gateway"
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/admin/modules/settings?saved=payments");
 }

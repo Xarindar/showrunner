@@ -1,14 +1,13 @@
 import { CreditCard, Save } from "lucide-react";
-import { PaymentProvider } from "@prisma/client";
 import { dataScopePresets, parseDataScopeConfig, requireAdmin, scopableModules } from "@/lib/auth";
 import { enumLabel } from "@/lib/format";
-import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
+import { getStripePaymentMethodSettings } from "@/lib/payments/methods";
 import { isRequiredModule } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
 import { getPlatformStatus, platformFoundationItems } from "@/lib/platform-status";
 import { getSiteSettings } from "@/lib/site";
 import { normalizeThemePreset, themePresetOptions } from "@/lib/theme/tokens";
-import { updateSettingsAction } from "./actions";
+import { updateSettingsAction, updateStripePaymentMethodsAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +18,14 @@ type SettingsPageProps = {
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   await requireAdmin("settings:update");
   const [{ saved, error }, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [platformStatus, stripeCredential] = await Promise.all([
+  const [platformStatus, stripePaymentMethods] = await Promise.all([
     getPlatformStatus(settings),
-    getConnectedGatewayCredential(settings.siteId, PaymentProvider.STRIPE)
+    getStripePaymentMethodSettings(settings.siteId)
   ]);
   const dataScopeConfig = parseDataScopeConfig(settings.dataScopeConfig);
   const dataScopeModules = scopableModules();
-  const stripeConnected = stripeCredential?.status === "CONNECTED" && Boolean(stripeCredential.externalAccountId);
+  const stripeCredential = stripePaymentMethods.credential;
+  const stripeConnected = stripePaymentMethods.connected;
 
   return (
     <div className="stack">
@@ -70,10 +70,49 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           </div>
         </div>
         {stripeConnected ? (
-          <div className="subpanel">
-            <strong>{stripeCredential.displayName || stripeCredential.externalAccountId}</strong>
-            <small>Stripe account: {stripeCredential.externalAccountId}</small>
-          </div>
+          <>
+            <div className="subpanel">
+              <strong>{stripeCredential?.displayName || stripeCredential?.externalAccountId}</strong>
+              <small>Stripe account: {stripeCredential?.externalAccountId}</small>
+            </div>
+            <form action={updateStripePaymentMethodsAction} className="subpanel form-grid">
+              <div>
+                <h3 style={{ fontSize: "1rem" }}>Checkout methods</h3>
+                <p style={{ color: "var(--muted)", margin: 0 }}>Choose which Stripe-backed options can appear at checkout.</p>
+              </div>
+              <div className="module-toggle-grid">
+                {stripePaymentMethods.options.map((option) => {
+                  const checked = stripePaymentMethods.enabledKeys.includes(option.key);
+                  const applePayStatus =
+                    option.key === "APPLE_PAY" && stripePaymentMethods.applePayDomain.status
+                      ? stripePaymentMethods.applePayDomain.status
+                      : "";
+
+                  return (
+                    <label className="module-toggle-row" key={option.key}>
+                      <input name="stripePaymentMethods" type="checkbox" value={option.key} defaultChecked={checked} />
+                      <span className="module-toggle-main">
+                        <span>
+                          <strong>{option.label}</strong>
+                          <span className="pill">{option.type}</span>
+                          {applePayStatus ? <span className={applePayStatus === "verified" ? "pill success" : "pill warning"}>{applePayStatus}</span> : null}
+                        </span>
+                        <small>
+                          {option.stripePaymentMethod === "card"
+                            ? "Card-backed Stripe Checkout method."
+                            : `Stripe Checkout payment_method_types: ${option.stripePaymentMethod}.`}
+                        </small>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <button className="button secondary" type="submit">
+                <CreditCard size={18} />
+                Save payment methods
+              </button>
+            </form>
+          </>
         ) : null}
       </section>
 

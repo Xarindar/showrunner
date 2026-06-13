@@ -13,6 +13,7 @@ import Stripe from "stripe";
 import { getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
+import { resolveStripeCheckoutPaymentMethods } from "@/lib/payments/methods";
 import { createStripeConnectAuthorizeUrl } from "@/lib/payments/stripe-connect";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
@@ -203,12 +204,14 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
   };
   const metadata = stripeMetadata(orderForMetadata);
   const requestOptions = await stripeRequestOptions(order.siteId);
+  const methodSelection = await resolveStripeCheckoutPaymentMethods(order.siteId);
   const session = await getStripe().checkout.sessions.create({
     client_reference_id: order.id,
     customer_email: order.customerEmail,
     line_items: stripeLineItems(order),
     metadata,
     mode: "payment",
+    payment_method_types: methodSelection.paymentMethodTypes,
     payment_intent_data: {
       metadata
     },
@@ -230,6 +233,8 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
       paymentStatus: session.payment_status,
       status: session.status
     },
+    enabledPaymentMethods: methodSelection.enabledKeys,
+    enabledWallets: methodSelection.cardWallets,
     pciScope: "Hosted/tokenized collection only. No raw card data is stored."
   } satisfies Prisma.InputJsonObject;
 
@@ -325,6 +330,7 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
     siteId: result.document.siteId
   });
   const requestOptions = await stripeRequestOptions(result.document.siteId);
+  const methodSelection = await resolveStripeCheckoutPaymentMethods(result.document.siteId);
   const session = await getStripe().checkout.sessions.create({
     client_reference_id: result.document.id,
     customer_email: result.document.customerEmail,
@@ -335,6 +341,7 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
     }),
     metadata,
     mode: "payment",
+    payment_method_types: methodSelection.paymentMethodTypes,
     payment_intent_data: {
       metadata
     },
@@ -356,6 +363,8 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
       paymentStatus: session.payment_status,
       status: session.status
     },
+    enabledPaymentMethods: methodSelection.enabledKeys,
+    enabledWallets: methodSelection.cardWallets,
     pciScope: "Hosted/tokenized collection only. No raw card data is stored."
   } satisfies Prisma.InputJsonObject;
 
