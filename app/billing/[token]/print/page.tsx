@@ -18,11 +18,16 @@ export default async function BillingPrintPage({ params }: BillingPrintPageProps
     where: { siteId_publicAccessToken: { siteId: settings.siteId, publicAccessToken: token } },
     include: {
       lineItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
-      attachments: { orderBy: { createdAt: "desc" } }
+      attachments: { orderBy: { createdAt: "desc" } },
+      payments: { orderBy: { createdAt: "asc" } }
     }
   });
 
   if (!document || document.status === BillingDocumentStatus.DRAFT) notFound();
+  const paidCents = document.payments
+    .filter((payment) => payment.status === "PAID" || payment.status === "AUTHORIZED")
+    .reduce((sum, payment) => sum + payment.amountCents, 0);
+  const remainingCents = Math.max(0, document.totalCents - paidCents);
 
   return (
     <main style={{ background: "white", color: "#111", minHeight: "100vh", padding: 32 }}>
@@ -110,6 +115,14 @@ export default async function BillingPrintPage({ params }: BillingPrintPageProps
               <td style={{ borderTop: "1px solid #222", fontWeight: 700, padding: "12px 0", textAlign: "right" }}>
                 {formatMoney(document.totalCents, document.currency)}
               </td>
+            </tr>
+            <tr>
+              <td style={{ padding: "8px 0" }}>Paid</td>
+              <td style={{ padding: "8px 0", textAlign: "right" }}>{formatMoney(paidCents, document.currency)}</td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: 700, padding: "8px 0" }}>Remaining</td>
+              <td style={{ fontWeight: 700, padding: "8px 0", textAlign: "right" }}>{formatMoney(remainingCents, document.currency)}</td>
             </tr>
           </tbody>
         </table>

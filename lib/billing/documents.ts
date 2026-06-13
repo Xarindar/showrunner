@@ -58,13 +58,18 @@ export async function snapshotBillingDocument(tx: BillingTx, documentId: string)
     where: { id: documentId },
     include: {
       lineItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
-      attachments: { orderBy: { createdAt: "desc" } }
+      attachments: { orderBy: { createdAt: "desc" } },
+      payments: { orderBy: { createdAt: "asc" } }
     }
   });
 
   if (!document) throw new Error("Billing document not found.");
 
   const publicAccessToken = await ensureBillingPublicToken(tx, document.id);
+  const paidCents = document.payments
+    .filter((payment) => payment.status === "PAID" || payment.status === "AUTHORIZED")
+    .reduce((sum, payment) => sum + payment.amountCents, 0);
+  const remainingCents = Math.max(0, document.totalCents - paidCents);
   const snapshot = {
     documentNumber: document.documentNumber,
     type: document.type,
@@ -76,6 +81,8 @@ export async function snapshotBillingDocument(tx: BillingTx, documentId: string)
     discount: moneySnapshot(document.discountCents, document.currency),
     tax: moneySnapshot(document.taxCents, document.currency),
     total: moneySnapshot(document.totalCents, document.currency),
+    paid: moneySnapshot(paidCents, document.currency),
+    remaining: moneySnapshot(remainingCents, document.currency),
     dueAt: document.dueAt?.toISOString() || null,
     acceptedAt: document.acceptedAt?.toISOString() || null,
     paidAt: document.paidAt?.toISOString() || null,
@@ -96,6 +103,15 @@ export async function snapshotBillingDocument(tx: BillingTx, documentId: string)
       url: attachment.url,
       notes: attachment.notes,
       createdAt: attachment.createdAt.toISOString()
+    })),
+    payments: document.payments.map((payment) => ({
+      provider: payment.provider,
+      status: payment.status,
+      amount: moneySnapshot(payment.amountCents, payment.currency),
+      externalCheckoutSession: payment.externalCheckoutSession,
+      externalPaymentId: payment.externalPaymentId,
+      hostedReceiptUrl: payment.hostedReceiptUrl,
+      createdAt: payment.createdAt.toISOString()
     }))
   };
 

@@ -46,12 +46,35 @@ model BillingDocument {
   updatedAt                DateTime              @updatedAt
   lineItems                BillingLineItem[]
   attachments              BillingAttachment[]
+  payments                 BillingPayment[]
 
   @@unique([siteId, documentNumber])
   @@unique([siteId, publicAccessToken])
   @@index([clientId])
   @@index([siteId, type, status])
   @@index([customerEmail])
+}
+
+model BillingPayment {
+  id                      String          @id @default(cuid())
+  billingDocumentId       String
+  billingDocument         BillingDocument @relation(fields: [billingDocumentId], references: [id], onDelete: Cascade)
+  provider                PaymentProvider
+  status                  PaymentStatus   @default(PENDING)
+  amountCents             Int
+  currency                String          @default("USD")
+  externalPaymentId       String?
+  externalCheckoutSession String?
+  hostedReceiptUrl        String?
+  rawSummary              Json            @default("{}")
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  @@index([billingDocumentId])
+  @@index([provider])
+  @@index([status])
+  @@index([externalCheckoutSession])
+  @@index([externalPaymentId])
 }
 
 model BillingLineItem {

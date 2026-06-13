@@ -4,12 +4,20 @@ import { BillingDocumentStatus, BillingDocumentType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { moneyCents } from "@/lib/admin-validation";
 import { snapshotBillingDocument } from "@/lib/billing/documents";
+import { getBillingPaymentSummary } from "@/lib/billing/payments";
+import { createStripeCheckoutSessionForBillingDocument } from "@/lib/commerce/stripe";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getCurrentSiteId } from "@/lib/site";
 
 const acceptSchema = z.object({
   token: z.string().trim().min(1)
+});
+
+const paymentSchema = z.object({
+  token: z.string().trim().min(1),
+  amount: moneyCents
 });
 
 export async function acceptPublicBillingDocumentAction(formData: FormData) {
@@ -22,11 +30,12 @@ export async function acceptPublicBillingDocumentAction(formData: FormData) {
   }
 
   const token = parsed.data.token;
+  const siteId = await getCurrentSiteId();
 
   try {
     await prisma.$transaction(async (tx) => {
       const document = await tx.billingDocument.findUnique({
-        where: { siteId_publicAccessToken: { siteId: DEFAULT_SITE_ID, publicAccessToken: token } },
+        where: { siteId_publicAccessToken: { siteId, publicAccessToken: token } },
         select: { id: true, type: true, status: true, acceptedAt: true }
       });
 
@@ -54,4 +63,47 @@ export async function acceptPublicBillingDocumentAction(formData: FormData) {
   revalidatePath(`/billing/${token}`);
   revalidatePath("/admin/modules/billing");
   redirect(`/billing/${encodeURIComponent(token)}?accepted=1`);
+}
+
+export async function createPublicBillingCheckoutAction(formData: FormData) {
+  const parsed = paymentSchema.safeParse({
+    token: formData.get("token"),
+    amount: formData.get("amount")
+  });
+
+  if (!parsed.success) {
+    redirect("/?error=billing-payment");
+  }
+
+  const { amount, token } = parsed.data;
+  const siteId = await getCurrentSiteId();
+  let checkoutUrl = "";
+
+  try {
+    const document = await prisma.billingDocument.findUnique({
+      where: { siteId_publicAccessToken: { siteId, publicAccessToken: token } },
+      select: {
+        id: true,
+        status: true
+      }
+    });
+
+    if (!document || document.status === BillingDocumentStatus.DRAFT) throw new Error("Document not found.");
+
+    const summary = await prisma.$transaction((tx) => getBillingPaymentSummary(tx, document.id));
+    if (amount > summary.remainingCents) {
+      throw new Error("Payment amount cannot exceed the remaining balance.");
+    }
+
+    const checkout = await createStripeCheckoutSessionForBillingDocument({
+      amountCents: amount,
+      billingDocumentId: document.id,
+      siteId
+    });
+    checkoutUrl = checkout.checkoutUrl;
+  } catch (error) {
+    redirect(`/billing/${encodeURIComponent(token)}?error=${encodeURIComponent(error instanceof Error ? error.message : "Could not start payment.")}`);
+  }
+
+  redirect(checkoutUrl);
 }

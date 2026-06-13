@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BillingDocumentStatus, BillingDocumentType } from "@prisma/client";
 import { CheckCircle, CreditCard, FileText, Printer } from "lucide-react";
-import { acceptPublicBillingDocumentAction } from "./actions";
+import { acceptPublicBillingDocumentAction, createPublicBillingCheckoutAction } from "./actions";
 import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 type BillingDocumentPageProps = {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ accepted?: string; error?: string }>;
+  searchParams: Promise<{ accepted?: string; checkout?: string; error?: string }>;
 };
 
 function statusClass(status: BillingDocumentStatus) {
@@ -26,12 +26,11 @@ function canAccept(type: BillingDocumentType, status: BillingDocumentStatus) {
 }
 
 function canPay(type: BillingDocumentType, status: BillingDocumentStatus) {
-  return (
-    type === BillingDocumentType.INVOICE &&
-    (status === BillingDocumentStatus.SENT ||
-      status === BillingDocumentStatus.ACCEPTED ||
-      status === BillingDocumentStatus.OVERDUE)
-  );
+  return type !== BillingDocumentType.CONTRACT && (status === BillingDocumentStatus.SENT || status === BillingDocumentStatus.ACCEPTED || status === BillingDocumentStatus.OVERDUE);
+}
+
+function paymentAmountInput(cents: number) {
+  return (cents / 100).toFixed(2);
 }
 
 export default async function BillingDocumentPage({ params, searchParams }: BillingDocumentPageProps) {
@@ -42,7 +41,8 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
     where: { siteId_publicAccessToken: { siteId: settings.siteId, publicAccessToken: token } },
     include: {
       lineItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
-      attachments: { orderBy: { createdAt: "desc" } }
+      attachments: { orderBy: { createdAt: "desc" } },
+      payments: { orderBy: { createdAt: "desc" } }
     }
   });
 
@@ -50,6 +50,10 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
 
   const payable = canPay(document.type, document.status);
   const acceptable = canAccept(document.type, document.status);
+  const paidCents = document.payments
+    .filter((payment) => payment.status === "PAID" || payment.status === "AUTHORIZED")
+    .reduce((sum, payment) => sum + payment.amountCents, 0);
+  const remainingCents = Math.max(0, document.totalCents - paidCents);
 
   return (
     <main className="site-shell" style={themeToCssVars(settings)}>
@@ -63,12 +67,18 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
             <Printer size={18} />
             Print
           </Link>
+          <Link href={`/billing/${token}/pdf`} className="button secondary">
+            <FileText size={18} />
+            PDF
+          </Link>
         </div>
       </nav>
 
       <section className="section" style={{ paddingTop: 22 }}>
         <div className="stack">
           {query.accepted ? <div className="success-message">Document accepted.</div> : null}
+          {query.checkout === "success" ? <div className="success-message">Payment received. Your balance is updated below.</div> : null}
+          {query.checkout === "cancel" ? <div className="error">Payment was canceled before completion.</div> : null}
           {query.error ? <div className="error">{query.error}</div> : null}
 
           <div className="card stack">
@@ -96,8 +106,8 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
               </div>
               <div className="subpanel">
                 <CreditCard size={20} />
-                <h3>Payment</h3>
-                <p>{document.paidAt ? formatDateTime(document.paidAt, settings.timezone) : "Hosted checkout only"}</p>
+                <h3>Balance</h3>
+                <p>{formatMoney(remainingCents, document.currency)} remaining</p>
               </div>
             </div>
 
@@ -147,6 +157,16 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
                         <strong>{formatMoney(document.totalCents, document.currency)}</strong>
                       </td>
                     </tr>
+                    <tr>
+                      <td>Paid</td>
+                      <td>{formatMoney(paidCents, document.currency)}</td>
+                    </tr>
+                    <tr>
+                      <td>Remaining</td>
+                      <td>
+                        <strong>{formatMoney(remainingCents, document.currency)}</strong>
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -162,20 +182,60 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
                     </button>
                   </form>
                 ) : null}
-                {payable && document.checkoutUrl ? (
-                  <a className="button" href={document.checkoutUrl}>
+                {payable && remainingCents > 0 ? (
+                  <form action={createPublicBillingCheckoutAction} className="form-grid">
+                    <input type="hidden" name="token" value={token} />
+                    <div className="field">
+                      <label htmlFor="billing-payment-amount">Payment amount</label>
+                      <input
+                        id="billing-payment-amount"
+                        name="amount"
+                        inputMode="decimal"
+                        defaultValue={paymentAmountInput(remainingCents)}
+                        required
+                      />
+                    </div>
+                    <button className="button" type="submit">
+                      <CreditCard size={18} />
+                      Pay with Stripe Checkout
+                    </button>
+                  </form>
+                ) : null}
+                {payable && document.checkoutUrl && remainingCents > 0 ? (
+                  <a className="button secondary" href={document.checkoutUrl}>
                     <CreditCard size={18} />
-                    Pay with Stripe Checkout
+                    Resume latest checkout
                   </a>
                 ) : null}
-                {payable && !document.checkoutUrl ? <span className="pill">Payment link pending</span> : null}
+                {payable && remainingCents <= 0 ? <span className="pill success">Paid in full</span> : null}
                 {!acceptable && !payable ? <span className="pill">No action needed</span> : null}
                 <Link className="button secondary" href={`/billing/${token}/print`}>
                   <Printer size={18} />
                   Print or save PDF
                 </Link>
+                <Link className="button secondary" href={`/billing/${token}/pdf`}>
+                  <FileText size={18} />
+                  Download PDF
+                </Link>
               </div>
             </div>
+
+            {document.payments.length ? (
+              <div className="subpanel">
+                <h3>Payment history</h3>
+                <table className="table" style={{ minWidth: 0 }}>
+                  <tbody>
+                    {document.payments.map((payment) => (
+                      <tr key={payment.id}>
+                        <td>{enumLabel(payment.status)}</td>
+                        <td>{formatMoney(payment.amountCents, payment.currency)}</td>
+                        <td>{formatDateTime(payment.createdAt, settings.timezone)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
 
             {document.attachments.length ? (
               <div className="subpanel">

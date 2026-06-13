@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { BillingDocumentStatus, BillingDocumentType } from "@prisma/client";
+import { BillingDocumentStatus, BillingDocumentType, PaymentStatus } from "@prisma/client";
 import { FileText, Plus, ReceiptText, WalletCards } from "lucide-react";
+import { requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -37,9 +38,32 @@ function dateInputValue(value?: Date | null) {
   return value ? value.toISOString().slice(0, 10) : "";
 }
 
-function currencyTotalsLabel(totals: { currency: string; _sum: { totalCents: number | null } }[]) {
+function paymentTotalsLabel(totals: { currency: string; _sum: { amountCents: number | null } }[]) {
   if (!totals.length) return formatMoney(0);
-  return totals.map((row) => formatMoney(row._sum.totalCents || 0, row.currency)).join(" / ");
+  return totals.map((row) => formatMoney(row._sum.amountCents || 0, row.currency)).join(" / ");
+}
+
+function paidCents(payments: { amountCents: number; status: PaymentStatus | string }[]) {
+  return payments
+    .filter((payment) => payment.status === "PAID" || payment.status === "AUTHORIZED")
+    .reduce((sum, payment) => sum + payment.amountCents, 0);
+}
+
+function openBalanceTotalsLabel(
+  documents: { currency: string; payments: { amountCents: number; status: string }[]; totalCents: number }[]
+) {
+  const totals = new Map<string, number>();
+  for (const document of documents) {
+    const remainingCents = Math.max(0, document.totalCents - paidCents(document.payments));
+    if (remainingCents > 0) {
+      totals.set(document.currency, (totals.get(document.currency) || 0) + remainingCents);
+    }
+  }
+
+  if (!totals.size) return formatMoney(0);
+  return Array.from(totals.entries())
+    .map(([currency, cents]) => formatMoney(cents, currency))
+    .join(" / ");
 }
 
 function nextStatuses(status: BillingDocumentStatus) {
@@ -56,6 +80,7 @@ function nextStatuses(status: BillingDocumentStatus) {
 }
 
 export default async function BillingPage({ searchParams }: BillingPageProps) {
+  await requireAdmin("billing:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
 
   await prisma.billingDocument.updateMany({
@@ -67,11 +92,12 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
     data: { status: BillingDocumentStatus.OVERDUE }
   });
 
-  const [documents, clients, documentCount, paidTotals, openTotals] = await Promise.all([
+  const [documents, clients, documentCount, paidTotals, openDocuments] = await Promise.all([
     prisma.billingDocument.findMany({
       where: { siteId: settings.siteId },
       include: {
         client: true,
+        payments: true,
         _count: { select: { lineItems: true, attachments: true } }
       },
       orderBy: { createdAt: "desc" },
@@ -83,15 +109,26 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       take: 40
     }),
     prisma.billingDocument.count({ where: { siteId: settings.siteId } }),
-    prisma.billingDocument.groupBy({
+    prisma.billingPayment.groupBy({
       by: ["currency"],
-      where: { siteId: settings.siteId, status: BillingDocumentStatus.PAID },
-      _sum: { totalCents: true }
+      where: {
+        billingDocument: { siteId: settings.siteId },
+        status: { in: [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] }
+      },
+      _sum: { amountCents: true }
     }),
-    prisma.billingDocument.groupBy({
-      by: ["currency"],
+    prisma.billingDocument.findMany({
       where: { siteId: settings.siteId, status: { in: [BillingDocumentStatus.SENT, BillingDocumentStatus.ACCEPTED, BillingDocumentStatus.OVERDUE] } },
-      _sum: { totalCents: true }
+      select: {
+        currency: true,
+        totalCents: true,
+        payments: {
+          select: {
+            amountCents: true,
+            status: true
+          }
+        }
+      }
     })
   ]);
 
@@ -102,7 +139,8 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         include: {
           client: true,
           lineItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
-          attachments: { orderBy: { createdAt: "desc" } }
+          attachments: { orderBy: { createdAt: "desc" } },
+          payments: { orderBy: { createdAt: "desc" } }
         }
       })
     : null;
@@ -111,6 +149,8 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   const selectedDocumentIsDraft = selectedDocument?.status === BillingDocumentStatus.DRAFT;
   const selectedDocumentIsFinal =
     selectedDocument?.status === BillingDocumentStatus.PAID || selectedDocument?.status === BillingDocumentStatus.VOID;
+  const selectedPaidCents = selectedDocument ? paidCents(selectedDocument.payments) : 0;
+  const selectedRemainingCents = selectedDocument ? Math.max(0, selectedDocument.totalCents - selectedPaidCents) : 0;
 
   return (
     <div className="stack">
@@ -135,14 +175,14 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         </div>
         <div className="card">
           <WalletCards size={22} />
-          <h3>{currencyTotalsLabel(paidTotals)}</h3>
+          <h3>{paymentTotalsLabel(paidTotals)}</h3>
           <p className="lead" style={{ fontSize: "0.95rem" }}>
             Total marked paid across all billing records.
           </p>
         </div>
         <div className="card">
           <FileText size={22} />
-          <h3>{currencyTotalsLabel(openTotals)}</h3>
+          <h3>{openBalanceTotalsLabel(openDocuments)}</h3>
           <p className="lead" style={{ fontSize: "0.95rem" }}>
             Sent, accepted, and overdue documents still open.
           </p>
@@ -269,7 +309,17 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                     <br />
                     <span style={{ color: "var(--muted)" }}>{document.customerEmail}</span>
                   </td>
-                  <td>{formatMoney(document.totalCents, document.currency)}</td>
+                  <td>
+                    {formatMoney(document.totalCents, document.currency)}
+                    {paidCents(document.payments) > 0 ? (
+                      <>
+                        <br />
+                        <span style={{ color: "var(--muted)" }}>
+                          {formatMoney(Math.max(0, document.totalCents - paidCents(document.payments)), document.currency)} due
+                        </span>
+                      </>
+                    ) : null}
+                  </td>
                   <td>
                     <span className={statusClass(document.status)}>{enumLabel(document.status)}</span>
                   </td>
@@ -315,6 +365,16 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                   <td>Total</td>
                   <td>
                     <strong>{formatMoney(selectedDocument.totalCents, selectedDocument.currency)}</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Paid</td>
+                  <td>{formatMoney(selectedPaidCents, selectedDocument.currency)}</td>
+                </tr>
+                <tr>
+                  <td>Remaining</td>
+                  <td>
+                    <strong>{formatMoney(selectedRemainingCents, selectedDocument.currency)}</strong>
                   </td>
                 </tr>
                 <tr>
@@ -423,6 +483,22 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 ) : null}
               </div>
             </div>
+            {selectedDocument.payments.length ? (
+              <div className="subpanel">
+                <h3 style={{ fontSize: "1.05rem" }}>Payment history</h3>
+                <table className="table" style={{ minWidth: 0 }}>
+                  <tbody>
+                    {selectedDocument.payments.map((payment) => (
+                      <tr key={payment.id}>
+                        <td>{enumLabel(payment.status)}</td>
+                        <td>{formatMoney(payment.amountCents, payment.currency)}</td>
+                        <td>{formatDateTime(payment.createdAt, settings.timezone)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
             {selectedDocumentIsDraft ? (
               <form action={updateBillingDocumentAction} className="subpanel form-grid">
                 <h3 style={{ fontSize: "1.05rem" }}>Edit draft details</h3>
