@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { EmailOutboxStatus, MessageLogStatus } from "@prisma/client";
 import { CalendarCheck, Save } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
+import { enumLabel, formatDateTime, formatMoney, stringArrayFromUnknown } from "@/lib/format";
 import { isRecord } from "@/lib/objects";
 import { getSiteSettings } from "@/lib/site";
 import { addClientNoteAction, updateClientAction } from "../actions";
@@ -25,6 +26,38 @@ type TimelineItem = {
 
 function truncate(value: string, length = 140) {
   return value.length > length ? `${value.slice(0, length - 1)}...` : value;
+}
+
+function clientEmailSet(client: { alternateEmails: unknown; email: string }) {
+  return [...new Set([client.email, ...stringArrayFromUnknown(client.alternateEmails)].map((email) => email.trim().toLowerCase()).filter(Boolean))];
+}
+
+function emailOutboxStatusClass(status: EmailOutboxStatus) {
+  if (status === EmailOutboxStatus.SENT) return "pill success";
+  if (status === EmailOutboxStatus.FAILED || status === EmailOutboxStatus.SUPPRESSED || status === EmailOutboxStatus.CANCELED) {
+    return "pill danger";
+  }
+  return "pill";
+}
+
+function messageLogStatusClass(status: MessageLogStatus) {
+  if (status === MessageLogStatus.SENT) return "pill success";
+  if (status === MessageLogStatus.FAILED || status === MessageLogStatus.SUPPRESSED) return "pill danger";
+  return "pill";
+}
+
+function relatedRecordHref(type: string, id: string) {
+  if (!type || !id) return "";
+  if (type === "booking") return `/admin/appointments/${id}`;
+  if (type === "order") return `/admin/modules/products?order=${encodeURIComponent(id)}`;
+  if (type === "billingDocument") return `/admin/modules/billing?document=${encodeURIComponent(id)}`;
+  if (type === "formSubmission" || type === "form_submission") return `/admin/modules/forms`;
+  return "";
+}
+
+function relatedRecordLabel(type: string, id: string) {
+  if (!type || !id) return "None";
+  return `${type} ${id.slice(0, 8)}`;
 }
 
 function summarizeSubmission(value: unknown) {
@@ -83,7 +116,38 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
 
   if (!client) notFound();
 
+  const clientEmails = clientEmailSet(client);
+  const bookingIds = client.bookings.map((booking) => booking.id);
+  const orderIds = client.orders.map((order) => order.id);
+  const billingDocumentIds = client.billingDocuments.map((document) => document.id);
+  const formSubmissionIds = client.formSubmissions.map((submission) => submission.id);
+  const relatedOutboxFilters: Array<{ relatedType: string; relatedId: { in: string[] } }> = [];
+  if (bookingIds.length) relatedOutboxFilters.push({ relatedType: "booking", relatedId: { in: bookingIds } });
+  if (orderIds.length) relatedOutboxFilters.push({ relatedType: "order", relatedId: { in: orderIds } });
+  if (billingDocumentIds.length) relatedOutboxFilters.push({ relatedType: "billingDocument", relatedId: { in: billingDocumentIds } });
+  if (formSubmissionIds.length) {
+    relatedOutboxFilters.push({ relatedType: "formSubmission", relatedId: { in: formSubmissionIds } });
+    relatedOutboxFilters.push({ relatedType: "form_submission", relatedId: { in: formSubmissionIds } });
+  }
+
+  const emailOutboxRows = await prisma.emailOutbox.findMany({
+    where: {
+      siteId: settings.siteId,
+      OR: [{ recipientEmail: { in: clientEmails } }, ...relatedOutboxFilters]
+    },
+    include: { template: { select: { name: true, key: true, purpose: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 80
+  });
+
   const timelineItems: TimelineItem[] = [
+    ...emailOutboxRows.map((message) => ({
+      id: `email-outbox-${message.id}`,
+      at: message.sentAt || message.updatedAt,
+      badge: "email",
+      title: message.subject || message.template?.name || message.templateKey,
+      detail: `${enumLabel(message.status)} | ${message.recipientEmail}`
+    })),
     ...client.bookings.map((booking) => ({
       id: `booking-${booking.id}`,
       at: booking.startsAt,
@@ -236,6 +300,96 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             </div>
           ))}
           {!timelineItems.length ? <p>No timeline activity yet.</p> : null}
+        </div>
+      </section>
+
+      <section className="card stack">
+        <div className="page-header" style={{ marginBottom: 16 }}>
+          <div>
+            <h2 style={{ fontSize: "1.35rem" }}>Email delivery history</h2>
+            <p style={{ color: "var(--muted)", margin: 0 }}>
+              Outbox and manual message records matched by client email, appointments, orders, billing documents, and form submissions.
+            </p>
+          </div>
+        </div>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Recipient</th>
+              <th>Template</th>
+              <th>Status</th>
+              <th>Related</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            {emailOutboxRows.map((row) => {
+              const relatedHref = relatedRecordHref(row.relatedType, row.relatedId);
+              const relatedLabel = relatedRecordLabel(row.relatedType, row.relatedId);
+
+              return (
+                <tr key={row.id}>
+                  <td>
+                    <strong>{row.recipientEmail}</strong>
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>{row.subject || row.purpose}</span>
+                  </td>
+                  <td>{row.template?.name || row.templateKey || "Template removed"}</td>
+                  <td>
+                    <span className={emailOutboxStatusClass(row.status)}>{enumLabel(row.status)}</span>
+                  </td>
+                  <td>{relatedHref ? <Link href={relatedHref}>{relatedLabel}</Link> : relatedLabel}</td>
+                  <td>{formatDateTime(row.sentAt || row.updatedAt, settings.timezone)}</td>
+                </tr>
+              );
+            })}
+            {!emailOutboxRows.length ? (
+              <tr>
+                <td colSpan={5}>No outbox delivery records for this client yet.</td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+        <div className="subpanel">
+          <h3 style={{ fontSize: "1.05rem" }}>Manual message notes</h3>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Recipient</th>
+                <th>Template</th>
+                <th>Status</th>
+                <th>Related</th>
+                <th>Logged</th>
+              </tr>
+            </thead>
+            <tbody>
+              {client.messageLogs.map((log) => {
+                const relatedHref = relatedRecordHref(log.relatedType, log.relatedId);
+                const relatedLabel = relatedRecordLabel(log.relatedType, log.relatedId);
+
+                return (
+                  <tr key={log.id}>
+                    <td>
+                      <strong>{log.recipientEmail || log.recipientPhone || client.email}</strong>
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>{log.subject || log.purpose}</span>
+                    </td>
+                    <td>{log.template?.name || log.purpose}</td>
+                    <td>
+                      <span className={messageLogStatusClass(log.status)}>{enumLabel(log.status)}</span>
+                    </td>
+                    <td>{relatedHref ? <Link href={relatedHref}>{relatedLabel}</Link> : relatedLabel}</td>
+                    <td>{formatDateTime(log.sentAt || log.createdAt, settings.timezone)}</td>
+                  </tr>
+                );
+              })}
+              {!client.messageLogs.length ? (
+                <tr>
+                  <td colSpan={5}>No manual message notes for this client yet.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
       </section>
 

@@ -1,5 +1,6 @@
 import { EmailOutboxStatus, EmailSuppressionScope, MessageChannel, MessageLogStatus, MessageTemplatePurpose } from "@prisma/client";
 import { Mail, MessageSquareText, Plus, Save, ShieldOff } from "lucide-react";
+import Link from "next/link";
 import { renderEmailTemplate } from "@/lib/email/render";
 import { enumLabel, formatDateTime, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -60,6 +61,14 @@ function outboxStatusClass(status: EmailOutboxStatus) {
   if (status === EmailOutboxStatus.SENT) return "pill success";
   if (status === EmailOutboxStatus.FAILED || status === EmailOutboxStatus.SUPPRESSED || status === EmailOutboxStatus.CANCELED) return "pill danger";
   return "pill";
+}
+
+function relatedRecordHref(type: string, id: string) {
+  if (!type || !id) return "";
+  if (type === "booking") return `/admin/appointments/${id}`;
+  if (type === "order") return `/admin/modules/products?order=${encodeURIComponent(id)}`;
+  if (type === "billingDocument") return `/admin/modules/billing?document=${encodeURIComponent(id)}`;
+  return "";
 }
 
 export default async function CommunicationsPage({ searchParams }: CommunicationsPageProps) {
@@ -485,27 +494,43 @@ export default async function CommunicationsPage({ searchParams }: Communication
                 <th>Recipient</th>
                 <th>Template</th>
                 <th>Status</th>
+                <th>Related</th>
                 <th>Updated</th>
               </tr>
             </thead>
             <tbody>
-              {outboxRows.map((row) => (
-                <tr key={row.id}>
-                  <td>
-                    <strong>{row.recipientEmail}</strong>
-                    <br />
-                    <span style={{ color: "var(--muted)" }}>{row.subject || row.purpose}</span>
-                  </td>
-                  <td>{row.template?.name || row.templateKey || "Template removed"}</td>
-                  <td>
-                    <span className={outboxStatusClass(row.status)}>{enumLabel(row.status)}</span>
-                  </td>
-                  <td>{formatDateTime(row.updatedAt, settings.timezone)}</td>
-                </tr>
-              ))}
+              {outboxRows.map((row) => {
+                const relatedHref = relatedRecordHref(row.relatedType, row.relatedId);
+
+                return (
+                  <tr key={row.id}>
+                    <td>
+                      <strong>{row.recipientEmail}</strong>
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>{row.subject || row.purpose}</span>
+                    </td>
+                    <td>{row.template?.name || row.templateKey || "Template removed"}</td>
+                    <td>
+                      <span className={outboxStatusClass(row.status)}>{enumLabel(row.status)}</span>
+                    </td>
+                    <td>
+                      {relatedHref ? (
+                        <Link href={relatedHref}>
+                          {row.relatedType} {row.relatedId.slice(0, 8)}
+                        </Link>
+                      ) : row.relatedType ? (
+                        `${row.relatedType} ${row.relatedId.slice(0, 8)}`
+                      ) : (
+                        "None"
+                      )}
+                    </td>
+                    <td>{formatDateTime(row.sentAt || row.updatedAt, settings.timezone)}</td>
+                  </tr>
+                );
+              })}
               {!outboxRows.length ? (
                 <tr>
-                  <td colSpan={4}>No outbox rows yet.</td>
+                  <td colSpan={5}>No outbox rows yet.</td>
                 </tr>
               ) : null}
             </tbody>
