@@ -43,9 +43,23 @@ enum PaymentStatus {
 enum PaymentProvider {
   MANUAL
   STRIPE
+  PAYPAL
   SHOPIFY
   SQUARE
   WOOCOMMERCE
+}
+
+enum PaymentGatewayConnectionStatus {
+  DISCONNECTED
+  PENDING
+  CONNECTED
+  ERROR
+}
+
+enum StripeWebhookEventStatus {
+  PROCESSING
+  PROCESSED
+  FAILED
 }
 
 model Product {
@@ -269,4 +283,47 @@ model Payment {
   @@index([orderId])
   @@index([provider])
   @@index([status])
+}
+
+model PaymentGatewayCredential {
+  id                    String                         @id @default(cuid())
+  siteId                String
+  site                  Site                           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  provider              PaymentProvider
+  status                PaymentGatewayConnectionStatus @default(DISCONNECTED)
+  externalAccountId     String                         @default("")
+  merchantId            String                         @default("")
+  displayName           String                         @default("")
+  encryptedAccessToken  String                         @default("")
+  encryptedRefreshToken String                         @default("")
+  encryptedSecretKey    String                         @default("")
+  webhookSecretHint     String                         @default("")
+  supportedWallets      Json                           @default("[]")
+  metadata              Json                           @default("{}")
+  connectedAt           DateTime?
+  expiresAt             DateTime?
+  lastVerifiedAt        DateTime?
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
+
+  @@unique([siteId, provider])
+  @@index([siteId, status])
+  @@index([provider, status])
+}
+
+model StripeWebhookEvent {
+  id          String                   @id @default(cuid())
+  eventId     String
+  type        String
+  status      StripeWebhookEventStatus @default(PROCESSING)
+  livemode    Boolean                  @default(false)
+  summary     Json                     @default("{}")
+  error       String                   @default("")
+  processedAt DateTime?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  @@unique([eventId])
+  @@index([status])
+  @@index([type])
 }

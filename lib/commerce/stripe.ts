@@ -13,6 +13,7 @@ import { getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPaymen
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
+import type { PaymentGateway, PaymentGatewayCheckoutInput } from "@/lib/payments/types";
 import { updateOrderStatus } from "./orders";
 
 let stripeClient: Stripe | null = null;
@@ -287,7 +288,7 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
       },
       payment
     };
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
   const metadata = stripeBillingMetadata({
     billingDocumentId: result.document.id,
@@ -806,3 +807,41 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
     throw error;
   }
 }
+
+async function createStripeGatewayCheckoutSession(input: PaymentGatewayCheckoutInput) {
+  if (input.kind === "order") {
+    const order = await createStripeCheckoutSessionForOrder(input.orderId, input.siteId);
+    return {
+      checkoutUrl: String(order.checkoutUrl || ""),
+      order,
+      provider: PaymentProvider.STRIPE
+    };
+  }
+
+  const result = await createStripeCheckoutSessionForBillingDocument({
+    amountCents: input.amountCents,
+    billingDocumentId: input.billingDocumentId,
+    siteId: input.siteId
+  });
+
+  return {
+    checkoutUrl: result.checkoutUrl,
+    paymentId: result.paymentId,
+    provider: PaymentProvider.STRIPE
+  };
+}
+
+export const stripePaymentGateway: PaymentGateway = {
+  provider: PaymentProvider.STRIPE,
+  createCheckoutSession: createStripeGatewayCheckoutSession,
+  createOnboardingSession: async () => ({
+    provider: PaymentProvider.STRIPE,
+    status: "unsupported"
+  }),
+  handleWebhookEvent: async (event: unknown) => handleStripeWebhookEvent(event as Stripe.Event),
+  refund: async () => {
+    throw new Error("Stripe refunds are not routed through the gateway adapter yet.");
+  },
+  supportedWallets: async () => [],
+  verifyWebhook: ({ rawBody, signature }) => constructStripeWebhookEvent(rawBody, signature)
+};

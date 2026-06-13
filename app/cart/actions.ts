@@ -2,7 +2,9 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { AnalyticsEventType } from "@prisma/client";
 import { z } from "zod";
+import { buildAddToCartEvent, buildBeginCheckoutEvent } from "@/lib/analytics/ecommerce";
 import {
   addCartItem,
   applyCartCoupon,
@@ -11,6 +13,8 @@ import {
   updateCartItem
 } from "@/lib/commerce/cart";
 import { queueOrderCheckoutEmail } from "@/lib/email";
+import { emitAnalyticsEvent, requestAttribution } from "@/lib/events/emit";
+import { createPaymentCheckoutSessionForOrder } from "@/lib/payments/checkout";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getSiteSettings } from "@/lib/site";
 
@@ -84,13 +88,31 @@ export async function addToCartAction(formData: FormData) {
   }
 
   try {
-    const cartId = await addCartItem({
+    const cart = await addCartItem({
       cartId: await currentCartId(),
       productId: parsed.data.productId,
       variantId: parsed.data.variantId,
       quantity: parsed.data.quantity
     });
-    await setCartId(cartId);
+    await emitAnalyticsEvent({
+      ...(await requestAttribution(undefined, parsed.data.returnTo || "/cart")),
+      currency: cart.currency,
+      dedupeWindowMinutes: 0,
+      eventName: "add_to_cart",
+      eventType: AnalyticsEventType.ADD_TO_CART,
+      metadata: buildAddToCartEvent({
+        currency: cart.currency,
+        productId: cart.analyticsItem.item_id,
+        productName: cart.analyticsItem.item_name,
+        quantity: cart.analyticsItem.quantity,
+        unitPriceCents: cart.valueCents / cart.analyticsItem.quantity,
+        variantName: cart.analyticsItem.item_variant
+      }),
+      relatedId: parsed.data.productId,
+      relatedType: "product",
+      valueCents: cart.valueCents
+    });
+    await setCartId(cart.cartId);
   } catch (error) {
     cartError(error instanceof Error ? error.message : "Could not add that item.");
   }
@@ -185,7 +207,7 @@ export async function preparePublicCheckoutAction(formData: FormData) {
     cartError(rateLimitMessage);
   }
 
-  let orderNumber = "";
+  let checkoutUrl = "";
 
   try {
     const order = await createCheckoutOrderFromCart({
@@ -193,13 +215,38 @@ export async function preparePublicCheckoutAction(formData: FormData) {
       customerName: parsed.data.customerName,
       customerEmail: parsed.data.customerEmail
     });
+    await emitAnalyticsEvent({
+      ...(await requestAttribution(undefined, "/cart")),
+      currency: order.currency,
+      eventName: "begin_checkout",
+      eventType: AnalyticsEventType.BEGIN_CHECKOUT,
+      metadata: buildBeginCheckoutEvent({
+        coupon: order.coupon?.code || undefined,
+        currency: order.currency,
+        items: order.items.map((item) => ({
+          item_id: item.productId,
+          item_name: item.name,
+          price: Number((item.unitPriceCents / 100).toFixed(2)),
+          quantity: item.quantity
+        })),
+        totalCents: order.totalCents
+      }),
+      relatedId: order.id,
+      relatedType: "order",
+      valueCents: order.totalCents
+    });
+    const checkoutOrder = await createPaymentCheckoutSessionForOrder({ orderId: order.id, siteId: order.siteId });
 
-    await queueOrderCheckoutEmail(order);
+    await queueOrderCheckoutEmail(checkoutOrder);
     await clearCartId();
-    orderNumber = order.orderNumber;
+    checkoutUrl = checkoutOrder.checkoutUrl || "";
   } catch (error) {
     cartError(error instanceof Error ? error.message : "Could not prepare checkout.");
   }
 
-  redirect(`/cart?order=${encodeURIComponent(orderNumber)}`);
+  if (!checkoutUrl) {
+    cartError("Stripe did not return a hosted checkout URL.");
+  }
+
+  redirect(checkoutUrl);
 }

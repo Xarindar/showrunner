@@ -7,7 +7,7 @@ import { z } from "zod";
 import { moneyCents } from "@/lib/admin-validation";
 import { snapshotBillingDocument } from "@/lib/billing/documents";
 import { getBillingPaymentSummary } from "@/lib/billing/payments";
-import { createStripeCheckoutSessionForBillingDocument } from "@/lib/commerce/stripe";
+import { createPaymentCheckoutSessionForBillingDocument } from "@/lib/payments/checkout";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
 
@@ -95,7 +95,7 @@ export async function createPublicBillingCheckoutAction(formData: FormData) {
       throw new Error("Payment amount cannot exceed the remaining balance.");
     }
 
-    const checkout = await createStripeCheckoutSessionForBillingDocument({
+    const checkout = await createPaymentCheckoutSessionForBillingDocument({
       amountCents: amount,
       billingDocumentId: document.id,
       siteId
