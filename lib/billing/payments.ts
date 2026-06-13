@@ -62,7 +62,7 @@ export async function settleBillingPayment(input: {
   rawSummary?: Prisma.InputJsonValue;
   siteId: string;
 }) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const payment = await tx.billingPayment.findFirst({
       where: {
         id: input.billingPaymentId,
@@ -73,7 +73,10 @@ export async function settleBillingPayment(input: {
 
     if (!payment) throw new Error("Billing payment target not found.");
     if (payment.status === PaymentStatus.PAID || payment.status === PaymentStatus.AUTHORIZED) {
-      return getBillingPaymentSummary(tx, payment.billingDocumentId);
+      return {
+        rejected: false,
+        summary: await getBillingPaymentSummary(tx, payment.billingDocumentId)
+      };
     }
     if (payment.status === PaymentStatus.REFUNDED || payment.status === PaymentStatus.FAILED) {
       throw new Error("Billing payment cannot be settled from its current state.");
@@ -97,7 +100,10 @@ export async function settleBillingPayment(input: {
         }
       });
 
-      throw new Error("Billing payment would exceed the remaining document balance.");
+      return {
+        rejected: true,
+        summary: beforeSettle
+      };
     }
 
     await tx.billingPayment.update({
@@ -132,8 +138,17 @@ export async function settleBillingPayment(input: {
       await snapshotBillingDocument(tx, payment.billingDocumentId);
     }
 
-    return summary;
+    return {
+      rejected: false,
+      summary
+    };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+  if (result.rejected) {
+    throw new Error("Billing payment would exceed the remaining document balance.");
+  }
+
+  return result.summary;
 }
 
 export async function markBillingPaymentFailed(input: {
