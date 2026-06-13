@@ -130,6 +130,12 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
         <p className="lead">
           Check your email for confirmation details. The business will follow up if anything needs to change.
         </p>
+        {state.calendarUrl ? (
+          <a className="button secondary" href={state.calendarUrl}>
+            <CalendarDays size={18} />
+            Add to calendar
+          </a>
+        ) : null}
       </div>
     );
   }

@@ -48,6 +48,21 @@ export type BookingRequest = {
   policyAccepted?: boolean;
 };
 
+export type CalendarFeedScope = {
+  siteId: string;
+  staffId?: string;
+};
+
+export type CalendarBookingScope = {
+  bookingId: string;
+  siteId: string;
+};
+
+export type CalendarFileAdapter = {
+  bookingPath(input: CalendarBookingScope): string;
+  feedPath(input: CalendarFeedScope): string;
+};
+
 export type SchedulingAdapter = {
   listActiveServices(): Promise<Service[]>;
   getAvailableSlots(serviceId: string, date: Date, options?: { resourceId?: string; staffId?: string; excludeBookingId?: string }): Promise<Slot[]>;

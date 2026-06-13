@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { absoluteCalendarUrl, icsCalendarAdapter, requestBaseUrl } from "@/lib/scheduling/calendar";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import { getSiteSettings } from "@/lib/site";
 import { getTodayDateKey, parseZonedDateKey } from "@/lib/timezone";
 import { AvailabilityPanel } from "./components/availability-panel";
 import { BlockoutsPanel } from "./components/blockouts-panel";
+import { CalendarFeedsPanel } from "./components/calendar-feeds-panel";
 import { RemindersPanel } from "./components/reminders-panel";
 import { ResourcesPanel } from "./components/resources-panel";
 import { ServicesPanel } from "./components/services-panel";
@@ -27,6 +29,7 @@ type SchedulingPageProps = {
 export default async function SchedulingPage({ searchParams }: SchedulingPageProps) {
   await requireAdmin("scheduling:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
+  const baseUrl = await requestBaseUrl();
   const [services, staff, resources, availability, blockouts, schedulingSettings] = await Promise.all([
     prisma.service.findMany({
       where: { siteId: settings.siteId },
@@ -94,6 +97,13 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       <RemindersPanel
         enabled={schedulingSettings?.bookingReminderEnabled ?? true}
         leadMinutes={schedulingSettings?.bookingReminderLeadMinutes ?? 1440}
+      />
+      <CalendarFeedsPanel
+        siteFeedUrl={absoluteCalendarUrl(baseUrl, icsCalendarAdapter.feedPath({ siteId: settings.siteId }))}
+        staffFeedUrls={staff.map((member) => ({
+          staff: member,
+          url: absoluteCalendarUrl(baseUrl, icsCalendarAdapter.feedPath({ siteId: settings.siteId, staffId: member.id }))
+        }))}
       />
       <ResourcesPanel resources={resources} assignedResourceIds={assignedResourceIds} resourceIdsWithAvailability={resourceIdsWithAvailability} />
       <ServicesPanel resources={resources} services={services} staff={staff} />

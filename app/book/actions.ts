@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
+import { icsCalendarAdapter } from "@/lib/scheduling/calendar";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 
 const bookingSchema = z.object({
@@ -19,6 +20,7 @@ const bookingSchema = z.object({
 });
 
 export type BookingFormState = {
+  calendarUrl?: string;
   ok?: boolean;
   error?: string;
 };
@@ -66,14 +68,16 @@ export async function createPublicBookingAction(_state: BookingFormState, formDa
       relatedId: booking.id,
       relatedType: "booking"
     });
+    revalidatePath("/admin");
+    revalidatePath("/admin/modules/appointments");
+    revalidatePath("/admin/modules/clients");
+    revalidatePath("/admin/modules/scheduling");
+    revalidatePath("/book");
+    return {
+      calendarUrl: icsCalendarAdapter.bookingPath({ bookingId: booking.id, siteId: booking.siteId }),
+      ok: true
+    };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to create booking." };
   }
-
-  revalidatePath("/admin");
-  revalidatePath("/admin/modules/appointments");
-  revalidatePath("/admin/modules/clients");
-  revalidatePath("/admin/modules/scheduling");
-  revalidatePath("/book");
-  return { ok: true };
 }
