@@ -1,5 +1,6 @@
-import { CartStatus, CouponType, OrderStatus, ProductStatus, ProductType } from "@prisma/client";
+import { CartStatus, CouponType, OrderStatus, PaymentStatus, ProductStatus, ProductType } from "@prisma/client";
 import { BadgeDollarSign, Boxes, CreditCard, PackagePlus, ReceiptText, Tags } from "lucide-react";
+import { requireAdmin } from "@/lib/auth";
 import { nextOrderStatuses } from "@/lib/commerce/orders";
 import { enumLabel, formatDateTime, formatMoney, stringArrayCsv } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -12,6 +13,7 @@ import {
   createProductAction,
   createProductVariantAction,
   setCommerceOrderCheckoutLinkAction,
+  refundCommercePaymentAction,
   updateCommerceOrderStatusAction,
   updateProductAction,
   updateProductStatusAction
@@ -51,7 +53,13 @@ function currencyTotalsLabel(totals: { currency: string; _sum: { totalCents: num
   return totals.map((row) => formatMoney(row._sum.totalCents || 0, row.currency)).join(" / ");
 }
 
+function refundablePaymentCents(payment: { amountCents: number; refundedCents: number; status: PaymentStatus }) {
+  if (payment.status !== PaymentStatus.PAID && payment.status !== PaymentStatus.AUTHORIZED) return 0;
+  return Math.max(0, payment.amountCents - payment.refundedCents);
+}
+
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
+  await requireAdmin("products:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
@@ -719,23 +727,58 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     <th>Provider</th>
                     <th>Status</th>
                     <th>Amount</th>
+                    <th>Refund</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedOrder.payments.map((payment) => (
-                    <tr key={payment.id}>
-                      <td>
-                        <strong>{enumLabel(payment.provider)}</strong>
-                        <br />
-                        <span style={{ color: "var(--muted)" }}>{payment.externalCheckoutSession || payment.externalPaymentId || "No reference"}</span>
-                      </td>
-                      <td>{enumLabel(payment.status)}</td>
-                      <td>{formatMoney(payment.amountCents, payment.currency)}</td>
-                    </tr>
-                  ))}
+                  {selectedOrder.payments.map((payment) => {
+                    const refundableCents = refundablePaymentCents(payment);
+
+                    return (
+                      <tr key={payment.id}>
+                        <td>
+                          <strong>{enumLabel(payment.provider)}</strong>
+                          <br />
+                          <span style={{ color: "var(--muted)" }}>{payment.externalCheckoutSession || payment.externalPaymentId || "No reference"}</span>
+                        </td>
+                        <td>{enumLabel(payment.status)}</td>
+                        <td>
+                          {formatMoney(payment.amountCents, payment.currency)}
+                          {payment.refundedCents > 0 ? (
+                            <>
+                              <br />
+                              <span style={{ color: "var(--muted)" }}>{formatMoney(payment.refundedCents, payment.currency)} refunded</span>
+                            </>
+                          ) : null}
+                        </td>
+                        <td>
+                          {refundableCents > 0 ? (
+                            <form action={refundCommercePaymentAction} className="form-grid" style={{ minWidth: 180 }}>
+                              <input type="hidden" name="paymentId" value={payment.id} />
+                              <div className="field">
+                                <label htmlFor={`refund-${payment.id}`}>Amount</label>
+                                <input
+                                  id={`refund-${payment.id}`}
+                                  name="amount"
+                                  defaultValue={moneyInput(refundableCents)}
+                                  inputMode="decimal"
+                                  required
+                                />
+                              </div>
+                              <button className="button danger" type="submit">
+                                Refund
+                              </button>
+                            </form>
+                          ) : (
+                            <span className="pill">Not refundable</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {!selectedOrder.payments.length ? (
                     <tr>
-                      <td colSpan={3}>No payment records yet.</td>
+                      <td colSpan={4}>No payment records yet.</td>
                     </tr>
                   ) : null}
                 </tbody>

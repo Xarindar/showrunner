@@ -1,0 +1,5 @@
+ALTER TABLE "Payment"
+  ADD COLUMN "refundedCents" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "BillingPayment"
+  ADD COLUMN "refundedCents" INTEGER NOT NULL DEFAULT 0;

@@ -12,6 +12,7 @@ import {
   createBillingDocumentAction,
   deleteBillingLineItemAction,
   queueBillingDocumentEmailAction,
+  refundBillingPaymentAction,
   setBillingCheckoutLinkAction,
   updateBillingDocumentAction,
   updateBillingLineItemAction,
@@ -38,20 +39,34 @@ function dateInputValue(value?: Date | null) {
   return value ? value.toISOString().slice(0, 10) : "";
 }
 
-function paymentTotalsLabel(totals: { currency: string; _sum: { amountCents: number | null } }[]) {
-  if (!totals.length) return formatMoney(0);
-  return totals.map((row) => formatMoney(row._sum.amountCents || 0, row.currency)).join(" / ");
+function paymentTotalsLabel(payments: { amountCents: number; currency: string; refundedCents: number }[]) {
+  if (!payments.length) return formatMoney(0);
+  const totals = new Map<string, number>();
+  for (const payment of payments) {
+    totals.set(payment.currency, (totals.get(payment.currency) || 0) + Math.max(0, payment.amountCents - payment.refundedCents));
+  }
+
+  return Array.from(totals.entries())
+    .map(([currency, cents]) => formatMoney(cents, currency))
+    .join(" / ");
 }
 
-function paidCents(payments: { amountCents: number; status: PaymentStatus | string }[]) {
+function paidCents(payments: { amountCents: number; refundedCents?: number; status: PaymentStatus | string }[]) {
   return payments
     .filter((payment) => payment.status === "PAID" || payment.status === "AUTHORIZED")
-    .reduce((sum, payment) => sum + payment.amountCents, 0);
+    .reduce((sum, payment) => sum + Math.max(0, payment.amountCents - (payment.refundedCents || 0)), 0);
 }
 
-function openBalanceTotalsLabel(
-  documents: { currency: string; payments: { amountCents: number; status: string }[]; totalCents: number }[]
-) {
+function refundablePaymentCents(payment: { amountCents: number; refundedCents: number; status: PaymentStatus | string }) {
+  if (payment.status !== PaymentStatus.PAID && payment.status !== PaymentStatus.AUTHORIZED) return 0;
+  return Math.max(0, payment.amountCents - payment.refundedCents);
+}
+
+function openBalanceTotalsLabel(documents: {
+  currency: string;
+  payments: { amountCents: number; refundedCents: number; status: string }[];
+  totalCents: number;
+}[]) {
   const totals = new Map<string, number>();
   for (const document of documents) {
     const remainingCents = Math.max(0, document.totalCents - paidCents(document.payments));
@@ -109,13 +124,16 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       take: 40
     }),
     prisma.billingDocument.count({ where: { siteId: settings.siteId } }),
-    prisma.billingPayment.groupBy({
-      by: ["currency"],
+    prisma.billingPayment.findMany({
       where: {
         billingDocument: { siteId: settings.siteId },
         status: { in: [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] }
       },
-      _sum: { amountCents: true }
+      select: {
+        amountCents: true,
+        currency: true,
+        refundedCents: true
+      }
     }),
     prisma.billingDocument.findMany({
       where: { siteId: settings.siteId, status: { in: [BillingDocumentStatus.SENT, BillingDocumentStatus.ACCEPTED, BillingDocumentStatus.OVERDUE] } },
@@ -125,6 +143,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         payments: {
           select: {
             amountCents: true,
+            refundedCents: true,
             status: true
           }
         }
@@ -487,14 +506,56 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
               <div className="subpanel">
                 <h3 style={{ fontSize: "1.05rem" }}>Payment history</h3>
                 <table className="table" style={{ minWidth: 0 }}>
+                  <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Amount</th>
+                      <th>Created</th>
+                      <th>Refund</th>
+                    </tr>
+                  </thead>
                   <tbody>
-                    {selectedDocument.payments.map((payment) => (
-                      <tr key={payment.id}>
-                        <td>{enumLabel(payment.status)}</td>
-                        <td>{formatMoney(payment.amountCents, payment.currency)}</td>
-                        <td>{formatDateTime(payment.createdAt, settings.timezone)}</td>
-                      </tr>
-                    ))}
+                    {selectedDocument.payments.map((payment) => {
+                      const refundableCents = refundablePaymentCents(payment);
+
+                      return (
+                        <tr key={payment.id}>
+                          <td>{enumLabel(payment.status)}</td>
+                          <td>
+                            {formatMoney(payment.amountCents, payment.currency)}
+                            {payment.refundedCents > 0 ? (
+                              <>
+                                <br />
+                                <span style={{ color: "var(--muted)" }}>{formatMoney(payment.refundedCents, payment.currency)} refunded</span>
+                              </>
+                            ) : null}
+                          </td>
+                          <td>{formatDateTime(payment.createdAt, settings.timezone)}</td>
+                          <td>
+                            {refundableCents > 0 ? (
+                              <form action={refundBillingPaymentAction} className="form-grid" style={{ minWidth: 180 }}>
+                                <input type="hidden" name="paymentId" value={payment.id} />
+                                <div className="field">
+                                  <label htmlFor={`billing-refund-${payment.id}`}>Amount</label>
+                                  <input
+                                    id={`billing-refund-${payment.id}`}
+                                    name="amount"
+                                    defaultValue={moneyInput(refundableCents)}
+                                    inputMode="decimal"
+                                    required
+                                  />
+                                </div>
+                                <button className="button danger" type="submit">
+                                  Refund
+                                </button>
+                              </form>
+                            ) : (
+                              <span className="pill">Not refundable</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

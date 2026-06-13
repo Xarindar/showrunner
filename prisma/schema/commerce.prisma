@@ -284,6 +284,7 @@ model Payment {
   provider                PaymentProvider
   status                  PaymentStatus   @default(PENDING)
   amountCents             Int
+  refundedCents           Int             @default(0)
   currency                String          @default("USD")
   externalPaymentId       String?
   externalCheckoutSession String?

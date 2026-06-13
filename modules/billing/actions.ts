@@ -1,11 +1,12 @@
 "use server";
 
 import { randomBytes } from "crypto";
-import { BillingDocumentStatus, BillingDocumentType, PaymentProvider, Prisma } from "@prisma/client";
+import { BillingDocumentStatus, BillingDocumentType, PaymentProvider, PaymentStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { recordAuditLog } from "@/lib/audit";
 import {
   ensureBillingPublicToken,
   generateBillingPublicToken,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
 import { queueBillingDocumentEmail } from "@/lib/email";
+import { refundPaymentGatewayPayment } from "@/lib/payments/refunds";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
 
@@ -132,6 +134,11 @@ const billingCheckoutClearSchema = z.object({
 
 const billingEmailSchema = z.object({
   id: requiredText
+});
+
+const billingRefundSchema = z.object({
+  paymentId: requiredText,
+  amount: moneyCents
 });
 
 function refreshBilling() {
@@ -585,4 +592,106 @@ export async function addBillingAttachmentAction(formData: FormData) {
 
   refreshBilling();
   redirect(`/admin/modules/billing?saved=attachment&document=${input.billingDocumentId}`);
+}
+
+function billingPaymentAuditSnapshot(payment: {
+  amountCents: number;
+  billingDocument: {
+    documentNumber: string;
+    id: string;
+    status: BillingDocumentStatus;
+  };
+  currency: string;
+  externalCheckoutSession: string | null;
+  externalPaymentId: string | null;
+  id: string;
+  provider: PaymentProvider;
+  refundedCents: number;
+  status: PaymentStatus;
+}) {
+  return {
+    amountCents: payment.amountCents,
+    billingDocumentId: payment.billingDocument.id,
+    currency: payment.currency,
+    documentNumber: payment.billingDocument.documentNumber,
+    documentStatus: payment.billingDocument.status,
+    externalCheckoutSession: payment.externalCheckoutSession || "",
+    externalPaymentId: payment.externalPaymentId || "",
+    paymentId: payment.id,
+    provider: payment.provider,
+    refundedCents: payment.refundedCents,
+    remainingRefundableCents: Math.max(0, payment.amountCents - payment.refundedCents),
+    status: payment.status
+  };
+}
+
+export async function refundBillingPaymentAction(formData: FormData) {
+  const user = await requireAdmin("billing:manage");
+  const input = await parseForm(billingRefundSchema, formData, "/admin/modules/billing");
+  const siteId = await getCurrentSiteId();
+  let documentId = "";
+
+  try {
+    const payment = await prisma.billingPayment.findFirst({
+      where: {
+        id: input.paymentId,
+        billingDocument: { siteId }
+      },
+      include: { billingDocument: true }
+    });
+
+    if (!payment) throw new Error("Billing payment not found.");
+    documentId = payment.billingDocumentId;
+    if (payment.status !== PaymentStatus.PAID && payment.status !== PaymentStatus.AUTHORIZED) {
+      throw new Error("Only paid billing payments can be refunded.");
+    }
+
+    const remainingCents = Math.max(0, payment.amountCents - payment.refundedCents);
+    if (input.amount <= 0 || input.amount > remainingCents) {
+      throw new Error("Refund amount must be greater than zero and no more than the refundable balance.");
+    }
+
+    const before = billingPaymentAuditSnapshot(payment);
+    await refundPaymentGatewayPayment({
+      amountCents: input.amount,
+      paymentId: payment.id,
+      provider: payment.provider,
+      siteId
+    });
+
+    const nextRefundedCents = Math.min(payment.amountCents, payment.refundedCents + input.amount);
+    await prisma.billingPayment.update({
+      where: { id: payment.id },
+      data: {
+        refundedCents: nextRefundedCents,
+        status: nextRefundedCents >= payment.amountCents ? PaymentStatus.REFUNDED : payment.status
+      }
+    });
+
+    const afterPayment = await prisma.billingPayment.findUniqueOrThrow({
+      where: { id: payment.id },
+      include: { billingDocument: true }
+    });
+    await recordAuditLog({
+      action: "billing.payment_refunded",
+      actor: user,
+      metadata: {
+        amountCents: input.amount,
+        after: billingPaymentAuditSnapshot(afterPayment),
+        before,
+        currency: payment.currency,
+        provider: payment.provider
+      },
+      siteId,
+      targetId: payment.id,
+      targetLabel: payment.billingDocument.documentNumber,
+      targetType: "billing_payment"
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not refund that billing payment.";
+    redirect(`/admin/modules/billing${documentId ? `?document=${documentId}&` : "?"}error=${encodeURIComponent(message)}`);
+  }
+
+  refreshBilling();
+  redirect(`/admin/modules/billing?saved=refund&document=${documentId}`);
 }

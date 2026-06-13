@@ -1,14 +1,16 @@
 "use server";
 
-import { OrderStatus, PaymentProvider, Prisma, ProductStatus } from "@prisma/client";
+import { OrderStatus, PaymentProvider, PaymentStatus, Prisma, ProductStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
+import { recordAuditLog } from "@/lib/audit";
 import {
   collectionFormSchema,
   collectionProductFormSchema,
   couponFormSchema,
+  moneyCents,
   optionalStoredText,
   parseForm,
   productFormSchema,
@@ -20,6 +22,7 @@ import {
 } from "@/lib/admin-validation";
 import { updateOrderStatus } from "@/lib/commerce/orders";
 import { generateUniqueCommerceSlug } from "@/lib/commerce/slugs";
+import { refundPaymentGatewayPayment } from "@/lib/payments/refunds";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
 
@@ -37,6 +40,11 @@ const orderCheckoutLinkSchema = z.object({
 const orderCheckoutClearSchema = z.object({
   id: requiredText,
   confirmClear: z.literal("on", { error: "Confirm before clearing the hosted checkout link." })
+});
+
+const orderRefundSchema = z.object({
+  paymentId: requiredText,
+  amount: moneyCents
 });
 
 function refreshProducts() {
@@ -463,4 +471,119 @@ export async function clearCommerceOrderCheckoutLinkAction(formData: FormData) {
 
   refreshProducts();
   redirect(`/admin/modules/products?saved=checkout-clear&order=${input.id}`);
+}
+
+function orderPaymentAuditSnapshot(payment: {
+  amountCents: number;
+  currency: string;
+  externalCheckoutSession: string | null;
+  externalPaymentId: string | null;
+  id: string;
+  provider: PaymentProvider;
+  refundedCents: number;
+  status: PaymentStatus;
+  order: {
+    id: string;
+    orderNumber: string;
+    status: OrderStatus;
+  };
+}) {
+  return {
+    amountCents: payment.amountCents,
+    currency: payment.currency,
+    externalCheckoutSession: payment.externalCheckoutSession || "",
+    externalPaymentId: payment.externalPaymentId || "",
+    orderId: payment.order.id,
+    orderNumber: payment.order.orderNumber,
+    orderStatus: payment.order.status,
+    paymentId: payment.id,
+    provider: payment.provider,
+    refundedCents: payment.refundedCents,
+    remainingRefundableCents: Math.max(0, payment.amountCents - payment.refundedCents),
+    status: payment.status
+  };
+}
+
+export async function refundCommercePaymentAction(formData: FormData) {
+  const user = await requireAdmin("orders:manage");
+  const input = await parseForm(orderRefundSchema, formData, "/admin/modules/products");
+  const siteId = await getCurrentSiteId();
+  let orderId = "";
+
+  try {
+    const payment = await prisma.payment.findFirst({
+      where: {
+        id: input.paymentId,
+        order: { siteId }
+      },
+      include: { order: true }
+    });
+
+    if (!payment) throw new Error("Payment not found.");
+    orderId = payment.orderId;
+    if (payment.status !== PaymentStatus.PAID && payment.status !== PaymentStatus.AUTHORIZED) {
+      throw new Error("Only paid payments can be refunded.");
+    }
+
+    const remainingCents = Math.max(0, payment.amountCents - payment.refundedCents);
+    if (input.amount <= 0 || input.amount > remainingCents) {
+      throw new Error("Refund amount must be greater than zero and no more than the refundable balance.");
+    }
+
+    const before = orderPaymentAuditSnapshot(payment);
+    await refundPaymentGatewayPayment({
+      amountCents: input.amount,
+      paymentId: payment.id,
+      provider: payment.provider,
+      siteId
+    });
+
+    const nextRefundedCents = Math.min(payment.amountCents, payment.refundedCents + input.amount);
+    const fullyRefunded = nextRefundedCents >= payment.amountCents;
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        refundedCents: nextRefundedCents,
+        status: fullyRefunded ? PaymentStatus.REFUNDED : payment.status
+      }
+    });
+
+    if (
+      fullyRefunded &&
+      (payment.order.status === OrderStatus.PAID || payment.order.status === OrderStatus.FULFILLED)
+    ) {
+      await updateOrderStatus({
+        orderId: payment.orderId,
+        providerConfirmed: true,
+        siteId,
+        status: OrderStatus.REFUNDED
+      });
+    }
+
+    const afterPayment = await prisma.payment.findUniqueOrThrow({
+      where: { id: payment.id },
+      include: { order: true }
+    });
+    await recordAuditLog({
+      action: "order.payment_refunded",
+      actor: user,
+      metadata: {
+        amountCents: input.amount,
+        after: orderPaymentAuditSnapshot(afterPayment),
+        before,
+        currency: payment.currency,
+        provider: payment.provider
+      },
+      siteId,
+      targetId: payment.id,
+      targetLabel: payment.order.orderNumber,
+      targetType: "payment"
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not refund that payment.";
+    redirect(`/admin/modules/products${orderId ? `?order=${orderId}&` : "?"}error=${encodeURIComponent(message)}`);
+  }
+
+  refreshProducts();
+  redirect(`/admin/modules/products?saved=refund&order=${orderId}`);
 }
