@@ -1,10 +1,12 @@
-import type { Booking, Service } from "@prisma/client";
+import type { Booking, BookingResource, Resource, Service, StaffMember } from "@prisma/client";
 import Link from "next/link";
 import { formatDateTime } from "@/lib/format";
 import { updateBookingStatusAction } from "../actions";
 
 type BookingWithService = Booking & {
+  resources: Array<BookingResource & { resource: Resource }>;
   service: Service;
+  staff: StaffMember | null;
 };
 
 type AppointmentsTableProps = {
@@ -35,7 +37,17 @@ export function AppointmentsTable({ bookings, timezone }: AppointmentsTableProps
                 <br />
                 <span style={{ color: "var(--muted)" }}>{booking.customerEmail}</span>
               </td>
-              <td>{booking.service.name}</td>
+              <td>
+                {booking.service.name}
+                <br />
+                <span style={{ color: "var(--muted)" }}>{booking.staff?.name || "Any staff"}</span>
+                {booking.resources.length ? (
+                  <>
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>{booking.resources.map((assignment) => assignment.resource.name).join(", ")}</span>
+                  </>
+                ) : null}
+              </td>
               <td>{formatDateTime(booking.startsAt, timezone)}</td>
               <td>
                 <span className="pill">{booking.status.toLowerCase()}</span>

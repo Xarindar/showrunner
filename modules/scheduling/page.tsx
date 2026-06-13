@@ -1,35 +1,76 @@
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import { getSiteSettings } from "@/lib/site";
 import { getTodayDateKey, parseZonedDateKey } from "@/lib/timezone";
 import { AvailabilityPanel } from "./components/availability-panel";
 import { BlockoutsPanel } from "./components/blockouts-panel";
+import { ResourcesPanel } from "./components/resources-panel";
 import { ServicesPanel } from "./components/services-panel";
 import { SlotDiagnosticsPanel } from "./components/slot-diagnostics-panel";
+import { StaffPanel } from "./components/staff-panel";
 
 export const dynamic = "force-dynamic";
 
 type SchedulingPageProps = {
-  searchParams: Promise<{ saved?: string; error?: string; diagnosticServiceId?: string; diagnosticDate?: string }>;
+  searchParams: Promise<{
+    saved?: string;
+    error?: string;
+    diagnosticServiceId?: string;
+    diagnosticStaffId?: string;
+    diagnosticResourceId?: string;
+    diagnosticDate?: string;
+  }>;
 };
 
 export default async function SchedulingPage({ searchParams }: SchedulingPageProps) {
+  await requireAdmin("scheduling:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [services, availability, blockouts] = await Promise.all([
-    prisma.service.findMany({ where: { siteId: settings.siteId }, orderBy: { createdAt: "asc" } }),
-    prisma.availabilityRule.findMany({ where: { siteId: settings.siteId }, orderBy: [{ weekday: "asc" }, { startMinutes: "asc" }] }),
-    prisma.blockedTime.findMany({ where: { siteId: settings.siteId }, orderBy: { startsAt: "asc" }, take: 20 })
+  const [services, staff, resources, availability, blockouts] = await Promise.all([
+    prisma.service.findMany({
+      where: { siteId: settings.siteId },
+      include: {
+        resourceAssignments: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
+        staffAssignments: { include: { staff: true }, orderBy: { staff: { name: "asc" } } }
+      },
+      orderBy: { createdAt: "asc" }
+    }),
+    prisma.staffMember.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
+    prisma.resource.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
+    prisma.availabilityRule.findMany({
+      where: { siteId: settings.siteId },
+      include: { resource: true, staff: true },
+      orderBy: [{ staffId: "asc" }, { resourceId: "asc" }, { weekday: "asc" }, { startMinutes: "asc" }]
+    }),
+    prisma.blockedTime.findMany({ where: { siteId: settings.siteId }, include: { resource: true }, orderBy: { startsAt: "asc" }, take: 20 })
   ]);
+  const staffIdsWithAvailability = new Set(
+    availability.flatMap((rule) => (rule.staffId ? [rule.staffId] : []))
+  );
+  const assignedStaffIds = new Set(
+    services.flatMap((service) => service.staffAssignments.map((assignment) => assignment.staffId))
+  );
+  const resourceIdsWithAvailability = new Set(
+    availability.flatMap((rule) => (rule.resourceId ? [rule.resourceId] : []))
+  );
+  const assignedResourceIds = new Set(
+    services.flatMap((service) => service.resourceAssignments.map((assignment) => assignment.resourceId))
+  );
   const selectedServiceId = services.some((service) => service.id === params.diagnosticServiceId)
     ? String(params.diagnosticServiceId)
     : services[0]?.id || "";
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(params.diagnosticDate || "")
     ? String(params.diagnosticDate)
     : getTodayDateKey(settings.timezone);
+  const selectedStaffId = staff.some((member) => member.id === params.diagnosticStaffId) ? String(params.diagnosticStaffId) : "";
+  const selectedResourceId = resources.some((resource) => resource.id === params.diagnosticResourceId) ? String(params.diagnosticResourceId) : "";
   const diagnosticDay = parseZonedDateKey(selectedDate, settings.timezone);
   const diagnostics =
     selectedServiceId && diagnosticDay
-      ? await nativeSchedulingAdapter.getSlotDiagnostics(selectedServiceId, diagnosticDay)
+      ? await nativeSchedulingAdapter.getSlotDiagnostics(selectedServiceId, diagnosticDay, {
+          resourceId: selectedResourceId || undefined,
+          staffId: selectedStaffId || undefined
+        })
       : null;
 
   return (
@@ -47,15 +88,21 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
         <div className="error">{params.error === "blockout" ? "Blockouts must use valid start and end times." : params.error}</div>
       ) : null}
 
-      <ServicesPanel services={services} />
+      <StaffPanel staff={staff} assignedStaffIds={assignedStaffIds} staffIdsWithAvailability={staffIdsWithAvailability} />
+      <ResourcesPanel resources={resources} assignedResourceIds={assignedResourceIds} resourceIdsWithAvailability={resourceIdsWithAvailability} />
+      <ServicesPanel resources={resources} services={services} staff={staff} />
       <SlotDiagnosticsPanel
         diagnostics={diagnostics}
+        resources={resources}
         selectedDate={selectedDate}
+        selectedResourceId={selectedResourceId}
         selectedServiceId={selectedServiceId}
+        selectedStaffId={selectedStaffId}
         services={services}
+        staff={staff}
       />
-      <AvailabilityPanel availability={availability} />
-      <BlockoutsPanel blockouts={blockouts} timezone={settings.timezone} />
+      <AvailabilityPanel availability={availability} resources={resources} staff={staff} />
+      <BlockoutsPanel blockouts={blockouts} resources={resources} timezone={settings.timezone} />
     </div>
   );
 }

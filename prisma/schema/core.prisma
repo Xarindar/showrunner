@@ -18,6 +18,7 @@ model AdminUser {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   auditLogs    AuditLog[]
+  staffProfiles StaffMember[]
 }
 
 model Tenant {

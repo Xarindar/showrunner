@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarClock, Save } from "lucide-react";
+import { getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/format";
 import { getSiteSettings } from "@/lib/site";
@@ -30,11 +31,14 @@ function formatDateTimeLocalInput(value: Date, timeZone: string) {
 
 export default async function AppointmentDetailPage({ params, searchParams }: AppointmentDetailPageProps) {
   const [{ id }, { saved, error }] = await Promise.all([params, searchParams]);
+  const user = await requireAdmin("appointments:manage");
   const settings = await getSiteSettings();
   const booking = await prisma.booking.findFirst({
-    where: { id, siteId: settings.siteId },
+    where: await getAccessibleBookingWhere(user, settings.siteId, { id }),
     include: {
+      resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
       service: true,
+      staff: true,
       client: true
     }
   });
@@ -89,6 +93,14 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
               <tr>
                 <td>Service</td>
                 <td>{booking.service.name}</td>
+              </tr>
+              <tr>
+                <td>Staff</td>
+                <td>{booking.staff?.name || "Any staff"}</td>
+              </tr>
+              <tr>
+                <td>Resources</td>
+                <td>{booking.resources.length ? booking.resources.map((assignment) => assignment.resource.name).join(", ") : "None"}</td>
               </tr>
               <tr>
                 <td>Time</td>

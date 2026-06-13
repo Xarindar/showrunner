@@ -1,11 +1,15 @@
-import type { Service } from "@prisma/client";
+import type { Resource, Service, StaffMember } from "@prisma/client";
 import { Search } from "lucide-react";
 import type { SlotDiagnostics } from "@/lib/scheduling/types";
 
 type SlotDiagnosticsPanelProps = {
   services: Service[];
+  resources: Resource[];
   selectedServiceId: string;
   selectedDate: string;
+  selectedResourceId: string;
+  selectedStaffId: string;
+  staff: StaffMember[];
   diagnostics: SlotDiagnostics | null;
 };
 
@@ -16,8 +20,12 @@ function reasonSummary(slot: SlotDiagnostics["slots"][number]) {
 
 export function SlotDiagnosticsPanel({
   services,
+  resources,
   selectedServiceId,
   selectedDate,
+  selectedResourceId,
+  selectedStaffId,
+  staff,
   diagnostics
 }: SlotDiagnosticsPanelProps) {
   const shownSlots = diagnostics?.slots.slice(0, 80) || [];
@@ -33,13 +41,35 @@ export function SlotDiagnosticsPanel({
       </div>
 
       <form action="/admin/modules/scheduling" className="subpanel form-grid">
-        <div className="grid-2">
+        <div className="grid-3">
           <div className="field">
             <label htmlFor="diagnosticServiceId">Service</label>
             <select id="diagnosticServiceId" name="diagnosticServiceId" defaultValue={selectedServiceId}>
               {services.map((service) => (
                 <option key={service.id} value={service.id}>
                   {service.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="diagnosticStaffId">Staff</label>
+            <select id="diagnosticStaffId" name="diagnosticStaffId" defaultValue={selectedStaffId}>
+              <option value="">Any assigned staff</option>
+              {staff.map((member) => (
+                <option key={member.id} value={member.id} disabled={!member.isActive}>
+                  {member.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="diagnosticResourceId">Resource</label>
+            <select id="diagnosticResourceId" name="diagnosticResourceId" defaultValue={selectedResourceId}>
+              <option value="">Required resources</option>
+              {resources.map((resource) => (
+                <option key={resource.id} value={resource.id} disabled={!resource.isActive}>
+                  {resource.name}
                 </option>
               ))}
             </select>
@@ -59,6 +89,8 @@ export function SlotDiagnosticsPanel({
         <div className="subpanel">
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
             <span className="pill">{diagnostics.serviceName}</span>
+            {diagnostics.staffName ? <span className="pill">{diagnostics.staffName}</span> : null}
+            {diagnostics.resourceNames.length ? <span className="pill">{diagnostics.resourceNames.join(", ")}</span> : null}
             <span className="pill">{diagnostics.ruleCount} rules</span>
             <span className="pill success">{diagnostics.availableCount} available</span>
             <span className="pill">{diagnostics.slotCount} generated</span>
@@ -73,14 +105,18 @@ export function SlotDiagnosticsPanel({
             <thead>
               <tr>
                 <th>Time</th>
+                <th>Staff</th>
+                <th>Resources</th>
                 <th>Status</th>
                 <th>Reason</th>
               </tr>
             </thead>
             <tbody>
               {shownSlots.map((slot) => (
-                <tr key={slot.startsAt.toISOString()}>
+                <tr key={`${slot.startsAt.toISOString()}-${slot.staffId || "global"}`}>
                   <td>{slot.label}</td>
+                  <td>{slot.staffName || "Business-wide"}</td>
+                  <td>{slot.resourceNames.length ? slot.resourceNames.join(", ") : "None"}</td>
                   <td>
                     <span className={slot.available ? "pill success" : "pill danger"}>
                       {slot.available ? "available" : "blocked"}
@@ -91,7 +127,7 @@ export function SlotDiagnosticsPanel({
               ))}
               {!shownSlots.length ? (
                 <tr>
-                  <td colSpan={3}>No slots were generated for this date.</td>
+                  <td colSpan={5}>No slots were generated for this date.</td>
                 </tr>
               ) : null}
             </tbody>

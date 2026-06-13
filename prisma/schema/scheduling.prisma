@@ -28,15 +28,98 @@ model Service {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   bookings            Booking[]
+  staffAssignments    ServiceStaff[]
+  resourceAssignments ServiceResource[]
 
   @@unique([siteId, slug])
   @@index([siteId])
+}
+
+model StaffMember {
+  id                String             @id @default(cuid())
+  siteId            String
+  site              Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  adminUserId       String?
+  adminUser         AdminUser?         @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  name              String
+  email             String             @default("")
+  phone             String             @default("")
+  title             String             @default("")
+  bio               String             @default("")
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  availabilityRules AvailabilityRule[]
+  bookings          Booking[]
+  services          ServiceStaff[]
+  portfolioGalleries PortfolioGallery[]
+  mediaAssets       MediaAsset[]
+
+  @@index([siteId, isActive])
+  @@index([siteId, email])
+  @@index([adminUserId])
+  @@unique([siteId, adminUserId])
+}
+
+model Resource {
+  id                String             @id @default(cuid())
+  siteId            String
+  site              Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  name              String
+  type              String             @default("ROOM")
+  description       String             @default("")
+  location          String             @default("")
+  capacity          Int                @default(1)
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  availabilityRules AvailabilityRule[]
+  blockouts         BlockedTime[]
+  services          ServiceResource[]
+  bookings          BookingResource[]
+
+  @@index([siteId, isActive])
+  @@index([siteId, type])
+}
+
+model ServiceStaff {
+  id        String      @id @default(cuid())
+  siteId    String
+  site      Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service     @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  staffId   String
+  staff     StaffMember @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+
+  @@unique([serviceId, staffId])
+  @@index([siteId, staffId])
+  @@index([siteId, serviceId])
+}
+
+model ServiceResource {
+  id         String   @id @default(cuid())
+  siteId     String
+  site       Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  serviceId  String
+  service    Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([serviceId, resourceId])
+  @@index([siteId, resourceId])
+  @@index([siteId, serviceId])
 }
 
 model AvailabilityRule {
   id           String   @id @default(cuid())
   siteId       String
   site         Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  staffId      String?
+  staff        StaffMember? @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  resourceId   String?
+  resource     Resource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
   weekday      Int
   startMinutes Int
   endMinutes   Int
@@ -44,18 +127,23 @@ model AvailabilityRule {
   updatedAt    DateTime @updatedAt
 
   @@index([siteId])
+  @@index([siteId, staffId])
+  @@index([siteId, resourceId])
 }
 
 model BlockedTime {
   id        String   @id @default(cuid())
   siteId    String
   site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  resourceId String?
+  resource  Resource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
   startsAt  DateTime
   endsAt    DateTime
   reason    String?
   createdAt DateTime @default(now())
 
   @@index([siteId, startsAt, endsAt])
+  @@index([siteId, resourceId])
 }
 
 model Booking {
@@ -64,6 +152,9 @@ model Booking {
   site               Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
   serviceId          String
   service            Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  staffId            String?
+  staff              StaffMember?  @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  resources          BookingResource[]
   clientId           String?
   client             Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
   customerName       String
@@ -82,5 +173,21 @@ model Booking {
 
   @@index([siteId, startsAt, endsAt])
   @@index([serviceId, startsAt])
+  @@index([staffId, startsAt])
   @@index([clientId])
+}
+
+model BookingResource {
+  id         String      @id @default(cuid())
+  siteId     String
+  site       Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  bookingId  String
+  booking    Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  resourceId String
+  resource   Resource    @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+
+  @@unique([bookingId, resourceId])
+  @@index([siteId, resourceId])
+  @@index([siteId, bookingId])
 }

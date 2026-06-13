@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { randomBytes } from "crypto";
 import {
+  AdminRole,
   AnalyticsEventType,
   AutomationAction,
   AutomationStatus,
@@ -276,12 +277,14 @@ async function seedEmailCore(businessName: string, contactEmail: string, siteId 
         "",
         "Total: {{orderTotal}}",
         "",
+        "Pay securely: {{checkoutUrl}}",
+        "",
         "{{businessName}} will complete payment collection through hosted checkout. No card details are collected by this site."
       ].join("\n"),
       htmlBody:
-        "<p>Hi {{customerName}},</p><p>Order {{orderNumber}} is prepared with {{paymentProvider}} payment status {{paymentStatus}}.</p><p><strong>Total:</strong> {{orderTotal}}</p><p>{{businessName}} will complete payment collection through hosted checkout. No card details are collected by this site.</p>",
+        "<p>Hi {{customerName}},</p><p>Order {{orderNumber}} is prepared with {{paymentProvider}} payment status {{paymentStatus}}.</p><p><strong>Total:</strong> {{orderTotal}}</p><p><a href=\"{{checkoutUrl}}\">Pay securely with Stripe</a></p><p>{{businessName}} will complete payment collection through hosted checkout. No card details are collected by this site.</p>",
       requiredTokens: ["businessName", "customerName", "orderNumber", "orderTotal", "paymentProvider", "paymentStatus"],
-      optionalTokens: ["customerEmail"]
+      optionalTokens: ["customerEmail", "checkoutUrl"]
     },
     {
       id: "email-template-order-receipt-customer",
@@ -378,10 +381,11 @@ async function main() {
 
   await prisma.adminUser.upsert({
     where: { email },
-    update: resetAdminPassword ? { passwordHash } : {},
+    update: resetAdminPassword ? { passwordHash, role: AdminRole.OWNER } : { role: AdminRole.OWNER },
     create: {
       email,
-      passwordHash
+      passwordHash,
+      role: AdminRole.OWNER
     }
   });
 
@@ -424,6 +428,55 @@ async function main() {
     await prisma.availabilityRule.createMany({
       data: [1, 2, 3, 4, 5].map((weekday) => ({
         siteId: settings.siteId,
+        weekday,
+        startMinutes: 9 * 60,
+        endMinutes: 17 * 60
+      }))
+    });
+  }
+
+  const studioResource = await prisma.resource.upsert({
+    where: { id: "seed-studio-a" },
+    update: {
+      isActive: true,
+      name: "Studio A",
+      type: "ROOM"
+    },
+    create: {
+      id: "seed-studio-a",
+      siteId: settings.siteId,
+      name: "Studio A",
+      type: "ROOM",
+      description: "Sample room resource for resource-backed scheduling.",
+      location: "Main studio",
+      capacity: 1,
+      isActive: true
+    }
+  });
+
+  await prisma.serviceResource.upsert({
+    where: {
+      serviceId_resourceId: {
+        serviceId: consultation.id,
+        resourceId: studioResource.id
+      }
+    },
+    update: {},
+    create: {
+      siteId: settings.siteId,
+      serviceId: consultation.id,
+      resourceId: studioResource.id
+    }
+  });
+
+  const hasResourceAvailability = await prisma.availabilityRule.count({
+    where: { siteId: settings.siteId, resourceId: studioResource.id }
+  });
+  if (!hasResourceAvailability) {
+    await prisma.availabilityRule.createMany({
+      data: [1, 2, 3, 4, 5].map((weekday) => ({
+        siteId: settings.siteId,
+        resourceId: studioResource.id,
         weekday,
         startMinutes: 9 * 60,
         endMinutes: 17 * 60

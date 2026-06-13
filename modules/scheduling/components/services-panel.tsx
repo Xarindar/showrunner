@@ -1,13 +1,90 @@
 import { Fragment } from "react";
-import type { Service } from "@prisma/client";
+import type { Resource, Service, ServiceResource, ServiceStaff, StaffMember } from "@prisma/client";
 import { Check, CircleOff, Plus, Save } from "lucide-react";
 import { createServiceAction, toggleServiceAction, updateServiceAction } from "../actions";
 
-type ServicesPanelProps = {
-  services: Service[];
+type ServiceWithStaff = Service & {
+  resourceAssignments: Array<ServiceResource & { resource: Resource }>;
+  staffAssignments: Array<ServiceStaff & { staff: StaffMember }>;
 };
 
-export function ServicesPanel({ services }: ServicesPanelProps) {
+type ServicesPanelProps = {
+  resources: Resource[];
+  services: ServiceWithStaff[];
+  staff: StaffMember[];
+};
+
+function StaffCheckboxes({
+  assignedStaffIds,
+  checkboxIdPrefix,
+  staff
+}: {
+  assignedStaffIds: string[];
+  checkboxIdPrefix: string;
+  staff: StaffMember[];
+}) {
+  if (!staff.length) {
+    return <p style={{ color: "var(--muted)", margin: 0 }}>Add staff to assign this service to specific people.</p>;
+  }
+
+  return (
+    <div className="field">
+      <label>Staff who can take this service</label>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        {staff.map((member) => (
+          <label key={member.id} style={{ alignItems: "center", display: "flex", gap: 6 }}>
+            <input
+              id={`${checkboxIdPrefix}-${member.id}`}
+              name="staffIds"
+              type="checkbox"
+              value={member.id}
+              defaultChecked={assignedStaffIds.includes(member.id)}
+              disabled={!member.isActive}
+            />
+            {member.name}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ResourceCheckboxes({
+  assignedResourceIds,
+  checkboxIdPrefix,
+  resources
+}: {
+  assignedResourceIds: string[];
+  checkboxIdPrefix: string;
+  resources: Resource[];
+}) {
+  if (!resources.length) {
+    return <p style={{ color: "var(--muted)", margin: 0 }}>Add rooms or equipment before requiring resources for a service.</p>;
+  }
+
+  return (
+    <div className="field">
+      <label>Required rooms or equipment</label>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        {resources.map((resource) => (
+          <label key={resource.id} style={{ alignItems: "center", display: "flex", gap: 6 }}>
+            <input
+              id={`${checkboxIdPrefix}-${resource.id}`}
+              name="resourceIds"
+              type="checkbox"
+              value={resource.id}
+              defaultChecked={assignedResourceIds.includes(resource.id)}
+              disabled={!resource.isActive}
+            />
+            {resource.name}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ServicesPanel({ resources, services, staff }: ServicesPanelProps) {
   return (
     <section className="grid-2">
       <form action={createServiceAction} className="card form-grid">
@@ -75,6 +152,8 @@ export function ServicesPanel({ services }: ServicesPanelProps) {
           <input name="isActive" type="checkbox" defaultChecked />
           Active
         </label>
+        <StaffCheckboxes assignedStaffIds={[]} checkboxIdPrefix="new-service-staff" staff={staff} />
+        <ResourceCheckboxes assignedResourceIds={[]} checkboxIdPrefix="new-service-resource" resources={resources} />
         <button className="button" type="submit">
           <Plus size={18} />
           Add service
@@ -122,6 +201,16 @@ export function ServicesPanel({ services }: ServicesPanelProps) {
                   <td colSpan={4} style={{ color: "var(--muted)", paddingTop: 0 }}>
                     Notice: {service.minimumNoticeHours}h - Advance: {service.maxAdvanceDays}d - Interval:{" "}
                     {service.slotIntervalMinutes}m - Buffer: {service.bufferBeforeMinutes}/{service.bufferAfterMinutes}m
+                    <br />
+                    Staff:{" "}
+                    {service.staffAssignments.length
+                      ? service.staffAssignments.map((assignment) => assignment.staff.name).join(", ")
+                      : "business-wide availability"}
+                    <br />
+                    Resources:{" "}
+                    {service.resourceAssignments.length
+                      ? service.resourceAssignments.map((assignment) => assignment.resource.name).join(", ")
+                      : "none required"}
                   </td>
                 </tr>
                 <tr>
@@ -237,6 +326,16 @@ export function ServicesPanel({ services }: ServicesPanelProps) {
                           <input name="isActive" type="checkbox" defaultChecked={service.isActive} />
                           Active
                         </label>
+                        <StaffCheckboxes
+                          assignedStaffIds={service.staffAssignments.map((assignment) => assignment.staffId)}
+                          checkboxIdPrefix={`service-${service.id}-staff`}
+                          staff={staff}
+                        />
+                        <ResourceCheckboxes
+                          assignedResourceIds={service.resourceAssignments.map((assignment) => assignment.resourceId)}
+                          checkboxIdPrefix={`service-${service.id}-resource`}
+                          resources={resources}
+                        />
                         <button className="button" type="submit">
                           <Save size={18} />
                           Save service

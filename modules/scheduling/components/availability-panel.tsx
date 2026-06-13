@@ -1,19 +1,46 @@
-import type { AvailabilityRule } from "@prisma/client";
+import type { AvailabilityRule, Resource, StaffMember } from "@prisma/client";
 import { Clock, Trash2 } from "lucide-react";
 import { minutesToTime } from "@/lib/format";
 import { weekdays } from "@/lib/scheduling/constants";
 import { createAvailabilityAction, deleteAvailabilityAction } from "../actions";
 
 type AvailabilityPanelProps = {
-  availability: AvailabilityRule[];
+  availability: Array<AvailabilityRule & { resource: Resource | null; staff: StaffMember | null }>;
+  resources: Resource[];
+  staff: StaffMember[];
 };
 
-export function AvailabilityPanel({ availability }: AvailabilityPanelProps) {
+export function AvailabilityPanel({ availability, resources, staff }: AvailabilityPanelProps) {
   return (
     <section className="grid-2">
       <form action={createAvailabilityAction} className="card form-grid">
         <h2 style={{ fontSize: "1.35rem" }}>Weekly availability</h2>
-        <div className="grid-3">
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor="availability-staff">Staff</label>
+            <select id="availability-staff" name="staffId" defaultValue="">
+              <option value="">Business-wide</option>
+              {staff.map((member) => (
+                <option key={member.id} value={member.id} disabled={!member.isActive}>
+                  {member.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="availability-resource">Resource</label>
+            <select id="availability-resource" name="resourceId" defaultValue="">
+              <option value="">None</option>
+              {resources.map((resource) => (
+                <option key={resource.id} value={resource.id} disabled={!resource.isActive}>
+                  {resource.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <p style={{ color: "var(--muted)", margin: 0 }}>Choose either staff or resource for scoped hours, or leave both empty for business-wide hours.</p>
+        <div className="grid-2">
           <div className="field">
             <label htmlFor="weekday">Day</label>
             <select id="weekday" name="weekday" defaultValue="1">
@@ -24,6 +51,8 @@ export function AvailabilityPanel({ availability }: AvailabilityPanelProps) {
               ))}
             </select>
           </div>
+        </div>
+        <div className="grid-2">
           <div className="field">
             <label htmlFor="startTime">Start</label>
             <input id="startTime" name="startTime" type="time" defaultValue="09:00" required />
@@ -42,9 +71,18 @@ export function AvailabilityPanel({ availability }: AvailabilityPanelProps) {
       <div className="card">
         <h2 style={{ fontSize: "1.35rem" }}>Availability rules</h2>
         <table className="table">
+          <thead>
+            <tr>
+              <th>Owner</th>
+              <th>Day</th>
+              <th>Hours</th>
+              <th>Action</th>
+            </tr>
+          </thead>
           <tbody>
             {availability.map((rule) => (
               <tr key={rule.id}>
+                <td>{rule.staff?.name || rule.resource?.name || "Business-wide"}</td>
                 <td>{weekdays[rule.weekday]}</td>
                 <td>
                   {minutesToTime(rule.startMinutes)} - {minutesToTime(rule.endMinutes)}

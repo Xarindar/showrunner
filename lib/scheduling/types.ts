@@ -4,6 +4,10 @@ export type Slot = {
   startsAt: Date;
   endsAt: Date;
   label: string;
+  resourceIds: string[];
+  resourceNames: string[];
+  staffId?: string;
+  staffName?: string;
 };
 
 export type SlotDiagnosticReason = {
@@ -19,6 +23,10 @@ export type SlotDiagnostic = Slot & {
 export type SlotDiagnostics = {
   serviceId: string;
   serviceName: string;
+  resourceIds: string[];
+  resourceNames: string[];
+  staffId?: string;
+  staffName?: string;
   timezone: string;
   ruleCount: number;
   slotCount: number;
@@ -29,6 +37,8 @@ export type SlotDiagnostics = {
 
 export type BookingRequest = {
   serviceId: string;
+  staffId?: string;
+  resourceIds?: string[];
   startsAt: Date;
   customerName: string;
   customerEmail: string;
@@ -40,7 +50,11 @@ export type BookingRequest = {
 
 export type SchedulingAdapter = {
   listActiveServices(): Promise<Service[]>;
-  getAvailableSlots(serviceId: string, date: Date): Promise<Slot[]>;
-  getSlotDiagnostics(serviceId: string, date: Date, options?: { excludeBookingId?: string }): Promise<SlotDiagnostics | null>;
+  getAvailableSlots(serviceId: string, date: Date, options?: { resourceId?: string; staffId?: string; excludeBookingId?: string }): Promise<Slot[]>;
+  getSlotDiagnostics(
+    serviceId: string,
+    date: Date,
+    options?: { resourceId?: string; staffId?: string; excludeBookingId?: string }
+  ): Promise<SlotDiagnostics | null>;
   createBooking(input: BookingRequest): Promise<Booking>;
 };

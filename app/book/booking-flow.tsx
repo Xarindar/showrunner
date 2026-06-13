@@ -15,12 +15,26 @@ type BookableService = {
   intakePrompt: string | null;
   policyText: string | null;
   requirePolicy: boolean;
+  staff: Array<{
+    id: string;
+    name: string;
+    title: string;
+  }>;
+  resources: Array<{
+    id: string;
+    name: string;
+    type: string;
+  }>;
 };
 
 type Slot = {
   startsAt: string;
   endsAt: string;
   label: string;
+  resourceIds: string[];
+  resourceNames: string[];
+  staffId: string;
+  staffName: string;
 };
 
 type BookingFlowProps = {
@@ -40,6 +54,10 @@ const steps: Array<{ id: Step; label: string }> = [
   { id: "review", label: "Review" }
 ];
 
+function slotKey(slot: Slot) {
+  return `${slot.startsAt}|${slot.staffId || ""}|${slot.resourceIds.join(",")}`;
+}
+
 export function BookingFlow({ services, defaultDate, initialServiceSlug }: BookingFlowProps) {
   const initialService =
     services.find((service) => service.slug === initialServiceSlug) || services.find((service) => service.id === initialServiceSlug) || services[0];
@@ -47,6 +65,7 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
   const [step, setStep] = useState<Step>("service");
   const [transitionDirection, setTransitionDirection] = useState<TransitionDirection>("forward");
   const [serviceId, setServiceId] = useState(initialService?.id || "");
+  const [staffFilterId, setStaffFilterId] = useState("");
   const [date, setDate] = useState(defaultDate);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState("");
@@ -62,7 +81,7 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
     () => services.find((service) => service.id === serviceId) || services[0],
     [serviceId, services]
   );
-  const selectedSlotDetails = slots.find((slot) => slot.startsAt === selectedSlot);
+  const selectedSlotDetails = slots.find((slot) => slotKey(slot) === selectedSlot);
   const stepIndex = steps.findIndex((item) => item.id === step);
   const detailsReady = customerName.trim().length > 1 && customerEmail.includes("@");
   const reviewReady = selectedService && selectedSlotDetails && detailsReady;
@@ -74,12 +93,15 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
 
     let active = true;
 
-    fetch(`/api/availability?serviceId=${serviceId}&date=${date}`)
+    const params = new URLSearchParams({ serviceId, date });
+    if (staffFilterId) params.set("staffId", staffFilterId);
+
+    fetch(`/api/availability?${params.toString()}`)
       .then((response) => response.json())
       .then((data: { slots: Slot[] }) => {
         if (!active) return;
         setSlots(data.slots);
-        setSelectedSlot(data.slots[0]?.startsAt || "");
+        setSelectedSlot(data.slots[0] ? slotKey(data.slots[0]) : "");
       })
       .catch(() => {
         if (active) setSlots([]);
@@ -91,7 +113,7 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
     return () => {
       active = false;
     };
-  }, [serviceId, date]);
+  }, [serviceId, staffFilterId, date]);
 
   if (!services.length) {
     return <div className="booking-card">No services are available yet.</div>;
@@ -138,6 +160,7 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
     setLoadingSlots(true);
     setSelectedSlot("");
     setServiceId(service.id);
+    setStaffFilterId("");
 
     window.history.replaceState({}, "", `/book/${serviceSlug}`);
   }
@@ -215,6 +238,28 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
                 }}
               />
             </div>
+            {selectedService?.staff.length ? (
+              <div className="date-picker-row">
+                <label htmlFor="staffFilterId">Staff</label>
+                <select
+                  id="staffFilterId"
+                  value={staffFilterId}
+                  onChange={(event) => {
+                    setLoadingSlots(true);
+                    setSelectedSlot("");
+                    setStaffFilterId(event.target.value);
+                  }}
+                >
+                  <option value="">Any available staff</option>
+                  {selectedService.staff.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}
+                      {member.title ? `, ${member.title}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
 
             <div className="slot-panel" aria-busy={loadingSlots}>
               {loadingSlots ? (
@@ -238,9 +283,9 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
                 <div className="time-slot-grid">
                   {slots.map((slot) => (
                     <button
-                      className={slot.startsAt === selectedSlot ? "time-slot selected" : "time-slot"}
-                      key={slot.startsAt}
-                      onClick={() => setSelectedSlot(slot.startsAt)}
+                      className={slotKey(slot) === selectedSlot ? "time-slot selected" : "time-slot"}
+                      key={slotKey(slot)}
+                      onClick={() => setSelectedSlot(slotKey(slot))}
                       type="button"
                     >
                       {slot.label}
@@ -316,7 +361,9 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
         {step === "review" ? (
           <form action={action} className={panelClass}>
             <input name="serviceId" type="hidden" value={selectedService?.id || ""} />
-            <input name="startsAt" type="hidden" value={selectedSlot} />
+            <input name="staffId" type="hidden" value={selectedSlotDetails?.staffId || ""} />
+            <input name="resourceIds" type="hidden" value={selectedSlotDetails?.resourceIds.join(",") || ""} />
+            <input name="startsAt" type="hidden" value={selectedSlotDetails?.startsAt || ""} />
             <input name="customerName" type="hidden" value={customerName} />
             <input name="customerEmail" type="hidden" value={customerEmail} />
             <input name="customerPhone" type="hidden" value={customerPhone} />
@@ -334,6 +381,18 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
                 <span>Time</span>
                 <strong>{date} at {selectedSlotDetails?.label}</strong>
               </div>
+              {selectedSlotDetails?.staffName ? (
+                <div>
+                  <span>Staff</span>
+                  <strong>{selectedSlotDetails.staffName}</strong>
+                </div>
+              ) : null}
+              {selectedSlotDetails?.resourceNames.length ? (
+                <div>
+                  <span>Resources</span>
+                  <strong>{selectedSlotDetails.resourceNames.join(", ")}</strong>
+                </div>
+              ) : null}
               <div>
                 <span>Name</span>
                 <strong>{customerName}</strong>
@@ -392,6 +451,22 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
             <dt>When</dt>
             <dd className="summary-value" key={selectedSlotDetails ? `${date}-${selectedSlotDetails.startsAt}` : "time-empty"}>
               {selectedSlotDetails ? `${date} at ${selectedSlotDetails.label}` : "Choose a time"}
+            </dd>
+          </div>
+          <div>
+            <dt>Staff</dt>
+            <dd className="summary-value" key={selectedSlotDetails?.staffId || "staff-empty"}>
+              {selectedSlotDetails?.staffName || (selectedService?.staff.length ? "Any available staff" : "Assigned after booking")}
+            </dd>
+          </div>
+          <div>
+            <dt>Resources</dt>
+            <dd className="summary-value" key={selectedSlotDetails?.resourceIds.join("-") || "resources-empty"}>
+              {selectedSlotDetails?.resourceNames.length
+                ? selectedSlotDetails.resourceNames.join(", ")
+                : selectedService?.resources.length
+                  ? selectedService.resources.map((resource) => resource.name).join(", ")
+                  : "No dedicated resource"}
             </dd>
           </div>
           <div>

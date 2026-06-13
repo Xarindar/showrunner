@@ -7,6 +7,8 @@ import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 
 const bookingSchema = z.object({
   serviceId: z.string().min(1),
+  staffId: z.string().trim().optional(),
+  resourceIds: z.string().trim().optional(),
   startsAt: z.string().min(1).refine((value) => !Number.isNaN(new Date(value).getTime()), "Choose a valid appointment time."),
   customerName: z.string().trim().min(2, "Add your name."),
   customerEmail: z.email("Add a valid email.").transform((value) => value.trim().toLowerCase()),
@@ -24,6 +26,8 @@ export type BookingFormState = {
 export async function createPublicBookingAction(_state: BookingFormState, formData: FormData): Promise<BookingFormState> {
   const parsed = bookingSchema.safeParse({
     serviceId: formData.get("serviceId"),
+    staffId: formData.get("staffId") || undefined,
+    resourceIds: formData.get("resourceIds") || undefined,
     startsAt: formData.get("startsAt"),
     customerName: formData.get("customerName"),
     customerEmail: formData.get("customerEmail"),
@@ -40,6 +44,8 @@ export async function createPublicBookingAction(_state: BookingFormState, formDa
   try {
     const booking = await nativeSchedulingAdapter.createBooking({
       serviceId: parsed.data.serviceId,
+      staffId: parsed.data.staffId,
+      resourceIds: parsed.data.resourceIds?.split(",").map((id) => id.trim()).filter(Boolean),
       startsAt: new Date(parsed.data.startsAt),
       customerName: parsed.data.customerName,
       customerEmail: parsed.data.customerEmail,
@@ -53,6 +59,8 @@ export async function createPublicBookingAction(_state: BookingFormState, formDa
       actorEmail: parsed.data.customerEmail,
       metadata: {
         serviceId: parsed.data.serviceId,
+        resourceIds: parsed.data.resourceIds,
+        staffId: parsed.data.staffId,
         startsAt: parsed.data.startsAt
       },
       relatedId: booking.id,

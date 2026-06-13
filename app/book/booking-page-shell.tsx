@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Resource, Service, ServiceResource, ServiceStaff, StaffMember } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
@@ -8,6 +9,11 @@ import { BookingFlow } from "./booking-flow";
 
 type BookingPageShellProps = {
   initialServiceSlug?: string;
+};
+
+type ActiveServiceWithStaff = Service & {
+  resourceAssignments: Array<ServiceResource & { resource: Resource }>;
+  staffAssignments: Array<ServiceStaff & { staff: StaffMember }>;
 };
 
 function getDefaultDate(timeZone: string, availableWeekdays: number[]) {
@@ -29,7 +35,7 @@ function getDefaultDate(timeZone: string, availableWeekdays: number[]) {
 export async function BookingPageShell({ initialServiceSlug }: BookingPageShellProps) {
   const settings = await getSiteSettings();
   const [services, availability] = await Promise.all([
-    nativeSchedulingAdapter.listActiveServices(),
+    nativeSchedulingAdapter.listActiveServices() as Promise<ActiveServiceWithStaff[]>,
     prisma.availabilityRule.findMany({ where: { siteId: settings.siteId }, select: { weekday: true } })
   ]);
 
@@ -67,7 +73,21 @@ export async function BookingPageShell({ initialServiceSlug }: BookingPageShellP
             location: service.location,
             intakePrompt: service.intakePrompt,
             policyText: service.policyText,
-            requirePolicy: service.requirePolicy
+            requirePolicy: service.requirePolicy,
+            resources: service.resourceAssignments
+              ? service.resourceAssignments.map((assignment) => ({
+                  id: assignment.resource.id,
+                  name: assignment.resource.name,
+                  type: assignment.resource.type
+                }))
+              : [],
+            staff: service.staffAssignments
+              ? service.staffAssignments.map((assignment) => ({
+                  id: assignment.staff.id,
+                  name: assignment.staff.name,
+                  title: assignment.staff.title
+                }))
+              : []
           }))}
         />
       </section>

@@ -1,14 +1,15 @@
-import type { BlockedTime } from "@prisma/client";
+import type { BlockedTime, Resource } from "@prisma/client";
 import { Plus, Trash2 } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import { createBlockoutAction, deleteBlockoutAction } from "../actions";
 
 type BlockoutsPanelProps = {
-  blockouts: BlockedTime[];
+  blockouts: Array<BlockedTime & { resource: Resource | null }>;
+  resources: Resource[];
   timezone: string;
 };
 
-export function BlockoutsPanel({ blockouts, timezone }: BlockoutsPanelProps) {
+export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPanelProps) {
   return (
     <section className="grid-2">
       <form action={createBlockoutAction} className="card form-grid">
@@ -27,6 +28,17 @@ export function BlockoutsPanel({ blockouts, timezone }: BlockoutsPanelProps) {
           <label htmlFor="reason">Reason</label>
           <input id="reason" name="reason" placeholder="Vacation, private event, closed" />
         </div>
+        <div className="field">
+          <label htmlFor="blockout-resource">Resource</label>
+          <select id="blockout-resource" name="resourceId" defaultValue="">
+            <option value="">All booking</option>
+            {resources.map((resource) => (
+              <option key={resource.id} value={resource.id}>
+                {resource.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <button className="button" type="submit">
           <Plus size={18} />
           Add blockout
@@ -42,7 +54,10 @@ export function BlockoutsPanel({ blockouts, timezone }: BlockoutsPanelProps) {
                 <td>
                   {formatDateTime(block.startsAt, timezone)}
                   <br />
-                  <span style={{ color: "var(--muted)" }}>{block.reason || "No reason"}</span>
+                  <span style={{ color: "var(--muted)" }}>
+                    {block.resource ? `${block.resource.name} - ` : ""}
+                    {block.reason || "No reason"}
+                  </span>
                 </td>
                 <td>
                   <form action={deleteBlockoutAction}>

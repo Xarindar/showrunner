@@ -13,20 +13,22 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Native public booking is live for single-staff service availability.",
-    primaryGap: "External calendars, staff/resources, capacity, reschedule/cancel links, paid booking, and reminders are pending."
+    summary: "Native public booking is live with multi-staff service assignment, resource requirements, scoped availability, and staff/resource-aware conflict checks.",
+    primaryGap: "External calendars, capacity groups, reschedule/cancel links, paid booking, and reminders are pending."
   },
   capabilities: [
     { label: "Native availability", status: "live" },
     { label: "Public booking", status: "live" },
+    { label: "Multi-staff scheduling", status: "live" },
+    { label: "Bookable resources", status: "live" },
     { label: "External calendar adapter", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/scheduling"],
   publicRoutes: ["/book", "/book/[serviceSlug]", "/api/availability"],
   widgetRoutes: [],
   dependencies: ["appointments", "clients", "communications"],
-  dataModels: ["Service", "AvailabilityRule", "BlockedTime", "Booking"],
-  permissions: ["scheduling.read", "scheduling.write"],
+  dataModels: ["Service", "StaffMember", "Resource", "ServiceStaff", "ServiceResource", "AvailabilityRule", "BlockedTime", "Booking", "BookingResource"],
+  permissions: ["scheduling:manage"],
   settingsSections: ["Scheduling", "Notifications"],
   healthChecks: ["active-services", "availability-rules", "booking-window"]
 } satisfies ShellModule;
