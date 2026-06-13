@@ -20,18 +20,23 @@ type SettingsPageProps = {
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   await requireAdmin("settings:update");
   const [{ saved, error }, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [platformStatus, stripePaymentMethods, squareCredential] = await Promise.all([
+  const [platformStatus, stripePaymentMethods, squareCredential, paypalCredential] = await Promise.all([
     getPlatformStatus(settings),
     getStripePaymentMethodSettings(settings.siteId),
-    getConnectedGatewayCredential(settings.siteId, PaymentProvider.SQUARE)
+    getConnectedGatewayCredential(settings.siteId, PaymentProvider.SQUARE),
+    getConnectedGatewayCredential(settings.siteId, PaymentProvider.PAYPAL)
   ]);
   const dataScopeConfig = parseDataScopeConfig(settings.dataScopeConfig);
   const dataScopeModules = scopableModules();
   const stripeCredential = stripePaymentMethods.credential;
   const stripeConnected = stripePaymentMethods.connected;
   const squareConnected = squareCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(squareCredential.merchantId);
+  const paypalConnected = paypalCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(paypalCredential.merchantId);
+  const selectedProviderDisconnected =
+    (settings.checkoutProvider === PaymentProvider.SQUARE && !squareConnected) ||
+    (settings.checkoutProvider === PaymentProvider.PAYPAL && !paypalConnected);
   const activeCheckoutProvider =
-    settings.checkoutProvider === PaymentProvider.SQUARE && !squareConnected ? PaymentProvider.STRIPE : settings.checkoutProvider;
+    selectedProviderDisconnected ? PaymentProvider.STRIPE : settings.checkoutProvider;
 
   return (
     <div className="stack">
@@ -78,15 +83,20 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               <CreditCard size={18} />
               {squareConnected ? "Reconnect Square" : "Connect Square"}
             </a>
+            <span className={paypalConnected ? "pill success" : "pill warning"}>{paypalConnected ? "Connected" : "Not connected"}</span>
+            <a className="button secondary" href="/api/payments/paypal/connect/start">
+              <CreditCard size={18} />
+              {paypalConnected ? "Reconnect PayPal" : "Connect PayPal"}
+            </a>
           </div>
         </div>
         <form action={updateCheckoutProviderAction} className="subpanel form-grid">
           <div>
             <h3 style={{ fontSize: "1rem" }}>Checkout provider</h3>
             <p style={{ color: "var(--muted)", margin: 0 }}>Choose which connected provider creates new public checkout sessions.</p>
-            {settings.checkoutProvider === PaymentProvider.SQUARE && !squareConnected ? (
+            {selectedProviderDisconnected ? (
               <p className="error" style={{ marginTop: 8 }}>
-                Square is disconnected, so new checkout sessions are using Stripe until Square is connected again.
+                {settings.checkoutProvider === PaymentProvider.SQUARE ? "Square" : "PayPal"} is disconnected, so new checkout sessions are using Stripe until it is connected again.
               </p>
             ) : null}
           </div>
@@ -123,6 +133,26 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                   {squareConnected
                     ? `Merchant ${squareCredential?.merchantId}, location ${squareCredential?.displayName || "connected"}.`
                     : "Connect Square before using it for public checkout."}
+                </small>
+              </span>
+            </label>
+            <label className="module-toggle-row">
+              <input
+                disabled={!paypalConnected}
+                name="checkoutProvider"
+                type="radio"
+                value={PaymentProvider.PAYPAL}
+                defaultChecked={activeCheckoutProvider === PaymentProvider.PAYPAL}
+              />
+              <span className="module-toggle-main">
+                <span>
+                  <strong>PayPal</strong>
+                  <span className={paypalConnected ? "pill success" : "pill warning"}>{paypalConnected ? "Connected account" : "Connect first"}</span>
+                </span>
+                <small>
+                  {paypalConnected
+                    ? `Merchant ${paypalCredential?.merchantId || paypalCredential?.displayName}.`
+                    : "Connect PayPal before using it for public checkout."}
                 </small>
               </span>
             </label>

@@ -29,6 +29,7 @@ export type PaymentGatewayCheckoutSession = {
 };
 
 export type PaymentGatewayWebhookInput = {
+  headers?: Headers;
   rawBody: string;
   signature: string | null;
   siteId?: string;
@@ -47,5 +48,5 @@ export type PaymentGateway = {
   handleWebhookEvent(event: unknown): Promise<unknown>;
   refund(input: PaymentGatewayRefundInput): Promise<unknown>;
   supportedWallets(siteId?: string): Promise<PaymentWallet[]>;
-  verifyWebhook(input: PaymentGatewayWebhookInput): unknown;
+  verifyWebhook(input: PaymentGatewayWebhookInput): Promise<unknown> | unknown;
 };

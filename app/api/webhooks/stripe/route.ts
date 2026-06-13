@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get("stripe-signature");
 
   try {
-    const event = constructPaymentWebhookEvent({ rawBody, signature });
+    const event = await constructPaymentWebhookEvent({ rawBody, signature });
     await handlePaymentWebhookEvent({ event });
     return Response.json({ received: true });
   } catch (error) {

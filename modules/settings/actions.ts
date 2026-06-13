@@ -127,7 +127,7 @@ export async function updateStripePaymentMethodsAction(formData: FormData) {
 
 function parseCheckoutProvider(value: FormDataEntryValue | null) {
   const provider = String(value || "").trim().toUpperCase();
-  if (provider === PaymentProvider.STRIPE || provider === PaymentProvider.SQUARE) return provider;
+  if (provider === PaymentProvider.STRIPE || provider === PaymentProvider.SQUARE || provider === PaymentProvider.PAYPAL) return provider;
   throw new Error("Choose a supported checkout provider.");
 }
 
@@ -138,10 +138,10 @@ export async function updateCheckoutProviderAction(formData: FormData) {
   let provider: PaymentProvider;
   try {
     provider = parseCheckoutProvider(formData.get("checkoutProvider"));
-    if (provider === PaymentProvider.SQUARE) {
-      const squareCredential = await getConnectedGatewayCredential(site.id, PaymentProvider.SQUARE);
-      if (squareCredential?.status !== PaymentGatewayConnectionStatus.CONNECTED) {
-        throw new Error("Connect Square before making it the checkout provider.");
+    if (provider === PaymentProvider.SQUARE || provider === PaymentProvider.PAYPAL) {
+      const credential = await getConnectedGatewayCredential(site.id, provider);
+      if (credential?.status !== PaymentGatewayConnectionStatus.CONNECTED || !credential.merchantId.trim()) {
+        throw new Error(`Connect ${provider === PaymentProvider.SQUARE ? "Square" : "PayPal"} before making it the checkout provider.`);
       }
     }
 

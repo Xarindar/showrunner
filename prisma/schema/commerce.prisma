@@ -68,6 +68,12 @@ enum SquareWebhookEventStatus {
   FAILED
 }
 
+enum PayPalWebhookEventStatus {
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
 model Product {
   id                  String              @id @default(cuid())
   siteId              String
@@ -350,4 +356,20 @@ model SquareWebhookEvent {
   @@index([status])
   @@index([type])
   @@index([merchantId])
+}
+
+model PayPalWebhookEvent {
+  id          String                   @id @default(cuid())
+  eventId     String
+  type        String
+  status      PayPalWebhookEventStatus @default(PROCESSING)
+  summary     Json                     @default("{}")
+  error       String                   @default("")
+  processedAt DateTime?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  @@unique([eventId])
+  @@index([status])
+  @@index([type])
 }

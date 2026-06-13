@@ -1,12 +1,14 @@
 import { PaymentProvider } from "@prisma/client";
 import { getPaymentGateway } from "./registry";
 
-export function constructPaymentWebhookEvent(input: {
+export async function constructPaymentWebhookEvent(input: {
+  headers?: Headers;
   provider?: PaymentProvider;
   rawBody: string;
   signature: string | null;
 }) {
-  return getPaymentGateway(input.provider || PaymentProvider.STRIPE).verifyWebhook({
+  return await getPaymentGateway(input.provider || PaymentProvider.STRIPE).verifyWebhook({
+    headers: input.headers,
     rawBody: input.rawBody,
     signature: input.signature
   });
