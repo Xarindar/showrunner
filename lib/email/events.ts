@@ -45,6 +45,12 @@ type OrderForEmail = {
   receiptUrl?: string | null;
 };
 
+type BookingStatusEmailOptions = {
+  idempotencyKey?: string;
+  logLabel?: string;
+  templateKey?: string;
+};
+
 function endTime(value: Date, timeZone: string) {
   return new Intl.DateTimeFormat("en", {
     timeStyle: "short",
@@ -117,10 +123,32 @@ export async function queueBookingCreatedEmails(booking: BookingForEmail) {
   ]);
 }
 
-export async function queueBookingStatusEmail(booking: BookingForEmail, previousStatus?: BookingStatus) {
-  if (previousStatus && previousStatus === booking.status) return;
+export async function queueBookingStatusEmail(
+  booking: BookingForEmail,
+  previousStatus?: BookingStatus,
+  options: BookingStatusEmailOptions = {}
+) {
+  if (!options.templateKey && previousStatus && previousStatus === booking.status) return;
 
   const tokens = await bookingTokens(booking);
+
+  if (options.templateKey) {
+    const templateKey = options.templateKey;
+    await logQueueError(options.logLabel || "booking-status-customer", () =>
+      queueEmail({
+        siteId: booking.siteId,
+        templateKey,
+        recipientEmail: booking.customerEmail,
+        recipientName: booking.customerName,
+        category: EmailCategory.TRANSACTIONAL,
+        relatedType: "booking",
+        relatedId: booking.id,
+        tokens,
+        idempotencyKey: options.idempotencyKey || `booking:${booking.id}:${templateKey}:customer`
+      })
+    );
+    return;
+  }
 
   if (booking.status === BookingStatus.CONFIRMED) {
     await logQueueError("booking-confirmed-customer", () =>
