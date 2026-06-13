@@ -1,6 +1,6 @@
 "use server";
 
-import { GiftCardStatus, OrderStatus, PaymentProvider, PaymentStatus, Prisma, ProductStatus } from "@prisma/client";
+import { GiftCardStatus, OrderStatus, PaymentProvider, PaymentStatus, Prisma, ProductStatus, ProductType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -34,6 +34,12 @@ import { getCurrentSiteId } from "@/lib/site";
 const orderStatusFormSchema = z.object({
   id: requiredText,
   status: z.enum(OrderStatus)
+});
+
+const orderFulfillmentSchema = z.object({
+  carrier: optionalStoredText,
+  id: requiredText,
+  trackingNumber: optionalStoredText
 });
 
 const orderCheckoutLinkSchema = z.object({
@@ -552,6 +558,61 @@ export async function updateCommerceOrderStatusAction(formData: FormData) {
 
   refreshProducts();
   redirect(`/admin/modules/products?saved=order&order=${input.id}`);
+}
+
+export async function fulfillCommerceOrderAction(formData: FormData) {
+  const user = await requireAdmin("products:manage");
+  const input = await parseForm(orderFulfillmentSchema, formData, "/admin/modules/products");
+  const siteId = await getCurrentSiteId();
+
+  try {
+    const order = await prisma.order.findFirst({
+      where: { id: input.id, siteId },
+      include: {
+        items: {
+          include: { product: true }
+        }
+      }
+    });
+
+    if (!order) throw new Error("Order not found.");
+    if (order.status !== OrderStatus.PAID) {
+      throw new Error("Only paid orders can be fulfilled.");
+    }
+    if (!order.items.some((item) => item.product.type === ProductType.PHYSICAL)) {
+      throw new Error("Only orders with physical products can be fulfilled.");
+    }
+
+    const fulfilledOrder = await updateOrderStatus({
+      actorEmail: user.email || "",
+      fulfillmentCarrier: input.carrier,
+      fulfillmentTrackingNumber: input.trackingNumber,
+      orderId: order.id,
+      siteId,
+      status: OrderStatus.FULFILLED
+    });
+
+    await recordAuditLog({
+      action: "order.fulfilled",
+      actor: user,
+      metadata: {
+        carrier: fulfilledOrder.fulfillmentCarrier,
+        fulfilledAt: fulfilledOrder.fulfilledAt?.toISOString() || "",
+        orderNumber: fulfilledOrder.orderNumber,
+        trackingNumber: fulfilledOrder.fulfillmentTrackingNumber
+      },
+      siteId,
+      targetId: fulfilledOrder.id,
+      targetLabel: fulfilledOrder.orderNumber,
+      targetType: "order"
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not fulfill that order.";
+    redirect(`/admin/modules/products?order=${input.id}&error=${encodeURIComponent(message)}`);
+  }
+
+  refreshProducts();
+  redirect(`/admin/modules/products?saved=fulfilled&order=${input.id}`);
 }
 
 export async function setCommerceOrderCheckoutLinkAction(formData: FormData) {

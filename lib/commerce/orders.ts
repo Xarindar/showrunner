@@ -24,6 +24,9 @@ type OrderWithItems = Prisma.OrderGetPayload<{
 }>;
 
 type OrderTransitionOptions = {
+  actorEmail?: string;
+  fulfillmentCarrier?: string;
+  fulfillmentTrackingNumber?: string;
   providerConfirmed?: boolean;
 };
 
@@ -267,6 +270,9 @@ async function issueGiftCardsForPaidOrder(tx: CommerceTx, order: OrderWithItems)
 }
 
 export async function updateOrderStatus(input: {
+  actorEmail?: string;
+  fulfillmentCarrier?: string;
+  fulfillmentTrackingNumber?: string;
   orderId: string;
   status: OrderStatus;
   siteId?: string;
@@ -294,10 +300,15 @@ export async function updateOrderStatus(input: {
 
     const becamePaid = input.status === OrderStatus.PAID && order.status !== OrderStatus.PAID;
     const becameCanceled = input.status === OrderStatus.CANCELED && order.status !== OrderStatus.CANCELED;
+    const becameFulfilled = input.status === OrderStatus.FULFILLED && order.status !== OrderStatus.FULFILLED;
 
     if (becamePaid) {
       await consumeCouponRedemptionForPaidOrder(tx, order);
       await decrementInventoryForPaidOrder(tx, order);
+    }
+
+    if (becameFulfilled && !order.items.some((item) => item.product.type === ProductType.PHYSICAL)) {
+      throw new Error("Only orders with physical products can be fulfilled.");
     }
 
     if (becameCanceled) {
@@ -309,6 +320,10 @@ export async function updateOrderStatus(input: {
     const updatedOrder = await tx.order.update({
       where: { id: order.id },
       data: {
+        fulfilledAt: input.status === OrderStatus.FULFILLED ? order.fulfilledAt || new Date() : undefined,
+        fulfillmentCarrier: input.status === OrderStatus.FULFILLED ? input.fulfillmentCarrier?.trim() || order.fulfillmentCarrier : undefined,
+        fulfillmentTrackingNumber:
+          input.status === OrderStatus.FULFILLED ? input.fulfillmentTrackingNumber?.trim() || order.fulfillmentTrackingNumber : undefined,
         status: input.status,
         placedAt: input.status === OrderStatus.PAID ? order.placedAt || new Date() : undefined
       },
@@ -319,6 +334,7 @@ export async function updateOrderStatus(input: {
 
     return {
       becamePaid,
+      becameFulfilled,
       issuedGiftCards,
       order: updatedOrder,
       sourceOrder: order
@@ -372,6 +388,23 @@ export async function updateOrderStatus(input: {
         valueCents: result.order.totalCents
       })
     ]);
+  }
+
+  if (result.becameFulfilled) {
+    await emitModuleEvent("order.fulfilled", {
+      actorEmail: input.actorEmail || "",
+      currency: result.order.currency,
+      idempotencyKey: `order:${result.order.id}:fulfilled`,
+      metadata: {
+        carrier: result.order.fulfillmentCarrier,
+        fulfilledAt: result.order.fulfilledAt?.toISOString() || "",
+        orderNumber: result.order.orderNumber,
+        trackingNumber: result.order.fulfillmentTrackingNumber
+      },
+      relatedId: result.order.id,
+      relatedType: "order",
+      valueCents: result.order.totalCents
+    });
   }
 
   return result.order;

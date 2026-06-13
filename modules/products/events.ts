@@ -7,5 +7,11 @@ export const productEvents = {
     analyticsEventType: AnalyticsEventType.PURCHASE,
     automationTrigger: AutomationTrigger.ORDER_PAID,
     relatedType: "order"
+  },
+  "order.fulfilled": {
+    analyticsEventName: "order_fulfilled",
+    analyticsEventType: AnalyticsEventType.CUSTOM,
+    automationTrigger: AutomationTrigger.ORDER_FULFILLED,
+    relatedType: "order"
   }
 } as const satisfies ModuleEventSlice;

@@ -1,5 +1,5 @@
 import { CartStatus, CouponType, GiftCardStatus, OrderStatus, PaymentStatus, ProductStatus, ProductType } from "@prisma/client";
-import { BadgeDollarSign, Boxes, CreditCard, PackagePlus, ReceiptText, Tags } from "lucide-react";
+import { BadgeDollarSign, Boxes, CreditCard, PackagePlus, ReceiptText, Tags, Truck } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { nextOrderStatuses } from "@/lib/commerce/orders";
 import { enumLabel, formatDateTime, formatMoney, stringArrayCsv } from "@/lib/format";
@@ -13,6 +13,7 @@ import {
   createGiftCardAction,
   createProductAction,
   createProductVariantAction,
+  fulfillCommerceOrderAction,
   updateCommerceCheckoutSettingsAction,
   setCommerceOrderCheckoutLinkAction,
   refundCommercePaymentAction,
@@ -129,6 +130,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       })
     : null;
   const selectedOrderNextStatuses = selectedOrder ? nextOrderStatuses(selectedOrder.status) : [];
+  const selectedOrderHasPhysicalItems = selectedOrder?.items.some((item) => item.product.type === ProductType.PHYSICAL) ?? false;
+  const selectedOrderCanFulfill = Boolean(selectedOrder && selectedOrder.status === OrderStatus.PAID && selectedOrderHasPhysicalItems);
   const savedMessage = params.saved ? "Commerce changes saved." : null;
   const errorMessage = params.error || null;
 
@@ -715,7 +718,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             </table>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {selectedOrderNextStatuses.map((status) => (
+              {selectedOrderNextStatuses.filter((status) => status !== OrderStatus.FULFILLED).map((status) => (
                 <form action={updateCommerceOrderStatusAction} key={status}>
                   <input type="hidden" name="id" value={selectedOrder.id} />
                   <input type="hidden" name="status" value={status} />
@@ -724,7 +727,58 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   </button>
                 </form>
               ))}
-              {!selectedOrderNextStatuses.length ? <span className="pill">Final state</span> : null}
+              {!selectedOrderNextStatuses.filter((status) => status !== OrderStatus.FULFILLED).length && !selectedOrderCanFulfill ? (
+                <span className="pill">Final state</span>
+              ) : null}
+            </div>
+
+            <div className="subpanel form-grid">
+              <div className="page-header" style={{ marginBottom: 0, minHeight: 0 }}>
+                <div>
+                  <h3 style={{ fontSize: "1.05rem" }}>Fulfillment</h3>
+                  <p>
+                    {selectedOrder.fulfilledAt
+                      ? `Fulfilled ${formatDateTime(selectedOrder.fulfilledAt, settings.timezone)}`
+                      : selectedOrderHasPhysicalItems
+                        ? "Add shipment details when the physical order leaves."
+                        : "No physical products require shipment."}
+                  </p>
+                </div>
+                <Truck size={22} />
+              </div>
+              {selectedOrder.fulfilledAt ? (
+                <table className="table">
+                  <tbody>
+                    <tr>
+                      <td>Carrier</td>
+                      <td>{selectedOrder.fulfillmentCarrier || "Not recorded"}</td>
+                    </tr>
+                    <tr>
+                      <td>Tracking</td>
+                      <td>{selectedOrder.fulfillmentTrackingNumber || "Not recorded"}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              ) : null}
+              {selectedOrderCanFulfill ? (
+                <form action={fulfillCommerceOrderAction} className="form-grid">
+                  <input type="hidden" name="id" value={selectedOrder.id} />
+                  <div className="grid-2">
+                    <div className="field">
+                      <label htmlFor={`order-${selectedOrder.id}-carrier`}>Carrier</label>
+                      <input id={`order-${selectedOrder.id}-carrier`} name="carrier" placeholder="UPS, USPS, FedEx" />
+                    </div>
+                    <div className="field">
+                      <label htmlFor={`order-${selectedOrder.id}-tracking`}>Tracking number</label>
+                      <input id={`order-${selectedOrder.id}-tracking`} name="trackingNumber" />
+                    </div>
+                  </div>
+                  <button className="button" type="submit">
+                    <Truck size={18} />
+                    Mark fulfilled
+                  </button>
+                </form>
+              ) : null}
             </div>
 
             <div className="subpanel form-grid">

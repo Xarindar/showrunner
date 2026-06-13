@@ -297,6 +297,9 @@ model Order {
   notes         String      @default("")
   checkoutUrl   String?
   placedAt      DateTime?
+  fulfilledAt   DateTime?
+  fulfillmentCarrier String @default("")
+  fulfillmentTrackingNumber String @default("")
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   items         OrderItem[]
