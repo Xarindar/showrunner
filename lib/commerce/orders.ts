@@ -1,9 +1,9 @@
 import "server-only";
 
-import { randomBytes } from "crypto";
 import { GiftCardStatus, OrderStatus, PaymentStatus, Prisma, ProductType } from "@prisma/client";
 import { buildPurchaseEvent } from "@/lib/analytics/ecommerce";
 import { recordAuditLog } from "@/lib/audit";
+import { generateGiftCardCode } from "@/lib/commerce/gift-cards";
 import { emitModuleEvent } from "@/lib/events/emit";
 import { queueOrderReceiptEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
@@ -215,23 +215,6 @@ async function restoreGiftCardRedemptionsForCanceledOrder(
   }
 }
 
-function randomGiftCardSegment() {
-  return randomBytes(3).toString("hex").slice(0, 4).toUpperCase();
-}
-
-async function generatePurchasedGiftCardCode(tx: CommerceTx, siteId: string) {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const code = `GC-${randomGiftCardSegment()}-${randomGiftCardSegment()}`;
-    const existing = await tx.giftCard.findUnique({
-      where: { siteId_code: { siteId, code } },
-      select: { id: true }
-    });
-    if (!existing) return code;
-  }
-
-  throw new Error("Could not generate a unique gift card code.");
-}
-
 async function issueGiftCardsForPaidOrder(tx: CommerceTx, order: OrderWithItems): Promise<IssuedPurchasedGiftCard[]> {
   const issued: IssuedPurchasedGiftCard[] = [];
 
@@ -248,7 +231,7 @@ async function issueGiftCardsForPaidOrder(tx: CommerceTx, order: OrderWithItems)
     const giftCard = await tx.giftCard.create({
       data: {
         balanceCents: item.lineTotalCents,
-        code: await generatePurchasedGiftCardCode(tx, order.siteId),
+        code: await generateGiftCardCode(tx, order.siteId),
         currency: order.currency,
         initialAmountCents: item.lineTotalCents,
         note: item.giftCardMessage,

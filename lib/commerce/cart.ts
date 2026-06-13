@@ -236,6 +236,8 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
 
   let currency = cart.currency || "USD";
   let subtotalCents = 0;
+  let discountableSubtotalCents = 0;
+  let hasGiftCardItems = false;
   let hasShippableItems = false;
 
   for (const item of cart.items) {
@@ -265,11 +267,14 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
 
     if (subtotalCents === 0) currency = item.product.currency;
     if (item.product.currency !== currency) throw new Error("A cart can only contain one currency.");
+    const isGiftCardItem = item.product.type === ProductType.GIFT_CARD;
+    if (isGiftCardItem) hasGiftCardItems = true;
     if (item.product.type === ProductType.PHYSICAL) hasShippableItems = true;
 
     const unitPriceCents = item.variant?.priceCents ?? item.product.basePriceCents;
     const nextLineTotalCents = lineTotal(unitPriceCents, nextQuantity);
     subtotalCents += nextLineTotalCents;
+    if (!isGiftCardItem) discountableSubtotalCents += nextLineTotalCents;
     if (subtotalCents > maxIntCents) throw new Error("Cart subtotal is too high.");
 
     if (
@@ -292,7 +297,11 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
   let discountCents = 0;
   if (cart.coupon) {
     if (couponIsUsable(cart.coupon)) {
-      discountCents = couponDiscountCents(cart.coupon, subtotalCents);
+      discountCents = couponDiscountCents(cart.coupon, discountableSubtotalCents);
+      if (discountCents === 0 && discountableSubtotalCents === 0) {
+        couponId = null;
+        warnings.push({ code: "coupon_removed", message: "Coupons do not apply to gift cards." });
+      }
     } else {
       couponId = null;
       warnings.push({ code: "coupon_removed", message: "The coupon is no longer available." });
@@ -302,7 +311,10 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
   let giftCardId = cart.giftCardId;
   let giftCardBalanceCents = 0;
   if (cart.giftCard) {
-    if (giftCardIsUsable(cart.giftCard) && cart.giftCard.currency === currency) {
+    if (hasGiftCardItems) {
+      giftCardId = null;
+      warnings.push({ code: "gift_card_removed", message: "Gift cards cannot be used to buy gift cards." });
+    } else if (giftCardIsUsable(cart.giftCard) && cart.giftCard.currency === currency) {
       giftCardBalanceCents = cart.giftCard.balanceCents;
     } else {
       giftCardId = null;

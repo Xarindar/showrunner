@@ -1,12 +1,12 @@
 "use server";
 
-import { randomBytes } from "crypto";
 import { GiftCardStatus, OrderStatus, PaymentProvider, PaymentStatus, Prisma, ProductStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
+import { generateGiftCardCode } from "@/lib/commerce/gift-cards";
 import {
   collectionFormSchema,
   collectionProductFormSchema,
@@ -108,25 +108,6 @@ function refreshProducts() {
   revalidatePath("/admin/modules/clients");
   revalidatePath("/cart");
   revalidatePath("/shop");
-}
-
-async function generateGiftCardCode(siteId: string, requestedCode?: string) {
-  if (requestedCode) return requestedCode;
-
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const code = `GC-${randomGiftCardSegment()}-${randomGiftCardSegment()}`;
-    const existing = await prisma.giftCard.findUnique({
-      where: { siteId_code: { siteId, code } },
-      select: { id: true }
-    });
-    if (!existing) return code;
-  }
-
-  throw new Error("Could not generate a unique gift card code.");
-}
-
-function randomGiftCardSegment() {
-  return randomBytes(3).toString("hex").slice(0, 4).toUpperCase();
 }
 
 async function syncDefaultVariant(
@@ -493,7 +474,7 @@ export async function createGiftCardAction(formData: FormData) {
   const user = await requireAdmin("products:manage");
   const input = await parseForm(giftCardIssueSchema, formData, "/admin/modules/products");
   const siteId = await getCurrentSiteId();
-  const code = await generateGiftCardCode(siteId, input.code);
+  const code = await generateGiftCardCode(prisma, siteId, input.code);
 
   let giftCard: {
     code: string;
