@@ -12,6 +12,7 @@ import { cookies, headers } from "next/headers";
 import { moduleEventCatalog, type ModuleEventName } from "@/lib/events/catalog";
 import { queueWebhookDelivery } from "@/lib/events/webhook-delivery";
 import { prisma } from "@/lib/prisma";
+import { queueCommunicationsEventEmails } from "@/modules/communications/auto-send";
 import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -356,6 +357,7 @@ export async function emitModuleEvent(name: ModuleEventName, input: EmitModuleEv
 
   const results = await Promise.allSettled([
     recordAnalyticsEvent(envelope, input.dedupeWindowMinutes),
+    queueCommunicationsEventEmails(name, envelope),
     recordMatchedAutomationRuns(envelope),
     queueSubscribedWebhookEndpoints(envelope)
   ]);

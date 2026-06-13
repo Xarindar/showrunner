@@ -1,12 +1,13 @@
 import { BookingStatus, EmailCategory } from "@prisma/client";
 import type { BillingDocumentEmailInput } from "@/lib/billing/documents";
 import { formatDateTime, formatMoney } from "@/lib/format";
-import { getSiteSettings } from "@/lib/site";
+import { getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
 import { queueAdminEmail, queueEmail } from "./queue";
 import type { EmailTokens } from "./types";
 
 type BookingForEmail = {
   id: string;
+  siteId?: string;
   customerName: string;
   customerEmail: string;
   startsAt: Date;
@@ -20,6 +21,7 @@ type BookingForEmail = {
 
 type FormForEmail = {
   id: string;
+  siteId?: string;
   name: string;
   notificationEmail?: string | null;
 };
@@ -33,6 +35,7 @@ type FormSubmissionForEmail = {
 
 type OrderForEmail = {
   id: string;
+  siteId?: string;
   orderNumber: string;
   customerName: string;
   customerEmail: string;
@@ -53,8 +56,12 @@ function appointmentTime(booking: BookingForEmail, timeZone: string) {
   return `${formatDateTime(booking.startsAt, timeZone)} - ${endTime(booking.endsAt, timeZone)}`;
 }
 
+async function settingsForSite(siteId?: string) {
+  return siteId ? getSiteSettingsForSite(siteId) : getSiteSettings();
+}
+
 async function bookingTokens(booking: BookingForEmail): Promise<EmailTokens> {
-  const settings = await getSiteSettings();
+  const settings = await settingsForSite(booking.siteId);
 
   return {
     businessName: settings.businessName,
@@ -85,6 +92,7 @@ export async function queueBookingCreatedEmails(booking: BookingForEmail) {
   await Promise.all([
     logQueueError("booking-created-customer", () =>
       queueEmail({
+        siteId: booking.siteId,
         templateKey: "booking.created.customer",
         recipientEmail: booking.customerEmail,
         recipientName: booking.customerName,
@@ -97,6 +105,7 @@ export async function queueBookingCreatedEmails(booking: BookingForEmail) {
     ),
     logQueueError("booking-created-admin", () =>
       queueAdminEmail({
+        siteId: booking.siteId,
         templateKey: "booking.created.admin",
         groupKey: "bookings",
         relatedType: "booking",
@@ -116,6 +125,7 @@ export async function queueBookingStatusEmail(booking: BookingForEmail, previous
   if (booking.status === BookingStatus.CONFIRMED) {
     await logQueueError("booking-confirmed-customer", () =>
       queueEmail({
+        siteId: booking.siteId,
         templateKey: "booking.confirmed.customer",
         recipientEmail: booking.customerEmail,
         recipientName: booking.customerName,
@@ -131,6 +141,7 @@ export async function queueBookingStatusEmail(booking: BookingForEmail, previous
   if (booking.status === BookingStatus.CANCELED) {
     await logQueueError("booking-canceled-customer", () =>
       queueEmail({
+        siteId: booking.siteId,
         templateKey: "booking.canceled.customer",
         recipientEmail: booking.customerEmail,
         recipientName: booking.customerName,
@@ -146,6 +157,7 @@ export async function queueBookingStatusEmail(booking: BookingForEmail, previous
   if (booking.status === BookingStatus.COMPLETED) {
     await logQueueError("booking-completed-admin", () =>
       queueAdminEmail({
+        siteId: booking.siteId,
         templateKey: "booking.completed.admin",
         groupKey: "bookings",
         relatedType: "booking",
@@ -172,7 +184,7 @@ function submissionSummary(data: Record<string, unknown>) {
 }
 
 export async function queueFormSubmittedEmail(form: FormForEmail, submission: FormSubmissionForEmail) {
-  const settings = await getSiteSettings();
+  const settings = await settingsForSite(form.siteId);
   const tokens: EmailTokens = {
     businessName: settings.businessName,
     formName: form.name,
@@ -183,6 +195,7 @@ export async function queueFormSubmittedEmail(form: FormForEmail, submission: Fo
 
   await logQueueError("form-submitted-admin", () =>
     queueAdminEmail({
+      siteId: form.siteId,
       templateKey: "form.submitted.admin",
       groupKey: "forms",
       overrideEmail: form.notificationEmail,
@@ -196,10 +209,11 @@ export async function queueFormSubmittedEmail(form: FormForEmail, submission: Fo
 
 export async function queueBillingDocumentEmail(input: {
   document: BillingDocumentEmailInput;
+  siteId?: string;
   publicUrl: string;
   idempotencyKey: string;
 }) {
-  const settings = await getSiteSettings();
+  const settings = await settingsForSite(input.siteId);
   const dueAt = input.document.dueAt ? formatDateTime(input.document.dueAt, settings.timezone) : "No due date";
   const tokens: EmailTokens = {
     businessName: settings.businessName,
@@ -218,6 +232,7 @@ export async function queueBillingDocumentEmail(input: {
 
   await logQueueError("billing-document-customer", () =>
     queueEmail({
+      siteId: input.siteId,
       templateKey: "billing.document.customer",
       recipientEmail: input.document.customerEmail,
       recipientName: input.document.customerName,
@@ -231,7 +246,7 @@ export async function queueBillingDocumentEmail(input: {
 }
 
 export async function queueOrderCheckoutEmail(order: OrderForEmail) {
-  const settings = await getSiteSettings();
+  const settings = await settingsForSite(order.siteId);
   const tokens: EmailTokens = {
     businessName: settings.businessName,
     customerName: order.customerName,
@@ -244,6 +259,7 @@ export async function queueOrderCheckoutEmail(order: OrderForEmail) {
 
   await logQueueError("order-checkout-customer", () =>
     queueEmail({
+      siteId: order.siteId,
       templateKey: "order.checkout.customer",
       recipientEmail: order.customerEmail,
       recipientName: order.customerName,
@@ -257,7 +273,7 @@ export async function queueOrderCheckoutEmail(order: OrderForEmail) {
 }
 
 export async function queueOrderReceiptEmail(order: OrderForEmail) {
-  const settings = await getSiteSettings();
+  const settings = await settingsForSite(order.siteId);
   const receiptUrl = order.receiptUrl || order.checkoutUrl || `/cart?order=${encodeURIComponent(order.orderNumber)}`;
   const tokens: EmailTokens = {
     businessName: settings.businessName,
@@ -272,6 +288,7 @@ export async function queueOrderReceiptEmail(order: OrderForEmail) {
 
   await logQueueError("order-receipt-customer", () =>
     queueEmail({
+      siteId: order.siteId,
       templateKey: "order.receipt.customer",
       recipientEmail: order.customerEmail,
       recipientName: order.customerName,

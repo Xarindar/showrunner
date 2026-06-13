@@ -13,11 +13,12 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Transactional outbox and booking template settings are live; manual notes remain admin-managed.",
+    summary: "Transactional outbox, event-triggered email templates, and booking template settings are live; manual notes remain admin-managed.",
     primaryGap: "General-purpose template editing, campaign scheduling, SMS, and delivery-health dashboards are pending."
   },
   capabilities: [
     { label: "Transactional outbox", status: "live" },
+    { label: "Event-triggered templates", status: "live" },
     { label: "Booking template settings", status: "live" },
     { label: "Manual template catalog", status: "manual" },
     { label: "Campaign send UI", status: "planned" }
