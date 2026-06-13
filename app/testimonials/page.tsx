@@ -108,12 +108,22 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
                 New submissions go to the admin queue before public display.
               </p>
             </div>
-            {query.submitted ? <div className="success-message">Thanks. Your testimonial is waiting for review.</div> : null}
-            {query.error ? <div className="error">{decodeURIComponent(query.error)}</div> : null}
+            {query.submitted ? (
+              <div className="success-message" role="status" aria-live="polite">
+                Thanks. Your testimonial is waiting for review.
+              </div>
+            ) : null}
+            {query.error ? (
+              <div className="error" role="alert">
+                {decodeURIComponent(query.error)}
+              </div>
+            ) : null}
             <div className="grid-2">
               <div className="field">
-                <label htmlFor="authorName">Name</label>
-                <input id="authorName" name="authorName" required />
+                <label htmlFor="authorName">
+                  Name <span aria-hidden="true">*</span>
+                </label>
+                <input id="authorName" name="authorName" required aria-required="true" />
               </div>
               <div className="field">
                 <label htmlFor="authorEmail">Email</label>
@@ -131,16 +141,20 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
               </div>
             </div>
             <div className="field">
-              <label htmlFor="quote">Testimonial</label>
-              <textarea id="quote" name="quote" required />
+              <label htmlFor="quote">
+                Testimonial <span aria-hidden="true">*</span>
+              </label>
+              <textarea id="quote" name="quote" required aria-required="true" />
             </div>
             <div className="field">
               <label htmlFor="rating">Rating</label>
               <input id="rating" name="rating" type="number" min="1" max="5" defaultValue="5" />
             </div>
             <label style={{ alignItems: "flex-start", display: "flex", gap: 10, lineHeight: 1.5 }}>
-              <input name="permissionGranted" required type="checkbox" />
-              I give permission to display this testimonial publicly after review.
+              <input name="permissionGranted" required aria-required="true" type="checkbox" />
+              <span>
+                I give permission to display this testimonial publicly after review. <span aria-hidden="true">*</span>
+              </span>
             </label>
             <button className="button" type="submit">
               Submit testimonial

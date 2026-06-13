@@ -47,6 +47,15 @@ function optionsFromJson(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim())) : [];
 }
 
+function labelText(label: string, isRequired: boolean) {
+  return (
+    <>
+      {label}
+      {isRequired ? <span aria-hidden="true"> *</span> : null}
+    </>
+  );
+}
+
 function renderField(field: FormField) {
   const name = fieldInputName(field.id);
   const options = optionsFromJson(field.options);
@@ -55,6 +64,7 @@ function renderField(field: FormField) {
     id: field.id,
     name,
     required: field.isRequired,
+    "aria-required": field.isRequired || undefined,
     "aria-describedby": helpId
   };
 
@@ -65,7 +75,7 @@ function renderField(field: FormField) {
   if (field.type === FormFieldType.TEXTAREA) {
     return (
       <div className="field" key={field.id}>
-        <label htmlFor={field.id}>{field.label}</label>
+        <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
         <textarea {...commonProps} placeholder={field.placeholder} />
         {field.helpText ? (
           <small id={helpId} style={{ color: "var(--muted)" }}>
@@ -79,7 +89,7 @@ function renderField(field: FormField) {
   if (field.type === FormFieldType.SELECT) {
     return (
       <div className="field" key={field.id}>
-        <label htmlFor={field.id}>{field.label}</label>
+        <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
         <select {...commonProps} defaultValue="">
           <option value="" disabled>
             Select one
@@ -101,8 +111,10 @@ function renderField(field: FormField) {
 
   if (field.type === FormFieldType.RADIO) {
     return (
-      <fieldset className="field" key={field.id} style={{ border: 0, margin: 0, padding: 0 }}>
-        <legend style={{ color: "var(--muted)", fontSize: "0.88rem", fontWeight: 700 }}>{field.label}</legend>
+      <fieldset className="field" key={field.id} style={{ border: 0, margin: 0, padding: 0 }} aria-describedby={helpId}>
+        <legend style={{ color: "var(--muted)", fontSize: "0.88rem", fontWeight: 700 }}>
+          {labelText(field.label, field.isRequired)}
+        </legend>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           {options.map((option) => (
             <label key={option} style={{ alignItems: "center", display: "flex", gap: 8 }}>
@@ -124,8 +136,14 @@ function renderField(field: FormField) {
     return (
       <div className="field" key={field.id}>
         <label style={{ alignItems: "center", color: "var(--ink)", display: "flex", gap: 8 }}>
-          <input name={name} required={field.isRequired} type="checkbox" />
-          {field.label}
+          <input
+            name={name}
+            required={field.isRequired}
+            aria-required={field.isRequired || undefined}
+            aria-describedby={helpId}
+            type="checkbox"
+          />
+          {labelText(field.label, field.isRequired)}
         </label>
         {field.helpText ? (
           <small id={helpId} style={{ color: "var(--muted)" }}>
@@ -142,7 +160,7 @@ function renderField(field: FormField) {
 
   return (
     <div className="field" key={field.id}>
-      <label htmlFor={field.id}>{field.label}</label>
+      <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
       <input {...commonProps} placeholder={placeholder} type={inputType} />
       {field.helpText ? (
         <small id={helpId} style={{ color: "var(--muted)" }}>
@@ -211,8 +229,16 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
           {form.description ? <p className="lead">{form.description}</p> : null}
         </div>
 
-        {query.submitted ? <div className="success-message">{form.successMessage}</div> : null}
-        {query.error ? <div className="error">{decodeURIComponent(query.error)}</div> : null}
+        {query.submitted ? (
+          <div className="success-message" role="status" aria-live="polite">
+            {form.successMessage}
+          </div>
+        ) : null}
+        {query.error ? (
+          <div className="error" role="alert">
+            {decodeURIComponent(query.error)}
+          </div>
+        ) : null}
 
         <form action={createPublicFormSubmissionAction} className="card form-grid">
           <input type="hidden" name="formId" value={form.id} />
