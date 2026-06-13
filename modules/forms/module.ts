@@ -14,12 +14,13 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Public forms, builder CRUD, submission storage, client/inquiry linking, honeypot, and rate limits are live.",
+    summary: "Public forms, builder CRUD, template cloning, submission storage, client/inquiry linking, honeypot, and rate limits are live.",
     primaryGap: "File uploads, conditional logic, field versioning, exports, and booking/order/gallery attachments are pending."
   },
   capabilities: [
     { label: "Public form route", status: "live" },
     { label: "Builder CRUD", status: "live" },
+    { label: "Starter template catalog", status: "live" },
     { label: "Advanced workflow attachment", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/forms"],

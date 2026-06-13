@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
 import { slugify } from "@/lib/slug";
+import { findFormTemplate } from "./templates";
 
 const supportedDestinations = [FormDestination.STANDALONE_LEAD, FormDestination.CLIENT, FormDestination.INQUIRY] as const;
 const hiddenHoneypotField = "companyWebsite";
@@ -48,6 +49,10 @@ const deleteFormSchema = z.object({
 
 const duplicateFormSchema = z.object({
   id: requiredText
+});
+
+const templateFormSchema = z.object({
+  templateKey: requiredText
 });
 
 const fieldSchema = z
@@ -256,6 +261,47 @@ export async function duplicateFormAction(formData: FormData) {
 
   refreshForms(form.slug);
   redirect(`/admin/modules/forms?saved=duplicate&form=${form.id}`);
+}
+
+export async function createFormFromTemplateAction(formData: FormData) {
+  await requireAdmin("forms:manage");
+  const input = await parseForm(templateFormSchema, formData, "/admin/modules/forms");
+  const template = findFormTemplate(input.templateKey);
+
+  if (!template) {
+    redirect(`/admin/modules/forms?error=${encodeURIComponent("Form template not found.")}`);
+  }
+
+  const siteId = await getCurrentSiteId();
+  const slug = await generateUniqueFormSlug(template.name, undefined, undefined, siteId);
+  const form = await prisma.form.create({
+    data: {
+      siteId,
+      slug,
+      name: template.name,
+      description: template.description,
+      status: FormStatus.DRAFT,
+      destination: template.destination,
+      submitButtonLabel: template.submitButtonLabel,
+      successMessage: template.successMessage,
+      fields: {
+        create: template.fields.map((field, index) => ({
+          label: field.label,
+          type: field.type,
+          fieldRole: field.fieldRole || FormFieldRole.NONE,
+          placeholder: field.placeholder || "",
+          helpText: field.helpText || "",
+          options: (field.options || []) as Prisma.InputJsonValue,
+          isRequired: field.isRequired || false,
+          isHidden: field.type === FormFieldType.HIDDEN || field.isHidden || false,
+          sortOrder: (index + 1) * 10
+        }))
+      }
+    }
+  });
+
+  refreshForms(form.slug);
+  redirect(`/admin/modules/forms?saved=template&form=${form.id}`);
 }
 
 export async function deleteFormAction(formData: FormData) {

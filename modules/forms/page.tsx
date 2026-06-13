@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { FormDestination, FormFieldRole, FormFieldType, FormStatus } from "@prisma/client";
-import { ClipboardList, FileText, Inbox, Plus } from "lucide-react";
+import { ClipboardList, CopyPlus, FileText, Inbox, Plus } from "lucide-react";
+import { getAccessibleFormSubmissionWhere, requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime, stringArrayCsv } from "@/lib/format";
 import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
   createFormAction,
+  createFormFromTemplateAction,
   createFormFieldAction,
   deleteFormAction,
   deleteFormFieldAction,
@@ -15,6 +17,7 @@ import {
   updateFormFieldAction,
   updateFormStatusAction
 } from "./actions";
+import { formTemplates } from "./templates";
 
 export const dynamic = "force-dynamic";
 
@@ -82,16 +85,18 @@ function destinationOptions(current?: FormDestination) {
 }
 
 export default async function FormsPage({ searchParams }: FormsPageProps) {
+  const user = await requireAdmin("forms:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
   const formWhere = statusFilter === "all" ? { siteId: settings.siteId } : { siteId: settings.siteId, status: statusFilter.toUpperCase() as FormStatus };
+  const submissionWhere = await getAccessibleFormSubmissionWhere(user, settings.siteId);
 
   const [forms, formCount, activeCount, submissionCount, fieldCount] = await Promise.all([
     prisma.form.findMany({
       where: formWhere,
       include: {
-        _count: { select: { fields: true, submissions: true } }
+        _count: { select: { fields: true, submissions: { where: submissionWhere } } }
       },
       orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
       skip: (page - 1) * pageSize,
@@ -99,7 +104,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
     }),
     prisma.form.count({ where: formWhere }),
     prisma.form.count({ where: { siteId: settings.siteId, status: FormStatus.ACTIVE } }),
-    prisma.formSubmission.count({ where: { form: { siteId: settings.siteId } } }),
+    prisma.formSubmission.count({ where: submissionWhere }),
     prisma.formField.count({ where: { form: { siteId: settings.siteId } } })
   ]);
 
@@ -110,6 +115,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
         include: {
           fields: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
           submissions: {
+            where: submissionWhere,
             include: { client: true },
             orderBy: { createdAt: "desc" },
             take: 10
@@ -161,6 +167,34 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
           <p className="lead" style={{ fontSize: "0.95rem" }}>
             Fields support text, email, choices, dates, checkboxes, signatures, and hidden metadata.
           </p>
+        </div>
+      </section>
+
+      <section className="card stack">
+        <div className="page-header" style={{ marginBottom: 0 }}>
+          <div>
+            <h2 style={{ fontSize: "1.35rem" }}>Start from template</h2>
+            <p>Clone a starter into a draft form, then customize fields, copy, and status before publishing.</p>
+          </div>
+        </div>
+        <div className="grid-3">
+          {formTemplates.map((template) => (
+            <form action={createFormFromTemplateAction} className="subpanel form-grid" key={template.key}>
+              <input type="hidden" name="templateKey" value={template.key} />
+              <div>
+                <span className="pill">{template.category}</span>
+                <h3 style={{ fontSize: "1.05rem", marginBottom: 6 }}>{template.name}</h3>
+                <p style={{ color: "var(--muted)", margin: 0 }}>{template.description}</p>
+              </div>
+              <p style={{ color: "var(--muted)", margin: 0 }}>
+                {template.fields.length} fields · {enumLabel(template.destination)}
+              </p>
+              <button className="button secondary" type="submit">
+                <CopyPlus size={18} />
+                Use template
+              </button>
+            </form>
+          ))}
         </div>
       </section>
 
