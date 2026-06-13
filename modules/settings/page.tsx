@@ -30,6 +30,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   const stripeCredential = stripePaymentMethods.credential;
   const stripeConnected = stripePaymentMethods.connected;
   const squareConnected = squareCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(squareCredential.merchantId);
+  const activeCheckoutProvider =
+    settings.checkoutProvider === PaymentProvider.SQUARE && !squareConnected ? PaymentProvider.STRIPE : settings.checkoutProvider;
 
   return (
     <div className="stack">
@@ -82,6 +84,11 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           <div>
             <h3 style={{ fontSize: "1rem" }}>Checkout provider</h3>
             <p style={{ color: "var(--muted)", margin: 0 }}>Choose which connected provider creates new public checkout sessions.</p>
+            {settings.checkoutProvider === PaymentProvider.SQUARE && !squareConnected ? (
+              <p className="error" style={{ marginTop: 8 }}>
+                Square is disconnected, so new checkout sessions are using Stripe until Square is connected again.
+              </p>
+            ) : null}
           </div>
           <div className="module-toggle-grid">
             <label className="module-toggle-row">
@@ -89,7 +96,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                 name="checkoutProvider"
                 type="radio"
                 value={PaymentProvider.STRIPE}
-                defaultChecked={settings.checkoutProvider === PaymentProvider.STRIPE}
+                defaultChecked={activeCheckoutProvider === PaymentProvider.STRIPE}
               />
               <span className="module-toggle-main">
                 <span>
@@ -105,7 +112,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                 name="checkoutProvider"
                 type="radio"
                 value={PaymentProvider.SQUARE}
-                defaultChecked={settings.checkoutProvider === PaymentProvider.SQUARE}
+                defaultChecked={activeCheckoutProvider === PaymentProvider.SQUARE}
               />
               <span className="module-toggle-main">
                 <span>

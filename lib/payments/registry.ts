@@ -1,4 +1,4 @@
-import { PaymentProvider } from "@prisma/client";
+import { PaymentGatewayConnectionStatus, PaymentProvider } from "@prisma/client";
 import { stripePaymentGateway } from "@/lib/commerce/stripe";
 import { squarePaymentGateway } from "@/lib/commerce/square";
 import { prisma } from "@/lib/prisma";
@@ -12,12 +12,31 @@ export function getPaymentGateway(provider: PaymentProvider = PaymentProvider.ST
 }
 
 export async function resolvePaymentProviderForSite(siteId: string, provider?: PaymentProvider) {
-  if (provider) return provider;
-
   const settings = await prisma.siteSettings.findUnique({
     where: { siteId },
     select: { checkoutProvider: true }
   });
+  const selectedProvider = provider || settings?.checkoutProvider || PaymentProvider.STRIPE;
 
-  return settings?.checkoutProvider || PaymentProvider.STRIPE;
+  if (selectedProvider !== PaymentProvider.SQUARE) return selectedProvider;
+
+  const squareCredential = await prisma.paymentGatewayCredential.findUnique({
+    where: {
+      siteId_provider: {
+        provider: PaymentProvider.SQUARE,
+        siteId
+      }
+    },
+    select: {
+      merchantId: true,
+      status: true
+    }
+  });
+  const squareConnected =
+    squareCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(squareCredential.merchantId.trim());
+
+  if (squareConnected) return PaymentProvider.SQUARE;
+  if (provider) throw new Error("Square checkout is not connected for this site.");
+
+  return PaymentProvider.STRIPE;
 }
