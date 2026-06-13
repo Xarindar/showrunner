@@ -75,7 +75,7 @@ export default async function ShopPage() {
           <div>
             <p className="eyebrow">Shop</p>
             <h1 style={{ fontSize: "2.4rem" }}>Products and packages</h1>
-            <p>Active catalog items with cart math, coupons, and draft order handoff readiness.</p>
+            <p>Browse available products and packages, apply coupons, and check out securely.</p>
           </div>
         </div>
 

@@ -122,7 +122,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         <div>
           <p className="eyebrow">Products</p>
           <h1 style={{ fontSize: "2.4rem" }}>Commerce catalog</h1>
-          <p>Products, variants, collections, coupons, storefront cart math, and hosted payment handoff records.</p>
+          <p>Manage products, variants, collections, coupons, orders, and checkout status.</p>
         </div>
       </header>
 

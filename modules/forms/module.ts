@@ -21,7 +21,7 @@ export const manifest = {
     { label: "Public form route", status: "live" },
     { label: "Builder CRUD", status: "live" },
     { label: "Starter template catalog", status: "live" },
-    { label: "Advanced workflow attachment", status: "planned" }
+    { label: "Booking, order, and gallery attachments", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/forms"],
   publicRoutes: ["/forms/[slug]"],
