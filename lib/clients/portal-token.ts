@@ -7,6 +7,7 @@ const fallbackSecret = "dev-client-portal-secret-change-before-deploying";
 type ClientPortalTokenInput = {
   clientId: string;
   email: string;
+  portalAccessVersion: number;
   siteId: string;
 };
 
@@ -29,7 +30,7 @@ function normalizedEmail(value: string) {
 }
 
 function tokenPayload(input: ClientPortalTokenInput) {
-  return ["client-portal", "v1", input.siteId, input.clientId, normalizedEmail(input.email)].join(":");
+  return ["client-portal", "v2", input.siteId, input.clientId, input.portalAccessVersion, normalizedEmail(input.email)].join(":");
 }
 
 export function clientPortalToken(input: ClientPortalTokenInput) {

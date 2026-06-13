@@ -12,7 +12,8 @@ import {
   createClientSegmentAction,
   deleteClientSegmentAction,
   importClientsCsvAction,
-  mergeClientsAction
+  mergeClientsAction,
+  reissueClientPortalLinkAction
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -74,6 +75,7 @@ function savedMessage(params: Awaited<NonNullable<ClientsPageProps["searchParams
   if (params.saved === "imported") {
     return `Imported ${Number(params.imported || 0)} clients. Skipped ${Number(params.skipped || 0)} rows or duplicates.`;
   }
+  if (params.saved === "portal-link-reissued") return "Client portal link reissued. The previous link no longer works.";
   if (params.saved === "segment-deleted") return "Client segment deleted.";
   if (params.saved) return "Client segment saved.";
   return "";
@@ -427,11 +429,22 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                   <span style={{ color: "var(--muted)" }}>{client.companyName || client.familyName || client.email}</span>
                   <br />
                   <Link
-                    href={clientPortalPath({ clientId: client.id, email: client.email, siteId: settings.siteId })}
+                    href={clientPortalPath({
+                      clientId: client.id,
+                      email: client.email,
+                      portalAccessVersion: client.portalAccessVersion,
+                      siteId: settings.siteId
+                    })}
                     style={{ color: "var(--primary-dark)" }}
                   >
                     Client portal
                   </Link>
+                  <form action={reissueClientPortalLinkAction} style={{ marginTop: 8 }}>
+                    <input name="clientId" type="hidden" value={client.id} />
+                    <button className="button secondary" type="submit">
+                      Reissue portal link
+                    </button>
+                  </form>
                   <br />
                   {client.tags.map((tag) => (
                     <span className="pill" key={tag.id} style={{ marginRight: 4 }}>

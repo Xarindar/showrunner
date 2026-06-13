@@ -1,0 +1,2 @@
+ALTER TABLE "Client"
+ADD COLUMN "portalAccessVersion" INTEGER NOT NULL DEFAULT 1;

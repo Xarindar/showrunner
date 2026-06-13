@@ -326,6 +326,50 @@ export async function updateClientAction(formData: FormData) {
   redirect(`/admin/clients/${input.id}?saved=client`);
 }
 
+export async function reissueClientPortalLinkAction(formData: FormData) {
+  const user = await requireAdmin("clients:manage");
+  const clientId = String(formData.get("clientId") || "").trim();
+  const siteId = await getCurrentSiteId();
+
+  if (!clientId) {
+    redirect("/admin/modules/clients?error=Client%20not%20found.");
+  }
+
+  const accessibleWhere = await getAccessibleClientWhere(user, siteId, { id: clientId });
+  const client = await prisma.client.findFirst({
+    where: accessibleWhere,
+    select: { email: true, id: true, name: true, portalAccessVersion: true }
+  });
+
+  if (!client) {
+    redirect("/admin/modules/clients?error=Client%20not%20found.");
+  }
+
+  const updated = await prisma.client.update({
+    where: { id: client.id },
+    data: { portalAccessVersion: { increment: 1 } },
+    select: { portalAccessVersion: true }
+  });
+
+  await recordAuditLog({
+    action: "client.portal_link_reissued",
+    actor: user,
+    metadata: {
+      after: { portalAccessVersion: updated.portalAccessVersion },
+      before: { portalAccessVersion: client.portalAccessVersion },
+      email: client.email
+    },
+    siteId,
+    targetId: client.id,
+    targetLabel: client.name,
+    targetType: "client"
+  });
+
+  revalidatePath("/admin/modules/clients");
+  revalidatePath(`/admin/clients/${client.id}`);
+  redirect("/admin/modules/clients?saved=portal-link-reissued");
+}
+
 export async function addClientNoteAction(formData: FormData) {
   const user = await requireAdmin("clients:manage");
   const input = await parseForm(clientNoteFormSchema, formData);

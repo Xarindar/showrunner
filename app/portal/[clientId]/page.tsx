@@ -70,6 +70,7 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
     !verifyClientPortalToken({
       clientId: client.id,
       email: client.email,
+      portalAccessVersion: client.portalAccessVersion,
       siteId: settings.siteId,
       token
     })
