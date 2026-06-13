@@ -1,28 +1,65 @@
 // Clients module models.
 
+enum ClientPipelineStage {
+  INQUIRY
+  CONTACTED
+  PROPOSAL_SENT
+  BOOKED
+  COMPLETED
+  FOLLOW_UP
+  ARCHIVED
+}
+
 model Client {
-  id               String            @id @default(cuid())
-  siteId           String
-  site             Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  name             String
-  email            String
-  phone            String?
-  status           String            @default("active")
-  privateNotes     String?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  bookings         Booking[]
-  notes            ClientNote[]
-  carts            Cart[]
-  orders           Order[]
-  formSubmissions  FormSubmission[]
-  testimonials     Testimonial[]
-  billingDocuments BillingDocument[]
-  messageLogs      MessageLog[]
-  emailSubscribers EmailSubscriber[]
+  id                      String              @id @default(cuid())
+  siteId                  String
+  site                    Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  name                    String
+  email                   String
+  phone                   String?
+  status                  String              @default("active")
+  pipelineStage           ClientPipelineStage @default(INQUIRY)
+  companyName             String              @default("")
+  familyName              String              @default("")
+  alternateEmails         Json                @default("[]")
+  alternatePhones         Json                @default("[]")
+  addressLine1            String              @default("")
+  addressLine2            String              @default("")
+  city                    String              @default("")
+  region                  String              @default("")
+  postalCode              String              @default("")
+  country                 String              @default("")
+  timezone                String              @default("")
+  pronouns                String              @default("")
+  birthday                DateTime?
+  anniversary             DateTime?
+  preferences             Json                @default("{}")
+  emailOptIn              Boolean             @default(false)
+  smsOptIn                Boolean             @default(false)
+  photoUsageRelease       Boolean             @default(false)
+  policyAcceptanceHistory Json                @default("[]")
+  dataExportRequestedAt   DateTime?
+  dataDeletionRequestedAt DateTime?
+  privateNotes            String?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  bookings                Booking[]
+  notes                   ClientNote[]
+  tags                    ClientTag[]
+  files                   ClientFile[]
+  carts                   Cart[]
+  orders                  Order[]
+  formSubmissions         FormSubmission[]
+  testimonials            Testimonial[]
+  billingDocuments        BillingDocument[]
+  messageLogs             MessageLog[]
+  emailSubscribers        EmailSubscriber[]
+  portfolioGalleryAccesses PortfolioGalleryAccess[]
 
   @@unique([siteId, email])
   @@index([siteId])
+  @@index([siteId, status])
+  @@index([siteId, pipelineStage])
 }
 
 model ClientNote {
@@ -33,4 +70,54 @@ model ClientNote {
   createdAt DateTime @default(now())
 
   @@index([clientId])
+}
+
+model ClientTag {
+  id          String   @id @default(cuid())
+  siteId      String
+  site        Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  label       String
+  source      String   @default("automation")
+  relatedType String   @default("")
+  relatedId   String   @default("")
+  createdAt   DateTime @default(now())
+
+  @@unique([clientId, label])
+  @@index([siteId, label])
+  @@index([relatedType, relatedId])
+}
+
+model ClientFile {
+  id         String   @id @default(cuid())
+  siteId     String
+  site       Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title      String
+  url        String
+  category   String   @default("")
+  notes      String   @default("")
+  uploadedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([siteId, clientId])
+  @@index([category])
+  @@index([uploadedAt])
+}
+
+model ClientSegment {
+  id        String   @id @default(cuid())
+  siteId    String
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  name      String
+  key       String
+  criteria  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([siteId, key])
+  @@index([siteId])
 }

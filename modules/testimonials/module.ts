@@ -32,6 +32,7 @@ export const manifest = {
   dataScope: {
     ownerKind: "client-link",
     ownerField: "clientId",
+    ownerRelationField: "client",
     scopableRoles: [AdminRole.STAFF]
   }
 } satisfies ShellModule;

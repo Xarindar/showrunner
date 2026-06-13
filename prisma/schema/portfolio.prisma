@@ -117,6 +117,7 @@ model PortfolioGalleryAccess {
   galleryId      String
   gallery        PortfolioGallery             @relation(fields: [galleryId], references: [id], onDelete: Cascade)
   clientId       String?
+  client         Client?                       @relation(fields: [clientId], references: [id], onDelete: SetNull)
   recipientEmail String
   accessToken    String
   status         PortfolioAccessStatus        @default(ACTIVE)
@@ -130,6 +131,7 @@ model PortfolioGalleryAccess {
 
   @@unique([siteId, accessToken])
   @@index([siteId, galleryId])
+  @@index([clientId])
   @@index([recipientEmail])
   @@index([status])
 }

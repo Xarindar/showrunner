@@ -100,10 +100,10 @@ export async function resolveDataScopeMode(user: AdminSessionUser, siteId: strin
   return config[moduleId]?.[user.role] ?? "OWN";
 }
 
-/** Staff records (if any) matching the admin's email - the generic "staff-field" owner identity. */
+/** Staff records explicitly linked to the admin user - the generic "staff-field" owner identity. */
 export async function getOwnerStaffIds(user: AdminSessionUser, siteId: string): Promise<string[]> {
   const matches = await prisma.staffMember.findMany({
-    where: { siteId, email: { equals: user.email, mode: "insensitive" } },
+    where: { siteId, adminUserId: user.id },
     select: { id: true }
   });
 
@@ -111,39 +111,22 @@ export async function getOwnerStaffIds(user: AdminSessionUser, siteId: string): 
 }
 
 /**
- * Clients owned by the admin's matched staff records, via either booking
- * assignment or gallery/proofing access (so PHOTOGRAPHER ownership keys on
- * gallery ownership, not booking.staffId). Generic across every role that
- * resolves to one or more staffIds.
+ * Clients owned by the admin's linked staff records, via either booking
+ * assignment or gallery/proofing access. This returns a relation filter
+ * instead of materializing client ids, so Prisma enforces ownership in the
+ * same query that reads or mutates the target record.
  */
-async function getOwnedClientIds(user: AdminSessionUser, siteId: string): Promise<string[]> {
+async function getOwnedClientWhere(user: AdminSessionUser, siteId: string): Promise<Prisma.ClientWhereInput> {
   const staffIds = await getOwnerStaffIds(user, siteId);
-  if (!staffIds.length) return [];
+  if (!staffIds.length) return { id: { in: [] } };
 
-  const [bookingClients, ownedGalleries] = await Promise.all([
-    prisma.client.findMany({
-      where: { siteId, bookings: { some: { siteId, staffId: { in: staffIds } } } },
-      select: { id: true }
-    }),
-    prisma.portfolioGallery.findMany({
-      where: { siteId, photographerId: { in: staffIds } },
-      select: { id: true }
-    })
-  ]);
-
-  const clientIds = new Set(bookingClients.map((client) => client.id));
-
-  if (ownedGalleries.length) {
-    const galleryAccesses = await prisma.portfolioGalleryAccess.findMany({
-      where: { siteId, galleryId: { in: ownedGalleries.map((gallery) => gallery.id) }, clientId: { not: null } },
-      select: { clientId: true }
-    });
-    for (const access of galleryAccesses) {
-      if (access.clientId) clientIds.add(access.clientId);
-    }
-  }
-
-  return Array.from(clientIds);
+  return {
+    siteId,
+    OR: [
+      { bookings: { some: { siteId, staffId: { in: staffIds } } } },
+      { portfolioGalleryAccesses: { some: { siteId, gallery: { photographerId: { in: staffIds } } } } }
+    ]
+  };
 }
 
 /**
@@ -160,8 +143,14 @@ async function getOwnerWhereFragment(moduleId: string, user: AdminSessionUser, s
   const mode = await resolveDataScopeMode(user, siteId, moduleId);
   if (mode === "ALL") return {};
 
-  const ownerIds = dataScope.ownerKind === "staff-field" ? await getOwnerStaffIds(user, siteId) : await getOwnedClientIds(user, siteId);
+  if (dataScope.ownerKind === "client-link") {
+    const clientWhere = await getOwnedClientWhere(user, siteId);
+    if (dataScope.ownerField === "id") return clientWhere as Record<string, unknown>;
+    if (dataScope.ownerRelationField) return { [dataScope.ownerRelationField]: clientWhere };
+    return { [dataScope.ownerField]: { in: [] } };
+  }
 
+  const ownerIds = await getOwnerStaffIds(user, siteId);
   return { [dataScope.ownerField]: { in: ownerIds } };
 }
 

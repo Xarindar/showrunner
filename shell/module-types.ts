@@ -37,8 +37,8 @@ export type DataScopeMode = "ALL" | "OWN";
  *
  * - "staff-field": the record has a direct FK to StaffMember (e.g. Booking.staffId,
  *   PortfolioGallery.photographerId, MediaAsset.uploadedByStaffId). Ownership = the
- *   staff member matching the admin's email owns records where ownerField is in
- *   their staff ids.
+ *   StaffMember profile explicitly linked to the AdminUser owns records where
+ *   ownerField is in that user's staff ids.
  * - "client-link": the record either IS a Client (ownerField "id") or has an FK to
  *   Client (e.g. FormSubmission.clientId, Testimonial.clientId). Ownership is derived
  *   from the same staff-id resolution, generically expanded to "clients owned by
@@ -50,6 +50,8 @@ export type ModuleDataScope = {
   ownerKind: DataScopeOwnerKind;
   /** Prisma field name carrying the ownership link (see DataScopeOwnerKind). */
   ownerField: string;
+  /** Relation name to Client for client-link records that are not the Client model itself. */
+  ownerRelationField?: string;
   /** Roles that owners can configure to "OWN" for this module; all other roles stay "ALL". */
   scopableRoles: AdminRole[];
 };
