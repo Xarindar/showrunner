@@ -2,16 +2,19 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { AnalyticsEventType, CartStatus } from "@prisma/client";
+import { AnalyticsEventType, CartStatus, OrderStatus } from "@prisma/client";
 import { z } from "zod";
 import { buildAddToCartEvent, buildBeginCheckoutEvent } from "@/lib/analytics/ecommerce";
 import {
   addCartItem,
+  applyGiftCardToCart,
   applyCartCoupon,
   createCheckoutOrderFromCart,
+  removeCartGiftCard,
   removeCartCoupon,
   updateCartItem
 } from "@/lib/commerce/cart";
+import { updateOrderStatus } from "@/lib/commerce/orders";
 import { queueOrderCheckoutEmail } from "@/lib/email";
 import { subscribeToList } from "@/lib/email/subscriptions";
 import { emitAnalyticsEvent, requestAttribution } from "@/lib/events/emit";
@@ -35,6 +38,10 @@ const updateCartItemSchema = z.object({
 });
 
 const couponSchema = z.object({
+  code: z.string().trim().min(1)
+});
+
+const giftCardSchema = z.object({
   code: z.string().trim().min(1)
 });
 
@@ -197,6 +204,45 @@ export async function removePublicCartCouponAction(_formData: FormData) {
   redirect("/cart?saved=coupon-removed");
 }
 
+export async function applyPublicGiftCardAction(formData: FormData) {
+  await requirePublicProductsModule();
+
+  const cartId = await currentCartId();
+  if (!cartId) cartError("Cart not found.");
+
+  const parsed = giftCardSchema.safeParse({
+    code: formData.get("code")
+  });
+
+  if (!parsed.success) {
+    cartError(parsed.error.issues[0]?.message || "Add a gift card code.");
+  }
+
+  try {
+    await applyGiftCardToCart({ cartId, code: parsed.data.code });
+  } catch (error) {
+    cartError(error instanceof Error ? error.message : "Could not apply that gift card.");
+  }
+
+  redirect("/cart?saved=gift-card");
+}
+
+export async function removePublicGiftCardAction(_formData: FormData) {
+  void _formData;
+  await requirePublicProductsModule();
+
+  const cartId = await currentCartId();
+  if (!cartId) cartError("Cart not found.");
+
+  try {
+    await removeCartGiftCard(cartId);
+  } catch (error) {
+    cartError(error instanceof Error ? error.message : "Could not remove that gift card.");
+  }
+
+  redirect("/cart?saved=gift-card-removed");
+}
+
 export async function saveCartForRecoveryAction(formData: FormData) {
   await requirePublicProductsModule();
 
@@ -288,6 +334,7 @@ export async function preparePublicCheckoutAction(formData: FormData) {
   }
 
   let checkoutUrl = "";
+  let completedOrderNumber = "";
 
   try {
     const order = await createCheckoutOrderFromCart({
@@ -315,13 +362,28 @@ export async function preparePublicCheckoutAction(formData: FormData) {
       relatedType: "order",
       valueCents: order.totalCents
     });
-    const checkoutOrder = await createPaymentCheckoutSessionForOrder({ orderId: order.id, siteId: order.siteId });
+    if (order.totalCents <= 0) {
+      await updateOrderStatus({
+        orderId: order.id,
+        providerConfirmed: true,
+        siteId: order.siteId,
+        status: OrderStatus.PAID
+      });
+      await clearCartId();
+      completedOrderNumber = order.orderNumber;
+    } else {
+      const checkoutOrder = await createPaymentCheckoutSessionForOrder({ orderId: order.id, siteId: order.siteId });
 
-    await queueOrderCheckoutEmail(checkoutOrder);
-    await clearCartId();
-    checkoutUrl = checkoutOrder.checkoutUrl || "";
+      await queueOrderCheckoutEmail(checkoutOrder);
+      await clearCartId();
+      checkoutUrl = checkoutOrder.checkoutUrl || "";
+    }
   } catch (error) {
     cartError(error instanceof Error ? error.message : "Could not prepare checkout.");
+  }
+
+  if (completedOrderNumber) {
+    redirect(`/cart?checkout=success&order=${encodeURIComponent(completedOrderNumber)}`);
   }
 
   if (!checkoutUrl) {

@@ -1,4 +1,4 @@
-import { CartStatus, CouponType, OrderStatus, PaymentStatus, ProductStatus, ProductType } from "@prisma/client";
+import { CartStatus, CouponType, GiftCardStatus, OrderStatus, PaymentStatus, ProductStatus, ProductType } from "@prisma/client";
 import { BadgeDollarSign, Boxes, CreditCard, PackagePlus, ReceiptText, Tags } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { nextOrderStatuses } from "@/lib/commerce/orders";
@@ -10,6 +10,7 @@ import {
   clearCommerceOrderCheckoutLinkAction,
   createCollectionAction,
   createCouponAction,
+  createGiftCardAction,
   createProductAction,
   createProductVariantAction,
   updateCommerceCheckoutSettingsAction,
@@ -70,7 +71,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const statusFilter = normalizeStatusFilter(params.status);
   const productWhere = statusFilter === "all" ? { siteId: settings.siteId } : { siteId: settings.siteId, status: statusFilter.toUpperCase() as ProductStatus };
 
-  const [products, productCount, activeCount, collections, coupons, orderCount, paidOrderTotals, openCartCount, orders] = await Promise.all([
+  const [products, productCount, activeCount, collections, coupons, giftCards, orderCount, paidOrderTotals, openCartCount, orders] = await Promise.all([
     prisma.product.findMany({
       where: productWhere,
       include: {
@@ -88,6 +89,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.ACTIVE } }),
     prisma.collection.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }] }),
     prisma.coupon.findMany({ where: { siteId: settings.siteId }, orderBy: { createdAt: "desc" }, take: 12 }),
+    prisma.giftCard.findMany({ where: { siteId: settings.siteId }, orderBy: { createdAt: "desc" }, take: 12 }),
     prisma.order.count({ where: { siteId: settings.siteId } }),
     prisma.order.groupBy({
       by: ["currency"],
@@ -114,6 +116,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         where: { id: selectedOrderId, siteId: settings.siteId },
         include: {
           client: true,
+          giftCard: true,
           items: {
             include: {
               product: true,
@@ -681,6 +684,18 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   <td>{formatMoney(selectedOrder.shippingCents, selectedOrder.currency)}</td>
                 </tr>
                 <tr>
+                  <td>Gift card</td>
+                  <td>
+                    -{formatMoney(selectedOrder.giftCardCreditCents, selectedOrder.currency)}
+                    {selectedOrder.giftCard ? (
+                      <>
+                        <br />
+                        <span style={{ color: "var(--muted)" }}>{selectedOrder.giftCard.code}</span>
+                      </>
+                    ) : null}
+                  </td>
+                </tr>
+                <tr>
                   <td>Total</td>
                   <td>
                     <strong>{formatMoney(selectedOrder.totalCents, selectedOrder.currency)}</strong>
@@ -1025,6 +1040,97 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               {!coupons.length ? (
                 <tr>
                   <td colSpan={3}>No coupons yet.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+
+          <div className="subpanel form-grid">
+            <h3 style={{ fontSize: "1.05rem" }}>Issue gift card</h3>
+            <form action={createGiftCardAction} className="form-grid">
+              <div className="grid-3">
+                <div className="field">
+                  <label htmlFor="giftCardCode">Code</label>
+                  <input id="giftCardCode" name="code" placeholder="Auto-generate" />
+                </div>
+                <div className="field">
+                  <label htmlFor="giftCardAmount">Amount</label>
+                  <input id="giftCardAmount" name="amount" inputMode="decimal" required />
+                </div>
+                <div className="field">
+                  <label htmlFor="giftCardCurrency">Currency</label>
+                  <input id="giftCardCurrency" name="currency" defaultValue="USD" maxLength={3} required />
+                </div>
+              </div>
+              <div className="grid-2">
+                <div className="field">
+                  <label htmlFor="giftCardRecipientName">Recipient name</label>
+                  <input id="giftCardRecipientName" name="recipientName" />
+                </div>
+                <div className="field">
+                  <label htmlFor="giftCardRecipientEmail">Recipient email</label>
+                  <input id="giftCardRecipientEmail" name="recipientEmail" type="email" />
+                </div>
+              </div>
+              <div className="grid-2">
+                <div className="field">
+                  <label htmlFor="giftCardPurchaserName">Purchaser name</label>
+                  <input id="giftCardPurchaserName" name="purchaserName" />
+                </div>
+                <div className="field">
+                  <label htmlFor="giftCardPurchaserEmail">Purchaser email</label>
+                  <input id="giftCardPurchaserEmail" name="purchaserEmail" type="email" />
+                </div>
+              </div>
+              <div className="grid-2">
+                <div className="field">
+                  <label htmlFor="giftCardExpiresAt">Expires</label>
+                  <input id="giftCardExpiresAt" name="expiresAt" type="date" />
+                </div>
+                <div className="field">
+                  <label htmlFor="giftCardNote">Note</label>
+                  <input id="giftCardNote" name="note" />
+                </div>
+              </div>
+              <button className="button secondary" type="submit">
+                Issue gift card
+              </button>
+            </form>
+          </div>
+
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Gift card</th>
+                <th>Balance</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {giftCards.map((giftCard) => (
+                <tr key={giftCard.id}>
+                  <td>
+                    <strong>{giftCard.code}</strong>
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>
+                      {giftCard.recipientEmail || giftCard.recipientName || "No recipient"}
+                    </span>
+                  </td>
+                  <td>
+                    {formatMoney(giftCard.balanceCents, giftCard.currency)}
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>of {formatMoney(giftCard.initialAmountCents, giftCard.currency)}</span>
+                  </td>
+                  <td>
+                    <span className={giftCard.status === GiftCardStatus.ACTIVE ? "pill success" : "pill danger"}>
+                      {enumLabel(giftCard.status)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {!giftCards.length ? (
+                <tr>
+                  <td colSpan={3}>No gift cards yet.</td>
                 </tr>
               ) : null}
             </tbody>

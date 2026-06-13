@@ -74,6 +74,11 @@ enum PayPalWebhookEventStatus {
   FAILED
 }
 
+enum GiftCardStatus {
+  ACTIVE
+  DISABLED
+}
+
 model Product {
   id                  String              @id @default(cuid())
   siteId              String
@@ -182,31 +187,61 @@ model Coupon {
   @@index([siteId, isActive])
 }
 
+model GiftCard {
+  id                 String                 @id @default(cuid())
+  siteId             String
+  site               Site                   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  code               String
+  status             GiftCardStatus         @default(ACTIVE)
+  currency           String                 @default("USD")
+  initialAmountCents Int
+  balanceCents       Int
+  recipientName      String                 @default("")
+  recipientEmail     String                 @default("")
+  purchaserName      String                 @default("")
+  purchaserEmail     String                 @default("")
+  note               String                 @default("")
+  issuedAt           DateTime               @default(now())
+  expiresAt          DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  carts              Cart[]
+  orders             Order[]
+  redemptions        GiftCardRedemption[]
+
+  @@unique([siteId, code])
+  @@index([siteId, status])
+  @@index([recipientEmail])
+}
+
 model Cart {
-  id            String     @id @default(cuid())
-  siteId        String
-  site          Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  clientId      String?
-  client        Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  customerEmail String?
-  status        CartStatus @default(OPEN)
-  currency      String     @default("USD")
-  subtotalCents Int        @default(0)
-  discountCents Int        @default(0)
-  taxCents      Int        @default(0)
-  shippingCents Int        @default(0)
-  totalCents    Int        @default(0)
-  couponId      String?
-  coupon        Coupon?    @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  checkoutUrl   String?
-  expiresAt     DateTime?
+  id                     String     @id @default(cuid())
+  siteId                 String
+  site                   Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  clientId               String?
+  client                 Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  customerEmail          String?
+  status                 CartStatus @default(OPEN)
+  currency               String     @default("USD")
+  subtotalCents          Int        @default(0)
+  discountCents          Int        @default(0)
+  taxCents               Int        @default(0)
+  shippingCents          Int        @default(0)
+  giftCardCreditCents    Int        @default(0)
+  totalCents             Int        @default(0)
+  couponId               String?
+  coupon                 Coupon?    @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  giftCardId             String?
+  giftCard               GiftCard?  @relation(fields: [giftCardId], references: [id], onDelete: SetNull)
+  checkoutUrl            String?
+  expiresAt              DateTime?
   abandonedAt            DateTime?
   recoveryEmailQueuedAt DateTime?
   recoveryAttemptCount  Int        @default(0)
   recoveryLastError     String     @default("")
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  items         CartItem[]
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+  items                  CartItem[]
 
   @@index([clientId])
   @@index([siteId, status])
@@ -247,9 +282,12 @@ model Order {
   discountCents Int         @default(0)
   taxCents      Int         @default(0)
   shippingCents Int         @default(0)
+  giftCardCreditCents Int   @default(0)
   totalCents    Int         @default(0)
   couponId      String?
   coupon        Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  giftCardId    String?
+  giftCard      GiftCard?   @relation(fields: [giftCardId], references: [id], onDelete: SetNull)
   notes         String      @default("")
   checkoutUrl   String?
   placedAt      DateTime?
@@ -257,11 +295,29 @@ model Order {
   updatedAt     DateTime    @updatedAt
   items         OrderItem[]
   payments      Payment[]
+  giftCardRedemptions GiftCardRedemption[]
 
   @@unique([siteId, orderNumber])
   @@index([clientId])
   @@index([siteId, status])
   @@index([customerEmail])
+}
+
+model GiftCardRedemption {
+  id           String    @id @default(cuid())
+  giftCardId   String
+  giftCard     GiftCard  @relation(fields: [giftCardId], references: [id], onDelete: Cascade)
+  orderId      String
+  order        Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amountCents  Int
+  currency     String    @default("USD")
+  codeSnapshot String
+  restoredAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([giftCardId])
+  @@index([orderId])
+  @@index([restoredAt])
 }
 
 model OrderItem {

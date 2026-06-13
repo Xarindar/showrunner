@@ -75,6 +75,7 @@ model Site {
   coupons                  Coupon[]
   carts                    Cart[]
   orders                   Order[]
+  giftCards                GiftCard[]
   paymentGatewayCredentials PaymentGatewayCredential[]
   billingDocuments         BillingDocument[]
   messageTemplates         MessageTemplate[]

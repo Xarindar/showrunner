@@ -1,15 +1,17 @@
 import "server-only";
 
 import { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
+import { buildPurchaseEvent } from "@/lib/analytics/ecommerce";
 import { emitModuleEvent } from "@/lib/events/emit";
 import { queueOrderReceiptEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getCurrentSiteId } from "@/lib/site";
 
 type CommerceTx = Prisma.TransactionClient;
 
 type OrderWithItems = Prisma.OrderGetPayload<{
   include: {
+    giftCardRedemptions: true;
     items: {
       include: {
         product: true;
@@ -180,18 +182,42 @@ async function consumeCouponRedemptionForPaidOrder(tx: CommerceTx, order: { coup
   throw new Error("Could not confirm coupon redemption. Please retry.");
 }
 
+async function restoreGiftCardRedemptionsForCanceledOrder(
+  tx: CommerceTx,
+  redemptions: { amountCents: number; giftCardId: string; id: string; restoredAt: Date | null }[]
+) {
+  const restoredAt = new Date();
+
+  for (const redemption of redemptions) {
+    if (redemption.restoredAt) continue;
+
+    const marked = await tx.giftCardRedemption.updateMany({
+      where: { id: redemption.id, restoredAt: null },
+      data: { restoredAt }
+    });
+    if (marked.count !== 1) continue;
+
+    await tx.giftCard.update({
+      where: { id: redemption.giftCardId },
+      data: { balanceCents: { increment: redemption.amountCents } }
+    });
+  }
+}
+
 export async function updateOrderStatus(input: {
   orderId: string;
   status: OrderStatus;
   siteId?: string;
   providerConfirmed?: boolean;
 }) {
-  const siteId = input.siteId || DEFAULT_SITE_ID;
+  const siteId = input.siteId || (await getCurrentSiteId());
   const providerConfirmed = input.providerConfirmed ?? false;
   const result = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findFirst({
       where: { id: input.orderId, siteId },
       include: {
+        coupon: true,
+        giftCardRedemptions: true,
         items: {
           include: {
             product: true,
@@ -205,10 +231,15 @@ export async function updateOrderStatus(input: {
     assertAllowedOrderStatusTransition(order.status, input.status, { providerConfirmed });
 
     const becamePaid = input.status === OrderStatus.PAID && order.status !== OrderStatus.PAID;
+    const becameCanceled = input.status === OrderStatus.CANCELED && order.status !== OrderStatus.CANCELED;
 
     if (becamePaid) {
       await consumeCouponRedemptionForPaidOrder(tx, order);
       await decrementInventoryForPaidOrder(tx, order);
+    }
+
+    if (becameCanceled) {
+      await restoreGiftCardRedemptionsForCanceledOrder(tx, order.giftCardRedemptions);
     }
 
     const updatedOrder = await tx.order.update({
@@ -224,7 +255,8 @@ export async function updateOrderStatus(input: {
 
     return {
       becamePaid,
-      order: updatedOrder
+      order: updatedOrder,
+      sourceOrder: order
     };
   });
 
@@ -236,6 +268,19 @@ export async function updateOrderStatus(input: {
         currency: result.order.currency,
         idempotencyKey: `order:${result.order.id}:paid`,
         metadata: {
+          ...buildPurchaseEvent({
+            coupon: result.sourceOrder.coupon?.code || undefined,
+            currency: result.order.currency,
+            items: result.sourceOrder.items.map((item) => ({
+              item_id: item.productId,
+              item_name: item.name,
+              item_variant: item.variant && !item.variant.isDefault ? item.variant.name : undefined,
+              price: Number((item.unitPriceCents / 100).toFixed(2)),
+              quantity: item.quantity
+            })),
+            totalCents: result.order.totalCents,
+            transactionId: result.order.orderNumber
+          }),
           orderNumber: result.order.orderNumber,
           paymentProvider: result.order.payments[0]?.provider || ""
         },

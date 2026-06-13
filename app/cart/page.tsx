@@ -3,9 +3,13 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { CreditCard, FileText, ShoppingBag, Trash2 } from "lucide-react";
 import { FormAttachmentTargetType } from "@prisma/client";
+import { TrackAnalyticsEvent, TrackedAnalyticsForm } from "@/components/analytics/tracker";
+import { buildPurchaseEvent } from "@/lib/analytics/ecommerce";
 import {
   applyPublicCartCouponAction,
+  applyPublicGiftCardAction,
   preparePublicCheckoutAction,
+  removePublicGiftCardAction,
   removePublicCartCouponAction,
   saveCartForRecoveryAction,
   updatePublicCartItemAction
@@ -20,7 +24,7 @@ import { themeToCssVars } from "@/lib/theme/tokens";
 export const dynamic = "force-dynamic";
 
 type CartPageProps = {
-  searchParams: Promise<{ added?: string; recovered?: string; saved?: string; error?: string; order?: string }>;
+  searchParams: Promise<{ added?: string; checkout?: string; recovered?: string; saved?: string; error?: string; order?: string }>;
 };
 
 const cartCookieName = "commerce_cart_id";
@@ -45,9 +49,28 @@ export default async function CartPage({ searchParams }: CartPageProps) {
   const preparedOrder = query.order
     ? await prisma.order.findUnique({
         where: { siteId_orderNumber: { siteId: settings.siteId, orderNumber: query.order } },
-        include: { payments: { orderBy: { createdAt: "desc" }, take: 1 } }
+        include: {
+          coupon: true,
+          items: { orderBy: { createdAt: "asc" } },
+          payments: { orderBy: { createdAt: "desc" }, take: 1 }
+        }
       })
     : null;
+  const purchaseEvent =
+    query.checkout === "success" && preparedOrder
+      ? buildPurchaseEvent({
+          coupon: preparedOrder.coupon?.code || undefined,
+          currency: preparedOrder.currency,
+          items: preparedOrder.items.map((item) => ({
+            item_id: item.productId,
+            item_name: item.name,
+            price: Number((item.unitPriceCents / 100).toFixed(2)),
+            quantity: item.quantity
+          })),
+          totalCents: preparedOrder.totalCents,
+          transactionId: preparedOrder.orderNumber
+        })
+      : null;
   const orderFormAttachments = preparedOrder
     ? await getPublicFormAttachments({
         siteId: settings.siteId,
@@ -58,6 +81,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
 
   return (
     <main className="site-shell" style={themeToCssVars(settings)}>
+      {purchaseEvent ? <TrackAnalyticsEvent event={purchaseEvent} onceKey={`purchase:${preparedOrder?.orderNumber}`} /> : null}
       <nav className="site-nav">
         <Link href="/" className="brand">
           <span className="brand-mark" />
@@ -103,8 +127,8 @@ export default async function CartPage({ searchParams }: CartPageProps) {
           ) : null}
           {preparedOrder ? (
             <div className="success-message" role="status" aria-live="polite">
-              Order {preparedOrder.orderNumber} is prepared with a pending Stripe payment record for{" "}
-              {formatMoney(preparedOrder.totalCents, preparedOrder.currency)}. Attach the hosted checkout link from the admin order queue.
+              Order {preparedOrder.orderNumber} is {preparedOrder.status.toLowerCase()} for{" "}
+              {formatMoney(preparedOrder.totalCents, preparedOrder.currency)}.
             </div>
           ) : null}
           {orderFormAttachments.length ? (
@@ -214,6 +238,10 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                       <td>{formatMoney(cartResult.cart.taxCents, cartResult.cart.currency)}</td>
                     </tr>
                     <tr>
+                      <td>Gift card</td>
+                      <td>-{formatMoney(cartResult.cart.giftCardCreditCents, cartResult.cart.currency)}</td>
+                    </tr>
+                    <tr>
                       <td>Total</td>
                       <td>
                         <strong>{formatMoney(cartResult.cart.totalCents, cartResult.cart.currency)}</strong>
@@ -244,6 +272,30 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                   )}
                 </div>
 
+                <div className="subpanel form-grid">
+                  <h3>Gift card</h3>
+                  {cartResult.cart.giftCard ? (
+                    <form action={removePublicGiftCardAction} className="form-grid">
+                      <p>
+                        Applied: {cartResult.cart.giftCard.code} ({formatMoney(cartResult.cart.giftCardCreditCents, cartResult.cart.currency)})
+                      </p>
+                      <button className="button secondary" type="submit">
+                        Remove gift card
+                      </button>
+                    </form>
+                  ) : (
+                    <form action={applyPublicGiftCardAction} className="form-grid">
+                      <div className="field">
+                        <label htmlFor="gift-card-code">Gift card code</label>
+                        <input id="gift-card-code" name="code" />
+                      </div>
+                      <button className="button secondary" type="submit">
+                        Apply gift card
+                      </button>
+                    </form>
+                  )}
+                </div>
+
                 <form action={saveCartForRecoveryAction} className="subpanel form-grid">
                   <h3>Save this cart</h3>
                   <div className="field">
@@ -263,7 +315,23 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                   </button>
                 </form>
 
-                <form action={preparePublicCheckoutAction} className="subpanel form-grid">
+                <TrackedAnalyticsForm
+                  action={preparePublicCheckoutAction}
+                  analyticsData={JSON.stringify({
+                    coupon: cartResult.cart.coupon?.code || undefined,
+                    currency: cartResult.cart.currency,
+                    items: cartResult.cart.items.map((item) => ({
+                      item_id: item.productId,
+                      item_name: itemName(item),
+                      item_variant: item.variant && !item.variant.isDefault ? item.variant.name : undefined,
+                      price: Number((item.unitPriceCents / 100).toFixed(2)),
+                      quantity: item.quantity
+                    })),
+                    totalCents: cartResult.cart.totalCents
+                  })}
+                  className="subpanel form-grid"
+                  mode="begin_checkout"
+                >
                   <h3>Checkout</h3>
                   <div className="field">
                     <label htmlFor="checkout-name">Name</label>
@@ -277,7 +345,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                     <CreditCard size={18} />
                     Continue to checkout
                   </button>
-                </form>
+                </TrackedAnalyticsForm>
               </div>
             </section>
           )}

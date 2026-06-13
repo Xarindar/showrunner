@@ -15,8 +15,8 @@ export const manifest = {
     level: "partial",
     mode: "live",
     summary:
-      "Client records, notes, linked bookings/forms/testimonials, timeline, segments, pipeline stages, preferences, files, CSV import/export, and duplicate merge are live.",
-    primaryGap: "Portal access and formal consent document versioning are still pending."
+      "Client records, notes, linked bookings/forms/testimonials, timeline, segments, pipeline stages, preferences, files, CSV import/export, duplicate merge, and tokenized client portal views are live.",
+    primaryGap: "Formal consent document versioning is still pending."
   },
   capabilities: [
     { label: "Client records", status: "live" },
@@ -26,11 +26,13 @@ export const manifest = {
     { label: "Lead pipeline", status: "live" },
     { label: "Consent and preferences", status: "live" },
     { label: "CSV import/export", status: "live" },
-    { label: "Duplicate merge", status: "live" }
+    { label: "Duplicate merge", status: "live" },
+    { label: "Tokenized client portal", status: "live" }
   ],
   adminRoutes: ["/admin/modules/clients", "/admin/clients/[id]"],
+  publicRoutes: ["/portal/[clientId]"],
   dependencies: ["appointments", "forms"],
-  dataModels: ["Client", "ClientNote", "ClientTag", "ClientFile", "ClientSegment", "Booking", "FormSubmission"],
+  dataModels: ["Client", "ClientNote", "ClientTag", "ClientFile", "ClientSegment", "Booking", "FormSubmission", "Order", "BillingDocument"],
   permissions: ["clients:manage"],
   settingsSections: ["Data"],
   healthChecks: ["client-count"],

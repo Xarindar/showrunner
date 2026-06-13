@@ -108,13 +108,14 @@ function assertStripeCurrency(currency: string) {
 function stripeLineItems(order: {
   currency: string;
   discountCents: number;
+  giftCardCreditCents: number;
   items: { lineTotalCents: number; name: string; quantity: number; unitPriceCents: number }[];
   orderNumber: string;
   shippingCents: number;
   taxCents: number;
   totalCents: number;
 }) {
-  if (order.discountCents > 0) {
+  if (order.discountCents > 0 || order.giftCardCreditCents > 0) {
     return [
       {
         price_data: {

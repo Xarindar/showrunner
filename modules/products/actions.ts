@@ -1,6 +1,7 @@
 "use server";
 
-import { OrderStatus, PaymentProvider, PaymentStatus, Prisma, ProductStatus } from "@prisma/client";
+import { randomBytes } from "crypto";
+import { GiftCardStatus, OrderStatus, PaymentProvider, PaymentStatus, Prisma, ProductStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -10,7 +11,9 @@ import {
   collectionFormSchema,
   collectionProductFormSchema,
   couponFormSchema,
+  currencyCode,
   moneyCents,
+  optionalEmailStored,
   optionalMoneyCents,
   optionalStoredText,
   parseForm,
@@ -49,6 +52,31 @@ const orderRefundSchema = z.object({
   amount: moneyCents
 });
 
+const optionalStoredDate = z
+  .string()
+  .transform((value) => value.trim())
+  .transform((value, context) => {
+    if (!value) return undefined;
+    const date = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) {
+      context.addIssue({ code: "custom", message: "Use a valid date." });
+      return z.NEVER;
+    }
+    return date;
+  });
+
+const giftCardIssueSchema = z.object({
+  amount: moneyCents,
+  code: optionalStoredText.transform((value) => value.toUpperCase()),
+  currency: currencyCode.catch("USD"),
+  expiresAt: optionalStoredDate,
+  note: optionalStoredText,
+  purchaserEmail: optionalEmailStored,
+  purchaserName: optionalStoredText,
+  recipientEmail: optionalEmailStored,
+  recipientName: optionalStoredText
+});
+
 const percentRateBps = z
   .string()
   .transform((value) => value.trim())
@@ -80,6 +108,25 @@ function refreshProducts() {
   revalidatePath("/admin/modules/clients");
   revalidatePath("/cart");
   revalidatePath("/shop");
+}
+
+async function generateGiftCardCode(siteId: string, requestedCode?: string) {
+  if (requestedCode) return requestedCode;
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const code = `GC-${randomGiftCardSegment()}-${randomGiftCardSegment()}`;
+    const existing = await prisma.giftCard.findUnique({
+      where: { siteId_code: { siteId, code } },
+      select: { id: true }
+    });
+    if (!existing) return code;
+  }
+
+  throw new Error("Could not generate a unique gift card code.");
+}
+
+function randomGiftCardSegment() {
+  return randomBytes(3).toString("hex").slice(0, 4).toUpperCase();
 }
 
 async function syncDefaultVariant(
@@ -440,6 +487,70 @@ export async function createCouponAction(formData: FormData) {
 
   refreshProducts();
   redirect("/admin/modules/products?saved=coupon");
+}
+
+export async function createGiftCardAction(formData: FormData) {
+  const user = await requireAdmin("products:manage");
+  const input = await parseForm(giftCardIssueSchema, formData, "/admin/modules/products");
+  const siteId = await getCurrentSiteId();
+  const code = await generateGiftCardCode(siteId, input.code);
+
+  let giftCard: {
+    code: string;
+    currency: string;
+    expiresAt: Date | null;
+    id: string;
+    initialAmountCents: number;
+  };
+  try {
+    giftCard = await prisma.giftCard.create({
+      data: {
+        balanceCents: input.amount,
+        code,
+        currency: input.currency,
+        expiresAt: input.expiresAt,
+        initialAmountCents: input.amount,
+        note: input.note,
+        purchaserEmail: input.purchaserEmail,
+        purchaserName: input.purchaserName,
+        recipientEmail: input.recipientEmail,
+        recipientName: input.recipientName,
+        siteId,
+        status: GiftCardStatus.ACTIVE
+      },
+      select: {
+        code: true,
+        currency: true,
+        expiresAt: true,
+        id: true,
+        initialAmountCents: true
+      }
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      redirect(`/admin/modules/products?error=${encodeURIComponent(`Gift card ${code} already exists.`)}`);
+    }
+
+    throw error;
+  }
+
+  await recordAuditLog({
+    action: "gift_card.issued",
+    actor: user,
+    metadata: {
+      amountCents: giftCard.initialAmountCents,
+      code: giftCard.code,
+      currency: giftCard.currency,
+      expiresAt: giftCard.expiresAt?.toISOString() || ""
+    },
+    siteId,
+    targetId: giftCard.id,
+    targetLabel: giftCard.code,
+    targetType: "gift_card"
+  });
+
+  refreshProducts();
+  redirect("/admin/modules/products?saved=gift-card");
 }
 
 export async function updateCommerceOrderStatusAction(formData: FormData) {

@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import {
   CartStatus,
   CouponType,
+  GiftCardStatus,
   OrderStatus,
   PaymentProvider,
   PaymentStatus,
@@ -11,8 +12,10 @@ import {
   ProductStatus,
   ProductType
 } from "@prisma/client";
+import { buildAnalyticsItem } from "@/lib/analytics/ecommerce";
+import { recordAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getCurrentSiteId } from "@/lib/site";
 
 const maxIntCents = 2_147_483_647;
 const maxCartQuantity = 999;
@@ -20,7 +23,7 @@ const maxCartQuantity = 999;
 type CommerceTx = Prisma.TransactionClient;
 
 type RepriceWarning = {
-  code: "removed_unavailable" | "quantity_reduced" | "coupon_removed";
+  code: "removed_unavailable" | "quantity_reduced" | "coupon_removed" | "gift_card_removed";
   message: string;
 };
 
@@ -67,6 +70,22 @@ function couponDiscountCents(
   return Math.min(subtotalCents, Math.floor((subtotalCents * (coupon.percentOff || 0)) / 100));
 }
 
+function normalizeGiftCardCode(code: string) {
+  return code.trim().toUpperCase();
+}
+
+function giftCardIsUsable(giftCard: {
+  balanceCents: number;
+  currency: string;
+  expiresAt: Date | null;
+  status: GiftCardStatus;
+}) {
+  if (giftCard.status !== GiftCardStatus.ACTIVE) return false;
+  if (giftCard.balanceCents <= 0) return false;
+  if (giftCard.expiresAt && giftCard.expiresAt < new Date()) return false;
+  return true;
+}
+
 async function getCommerceCheckoutSettings(tx: CommerceTx, siteId: string): Promise<CommerceCheckoutSettings> {
   const settings = await tx.siteSettings.findUnique({
     where: { siteId },
@@ -92,6 +111,7 @@ async function getCommerceCheckoutSettings(tx: CommerceTx, siteId: string): Prom
 
 function calculateCheckoutTotals(input: {
   discountCents: number;
+  giftCardBalanceCents: number;
   hasShippableItems: boolean;
   settings: CommerceCheckoutSettings;
   subtotalCents: number;
@@ -114,15 +134,19 @@ function calculateCheckoutTotals(input: {
     input.settings.commerceTaxEnabled && input.settings.commerceTaxRateBps > 0
       ? Math.round((taxableCents * input.settings.commerceTaxRateBps) / 10_000)
       : 0;
-  const totalCents = discountedSubtotalCents + shippingCents + taxCents;
+  const totalBeforeGiftCardCents = discountedSubtotalCents + shippingCents + taxCents;
+  const giftCardCreditCents = Math.min(totalBeforeGiftCardCents, Math.max(0, input.giftCardBalanceCents));
+  const totalCents = totalBeforeGiftCardCents - giftCardCreditCents;
   if (totalCents > maxIntCents) throw new Error("Cart total is too high.");
 
   return {
+    giftCardCreditCents,
     shippingCents,
     taxCents,
     totalCents
   };
 }
+
 async function generateOrderNumber(tx: CommerceTx, siteId: string) {
   const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
 
@@ -142,7 +166,7 @@ async function resolvePurchasableVariant(
   tx: CommerceTx,
   input: { productId: string; variantId?: string; quantity: number; siteId?: string }
 ) {
-  const siteId = input.siteId || DEFAULT_SITE_ID;
+  const siteId = input.siteId || (await getCurrentSiteId());
   const product = await tx.product.findFirst({
     where: { id: input.productId, siteId },
     include: {
@@ -189,12 +213,13 @@ async function resolvePurchasableVariant(
 
 export async function repriceCart(tx: CommerceTx, cartId: string, options: RepriceCartOptions = {}) {
   const allowedStatuses = options.allowedStatuses || [CartStatus.OPEN];
-  const siteId = options.siteId || DEFAULT_SITE_ID;
+  const siteId = options.siteId || (await getCurrentSiteId());
   const warnings: RepriceWarning[] = [];
   const cart = await tx.cart.findFirst({
     where: { id: cartId, siteId },
     include: {
       coupon: true,
+      giftCard: true,
       items: {
         include: { product: true, variant: true },
         orderBy: { createdAt: "asc" }
@@ -270,9 +295,21 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
     }
   }
 
+  let giftCardId = cart.giftCardId;
+  let giftCardBalanceCents = 0;
+  if (cart.giftCard) {
+    if (giftCardIsUsable(cart.giftCard) && cart.giftCard.currency === currency) {
+      giftCardBalanceCents = cart.giftCard.balanceCents;
+    } else {
+      giftCardId = null;
+      warnings.push({ code: "gift_card_removed", message: "The gift card is no longer available for this cart." });
+    }
+  }
+
   const checkoutSettings = await getCommerceCheckoutSettings(tx, siteId);
-  const { shippingCents, taxCents, totalCents } = calculateCheckoutTotals({
+  const { giftCardCreditCents, shippingCents, taxCents, totalCents } = calculateCheckoutTotals({
     discountCents,
+    giftCardBalanceCents,
     hasShippableItems,
     settings: checkoutSettings,
     subtotalCents
@@ -285,8 +322,10 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
       discountCents,
       shippingCents,
       taxCents,
+      giftCardCreditCents,
       totalCents,
-      couponId
+      couponId,
+      giftCardId
     }
   });
 
@@ -294,6 +333,7 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
     where: { id: cartId, siteId },
     include: {
       coupon: true,
+      giftCard: true,
       items: {
         include: { product: true, variant: true },
         orderBy: { createdAt: "asc" }
@@ -308,31 +348,33 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
 export async function getOpenCart(cartId?: string) {
   if (!cartId) return null;
 
+  const siteId = await getCurrentSiteId();
   return prisma.$transaction(async (tx) => {
     const cart = await tx.cart.findFirst({
-      where: { id: cartId, siteId: DEFAULT_SITE_ID },
+      where: { id: cartId, siteId },
       select: { id: true, status: true }
     });
 
     if (!cart || cart.status !== CartStatus.OPEN) return null;
-    return repriceCart(tx, cartId);
+    return repriceCart(tx, cartId, { siteId });
   });
 }
 
 export async function addCartItem(input: { cartId?: string; productId: string; variantId?: string; quantity: number }) {
+  const siteId = await getCurrentSiteId();
   return prisma.$transaction(async (tx) => {
     const quantity = Math.min(Math.max(1, input.quantity), maxCartQuantity);
     const resolved = await resolvePurchasableVariant(tx, {
       productId: input.productId,
       variantId: input.variantId,
       quantity,
-      siteId: DEFAULT_SITE_ID
+      siteId
     });
 
     const cart =
       input.cartId
         ? await tx.cart.findFirst({
-            where: { id: input.cartId, siteId: DEFAULT_SITE_ID, status: CartStatus.OPEN },
+            where: { id: input.cartId, siteId, status: CartStatus.OPEN },
             include: { items: { include: { product: true } } }
           })
         : null;
@@ -341,7 +383,7 @@ export async function addCartItem(input: { cartId?: string; productId: string; v
       cart ||
       (await tx.cart.create({
         data: {
-          siteId: DEFAULT_SITE_ID,
+          siteId,
           currency: resolved.currency,
           expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14)
         },
@@ -385,15 +427,27 @@ export async function addCartItem(input: { cartId?: string; productId: string; v
       });
     }
 
-    await repriceCart(tx, openCart.id);
-    return openCart.id;
+    await repriceCart(tx, openCart.id, { siteId });
+    return {
+      analyticsItem: buildAnalyticsItem({
+        productId: resolved.product.id,
+        productName: resolved.product.name,
+        quantity,
+        unitPriceCents: resolved.unitPriceCents,
+        variantName: resolved.variant && !resolved.variant.isDefault ? resolved.variant.name : undefined
+      }),
+      cartId: openCart.id,
+      currency: resolved.currency,
+      valueCents: lineTotal(resolved.unitPriceCents, quantity)
+    };
   });
 }
 
 export async function updateCartItem(input: { cartId: string; itemId: string; quantity: number }) {
+  const siteId = await getCurrentSiteId();
   return prisma.$transaction(async (tx) => {
     const item = await tx.cartItem.findFirst({
-      where: { id: input.itemId, cartId: input.cartId },
+      where: { id: input.itemId, cartId: input.cartId, cart: { siteId } },
       select: { id: true, unitPriceCents: true }
     });
     if (!item) throw new Error("Cart item not found.");
@@ -411,14 +465,15 @@ export async function updateCartItem(input: { cartId: string; itemId: string; qu
       });
     }
 
-    await repriceCart(tx, input.cartId);
+    await repriceCart(tx, input.cartId, { siteId });
   });
 }
 
 export async function applyCartCoupon(input: { cartId: string; code: string }) {
+  const siteId = await getCurrentSiteId();
   return prisma.$transaction(async (tx) => {
     const cart = await tx.cart.findFirst({
-      where: { id: input.cartId, siteId: DEFAULT_SITE_ID },
+      where: { id: input.cartId, siteId },
       select: { siteId: true }
     });
     if (!cart) throw new Error("Cart not found.");
@@ -435,15 +490,56 @@ export async function applyCartCoupon(input: { cartId: string; code: string }) {
       where: { id: input.cartId },
       data: { couponId: coupon.id }
     });
-    await repriceCart(tx, input.cartId);
+    await repriceCart(tx, input.cartId, { siteId });
   });
 }
 
 export async function removeCartCoupon(cartId: string) {
+  const siteId = await getCurrentSiteId();
   return prisma.$transaction(async (tx) => {
-    const updated = await tx.cart.updateMany({ where: { id: cartId, siteId: DEFAULT_SITE_ID }, data: { couponId: null } });
+    const updated = await tx.cart.updateMany({ where: { id: cartId, siteId }, data: { couponId: null } });
     if (updated.count !== 1) throw new Error("Cart not found.");
-    await repriceCart(tx, cartId);
+    await repriceCart(tx, cartId, { siteId });
+  });
+}
+
+export async function applyGiftCardToCart(input: { cartId: string; code: string }) {
+  const siteId = await getCurrentSiteId();
+  return prisma.$transaction(async (tx) => {
+    const cart = await tx.cart.findFirst({
+      where: { id: input.cartId, siteId, status: CartStatus.OPEN },
+      select: { currency: true, id: true, items: { select: { id: true }, take: 1 } }
+    });
+    if (!cart) throw new Error("Cart not found.");
+    if (!cart.items.length) throw new Error("Add an item before applying a gift card.");
+
+    const giftCard = await tx.giftCard.findUnique({
+      where: { siteId_code: { siteId, code: normalizeGiftCardCode(input.code) } }
+    });
+    if (!giftCard || !giftCardIsUsable(giftCard)) {
+      throw new Error("That gift card is not available.");
+    }
+    if (giftCard.currency !== cart.currency) {
+      throw new Error("That gift card uses a different currency.");
+    }
+
+    await tx.cart.update({
+      where: { id: cart.id },
+      data: { giftCardId: giftCard.id }
+    });
+    await repriceCart(tx, cart.id, { siteId });
+  });
+}
+
+export async function removeCartGiftCard(cartId: string) {
+  const siteId = await getCurrentSiteId();
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.cart.updateMany({
+      where: { id: cartId, siteId, status: CartStatus.OPEN },
+      data: { giftCardCreditCents: 0, giftCardId: null }
+    });
+    if (updated.count !== 1) throw new Error("Cart not found.");
+    await repriceCart(tx, cartId, { siteId });
   });
 }
 
@@ -467,10 +563,11 @@ async function findOrCreateOrderClient(
 }
 
 export async function createCheckoutOrderFromCart(input: { cartId: string; customerName: string; customerEmail: string }) {
-  return prisma.$transaction(async (tx) => {
+  const siteId = await getCurrentSiteId();
+  const result = await prisma.$transaction(async (tx) => {
     const customerEmail = input.customerEmail.trim().toLowerCase();
     const claimedCart = await tx.cart.updateMany({
-      where: { id: input.cartId, siteId: DEFAULT_SITE_ID, status: CartStatus.OPEN },
+      where: { id: input.cartId, siteId, status: CartStatus.OPEN },
       data: {
         status: CartStatus.CHECKED_OUT,
         customerEmail
@@ -482,9 +579,47 @@ export async function createCheckoutOrderFromCart(input: { cartId: string; custo
     }
 
     const { cart } = await repriceCart(tx, input.cartId, {
-      allowedStatuses: [CartStatus.CHECKED_OUT]
+      allowedStatuses: [CartStatus.CHECKED_OUT],
+      siteId
     });
     if (!cart.items.length) throw new Error("Add at least one item before preparing checkout.");
+
+    let redeemedGiftCard:
+      | {
+          amountCents: number;
+          code: string;
+          giftCardId: string;
+        }
+      | null = null;
+    if (cart.giftCardId && cart.giftCardCreditCents > 0) {
+      const claimed = await tx.giftCard.updateMany({
+        where: {
+          id: cart.giftCardId,
+          siteId,
+          status: GiftCardStatus.ACTIVE,
+          balanceCents: { gte: cart.giftCardCreditCents },
+          currency: cart.currency,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
+        },
+        data: {
+          balanceCents: { decrement: cart.giftCardCreditCents }
+        }
+      });
+
+      if (claimed.count !== 1) {
+        throw new Error("Gift card balance changed. Reload the cart and try again.");
+      }
+
+      const giftCard = await tx.giftCard.findUniqueOrThrow({
+        where: { id: cart.giftCardId },
+        select: { code: true, id: true }
+      });
+      redeemedGiftCard = {
+        amountCents: cart.giftCardCreditCents,
+        code: giftCard.code,
+        giftCardId: giftCard.id
+      };
+    }
 
     const clientId = await findOrCreateOrderClient(tx, {
       customerName: input.customerName,
@@ -505,8 +640,10 @@ export async function createCheckoutOrderFromCart(input: { cartId: string; custo
         discountCents: cart.discountCents,
         taxCents: cart.taxCents,
         shippingCents: cart.shippingCents,
+        giftCardCreditCents: cart.giftCardCreditCents,
         totalCents: cart.totalCents,
         couponId: cart.couponId,
+        giftCardId: cart.giftCardId,
         notes: "Order prepared from public cart. Hosted checkout URL and payment webhook confirmation are still pending.",
         placedAt: new Date(),
         items: {
@@ -525,23 +662,61 @@ export async function createCheckoutOrderFromCart(input: { cartId: string; custo
         },
         payments: {
           create: {
-            provider: PaymentProvider.STRIPE,
+            provider: cart.totalCents > 0 ? PaymentProvider.STRIPE : PaymentProvider.MANUAL,
             status: PaymentStatus.PENDING,
             amountCents: cart.totalCents,
             currency: cart.currency,
             rawSummary: {
-              strategy: "stripe_checkout",
+              strategy: cart.totalCents > 0 ? "stripe_checkout" : "gift_card_checkout",
               sourceCartId: cart.id,
               shippingCents: cart.shippingCents,
               taxCents: cart.taxCents,
+              giftCardCreditCents: cart.giftCardCreditCents,
               pciScope: "Hosted/tokenized collection only. No raw card data is stored."
             }
           }
         }
       },
-      include: { payments: true }
+      include: {
+        coupon: true,
+        giftCard: true,
+        giftCardRedemptions: true,
+        items: { orderBy: { createdAt: "asc" } },
+        payments: true
+      }
     });
 
-    return order;
+    if (redeemedGiftCard) {
+      await tx.giftCardRedemption.create({
+        data: {
+          amountCents: redeemedGiftCard.amountCents,
+          codeSnapshot: redeemedGiftCard.code,
+          currency: cart.currency,
+          giftCardId: redeemedGiftCard.giftCardId,
+          orderId: order.id
+        }
+      });
+    }
+
+    return { order, redeemedGiftCard };
   });
+
+  if (result.redeemedGiftCard) {
+    await recordAuditLog({
+      action: "gift_card.redeemed",
+      actor: null,
+      metadata: {
+        amountCents: result.redeemedGiftCard.amountCents,
+        code: result.redeemedGiftCard.code,
+        currency: result.order.currency,
+        orderNumber: result.order.orderNumber
+      },
+      siteId: result.order.siteId,
+      targetId: result.redeemedGiftCard.giftCardId,
+      targetLabel: result.redeemedGiftCard.code,
+      targetType: "gift_card"
+    });
+  }
+
+  return result.order;
 }
