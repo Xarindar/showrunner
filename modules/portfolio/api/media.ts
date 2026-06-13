@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { mediaDeliveryResponse, normalizeMediaVariantType } from "@/lib/media";
 import { findActiveGalleryAccess } from "@/lib/portfolio/access";
 import { prisma } from "@/lib/prisma";
+import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getSiteSettings } from "@/lib/site";
 
 type GalleryMediaRouteProps = {
@@ -42,6 +43,14 @@ export async function GET(request: NextRequest, { params }: GalleryMediaRoutePro
   const accessToken = request.nextUrl.searchParams.get("access") || request.nextUrl.searchParams.get("token") || "";
   const access = accessToken ? await findActiveGalleryAccess(accessToken, item.gallery.id, settings.siteId) : null;
   if (item.gallery.visibility !== PortfolioGalleryVisibility.PUBLIC && !access) return notFound();
+
+  if (item.gallery.visibility === PortfolioGalleryVisibility.PUBLIC && !access) {
+    const rateLimitMessage = await publicRateLimitMessage(`gallery_media:${item.gallery.id}:${item.id}`, {
+      limit: 4,
+      windowMinutes: 10
+    });
+    if (rateLimitMessage) return new Response(rateLimitMessage, { status: 429 });
+  }
 
   const asset = await prisma.mediaAsset.findFirst({
     where: { id: item.mediaAssetId, siteId: settings.siteId },

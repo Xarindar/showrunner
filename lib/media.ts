@@ -512,7 +512,7 @@ function mediaVariantMetadata(value: unknown) {
 }
 
 function isTransformableImage(asset: Pick<MediaAsset, "mimeType">) {
-  return allowedImageTypes.has(asset.mimeType);
+  return allowedImageTypes.has(asset.mimeType) && asset.mimeType !== "image/gif";
 }
 
 function r2VariantObjectKey(asset: Pick<MediaAsset, "key">, type: MediaVariantType) {
@@ -675,6 +675,14 @@ function safeFilename(value: string) {
   return filename || "media-asset";
 }
 
+function downloadFilename(filename: string, contentType: string, type: MediaVariantType) {
+  const safe = safeFilename(filename);
+  if (type === MediaVariantType.DOWNLOAD || !contentType.includes("webp")) return safe;
+
+  const withoutExtension = safe.replace(/\.[^.]+$/, "");
+  return `${withoutExtension || "media-asset"}.webp`;
+}
+
 export async function mediaDeliveryResponse({
   asset,
   download,
@@ -696,11 +704,12 @@ export async function mediaDeliveryResponse({
 
   const headers = new Headers();
   headers.set("cache-control", privateAccess || asset.isPrivate ? "private, no-store" : "public, max-age=300");
-  headers.set("content-type", upstream.headers.get("content-type") || asset.mimeType || "application/octet-stream");
+  const contentType = upstream.headers.get("content-type") || asset.mimeType || "application/octet-stream";
+  headers.set("content-type", contentType);
   headers.set("x-media-variant", type);
 
   if (download) {
-    headers.set("content-disposition", `attachment; filename="${safeFilename(asset.filename)}"`);
+    headers.set("content-disposition", `attachment; filename="${downloadFilename(asset.filename, contentType, type)}"`);
   }
 
   return new Response(upstream.body, {

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { mediaDeliveryResponse, normalizeMediaVariantType, verifySignedMediaUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
+import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getSiteSettings } from "@/lib/site";
 
 export const runtime = "nodejs";
@@ -44,6 +45,14 @@ export async function GET(request: NextRequest, { params }: MediaAssetRouteProps
       signature: request.nextUrl.searchParams.get("signature"),
       type
     });
+
+  if (!asset.isPrivate) {
+    const rateLimitMessage = await publicRateLimitMessage(`media_asset:${asset.id}`, {
+      limit: 4,
+      windowMinutes: 10
+    });
+    if (rateLimitMessage) return new Response(rateLimitMessage, { status: 429 });
+  }
 
   const response = await mediaDeliveryResponse({
     asset,
