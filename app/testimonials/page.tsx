@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { TestimonialStatus } from "@prisma/client";
 import { CalendarDays, MessageSquare, Star } from "lucide-react";
 import { notFound } from "next/navigation";
+import { JsonLd } from "@/components/structured-data";
+import { buildBreadcrumbJsonLd, buildPageMetadata, getCanonicalBaseUrl } from "@/lib/seo";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
 import { prisma } from "@/lib/prisma";
@@ -9,12 +12,22 @@ import { createPublicTestimonialAction } from "@/modules/testimonials/actions";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+  return buildPageMetadata(settings, {
+    canonicalPath: "/testimonials",
+    description: `Client testimonials and reviews for ${settings.businessName}.`,
+    title: "Testimonials"
+  });
+}
+
 type TestimonialsPublicPageProps = {
   searchParams: Promise<{ submitted?: string; error?: string }>;
 };
 
 export default async function TestimonialsPublicPage({ searchParams }: TestimonialsPublicPageProps) {
   const [settings, query] = await Promise.all([getSiteSettings(), searchParams]);
+  const baseUrl = await getCanonicalBaseUrl(settings.siteId);
 
   if (!settings.enabledModuleIds.includes("testimonials")) {
     notFound();
@@ -32,6 +45,15 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
 
   return (
     <main className="site-shell" style={themeToCssVars(settings)}>
+      <JsonLd
+        data={buildBreadcrumbJsonLd(
+          [
+            { name: "Home", path: "/" },
+            { name: "Testimonials", path: "/testimonials" }
+          ],
+          baseUrl
+        )}
+      />
       <nav className="site-nav">
         <Link href="/" className="brand">
           <span className="brand-mark" />

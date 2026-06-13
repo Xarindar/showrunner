@@ -1,15 +1,29 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import NextImage from "next/image";
 import { CalendarDays, FileText, Image as ImageIcon, LockKeyhole, MessageSquare, ShoppingBag, Star } from "lucide-react";
 import { FormStatus, PortfolioGalleryStatus, PortfolioGalleryVisibility, TestimonialStatus } from "@prisma/client";
+import { JsonLd } from "@/components/structured-data";
 import { prisma } from "@/lib/prisma";
+import { buildImageObjectJsonLd, buildLocalBusinessJsonLd, buildPageMetadata, buildWebSiteJsonLd, getCanonicalBaseUrl } from "@/lib/seo";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+  return buildPageMetadata(settings, {
+    canonicalPath: "/",
+    description: settings.heroSubheadline,
+    image: settings.heroImageUrl,
+    title: settings.businessName
+  });
+}
+
 export default async function HomePage() {
   const settings = await getSiteSettings();
+  const baseUrl = await getCanonicalBaseUrl(settings.siteId);
   const formsEnabled = settings.enabledModuleIds.includes("forms");
   const portfolioEnabled = settings.enabledModuleIds.includes("portfolio");
   const productsEnabled = settings.enabledModuleIds.includes("products");
@@ -49,6 +63,18 @@ export default async function HomePage() {
 
   return (
     <main className="site-shell" style={themeToCssVars(settings)}>
+      <JsonLd
+        data={[
+          buildLocalBusinessJsonLd(settings, baseUrl),
+          buildWebSiteJsonLd(settings, baseUrl),
+          buildImageObjectJsonLd({
+            baseUrl,
+            description: settings.heroSubheadline,
+            name: `${settings.businessName} hero image`,
+            url: settings.heroImageUrl
+          })
+        ]}
+      />
       <nav className="site-nav">
         <Link href="/" className="brand">
           <span className="brand-mark" />

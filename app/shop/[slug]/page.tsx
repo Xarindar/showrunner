@@ -1,11 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import NextImage from "next/image";
 import { notFound } from "next/navigation";
 import { ProductStatus } from "@prisma/client";
+import { JsonLd } from "@/components/structured-data";
 import { ShoppingCart } from "lucide-react";
 import { addToCartAction } from "@/app/cart/actions";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { buildBreadcrumbJsonLd, buildImageObjectJsonLd, buildPageMetadata, buildProductJsonLd, getCanonicalBaseUrl } from "@/lib/seo";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
 
@@ -14,6 +17,25 @@ export const dynamic = "force-dynamic";
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
 };
+
+export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
+  const [{ slug }, settings] = await Promise.all([params, getSiteSettings()]);
+  if (!settings.enabledModuleIds.includes("products")) return {};
+
+  const product = await prisma.product.findUnique({
+    where: { siteId_slug: { siteId: settings.siteId, slug } },
+    select: { description: true, imageUrl: true, name: true, status: true, summary: true }
+  });
+
+  if (!product || product.status !== ProductStatus.ACTIVE) return {};
+
+  return buildPageMetadata(settings, {
+    canonicalPath: `/shop/${slug}`,
+    description: product.summary || product.description,
+    image: product.imageUrl,
+    title: product.name
+  });
+}
 
 function variantLabel(variant: { name: string; optionName: string; optionValue: string; isDefault: boolean }) {
   if (variant.isDefault) return variant.name;
@@ -24,6 +46,7 @@ function variantLabel(variant: { name: string; optionName: string; optionValue: 
 export default async function ProductPage({ params }: ProductPageProps) {
   const [{ slug }, settings] = await Promise.all([params, getSiteSettings()]);
   if (!settings.enabledModuleIds.includes("products")) notFound();
+  const baseUrl = await getCanonicalBaseUrl(settings.siteId);
 
   const product = await prisma.product.findUnique({
     where: { siteId_slug: { siteId: settings.siteId, slug } },
@@ -43,9 +66,41 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   const defaultVariant = product.variants[0] || null;
   const defaultPriceCents = defaultVariant?.priceCents ?? product.basePriceCents;
+  const categories = product.collectionProducts.map(({ collection }) => collection.name);
 
   return (
     <main className="site-shell" style={themeToCssVars(settings)}>
+      <JsonLd
+        data={[
+          buildProductJsonLd({
+            baseUrl,
+            categories,
+            currency: product.currency,
+            description: product.summary || product.description,
+            imageUrl: product.imageUrl,
+            name: product.name,
+            path: `/shop/${product.slug}`,
+            priceCents: defaultPriceCents,
+            sku: defaultVariant?.sku || product.sku
+          }),
+          product.imageUrl
+            ? buildImageObjectJsonLd({
+                baseUrl,
+                description: product.summary || product.description,
+                name: product.name,
+                url: product.imageUrl
+              })
+            : {},
+          buildBreadcrumbJsonLd(
+            [
+              { name: "Home", path: "/" },
+              { name: "Shop", path: "/shop" },
+              { name: product.name, path: `/shop/${product.slug}` }
+            ],
+            baseUrl
+          )
+        ].filter((item) => Object.keys(item).length)}
+      />
       <nav className="site-nav">
         <Link href="/" className="brand">
           <span className="brand-mark" />

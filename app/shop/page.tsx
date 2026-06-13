@@ -1,19 +1,32 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import NextImage from "next/image";
 import { notFound } from "next/navigation";
 import { ProductStatus } from "@prisma/client";
+import { JsonLd } from "@/components/structured-data";
 import { ShoppingCart } from "lucide-react";
 import { addToCartAction } from "@/app/cart/actions";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { buildBreadcrumbJsonLd, buildPageMetadata, getCanonicalBaseUrl } from "@/lib/seo";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+  return buildPageMetadata(settings, {
+    canonicalPath: "/shop",
+    description: "Browse active products, packages, and collections.",
+    title: "Shop"
+  });
+}
+
 export default async function ShopPage() {
   const settings = await getSiteSettings();
   if (!settings.enabledModuleIds.includes("products")) notFound();
+  const baseUrl = await getCanonicalBaseUrl(settings.siteId);
 
   const [products, collections] = await Promise.all([
     prisma.product.findMany({
@@ -35,6 +48,15 @@ export default async function ShopPage() {
 
   return (
     <main className="site-shell" style={themeToCssVars(settings)}>
+      <JsonLd
+        data={buildBreadcrumbJsonLd(
+          [
+            { name: "Home", path: "/" },
+            { name: "Shop", path: "/shop" }
+          ],
+          baseUrl
+        )}
+      />
       <nav className="site-nav">
         <Link href="/" className="brand">
           <span className="brand-mark" />

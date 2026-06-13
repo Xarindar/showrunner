@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { FormFieldType, FormStatus, type FormField } from "@prisma/client";
 import { CalendarDays, MessageSquare } from "lucide-react";
 import { notFound } from "next/navigation";
+import { JsonLd } from "@/components/structured-data";
+import { buildBreadcrumbJsonLd, buildPageMetadata, getCanonicalBaseUrl } from "@/lib/seo";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
 import { prisma } from "@/lib/prisma";
@@ -13,6 +16,28 @@ type PublicFormPageProps = {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ submitted?: string; error?: string }>;
 };
+
+export async function generateMetadata({ params }: PublicFormPageProps): Promise<Metadata> {
+  const [{ slug }, settings] = await Promise.all([params, getSiteSettings()]);
+  if (!settings.enabledModuleIds.includes("forms")) return {};
+
+  const form = await prisma.form.findFirst({
+    where: {
+      siteId: settings.siteId,
+      slug,
+      status: FormStatus.ACTIVE
+    },
+    select: { description: true, name: true }
+  });
+
+  if (!form) return {};
+
+  return buildPageMetadata(settings, {
+    canonicalPath: `/forms/${slug}`,
+    description: form.description || `Submit ${form.name} to ${settings.businessName}.`,
+    title: form.name
+  });
+}
 
 function fieldInputName(fieldId: string) {
   return `field-${fieldId}`;
@@ -131,6 +156,7 @@ function renderField(field: FormField) {
 export default async function PublicFormPage({ params, searchParams }: PublicFormPageProps) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   const settings = await getSiteSettings();
+  const baseUrl = await getCanonicalBaseUrl(settings.siteId);
   const form = await prisma.form.findFirst({
     where: {
       siteId: settings.siteId,
@@ -150,6 +176,15 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
 
   return (
     <main className="site-shell" style={themeToCssVars(settings)}>
+      <JsonLd
+        data={buildBreadcrumbJsonLd(
+          [
+            { name: "Home", path: "/" },
+            { name: form.name, path: `/forms/${form.slug}` }
+          ],
+          baseUrl
+        )}
+      />
       <nav className="site-nav">
         <Link href="/" className="brand">
           <span className="brand-mark" />
