@@ -180,6 +180,26 @@ async function seedEmailCore(businessName: string, contactEmail: string, siteId 
       optionalTokens: ["customerEmail", "timezone", "bookingStatus"]
     },
     {
+      id: "email-template-booking-rescheduled-customer",
+      key: "booking.rescheduled.customer",
+      name: "Booking rescheduled",
+      description: "Sent to the customer when an appointment is moved to a new time.",
+      purpose: MessageTemplatePurpose.BOOKING_CONFIRMATION,
+      subject: "Your {{businessName}} appointment was rescheduled",
+      previewText: "Your appointment time changed.",
+      textBody: [
+        "Hi {{customerName}},",
+        "",
+        "Your {{serviceName}} appointment with {{businessName}} was rescheduled.",
+        "",
+        "New time: {{appointmentTime}}"
+      ].join("\n"),
+      htmlBody:
+        "<p>Hi {{customerName}},</p><p>Your {{serviceName}} appointment with {{businessName}} was rescheduled.</p><p><strong>New time:</strong> {{appointmentTime}}</p>",
+      requiredTokens: ["businessName", "customerName", "serviceName", "appointmentTime"],
+      optionalTokens: ["customerEmail", "timezone", "bookingStatus"]
+    },
+    {
       id: "email-template-booking-canceled-customer",
       key: "booking.canceled.customer",
       name: "Booking canceled",

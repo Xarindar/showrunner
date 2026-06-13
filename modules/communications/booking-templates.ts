@@ -3,6 +3,7 @@ export const bookingTemplateKeys = [
   "booking.created.admin",
   "booking.confirmed.customer",
   "booking.reminder.customer",
+  "booking.rescheduled.customer",
   "booking.canceled.customer",
   "booking.delayed.customer",
   "booking.completed.admin"
