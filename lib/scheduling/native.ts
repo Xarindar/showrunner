@@ -327,20 +327,6 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
           }
         }
 
-        for (const unavailable of googleCalendarBusy.unavailable) {
-          const appliesToSlot =
-            unavailable.ownerType === SchedulingCalendarOwnerType.SITE ||
-            (owner.id && unavailable.ownerType === SchedulingCalendarOwnerType.STAFF && unavailable.ownerId === owner.id);
-          if (appliesToSlot) {
-            reasons.push({
-              code: "google_calendar_unavailable",
-              message: `${unavailable.ownerType === SchedulingCalendarOwnerType.STAFF ? owner.name : "The business"} Google Calendar could not be checked: ${
-                unavailable.message
-              }`
-            });
-          }
-        }
-
         for (const busy of googleCalendarBusy.busy) {
           const appliesToSlot =
             busy.ownerType === SchedulingCalendarOwnerType.SITE ||

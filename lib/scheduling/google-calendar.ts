@@ -38,15 +38,8 @@ export type CalendarBusyWindow = {
   start: Date;
 };
 
-export type CalendarUnavailableScope = {
-  message: string;
-  ownerId: string;
-  ownerType: SchedulingCalendarOwnerType;
-};
-
 export type CalendarBusyResult = {
   busy: CalendarBusyWindow[];
-  unavailable: CalendarUnavailableScope[];
 };
 
 function appBaseUrl() {
@@ -398,7 +391,7 @@ export async function listGoogleBusyWindows(input: { end: Date; siteId: string; 
     }
   });
 
-  const result: CalendarBusyResult = { busy: [], unavailable: [] };
+  const result: CalendarBusyResult = { busy: [] };
   for (const connection of connections) {
     try {
       const accessToken = await accessTokenForConnection(connection);
@@ -426,11 +419,6 @@ export async function listGoogleBusyWindows(input: { end: Date; siteId: string; 
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Google Calendar could not be checked.";
-      result.unavailable.push({
-        message,
-        ownerId: connection.ownerId,
-        ownerType: connection.ownerType
-      });
       await prisma.schedulingCalendarConnection.update({
         where: { id: connection.id },
         data: {
