@@ -3,30 +3,65 @@
 enum MediaDriver {
   REPO
   R2
+  CLOUDFLARE_IMAGES
+}
+
+enum MediaVariantType {
+  THUMBNAIL
+  CARD
+  HERO
+  FULL
+  SOCIAL
+  DOWNLOAD
 }
 
 model MediaAsset {
-  id           String      @id @default(cuid())
-  siteId       String
-  site         Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  driver       MediaDriver
-  key          String
-  url          String
-  filename     String
-  mimeType     String      @default("")
-  sizeBytes    Int         @default(0)
-  folder       String      @default("")
-  tags         Json        @default("[]")
-  caption      String      @default("")
-  credit       String      @default("")
-  alt          String?
-  isDecorative Boolean     @default(false)
-  isPrivate    Boolean     @default(false)
-  deletedAt    DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id                String              @id @default(cuid())
+  siteId            String
+  site              Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  uploadedByStaffId String?
+  uploadedBy        StaffMember?        @relation(fields: [uploadedByStaffId], references: [id], onDelete: SetNull)
+  driver            MediaDriver
+  key               String
+  storageProviderId String              @default("")
+  url               String
+  filename          String
+  mimeType          String              @default("")
+  sizeBytes         Int                 @default(0)
+  folder            String              @default("")
+  tags              Json                @default("[]")
+  caption           String              @default("")
+  credit            String              @default("")
+  usageContext      String              @default("")
+  focalPointX       Float               @default(0.5)
+  focalPointY       Float               @default(0.5)
+  alt               String?
+  isDecorative      Boolean             @default(false)
+  isPrivate         Boolean             @default(false)
+  deletedAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  variants          MediaAssetVariant[]
 
   @@index([siteId, folder])
   @@index([isPrivate])
   @@index([deletedAt])
+  @@index([uploadedByStaffId])
+}
+
+model MediaAssetVariant {
+  id          String           @id @default(cuid())
+  assetId     String
+  asset       MediaAsset       @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  type        MediaVariantType
+  url         String           @default("")
+  width       Int              @default(0)
+  height      Int              @default(0)
+  format      String           @default("")
+  sizeBytes   Int              @default(0)
+  metadata    Json             @default("{}")
+  generatedAt DateTime         @default(now())
+
+  @@unique([assetId, type])
+  @@index([type])
 }

@@ -1,11 +1,15 @@
-import { Camera, Image as ImageIcon, KeyRound, Star } from "lucide-react";
+import { Camera, Download, Image as ImageIcon, KeyRound, RotateCcw, Star } from "lucide-react";
 import {
   PortfolioAccessStatus,
   PortfolioGalleryStatus,
   PortfolioGalleryVisibility,
-  PortfolioItemType
+  PortfolioItemType,
+  PortfolioProofItemStatus,
+  PortfolioProofRoundStatus,
+  type Prisma
 } from "@prisma/client";
 import { cssBackgroundImage } from "@/lib/css";
+import { getAccessibleClientWhere, getAccessibleGalleryWhere, getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -13,8 +17,10 @@ import {
   addPortfolioGalleryItemAction,
   createPortfolioAccessAction,
   createPortfolioGalleryAction,
+  createPortfolioProofRoundAction,
   updatePortfolioAccessStatusAction,
-  updatePortfolioGalleryStatusAction
+  updatePortfolioGalleryStatusAction,
+  updatePortfolioProofRoundStatusAction
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -36,43 +42,88 @@ function accessStatusClass(status: PortfolioAccessStatus) {
 }
 
 export default async function PortfolioPage({ searchParams }: PortfolioPageProps) {
+  const user = await requireAdmin("portfolio:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
+  const galleryWhere: Prisma.PortfolioGalleryWhereInput = await getAccessibleGalleryWhere(user, settings.siteId);
+  const activeMediaWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: null });
+  const clientWhere: Prisma.ClientWhereInput = await getAccessibleClientWhere(user, settings.siteId);
   const [galleries, mediaAssets, clients, publishedCount, privateCount, itemCount, favoriteCount] = await Promise.all([
     prisma.portfolioGallery.findMany({
-      where: { siteId: settings.siteId },
+      where: galleryWhere,
       include: { _count: { select: { items: true, accesses: true, favorites: true } } },
       orderBy: [{ status: "asc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
       take: 30
     }),
     prisma.mediaAsset.findMany({
-      where: { siteId: settings.siteId, deletedAt: null },
+      where: activeMediaWhere,
       orderBy: { createdAt: "desc" },
       take: 60
     }),
     prisma.client.findMany({
-      where: { siteId: settings.siteId },
+      where: clientWhere,
       orderBy: { updatedAt: "desc" },
       take: 50
     }),
-    prisma.portfolioGallery.count({ where: { siteId: settings.siteId, status: PortfolioGalleryStatus.PUBLISHED } }),
+    prisma.portfolioGallery.count({ where: await getAccessibleGalleryWhere(user, settings.siteId, { status: PortfolioGalleryStatus.PUBLISHED }) }),
     prisma.portfolioGallery.count({
-      where: { siteId: settings.siteId, visibility: { in: [PortfolioGalleryVisibility.PRIVATE, PortfolioGalleryVisibility.PASSWORD] } }
+      where: await getAccessibleGalleryWhere(user, settings.siteId, {
+        visibility: { in: [PortfolioGalleryVisibility.PRIVATE, PortfolioGalleryVisibility.PASSWORD] }
+      })
     }),
-    prisma.portfolioGalleryItem.count({ where: { gallery: { siteId: settings.siteId } } }),
-    prisma.portfolioGalleryFavorite.count({ where: { gallery: { siteId: settings.siteId } } })
+    prisma.portfolioGalleryItem.count({ where: { gallery: galleryWhere } }),
+    prisma.portfolioGalleryFavorite.count({ where: { gallery: galleryWhere } })
   ]);
 
   const selectedGalleryId = params.gallery || galleries[0]?.id;
   const selectedGallery = selectedGalleryId
     ? await prisma.portfolioGallery.findFirst({
-        where: { id: selectedGalleryId, siteId: settings.siteId },
+        where: await getAccessibleGalleryWhere(user, settings.siteId, { id: selectedGalleryId }),
         include: {
           items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
           accesses: { orderBy: { createdAt: "desc" }, take: 20 },
-          favorites: { orderBy: { createdAt: "desc" }, take: 20 }
+          favorites: {
+            include: { item: { select: { id: true, imageUrl: true, title: true } } },
+            orderBy: { createdAt: "desc" },
+            take: 20
+          },
+          proofRounds: {
+            include: {
+              approvals: { orderBy: { createdAt: "desc" }, take: 20 },
+              comments: {
+                include: { item: { select: { id: true, imageUrl: true, title: true } } },
+                orderBy: { createdAt: "desc" },
+                take: 50
+              },
+              decisions: {
+                include: { item: { select: { id: true, imageUrl: true, title: true } } },
+                orderBy: { updatedAt: "desc" },
+                take: 100
+              }
+            },
+            orderBy: { roundNumber: "desc" },
+            take: 5
+          }
         }
       })
     : null;
+  const latestProofRound = selectedGallery?.proofRounds[0] || null;
+  const selectedImageExport = selectedGallery
+    ? [
+        ...selectedGallery.favorites.map((favorite) => ({
+          item: favorite.item?.title || favorite.item?.imageUrl || favorite.itemId,
+          source: "favorite",
+          viewer: favorite.viewerEmail || favorite.clientId || "anonymous"
+        })),
+        ...(latestProofRound?.decisions || [])
+          .filter((decision) => decision.status === PortfolioProofItemStatus.APPROVED)
+          .map((decision) => ({
+            item: decision.item?.title || decision.item?.imageUrl || decision.itemId,
+            source: "approved",
+            viewer: decision.viewerEmail || decision.clientId || "anonymous"
+          }))
+      ]
+    : [];
+  const selectedDownloadableCount = selectedGallery?.items.filter((item) => item.isDownloadable && item.mediaAssetId).length || 0;
   const savedMessage = params.saved ? "Portfolio changes saved." : null;
   const errorMessage = params.error || null;
 
@@ -291,7 +342,17 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 </tr>
                 <tr>
                   <td>Proofing</td>
-                  <td>{selectedGallery.proofingEnabled ? "Enabled" : "Disabled"}</td>
+                  <td>
+                    {selectedGallery.proofingEnabled ? "Enabled" : "Disabled"}
+                    {latestProofRound ? (
+                      <>
+                        <br />
+                        <span style={{ color: "var(--muted)" }}>
+                          Round {latestProofRound.roundNumber} - {enumLabel(latestProofRound.status)}
+                        </span>
+                      </>
+                    ) : null}
+                  </td>
                 </tr>
                 <tr>
                   <td>Downloads</td>
@@ -309,9 +370,15 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             </table>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {[PortfolioGalleryStatus.PUBLISHED, PortfolioGalleryStatus.DRAFT, PortfolioGalleryStatus.ARCHIVED].map((status) => (
-                <form action={updatePortfolioGalleryStatusAction} key={status}>
+                <form action={updatePortfolioGalleryStatusAction} className="stack" key={status} style={{ gap: 6 }}>
                   <input type="hidden" name="id" value={selectedGallery.id} />
                   <input type="hidden" name="status" value={status} />
+                  {status === PortfolioGalleryStatus.ARCHIVED ? (
+                    <label style={{ alignItems: "center", display: "flex", gap: 6 }}>
+                      <input name="confirmArchive" type="checkbox" />
+                      Confirm archive
+                    </label>
+                  ) : null}
                   <button className="button secondary" type="submit">
                     Mark {enumLabel(status)}
                   </button>
@@ -395,6 +462,96 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
 
       {selectedGallery ? (
         <section className="grid-2">
+          <form action={createPortfolioProofRoundAction} className="card form-grid">
+            <input type="hidden" name="galleryId" value={selectedGallery.id} />
+            <h2 style={{ fontSize: "1.35rem" }}>Start revision round</h2>
+            <div className="grid-2">
+              <div className="field">
+                <label htmlFor="round-title">Title</label>
+                <input id="round-title" name="title" placeholder={`Round ${(latestProofRound?.roundNumber || 0) + 1}`} />
+              </div>
+              <div className="field">
+                <label htmlFor="round-due">Due date</label>
+                <input id="round-due" name="dueAt" type="date" />
+              </div>
+            </div>
+            <div className="field">
+              <label htmlFor="round-instructions">Instructions</label>
+              <textarea id="round-instructions" name="instructions" />
+            </div>
+            <button className="button secondary" type="submit">
+              <RotateCcw size={16} />
+              Start round
+            </button>
+          </form>
+
+          <div className="card stack">
+            <h2 style={{ fontSize: "1.35rem" }}>Proofing rounds</h2>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Round</th>
+                  <th>Activity</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedGallery.proofRounds.map((round) => (
+                  <tr key={round.id}>
+                    <td>
+                      <strong>{round.title || `Round ${round.roundNumber}`}</strong>
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>
+                        Opened {formatDateTime(round.openedAt, settings.timezone)}
+                      </span>
+                    </td>
+                    <td>
+                      {round.decisions.length} decisions
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>
+                        {round.comments.length} comments - {round.approvals.length} responses
+                      </span>
+                    </td>
+                    <td>
+                      <span className={round.status === PortfolioProofRoundStatus.OPEN ? "pill success" : "pill"}>
+                        {enumLabel(round.status)}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {[PortfolioProofRoundStatus.LOCKED, PortfolioProofRoundStatus.CHANGES_REQUESTED, PortfolioProofRoundStatus.APPROVED].map(
+                          (status) => (
+                            <form action={updatePortfolioProofRoundStatusAction} className="stack" key={status} style={{ gap: 6 }}>
+                              <input type="hidden" name="id" value={round.id} />
+                              <input type="hidden" name="status" value={status} />
+                              <label style={{ alignItems: "center", display: "flex", gap: 6 }}>
+                                <input name="confirmTransition" type="checkbox" />
+                                Confirm {enumLabel(status).toLowerCase()}
+                              </label>
+                              <button className="button secondary" type="submit">
+                                Mark {enumLabel(status)}
+                              </button>
+                            </form>
+                          )
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!selectedGallery.proofRounds.length ? (
+                  <tr>
+                    <td colSpan={4}>No proofing rounds yet.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {selectedGallery ? (
+        <section className="grid-2">
           <div className="card stack">
             <h2 style={{ fontSize: "1.35rem" }}>Gallery items</h2>
             <div className="grid-3">
@@ -450,6 +607,105 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 ) : null}
               </tbody>
             </table>
+          </div>
+        </section>
+      ) : null}
+
+      {selectedGallery ? (
+        <section className="grid-2">
+          <div className="card stack">
+            <h2 style={{ fontSize: "1.35rem" }}>Proof decisions and comments</h2>
+            {!latestProofRound ? <p className="empty-state">No proofing round selected.</p> : null}
+            {latestProofRound ? (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Image</th>
+                    <th>Viewer</th>
+                    <th>Decision</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {latestProofRound.decisions.map((decision) => (
+                    <tr key={decision.id}>
+                      <td>{decision.item?.title || decision.item?.imageUrl || decision.itemId}</td>
+                      <td>{decision.viewerEmail || decision.clientId || "Anonymous"}</td>
+                      <td>{enumLabel(decision.status)}</td>
+                      <td>{decision.notes || "-"}</td>
+                    </tr>
+                  ))}
+                  {!latestProofRound.decisions.length ? (
+                    <tr>
+                      <td colSpan={4}>No image decisions yet.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            ) : null}
+            {latestProofRound?.comments.length ? (
+              <div className="stack">
+                <h3 style={{ fontSize: "1rem" }}>Recent proof comments</h3>
+                {latestProofRound.comments.slice(0, 8).map((comment) => (
+                  <div className="subpanel" key={comment.id}>
+                    <strong>{comment.item?.title || comment.item?.imageUrl || "Round comment"}</strong>
+                    <p style={{ margin: "6px 0" }}>{comment.body}</p>
+                    <small style={{ color: "var(--muted)" }}>
+                      {comment.authorName || comment.viewerEmail || "Viewer"} - {formatDateTime(comment.createdAt, settings.timezone)}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="card stack">
+            <h2 style={{ fontSize: "1.35rem" }}>Selected image export</h2>
+            <textarea
+              readOnly
+              rows={Math.max(6, Math.min(14, selectedImageExport.length + 1))}
+              value={selectedImageExport.map((entry) => `${entry.source},${entry.viewer},${entry.item}`).join("\n")}
+            />
+            <div className="subpanel stack">
+              <h3 style={{ fontSize: "1rem" }}>Delivery bundle</h3>
+              <p style={{ color: "var(--muted)" }}>
+                {selectedDownloadableCount} media-backed downloadable item{selectedDownloadableCount === 1 ? "" : "s"} ready for a ZIP delivery bundle.
+              </p>
+              {selectedGallery.downloadEnabled && selectedDownloadableCount ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {selectedGallery.visibility === PortfolioGalleryVisibility.PUBLIC ? (
+                    <a className="button secondary" href={`/galleries/${selectedGallery.slug}/bundle`}>
+                      <Download size={16} />
+                      Public bundle
+                    </a>
+                  ) : null}
+                  {selectedGallery.accesses
+                    .filter((access) => access.status === PortfolioAccessStatus.ACTIVE)
+                    .slice(0, 4)
+                    .map((access) => (
+                      <a className="button secondary" href={`/galleries/${selectedGallery.slug}/bundle?access=${access.accessToken}`} key={access.id}>
+                        <Download size={16} />
+                        {access.recipientEmail}
+                      </a>
+                    ))}
+                </div>
+              ) : (
+                <p style={{ color: "var(--muted)" }}>Enable gallery downloads and mark media-backed items downloadable to create a bundle.</p>
+              )}
+            </div>
+            <div className="stack">
+              <h3 style={{ fontSize: "1rem" }}>Round responses</h3>
+              {latestProofRound?.approvals.map((approval) => (
+                <div className="subpanel" key={approval.id}>
+                  <strong>{enumLabel(approval.status)}</strong>
+                  <p style={{ margin: "6px 0" }}>{approval.notes || "-"}</p>
+                  <small style={{ color: "var(--muted)" }}>
+                    {approval.approverName || approval.viewerEmail || "Viewer"} - {formatDateTime(approval.createdAt, settings.timezone)}
+                  </small>
+                </div>
+              ))}
+              {!latestProofRound?.approvals.length ? <p className="empty-state">No round responses yet.</p> : null}
+            </div>
           </div>
         </section>
       ) : null}

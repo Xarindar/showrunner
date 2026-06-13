@@ -1,17 +1,54 @@
 import "server-only";
 
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { type AdminRole } from "@prisma/client";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { hasAdminPermission as userHasAdminPermission, type AdminPermission } from "@/lib/admin-permissions";
 import { prisma } from "@/lib/prisma";
+import { getCurrentSiteId } from "@/lib/site";
 
 const cookieName = "admin_session";
 const devSecret = "dev-secret-change-before-deploying";
 const dummyPasswordHash = bcrypt.hashSync("not-the-admin-password", 12);
-const loginAttempts = new Map<string, { count: number; lockedUntil?: number }>();
 const maxLoginAttempts = 6;
 const lockoutMs = 10 * 60 * 1000;
+const loginAttemptScope = "admin_login";
+
+export type AdminSessionUser = {
+  id: string;
+  email: string;
+  role: AdminRole;
+};
+
+export {
+  adminPermissions,
+  assertAdminCan,
+  hasAdminPermission,
+  type AdminPermission
+} from "@/lib/admin-permissions";
+
+export {
+  applyDataScopePreset,
+  dataScopeConfigFromFormData,
+  dataScopePresets,
+  getAccessibleBookingWhere,
+  getAccessibleClientWhere,
+  getAccessibleModuleWhere,
+  getAccessibleFormSubmissionWhere,
+  getAccessibleGalleryWhere,
+  getAccessibleMediaWhere,
+  getAccessibleTestimonialWhere,
+  getOwnerStaffIds,
+  parseDataScopeConfig,
+  resolveDataScopeMode,
+  scopableModules,
+  type DataScopeConfig,
+  type DataScopeMode,
+  type DataScopePreset
+} from "@/lib/data-scope";
 
 function getSecret() {
   const secret = process.env.AUTH_SECRET;
@@ -26,28 +63,79 @@ function getSecret() {
   return new TextEncoder().encode(secret || devSecret);
 }
 
-function getLoginAttemptKey(email: string) {
-  return email.trim().toLowerCase();
+function firstForwardedIp(value: string | null) {
+  return value?.split(",")[0]?.trim() || "";
 }
 
-function isLockedOut(email: string) {
-  const attempt = loginAttempts.get(getLoginAttemptKey(email));
-  return Boolean(attempt?.lockedUntil && attempt.lockedUntil > Date.now());
+function loginAttemptKey(identifier: string, siteId: string) {
+  return crypto.createHash("sha256").update(`${siteId}:${loginAttemptScope}:${identifier}`).digest("hex");
 }
 
-function recordLoginFailure(email: string) {
-  const key = getLoginAttemptKey(email);
-  const current = loginAttempts.get(key);
-  const count = (current?.count || 0) + 1;
+async function loginAttemptIdentifier(email: string) {
+  const headerStore = await headers();
+  const ipAddress =
+    firstForwardedIp(headerStore.get("x-forwarded-for")) ||
+    headerStore.get("x-real-ip")?.trim() ||
+    headerStore.get("cf-connecting-ip")?.trim() ||
+    "unknown";
 
-  loginAttempts.set(key, {
-    count,
-    lockedUntil: count >= maxLoginAttempts ? Date.now() + lockoutMs : current?.lockedUntil
+  return `${email.trim().toLowerCase()}:${ipAddress}`;
+}
+
+async function isLockedOut(identifier: string, siteId: string) {
+  const now = new Date();
+  const existing = await prisma.publicRateLimit.findUnique({
+    where: { siteId_key: { siteId, key: loginAttemptKey(identifier, siteId) } }
+  });
+
+  if (!existing) return false;
+  if (now.getTime() - existing.windowStart.getTime() >= lockoutMs) return false;
+
+  return existing.count >= maxLoginAttempts;
+}
+
+async function recordLoginFailure(identifier: string, siteId: string) {
+  const now = new Date();
+  const key = loginAttemptKey(identifier, siteId);
+  const existing = await prisma.publicRateLimit.findUnique({
+    where: { siteId_key: { siteId, key } }
+  });
+
+  if (!existing || now.getTime() - existing.windowStart.getTime() >= lockoutMs) {
+    await prisma.publicRateLimit.upsert({
+      where: { siteId_key: { siteId, key } },
+      update: {
+        count: 1,
+        identifier,
+        scope: loginAttemptScope,
+        windowStart: now
+      },
+      create: {
+        siteId,
+        key,
+        scope: loginAttemptScope,
+        identifier,
+        count: 1,
+        windowStart: now
+      }
+    });
+    return;
+  }
+
+  await prisma.publicRateLimit.update({
+    where: { siteId_key: { siteId, key } },
+    data: { count: { increment: 1 } }
   });
 }
 
-function clearLoginFailures(email: string) {
-  loginAttempts.delete(getLoginAttemptKey(email));
+async function clearLoginFailures(identifier: string, siteId: string) {
+  await prisma.publicRateLimit.deleteMany({
+    where: {
+      siteId,
+      scope: loginAttemptScope,
+      identifier
+    }
+  });
 }
 
 export async function createSession(userId: string) {
@@ -91,24 +179,32 @@ export async function getAdminUser() {
   }
 }
 
-export async function requireAdmin() {
+export async function requireAuthenticatedAdmin() {
   const user = await getAdminUser();
   if (!user) redirect("/admin/login");
   return user;
 }
 
+export async function requireAdmin(permission: AdminPermission) {
+  const user = await requireAuthenticatedAdmin();
+  if (!userHasAdminPermission(user, permission)) redirect("/admin?error=permission");
+  return user;
+}
+
 export async function verifyAdminLogin(email: string, password: string) {
-  if (isLockedOut(email)) return null;
+  const siteId = await getCurrentSiteId();
+  const attemptIdentifier = await loginAttemptIdentifier(email);
+  if (await isLockedOut(attemptIdentifier, siteId)) return null;
 
   const user = await prisma.adminUser.findUnique({ where: { email } });
   const passwordHash = user?.passwordHash || dummyPasswordHash;
   const valid = await bcrypt.compare(password, passwordHash);
 
   if (!user || !valid) {
-    recordLoginFailure(email);
+    await recordLoginFailure(attemptIdentifier, siteId);
     return null;
   }
 
-  clearLoginFailures(email);
+  await clearLoginFailures(attemptIdentifier, siteId);
   return user;
 }

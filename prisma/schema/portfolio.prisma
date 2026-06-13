@@ -24,59 +24,86 @@ enum PortfolioAccessStatus {
   EXPIRED
 }
 
+enum PortfolioProofRoundStatus {
+  OPEN
+  CHANGES_REQUESTED
+  APPROVED
+  LOCKED
+}
+
+enum PortfolioProofApprovalStatus {
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+enum PortfolioProofItemStatus {
+  APPROVED
+  CHANGES_REQUESTED
+  REJECTED
+}
+
 model PortfolioGallery {
-  id              String                     @id @default(cuid())
+  id              String                       @id @default(cuid())
   siteId          String
-  site            Site                       @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  slug            String                     @default(cuid())
+  site            Site                         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  photographerId  String?
+  photographer    StaffMember?                 @relation(fields: [photographerId], references: [id], onDelete: SetNull)
+  slug            String                       @default(cuid())
   title           String
-  description     String                     @default("")
-  status          PortfolioGalleryStatus     @default(DRAFT)
-  visibility      PortfolioGalleryVisibility @default(PUBLIC)
-  category        String                     @default("")
-  coverImageUrl   String                     @default("")
-  location        String                     @default("")
+  description     String                       @default("")
+  status          PortfolioGalleryStatus       @default(DRAFT)
+  visibility      PortfolioGalleryVisibility   @default(PUBLIC)
+  category        String                       @default("")
+  coverImageUrl   String                       @default("")
+  location        String                       @default("")
   shotAt          DateTime?
-  seoTitle        String                     @default("")
-  seoDescription  String                     @default("")
-  proofingEnabled Boolean                    @default(false)
-  downloadEnabled Boolean                    @default(false)
-  accessCodeHash  String                     @default("")
-  rightsNotes     String                     @default("")
-  sortOrder       Int                        @default(0)
+  seoTitle        String                       @default("")
+  seoDescription  String                       @default("")
+  proofingEnabled Boolean                      @default(false)
+  downloadEnabled Boolean                      @default(false)
+  accessCodeHash  String                       @default("")
+  rightsNotes     String                       @default("")
+  sortOrder       Int                          @default(0)
   publishedAt     DateTime?
-  createdAt       DateTime                   @default(now())
-  updatedAt       DateTime                   @updatedAt
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
   items           PortfolioGalleryItem[]
   accesses        PortfolioGalleryAccess[]
   favorites       PortfolioGalleryFavorite[]
+  proofRounds     PortfolioProofRound[]
+  proofComments   PortfolioProofComment[]
+  proofApprovals  PortfolioProofApproval[]
+  proofDecisions  PortfolioProofItemDecision[]
 
   @@unique([siteId, slug])
   @@index([siteId, status])
   @@index([visibility])
   @@index([category])
   @@index([sortOrder])
+  @@index([photographerId])
 }
 
 model PortfolioGalleryItem {
-  id             String                     @id @default(cuid())
+  id             String                       @id @default(cuid())
   galleryId      String
-  gallery        PortfolioGallery           @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  gallery        PortfolioGallery             @relation(fields: [galleryId], references: [id], onDelete: Cascade)
   mediaAssetId   String?
-  type           PortfolioItemType          @default(IMAGE)
-  title          String                     @default("")
-  caption        String                     @default("")
-  altText        String                     @default("")
-  imageUrl       String                     @default("")
-  thumbnailUrl   String                     @default("")
-  sortOrder      Int                        @default(0)
-  isCover        Boolean                    @default(false)
-  isDownloadable Boolean                    @default(false)
-  isWatermarked  Boolean                    @default(false)
-  licenseNotes   String                     @default("")
-  createdAt      DateTime                   @default(now())
-  updatedAt      DateTime                   @updatedAt
+  type           PortfolioItemType            @default(IMAGE)
+  title          String                       @default("")
+  caption        String                       @default("")
+  altText        String                       @default("")
+  imageUrl       String                       @default("")
+  thumbnailUrl   String                       @default("")
+  sortOrder      Int                          @default(0)
+  isCover        Boolean                      @default(false)
+  isDownloadable Boolean                      @default(false)
+  isWatermarked  Boolean                      @default(false)
+  licenseNotes   String                       @default("")
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
   favorites      PortfolioGalleryFavorite[]
+  proofComments  PortfolioProofComment[]
+  proofDecisions PortfolioProofItemDecision[]
 
   @@index([galleryId])
   @@index([mediaAssetId])
@@ -84,19 +111,22 @@ model PortfolioGalleryItem {
 }
 
 model PortfolioGalleryAccess {
-  id             String                @id @default(cuid())
+  id             String                       @id @default(cuid())
   siteId         String
-  site           Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  site           Site                         @relation(fields: [siteId], references: [id], onDelete: Cascade)
   galleryId      String
-  gallery        PortfolioGallery      @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  gallery        PortfolioGallery             @relation(fields: [galleryId], references: [id], onDelete: Cascade)
   clientId       String?
   recipientEmail String
   accessToken    String
-  status         PortfolioAccessStatus @default(ACTIVE)
+  status         PortfolioAccessStatus        @default(ACTIVE)
   expiresAt      DateTime?
   lastViewedAt   DateTime?
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  proofComments  PortfolioProofComment[]
+  proofApprovals PortfolioProofApproval[]
+  proofDecisions PortfolioProofItemDecision[]
 
   @@unique([siteId, accessToken])
   @@index([siteId, galleryId])
@@ -118,4 +148,103 @@ model PortfolioGalleryFavorite {
   @@index([galleryId])
   @@index([itemId])
   @@index([viewerEmail])
+}
+
+model PortfolioProofRound {
+  id           String                       @id @default(cuid())
+  siteId       String
+  site         Site                         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  galleryId    String
+  gallery      PortfolioGallery             @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  roundNumber  Int                          @default(1)
+  title        String                       @default("")
+  instructions String                       @default("")
+  status       PortfolioProofRoundStatus    @default(OPEN)
+  dueAt        DateTime?
+  openedAt     DateTime                     @default(now())
+  closedAt     DateTime?
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+  comments     PortfolioProofComment[]
+  approvals    PortfolioProofApproval[]
+  decisions    PortfolioProofItemDecision[]
+
+  @@unique([galleryId, roundNumber])
+  @@index([siteId, status])
+  @@index([galleryId, status])
+}
+
+model PortfolioProofComment {
+  id          String                  @id @default(cuid())
+  siteId      String
+  site        Site                    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  galleryId   String
+  gallery     PortfolioGallery        @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  roundId     String
+  round       PortfolioProofRound     @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  itemId      String?
+  item        PortfolioGalleryItem?   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  accessId    String?
+  access      PortfolioGalleryAccess? @relation(fields: [accessId], references: [id], onDelete: SetNull)
+  clientId    String?
+  viewerEmail String                  @default("")
+  authorName  String                  @default("")
+  body        String
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([siteId, galleryId])
+  @@index([roundId])
+  @@index([itemId])
+  @@index([viewerEmail])
+}
+
+model PortfolioProofApproval {
+  id           String                       @id @default(cuid())
+  siteId       String
+  site         Site                         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  galleryId    String
+  gallery      PortfolioGallery             @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  roundId      String
+  round        PortfolioProofRound          @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  accessId     String?
+  access       PortfolioGalleryAccess?      @relation(fields: [accessId], references: [id], onDelete: SetNull)
+  clientId     String?
+  viewerEmail  String                       @default("")
+  approverName String                       @default("")
+  status       PortfolioProofApprovalStatus
+  notes        String                       @default("")
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+
+  @@index([siteId, galleryId])
+  @@index([roundId])
+  @@index([viewerEmail])
+  @@index([status])
+}
+
+model PortfolioProofItemDecision {
+  id          String                   @id @default(cuid())
+  siteId      String
+  site        Site                     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  galleryId   String
+  gallery     PortfolioGallery         @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  roundId     String
+  round       PortfolioProofRound      @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  itemId      String
+  item        PortfolioGalleryItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  accessId    String?
+  access      PortfolioGalleryAccess?  @relation(fields: [accessId], references: [id], onDelete: SetNull)
+  clientId    String?
+  viewerEmail String                   @default("")
+  status      PortfolioProofItemStatus
+  notes       String                   @default("")
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  @@unique([roundId, itemId, viewerEmail])
+  @@unique([roundId, itemId, accessId])
+  @@index([siteId, galleryId])
+  @@index([itemId])
+  @@index([status])
 }

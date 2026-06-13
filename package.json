@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
+    "auth:check": "tsx scripts/check-admin-permissions.ts",
     "email:process": "tsx scripts/process-email-outbox.ts",
     "automation:process": "tsx scripts/process-automation-runs.ts",
     "webhooks:process": "tsx scripts/process-webhook-deliveries.ts",

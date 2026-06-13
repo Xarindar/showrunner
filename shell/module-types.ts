@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import type { AdminRole } from "@prisma/client";
+import type { AdminPermission } from "@/lib/admin-permissions";
 import type { ModuleIconName } from "@/shell/module-icons";
 
 export type { ModuleIconName };
@@ -22,6 +24,36 @@ export type ModuleReadiness = {
   primaryGap?: string;
 };
 
+/**
+ * "ALL" = role can see/manage every record in the module (site-wide).
+ * "OWN" = role is restricted to records it owns, per `ModuleDataScope.ownerKind`.
+ */
+export type DataScopeMode = "ALL" | "OWN";
+
+/**
+ * The two generic ownership shapes that cover every scoped record in the
+ * platform. The scope engine (lib/data-scope.ts) reads this declaration
+ * instead of hardcoding per-module record-ownership logic.
+ *
+ * - "staff-field": the record has a direct FK to StaffMember (e.g. Booking.staffId,
+ *   PortfolioGallery.photographerId, MediaAsset.uploadedByStaffId). Ownership = the
+ *   staff member matching the admin's email owns records where ownerField is in
+ *   their staff ids.
+ * - "client-link": the record either IS a Client (ownerField "id") or has an FK to
+ *   Client (e.g. FormSubmission.clientId, Testimonial.clientId). Ownership is derived
+ *   from the same staff-id resolution, generically expanded to "clients owned by
+ *   those staff" (via bookings and, for photographers, gallery access).
+ */
+export type DataScopeOwnerKind = "staff-field" | "client-link";
+
+export type ModuleDataScope = {
+  ownerKind: DataScopeOwnerKind;
+  /** Prisma field name carrying the ownership link (see DataScopeOwnerKind). */
+  ownerField: string;
+  /** Roles that owners can configure to "OWN" for this module; all other roles stay "ALL". */
+  scopableRoles: AdminRole[];
+};
+
 export type ShellModule = {
   id: string;
   label: string;
@@ -40,7 +72,8 @@ export type ShellModule = {
   widgetRoutes?: string[];
   dependencies?: string[];
   dataModels?: string[];
-  permissions?: string[];
+  permissions?: AdminPermission[];
   settingsSections?: string[];
   healthChecks?: string[];
+  dataScope?: ModuleDataScope;
 };

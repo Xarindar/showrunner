@@ -1,15 +1,23 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { PortfolioAccessStatus, PortfolioGalleryStatus, PortfolioGalleryVisibility, PortfolioItemType, Prisma } from "@prisma/client";
+import {
+  MediaVariantType,
+  PortfolioAccessStatus,
+  PortfolioGalleryStatus,
+  PortfolioGalleryVisibility,
+  PortfolioItemType,
+  PortfolioProofRoundStatus,
+  Prisma
+} from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { parseForm } from "@/lib/admin-validation";
-import { requireAdmin } from "@/lib/auth";
+import { getAccessibleClientWhere, getAccessibleGalleryWhere, getAccessibleMediaWhere, getOwnerStaffIds, requireAdmin, resolveDataScopeMode } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getCurrentSiteId } from "@/lib/site";
 import { slugify } from "@/lib/slug";
 
 const trimmed = z.string().transform((value) => value.trim());
@@ -53,6 +61,7 @@ const gallerySchema = z.object({
 });
 
 const galleryStatusSchema = z.object({
+  confirmArchive: z.literal("on").optional(),
   id: requiredText,
   status: z.enum(PortfolioGalleryStatus)
 });
@@ -91,8 +100,21 @@ const accessStatusSchema = z.object({
   status: z.enum(PortfolioAccessStatus)
 });
 
-async function generateUniquePortfolioSlug(input: { title: string; slug?: string; siteId?: string; exceptId?: string }) {
-  const siteId = input.siteId || DEFAULT_SITE_ID;
+const proofRoundSchema = z.object({
+  dueAt: optionalDate,
+  galleryId: requiredText,
+  instructions: optionalStoredText,
+  title: optionalStoredText
+});
+
+const proofRoundStatusSchema = z.object({
+  confirmTransition: z.literal("on").optional(),
+  id: requiredText,
+  status: z.enum(PortfolioProofRoundStatus)
+});
+
+async function generateUniquePortfolioSlug(input: { title: string; slug?: string; siteId: string; exceptId?: string }) {
+  const siteId = input.siteId;
   const base = slugify(input.slug || input.title) || "gallery";
   let candidate = base;
   let suffix = 2;
@@ -114,6 +136,17 @@ async function generateUniquePortfolioSlug(input: { title: string; slug?: string
   return candidate;
 }
 
+async function scopedPortfolioOwnerId(user: Awaited<ReturnType<typeof requireAdmin>>, siteId: string) {
+  if ((await resolveDataScopeMode(user, siteId, "portfolio")) !== "OWN") return undefined;
+
+  const staffIds = await getOwnerStaffIds(user, siteId);
+  if (!staffIds.length) {
+    redirect(`/admin/modules/portfolio?error=${encodeURIComponent("Create an active staff profile using this admin email before creating scoped galleries.")}`);
+  }
+
+  return staffIds[0];
+}
+
 function refreshPortfolio() {
   revalidatePath("/admin");
   revalidatePath("/admin/modules/portfolio");
@@ -123,16 +156,29 @@ function galleryRedirect(galleryId: string, saved: string) {
   redirect(`/admin/modules/portfolio?saved=${saved}&gallery=${galleryId}`);
 }
 
+async function nextProofRoundNumber(galleryId: string) {
+  const latest = await prisma.portfolioProofRound.findFirst({
+    where: { galleryId },
+    orderBy: { roundNumber: "desc" },
+    select: { roundNumber: true }
+  });
+
+  return (latest?.roundNumber || 0) + 1;
+}
+
 export async function createPortfolioGalleryAction(formData: FormData) {
-  await requireAdmin();
+  const user = await requireAdmin("portfolio:manage");
   const input = await parseForm(gallerySchema, formData, "/admin/modules/portfolio");
-  const slug = await generateUniquePortfolioSlug({ title: input.title, slug: input.slug });
+  const siteId = await getCurrentSiteId();
+  const photographerId = await scopedPortfolioOwnerId(user, siteId);
+  const slug = await generateUniquePortfolioSlug({ title: input.title, slug: input.slug, siteId });
   const accessCodeHash = input.accessCode ? await bcrypt.hash(input.accessCode, 12) : "";
 
   try {
     const gallery = await prisma.portfolioGallery.create({
       data: {
-        siteId: DEFAULT_SITE_ID,
+        siteId,
+        photographerId,
         slug,
         title: input.title,
         description: input.description,
@@ -149,7 +195,17 @@ export async function createPortfolioGalleryAction(formData: FormData) {
         accessCodeHash,
         rightsNotes: input.rightsNotes,
         sortOrder: input.sortOrder,
-        publishedAt: input.status === PortfolioGalleryStatus.PUBLISHED ? new Date() : undefined
+        publishedAt: input.status === PortfolioGalleryStatus.PUBLISHED ? new Date() : undefined,
+        proofRounds:
+          input.proofingEnabled === "on"
+            ? {
+                create: {
+                  siteId,
+                  roundNumber: 1,
+                  title: "Round 1"
+                }
+              }
+            : undefined
       }
     });
 
@@ -165,11 +221,16 @@ export async function createPortfolioGalleryAction(formData: FormData) {
 }
 
 export async function updatePortfolioGalleryStatusAction(formData: FormData) {
-  await requireAdmin();
+  const user = await requireAdmin("portfolio:manage");
   const input = await parseForm(galleryStatusSchema, formData, "/admin/modules/portfolio");
+  const siteId = await getCurrentSiteId();
+
+  if (input.status === PortfolioGalleryStatus.ARCHIVED && input.confirmArchive !== "on") {
+    redirect(`/admin/modules/portfolio?error=${encodeURIComponent("Confirm archive before marking a gallery archived.")}`);
+  }
 
   await prisma.portfolioGallery.updateMany({
-    where: { id: input.id, siteId: DEFAULT_SITE_ID },
+    where: await getAccessibleGalleryWhere(user, siteId, { id: input.id }),
     data: {
       status: input.status,
       publishedAt: input.status === PortfolioGalleryStatus.PUBLISHED ? new Date() : undefined
@@ -179,12 +240,95 @@ export async function updatePortfolioGalleryStatusAction(formData: FormData) {
   refreshPortfolio();
 }
 
-export async function addPortfolioGalleryItemAction(formData: FormData) {
-  await requireAdmin();
-  const input = await parseForm(galleryItemSchema, formData, "/admin/modules/portfolio");
+export async function createPortfolioProofRoundAction(formData: FormData) {
+  const user = await requireAdmin("portfolio:manage");
+  const input = await parseForm(proofRoundSchema, formData, "/admin/modules/portfolio");
+  const siteId = await getCurrentSiteId();
   const gallery = await prisma.portfolioGallery.findFirst({
-    where: { id: input.galleryId, siteId: DEFAULT_SITE_ID },
+    where: await getAccessibleGalleryWhere(user, siteId, { id: input.galleryId }),
+    select: { id: true, proofingEnabled: true }
+  });
+
+  if (!gallery) {
+    redirect(`/admin/modules/portfolio?error=${encodeURIComponent("Gallery not found.")}`);
+  }
+
+  if (!gallery.proofingEnabled) {
+    redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Enable proofing before starting a revision round.")}`);
+  }
+
+  const openRound = await prisma.portfolioProofRound.findFirst({
+    where: {
+      galleryId: gallery.id,
+      status: PortfolioProofRoundStatus.OPEN
+    },
     select: { id: true }
+  });
+
+  if (openRound) {
+    redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Lock or approve the open round before starting another revision round.")}`);
+  }
+
+  const roundNumber = await nextProofRoundNumber(gallery.id);
+  await prisma.portfolioProofRound.create({
+    data: {
+      siteId,
+      galleryId: gallery.id,
+      roundNumber,
+      title: input.title || `Round ${roundNumber}`,
+      instructions: input.instructions,
+      dueAt: input.dueAt
+    }
+  });
+
+  refreshPortfolio();
+  galleryRedirect(gallery.id, "round");
+}
+
+export async function updatePortfolioProofRoundStatusAction(formData: FormData) {
+  const user = await requireAdmin("portfolio:manage");
+  const input = await parseForm(proofRoundStatusSchema, formData, "/admin/modules/portfolio");
+  const siteId = await getCurrentSiteId();
+  const galleryWhere = await getAccessibleGalleryWhere(user, siteId);
+  const round = await prisma.portfolioProofRound.findFirst({
+    where: { id: input.id, siteId, gallery: galleryWhere },
+    select: { galleryId: true, status: true }
+  });
+
+  if (!round) {
+    redirect(`/admin/modules/portfolio?error=${encodeURIComponent("Proofing round not found.")}`);
+  }
+
+  const confirmStatuses: PortfolioProofRoundStatus[] = [
+    PortfolioProofRoundStatus.APPROVED,
+    PortfolioProofRoundStatus.CHANGES_REQUESTED,
+    PortfolioProofRoundStatus.LOCKED
+  ];
+  const needsConfirm = confirmStatuses.includes(input.status);
+
+  if (needsConfirm && input.confirmTransition !== "on") {
+    redirect(`/admin/modules/portfolio?gallery=${round.galleryId}&error=${encodeURIComponent("Confirm the proofing status change before saving it.")}`);
+  }
+
+  await prisma.portfolioProofRound.updateMany({
+    where: { id: input.id, siteId, gallery: galleryWhere },
+    data: {
+      status: input.status,
+      closedAt: input.status === PortfolioProofRoundStatus.OPEN ? null : new Date()
+    }
+  });
+
+  refreshPortfolio();
+  galleryRedirect(round.galleryId, "round");
+}
+
+export async function addPortfolioGalleryItemAction(formData: FormData) {
+  const user = await requireAdmin("portfolio:manage");
+  const input = await parseForm(galleryItemSchema, formData, "/admin/modules/portfolio");
+  const siteId = await getCurrentSiteId();
+  const gallery = await prisma.portfolioGallery.findFirst({
+    where: await getAccessibleGalleryWhere(user, siteId, { id: input.galleryId }),
+    select: { id: true, slug: true, visibility: true }
   });
 
   if (!gallery) {
@@ -193,8 +337,8 @@ export async function addPortfolioGalleryItemAction(formData: FormData) {
 
   const asset = input.mediaAssetId
     ? await prisma.mediaAsset.findFirst({
-        where: { id: input.mediaAssetId, siteId: DEFAULT_SITE_ID },
-        select: { url: true, alt: true, filename: true, deletedAt: true }
+        where: await getAccessibleMediaWhere(user, siteId, { id: input.mediaAssetId }),
+        select: { alt: true, deletedAt: true, filename: true, id: true, isDecorative: true, isPrivate: true, url: true }
       })
     : null;
 
@@ -207,6 +351,14 @@ export async function addPortfolioGalleryItemAction(formData: FormData) {
 
   if (!imageUrl) {
     redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Choose a valid media asset or URL.")}`);
+  }
+
+  if (asset && !asset.isDecorative && !altText.trim()) {
+    redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Add alt text or mark the media asset decorative before public use.")}`);
+  }
+
+  if (asset?.isPrivate && gallery.visibility === PortfolioGalleryVisibility.PUBLIC) {
+    redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Private media assets require a private or password gallery.")}`);
   }
 
   const itemData = {
@@ -226,17 +378,21 @@ export async function addPortfolioGalleryItemAction(formData: FormData) {
   };
 
   if (itemData.isCover) {
-    await prisma.$transaction([
-      prisma.portfolioGalleryItem.updateMany({
+    await prisma.$transaction(async (tx) => {
+      await tx.portfolioGalleryItem.updateMany({
         where: { galleryId: input.galleryId },
         data: { isCover: false }
-      }),
-      prisma.portfolioGallery.update({
+      });
+      const created = await tx.portfolioGalleryItem.create({ data: itemData });
+      await tx.portfolioGallery.update({
         where: { id: input.galleryId },
-        data: { coverImageUrl: imageUrl }
-      }),
-      prisma.portfolioGalleryItem.create({ data: itemData })
-    ]);
+        data: {
+          coverImageUrl: input.mediaAssetId
+            ? `/galleries/${encodeURIComponent(gallery.slug)}/media/${encodeURIComponent(created.id)}?variant=${MediaVariantType.HERO}`
+            : imageUrl
+        }
+      });
+    });
   } else {
     await prisma.portfolioGalleryItem.create({ data: itemData });
   }
@@ -246,10 +402,11 @@ export async function addPortfolioGalleryItemAction(formData: FormData) {
 }
 
 export async function createPortfolioAccessAction(formData: FormData) {
-  await requireAdmin();
+  const user = await requireAdmin("portfolio:manage");
   const input = await parseForm(accessSchema, formData, "/admin/modules/portfolio");
+  const siteId = await getCurrentSiteId();
   const gallery = await prisma.portfolioGallery.findFirst({
-    where: { id: input.galleryId, siteId: DEFAULT_SITE_ID },
+    where: await getAccessibleGalleryWhere(user, siteId, { id: input.galleryId }),
     select: { siteId: true }
   });
   if (!gallery) {
@@ -257,7 +414,7 @@ export async function createPortfolioAccessAction(formData: FormData) {
   }
   if (input.clientId) {
     const client = await prisma.client.findFirst({
-      where: { id: input.clientId, siteId: gallery.siteId },
+      where: await getAccessibleClientWhere(user, siteId, { id: input.clientId }),
       select: { id: true }
     });
     if (!client) {
@@ -281,11 +438,13 @@ export async function createPortfolioAccessAction(formData: FormData) {
 }
 
 export async function updatePortfolioAccessStatusAction(formData: FormData) {
-  await requireAdmin();
+  const user = await requireAdmin("portfolio:manage");
   const input = await parseForm(accessStatusSchema, formData, "/admin/modules/portfolio");
+  const siteId = await getCurrentSiteId();
+  const galleryWhere = await getAccessibleGalleryWhere(user, siteId);
 
   const access = await prisma.portfolioGalleryAccess.findFirst({
-    where: { id: input.id, siteId: DEFAULT_SITE_ID },
+    where: { id: input.id, siteId, gallery: galleryWhere },
     select: { galleryId: true }
   });
 
@@ -293,8 +452,8 @@ export async function updatePortfolioAccessStatusAction(formData: FormData) {
     redirect(`/admin/modules/portfolio?error=${encodeURIComponent("Access link not found.")}`);
   }
 
-  await prisma.portfolioGalleryAccess.update({
-    where: { id: input.id },
+  await prisma.portfolioGalleryAccess.updateMany({
+    where: { id: input.id, siteId, gallery: galleryWhere },
     data: { status: input.status }
   });
 

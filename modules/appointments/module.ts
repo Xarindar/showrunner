@@ -1,3 +1,4 @@
+import { AdminRole } from "@prisma/client";
 import type { ShellModule } from "@/shell/module-types";
 
 export const manifest = {
@@ -24,7 +25,12 @@ export const manifest = {
   adminRoutes: ["/admin/modules/appointments", "/admin/appointments/[id]"],
   dependencies: ["scheduling", "clients", "communications"],
   dataModels: ["Booking", "Client", "Service", "EmailOutbox"],
-  permissions: ["appointments.read", "appointments.write"],
+  permissions: ["appointments:manage"],
   settingsSections: ["Notifications"],
-  healthChecks: ["pending-bookings", "status-email-queue"]
+  healthChecks: ["pending-bookings", "status-email-queue"],
+  dataScope: {
+    ownerKind: "staff-field",
+    ownerField: "staffId",
+    scopableRoles: [AdminRole.STAFF]
+  }
 } satisfies ShellModule;

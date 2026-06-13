@@ -1,12 +1,23 @@
 // Platform core models. Part of the merged Prisma schema (prismaSchemaFolder).
 
+enum AdminRole {
+  OWNER
+  ADMIN
+  STAFF
+  PHOTOGRAPHER
+  FULFILLMENT
+  ACCOUNTANT
+  VIEWER
+}
+
 model AdminUser {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String     @id @default(cuid())
+  email        String     @unique
   passwordHash String
-  role         String   @default("admin")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role         AdminRole  @default(ADMIN)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  auditLogs    AuditLog[]
 }
 
 model Tenant {
@@ -19,49 +30,63 @@ model Tenant {
 }
 
 model Site {
-  id                         String                 @id @default(cuid())
-  tenantId                   String
-  tenant                     Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  slug                       String
-  name                       String
-  isDefault                  Boolean                @default(false)
-  createdAt                  DateTime               @default(now())
-  updatedAt                  DateTime               @updatedAt
-  domains                    SiteDomain[]
-  settings                   SiteSettings?
-  moduleInstallations        ModuleInstallation[]
-  publicRateLimits           PublicRateLimit[]
-  services                   Service[]
-  availabilityRules          AvailabilityRule[]
-  blockedTimes               BlockedTime[]
-  bookings                   Booking[]
-  clients                    Client[]
-  mediaAssets                MediaAsset[]
-  forms                      Form[]
-  testimonials               Testimonial[]
-  portfolioGalleries         PortfolioGallery[]
-  portfolioGalleryAccesses   PortfolioGalleryAccess[]
-  products                   Product[]
-  collections                Collection[]
-  coupons                    Coupon[]
-  carts                      Cart[]
-  orders                     Order[]
-  billingDocuments           BillingDocument[]
-  messageTemplates           MessageTemplate[]
-  messageLogs                MessageLog[]
-  suppressionListEntries     SuppressionListEntry[]
-  emailSendingDomains        EmailSendingDomain[]
-  emailSenderIdentities      EmailSenderIdentity[]
-  emailRecipientGroups       EmailRecipientGroup[]
-  emailOutboxes              EmailOutbox[]
-  emailProviderEvents        EmailProviderEvent[]
-  emailSubscriptionLists     EmailSubscriptionList[]
-  emailSubscribers           EmailSubscriber[]
-  emailCampaigns             EmailCampaign[]
-  automations                Automation[]
-  webhookEndpoints           WebhookEndpoint[]
-  analyticsEvents            AnalyticsEvent[]
-  analyticsGoals             AnalyticsGoal[]
+  id                       String                       @id @default(cuid())
+  tenantId                 String
+  tenant                   Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  slug                     String
+  name                     String
+  isDefault                Boolean                      @default(false)
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @updatedAt
+  domains                  SiteDomain[]
+  settings                 SiteSettings?
+  moduleInstallations      ModuleInstallation[]
+  publicRateLimits         PublicRateLimit[]
+  services                 Service[]
+  staffMembers             StaffMember[]
+  resources                Resource[]
+  serviceStaff             ServiceStaff[]
+  serviceResources         ServiceResource[]
+  availabilityRules        AvailabilityRule[]
+  blockedTimes             BlockedTime[]
+  bookings                 Booking[]
+  bookingResources         BookingResource[]
+  clients                  Client[]
+  clientTags               ClientTag[]
+  clientFiles              ClientFile[]
+  clientSegments           ClientSegment[]
+  mediaAssets              MediaAsset[]
+  forms                    Form[]
+  testimonials             Testimonial[]
+  portfolioGalleries       PortfolioGallery[]
+  portfolioGalleryAccesses PortfolioGalleryAccess[]
+  portfolioProofRounds     PortfolioProofRound[]
+  portfolioProofComments   PortfolioProofComment[]
+  portfolioProofApprovals  PortfolioProofApproval[]
+  portfolioProofDecisions  PortfolioProofItemDecision[]
+  products                 Product[]
+  collections              Collection[]
+  coupons                  Coupon[]
+  carts                    Cart[]
+  orders                   Order[]
+  billingDocuments         BillingDocument[]
+  messageTemplates         MessageTemplate[]
+  messageLogs              MessageLog[]
+  suppressionListEntries   SuppressionListEntry[]
+  emailSendingDomains      EmailSendingDomain[]
+  emailSenderIdentities    EmailSenderIdentity[]
+  emailRecipientGroups     EmailRecipientGroup[]
+  emailOutboxes            EmailOutbox[]
+  emailProviderEvents      EmailProviderEvent[]
+  emailSubscriptionLists   EmailSubscriptionList[]
+  emailSubscribers         EmailSubscriber[]
+  emailCampaigns           EmailCampaign[]
+  automations              Automation[]
+  automationTasks          AutomationTask[]
+  webhookEndpoints         WebhookEndpoint[]
+  analyticsEvents          AnalyticsEvent[]
+  analyticsGoals           AnalyticsGoal[]
+  auditLogs                AuditLog[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
@@ -83,7 +108,7 @@ model SiteDomain {
 }
 
 model SiteSettings {
-  id              String      @id @default("site")
+  id              String      @id @default(cuid())
   siteId          String      @unique
   site            Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
   businessName    String      @default("Showrunner")
@@ -97,7 +122,13 @@ model SiteSettings {
   introTitle      String      @default("A calm, capable client site")
   introBody       String      @default("Update the headline, hero image, core copy, services, hours, and bookings from one protected admin area.")
   mediaDriver     MediaDriver @default(REPO)
+  ga4MeasurementId String     @default("")
+  googleAdsTagId   String     @default("")
+  metaPixelId      String     @default("")
+  searchConsoleVerification String @default("")
+  analyticsRetentionDays Int  @default(365)
   enabledModules  Json
+  dataScopeConfig Json        @default("{}")
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 }
@@ -117,4 +148,42 @@ model PublicRateLimit {
   @@unique([siteId, key])
   @@index([siteId, scope, identifier])
   @@index([windowStart])
+}
+
+model AuditLog {
+  id          String     @id @default(cuid())
+  siteId      String?
+  site        Site?      @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  actorUserId String?
+  actor       AdminUser? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorEmail  String     @default("")
+  actorRole   AdminRole?
+  action      String
+  targetType  String
+  targetId    String     @default("")
+  targetLabel String     @default("")
+  ipAddress   String     @default("")
+  userAgent   String     @default("")
+  metadata    Json       @default("{}")
+  createdAt   DateTime   @default(now())
+
+  @@index([siteId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
+}
+
+model AuditLogFailure {
+  id          String   @id @default(cuid())
+  action      String
+  targetType  String
+  targetId    String   @default("")
+  actorEmail  String   @default("")
+  error       String
+  payload     String
+  createdAt   DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
+  @@index([createdAt])
 }

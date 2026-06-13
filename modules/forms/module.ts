@@ -1,3 +1,4 @@
+import { AdminRole } from "@prisma/client";
 import type { ShellModule } from "@/shell/module-types";
 
 export const manifest = {
@@ -25,7 +26,12 @@ export const manifest = {
   publicRoutes: ["/forms/[slug]"],
   dependencies: ["clients", "communications"],
   dataModels: ["Form", "FormField", "FormSubmission", "PublicRateLimit"],
-  permissions: ["forms.read", "forms.write"],
+  permissions: ["forms:manage", "forms:export"],
   settingsSections: ["Forms", "Notifications"],
-  healthChecks: ["active-forms", "public-rate-limits"]
+  healthChecks: ["active-forms", "public-rate-limits"],
+  dataScope: {
+    ownerKind: "client-link",
+    ownerField: "clientId",
+    scopableRoles: [AdminRole.STAFF]
+  }
 } satisfies ShellModule;
