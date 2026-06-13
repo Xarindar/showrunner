@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { CalendarCheck, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, FileText, MapPin } from "lucide-react";
 import { slugify } from "@/lib/slug";
-import { createPublicBookingAction, type BookingFormState } from "./actions";
+import { createPublicBookingAction, joinPublicWaitlistAction, type BookingFormState, type WaitlistFormState } from "./actions";
 
 type BookableService = {
   id: string;
@@ -15,6 +15,8 @@ type BookableService = {
   intakePrompt: string | null;
   policyText: string | null;
   requirePolicy: boolean;
+  requestOnly: boolean;
+  waitlistEnabled: boolean;
   staff: Array<{
     id: string;
     name: string;
@@ -47,6 +49,7 @@ type Step = "service" | "time" | "details" | "review";
 type TransitionDirection = "forward" | "back";
 
 const initialState: BookingFormState = {};
+const initialWaitlistState: WaitlistFormState = {};
 const steps: Array<{ id: Step; label: string }> = [
   { id: "service", label: "Service" },
   { id: "time", label: "Time" },
@@ -62,6 +65,7 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
   const initialService =
     services.find((service) => service.slug === initialServiceSlug) || services.find((service) => service.id === initialServiceSlug) || services[0];
   const [state, action, pending] = useActionState(createPublicBookingAction, initialState);
+  const [waitlistState, waitlistAction, waitlistPending] = useActionState(joinPublicWaitlistAction, initialWaitlistState);
   const [step, setStep] = useState<Step>("service");
   const [transitionDirection, setTransitionDirection] = useState<TransitionDirection>("forward");
   const [serviceId, setServiceId] = useState(initialService?.id || "");
@@ -82,11 +86,13 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
     [serviceId, services]
   );
   const selectedSlotDetails = slots.find((slot) => slotKey(slot) === selectedSlot);
+  const canJoinWaitlist = Boolean(selectedService?.waitlistEnabled && !loadingSlots && !slots.length);
   const stepIndex = steps.findIndex((item) => item.id === step);
   const detailsReady = customerName.trim().length > 1 && customerEmail.includes("@");
-  const reviewReady = selectedService && selectedSlotDetails && detailsReady;
+  const reviewReady = Boolean(selectedService && detailsReady && (selectedSlotDetails || canJoinWaitlist));
   const requiresPolicyAcceptance = Boolean(selectedService?.requirePolicy && selectedService.policyText?.trim());
   const panelClass = `booking-card booking-step-panel ${transitionDirection}`;
+  const submitting = pending || waitlistPending;
 
   useEffect(() => {
     if (!serviceId || !date) return;
@@ -119,24 +125,30 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
     return <div className="booking-card">No services are available yet.</div>;
   }
 
-  if (state.ok) {
+  if (state.ok || waitlistState.ok) {
+    const isWaitlist = Boolean(waitlistState.ok);
+    const isRequest = state.status === "PENDING";
     return (
       <div className="booking-complete">
         <div className="booking-complete-icon">
           <Check size={34} />
         </div>
-        <p className="eyebrow">Booked</p>
-        <h1>Your appointment request is in.</h1>
+        <p className="eyebrow">{isWaitlist ? "Waitlisted" : isRequest ? "Requested" : "Booked"}</p>
+        <h1>{isWaitlist ? "You're on the waitlist." : isRequest ? "Your appointment request is in." : "Your appointment is booked."}</h1>
         <p className="lead">
-          Check your email for confirmation details. The business will follow up if anything needs to change.
+          {isWaitlist
+            ? "The business will follow up if a time opens for your selected date."
+            : isRequest
+              ? "Check your email for request details. The business will approve or follow up if anything needs to change."
+              : "Check your email for confirmation details. The business will follow up if anything needs to change."}
         </p>
-        {state.calendarUrl ? (
+        {!isWaitlist && state.calendarUrl ? (
           <a className="button secondary" href={state.calendarUrl}>
             <CalendarDays size={18} />
             Add to calendar
           </a>
         ) : null}
-        {state.manageUrl ? (
+        {!isWaitlist && state.manageUrl ? (
           <a className="button" href={state.manageUrl}>
             <CalendarCheck size={18} />
             Manage appointment
@@ -168,7 +180,7 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
 
   function goNext() {
     if (step === "service") goToStep("time");
-    if (step === "time" && selectedSlot) goToStep("details");
+    if (step === "time" && (selectedSlot || canJoinWaitlist)) goToStep("details");
     if (step === "details" && detailsReady) goToStep("review");
   }
 
@@ -207,7 +219,7 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
           ))}
         </div>
 
-        {state.error ? <div className="error">{state.error}</div> : null}
+        {state.error || waitlistState.error ? <div className="error">{state.error || waitlistState.error}</div> : null}
 
         {step === "service" ? (
           <div className={panelClass}>
@@ -233,6 +245,13 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
                       </>
                     ) : null}
                   </span>
+                  {service.requestOnly || service.waitlistEnabled ? (
+                    <span className="service-choice-meta">
+                      {service.requestOnly ? "Approval required" : ""}
+                      {service.requestOnly && service.waitlistEnabled ? " | " : ""}
+                      {service.waitlistEnabled ? "Waitlist available" : ""}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -300,7 +319,11 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
               {!loadingSlots && !slots.length ? (
                 <div className="empty-state">
                   <CalendarDays size={24} />
-                  <p>No times are available for this date. Try another day.</p>
+                  <p>
+                    {selectedService?.waitlistEnabled
+                      ? "No times are available for this date. Continue to join the waitlist."
+                      : "No times are available for this date. Try another day."}
+                  </p>
                 </div>
               ) : null}
               {!loadingSlots && slots.length ? (
@@ -324,8 +347,8 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
                 <ChevronLeft size={18} />
                 Back
               </button>
-              <button className="button" disabled={!selectedSlot} onClick={goNext} type="button">
-                Continue
+              <button className="button" disabled={!selectedSlot && !canJoinWaitlist} onClick={goNext} type="button">
+                {canJoinWaitlist && !selectedSlot ? "Join waitlist" : "Continue"}
                 <ChevronRight size={18} />
               </button>
             </div>
@@ -383,11 +406,12 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
         ) : null}
 
         {step === "review" ? (
-          <form action={action} className={panelClass}>
+          <form action={selectedSlotDetails ? action : waitlistAction} className={panelClass}>
             <input name="serviceId" type="hidden" value={selectedService?.id || ""} />
-            <input name="staffId" type="hidden" value={selectedSlotDetails?.staffId || ""} />
+            <input name="staffId" type="hidden" value={selectedSlotDetails?.staffId || (!selectedSlotDetails ? staffFilterId : "")} />
             <input name="resourceIds" type="hidden" value={selectedSlotDetails?.resourceIds.join(",") || ""} />
             <input name="startsAt" type="hidden" value={selectedSlotDetails?.startsAt || ""} />
+            <input name="desiredDate" type="hidden" value={date} />
             <input name="customerName" type="hidden" value={customerName} />
             <input name="customerEmail" type="hidden" value={customerEmail} />
             <input name="customerPhone" type="hidden" value={customerPhone} />
@@ -395,15 +419,15 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
             <input name="intakeResponse" type="hidden" value={intakeResponse} />
 
             <p className="eyebrow">Step 4</p>
-            <h2>Review and request your appointment.</h2>
+            <h2>{selectedSlotDetails ? "Review and request your appointment." : "Review and join the waitlist."}</h2>
             <div className="review-list">
               <div>
                 <span>Service</span>
                 <strong>{selectedService?.name}</strong>
               </div>
               <div>
-                <span>Time</span>
-                <strong>{date} at {selectedSlotDetails?.label}</strong>
+                <span>{selectedSlotDetails ? "Time" : "Waitlist date"}</span>
+                <strong>{selectedSlotDetails ? `${date} at ${selectedSlotDetails.label}` : date}</strong>
               </div>
               {selectedSlotDetails?.staffName ? (
                 <div>
@@ -447,12 +471,16 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
               </button>
               <button
                 className="button"
-                aria-busy={pending}
-                disabled={pending || !reviewReady || (requiresPolicyAcceptance && !policyAccepted)}
+                aria-busy={submitting}
+                disabled={submitting || !reviewReady || (requiresPolicyAcceptance && !policyAccepted)}
                 type="submit"
               >
                 <CalendarCheck size={18} />
-                Request appointment
+                {selectedSlotDetails
+                  ? selectedService?.requestOnly
+                    ? "Request appointment"
+                    : "Book appointment"
+                  : "Join waitlist"}
               </button>
             </div>
           </form>

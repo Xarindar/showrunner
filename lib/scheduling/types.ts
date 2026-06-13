@@ -1,4 +1,4 @@
-import type { Booking, Service } from "@prisma/client";
+import type { Booking, BookingStatus, Service } from "@prisma/client";
 
 export type Slot = {
   startsAt: Date;
@@ -46,6 +46,7 @@ export type BookingRequest = {
   notes?: string;
   intakeResponse?: string;
   policyAccepted?: boolean;
+  status?: BookingStatus;
 };
 
 export type CalendarFeedScope = {

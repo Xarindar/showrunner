@@ -173,6 +173,14 @@ export async function getAccessibleBookingWhere(
   return getAccessibleModuleWhere("appointments", user, siteId, { siteId }, extra);
 }
 
+export async function getAccessibleBookingWaitlistWhere(
+  user: AdminSessionUser,
+  siteId: string,
+  extra: Prisma.BookingWaitlistEntryWhereInput = {}
+): Promise<Prisma.BookingWaitlistEntryWhereInput> {
+  return getAccessibleModuleWhere("appointments", user, siteId, { siteId }, extra);
+}
+
 export async function getAccessibleClientWhere(
   user: AdminSessionUser,
   siteId: string,

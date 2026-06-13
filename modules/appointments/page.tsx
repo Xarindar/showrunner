@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { BookingStatus, Prisma } from "@prisma/client";
+import { BookingStatus, BookingWaitlistStatus, Prisma } from "@prisma/client";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Filter, ListChecks } from "lucide-react";
-import { getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
+import { getAccessibleBookingWaitlistWhere, getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import { bookingConflictWarnings } from "@/lib/bookings/conflicts";
+import { formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { addDaysToDateKey, getTodayDateKey, parseZonedDateKey } from "@/lib/timezone";
+import { promoteWaitlistEntryAction, updateWaitlistEntryStatusAction } from "./actions";
 import { AppointmentCalendar, type AppointmentCalendarBooking, type AppointmentCalendarDay } from "./components/appointment-calendar";
 import { AppointmentsTable } from "./components/appointments-table";
 
@@ -21,6 +23,7 @@ type AppointmentsPageProps = {
     error?: string;
     page?: string;
     resourceId?: string;
+    saved?: string;
     staffId?: string;
     status?: string;
     view?: string;
@@ -145,6 +148,21 @@ function localBookingParts(date: Date, timeZone: string) {
   };
 }
 
+function formatDateTimeLocalInput(value: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+    minute: "2-digit",
+    month: "2-digit",
+    timeZone,
+    year: "numeric"
+  }).formatToParts(value);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}`;
+}
+
 function calendarHref(input: {
   dateKey: string;
   page?: number;
@@ -199,8 +217,13 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
     startsAt: { lt: rangeEnd },
     endsAt: { gt: rangeStart }
   });
+  const waitlistWhere: Prisma.BookingWaitlistEntryWhereInput = await getAccessibleBookingWaitlistWhere(user, settings.siteId, {
+    status: BookingWaitlistStatus.WAITING,
+    ...(selectedStaffId ? { staffId: selectedStaffId } : {}),
+    ...(selectedResourceId ? { service: { resourceAssignments: { some: { resourceId: selectedResourceId } } } } : {})
+  });
 
-  const [bookings, bookingCount, pendingCount, upcomingCount, calendarBookings, staff, resources] = await Promise.all([
+  const [bookings, bookingCount, pendingCount, upcomingCount, waitlistEntries, waitlistCount, calendarBookings, staff, resources] = await Promise.all([
     prisma.booking.findMany({
       where: bookingWhere,
       include: {
@@ -220,6 +243,24 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
         startsAt: { gte: now }
       })
     }),
+    prisma.bookingWaitlistEntry.findMany({
+      where: waitlistWhere,
+      include: {
+        service: {
+          include: {
+            staffAssignments: {
+              where: { staff: { isActive: true } },
+              include: { staff: true },
+              orderBy: { staff: { name: "asc" } }
+            }
+          }
+        },
+        staff: true
+      },
+      orderBy: { createdAt: "asc" },
+      take: 50
+    }),
+    prisma.bookingWaitlistEntry.count({ where: waitlistWhere }),
     prisma.booking.findMany({
       where: calendarWhere,
       include: {
@@ -294,6 +335,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
         </Link>
       </header>
 
+      {params.saved ? <div className="success-message">Appointment desk updated.</div> : null}
       {params.error ? <div className="error">{params.error}</div> : null}
 
       <section className="grid-3">
@@ -313,9 +355,9 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
         </div>
         <div className="card">
           <CalendarDays size={22} />
-          <h3>Operations</h3>
+          <h3>{waitlistCount} waitlisted</h3>
           <p className="lead" style={{ fontSize: "0.95rem" }}>
-            This is the everyday appointment workspace.
+            Clients waiting for a full service/date.
           </p>
         </div>
       </section>
@@ -427,6 +469,102 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
         </div>
 
         <AppointmentCalendar bookings={calendarItems} days={days} hours={calendarHours} view={view} />
+      </section>
+
+      <section className="card">
+        <div className="page-header" style={{ marginBottom: 16 }}>
+          <div>
+            <h2 style={{ fontSize: "1.35rem" }}>Waitlist</h2>
+            <p style={{ color: "var(--muted)", margin: 0 }}>
+              {waitlistCount} waiting clients. Promote by choosing a real available slot.
+            </p>
+          </div>
+        </div>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Service</th>
+              <th>Desired date</th>
+              <th>Promote</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {waitlistEntries.map((entry) => (
+              <tr key={entry.id}>
+                <td>
+                  <strong>{entry.customerName}</strong>
+                  <br />
+                  <span style={{ color: "var(--muted)" }}>{entry.customerEmail}</span>
+                  {entry.customerPhone ? (
+                    <>
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>{entry.customerPhone}</span>
+                    </>
+                  ) : null}
+                </td>
+                <td>
+                  {entry.service.name}
+                  <br />
+                  <span style={{ color: "var(--muted)" }}>{entry.staff?.name || "Any staff"}</span>
+                  {entry.notes ? (
+                    <>
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>{entry.notes}</span>
+                    </>
+                  ) : null}
+                </td>
+                <td>{formatDateTime(entry.startsAt, settings.timezone)}</td>
+                <td>
+                  <form action={promoteWaitlistEntryAction} className="form-grid" style={{ gap: 8 }}>
+                    <input type="hidden" name="id" value={entry.id} />
+                    <div className="field">
+                      <label htmlFor={`waitlist-${entry.id}-startsAt`}>Start time</label>
+                      <input
+                        id={`waitlist-${entry.id}-startsAt`}
+                        name="startsAt"
+                        type="datetime-local"
+                        defaultValue={formatDateTimeLocalInput(entry.startsAt, settings.timezone)}
+                        required
+                      />
+                    </div>
+                    {entry.service.staffAssignments.length ? (
+                      <div className="field">
+                        <label htmlFor={`waitlist-${entry.id}-staffId`}>Staff</label>
+                        <select id={`waitlist-${entry.id}-staffId`} name="staffId" defaultValue={entry.staffId || ""} required>
+                          <option value="">Choose staff</option>
+                          {entry.service.staffAssignments.map((assignment) => (
+                            <option key={assignment.staffId} value={assignment.staffId}>
+                              {assignment.staff.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
+                    <button className="button secondary" type="submit">
+                      Promote
+                    </button>
+                  </form>
+                </td>
+                <td>
+                  <form action={updateWaitlistEntryStatusAction}>
+                    <input type="hidden" name="id" value={entry.id} />
+                    <input type="hidden" name="status" value={BookingWaitlistStatus.DECLINED} />
+                    <button className="button danger" type="submit">
+                      decline
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+            {!waitlistEntries.length ? (
+              <tr>
+                <td colSpan={5}>No waitlist entries match these filters.</td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
       </section>
 
       <section className="card">

@@ -13,6 +13,13 @@ enum BookingReminderStatus {
   FAILED
 }
 
+enum BookingWaitlistStatus {
+  WAITING
+  PROMOTED
+  DECLINED
+  CANCELED
+}
+
 enum SchedulingCalendarProvider {
   GOOGLE
 }
@@ -80,10 +87,13 @@ model Service {
   intakePrompt        String?
   policyText          String?
   requirePolicy       Boolean   @default(false)
+  requestOnly         Boolean   @default(false)
+  waitlistEnabled     Boolean   @default(false)
   isActive            Boolean   @default(true)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   bookings            Booking[]
+  waitlistEntries     BookingWaitlistEntry[]
   staffAssignments    ServiceStaff[]
   resourceAssignments ServiceResource[]
 
@@ -107,6 +117,7 @@ model StaffMember {
   updatedAt         DateTime           @updatedAt
   availabilityRules AvailabilityRule[]
   bookings          Booking[]
+  waitlistEntries   BookingWaitlistEntry[]
   services          ServiceStaff[]
   portfolioGalleries PortfolioGallery[]
   mediaAssets       MediaAsset[]
@@ -227,11 +238,39 @@ model Booking {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   reminders          BookingReminder[]
+  promotedWaitlistEntries BookingWaitlistEntry[]
 
   @@index([siteId, startsAt, endsAt])
   @@index([serviceId, startsAt])
   @@index([staffId, startsAt])
   @@index([clientId])
+}
+
+model BookingWaitlistEntry {
+  id                String                @id @default(cuid())
+  siteId            String
+  site              Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  serviceId         String
+  service           Service               @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  staffId           String?
+  staff             StaffMember?          @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  promotedBookingId String?
+  promotedBooking   Booking?              @relation(fields: [promotedBookingId], references: [id], onDelete: SetNull)
+  customerName      String
+  customerEmail     String
+  customerPhone     String?
+  notes             String?
+  intakeResponse    String?
+  policyAccepted    Boolean               @default(false)
+  startsAt          DateTime
+  status            BookingWaitlistStatus @default(WAITING)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([siteId, status, startsAt])
+  @@index([serviceId, startsAt])
+  @@index([staffId, startsAt])
+  @@index([promotedBookingId])
 }
 
 model BookingReminder {

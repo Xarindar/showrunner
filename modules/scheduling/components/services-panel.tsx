@@ -149,6 +149,14 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
           Require policy acceptance
         </label>
         <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+          <input name="requestOnly" type="checkbox" />
+          Request-only approval
+        </label>
+        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+          <input name="waitlistEnabled" type="checkbox" />
+          Offer waitlist when full
+        </label>
+        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
           <input name="isActive" type="checkbox" defaultChecked />
           Active
         </label>
@@ -185,6 +193,18 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                     <span className={service.isActive ? "pill success" : "pill danger"}>
                       {service.isActive ? "active" : "inactive"}
                     </span>
+                    {service.requestOnly ? (
+                      <>
+                        <br />
+                        <span className="pill">request-only</span>
+                      </>
+                    ) : null}
+                    {service.waitlistEnabled ? (
+                      <>
+                        <br />
+                        <span className="pill">waitlist</span>
+                      </>
+                    ) : null}
                   </td>
                   <td>
                     <form action={toggleServiceAction}>
@@ -321,6 +341,14 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                         <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
                           <input name="requirePolicy" type="checkbox" defaultChecked={service.requirePolicy && Boolean(service.policyText?.trim())} />
                           Require policy acceptance
+                        </label>
+                        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                          <input name="requestOnly" type="checkbox" defaultChecked={service.requestOnly} />
+                          Request-only approval
+                        </label>
+                        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                          <input name="waitlistEnabled" type="checkbox" defaultChecked={service.waitlistEnabled} />
+                          Offer waitlist when full
                         </label>
                         <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
                           <input name="isActive" type="checkbox" defaultChecked={service.isActive} />

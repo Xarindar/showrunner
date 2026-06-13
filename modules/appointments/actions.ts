@@ -1,14 +1,22 @@
 "use server";
 
-import { BookingStatus } from "@prisma/client";
+import { BookingStatus, BookingWaitlistStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
-import { bookingDetailFormSchema, bookingRescheduleFormSchema, bookingStatusFormSchema, parseForm } from "@/lib/admin-validation";
+import { getAccessibleBookingWaitlistWhere, getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
+import {
+  bookingDetailFormSchema,
+  bookingRescheduleFormSchema,
+  bookingStatusFormSchema,
+  bookingWaitlistPromoteFormSchema,
+  bookingWaitlistStatusFormSchema,
+  parseForm
+} from "@/lib/admin-validation";
 import { rescheduleBookingWithAvailability } from "@/lib/bookings/reschedule";
 import { updateBookingStatus } from "@/lib/bookings/status";
 import { emitModuleEvent } from "@/lib/events/emit";
 import { prisma } from "@/lib/prisma";
+import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import { getSiteSettings } from "@/lib/site";
 import { parseZonedDateTimeInput } from "@/lib/timezone";
 
@@ -188,4 +196,141 @@ export async function rescheduleBookingFromCalendarAction(input: {
     ok: true,
     startsAt: updated.startsAt.toISOString()
   };
+}
+
+export async function promoteWaitlistEntryAction(formData: FormData) {
+  const user = await requireAdmin("appointments:manage");
+  const input = await parseForm(bookingWaitlistPromoteFormSchema, formData);
+  const settings = await getSiteSettings();
+  const startsAt = parseZonedDateTimeInput(input.startsAt, settings.timezone);
+
+  if (!startsAt) {
+    redirect(`/admin/modules/appointments?error=${encodeURIComponent("Choose a valid promotion time.")}`);
+  }
+
+  const entry = await prisma.bookingWaitlistEntry.findFirst({
+    where: await getAccessibleBookingWaitlistWhere(user, settings.siteId, {
+      id: input.id,
+      status: BookingWaitlistStatus.WAITING
+    }),
+    include: {
+      service: {
+        include: {
+          staffAssignments: {
+            where: { staff: { isActive: true } },
+            include: { staff: true },
+            orderBy: { staff: { name: "asc" } }
+          }
+        }
+      },
+      staff: true
+    }
+  });
+
+  if (!entry) {
+    redirect(`/admin/modules/appointments?error=${encodeURIComponent("Waitlist entry not found.")}`);
+  }
+
+  const staffId = input.staffId || entry.staffId || undefined;
+  if (staffId && !entry.service.staffAssignments.some((assignment) => assignment.staffId === staffId)) {
+    redirect(`/admin/modules/appointments?error=${encodeURIComponent("Choose a staff member assigned to that service.")}`);
+  }
+
+  let booking;
+  try {
+    booking = await nativeSchedulingAdapter.createBooking({
+      serviceId: entry.serviceId,
+      staffId,
+      startsAt,
+      customerName: entry.customerName,
+      customerEmail: entry.customerEmail,
+      customerPhone: entry.customerPhone || undefined,
+      notes: entry.notes || undefined,
+      intakeResponse: entry.intakeResponse || undefined,
+      policyAccepted: entry.policyAccepted,
+      status: BookingStatus.CONFIRMED
+    });
+  } catch (error) {
+    redirect(
+      `/admin/modules/appointments?error=${encodeURIComponent(error instanceof Error ? error.message : "Unable to promote waitlist entry.")}`
+    );
+  }
+
+  await prisma.bookingWaitlistEntry.update({
+    where: { id: entry.id },
+    data: {
+      promotedBookingId: booking.id,
+      status: BookingWaitlistStatus.PROMOTED
+    }
+  });
+
+  await emitModuleEvent("booking.created", {
+    actorEmail: user.email,
+    metadata: {
+      serviceId: booking.serviceId,
+      staffId: booking.staffId,
+      startsAt: booking.startsAt.toISOString(),
+      source: "waitlist",
+      waitlistEntryId: entry.id
+    },
+    relatedId: booking.id,
+    relatedType: "booking"
+  });
+  await emitModuleEvent("booking.waitlist.promoted", {
+    actorEmail: user.email,
+    metadata: {
+      bookingId: booking.id,
+      serviceId: entry.serviceId,
+      serviceName: entry.service.name,
+      staffId: booking.staffId,
+      startsAt: booking.startsAt.toISOString()
+    },
+    relatedId: entry.id,
+    relatedType: "booking_waitlist_entry"
+  });
+
+  refreshAppointments();
+  redirect("/admin/modules/appointments?saved=waitlist-promoted");
+}
+
+export async function updateWaitlistEntryStatusAction(formData: FormData) {
+  const user = await requireAdmin("appointments:manage");
+  const input = await parseForm(bookingWaitlistStatusFormSchema, formData);
+  const settings = await getSiteSettings();
+  const entry = await prisma.bookingWaitlistEntry.findFirst({
+    where: await getAccessibleBookingWaitlistWhere(user, settings.siteId, {
+      id: input.id,
+      status: BookingWaitlistStatus.WAITING
+    }),
+    include: { service: true }
+  });
+
+  if (!entry) {
+    redirect(`/admin/modules/appointments?error=${encodeURIComponent("Waitlist entry not found.")}`);
+  }
+
+  if (input.status !== BookingWaitlistStatus.DECLINED && input.status !== BookingWaitlistStatus.CANCELED) {
+    redirect(`/admin/modules/appointments?error=${encodeURIComponent("Choose a valid waitlist status.")}`);
+  }
+
+  await prisma.bookingWaitlistEntry.update({
+    where: { id: entry.id },
+    data: { status: input.status }
+  });
+
+  if (input.status === BookingWaitlistStatus.DECLINED) {
+    await emitModuleEvent("booking.waitlist.declined", {
+      actorEmail: user.email,
+      metadata: {
+        serviceId: entry.serviceId,
+        serviceName: entry.service.name,
+        startsAt: entry.startsAt.toISOString()
+      },
+      relatedId: entry.id,
+      relatedType: "booking_waitlist_entry"
+    });
+  }
+
+  refreshAppointments();
+  redirect("/admin/modules/appointments?saved=waitlist");
 }

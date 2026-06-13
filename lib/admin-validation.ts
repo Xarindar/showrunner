@@ -1,6 +1,6 @@
 import "server-only";
 
-import { BookingStatus, CouponType, MediaDriver, ProductStatus, ProductType } from "@prisma/client";
+import { BookingStatus, BookingWaitlistStatus, CouponType, MediaDriver, ProductStatus, ProductType } from "@prisma/client";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -99,11 +99,15 @@ export const serviceFormSchema = z
     intakePrompt: optionalStoredText,
     policyText: optionalStoredText,
     requirePolicy: z.literal("on").optional(),
+    requestOnly: z.literal("on").optional(),
+    waitlistEnabled: z.literal("on").optional(),
     isActive: z.literal("on").optional()
   })
   .transform((value) => ({
     ...value,
     requirePolicy: Boolean(value.requirePolicy && value.policyText.trim()),
+    requestOnly: value.requestOnly === "on",
+    waitlistEnabled: value.waitlistEnabled === "on",
     isActive: value.isActive === "on"
   }));
 
@@ -141,6 +145,17 @@ export const bookingDetailFormSchema = z.object({
 export const bookingRescheduleFormSchema = z.object({
   id,
   startsAt: requiredText
+});
+
+export const bookingWaitlistPromoteFormSchema = z.object({
+  id,
+  staffId: optionalId,
+  startsAt: requiredText
+});
+
+export const bookingWaitlistStatusFormSchema = z.object({
+  id,
+  status: z.enum(BookingWaitlistStatus)
 });
 
 export const clientFormSchema = z.object({

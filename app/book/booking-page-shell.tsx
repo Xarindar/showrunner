@@ -74,6 +74,8 @@ export async function BookingPageShell({ initialServiceSlug }: BookingPageShellP
             intakePrompt: service.intakePrompt,
             policyText: service.policyText,
             requirePolicy: service.requirePolicy,
+            requestOnly: service.requestOnly,
+            waitlistEnabled: service.waitlistEnabled,
             resources: service.resourceAssignments
               ? service.resourceAssignments.map((assignment) => ({
                   id: assignment.resource.id,

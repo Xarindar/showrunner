@@ -514,6 +514,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
               notes: input.notes,
               intakeResponse: input.intakeResponse,
               policyAccepted: Boolean(input.policyAccepted),
+              status: input.status || (service.requestOnly ? BookingStatus.PENDING : BookingStatus.CONFIRMED),
               resources: requiredResourceIds.length
                 ? {
                     create: requiredResourceIds.map((resourceId) => ({

@@ -23,6 +23,18 @@ export async function updateBookingStatus(input: { bookingId: string; status: Bo
 
   await queueBookingStatusEmail(updated, current.status);
 
+  if (current.status === BookingStatus.PENDING && updated.status === BookingStatus.CONFIRMED) {
+    await emitModuleEvent("booking.request.approved", {
+      actorEmail: updated.customerEmail,
+      metadata: {
+        serviceId: updated.serviceId,
+        serviceName: updated.service.name
+      },
+      relatedId: updated.id,
+      relatedType: "booking"
+    });
+  }
+
   if (current.status !== BookingStatus.CANCELED && updated.status === BookingStatus.CANCELED) {
     await emitModuleEvent("booking.canceled", {
       actorEmail: updated.customerEmail,

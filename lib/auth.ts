@@ -35,6 +35,7 @@ export {
   dataScopeConfigFromFormData,
   dataScopePresets,
   getAccessibleBookingWhere,
+  getAccessibleBookingWaitlistWhere,
   getAccessibleClientWhere,
   getAccessibleModuleWhere,
   getAccessibleFormSubmissionWhere,

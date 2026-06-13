@@ -163,6 +163,8 @@ export async function createServiceAction(formData: FormData) {
       intakePrompt: input.intakePrompt,
       policyText: input.policyText,
       requirePolicy: input.requirePolicy,
+      requestOnly: input.requestOnly,
+      waitlistEnabled: input.waitlistEnabled,
       isActive: input.isActive
     }
   });
@@ -208,6 +210,8 @@ export async function updateServiceAction(formData: FormData) {
       intakePrompt: input.intakePrompt,
       policyText: input.policyText,
       requirePolicy: input.requirePolicy,
+      requestOnly: input.requestOnly,
+      waitlistEnabled: input.waitlistEnabled,
       isActive: input.isActive
     }
   });
