@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto";
 import {
   MediaVariantType,
+  PortfolioGalleryLayout,
   PortfolioAccessStatus,
   PortfolioGalleryStatus,
   PortfolioGalleryVisibility,
@@ -47,6 +48,7 @@ const gallerySchema = z.object({
   description: optionalStoredText,
   status: z.enum(PortfolioGalleryStatus).catch(PortfolioGalleryStatus.DRAFT),
   visibility: z.enum(PortfolioGalleryVisibility).catch(PortfolioGalleryVisibility.PUBLIC),
+  layout: z.enum(PortfolioGalleryLayout).catch(PortfolioGalleryLayout.GRID),
   category: optionalStoredText,
   coverImageUrl: optionalUrlOrPath,
   location: optionalStoredText,
@@ -64,6 +66,11 @@ const galleryStatusSchema = z.object({
   confirmArchive: z.literal("on").optional(),
   id: requiredText,
   status: z.enum(PortfolioGalleryStatus)
+});
+
+const galleryLayoutSchema = z.object({
+  id: requiredText,
+  layout: z.enum(PortfolioGalleryLayout)
 });
 
 const galleryItemSchema = z
@@ -184,6 +191,7 @@ export async function createPortfolioGalleryAction(formData: FormData) {
         description: input.description,
         status: input.status,
         visibility: input.visibility,
+        layout: input.layout,
         category: input.category,
         coverImageUrl: input.coverImageUrl,
         location: input.location,
@@ -238,6 +246,20 @@ export async function updatePortfolioGalleryStatusAction(formData: FormData) {
   });
 
   refreshPortfolio();
+}
+
+export async function updatePortfolioGalleryLayoutAction(formData: FormData) {
+  const user = await requireAdmin("portfolio:manage");
+  const input = await parseForm(galleryLayoutSchema, formData, "/admin/modules/portfolio");
+  const siteId = await getCurrentSiteId();
+
+  await prisma.portfolioGallery.updateMany({
+    where: await getAccessibleGalleryWhere(user, siteId, { id: input.id }),
+    data: { layout: input.layout }
+  });
+
+  refreshPortfolio();
+  galleryRedirect(input.id, "layout");
 }
 
 export async function createPortfolioProofRoundAction(formData: FormData) {

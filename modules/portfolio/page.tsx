@@ -1,6 +1,7 @@
 import { Camera, Download, Image as ImageIcon, KeyRound, RotateCcw, Star } from "lucide-react";
 import {
   PortfolioAccessStatus,
+  PortfolioGalleryLayout,
   PortfolioGalleryStatus,
   PortfolioGalleryVisibility,
   PortfolioItemType,
@@ -19,6 +20,7 @@ import {
   createPortfolioGalleryAction,
   createPortfolioProofRoundAction,
   updatePortfolioAccessStatusAction,
+  updatePortfolioGalleryLayoutAction,
   updatePortfolioGalleryStatusAction,
   updatePortfolioProofRoundStatusAction
 } from "./actions";
@@ -203,6 +205,16 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               <input id="gallery-sort" name="sortOrder" type="number" defaultValue="0" />
             </div>
           </div>
+          <div className="field">
+            <label htmlFor="gallery-layout">Layout</label>
+            <select id="gallery-layout" name="layout" defaultValue={PortfolioGalleryLayout.GRID}>
+              {Object.values(PortfolioGalleryLayout).map((layout) => (
+                <option key={layout} value={layout}>
+                  {enumLabel(layout)}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="grid-3">
             <div className="field">
               <label htmlFor="gallery-category">Category</label>
@@ -341,6 +353,10 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                   </td>
                 </tr>
                 <tr>
+                  <td>Layout</td>
+                  <td>{enumLabel(selectedGallery.layout)}</td>
+                </tr>
+                <tr>
                   <td>Proofing</td>
                   <td>
                     {selectedGallery.proofingEnabled ? "Enabled" : "Disabled"}
@@ -368,6 +384,22 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 </tr>
               </tbody>
             </table>
+            <form action={updatePortfolioGalleryLayoutAction} className="form-grid">
+              <input type="hidden" name="id" value={selectedGallery.id} />
+              <div className="field">
+                <label htmlFor={`gallery-${selectedGallery.id}-layout`}>Gallery layout</label>
+                <select id={`gallery-${selectedGallery.id}-layout`} name="layout" defaultValue={selectedGallery.layout}>
+                  {Object.values(PortfolioGalleryLayout).map((layout) => (
+                    <option key={layout} value={layout}>
+                      {enumLabel(layout)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button className="button secondary" type="submit">
+                Save layout
+              </button>
+            </form>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {[PortfolioGalleryStatus.PUBLISHED, PortfolioGalleryStatus.DRAFT, PortfolioGalleryStatus.ARCHIVED].map((status) => (
                 <form action={updatePortfolioGalleryStatusAction} className="stack" key={status} style={{ gap: 6 }}>

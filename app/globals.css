@@ -1489,6 +1489,111 @@ button.button:disabled,
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.public-gallery-layout-masonry {
+  column-count: 3;
+  column-gap: 14px;
+  display: block;
+}
+
+.public-gallery-layout-masonry .public-gallery-item {
+  break-inside: avoid;
+  display: inline-block;
+  margin: 0 0 14px;
+  width: 100%;
+}
+
+.public-gallery-layout-masonry .public-gallery-item:nth-child(3n + 1) img {
+  aspect-ratio: 4 / 5;
+}
+
+.public-gallery-layout-masonry .public-gallery-item:nth-child(3n + 2) img {
+  aspect-ratio: 1 / 1;
+}
+
+.public-gallery-layout-editorial {
+  grid-auto-flow: dense;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.public-gallery-layout-editorial .public-gallery-item {
+  grid-column: span 2;
+}
+
+.public-gallery-layout-editorial .public-gallery-item:nth-child(7n + 1) {
+  grid-column: span 4;
+  grid-row: span 2;
+}
+
+.public-gallery-layout-editorial .public-gallery-item:nth-child(7n + 1) img {
+  aspect-ratio: 16 / 10;
+}
+
+.public-gallery-layout-editorial .public-gallery-item:nth-child(7n + 4),
+.public-gallery-layout-editorial .public-gallery-item:nth-child(7n + 5) {
+  grid-column: span 3;
+}
+
+.public-gallery-layout-carousel {
+  display: grid;
+  gap: 16px;
+  grid-auto-columns: minmax(280px, 42vw);
+  grid-auto-flow: column;
+  grid-template-columns: none;
+  margin-inline: calc(-1 * clamp(18px, 4vw, 32px));
+  overflow-x: auto;
+  padding: 4px clamp(18px, 4vw, 32px) 16px;
+  scroll-padding-inline: clamp(18px, 4vw, 32px);
+  scroll-snap-type: x mandatory;
+}
+
+.public-gallery-layout-carousel .public-gallery-item {
+  scroll-snap-align: start;
+}
+
+.public-gallery-layout-carousel .public-gallery-item img {
+  aspect-ratio: 3 / 4;
+}
+
+.public-gallery-layout-before-after {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.public-gallery-layout-before-after .public-gallery-item {
+  position: relative;
+}
+
+.public-gallery-layout-before-after .public-gallery-item:nth-child(odd) {
+  border-bottom-right-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.public-gallery-layout-before-after .public-gallery-item:nth-child(even) {
+  border-bottom-left-radius: 0;
+  border-top-left-radius: 0;
+}
+
+.public-gallery-layout-before-after .public-gallery-item:nth-child(odd)::before,
+.public-gallery-layout-before-after .public-gallery-item:nth-child(even)::before {
+  background: rgba(17, 24, 39, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: var(--radius-pill);
+  color: white;
+  content: "Before";
+  font-size: 0.78rem;
+  font-weight: 700;
+  left: 12px;
+  letter-spacing: 0;
+  padding: 5px 9px;
+  position: absolute;
+  text-transform: uppercase;
+  top: 12px;
+  z-index: 2;
+}
+
+.public-gallery-layout-before-after .public-gallery-item:nth-child(even)::before {
+  content: "After";
+}
+
 .public-gallery-item {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -1724,6 +1829,20 @@ button.button:disabled,
   .dashboard-action-card {
     height: 220px;
   }
+
+  .public-gallery-layout-masonry {
+    column-count: 2;
+  }
+
+  .public-gallery-layout-editorial {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .public-gallery-layout-editorial .public-gallery-item,
+  .public-gallery-layout-editorial .public-gallery-item:nth-child(7n + 4),
+  .public-gallery-layout-editorial .public-gallery-item:nth-child(7n + 5) {
+    grid-column: span 2;
+  }
 }
 
 @media (max-width: 860px) {
@@ -1739,6 +1858,28 @@ button.button:disabled,
   .public-gallery-grid,
   .booking-flow {
     grid-template-columns: 1fr;
+  }
+
+  .public-gallery-layout-masonry {
+    column-count: 1;
+  }
+
+  .public-gallery-layout-editorial .public-gallery-item,
+  .public-gallery-layout-editorial .public-gallery-item:nth-child(7n + 1),
+  .public-gallery-layout-editorial .public-gallery-item:nth-child(7n + 4),
+  .public-gallery-layout-editorial .public-gallery-item:nth-child(7n + 5) {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .public-gallery-layout-carousel {
+    grid-auto-columns: minmax(260px, 84vw);
+    grid-template-columns: none;
+  }
+
+  .public-gallery-layout-before-after .public-gallery-item:nth-child(odd),
+  .public-gallery-layout-before-after .public-gallery-item:nth-child(even) {
+    border-radius: var(--radius-card);
   }
 
   .hero {

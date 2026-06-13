@@ -14,7 +14,7 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Public galleries, access-token proofing, signed image variants, downloads, ZIP delivery bundles, favorite capture, widgets, and lightbox viewing are live.",
+    summary: "Public galleries, selectable gallery layouts, access-token proofing, signed image variants, downloads, ZIP delivery bundles, favorite capture, widgets, and lightbox viewing are live.",
     primaryGap: "Print/lab workflows, batch upload tooling, and watermark controls remain pending."
   },
   capabilities: [
@@ -23,6 +23,7 @@ export const manifest = {
     { label: "Proofing favorites", status: "live" },
     { label: "Comments and approvals", status: "live" },
     { label: "Gallery widgets and lightbox", status: "live" },
+    { label: "Selectable gallery layouts", status: "live" },
     { label: "Signed image variants", status: "live" },
     { label: "ZIP delivery bundles", status: "live" }
   ],
@@ -30,7 +31,7 @@ export const manifest = {
   publicRoutes: ["/galleries/[slug]", "/galleries/access/[token]"],
   widgetRoutes: ["/galleries/[slug]#gallery-grid"],
   dependencies: ["media", "clients"],
-  dataModels: ["PortfolioGallery", "PortfolioGalleryItem", "PortfolioGalleryAccess", "PortfolioGalleryFavorite"],
+  dataModels: ["PortfolioGallery", "PortfolioGalleryItem", "PortfolioGalleryAccess", "PortfolioGalleryFavorite", "PortfolioGalleryLayout"],
   permissions: ["portfolio:manage"],
   settingsSections: ["Portfolio", "Media"],
   healthChecks: ["published-galleries", "private-access-records"],

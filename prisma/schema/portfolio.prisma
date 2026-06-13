@@ -12,6 +12,14 @@ enum PortfolioGalleryVisibility {
   PASSWORD
 }
 
+enum PortfolioGalleryLayout {
+  GRID
+  MASONRY
+  EDITORIAL
+  CAROUSEL
+  BEFORE_AFTER
+}
+
 enum PortfolioItemType {
   IMAGE
   VIDEO
@@ -53,6 +61,7 @@ model PortfolioGallery {
   description     String                       @default("")
   status          PortfolioGalleryStatus       @default(DRAFT)
   visibility      PortfolioGalleryVisibility   @default(PUBLIC)
+  layout          PortfolioGalleryLayout       @default(GRID)
   category        String                       @default("")
   coverImageUrl   String                       @default("")
   location        String                       @default("")
