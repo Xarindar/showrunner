@@ -14,12 +14,13 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Public testimonial collection, moderation, featured display, honeypot, and rate limits are live.",
-    primaryGap: "Review requests, third-party imports, consent snapshots, schema output, and moderation audit trail are pending."
+    summary: "Public testimonial collection, moderation, featured display, moderation audit trail, honeypot, and rate limits are live.",
+    primaryGap: "Review requests, third-party imports, consent snapshots, and schema output are pending."
   },
   capabilities: [
     { label: "Public collection", status: "live" },
     { label: "Moderation", status: "live" },
+    { label: "Moderation audit trail", status: "live" },
     { label: "Request/import workflows", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/testimonials"],

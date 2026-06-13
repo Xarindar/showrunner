@@ -4,6 +4,7 @@ import { TestimonialStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { recordAuditLog } from "@/lib/audit";
 import { formObject, parseForm } from "@/lib/admin-validation";
 import { getAccessibleTestimonialWhere, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -63,12 +64,49 @@ const publicTestimonialSchema = z.object({
 const adminPermissionText = "Permission to display this testimonial publicly was recorded by an admin.";
 const publicPermissionText = "I give permission to display this testimonial publicly after review.";
 
+type TestimonialAuditSnapshot = {
+  authorEmail: string;
+  authorName: string;
+  clientId: string | null;
+  featured: boolean;
+  permissionGranted: boolean;
+  quotePreview: string;
+  status: TestimonialStatus;
+};
+
 function refreshTestimonials() {
   revalidatePath("/");
   revalidatePath("/testimonials");
   revalidatePath("/admin");
   revalidatePath("/admin/modules/testimonials");
   revalidatePath("/admin/modules/clients");
+}
+
+function testimonialAuditSnapshot(testimonial: {
+  authorEmail: string;
+  authorName: string;
+  clientId: string | null;
+  featured: boolean;
+  permissionGranted: boolean;
+  quote: string;
+  status: TestimonialStatus;
+}): TestimonialAuditSnapshot {
+  return {
+    authorEmail: testimonial.authorEmail,
+    authorName: testimonial.authorName,
+    clientId: testimonial.clientId,
+    featured: testimonial.featured,
+    permissionGranted: testimonial.permissionGranted,
+    quotePreview: testimonial.quote.slice(0, 160),
+    status: testimonial.status
+  };
+}
+
+function testimonialStatusAuditAction(status: TestimonialStatus) {
+  if (status === TestimonialStatus.APPROVED) return "testimonial.approved";
+  if (status === TestimonialStatus.REJECTED) return "testimonial.rejected";
+  if (status === TestimonialStatus.ARCHIVED) return "testimonial.archived";
+  return "testimonial.moderation_updated";
 }
 
 async function findOrCreateClient(authorName: string, authorEmail: string, updateExistingName: boolean, siteId: string) {
@@ -134,7 +172,16 @@ export async function updateTestimonialModerationAction(formData: FormData) {
   const accessibleWhere = await getAccessibleTestimonialWhere(user, siteId, { id: input.id });
   const testimonial = await prisma.testimonial.findFirst({
     where: accessibleWhere,
-    select: { permissionGranted: true, status: true }
+    select: {
+      authorEmail: true,
+      authorName: true,
+      clientId: true,
+      featured: true,
+      id: true,
+      permissionGranted: true,
+      quote: true,
+      status: true
+    }
   });
 
   if (!testimonial) {
@@ -142,7 +189,13 @@ export async function updateTestimonialModerationAction(formData: FormData) {
   }
 
   const nextStatus = input.status || testimonial.status;
-  const wantsFeatured = input.featured === "true";
+  const nextFeatured =
+    input.status === TestimonialStatus.REJECTED
+      ? false
+      : input.featured
+        ? input.featured === "true"
+        : testimonial.featured;
+  const wantsFeatured = nextFeatured;
   if ((nextStatus === TestimonialStatus.APPROVED || wantsFeatured) && !testimonial.permissionGranted) {
     redirect(`/admin/modules/testimonials?error=${encodeURIComponent("Permission is required before approving or featuring a testimonial.")}`);
   }
@@ -160,6 +213,47 @@ export async function updateTestimonialModerationAction(formData: FormData) {
     }
   });
 
+  const before = testimonialAuditSnapshot(testimonial);
+  const after: TestimonialAuditSnapshot = {
+    ...before,
+    featured: nextFeatured,
+    status: nextStatus
+  };
+  const auditEntries = [];
+
+  if (input.status && input.status !== testimonial.status) {
+    auditEntries.push({
+      action: testimonialStatusAuditAction(input.status),
+      previousStatus: testimonial.status,
+      nextStatus: input.status
+    });
+  }
+
+  if (nextFeatured !== testimonial.featured) {
+    auditEntries.push({
+      action: nextFeatured ? "testimonial.featured" : "testimonial.unfeatured",
+      previousFeatured: testimonial.featured,
+      nextFeatured
+    });
+  }
+
+  for (const entry of auditEntries) {
+    await recordAuditLog({
+      action: entry.action,
+      actor: user,
+      metadata: {
+        before,
+        after,
+        clientId: testimonial.clientId,
+        ...entry
+      },
+      siteId,
+      targetId: testimonial.id,
+      targetLabel: testimonial.authorName,
+      targetType: "testimonial"
+    });
+  }
+
   refreshTestimonials();
 }
 
@@ -167,9 +261,39 @@ export async function deleteTestimonialAction(formData: FormData) {
   const user = await requireAdmin("testimonials:manage");
   const input = await parseForm(deleteTestimonialSchema, formData, "/admin/modules/testimonials");
   const siteId = await getCurrentSiteId();
+  const accessibleWhere = await getAccessibleTestimonialWhere(user, siteId, { id: input.id });
+  const testimonial = await prisma.testimonial.findFirst({
+    where: accessibleWhere,
+    select: {
+      authorEmail: true,
+      authorName: true,
+      clientId: true,
+      featured: true,
+      id: true,
+      permissionGranted: true,
+      quote: true,
+      status: true
+    }
+  });
+
+  if (!testimonial) {
+    redirect(`/admin/modules/testimonials?error=${encodeURIComponent("Testimonial not found.")}`);
+  }
 
   await prisma.testimonial.deleteMany({
-    where: await getAccessibleTestimonialWhere(user, siteId, { id: input.id })
+    where: accessibleWhere
+  });
+  await recordAuditLog({
+    action: "testimonial.deleted",
+    actor: user,
+    metadata: {
+      before: testimonialAuditSnapshot(testimonial),
+      clientId: testimonial.clientId
+    },
+    siteId,
+    targetId: testimonial.id,
+    targetLabel: testimonial.authorName,
+    targetType: "testimonial"
   });
 
   refreshTestimonials();
