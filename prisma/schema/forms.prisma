@@ -54,6 +54,7 @@ model Form {
   description       String           @default("")
   status            FormStatus       @default(DRAFT)
   destination       FormDestination  @default(STANDALONE_LEAD)
+  enableSteps       Boolean          @default(false)
   submitButtonLabel String           @default("Submit")
   successMessage    String           @default("Thanks. Your form was submitted.")
   notificationEmail String?
@@ -79,8 +80,10 @@ model FormField {
   placeholder String        @default("")
   helpText    String        @default("")
   options     Json          @default("[]")
+  conditionalLogic Json          @default("{}")
   isRequired  Boolean       @default(false)
   isHidden    Boolean       @default(false)
+  pageNumber  Int           @default(1)
   sortOrder   Int           @default(0)
   createdAt   DateTime      @default(now())
   signatures  FormSignature[]

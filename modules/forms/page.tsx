@@ -8,6 +8,7 @@ import { publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
+import { conditionalActions, conditionalOperators, normalizeConditionalLogic } from "./conditional-logic";
 import {
   createFormAttachmentAction,
   createFormAction,
@@ -28,9 +29,26 @@ export const dynamic = "force-dynamic";
 const pageSize = 20;
 const statusFilters = ["all", ...Object.values(FormStatus).map((status) => status.toLowerCase())] as const;
 const supportedDestinations = Object.values(FormDestination);
+const conditionActionLabels = {
+  HIDE: "Hide",
+  SHOW: "Show"
+} as const;
+const conditionOperatorLabels = {
+  CONTAINS: "contains",
+  EMPTY: "is empty",
+  EQUALS: "equals",
+  NOT_EMPTY: "is not empty",
+  NOT_EQUALS: "does not equal"
+} as const;
 
 type FormsPageProps = {
   searchParams: Promise<{ saved?: string; error?: string; page?: string; status?: string; form?: string }>;
+};
+
+type BuilderField = {
+  conditionalLogic: unknown;
+  id: string;
+  label: string;
 };
 
 function normalizeStatusFilter(value?: string) {
@@ -90,6 +108,82 @@ function destinationOptions(current?: FormDestination) {
 
 function targetKey(targetType: FormAttachmentTargetType, targetId: string) {
   return `${targetType}:${targetId}`;
+}
+
+function conditionNeedsValue(operator: keyof typeof conditionOperatorLabels) {
+  return operator !== "EMPTY" && operator !== "NOT_EMPTY";
+}
+
+function conditionSummary(field: BuilderField, fields: BuilderField[]) {
+  const logic = normalizeConditionalLogic(field.conditionalLogic);
+  if (!logic.enabled) return null;
+
+  const source = fields.find((candidate) => candidate.id === logic.sourceFieldId);
+  const value = conditionNeedsValue(logic.operator) ? ` "${logic.value}"` : "";
+
+  return `${conditionActionLabels[logic.action]} when ${source?.label || "selected field"} ${conditionOperatorLabels[logic.operator]}${value}`;
+}
+
+function conditionalControls(input: { field?: BuilderField; fields: BuilderField[]; idPrefix: string }) {
+  const logic = normalizeConditionalLogic(input.field?.conditionalLogic);
+  const sourceFields = input.fields.filter((field) => field.id !== input.field?.id);
+  const hasSourceFields = sourceFields.length > 0;
+
+  return (
+    <details>
+      <summary>Conditional visibility</summary>
+      <div className="form-grid" style={{ marginTop: 12 }}>
+        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+          <input name="conditionEnabled" type="checkbox" defaultChecked={logic.enabled} disabled={!hasSourceFields} />
+          Enable rule
+        </label>
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor={`${input.idPrefix}-condition-action`}>Action</label>
+            <select id={`${input.idPrefix}-condition-action`} name="conditionAction" defaultValue={logic.action}>
+              {conditionalActions.map((action) => (
+                <option key={action} value={action}>
+                  {conditionActionLabels[action]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor={`${input.idPrefix}-condition-source`}>When field</label>
+            <select
+              id={`${input.idPrefix}-condition-source`}
+              name="conditionSourceFieldId"
+              defaultValue={logic.sourceFieldId}
+              disabled={!hasSourceFields}
+            >
+              <option value="">{hasSourceFields ? "Choose field" : "Add another field first"}</option>
+              {sourceFields.map((field) => (
+                <option key={field.id} value={field.id}>
+                  {field.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor={`${input.idPrefix}-condition-operator`}>Operator</label>
+            <select id={`${input.idPrefix}-condition-operator`} name="conditionOperator" defaultValue={logic.operator}>
+              {conditionalOperators.map((operator) => (
+                <option key={operator} value={operator}>
+                  {conditionOperatorLabels[operator]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor={`${input.idPrefix}-condition-value`}>Value</label>
+            <input id={`${input.idPrefix}-condition-value`} name="conditionValue" defaultValue={logic.value} />
+          </div>
+        </div>
+      </div>
+    </details>
+  );
 }
 
 export default async function FormsPage({ searchParams }: FormsPageProps) {
@@ -326,6 +420,10 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
             <label htmlFor="successMessage">Success message</label>
             <input id="successMessage" name="successMessage" placeholder="Thanks. Your form was submitted." />
           </div>
+          <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <input name="enableSteps" type="checkbox" />
+            Use multi-step pages
+          </label>
           <button className="button" type="submit">
             <Plus size={18} />
             Create form
@@ -465,6 +563,10 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               <label htmlFor={`selected-${selectedForm.id}-success`}>Success message</label>
               <input id={`selected-${selectedForm.id}-success`} name="successMessage" defaultValue={selectedForm.successMessage} />
             </div>
+            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <input name="enableSteps" type="checkbox" defaultChecked={selectedForm.enableSteps} />
+              Use multi-step pages
+            </label>
             <button className="button" type="submit">
               Save form
             </button>
@@ -633,10 +735,14 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                   <input id="field-options" name="options" placeholder="Email, Phone, Text" />
                 </div>
               </div>
-              <div className="grid-2">
+              <div className="grid-3">
                 <div className="field">
                   <label htmlFor="field-help">Help text</label>
                   <input id="field-help" name="helpText" />
+                </div>
+                <div className="field">
+                  <label htmlFor="field-page">Page</label>
+                  <input id="field-page" name="pageNumber" type="number" min={1} defaultValue={1} />
                 </div>
                 <div className="field">
                   <label htmlFor="field-sort">Sort order</label>
@@ -653,6 +759,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                   Hidden metadata
                 </label>
               </div>
+              {conditionalControls({ fields: selectedForm.fields, idPrefix: "field-new" })}
               <button className="button secondary" type="submit">
                 Add field
               </button>
@@ -682,7 +789,15 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                       {field.isHidden ? <span className="pill">hidden</span> : null}
                       {field.fieldRole !== FormFieldRole.NONE ? <span className="pill">{enumLabel(field.fieldRole)}</span> : null}
                       <br />
-                      <span style={{ color: "var(--muted)" }}>Sort {field.sortOrder}</span>
+                      <span style={{ color: "var(--muted)" }}>
+                        Page {field.pageNumber} · Sort {field.sortOrder}
+                      </span>
+                      {conditionSummary(field, selectedForm.fields) ? (
+                        <>
+                          <br />
+                          <span style={{ color: "var(--muted)" }}>{conditionSummary(field, selectedForm.fields)}</span>
+                        </>
+                      ) : null}
                     </td>
                     <td>
                       <details>
@@ -694,7 +809,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                             <label htmlFor={`field-${field.id}-label`}>Label</label>
                             <input id={`field-${field.id}-label`} name="label" defaultValue={field.label} required />
                           </div>
-                          <div className="grid-2">
+                          <div className="grid-3">
                             <div className="field">
                               <label htmlFor={`field-${field.id}-type`}>Type</label>
                               <select id={`field-${field.id}-type`} name="type" defaultValue={field.type}>
@@ -704,6 +819,10 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                                   </option>
                                 ))}
                               </select>
+                            </div>
+                            <div className="field">
+                              <label htmlFor={`field-${field.id}-page`}>Page</label>
+                              <input id={`field-${field.id}-page`} name="pageNumber" type="number" min={1} defaultValue={field.pageNumber} />
                             </div>
                             <div className="field">
                               <label htmlFor={`field-${field.id}-sort`}>Sort order</label>
@@ -742,6 +861,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                               Hidden metadata
                             </label>
                           </div>
+                          {conditionalControls({ field, fields: selectedForm.fields, idPrefix: `field-${field.id}` })}
                           <button className="button secondary" type="submit">
                             Save field
                           </button>

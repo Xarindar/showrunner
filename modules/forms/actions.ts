@@ -22,6 +22,7 @@ import { prisma } from "@/lib/prisma";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
 import { slugify } from "@/lib/slug";
+import { computeVisibleFieldIds, conditionalActions, conditionalOperators, normalizeConditionalLogic } from "./conditional-logic";
 import { findFormTemplate } from "./templates";
 
 const supportedDestinations = Object.values(FormDestination) as [FormDestination, ...FormDestination[]];
@@ -39,12 +40,14 @@ const formSchema = z
     description: optionalStoredText,
     status: z.enum(FormStatus).catch(FormStatus.DRAFT),
     destination: z.enum(supportedDestinations).catch(FormDestination.STANDALONE_LEAD),
+    enableSteps: z.literal("on").optional(),
     submitButtonLabel: optionalStoredText,
     successMessage: optionalStoredText,
     notificationEmail: optionalEmail
   })
   .transform((value) => ({
     ...value,
+    enableSteps: value.enableSteps === "on",
     submitButtonLabel: value.submitButtonLabel || "Submit",
     successMessage: value.successMessage || "Thanks. Your form was submitted."
   }));
@@ -100,8 +103,14 @@ const fieldSchema = z
     placeholder: optionalStoredText,
     helpText: optionalStoredText,
     options: optionalStoredText,
+    conditionAction: z.enum(conditionalActions).catch("SHOW"),
+    conditionEnabled: z.literal("on").optional(),
+    conditionOperator: z.enum(conditionalOperators).catch("EQUALS"),
+    conditionSourceFieldId: optionalStoredText,
+    conditionValue: optionalStoredText,
     isRequired: z.literal("on").optional(),
     isHidden: z.literal("on").optional(),
+    pageNumber: z.coerce.number().int().min(1).default(1),
     sortOrder: z.coerce.number().int().default(0)
   })
   .transform((value) => ({
@@ -113,6 +122,16 @@ const fieldSchema = z
           ? FormFieldRole.NONE
           : value.fieldRole,
     options: csvList(value.options),
+    conditionalLogic:
+      value.conditionEnabled === "on" && value.conditionSourceFieldId
+        ? {
+            action: value.conditionAction,
+            enabled: true,
+            operator: value.conditionOperator,
+            sourceFieldId: value.conditionSourceFieldId,
+            value: value.conditionValue
+          }
+        : {},
     isRequired: value.isRequired === "on",
     isHidden: value.type === FormFieldType.HIDDEN || value.isHidden === "on"
   }));
@@ -185,6 +204,7 @@ export async function createFormAction(formData: FormData) {
         description: input.description,
         status: input.status,
         destination: input.destination,
+        enableSteps: input.enableSteps,
         submitButtonLabel: input.submitButtonLabel,
         successMessage: input.successMessage,
         notificationEmail: input.notificationEmail
@@ -228,6 +248,7 @@ export async function updateFormAction(formData: FormData) {
         description: input.description,
         status: input.status,
         destination: input.destination,
+        enableSteps: input.enableSteps,
         submitButtonLabel: input.submitButtonLabel,
         successMessage: input.successMessage,
         notificationEmail: input.notificationEmail
@@ -285,33 +306,64 @@ export async function duplicateFormAction(formData: FormData) {
   }
 
   const slug = await generateUniqueFormSlug(`${source.name} copy`, undefined, undefined, siteId);
-  const form = await prisma.form.create({
-    data: {
-      siteId,
-      slug,
-      name: `${source.name} copy`,
-      description: source.description,
-      status: FormStatus.DRAFT,
-      destination: supportedDestinations.includes(source.destination as (typeof supportedDestinations)[number])
-        ? source.destination
-        : FormDestination.STANDALONE_LEAD,
-      submitButtonLabel: source.submitButtonLabel,
-      successMessage: source.successMessage,
-      notificationEmail: source.notificationEmail,
-      fields: {
-        create: source.fields.map((field) => ({
+  const form = await prisma.$transaction(async (tx) => {
+    const createdForm = await tx.form.create({
+      data: {
+        siteId,
+        slug,
+        name: `${source.name} copy`,
+        description: source.description,
+        status: FormStatus.DRAFT,
+        destination: supportedDestinations.includes(source.destination as (typeof supportedDestinations)[number])
+          ? source.destination
+          : FormDestination.STANDALONE_LEAD,
+        enableSteps: source.enableSteps,
+        submitButtonLabel: source.submitButtonLabel,
+        successMessage: source.successMessage,
+        notificationEmail: source.notificationEmail
+      }
+    });
+    const fieldIdBySourceId = new Map<string, string>();
+
+    for (const field of source.fields) {
+      const createdField = await tx.formField.create({
+        data: {
+          formId: createdForm.id,
           label: field.label,
           type: field.type,
           fieldRole: field.fieldRole,
           placeholder: field.placeholder,
           helpText: field.helpText,
           options: (Array.isArray(field.options) ? field.options : []) as Prisma.InputJsonValue,
+          conditionalLogic: {},
           isRequired: field.isRequired,
           isHidden: field.isHidden,
+          pageNumber: field.pageNumber,
           sortOrder: field.sortOrder
-        }))
-      }
+        },
+        select: { id: true }
+      });
+      fieldIdBySourceId.set(field.id, createdField.id);
     }
+
+    for (const field of source.fields) {
+      const logic = normalizeConditionalLogic(field.conditionalLogic);
+      const fieldId = fieldIdBySourceId.get(field.id);
+      const sourceFieldId = fieldIdBySourceId.get(logic.sourceFieldId);
+      if (!logic.enabled || !fieldId || !sourceFieldId) continue;
+
+      await tx.formField.update({
+        where: { id: fieldId },
+        data: {
+          conditionalLogic: {
+            ...logic,
+            sourceFieldId
+          } as Prisma.InputJsonValue
+        }
+      });
+    }
+
+    return createdForm;
   });
 
   refreshForms(form.slug);
@@ -387,11 +439,15 @@ export async function createFormFieldAction(formData: FormData) {
   const siteId = await getCurrentSiteId();
   const form = await prisma.form.findFirst({
     where: { id: input.formId, siteId },
-    select: { slug: true }
+    select: { fields: { select: { id: true } }, slug: true }
   });
 
   if (!form) {
     redirect(`/admin/modules/forms?error=${encodeURIComponent("Form not found.")}`);
+  }
+
+  if (!conditionSourceAllowed(input, new Set(form.fields.map((field) => field.id)))) {
+    redirect(`/admin/modules/forms?form=${input.formId}&error=${encodeURIComponent("Choose a valid field for the conditional rule.")}`);
   }
 
   await prisma.formField.create({
@@ -403,8 +459,10 @@ export async function createFormFieldAction(formData: FormData) {
       placeholder: input.placeholder,
       helpText: input.helpText,
       options: input.options,
+      conditionalLogic: input.conditionalLogic as Prisma.InputJsonValue,
       isRequired: input.isRequired,
       isHidden: input.isHidden,
+      pageNumber: input.pageNumber,
       sortOrder: input.sortOrder
     }
   });
@@ -419,11 +477,15 @@ export async function updateFormFieldAction(formData: FormData) {
   const siteId = await getCurrentSiteId();
   const form = await prisma.form.findFirst({
     where: { id: input.formId, siteId },
-    select: { slug: true }
+    select: { fields: { select: { id: true } }, slug: true }
   });
 
   if (!form) {
     redirect(`/admin/modules/forms?error=${encodeURIComponent("Form not found.")}`);
+  }
+
+  if (!conditionSourceAllowed(input, new Set(form.fields.map((field) => field.id)))) {
+    redirect(`/admin/modules/forms?form=${input.formId}&error=${encodeURIComponent("Choose a valid field for the conditional rule.")}`);
   }
 
   await prisma.formField.updateMany({
@@ -435,8 +497,10 @@ export async function updateFormFieldAction(formData: FormData) {
       placeholder: input.placeholder,
       helpText: input.helpText,
       options: input.options,
+      conditionalLogic: input.conditionalLogic as Prisma.InputJsonValue,
       isRequired: input.isRequired,
       isHidden: input.isHidden,
+      pageNumber: input.pageNumber,
       sortOrder: input.sortOrder
     }
   });
@@ -451,15 +515,28 @@ export async function deleteFormFieldAction(formData: FormData) {
   const siteId = await getCurrentSiteId();
   const form = await prisma.form.findFirst({
     where: { id: input.formId, siteId },
-    select: { slug: true }
+    select: { fields: { select: { conditionalLogic: true, id: true } }, slug: true }
   });
 
   if (!form) {
     redirect(`/admin/modules/forms?error=${encodeURIComponent("Form not found.")}`);
   }
 
-  await prisma.formField.deleteMany({
-    where: { id: input.id, formId: input.formId, form: { siteId } }
+  const dependentFieldIds = form.fields
+    .filter((field) => field.id !== input.id && normalizeConditionalLogic(field.conditionalLogic).sourceFieldId === input.id)
+    .map((field) => field.id);
+
+  await prisma.$transaction(async (tx) => {
+    if (dependentFieldIds.length) {
+      await tx.formField.updateMany({
+        where: { id: { in: dependentFieldIds }, formId: input.formId, form: { siteId } },
+        data: { conditionalLogic: {} }
+      });
+    }
+
+    await tx.formField.deleteMany({
+      where: { id: input.id, formId: input.formId, form: { siteId } }
+    });
   });
 
   refreshForms(form.slug);
@@ -587,6 +664,11 @@ function redirectWithPublicError(
   redirect(publicFormPath(slug, attachmentContext, { error: message }));
 }
 
+function conditionSourceAllowed(input: { conditionalLogic: unknown; id?: string }, fieldIds: Set<string>) {
+  const logic = normalizeConditionalLogic(input.conditionalLogic);
+  return !logic.enabled || (fieldIds.has(logic.sourceFieldId) && logic.sourceFieldId !== input.id);
+}
+
 export async function createPublicFormSubmissionAction(formData: FormData) {
   const settings = await getSiteSettings();
   if (!settings.enabledModuleIds.includes("forms")) {
@@ -658,11 +740,28 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
   }> = [];
   let submitterName = "";
   let submitterEmail = "";
+  const submittedValues: Record<string, string> = {};
 
   for (const field of form.fields) {
     const key = publicFieldName(field.id);
     const rawValue = field.type === FormFieldType.CHECKBOX ? (formData.get(key) === "on" ? "yes" : "") : String(formData.get(key) || "").trim();
+    submittedValues[field.id] = field.type === FormFieldType.HIDDEN ? field.placeholder : rawValue;
+  }
+
+  const visibleFieldIds = computeVisibleFieldIds(form.fields, submittedValues);
+
+  for (const field of form.fields) {
+    const rawValue = submittedValues[field.id] || "";
     const value = field.type === FormFieldType.HIDDEN ? field.placeholder : rawValue;
+
+    if (!visibleFieldIds.has(field.id)) {
+      data[field.id] = {
+        label: field.label,
+        type: field.type,
+        value: ""
+      };
+      continue;
+    }
 
     if (field.type === FormFieldType.SIGNATURE) {
       const signature = parseSignaturePayload(rawValue);

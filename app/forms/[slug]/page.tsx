@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { FormFieldType, FormStatus, type FormField } from "@prisma/client";
 import { CalendarDays, MessageSquare } from "lucide-react";
@@ -10,6 +11,7 @@ import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
 import { prisma } from "@/lib/prisma";
 import { createPublicFormSubmissionAction } from "@/modules/forms/actions";
+import { PublicFormBehavior } from "./public-form-behavior";
 import { SignatureField } from "./signature-field";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +64,16 @@ function renderField(field: FormField) {
   const name = fieldInputName(field.id);
   const options = optionsFromJson(field.options);
   const helpId = field.helpText ? `${field.id}-help` : undefined;
+  const wrapField = (children: ReactNode, forceHidden = false) => (
+    <div
+      data-form-field-id={field.id}
+      data-form-field-page={field.pageNumber}
+      hidden={forceHidden}
+      key={field.id}
+    >
+      {children}
+    </div>
+  );
   const commonProps = {
     id: field.id,
     name,
@@ -71,12 +83,12 @@ function renderField(field: FormField) {
   };
 
   if (field.type === FormFieldType.HIDDEN) {
-    return <input key={field.id} type="hidden" name={name} value={field.placeholder} />;
+    return wrapField(<input type="hidden" name={name} value={field.placeholder} />, true);
   }
 
   if (field.type === FormFieldType.TEXTAREA) {
-    return (
-      <div className="field" key={field.id}>
+    return wrapField(
+      <div className="field">
         <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
         <textarea {...commonProps} placeholder={field.placeholder} />
         {field.helpText ? (
@@ -89,8 +101,8 @@ function renderField(field: FormField) {
   }
 
   if (field.type === FormFieldType.SELECT) {
-    return (
-      <div className="field" key={field.id}>
+    return wrapField(
+      <div className="field">
         <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
         <select {...commonProps} defaultValue="">
           <option value="" disabled>
@@ -112,8 +124,8 @@ function renderField(field: FormField) {
   }
 
   if (field.type === FormFieldType.RADIO) {
-    return (
-      <fieldset className="field" key={field.id} style={{ border: 0, margin: 0, padding: 0 }} aria-describedby={helpId}>
+    return wrapField(
+      <fieldset className="field" style={{ border: 0, margin: 0, padding: 0 }} aria-describedby={helpId}>
         <legend style={{ color: "var(--muted)", fontSize: "0.88rem", fontWeight: 700 }}>
           {labelText(field.label, field.isRequired)}
         </legend>
@@ -135,8 +147,8 @@ function renderField(field: FormField) {
   }
 
   if (field.type === FormFieldType.CHECKBOX) {
-    return (
-      <div className="field" key={field.id}>
+    return wrapField(
+      <div className="field">
         <label style={{ alignItems: "center", color: "var(--ink)", display: "flex", gap: 8 }}>
           <input
             name={name}
@@ -157,12 +169,11 @@ function renderField(field: FormField) {
   }
 
   if (field.type === FormFieldType.SIGNATURE) {
-    return (
+    return wrapField(
       <SignatureField
         fieldId={field.id}
         helpText={field.helpText}
         isRequired={field.isRequired}
-        key={field.id}
         label={field.label}
         name={name}
         placeholder={field.placeholder}
@@ -173,8 +184,8 @@ function renderField(field: FormField) {
   const inputType =
     field.type === FormFieldType.EMAIL ? "email" : field.type === FormFieldType.PHONE ? "tel" : field.type === FormFieldType.DATE ? "date" : "text";
 
-  return (
-    <div className="field" key={field.id}>
+  return wrapField(
+    <div className="field">
       <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
       <input {...commonProps} placeholder={field.placeholder} type={inputType} />
       {field.helpText ? (
@@ -291,9 +302,17 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
           />
           {form.fields.map(renderField)}
           {!form.fields.length ? <p className="empty-state">This form does not have fields yet.</p> : null}
-          <button className="button" type="submit">
-            {form.submitButtonLabel}
-          </button>
+          <PublicFormBehavior
+            enableSteps={form.enableSteps}
+            fields={form.fields.map((field) => ({
+              conditionalLogic: field.conditionalLogic,
+              id: field.id,
+              inputName: fieldInputName(field.id),
+              pageNumber: field.pageNumber,
+              type: field.type
+            }))}
+            submitButtonLabel={form.submitButtonLabel}
+          />
         </form>
       </section>
     </main>
