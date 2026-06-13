@@ -11,8 +11,7 @@ import { queueFormSubmittedEmail } from "@/lib/email";
 import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
 import { prisma } from "@/lib/prisma";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
-import { getSiteSettings } from "@/lib/site";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
 import { slugify } from "@/lib/slug";
 
 const supportedDestinations = [FormDestination.STANDALONE_LEAD, FormDestination.CLIENT, FormDestination.INQUIRY] as const;
@@ -85,7 +84,7 @@ const fieldDeleteSchema = z.object({
   confirmDelete: z.literal("on", { error: "Confirm deletion before removing the field." })
 });
 
-async function generateUniqueFormSlug(name: string, inputSlug?: string, exceptId?: string, siteId = DEFAULT_SITE_ID) {
+async function generateUniqueFormSlug(name: string, inputSlug: string | undefined, exceptId: string | undefined, siteId: string) {
   const base = slugify(inputSlug || name) || "form";
   let candidate = base;
   let suffix = 2;
@@ -111,15 +110,16 @@ function refreshForms(slug?: string) {
 }
 
 export async function createFormAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("forms:manage");
   const input = await parseForm(formSchema, formData, "/admin/modules/forms");
-  const slug = await generateUniqueFormSlug(input.name, input.slug);
+  const siteId = await getCurrentSiteId();
+  const slug = await generateUniqueFormSlug(input.name, input.slug, undefined, siteId);
 
   let form;
   try {
     form = await prisma.form.create({
       data: {
-        siteId: DEFAULT_SITE_ID,
+        siteId,
         slug,
         name: input.name,
         description: input.description,
@@ -143,18 +143,18 @@ export async function createFormAction(formData: FormData) {
 }
 
 export async function updateFormAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("forms:manage");
   const input = await parseForm(formUpdateSchema, formData, "/admin/modules/forms");
+  const siteId = await getCurrentSiteId();
   const current = await prisma.form.findFirst({
-    where: { id: input.id, siteId: DEFAULT_SITE_ID },
-    select: { siteId: true, slug: true }
+    where: { id: input.id, siteId },
+    select: { slug: true }
   });
 
   if (!current) {
     redirect(`/admin/modules/forms?error=${encodeURIComponent("Form not found.")}`);
   }
 
-  const siteId = current?.siteId || DEFAULT_SITE_ID;
   const slug = input.slug
     ? await generateUniqueFormSlug(input.name, input.slug, input.id, siteId)
     : current?.slug || (await generateUniqueFormSlug(input.name, undefined, input.id, siteId));
@@ -186,11 +186,12 @@ export async function updateFormAction(formData: FormData) {
 }
 
 export async function updateFormStatusAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("forms:manage");
   const input = await parseForm(formStatusSchema, formData, "/admin/modules/forms");
+  const siteId = await getCurrentSiteId();
 
   const form = await prisma.form.findFirst({
-    where: { id: input.id, siteId: DEFAULT_SITE_ID },
+    where: { id: input.id, siteId },
     select: { slug: true }
   });
 
@@ -207,10 +208,11 @@ export async function updateFormStatusAction(formData: FormData) {
 }
 
 export async function duplicateFormAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("forms:manage");
   const input = await parseForm(duplicateFormSchema, formData, "/admin/modules/forms");
+  const siteId = await getCurrentSiteId();
   const source = await prisma.form.findFirst({
-    where: { id: input.id, siteId: DEFAULT_SITE_ID },
+    where: { id: input.id, siteId },
     include: {
       fields: {
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
@@ -222,10 +224,10 @@ export async function duplicateFormAction(formData: FormData) {
     redirect(`/admin/modules/forms?error=${encodeURIComponent("Form not found.")}`);
   }
 
-  const slug = await generateUniqueFormSlug(`${source.name} copy`, undefined, undefined, source.siteId);
+  const slug = await generateUniqueFormSlug(`${source.name} copy`, undefined, undefined, siteId);
   const form = await prisma.form.create({
     data: {
-      siteId: source.siteId,
+      siteId,
       slug,
       name: `${source.name} copy`,
       description: source.description,
@@ -257,11 +259,12 @@ export async function duplicateFormAction(formData: FormData) {
 }
 
 export async function deleteFormAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("forms:manage");
   const input = await parseForm(deleteFormSchema, formData, "/admin/modules/forms");
+  const siteId = await getCurrentSiteId();
 
   const form = await prisma.form.findFirst({
-    where: { id: input.id, siteId: DEFAULT_SITE_ID },
+    where: { id: input.id, siteId },
     select: { slug: true }
   });
 
@@ -278,10 +281,11 @@ export async function deleteFormAction(formData: FormData) {
 }
 
 export async function createFormFieldAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("forms:manage");
   const input = await parseForm(fieldSchema, formData, "/admin/modules/forms");
+  const siteId = await getCurrentSiteId();
   const form = await prisma.form.findFirst({
-    where: { id: input.formId, siteId: DEFAULT_SITE_ID },
+    where: { id: input.formId, siteId },
     select: { slug: true }
   });
 
@@ -309,10 +313,11 @@ export async function createFormFieldAction(formData: FormData) {
 }
 
 export async function updateFormFieldAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("forms:manage");
   const input = await parseForm(fieldUpdateSchema, formData, "/admin/modules/forms");
+  const siteId = await getCurrentSiteId();
   const form = await prisma.form.findFirst({
-    where: { id: input.formId, siteId: DEFAULT_SITE_ID },
+    where: { id: input.formId, siteId },
     select: { slug: true }
   });
 
@@ -321,7 +326,7 @@ export async function updateFormFieldAction(formData: FormData) {
   }
 
   await prisma.formField.updateMany({
-    where: { id: input.id, formId: input.formId },
+    where: { id: input.id, formId: input.formId, form: { siteId } },
     data: {
       label: input.label,
       type: input.type,
@@ -340,10 +345,11 @@ export async function updateFormFieldAction(formData: FormData) {
 }
 
 export async function deleteFormFieldAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("forms:manage");
   const input = await parseForm(fieldDeleteSchema, formData, "/admin/modules/forms");
+  const siteId = await getCurrentSiteId();
   const form = await prisma.form.findFirst({
-    where: { id: input.formId, siteId: DEFAULT_SITE_ID },
+    where: { id: input.formId, siteId },
     select: { slug: true }
   });
 
@@ -352,7 +358,7 @@ export async function deleteFormFieldAction(formData: FormData) {
   }
 
   await prisma.formField.deleteMany({
-    where: { id: input.id, formId: input.formId }
+    where: { id: input.id, formId: input.formId, form: { siteId } }
   });
 
   refreshForms(form.slug);

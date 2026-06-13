@@ -19,7 +19,7 @@ import {
   parseForm
 } from "@/lib/admin-validation";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getCurrentSiteId } from "@/lib/site";
 import { slugify } from "@/lib/slug";
 
 function preferencesJson(notes: string) {
@@ -195,10 +195,10 @@ function fillBlank(current: string | null | undefined, fallback: string | null |
   return current?.trim() ? current : fallback || "";
 }
 
-async function syncClientTags(clientId: string, labels: string[]) {
+async function syncClientTags(clientId: string, labels: string[], siteId: string) {
   const normalized = [...new Set(labels.map((label) => label.trim().toLowerCase()).filter(Boolean))];
   const existing = await prisma.clientTag.findMany({
-    where: { clientId, siteId: DEFAULT_SITE_ID, source: "admin" },
+    where: { clientId, siteId, source: "admin" },
     select: { id: true, label: true }
   });
   const existingLabels = new Set(existing.map((tag) => tag.label.toLowerCase()));
@@ -208,7 +208,7 @@ async function syncClientTags(clientId: string, labels: string[]) {
     prisma.clientTag.deleteMany({
       where: {
         clientId,
-        siteId: DEFAULT_SITE_ID,
+        siteId,
         source: "admin",
         label: { in: existing.filter((tag) => !nextLabels.has(tag.label.toLowerCase())).map((tag) => tag.label) }
       }
@@ -218,7 +218,7 @@ async function syncClientTags(clientId: string, labels: string[]) {
       .map((label) =>
         prisma.clientTag.create({
           data: {
-            siteId: DEFAULT_SITE_ID,
+            siteId,
             clientId,
             label,
             source: "admin"
@@ -228,14 +228,14 @@ async function syncClientTags(clientId: string, labels: string[]) {
   ]);
 }
 
-async function uniqueSegmentKey(name: string) {
+async function uniqueSegmentKey(name: string, siteId: string) {
   const base = slugify(name) || "segment";
   let candidate = base;
   let suffix = 2;
 
   while (
     await prisma.clientSegment.findFirst({
-      where: { siteId: DEFAULT_SITE_ID, key: candidate },
+      where: { siteId, key: candidate },
       select: { id: true }
     })
   ) {
@@ -249,8 +249,9 @@ async function uniqueSegmentKey(name: string) {
 export async function createClientAction(formData: FormData) {
   await requireAdmin("clients:manage");
   const input = await parseForm(clientFormSchema, formData);
+  const siteId = await getCurrentSiteId();
   const existing = await prisma.client.findUnique({
-    where: { siteId_email: { siteId: DEFAULT_SITE_ID, email: input.email } },
+    where: { siteId_email: { siteId, email: input.email } },
     select: { id: true }
   });
 
@@ -260,13 +261,13 @@ export async function createClientAction(formData: FormData) {
 
   const client = await prisma.client.create({
     data: {
-      siteId: DEFAULT_SITE_ID,
+      siteId,
       ...clientData(input),
       policyAcceptanceHistory: policyHistory(input)
     }
   });
 
-  await syncClientTags(client.id, input.tags);
+  await syncClientTags(client.id, input.tags, siteId);
   revalidatePath("/admin/modules/clients");
   redirect(`/admin/clients/${client.id}`);
 }
@@ -274,7 +275,8 @@ export async function createClientAction(formData: FormData) {
 export async function updateClientAction(formData: FormData) {
   const user = await requireAdmin("clients:manage");
   const input = await parseForm(clientUpdateFormSchema, formData);
-  const accessibleWhere = await getAccessibleClientWhere(user, DEFAULT_SITE_ID, { id: input.id });
+  const siteId = await getCurrentSiteId();
+  const accessibleWhere = await getAccessibleClientWhere(user, siteId, { id: input.id });
   const existing = await prisma.client.findFirst({
     where: accessibleWhere,
     select: { id: true, policyAcceptanceHistory: true }
@@ -294,7 +296,7 @@ export async function updateClientAction(formData: FormData) {
     }
   });
 
-  await syncClientTags(input.id, input.tags);
+  await syncClientTags(input.id, input.tags, siteId);
   revalidatePath("/admin/modules/clients");
   revalidatePath(`/admin/clients/${input.id}`);
   redirect(`/admin/clients/${input.id}?saved=client`);
@@ -303,8 +305,9 @@ export async function updateClientAction(formData: FormData) {
 export async function addClientNoteAction(formData: FormData) {
   const user = await requireAdmin("clients:manage");
   const input = await parseForm(clientNoteFormSchema, formData);
+  const siteId = await getCurrentSiteId();
   const client = await prisma.client.findFirst({
-    where: await getAccessibleClientWhere(user, DEFAULT_SITE_ID, { id: input.clientId }),
+    where: await getAccessibleClientWhere(user, siteId, { id: input.clientId }),
     select: { id: true }
   });
 
@@ -326,13 +329,14 @@ export async function addClientNoteAction(formData: FormData) {
 export async function deleteClientNoteAction(formData: FormData) {
   const user = await requireAdmin("clients:manage");
   const input = await parseForm(clientNoteDeleteFormSchema, formData);
+  const siteId = await getCurrentSiteId();
 
   if (input.confirmDelete !== "on") {
     redirect(`/admin/clients/${input.clientId}?error=${encodeURIComponent("Confirm note delete before removing it.")}`);
   }
 
   const client = await prisma.client.findFirst({
-    where: await getAccessibleClientWhere(user, DEFAULT_SITE_ID, { id: input.clientId }),
+    where: await getAccessibleClientWhere(user, siteId, { id: input.clientId }),
     select: { id: true }
   });
 
@@ -344,7 +348,7 @@ export async function deleteClientNoteAction(formData: FormData) {
     where: {
       id: input.id,
       clientId: input.clientId,
-      client: { siteId: DEFAULT_SITE_ID }
+      client: { siteId }
     },
     select: {
       id: true,
@@ -356,14 +360,14 @@ export async function deleteClientNoteAction(formData: FormData) {
     where: {
       id: input.id,
       clientId: input.clientId,
-      client: { siteId: DEFAULT_SITE_ID }
+      client: { siteId }
     }
   });
   await recordAuditLog({
     action: "client_note.deleted",
     actor: user,
     metadata: { clientId: input.clientId },
-    siteId: DEFAULT_SITE_ID,
+    siteId,
     targetId: input.id,
     targetLabel: note?.content.slice(0, 80) || "",
     targetType: "client_note"
@@ -376,8 +380,9 @@ export async function deleteClientNoteAction(formData: FormData) {
 export async function addClientFileAction(formData: FormData) {
   const user = await requireAdmin("clients:manage");
   const input = await parseForm(clientFileFormSchema, formData);
+  const siteId = await getCurrentSiteId();
   const client = await prisma.client.findFirst({
-    where: await getAccessibleClientWhere(user, DEFAULT_SITE_ID, { id: input.clientId }),
+    where: await getAccessibleClientWhere(user, siteId, { id: input.clientId }),
     select: { id: true }
   });
 
@@ -387,7 +392,7 @@ export async function addClientFileAction(formData: FormData) {
 
   await prisma.clientFile.create({
     data: {
-      siteId: DEFAULT_SITE_ID,
+      siteId,
       clientId: input.clientId,
       title: input.title,
       url: input.url,
@@ -403,13 +408,14 @@ export async function addClientFileAction(formData: FormData) {
 export async function deleteClientFileAction(formData: FormData) {
   const user = await requireAdmin("clients:manage");
   const input = await parseForm(clientFileDeleteFormSchema, formData);
+  const siteId = await getCurrentSiteId();
 
   if (input.confirmDelete !== "on") {
     redirect(`/admin/clients/${input.clientId}?error=${encodeURIComponent("Confirm file delete before removing it.")}`);
   }
 
   const client = await prisma.client.findFirst({
-    where: await getAccessibleClientWhere(user, DEFAULT_SITE_ID, { id: input.clientId }),
+    where: await getAccessibleClientWhere(user, siteId, { id: input.clientId }),
     select: { id: true }
   });
 
@@ -421,7 +427,7 @@ export async function deleteClientFileAction(formData: FormData) {
     where: {
       id: input.id,
       clientId: input.clientId,
-      siteId: DEFAULT_SITE_ID
+      siteId
     },
     select: {
       id: true,
@@ -434,14 +440,14 @@ export async function deleteClientFileAction(formData: FormData) {
     where: {
       id: input.id,
       clientId: input.clientId,
-      siteId: DEFAULT_SITE_ID
+      siteId
     }
   });
   await recordAuditLog({
     action: "client_file.deleted",
     actor: user,
     metadata: { clientId: input.clientId, url: file?.url || "" },
-    siteId: DEFAULT_SITE_ID,
+    siteId,
     targetId: input.id,
     targetLabel: file?.title || "",
     targetType: "client_file"
@@ -454,6 +460,7 @@ export async function deleteClientFileAction(formData: FormData) {
 export async function createClientSegmentAction(formData: FormData) {
   await requireAdmin("clients:manage");
   const input = await parseForm(clientSegmentFormSchema, formData);
+  const siteId = await getCurrentSiteId();
   const criteria = compactCriteria({
     status: input.status || undefined,
     pipelineStage: input.pipelineStage || undefined,
@@ -463,12 +470,12 @@ export async function createClientSegmentAction(formData: FormData) {
     recentPurchaseDays: input.recentPurchaseDays,
     noRecentActivityDays: input.noRecentActivityDays
   });
-  const key = await uniqueSegmentKey(input.name);
+  const key = await uniqueSegmentKey(input.name, siteId);
 
   try {
     await prisma.clientSegment.create({
       data: {
-        siteId: DEFAULT_SITE_ID,
+        siteId,
         name: input.name,
         key,
         criteria
@@ -488,24 +495,25 @@ export async function createClientSegmentAction(formData: FormData) {
 export async function deleteClientSegmentAction(formData: FormData) {
   const user = await requireAdmin("clients:manage");
   const input = await parseForm(clientSegmentDeleteFormSchema, formData);
+  const siteId = await getCurrentSiteId();
 
   if (input.confirmDelete !== "on") {
     redirect("/admin/modules/clients?error=Confirm%20segment%20delete%20before%20removing%20it.");
   }
 
   const segment = await prisma.clientSegment.findFirst({
-    where: { id: input.id, siteId: DEFAULT_SITE_ID },
+    where: { id: input.id, siteId },
     select: { id: true, key: true, name: true }
   });
 
   await prisma.clientSegment.deleteMany({
-    where: { id: input.id, siteId: DEFAULT_SITE_ID }
+    where: { id: input.id, siteId }
   });
   await recordAuditLog({
     action: "client_segment.deleted",
     actor: user,
     metadata: { segmentKey: segment?.key || "" },
-    siteId: DEFAULT_SITE_ID,
+    siteId,
     targetId: input.id,
     targetLabel: segment?.name || "",
     targetType: "client_segment"
@@ -518,6 +526,7 @@ export async function deleteClientSegmentAction(formData: FormData) {
 export async function importClientsCsvAction(formData: FormData) {
   await requireAdmin("clients:manage");
   const input = await parseForm(clientCsvImportFormSchema, formData, "/admin/modules/clients");
+  const siteId = await getCurrentSiteId();
   const text = await input.file.text();
   const rows = parseCsv(text);
 
@@ -540,7 +549,7 @@ export async function importClientsCsvAction(formData: FormData) {
     }
 
     const existing = await prisma.client.findUnique({
-      where: { siteId_email: { siteId: DEFAULT_SITE_ID, email } },
+      where: { siteId_email: { siteId, email } },
       select: { id: true }
     });
 
@@ -551,7 +560,7 @@ export async function importClientsCsvAction(formData: FormData) {
 
     const client = await prisma.client.create({
       data: {
-        siteId: DEFAULT_SITE_ID,
+        siteId,
         name,
         email,
         phone: rowValue(row, ["phone", "primary phone", "mobile"]),
@@ -582,7 +591,7 @@ export async function importClientsCsvAction(formData: FormData) {
       }
     });
 
-    await syncClientTags(client.id, csvListValue(rowValue(row, ["tags", "tag"])));
+    await syncClientTags(client.id, csvListValue(rowValue(row, ["tags", "tag"])), siteId);
     imported += 1;
   }
 
@@ -593,6 +602,7 @@ export async function importClientsCsvAction(formData: FormData) {
 export async function mergeClientsAction(formData: FormData) {
   const user = await requireAdmin("clients:manage");
   const input = await parseForm(clientMergeFormSchema, formData, "/admin/modules/clients");
+  const siteId = await getCurrentSiteId();
 
   if (input.confirmMerge !== "on") {
     redirect(`/admin/clients/${input.survivorId}?error=${encodeURIComponent("Confirm merge before moving duplicate client data.")}`);
@@ -603,8 +613,8 @@ export async function mergeClientsAction(formData: FormData) {
   }
 
   const [survivorWhere, duplicateWhere] = await Promise.all([
-    getAccessibleClientWhere(user, DEFAULT_SITE_ID, { id: input.survivorId }),
-    getAccessibleClientWhere(user, DEFAULT_SITE_ID, { id: input.duplicateId })
+    getAccessibleClientWhere(user, siteId, { id: input.survivorId }),
+    getAccessibleClientWhere(user, siteId, { id: input.duplicateId })
   ]);
   const [survivor, duplicate] = await Promise.all([
     prisma.client.findFirst({
@@ -627,7 +637,7 @@ export async function mergeClientsAction(formData: FormData) {
       if (survivorLabels.has(tag.label.toLowerCase())) continue;
       await tx.clientTag.create({
         data: {
-          siteId: DEFAULT_SITE_ID,
+          siteId,
           clientId: survivor.id,
           label: tag.label,
           source: tag.source,

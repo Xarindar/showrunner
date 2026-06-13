@@ -5,11 +5,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { formObject, parseForm } from "@/lib/admin-validation";
-import { requireAdmin } from "@/lib/auth";
+import { getAccessibleTestimonialWhere, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
-import { getSiteSettings } from "@/lib/site";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
 
 const trimmed = z.string().transform((value) => value.trim());
 const requiredText = trimmed.pipe(z.string().min(1));
@@ -72,7 +71,7 @@ function refreshTestimonials() {
   revalidatePath("/admin/modules/clients");
 }
 
-async function findOrCreateClient(authorName: string, authorEmail: string, updateExistingName = false, siteId = DEFAULT_SITE_ID) {
+async function findOrCreateClient(authorName: string, authorEmail: string, updateExistingName: boolean, siteId: string) {
   if (!authorEmail) return undefined;
 
   const client = await prisma.client.upsert({
@@ -90,8 +89,9 @@ async function findOrCreateClient(authorName: string, authorEmail: string, updat
 }
 
 export async function createTestimonialAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("testimonials:manage");
   const input = await parseForm(testimonialSchema, formData, "/admin/modules/testimonials");
+  const siteId = await getCurrentSiteId();
   if ((input.status === TestimonialStatus.APPROVED || input.featured) && !input.permissionGranted) {
     redirect(`/admin/modules/testimonials?error=${encodeURIComponent("Permission is required before approving or featuring a testimonial.")}`);
   }
@@ -99,12 +99,12 @@ export async function createTestimonialAction(formData: FormData) {
     redirect(`/admin/modules/testimonials?error=${encodeURIComponent("Only approved testimonials can be featured.")}`);
   }
 
-  const clientId = await findOrCreateClient(input.authorName, input.authorEmail, true);
+  const clientId = await findOrCreateClient(input.authorName, input.authorEmail, true, siteId);
   const permissionGrantedAt = input.permissionGranted ? new Date() : null;
 
   await prisma.testimonial.create({
     data: {
-      siteId: DEFAULT_SITE_ID,
+      siteId,
       clientId,
       authorName: input.authorName,
       authorEmail: input.authorEmail,
@@ -128,10 +128,12 @@ export async function createTestimonialAction(formData: FormData) {
 }
 
 export async function updateTestimonialModerationAction(formData: FormData) {
-  await requireAdmin();
+  const user = await requireAdmin("testimonials:manage");
   const input = await parseForm(moderationSchema, formData, "/admin/modules/testimonials");
+  const siteId = await getCurrentSiteId();
+  const accessibleWhere = await getAccessibleTestimonialWhere(user, siteId, { id: input.id });
   const testimonial = await prisma.testimonial.findFirst({
-    where: { id: input.id, siteId: DEFAULT_SITE_ID },
+    where: accessibleWhere,
     select: { permissionGranted: true, status: true }
   });
 
@@ -149,8 +151,8 @@ export async function updateTestimonialModerationAction(formData: FormData) {
     redirect(`/admin/modules/testimonials?error=${encodeURIComponent("Only approved testimonials can be featured.")}`);
   }
 
-  await prisma.testimonial.update({
-    where: { id: input.id },
+  await prisma.testimonial.updateMany({
+    where: accessibleWhere,
     data: {
       ...(input.status ? { status: input.status } : {}),
       ...(input.featured ? { featured: input.featured === "true" } : {}),
@@ -162,11 +164,12 @@ export async function updateTestimonialModerationAction(formData: FormData) {
 }
 
 export async function deleteTestimonialAction(formData: FormData) {
-  await requireAdmin();
+  const user = await requireAdmin("testimonials:manage");
   const input = await parseForm(deleteTestimonialSchema, formData, "/admin/modules/testimonials");
+  const siteId = await getCurrentSiteId();
 
   await prisma.testimonial.deleteMany({
-    where: { id: input.id, siteId: DEFAULT_SITE_ID }
+    where: await getAccessibleTestimonialWhere(user, siteId, { id: input.id })
   });
 
   refreshTestimonials();
