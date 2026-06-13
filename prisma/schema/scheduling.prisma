@@ -203,6 +203,7 @@ model BookingReminder {
   leadMinutes  Int
   scheduledFor DateTime
   status       BookingReminderStatus @default(CLAIMED)
+  attemptCount Int                   @default(0)
   claimedAt    DateTime?
   queuedAt     DateTime?
   failedAt     DateTime?

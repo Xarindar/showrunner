@@ -8,6 +8,7 @@ import type { EmailTokens } from "@/lib/email/types";
 const DEFAULT_REMINDER_LEAD_MINUTES = 24 * 60;
 const MAX_BOOKINGS_PER_SITE = 100;
 const CLAIM_STALE_MINUTES = 15;
+const MAX_REMINDER_ATTEMPTS = 3;
 
 type ReminderBooking = {
   id: string;
@@ -97,7 +98,8 @@ async function claimReminder(booking: ReminderBooking, leadMinutes: number, now:
         leadMinutes,
         scheduledFor,
         status: BookingReminderStatus.CLAIMED,
-        claimedAt: now
+        claimedAt: now,
+        attemptCount: 1
       }
     });
     return true;
@@ -106,15 +108,27 @@ async function claimReminder(booking: ReminderBooking, leadMinutes: number, now:
       const reclaimed = await prisma.bookingReminder.updateMany({
         where: {
           bookingId: booking.id,
-          status: BookingReminderStatus.CLAIMED,
-          claimedAt: { lt: staleBefore }
+          attemptCount: { lt: MAX_REMINDER_ATTEMPTS },
+          OR: [
+            {
+              status: BookingReminderStatus.CLAIMED,
+              claimedAt: { lt: staleBefore }
+            },
+            {
+              status: BookingReminderStatus.FAILED,
+              OR: [{ failedAt: null }, { failedAt: { lt: staleBefore } }]
+            }
+          ]
         },
         data: {
           leadMinutes,
           scheduledFor,
+          status: BookingReminderStatus.CLAIMED,
           claimedAt: now,
+          queuedAt: null,
           failedAt: null,
-          lastError: ""
+          lastError: "",
+          attemptCount: { increment: 1 }
         }
       });
       return reclaimed.count > 0;
@@ -139,7 +153,8 @@ async function markReminderFailed(booking: ReminderBooking, leadMinutes: number,
       scheduledFor: new Date(booking.startsAt.getTime() - leadMinutes * 60 * 1000),
       status: BookingReminderStatus.FAILED,
       failedAt: new Date(),
-      lastError: cleanError(error)
+      lastError: cleanError(error),
+      attemptCount: 1
     }
   });
 }
@@ -181,7 +196,17 @@ export async function sweepBookingReminders(now = new Date()): Promise<BookingRe
             reminders: {
               some: {
                 status: BookingReminderStatus.CLAIMED,
-                claimedAt: { lt: staleBefore }
+                claimedAt: { lt: staleBefore },
+                attemptCount: { lt: MAX_REMINDER_ATTEMPTS }
+              }
+            }
+          },
+          {
+            reminders: {
+              some: {
+                status: BookingReminderStatus.FAILED,
+                attemptCount: { lt: MAX_REMINDER_ATTEMPTS },
+                OR: [{ failedAt: null }, { failedAt: { lt: staleBefore } }]
               }
             }
           }
