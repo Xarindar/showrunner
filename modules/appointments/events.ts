@@ -13,5 +13,11 @@ export const appointmentEvents = {
     analyticsEventType: AnalyticsEventType.CUSTOM,
     automationTrigger: AutomationTrigger.BOOKING_CANCELED,
     relatedType: "booking"
+  },
+  "booking.rescheduled": {
+    analyticsEventName: "booking rescheduled",
+    analyticsEventType: AnalyticsEventType.CUSTOM,
+    automationTrigger: AutomationTrigger.BOOKING_RESCHEDULED,
+    relatedType: "booking"
   }
 } as const satisfies ModuleEventSlice;

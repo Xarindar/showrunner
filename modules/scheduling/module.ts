@@ -13,8 +13,8 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Native public booking is live with multi-staff service assignment, resource requirements, scoped availability, reminders, ICS feeds, Google free/busy checks, and staff/resource-aware conflict checks.",
-    primaryGap: "Cal.com calendar sync, capacity groups, reschedule/cancel links, and paid booking are pending."
+    summary: "Native public booking is live with multi-staff service assignment, resource requirements, scoped availability, reminders, ICS feeds, Google free/busy checks, client self-service, and staff/resource-aware conflict checks.",
+    primaryGap: "Cal.com calendar sync, capacity groups, and paid booking are pending."
   },
   capabilities: [
     { label: "Native availability", status: "live" },
@@ -24,6 +24,7 @@ export const manifest = {
     { label: "Booking reminders", status: "live" },
     { label: "ICS calendar feeds", status: "live" },
     { label: "Google Calendar free/busy", status: "live" },
+    { label: "Client self-service", status: "live" },
     { label: "Cal.com calendar sync", status: "planned" }
   ],
   adminRoutes: [
@@ -34,7 +35,9 @@ export const manifest = {
   publicRoutes: [
     "/book",
     "/book/[serviceSlug]",
+    "/bookings/[id]",
     "/api/availability",
+    "/bookings/[id]/availability",
     "/api/calendar/feed.ics",
     "/api/calendar/booking.ics"
   ],

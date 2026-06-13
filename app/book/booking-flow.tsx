@@ -136,6 +136,12 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
             Add to calendar
           </a>
         ) : null}
+        {state.manageUrl ? (
+          <a className="button" href={state.manageUrl}>
+            <CalendarCheck size={18} />
+            Manage appointment
+          </a>
+        ) : null}
       </div>
     );
   }

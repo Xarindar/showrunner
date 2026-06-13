@@ -5,10 +5,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { bookingDetailFormSchema, bookingRescheduleFormSchema, bookingStatusFormSchema, parseForm } from "@/lib/admin-validation";
+import { rescheduleBookingWithAvailability } from "@/lib/bookings/reschedule";
 import { queueBookingStatusEmail } from "@/lib/email";
 import { emitModuleEvent } from "@/lib/events/emit";
 import { prisma } from "@/lib/prisma";
-import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import { getSiteSettings } from "@/lib/site";
 import { parseZonedDateTimeInput } from "@/lib/timezone";
 
@@ -95,26 +95,29 @@ export async function rescheduleBookingAction(formData: FormData) {
     redirect(`${detailPath}?error=${encodeURIComponent("Choose a valid new appointment time.")}`);
   }
 
-  const diagnostics = await nativeSchedulingAdapter.getSlotDiagnostics(booking.serviceId, startsAt, {
-    excludeBookingId: booking.id
-  });
-  const matchingSlot = diagnostics?.slots.find((slot) => slot.startsAt.getTime() === startsAt.getTime());
-
-  if (!matchingSlot) {
-    redirect(`${detailPath}?error=${encodeURIComponent("The new time must match a configured availability slot.")}`);
+  let updated;
+  try {
+    updated = await rescheduleBookingWithAvailability({
+      bookingId: booking.id,
+      siteId: settings.siteId,
+      startsAt
+    });
+  } catch (error) {
+    redirect(`${detailPath}?error=${encodeURIComponent(error instanceof Error ? error.message : "Unable to reschedule appointment.")}`);
   }
 
-  if (!matchingSlot.available) {
-    const reason = matchingSlot.reasons.map((item) => item.message).join(" ");
-    redirect(`${detailPath}?error=${encodeURIComponent(reason || "That time is not available.")}`);
-  }
-
-  await prisma.booking.update({
-    where: { id: booking.id },
-    data: {
-      startsAt: matchingSlot.startsAt,
-      endsAt: matchingSlot.endsAt
-    }
+  await emitModuleEvent("booking.rescheduled", {
+    actorEmail: updated.customerEmail,
+    metadata: {
+      previousEndsAt: booking.endsAt.toISOString(),
+      previousStartsAt: booking.startsAt.toISOString(),
+      serviceId: updated.serviceId,
+      serviceName: updated.service.name,
+      staffId: updated.staffId,
+      startsAt: updated.startsAt.toISOString()
+    },
+    relatedId: updated.id,
+    relatedType: "booking"
   });
 
   refreshAppointments();
