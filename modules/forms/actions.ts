@@ -26,6 +26,7 @@ import { slugify } from "@/lib/slug";
 import { formAnalyticsEvents } from "./analytics";
 import { computeVisibleFieldIds, conditionalActions, conditionalOperators, normalizeConditionalLogic } from "./conditional-logic";
 import { findFormTemplate } from "./templates";
+import { normalizeValidationRules, validateFormFieldValue } from "./validation-rules";
 
 const supportedDestinations = Object.values(FormDestination) as [FormDestination, ...FormDestination[]];
 const formAttachmentQueryKeyByType: Record<FormAttachmentTargetType, string> = {
@@ -113,7 +114,13 @@ const fieldSchema = z
     isRequired: z.literal("on").optional(),
     isHidden: z.literal("on").optional(),
     pageNumber: z.coerce.number().int().min(1).default(1),
-    sortOrder: z.coerce.number().int().default(0)
+    sortOrder: z.coerce.number().int().default(0),
+    validationMaxLength: optionalStoredText,
+    validationMaxValue: optionalStoredText,
+    validationMinLength: optionalStoredText,
+    validationMinValue: optionalStoredText,
+    validationPattern: optionalStoredText,
+    validationRequiredMessage: optionalStoredText
   })
   .transform((value) => ({
     ...value,
@@ -135,7 +142,15 @@ const fieldSchema = z
           }
         : {},
     isRequired: value.isRequired === "on",
-    isHidden: value.type === FormFieldType.HIDDEN || value.isHidden === "on"
+    isHidden: value.type === FormFieldType.HIDDEN || value.isHidden === "on",
+    validationRules: normalizeValidationRules({
+      maxLength: value.validationMaxLength,
+      maxValue: value.validationMaxValue,
+      minLength: value.validationMinLength,
+      minValue: value.validationMinValue,
+      pattern: value.validationPattern,
+      requiredMessage: value.validationRequiredMessage
+    })
   }));
 
 const fieldUpdateSchema = fieldSchema.and(z.object({ id: requiredText }));
@@ -338,6 +353,7 @@ export async function duplicateFormAction(formData: FormData) {
           helpText: field.helpText,
           options: (Array.isArray(field.options) ? field.options : []) as Prisma.InputJsonValue,
           conditionalLogic: {},
+          validationRules: field.validationRules as Prisma.InputJsonValue,
           isRequired: field.isRequired,
           isHidden: field.isHidden,
           pageNumber: field.pageNumber,
@@ -462,6 +478,7 @@ export async function createFormFieldAction(formData: FormData) {
       helpText: input.helpText,
       options: input.options,
       conditionalLogic: input.conditionalLogic as Prisma.InputJsonValue,
+      validationRules: input.validationRules as Prisma.InputJsonValue,
       isRequired: input.isRequired,
       isHidden: input.isHidden,
       pageNumber: input.pageNumber,
@@ -500,6 +517,7 @@ export async function updateFormFieldAction(formData: FormData) {
       helpText: input.helpText,
       options: input.options,
       conditionalLogic: input.conditionalLogic as Prisma.InputJsonValue,
+      validationRules: input.validationRules as Prisma.InputJsonValue,
       isRequired: input.isRequired,
       isHidden: input.isHidden,
       pageNumber: input.pageNumber,
@@ -799,12 +817,20 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
     if (field.type === FormFieldType.SIGNATURE) {
       const signature = parseSignaturePayload(rawValue);
       const consentAccepted = formData.get(publicFieldConsentName(field.id)) === "on";
+      const validSignature = signature ? validSignaturePayload(signature) : false;
 
-      if (field.isRequired && (!signature || !validSignaturePayload(signature))) {
-        redirectWithPublicError(form.slug, `Complete ${field.label}.`, attachmentContext);
+      if (field.isRequired && !validSignature) {
+        const validationMessage =
+          validateFormFieldValue({
+            fieldLabel: field.label,
+            isRequired: true,
+            rules: field.validationRules,
+            value: validSignature ? signature?.signerName || "" : ""
+          }) || `Complete ${field.label}.`;
+        redirectWithPublicError(form.slug, validationMessage, attachmentContext);
       }
 
-      if (signature && !validSignaturePayload(signature)) {
+      if (signature && !validSignature) {
         redirectWithPublicError(form.slug, `Complete ${field.label}.`, attachmentContext);
       }
 
@@ -832,8 +858,14 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
       continue;
     }
 
-    if (field.isRequired && !value) {
-      redirectWithPublicError(form.slug, `Complete ${field.label}.`, attachmentContext);
+    const validationMessage = validateFormFieldValue({
+      fieldLabel: field.label,
+      isRequired: field.isRequired,
+      rules: field.validationRules,
+      value
+    });
+    if (validationMessage) {
+      redirectWithPublicError(form.slug, validationMessage, attachmentContext);
     }
 
     if (field.type === FormFieldType.EMAIL && value && !z.email().safeParse(value).success) {

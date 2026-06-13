@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { formAnalyticsEvents, formFunnelEventNames } from "./analytics";
 import { conditionalActions, conditionalOperators, normalizeConditionalLogic } from "./conditional-logic";
+import { normalizeValidationRules } from "./validation-rules";
 import {
   createFormAttachmentAction,
   createFormAction,
@@ -50,6 +51,7 @@ type BuilderField = {
   conditionalLogic: unknown;
   id: string;
   label: string;
+  validationRules: unknown;
 };
 
 type FormFunnelMetrics = {
@@ -200,6 +202,65 @@ function conditionalControls(input: { field?: BuilderField; fields: BuilderField
             <label htmlFor={`${input.idPrefix}-condition-value`}>Value</label>
             <input id={`${input.idPrefix}-condition-value`} name="conditionValue" defaultValue={logic.value} />
           </div>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function validationSummary(field: BuilderField) {
+  const rules = normalizeValidationRules(field.validationRules);
+  const parts = [];
+
+  if (rules.minLength !== undefined) parts.push(`min ${rules.minLength} chars`);
+  if (rules.maxLength !== undefined) parts.push(`max ${rules.maxLength} chars`);
+  if (rules.minValue !== undefined) parts.push(`min value ${rules.minValue}`);
+  if (rules.maxValue !== undefined) parts.push(`max value ${rules.maxValue}`);
+  if (rules.pattern) parts.push("pattern");
+  if (rules.requiredMessage) parts.push("custom required message");
+
+  return parts.join(" · ");
+}
+
+function validationControls(input: { field?: BuilderField; idPrefix: string }) {
+  const rules = normalizeValidationRules(input.field?.validationRules);
+
+  return (
+    <details>
+      <summary>Validation rules</summary>
+      <div className="form-grid" style={{ marginTop: 12 }}>
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor={`${input.idPrefix}-validation-min-length`}>Min length</label>
+            <input id={`${input.idPrefix}-validation-min-length`} name="validationMinLength" type="number" min={0} defaultValue={rules.minLength ?? ""} />
+          </div>
+          <div className="field">
+            <label htmlFor={`${input.idPrefix}-validation-max-length`}>Max length</label>
+            <input id={`${input.idPrefix}-validation-max-length`} name="validationMaxLength" type="number" min={0} defaultValue={rules.maxLength ?? ""} />
+          </div>
+        </div>
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor={`${input.idPrefix}-validation-min-value`}>Min value</label>
+            <input id={`${input.idPrefix}-validation-min-value`} name="validationMinValue" inputMode="decimal" defaultValue={rules.minValue ?? ""} />
+          </div>
+          <div className="field">
+            <label htmlFor={`${input.idPrefix}-validation-max-value`}>Max value</label>
+            <input id={`${input.idPrefix}-validation-max-value`} name="validationMaxValue" inputMode="decimal" defaultValue={rules.maxValue ?? ""} />
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor={`${input.idPrefix}-validation-pattern`}>Regex pattern</label>
+          <input id={`${input.idPrefix}-validation-pattern`} name="validationPattern" defaultValue={rules.pattern || ""} placeholder="^[A-Z0-9-]+$" />
+        </div>
+        <div className="field">
+          <label htmlFor={`${input.idPrefix}-validation-required-message`}>Required message</label>
+          <input
+            id={`${input.idPrefix}-validation-required-message`}
+            name="validationRequiredMessage"
+            defaultValue={rules.requiredMessage || ""}
+            placeholder="Enter your project code."
+          />
         </div>
       </div>
     </details>
@@ -823,6 +884,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                 </label>
               </div>
               {conditionalControls({ fields: selectedForm.fields, idPrefix: "field-new" })}
+              {validationControls({ idPrefix: "field-new" })}
               <button className="button secondary" type="submit">
                 Add field
               </button>
@@ -859,6 +921,12 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                         <>
                           <br />
                           <span style={{ color: "var(--muted)" }}>{conditionSummary(field, selectedForm.fields)}</span>
+                        </>
+                      ) : null}
+                      {validationSummary(field) ? (
+                        <>
+                          <br />
+                          <span style={{ color: "var(--muted)" }}>{validationSummary(field)}</span>
                         </>
                       ) : null}
                     </td>
@@ -925,6 +993,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                             </label>
                           </div>
                           {conditionalControls({ field, fields: selectedForm.fields, idPrefix: `field-${field.id}` })}
+                          {validationControls({ field, idPrefix: `field-${field.id}` })}
                           <button className="button secondary" type="submit">
                             Save field
                           </button>

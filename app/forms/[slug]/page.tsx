@@ -13,6 +13,7 @@ import { themeToCssVars } from "@/lib/theme/tokens";
 import { prisma } from "@/lib/prisma";
 import { createPublicFormSubmissionAction } from "@/modules/forms/actions";
 import { formAnalyticsEvents } from "@/modules/forms/analytics";
+import { normalizeValidationRules } from "@/modules/forms/validation-rules";
 import { PublicFormBehavior } from "./public-form-behavior";
 import { SignatureField } from "./signature-field";
 
@@ -62,10 +63,33 @@ function labelText(label: string, isRequired: boolean) {
   );
 }
 
+function safePatternAttribute(pattern?: string) {
+  if (!pattern) return undefined;
+
+  try {
+    new RegExp(pattern);
+    return pattern;
+  } catch {
+    return undefined;
+  }
+}
+
 function renderField(field: FormField) {
   const name = fieldInputName(field.id);
   const options = optionsFromJson(field.options);
   const helpId = field.helpText ? `${field.id}-help` : undefined;
+  const validationRules = normalizeValidationRules(field.validationRules);
+  const hasNumericRange = validationRules.minValue !== undefined || validationRules.maxValue !== undefined;
+  const validationAttributes = {
+    maxLength: validationRules.maxLength,
+    minLength: validationRules.minLength
+  };
+  const inputValidationAttributes = {
+    ...validationAttributes,
+    inputMode: hasNumericRange ? ("decimal" as const) : undefined,
+    pattern: safePatternAttribute(validationRules.pattern),
+    title: validationRules.pattern ? "Use the expected format." : undefined
+  };
   const wrapField = (children: ReactNode, forceHidden = false) => (
     <div
       data-form-field-id={field.id}
@@ -92,7 +116,7 @@ function renderField(field: FormField) {
     return wrapField(
       <div className="field">
         <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
-        <textarea {...commonProps} placeholder={field.placeholder} />
+        <textarea {...commonProps} {...validationAttributes} placeholder={field.placeholder} />
         {field.helpText ? (
           <small id={helpId} style={{ color: "var(--muted)" }}>
             {field.helpText}
@@ -179,6 +203,7 @@ function renderField(field: FormField) {
         label={field.label}
         name={name}
         placeholder={field.placeholder}
+        validationRules={field.validationRules}
       />
     );
   }
@@ -189,7 +214,7 @@ function renderField(field: FormField) {
   return wrapField(
     <div className="field">
       <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
-      <input {...commonProps} placeholder={field.placeholder} type={inputType} />
+      <input {...commonProps} {...inputValidationAttributes} placeholder={field.placeholder} type={inputType} />
       {field.helpText ? (
         <small id={helpId} style={{ color: "var(--muted)" }}>
           {field.helpText}
@@ -331,8 +356,11 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
               conditionalLogic: field.conditionalLogic,
               id: field.id,
               inputName: fieldInputName(field.id),
+              isRequired: field.isRequired,
+              label: field.label,
               pageNumber: field.pageNumber,
-              type: field.type
+              type: field.type,
+              validationRules: field.validationRules
             }))}
             submitButtonLabel={form.submitButtonLabel}
           />

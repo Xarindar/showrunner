@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
+import { normalizeValidationRules } from "@/modules/forms/validation-rules";
 
 type SignatureFieldProps = {
   fieldId: string;
@@ -10,6 +11,7 @@ type SignatureFieldProps = {
   label: string;
   name: string;
   placeholder?: string;
+  validationRules?: unknown;
 };
 
 const consentStatement =
@@ -24,7 +26,7 @@ function signaturePayload(input: { drawnDataUrl: string; mode: "TYPED" | "DRAWN"
   });
 }
 
-export function SignatureField({ fieldId, helpText, isRequired, label, name, placeholder }: SignatureFieldProps) {
+export function SignatureField({ fieldId, helpText, isRequired, label, name, placeholder, validationRules: rawValidationRules }: SignatureFieldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawingRef = useRef(false);
   const [mode, setMode] = useState<"TYPED" | "DRAWN">("TYPED");
@@ -32,6 +34,7 @@ export function SignatureField({ fieldId, helpText, isRequired, label, name, pla
   const [drawnDataUrl, setDrawnDataUrl] = useState("");
   const helpId = helpText ? `${fieldId}-help` : undefined;
   const consentId = `${fieldId}-consent`;
+  const validationRules = normalizeValidationRules(rawValidationRules);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -107,7 +110,15 @@ export function SignatureField({ fieldId, helpText, isRequired, label, name, pla
         id={`${fieldId}-typed`}
         aria-describedby={helpId}
         autoComplete="name"
-        onChange={(event) => setTypedName(event.target.value)}
+        onChange={(event) => {
+          event.currentTarget.setCustomValidity("");
+          setTypedName(event.target.value);
+        }}
+        onInvalid={(event) => {
+          if (!event.currentTarget.value.trim() && validationRules.requiredMessage) {
+            event.currentTarget.setCustomValidity(validationRules.requiredMessage);
+          }
+        }}
         placeholder={placeholder || "Type your full legal name"}
         required={isRequired}
         value={typedName}

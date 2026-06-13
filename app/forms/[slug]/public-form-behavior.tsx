@@ -3,13 +3,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { recordPublicFormStartAction } from "@/modules/forms/actions";
 import { computeVisibleFieldIds } from "@/modules/forms/conditional-logic";
+import { validateFormFieldValue } from "@/modules/forms/validation-rules";
 
 type PublicFormFieldBehavior = {
   conditionalLogic: unknown;
   id: string;
   inputName: string;
+  isRequired: boolean;
+  label: string;
   pageNumber: number;
   type: string;
+  validationRules: unknown;
 };
 
 type PublicFormBehaviorProps = {
@@ -49,7 +53,35 @@ function setFieldEnabled(wrapper: HTMLElement, enabled: boolean, forceHidden: bo
 
     control.disabled = !enabled;
     control.required = enabled && control.dataset.originalRequired === "true";
+    if (!enabled) control.setCustomValidity("");
   }
+}
+
+function namedFieldControls(form: HTMLFormElement, field: PublicFormFieldBehavior) {
+  return Array.from(form.elements).filter(
+    (control): control is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
+      (control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement) &&
+      control.name === field.inputName
+  );
+}
+
+function setFieldCustomValidity(form: HTMLFormElement, field: PublicFormFieldBehavior) {
+  const controls = namedFieldControls(form, field).filter((control) => !control.disabled);
+  const firstControl = controls[0];
+  if (!firstControl) return;
+
+  for (const control of controls) control.setCustomValidity("");
+
+  if (field.type === "SIGNATURE") return;
+
+  const validationMessage = validateFormFieldValue({
+    fieldLabel: field.label,
+    isRequired: field.isRequired,
+    rules: field.validationRules,
+    value: fieldControlValue(form, field)
+  });
+
+  firstControl.setCustomValidity(validationMessage);
 }
 
 export function PublicFormBehavior({ enableSteps, fields, formId, formPath, submitButtonLabel }: PublicFormBehaviorProps) {
@@ -82,6 +114,7 @@ export function PublicFormBehavior({ enableSteps, fields, formId, formPath, subm
         const conditionVisible = visibleFieldIds.has(field.id);
         const pageVisible = !hasSteps || field.pageNumber === activePage;
         setFieldEnabled(wrapper, conditionVisible && pageVisible, field.type === "HIDDEN");
+        setFieldCustomValidity(form, field);
       }
     }
 
@@ -94,6 +127,7 @@ export function PublicFormBehavior({ enableSteps, fields, formId, formPath, subm
         const wrapper = form.querySelector<HTMLElement>(`[data-form-field-id="${field.id}"]`);
         if (!wrapper) continue;
         setFieldEnabled(wrapper, visibleFieldIds.has(field.id), field.type === "HIDDEN");
+        setFieldCustomValidity(form, field);
       }
     }
 
