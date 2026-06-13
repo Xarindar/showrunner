@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BillingDocumentStatus, OrderStatus, PaymentStatus } from "@prisma/client";
-import { CalendarCheck, FileText, Package, Receipt, User } from "lucide-react";
+import { BillingDocumentStatus, FormSignatureCaptureType, OrderStatus, PaymentStatus, PortfolioAccessStatus, PortfolioGalleryStatus } from "@prisma/client";
+import { CalendarCheck, FileText, Images, Package, PenLine, Receipt, User } from "lucide-react";
 import { verifyClientPortalToken } from "@/lib/clients/portal-token";
 import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -53,11 +53,44 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
         orderBy: { updatedAt: "desc" },
         take: 50
       },
+      formSubmissions: {
+        where: {
+          form: { siteId: settings.siteId },
+          signatures: { some: { siteId: settings.siteId } }
+        },
+        include: {
+          form: { select: { destination: true, name: true, slug: true } },
+          formAttachment: { select: { targetType: true, targetId: true } },
+          signatures: {
+            include: { formField: { select: { label: true } } },
+            orderBy: { signedAt: "desc" }
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50
+      },
       orders: {
         where: { status: { not: OrderStatus.DRAFT } },
         include: {
           items: { orderBy: { createdAt: "asc" } },
           payments: { orderBy: { createdAt: "desc" } }
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 50
+      },
+      portfolioGalleryAccesses: {
+        where: {
+          siteId: settings.siteId,
+          status: PortfolioAccessStatus.ACTIVE,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          gallery: { status: PortfolioGalleryStatus.PUBLISHED }
+        },
+        include: {
+          gallery: {
+            include: {
+              _count: { select: { items: true, proofRounds: true } }
+            }
+          }
         },
         orderBy: { updatedAt: "desc" },
         take: 50
@@ -118,6 +151,16 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
               <h2 style={{ fontSize: "1.25rem" }}>Open billing</h2>
               <p>{openBillingDocuments.length} documents</p>
             </div>
+            <div className="card">
+              <PenLine size={22} />
+              <h2 style={{ fontSize: "1.25rem" }}>Signed forms</h2>
+              <p>{client.formSubmissions.length} records</p>
+            </div>
+            <div className="card">
+              <Images size={22} />
+              <h2 style={{ fontSize: "1.25rem" }}>Galleries</h2>
+              <p>{client.portfolioGalleryAccesses.length} galleries</p>
+            </div>
           </section>
 
           <section className="card">
@@ -170,6 +213,119 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                 {!client.bookings.length ? (
                   <tr>
                     <td colSpan={4}>No appointment history yet.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="card">
+            <div className="page-header" style={{ marginBottom: 16 }}>
+              <div>
+                <PenLine size={22} />
+                <h2 style={{ fontSize: "1.35rem" }}>Signed forms and documents</h2>
+              </div>
+            </div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Document</th>
+                  <th>Signed by</th>
+                  <th>Signature</th>
+                  <th>Signed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {client.formSubmissions.map((submission) => (
+                  <tr key={submission.id}>
+                    <td>
+                      <strong>{submission.form.name}</strong>
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>
+                        {enumLabel(submission.form.destination)}
+                        {submission.formAttachment ? ` for ${enumLabel(submission.formAttachment.targetType)}` : ""}
+                      </span>
+                    </td>
+                    <td>
+                      {submission.submitterName || submission.signatures[0]?.signerName || client.name}
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>{submission.submitterEmail || submission.signatures[0]?.signerEmail || client.email}</span>
+                    </td>
+                    <td>
+                      {submission.signatures.map((signature) => (
+                        <div key={signature.id} style={{ marginBottom: 8 }}>
+                          <strong>{signature.formField.label}</strong>
+                          <br />
+                          {signature.captureType === FormSignatureCaptureType.TYPED ? (
+                            <span>{signature.capturedSignature}</span>
+                          ) : (
+                            <span>Drawn signature on file</span>
+                          )}
+                          <br />
+                          <span style={{ color: "var(--muted)" }}>{signature.consentStatement}</span>
+                        </div>
+                      ))}
+                    </td>
+                    <td>{formatDateTime(submission.signatures[0]?.signedAt || submission.createdAt, settings.timezone)}</td>
+                  </tr>
+                ))}
+                {!client.formSubmissions.length ? (
+                  <tr>
+                    <td colSpan={4}>No signed forms yet.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="card">
+            <div className="page-header" style={{ marginBottom: 16 }}>
+              <div>
+                <Images size={22} />
+                <h2 style={{ fontSize: "1.35rem" }}>Galleries</h2>
+              </div>
+            </div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Gallery</th>
+                  <th>Access</th>
+                  <th>Contents</th>
+                  <th>Last viewed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {client.portfolioGalleryAccesses.map((access) => (
+                  <tr key={access.id}>
+                    <td>
+                      <Link href={`/galleries/access/${access.accessToken}`}>
+                        <strong>{access.gallery.title}</strong>
+                      </Link>
+                      {access.gallery.description ? (
+                        <>
+                          <br />
+                          <span style={{ color: "var(--muted)" }}>{access.gallery.description}</span>
+                        </>
+                      ) : null}
+                    </td>
+                    <td>
+                      <span className={statusClass(access.status)}>{enumLabel(access.status)}</span>
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>
+                        {access.expiresAt ? `Expires ${formatDateTime(access.expiresAt, settings.timezone)}` : "No expiration"}
+                      </span>
+                    </td>
+                    <td>
+                      {access.gallery._count.items} items
+                      <br />
+                      <span style={{ color: "var(--muted)" }}>{access.gallery._count.proofRounds} proofing rounds</span>
+                    </td>
+                    <td>{access.lastViewedAt ? formatDateTime(access.lastViewedAt, settings.timezone) : "Not viewed yet"}</td>
+                  </tr>
+                ))}
+                {!client.portfolioGalleryAccesses.length ? (
+                  <tr>
+                    <td colSpan={4}>No galleries shared yet.</td>
                   </tr>
                 ) : null}
               </tbody>
