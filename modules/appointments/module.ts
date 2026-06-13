@@ -14,13 +14,13 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Live booking queue, status changes, notes, and status emails.",
-    primaryGap: "Calendar views, rescheduling, no-show workflows, staff/resource assignment, and audit trail are pending."
+    summary: "Live booking queue, month/week/day/agenda calendar views, drag rescheduling, status changes, notes, and status emails.",
+    primaryGap: "No-show workflows, staff/resource reassignment, and audit trail are pending."
   },
   capabilities: [
     { label: "Queue and filters", status: "live" },
     { label: "Status email hooks", status: "live" },
-    { label: "Calendar/reschedule UI", status: "planned" }
+    { label: "Calendar/reschedule UI", status: "live" }
   ],
   adminRoutes: ["/admin/modules/appointments", "/admin/appointments/[id]"],
   dependencies: ["scheduling", "clients", "communications"],
