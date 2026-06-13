@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import NextImage from "next/image";
 import { notFound } from "next/navigation";
-import { ProductStatus } from "@prisma/client";
+import { ProductStatus, ProductType } from "@prisma/client";
 import { JsonLd } from "@/components/structured-data";
 import { ShoppingCart } from "lucide-react";
 import { addToCartAction } from "@/app/cart/actions";
@@ -115,7 +115,7 @@ export default async function ShopPage() {
                   <Link className="button secondary" href={`/shop/${product.slug}`}>
                     Details
                   </Link>
-                  {variant ? (
+                  {variant && product.type !== ProductType.GIFT_CARD ? (
                     <form action={addToCartAction}>
                       <input type="hidden" name="productId" value={product.id} />
                       <input type="hidden" name="variantId" value={variant.id} />
@@ -125,6 +125,10 @@ export default async function ShopPage() {
                         Add
                       </button>
                     </form>
+                  ) : product.type === ProductType.GIFT_CARD ? (
+                    <Link className="button" href={`/shop/${product.slug}`}>
+                      Gift
+                    </Link>
                   ) : null}
                 </div>
               </article>

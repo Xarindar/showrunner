@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import NextImage from "next/image";
 import { notFound } from "next/navigation";
-import { ProductStatus } from "@prisma/client";
+import { ProductStatus, ProductType } from "@prisma/client";
 import { JsonLd } from "@/components/structured-data";
 import { ShoppingCart } from "lucide-react";
 import { addToCartAction } from "@/app/cart/actions";
@@ -66,6 +66,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   const defaultVariant = product.variants[0] || null;
   const defaultPriceCents = defaultVariant?.priceCents ?? product.basePriceCents;
+  const isGiftCard = product.type === ProductType.GIFT_CARD;
   const categories = product.collectionProducts.map(({ collection }) => collection.name);
 
   return (
@@ -168,11 +169,34 @@ export default async function ProductPage({ params }: ProductPageProps) {
                       ))}
                     </select>
                   </div>
-                  <div className="field">
-                    <label htmlFor="quantity">Quantity</label>
-                    <input id="quantity" name="quantity" type="number" min="1" max="999" defaultValue="1" required />
-                  </div>
+                  {isGiftCard ? (
+                    <input type="hidden" name="quantity" value="1" />
+                  ) : (
+                    <div className="field">
+                      <label htmlFor="quantity">Quantity</label>
+                      <input id="quantity" name="quantity" type="number" min="1" max="999" defaultValue="1" required />
+                    </div>
+                  )}
                 </div>
+                {isGiftCard ? (
+                  <div className="subpanel form-grid">
+                    <h2 style={{ fontSize: "1.05rem" }}>Gift recipient</h2>
+                    <div className="grid-2">
+                      <div className="field">
+                        <label htmlFor="giftCardRecipientName">Recipient name</label>
+                        <input id="giftCardRecipientName" name="giftCardRecipientName" />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="giftCardRecipientEmail">Recipient email</label>
+                        <input id="giftCardRecipientEmail" name="giftCardRecipientEmail" type="email" required />
+                      </div>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="giftCardMessage">Message</label>
+                      <textarea id="giftCardMessage" name="giftCardMessage" />
+                    </div>
+                  </div>
+                ) : null}
                 <button className="button" type="submit" aria-label={`Add ${product.name} to cart`}>
                   <ShoppingCart size={18} />
                   Add to cart
