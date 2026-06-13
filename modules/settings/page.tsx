@@ -1,6 +1,8 @@
-import { Save } from "lucide-react";
+import { CreditCard, Save } from "lucide-react";
+import { PaymentProvider } from "@prisma/client";
 import { dataScopePresets, parseDataScopeConfig, requireAdmin, scopableModules } from "@/lib/auth";
 import { enumLabel } from "@/lib/format";
+import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { isRequiredModule } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
 import { getPlatformStatus, platformFoundationItems } from "@/lib/platform-status";
@@ -17,9 +19,13 @@ type SettingsPageProps = {
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   await requireAdmin("settings:update");
   const [{ saved, error }, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const platformStatus = await getPlatformStatus(settings);
+  const [platformStatus, stripeCredential] = await Promise.all([
+    getPlatformStatus(settings),
+    getConnectedGatewayCredential(settings.siteId, PaymentProvider.STRIPE)
+  ]);
   const dataScopeConfig = parseDataScopeConfig(settings.dataScopeConfig);
   const dataScopeModules = scopableModules();
+  const stripeConnected = stripeCredential?.status === "CONNECTED" && Boolean(stripeCredential.externalAccountId);
 
   return (
     <div className="stack">
@@ -47,6 +53,28 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           <h2 style={{ fontSize: "1.2rem" }}>Security and data</h2>
           <p>{platformFoundationItems.length} foundation items tracked for roles, audit logs, site scoping, and policy controls.</p>
         </div>
+      </section>
+
+      <section className="card form-grid">
+        <div className="grid-2">
+          <div>
+            <h2 style={{ fontSize: "1.2rem" }}>Payments</h2>
+            <p>Stripe account connection for hosted checkout and refunds.</p>
+          </div>
+          <div style={{ alignItems: "center", display: "flex", gap: 12, justifyContent: "flex-end" }}>
+            <span className={stripeConnected ? "pill success" : "pill warning"}>{stripeConnected ? "Connected" : "Not connected"}</span>
+            <a className="button" href="/api/payments/stripe/connect/start">
+              <CreditCard size={18} />
+              {stripeConnected ? "Reconnect Stripe" : "Connect Stripe"}
+            </a>
+          </div>
+        </div>
+        {stripeConnected ? (
+          <div className="subpanel">
+            <strong>{stripeCredential.displayName || stripeCredential.externalAccountId}</strong>
+            <small>Stripe account: {stripeCredential.externalAccountId}</small>
+          </div>
+        ) : null}
       </section>
 
       <form action={updateSettingsAction} className="card form-grid">

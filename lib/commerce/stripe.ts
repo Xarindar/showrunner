@@ -3,6 +3,7 @@ import "server-only";
 import {
   BillingDocumentStatus,
   OrderStatus,
+  PaymentGatewayConnectionStatus,
   PaymentProvider,
   PaymentStatus,
   Prisma,
@@ -11,9 +12,11 @@ import {
 import Stripe from "stripe";
 import { getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
+import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
+import { createStripeConnectAuthorizeUrl } from "@/lib/payments/stripe-connect";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
-import type { PaymentGateway, PaymentGatewayCheckoutInput } from "@/lib/payments/types";
+import type { PaymentGateway, PaymentGatewayCheckoutInput, PaymentWallet } from "@/lib/payments/types";
 import { updateOrderStatus } from "./orders";
 
 let stripeClient: Stripe | null = null;
@@ -37,6 +40,29 @@ function getStripe() {
   }
 
   return stripeClient;
+}
+
+function configuredStripeWallets(): PaymentWallet[] {
+  return ["APPLE_PAY", "GOOGLE_PAY", "CASH_APP_PAY"];
+}
+
+function parseConnectedWallets(value: Prisma.JsonValue): PaymentWallet[] {
+  if (!Array.isArray(value)) return configuredStripeWallets();
+  const supported = new Set(configuredStripeWallets());
+  const wallets = value.filter((item): item is PaymentWallet => typeof item === "string" && supported.has(item as PaymentWallet));
+  return wallets.length ? wallets : configuredStripeWallets();
+}
+
+async function getStripeConnectedAccountId(siteId?: string) {
+  if (!siteId) return "";
+  const credential = await getConnectedGatewayCredential(siteId, PaymentProvider.STRIPE);
+  if (credential?.status !== PaymentGatewayConnectionStatus.CONNECTED) return "";
+  return credential.externalAccountId.trim();
+}
+
+async function stripeRequestOptions(siteId?: string): Promise<Stripe.RequestOptions | undefined> {
+  const stripeAccount = await getStripeConnectedAccountId(siteId);
+  return stripeAccount ? { stripeAccount } : undefined;
 }
 
 function appBaseUrl() {
@@ -176,6 +202,7 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
     payments: [payment]
   };
   const metadata = stripeMetadata(orderForMetadata);
+  const requestOptions = await stripeRequestOptions(order.siteId);
   const session = await getStripe().checkout.sessions.create({
     client_reference_id: order.id,
     customer_email: order.customerEmail,
@@ -187,7 +214,7 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
     },
     success_url: publicOrderUrl(order.orderNumber, "success"),
     cancel_url: publicOrderUrl(order.orderNumber, "cancel")
-  });
+  }, requestOptions);
 
   if (!session.url) throw new Error("Stripe did not return a hosted Checkout URL.");
 
@@ -195,6 +222,7 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
     strategy: "stripe_checkout",
     checkoutSession: {
       amountTotal: session.amount_total,
+      connectedAccount: requestOptions?.stripeAccount || "",
       currency: session.currency,
       id: session.id,
       livemode: session.livemode,
@@ -296,6 +324,7 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
     documentNumber: result.document.documentNumber,
     siteId: result.document.siteId
   });
+  const requestOptions = await stripeRequestOptions(result.document.siteId);
   const session = await getStripe().checkout.sessions.create({
     client_reference_id: result.document.id,
     customer_email: result.document.customerEmail,
@@ -311,7 +340,7 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
     },
     success_url: publicBillingUrl(result.document.publicAccessToken, "success"),
     cancel_url: publicBillingUrl(result.document.publicAccessToken, "cancel")
-  });
+  }, requestOptions);
 
   if (!session.url) throw new Error("Stripe did not return a hosted Checkout URL.");
 
@@ -319,6 +348,7 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
     strategy: "stripe_checkout_billing_document",
     checkoutSession: {
       amountTotal: session.amount_total,
+      connectedAccount: requestOptions?.stripeAccount || "",
       currency: session.currency,
       id: session.id,
       livemode: session.livemode,
@@ -365,6 +395,7 @@ function stripeEventSummary(event: Stripe.Event): Prisma.InputJsonObject {
     created: event.created,
     id: event.id,
     livemode: event.livemode,
+    connectedAccount: event.account || "",
     type: event.type
   };
   const object = event.data.object;
@@ -831,17 +862,113 @@ async function createStripeGatewayCheckoutSession(input: PaymentGatewayCheckoutI
   };
 }
 
+async function refundStripeGatewayPayment(input: { amountCents?: number; paymentId: string; siteId: string }) {
+  const payment = await prisma.payment.findFirst({
+    where: {
+      id: input.paymentId,
+      provider: PaymentProvider.STRIPE,
+      order: { siteId: input.siteId }
+    },
+    include: { order: true }
+  });
+
+  if (payment) {
+    if (!payment.externalPaymentId) throw new Error("Stripe payment intent is missing for this order payment.");
+    const refund = await getStripe().refunds.create(
+      {
+        amount: input.amountCents,
+        payment_intent: payment.externalPaymentId
+      },
+      await stripeRequestOptions(payment.order.siteId)
+    );
+    const isFullRefund = !input.amountCents || input.amountCents >= payment.amountCents;
+
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        rawSummary: {
+          refund: {
+            amount: refund.amount,
+            id: refund.id,
+            paymentIntent:
+              typeof refund.payment_intent === "string" ? refund.payment_intent : refund.payment_intent?.id || "",
+            status: refund.status || ""
+          },
+          strategy: "stripe_refund"
+        },
+        status: isFullRefund ? PaymentStatus.REFUNDED : payment.status
+      }
+    });
+
+    if (isFullRefund) {
+      await updateOrderStatus({
+        orderId: payment.orderId,
+        providerConfirmed: true,
+        siteId: payment.order.siteId,
+        status: OrderStatus.REFUNDED
+      });
+    }
+
+    return refund;
+  }
+
+  const billingPayment = await prisma.billingPayment.findFirst({
+    where: {
+      id: input.paymentId,
+      provider: PaymentProvider.STRIPE,
+      billingDocument: { siteId: input.siteId }
+    },
+    include: { billingDocument: true }
+  });
+
+  if (!billingPayment) throw new Error("Stripe payment record not found for refund.");
+  if (!billingPayment.externalPaymentId) throw new Error("Stripe payment intent is missing for this billing payment.");
+
+  const refund = await getStripe().refunds.create(
+    {
+      amount: input.amountCents,
+      payment_intent: billingPayment.externalPaymentId
+    },
+    await stripeRequestOptions(billingPayment.billingDocument.siteId)
+  );
+  const isFullRefund = !input.amountCents || input.amountCents >= billingPayment.amountCents;
+
+  await prisma.billingPayment.update({
+    where: { id: billingPayment.id },
+    data: {
+      rawSummary: {
+        refund: {
+          amount: refund.amount,
+          id: refund.id,
+          paymentIntent: typeof refund.payment_intent === "string" ? refund.payment_intent : refund.payment_intent?.id || "",
+          status: refund.status || ""
+        },
+        strategy: "stripe_refund_billing_document"
+      },
+      status: isFullRefund ? PaymentStatus.REFUNDED : billingPayment.status
+    }
+  });
+
+  return refund;
+}
+
 export const stripePaymentGateway: PaymentGateway = {
   provider: PaymentProvider.STRIPE,
   createCheckoutSession: createStripeGatewayCheckoutSession,
-  createOnboardingSession: async () => ({
+  createOnboardingSession: async (siteId: string) => ({
     provider: PaymentProvider.STRIPE,
-    status: "unsupported"
+    status: "pending",
+    url: createStripeConnectAuthorizeUrl(siteId)
   }),
   handleWebhookEvent: async (event: unknown) => handleStripeWebhookEvent(event as Stripe.Event),
-  refund: async () => {
-    throw new Error("Stripe refunds are not routed through the gateway adapter yet.");
+  refund: async (input) => {
+    return refundStripeGatewayPayment(input);
   },
-  supportedWallets: async () => [],
+  supportedWallets: async (siteId?: string) => {
+    if (!siteId) return configuredStripeWallets();
+    const credential = await getConnectedGatewayCredential(siteId, PaymentProvider.STRIPE);
+    if (credential?.status !== PaymentGatewayConnectionStatus.CONNECTED) return configuredStripeWallets();
+    return parseConnectedWallets(credential.supportedWallets);
+  },
   verifyWebhook: ({ rawBody, signature }) => constructStripeWebhookEvent(rawBody, signature)
 };
