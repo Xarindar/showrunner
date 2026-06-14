@@ -3,9 +3,11 @@ import {
   AutomationRunStatus,
   AutomationStatus,
   AutomationTrigger,
+  MessageChannel,
   WebhookDeliveryStatus
 } from "@prisma/client";
 import { Play, Plus, Webhook, Workflow } from "lucide-react";
+import { requireAdmin } from "@/lib/auth";
 import { moduleEventNames } from "@/lib/events/catalog";
 import { enumLabel, formatDateTime, stringArrayCsv } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -17,6 +19,7 @@ import {
   deleteWebhookEndpointAction,
   recordAutomationRunAction,
   recordWebhookDeliveryAction,
+  replayAutomationRunAction,
   updateAutomationAction,
   updateWebhookEndpointAction,
   updateAutomationStatusAction
@@ -35,8 +38,11 @@ function automationStatusClass(status: AutomationStatus) {
 }
 
 function runStatusClass(status: string) {
-  if (status === AutomationRunStatus.SUCCEEDED || status === WebhookDeliveryStatus.DELIVERED) return "pill success";
-  if (status === "FAILED") return "pill danger";
+  if (status === AutomationRunStatus.SUCCEEDED || status === WebhookDeliveryStatus.DELIVERED || status === "COMPLETED") return "pill success";
+  if (status === AutomationRunStatus.FAILED || status === WebhookDeliveryStatus.FAILED || status === AutomationRunStatus.DEAD_LETTER) {
+    return "pill danger";
+  }
+  if (status === AutomationRunStatus.PROCESSING) return "pill warning";
   return "pill";
 }
 
@@ -46,9 +52,15 @@ function conditionEntry(value: unknown) {
   return { key, value: String(item || "") };
 }
 
+function configTextareaValue(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !Object.keys(value).length) return "";
+  return JSON.stringify(value, null, 2);
+}
+
 export default async function AutomationPage({ searchParams }: AutomationPageProps) {
+  await requireAdmin("automation:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [automations, endpoints, recentDeliveries, activeCount, runCount] = await Promise.all([
+  const [automations, endpoints, recentDeliveries, messageTemplates, recentTasks, activeCount, runCount, deadLetterCount] = await Promise.all([
     prisma.automation.findMany({
       where: { siteId: settings.siteId },
       include: { _count: { select: { runs: true } } },
@@ -69,8 +81,19 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
       orderBy: { createdAt: "desc" },
       take: 10
     }),
+    prisma.messageTemplate.findMany({
+      where: { siteId: settings.siteId, channel: MessageChannel.EMAIL, isActive: true, key: { not: null } },
+      orderBy: [{ purpose: "asc" }, { name: "asc" }],
+      take: 100
+    }),
+    prisma.automationTask.findMany({
+      where: { siteId: settings.siteId },
+      orderBy: { createdAt: "desc" },
+      take: 10
+    }),
     prisma.automation.count({ where: { siteId: settings.siteId, status: AutomationStatus.ACTIVE } }),
-    prisma.automationRun.count({ where: { automation: { siteId: settings.siteId } } })
+    prisma.automationRun.count({ where: { automation: { siteId: settings.siteId } } }),
+    prisma.automationRun.count({ where: { automation: { siteId: settings.siteId }, status: AutomationRunStatus.DEAD_LETTER } })
   ]);
 
   const selectedAutomationId = params.automation || automations[0]?.id;
@@ -108,7 +131,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
           <Play size={22} />
           <h3>{runCount} run records</h3>
           <p className="lead" style={{ fontSize: "0.95rem" }}>
-            Live event matches plus operator-entered test notes.
+            Live event matches, queued executors, and {deadLetterCount} dead-lettered runs.
           </p>
         </div>
         <div className="card">
@@ -172,12 +195,31 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
             </div>
           </div>
           <div className="field">
+            <label htmlFor="automation-template">Email template</label>
+            <select id="automation-template" name="messageTemplateId" defaultValue="">
+              <option value="">No template</option>
+              {messageTemplates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name} ({template.key})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
             <label htmlFor="automation-subject">Subject template</label>
             <input id="automation-subject" name="subjectTemplate" placeholder="New {{trigger}} event" />
           </div>
           <div className="field">
             <label htmlFor="automation-body">Body template</label>
             <textarea id="automation-body" name="bodyTemplate" />
+          </div>
+          <div className="field">
+            <label htmlFor="automation-config">Action config JSON</label>
+            <textarea
+              id="automation-config"
+              name="actionConfig"
+              placeholder={'{"targetStatus":"CONFIRMED","tag":"vip","title":"Follow up with {{actorEmail}}","dueInDays":2}'}
+            />
           </div>
           <div className="grid-2">
             <div className="field">
@@ -299,12 +341,35 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                     </div>
                   </div>
                   <div className="field">
+                    <label htmlFor={`automation-${selectedAutomation.id}-template`}>Email template</label>
+                    <select
+                      id={`automation-${selectedAutomation.id}-template`}
+                      name="messageTemplateId"
+                      defaultValue={selectedAutomation.messageTemplateId || ""}
+                    >
+                      <option value="">No template</option>
+                      {messageTemplates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name} ({template.key})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
                     <label htmlFor={`automation-${selectedAutomation.id}-subject`}>Subject template</label>
                     <input id={`automation-${selectedAutomation.id}-subject`} name="subjectTemplate" defaultValue={selectedAutomation.subjectTemplate} />
                   </div>
                   <div className="field">
                     <label htmlFor={`automation-${selectedAutomation.id}-body`}>Body template</label>
                     <textarea id={`automation-${selectedAutomation.id}-body`} name="bodyTemplate" defaultValue={selectedAutomation.bodyTemplate} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`automation-${selectedAutomation.id}-config`}>Action config JSON</label>
+                    <textarea
+                      id={`automation-${selectedAutomation.id}-config`}
+                      name="actionConfig"
+                      defaultValue={configTextareaValue(selectedAutomation.actionConfig)}
+                    />
                   </div>
                   <div className="grid-2">
                     <div className="field">
@@ -406,6 +471,14 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                   <tr key={run.id}>
                     <td>
                       <span className={runStatusClass(run.status)}>{enumLabel(run.status)}</span>
+                      {run.status === AutomationRunStatus.DEAD_LETTER ? (
+                        <form action={replayAutomationRunAction} style={{ marginTop: 8 }}>
+                          <input type="hidden" name="id" value={run.id} />
+                          <button className="button secondary" type="submit">
+                            Replay
+                          </button>
+                        </form>
+                      ) : null}
                     </td>
                     <td>
                       {run.summary || run.triggerKey || "No summary"}
@@ -549,6 +622,43 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
       </section>
 
       <section className="grid-2">
+        <div className="card stack">
+          <h2 style={{ fontSize: "1.35rem" }}>Automation tasks</h2>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Task</th>
+                <th>Related</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentTasks.map((task) => (
+                <tr key={task.id}>
+                  <td>
+                    <strong>{task.title}</strong>
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>{task.assignedToEmail || task.actorEmail || "Unassigned"}</span>
+                  </td>
+                  <td>
+                    {task.relatedType || "No related record"}
+                    <br />
+                    <span style={{ color: "var(--muted)" }}>{task.relatedId}</span>
+                  </td>
+                  <td>
+                    <span className={runStatusClass(task.status)}>{enumLabel(task.status)}</span>
+                  </td>
+                </tr>
+              ))}
+              {!recentTasks.length ? (
+                <tr>
+                  <td colSpan={3}>No automation tasks yet.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+
         <form action={recordWebhookDeliveryAction} className="card form-grid">
           <h2 style={{ fontSize: "1.35rem" }}>Record manual webhook delivery</h2>
           <div className="grid-2">

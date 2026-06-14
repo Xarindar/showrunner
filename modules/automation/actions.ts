@@ -6,6 +6,7 @@ import {
   AutomationRunStatus,
   AutomationStatus,
   AutomationTrigger,
+  MessageChannel,
   WebhookDeliveryStatus
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -23,10 +24,42 @@ import {
 } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
 import { moduleEventNames } from "@/lib/events/catalog";
+import { replayAutomationRun } from "@/lib/events/automation-runs";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 
 const automationEvent = z.enum(moduleEventNames);
+const actionConfigText = optionalStoredText.transform((value, context) => {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      context.addIssue({ code: "custom", message: "Action config must be a JSON object." });
+      return z.NEVER;
+    }
+    return parsed;
+  } catch {
+    context.addIssue({ code: "custom", message: "Action config must be valid JSON." });
+    return z.NEVER;
+  }
+});
+
+function configText(value: unknown, key: string) {
+  return value && typeof value === "object" && !Array.isArray(value) && typeof (value as Record<string, unknown>)[key] === "string"
+    ? ((value as Record<string, unknown>)[key] as string).trim()
+    : "";
+}
+
+function configNumberish(value: unknown, key: string) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  const raw = (value as Record<string, unknown>)[key];
+  if (typeof raw === "number" && Number.isFinite(raw)) return String(raw);
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
+function actionNeedsTemplate(action: AutomationAction) {
+  return action === AutomationAction.SEND_EMAIL || action === AutomationAction.NOTIFY_ADMIN || action === AutomationAction.REQUEST_REVIEW;
+}
 
 const automationSchema = z
   .object({
@@ -35,9 +68,11 @@ const automationSchema = z
     trigger: z.enum(AutomationTrigger).catch(AutomationTrigger.MANUAL),
     action: z.enum(AutomationAction).catch(AutomationAction.NOTIFY_ADMIN),
     targetEmail: optionalEmail,
+    messageTemplateId: optionalStoredText,
     webhookUrl: optionalSafeExternalHttpsUrl,
     subjectTemplate: optionalStoredText,
     bodyTemplate: optionalStoredText,
+    actionConfig: actionConfigText,
     conditionKey: optionalStoredText,
     conditionValue: optionalStoredText
   })
@@ -45,10 +80,40 @@ const automationSchema = z
     ...value,
     conditions: value.conditionKey ? { [value.conditionKey]: value.conditionValue } : {}
   }))
-  .refine((value) => value.action !== AutomationAction.SEND_EMAIL || value.targetEmail, {
-    message: "Email automations need a target email.",
-    path: ["targetEmail"]
+  .refine(
+    (value) => !actionNeedsTemplate(value.action) || value.messageTemplateId,
+    {
+      message: "Email-based automations need a MessageTemplate.",
+      path: ["messageTemplateId"]
+    }
+  )
+  .refine((value) => value.action !== AutomationAction.UPDATE_STATUS || configText(value.actionConfig, "targetStatus"), {
+    message: "Update status automations need actionConfig.targetStatus.",
+    path: ["actionConfig"]
   })
+  .refine(
+    (value) => value.action !== AutomationAction.ADD_TAG || configText(value.actionConfig, "tag") || configText(value.actionConfig, "label"),
+    {
+      message: "Add tag automations need actionConfig.tag.",
+      path: ["actionConfig"]
+    }
+  )
+  .refine((value) => value.action !== AutomationAction.CREATE_TASK || configText(value.actionConfig, "title"), {
+    message: "Create task automations need actionConfig.title.",
+    path: ["actionConfig"]
+  })
+  .refine(
+    (value) =>
+      value.action !== AutomationAction.CREATE_INVOICE ||
+      configNumberish(value.actionConfig, "unitPriceCents") ||
+      configNumberish(value.actionConfig, "amountCents") ||
+      configNumberish(value.actionConfig, "unitPrice") ||
+      configNumberish(value.actionConfig, "amount"),
+    {
+      message: "Create invoice automations need actionConfig.unitPriceCents or actionConfig.amountCents.",
+      path: ["actionConfig"]
+    }
+  )
   .refine((value) => value.action !== AutomationAction.SEND_WEBHOOK || value.webhookUrl, {
     message: "Webhook automations need a webhook URL.",
     path: ["webhookUrl"]
@@ -59,6 +124,10 @@ const automationUpdateSchema = automationSchema.and(z.object({ id: requiredText 
 const automationStatusSchema = z.object({
   id: requiredText,
   status: z.enum(AutomationStatus)
+});
+
+const replayRunSchema = z.object({
+  id: requiredText
 });
 
 const deleteAutomationSchema = z.object({
@@ -125,10 +194,30 @@ function automationWebhookSecret(action: AutomationAction, currentSecret?: strin
   return missingSigningSecret(currentSecret) ? generateSigningSecret() : currentSecret || undefined;
 }
 
+async function requireAutomationTemplate(messageTemplateId: string, siteId: string) {
+  if (!messageTemplateId) return undefined;
+  const template = await prisma.messageTemplate.findFirst({
+    where: {
+      id: messageTemplateId,
+      siteId,
+      channel: MessageChannel.EMAIL,
+      isActive: true
+    },
+    select: { id: true }
+  });
+
+  if (!template) {
+    redirect(`/admin/modules/automation?error=${encodeURIComponent("Choose an active email template for that automation.")}`);
+  }
+
+  return template.id;
+}
+
 export async function createAutomationAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("automation:manage");
   const input = await parseForm(automationSchema, formData, "/admin/modules/automation");
   const settings = await getSiteSettings();
+  const messageTemplateId = await requireAutomationTemplate(input.messageTemplateId, settings.siteId);
 
   await prisma.automation.create({
     data: {
@@ -138,10 +227,12 @@ export async function createAutomationAction(formData: FormData) {
       trigger: input.trigger,
       action: input.action,
       targetEmail: input.targetEmail,
+      messageTemplateId,
       webhookUrl: input.webhookUrl,
       webhookSigningSecret: automationWebhookSecret(input.action) || "",
       subjectTemplate: input.subjectTemplate,
       bodyTemplate: input.bodyTemplate,
+      actionConfig: input.actionConfig,
       conditions: input.conditions
     }
   });
@@ -151,7 +242,7 @@ export async function createAutomationAction(formData: FormData) {
 }
 
 export async function updateAutomationStatusAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("automation:manage");
   const input = await parseForm(automationStatusSchema, formData, "/admin/modules/automation");
   const settings = await getSiteSettings();
 
@@ -164,7 +255,7 @@ export async function updateAutomationStatusAction(formData: FormData) {
 }
 
 export async function updateAutomationAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("automation:manage");
   const input = await parseForm(automationUpdateSchema, formData, "/admin/modules/automation");
   const settings = await getSiteSettings();
   const current = await prisma.automation.findFirst({
@@ -175,6 +266,7 @@ export async function updateAutomationAction(formData: FormData) {
   if (!current) {
     redirect(`/admin/modules/automation?error=${encodeURIComponent("Automation not found.")}`);
   }
+  const messageTemplateId = await requireAutomationTemplate(input.messageTemplateId, settings.siteId);
 
   await prisma.automation.update({
     where: { id: input.id },
@@ -184,10 +276,12 @@ export async function updateAutomationAction(formData: FormData) {
       trigger: input.trigger,
       action: input.action,
       targetEmail: input.targetEmail,
+      messageTemplateId,
       webhookUrl: input.webhookUrl,
       webhookSigningSecret: automationWebhookSecret(input.action, current?.webhookSigningSecret) || "",
       subjectTemplate: input.subjectTemplate,
       bodyTemplate: input.bodyTemplate,
+      actionConfig: input.actionConfig,
       conditions: input.conditions
     }
   });
@@ -197,7 +291,7 @@ export async function updateAutomationAction(formData: FormData) {
 }
 
 export async function deleteAutomationAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("automation:manage");
   const input = await parseForm(deleteAutomationSchema, formData, "/admin/modules/automation");
   const settings = await getSiteSettings();
 
@@ -209,8 +303,24 @@ export async function deleteAutomationAction(formData: FormData) {
   redirect("/admin/modules/automation?saved=automation-delete");
 }
 
+export async function replayAutomationRunAction(formData: FormData) {
+  await requireAdmin("automation:manage");
+  const input = await parseForm(replayRunSchema, formData, "/admin/modules/automation");
+  const settings = await getSiteSettings();
+
+  try {
+    await replayAutomationRun(input.id, settings.siteId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Automation run could not be replayed.";
+    redirect(`/admin/modules/automation?error=${encodeURIComponent(message)}`);
+  }
+
+  refreshAutomation();
+  redirect("/admin/modules/automation?saved=replay");
+}
+
 export async function recordAutomationRunAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("automation:manage");
   const input = await parseForm(automationRunSchema, formData, "/admin/modules/automation");
   const settings = await getSiteSettings();
   const automation = await prisma.automation.findFirst({
@@ -244,7 +354,7 @@ export async function recordAutomationRunAction(formData: FormData) {
 }
 
 export async function createWebhookEndpointAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("automation:manage");
   const input = await parseForm(webhookEndpointSchema, formData, "/admin/modules/automation");
   const settings = await getSiteSettings();
 
@@ -264,7 +374,7 @@ export async function createWebhookEndpointAction(formData: FormData) {
 }
 
 export async function updateWebhookEndpointAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("automation:manage");
   const input = await parseForm(webhookEndpointUpdateSchema, formData, "/admin/modules/automation");
   const settings = await getSiteSettings();
   const current = await prisma.webhookEndpoint.findFirst({
@@ -292,7 +402,7 @@ export async function updateWebhookEndpointAction(formData: FormData) {
 }
 
 export async function deleteWebhookEndpointAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("automation:manage");
   const input = await parseForm(deleteWebhookEndpointSchema, formData, "/admin/modules/automation");
   const settings = await getSiteSettings();
 
@@ -305,7 +415,7 @@ export async function deleteWebhookEndpointAction(formData: FormData) {
 }
 
 export async function recordWebhookDeliveryAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("automation:manage");
   const input = await parseForm(webhookDeliverySchema, formData, "/admin/modules/automation");
   const settings = await getSiteSettings();
   const endpoint = await prisma.webhookEndpoint.findFirst({

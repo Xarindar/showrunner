@@ -20,6 +20,7 @@ enum AutomationTrigger {
   GALLERY_VIEWED
   FAVORITE_ADDED
   GALLERY_APPROVED
+  GALLERY_CHANGES_REQUESTED
   CLIENT_TAGGED
   INVOICE_OVERDUE
   MANUAL
@@ -29,21 +30,32 @@ enum AutomationAction {
   SEND_EMAIL
   NOTIFY_ADMIN
   CREATE_INVOICE
+  UPDATE_STATUS
+  ADD_TAG
+  CREATE_TASK
   REQUEST_REVIEW
   SEND_WEBHOOK
 }
 
 enum AutomationRunStatus {
   QUEUED
+  PROCESSING
   SUCCEEDED
   FAILED
   SKIPPED
+  DEAD_LETTER
 }
 
 enum WebhookDeliveryStatus {
   PENDING
   DELIVERED
   FAILED
+}
+
+enum AutomationTaskStatus {
+  OPEN
+  COMPLETED
+  CANCELED
 }
 
 model Automation {
@@ -55,10 +67,13 @@ model Automation {
   trigger              AutomationTrigger @default(MANUAL)
   action               AutomationAction  @default(NOTIFY_ADMIN)
   targetEmail          String?
+  messageTemplateId    String?
+  messageTemplate      MessageTemplate?  @relation(fields: [messageTemplateId], references: [id], onDelete: SetNull)
   webhookUrl           String?
   webhookSigningSecret String            @default("")
   subjectTemplate      String            @default("")
   bodyTemplate         String            @default("")
+  actionConfig         Json              @default("{}")
   conditions           Json              @default("{}")
   lastRunAt            DateTime?
   createdAt            DateTime          @default(now())
@@ -68,21 +83,55 @@ model Automation {
 
   @@index([siteId, status])
   @@index([trigger])
+  @@index([messageTemplateId])
 }
 
 model AutomationRun {
-  id           String              @id @default(cuid())
-  automationId String
-  automation   Automation          @relation(fields: [automationId], references: [id], onDelete: Cascade)
-  status       AutomationRunStatus @default(QUEUED)
-  triggerKey   String              @default("")
-  relatedType  String              @default("")
-  relatedId    String              @default("")
-  summary      String              @default("")
-  createdAt    DateTime            @default(now())
+  id            String              @id @default(cuid())
+  automationId  String
+  automation    Automation          @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  status        AutomationRunStatus @default(QUEUED)
+  triggerKey    String              @default("")
+  relatedType   String              @default("")
+  relatedId     String              @default("")
+  summary       String              @default("")
+  payload       Json                @default("{}")
+  attemptCount  Int                 @default(0)
+  lastAttemptAt DateTime?
+  nextAttemptAt DateTime            @default(now())
+  replayOfRunId String?
+  replayOfRun   AutomationRun?      @relation("AutomationRunReplay", fields: [replayOfRunId], references: [id], onDelete: SetNull)
+  replays       AutomationRun[]     @relation("AutomationRunReplay")
+  createdAt     DateTime            @default(now())
+  tasks         AutomationTask[]
 
   @@index([automationId])
   @@index([status])
+  @@index([status, nextAttemptAt])
+  @@index([replayOfRunId])
+}
+
+model AutomationTask {
+  id              String               @id @default(cuid())
+  siteId          String
+  site            Site                 @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  automationRunId String?
+  automationRun   AutomationRun?       @relation(fields: [automationRunId], references: [id], onDelete: SetNull)
+  title           String
+  description     String               @default("")
+  status          AutomationTaskStatus @default(OPEN)
+  actorEmail      String               @default("")
+  assignedToEmail String               @default("")
+  relatedType     String               @default("")
+  relatedId       String               @default("")
+  dueAt           DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([siteId, status])
+  @@index([automationRunId])
+  @@index([relatedType, relatedId])
+  @@index([assignedToEmail])
 }
 
 model WebhookEndpoint {

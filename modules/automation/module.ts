@@ -6,27 +6,28 @@ export const manifest = {
   href: "/admin/modules/automation",
   icon: "Workflow",
   order: 120,
-  description: "Trigger rules, run history, and outbound webhook setup.",
+  description: "Trigger rules, live action executors, run history, tasks, and outbound webhook setup.",
   layout: "wide",
   status: "active",
   enabledByDefault: true,
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Module events match active rules, queue signed webhook deliveries, and keep manual run/delivery records clearly labeled.",
-    primaryGap: "Non-webhook action executors, replay/dead-letter UI, and production worker scheduling are still pending."
+    summary: "Module events match active rules, queue signed webhook deliveries, execute non-webhook actions, and preserve replayable run records.",
+    primaryGap: "Production scheduler provisioning, Zapier/Make connector support, and richer condition logic are still pending."
   },
   capabilities: [
     { label: "Rule registry", status: "foundation" },
     { label: "Event rule matching", status: "live" },
     { label: "Queued webhook dispatch", status: "live" },
-    { label: "Manual run records", status: "manual" },
-    { label: "Non-webhook executors", status: "planned" }
+    { label: "Non-webhook executors", status: "live" },
+    { label: "Replay and dead letters", status: "live" },
+    { label: "Manual run records", status: "manual" }
   ],
   adminRoutes: ["/admin/modules/automation"],
   dependencies: ["communications", "analytics"],
-  dataModels: ["Automation", "AutomationRun", "WebhookEndpoint", "WebhookDelivery"],
-  permissions: ["automation.read", "automation.write"],
+  dataModels: ["Automation", "AutomationRun", "AutomationTask", "WebhookEndpoint", "WebhookDelivery"],
+  permissions: ["automation:manage"],
   settingsSections: ["Automation", "Webhooks"],
   healthChecks: ["manual-runs", "webhook-secrets", "event-engine"]
 } satisfies ShellModule;
