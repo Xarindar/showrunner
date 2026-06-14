@@ -25,7 +25,6 @@ export const manifest = {
   adminRoutes: ["/admin"],
   dependencies: ["settings"],
   dataModels: ["SiteSettings", "Booking", "Client", "Service"],
-  permissions: ["dashboard.read"],
   settingsSections: ["Modules", "Operations"],
   healthChecks: ["module-readiness", "email-outbox", "booking-setup"]
 } satisfies ShellModule;

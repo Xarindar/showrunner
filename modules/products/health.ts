@@ -18,15 +18,17 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
   ]);
 
   if (activeProductCount > 0) {
-    warnings.push(
-      warning(
-        "Stripe Checkout is manual",
-        "Storefront, cart, order creation, and payment records are live. Attach hosted Checkout links manually until Stripe session creation and webhooks are configured.",
-        "info",
-        "products",
-        "/admin/modules/products"
-      )
-    );
+    if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
+      warnings.push(
+        warning(
+          "Stripe Checkout not configured",
+          "Storefront checkout needs STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET before live payment collection.",
+          "critical",
+          "products",
+          "/admin/modules/settings"
+        )
+      );
+    }
   }
 
   if (pendingCheckoutCount > 0) {

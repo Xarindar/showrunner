@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { LogOut, Menu, X } from "lucide-react";
+import type { AdminRole } from "@prisma/client";
 import { usePathname } from "next/navigation";
+import { hasAdminPermission } from "@/lib/admin-permissions";
 import { moduleIcons, moduleRegistry, type ModuleId } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
 import { logoutAction } from "@/app/admin/(protected)/actions";
@@ -11,9 +13,10 @@ import { useState } from "react";
 type AdminSidebarProps = {
   businessName: string;
   enabledModules: ModuleId[];
+  userRole: AdminRole;
 };
 
-export function AdminSidebar({ businessName, enabledModules }: AdminSidebarProps) {
+export function AdminSidebar({ businessName, enabledModules, userRole }: AdminSidebarProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -63,6 +66,9 @@ export function AdminSidebar({ businessName, enabledModules }: AdminSidebarProps
             const status = item.status as ModuleStatus;
             const isFuture = status === "future";
             const isActive = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
+            const visible = !item.permissions?.length || item.permissions.some((permission) => hasAdminPermission({ role: userRole }, permission));
+
+            if (!visible) return null;
 
             if (!enabled || isFuture) {
               return (

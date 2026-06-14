@@ -25,7 +25,7 @@ export const manifest = {
   publicRoutes: ["/"],
   dependencies: ["settings", "media"],
   dataModels: ["SiteSettings"],
-  permissions: ["content.read", "content.write"],
+  permissions: ["content:manage"],
   settingsSections: ["Content", "SEO"],
   healthChecks: ["homepage-copy", "hero-image"]
 } satisfies ShellModule;

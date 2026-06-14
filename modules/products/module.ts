@@ -28,7 +28,7 @@ export const manifest = {
   widgetRoutes: [],
   dependencies: ["media", "billing"],
   dataModels: ["Product", "ProductVariant", "Collection", "Coupon", "Cart", "Order", "Payment"],
-  permissions: ["products.read", "products.write"],
+  permissions: ["products:manage"],
   settingsSections: ["Commerce", "Payments"],
   healthChecks: ["active-products", "checkout-adapter"]
 } satisfies ShellModule;

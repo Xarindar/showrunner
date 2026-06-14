@@ -25,7 +25,6 @@ export const manifest = {
   adminRoutes: ["/admin/modules/help"],
   dependencies: ["dashboard", "settings"],
   dataModels: ["SiteSettings"],
-  permissions: ["help.read"],
   settingsSections: ["Support"],
   healthChecks: ["module-readiness"]
 } satisfies ShellModule;

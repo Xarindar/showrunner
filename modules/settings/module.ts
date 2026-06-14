@@ -15,19 +15,20 @@ export const manifest = {
     level: "partial",
     mode: "mixed",
     summary: "Single-site business, theme, media, and module toggles are live.",
-    primaryGap: "Tenant/site boundary and module installation records are in place; policies, roles, and audit logs remain pending."
+    primaryGap: "Tenant/site boundary, audit logs, and role-management foundation are in place; policies and full permission coverage remain pending."
   },
   capabilities: [
     { label: "Business identity", status: "live" },
     { label: "Theme and media settings", status: "live" },
     { label: "Module toggles", status: "live" },
     { label: "Tenant/site boundary", status: "foundation" },
-    { label: "Policy, roles, and audit controls", status: "planned" }
+    { label: "Policy controls", status: "planned" },
+    { label: "Role and audit controls", status: "foundation" }
   ],
   adminRoutes: ["/admin/modules/settings"],
   dependencies: ["dashboard"],
   dataModels: ["SiteSettings"],
-  permissions: ["settings.read", "settings.write", "modules.configure"],
+  permissions: ["settings:update"],
   settingsSections: ["Business", "Modules", "Theme", "Media", "Security", "Data"],
   healthChecks: ["module-enabled-state", "required-module-state"]
 } satisfies ShellModule;

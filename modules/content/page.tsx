@@ -1,4 +1,5 @@
 import { Save } from "lucide-react";
+import { requireAdmin } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site";
 import { manifest } from "./module";
 import { updateContentAction } from "./actions";
@@ -10,6 +11,7 @@ type ContentPageProps = {
 };
 
 export default async function ContentPage({ searchParams }: ContentPageProps) {
+  await requireAdmin("content:manage");
   const [{ saved }, settings] = await Promise.all([searchParams, getSiteSettings()]);
 
   return (

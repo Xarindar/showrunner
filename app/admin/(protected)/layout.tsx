@@ -1,5 +1,5 @@
 import { AdminSidebar } from "@/shell/admin-sidebar";
-import { requireAdmin } from "@/lib/auth";
+import { requireAuthenticatedAdmin } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
 
@@ -10,12 +10,12 @@ export default async function AdminLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  await requireAdmin();
+  const user = await requireAuthenticatedAdmin();
   const settings = await getSiteSettings();
 
   return (
     <div className="admin-root" style={themeToCssVars(settings)}>
-      <AdminSidebar businessName={settings.businessName} enabledModules={settings.enabledModuleIds} />
+      <AdminSidebar businessName={settings.businessName} enabledModules={settings.enabledModuleIds} userRole={user.role} />
       <main className="admin-main">{children}</main>
     </div>
   );

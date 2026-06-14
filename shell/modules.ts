@@ -16,6 +16,7 @@ import { manifest as productsModule } from "@/modules/products/module";
 import { manifest as schedulingModule } from "@/modules/scheduling/module";
 import { manifest as settingsModule } from "@/modules/settings/module";
 import { manifest as testimonialsModule } from "@/modules/testimonials/module";
+import { manifest as usersModule } from "@/modules/users/module";
 
 export { moduleIcons };
 
@@ -30,6 +31,7 @@ const registeredModules = [
   formsModule,
   testimonialsModule,
   settingsModule,
+  usersModule,
   helpModule,
   productsModule,
   communicationsModule,

@@ -40,7 +40,7 @@ const commonWorkflows = [
   {
     label: "Review conversion activity",
     href: "/admin/modules/analytics",
-    detail: "Review automatic and manual events, attribution, goals, and CSV export; adapters and retention controls remain pending."
+    detail: "Review automatic and manual events, attribution, goals, CSV export, adapter IDs, and retention policy."
   }
 ];
 

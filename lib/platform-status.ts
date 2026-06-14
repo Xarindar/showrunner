@@ -60,16 +60,16 @@ export const platformFoundationItems: PlatformFoundationItem[] = [
   {
     key: "audit-log",
     title: "Audit log",
-    status: "schema-needed",
-    detail: "Record sensitive create, update, delete, status, export, payment, refund, access, and role-change events with actor and target metadata.",
+    status: "schema-ready",
+    detail: "AuditLog exists with actor, site, target, request, and metadata fields. Sign-in, settings changes, and CSV exports are wired; broaden coverage across deletes, payments, refunds, access, and role changes.",
     models: ["AuditLog"]
   },
   {
     key: "roles-permissions",
     title: "Roles and permissions",
-    status: "schema-needed",
-    detail: "Replace string-only AdminUser.role with roles, permission sets, module permissions, and record ownership rules.",
-    models: ["Role", "Permission", "RolePermission", "AdminUserRole"]
+    status: "schema-ready",
+    detail: "AdminUser.role is a typed role with shared permission helpers and first enforcement points. Dedicated role tables, module-scoped overrides, and record ownership rules remain future work.",
+    models: ["AdminRole", "AdminUser"]
   },
   {
     key: "security-controls",

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TestimonialStatus } from "@prisma/client";
 import { MessageSquare, Plus, ShieldCheck, Star } from "lucide-react";
+import { getAccessibleTestimonialWhere, requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -26,11 +27,12 @@ function statusClass(status: TestimonialStatus) {
 }
 
 export default async function TestimonialsPage({ searchParams }: TestimonialsPageProps) {
+  const user = await requireAdmin("testimonials:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
-  const testimonialWhere =
-    statusFilter === "all" ? { siteId: settings.siteId } : { siteId: settings.siteId, status: statusFilter.toUpperCase() as TestimonialStatus };
+  const statusExtra = statusFilter === "all" ? {} : { status: statusFilter.toUpperCase() as TestimonialStatus };
+  const testimonialWhere = await getAccessibleTestimonialWhere(user, settings.siteId, statusExtra);
 
   const [testimonials, testimonialCount, approvedCount, pendingCount, featuredCount] = await Promise.all([
     prisma.testimonial.findMany({
@@ -41,9 +43,11 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
       take: pageSize
     }),
     prisma.testimonial.count({ where: testimonialWhere }),
-    prisma.testimonial.count({ where: { siteId: settings.siteId, status: TestimonialStatus.APPROVED } }),
-    prisma.testimonial.count({ where: { siteId: settings.siteId, status: TestimonialStatus.PENDING } }),
-    prisma.testimonial.count({ where: { siteId: settings.siteId, status: TestimonialStatus.APPROVED, featured: true } })
+    prisma.testimonial.count({ where: await getAccessibleTestimonialWhere(user, settings.siteId, { status: TestimonialStatus.APPROVED }) }),
+    prisma.testimonial.count({ where: await getAccessibleTestimonialWhere(user, settings.siteId, { status: TestimonialStatus.PENDING }) }),
+    prisma.testimonial.count({
+      where: await getAccessibleTestimonialWhere(user, settings.siteId, { status: TestimonialStatus.APPROVED, featured: true })
+    })
   ]);
   const pageCount = Math.max(1, Math.ceil(testimonialCount / pageSize));
   const savedMessage = params.saved ? "Testimonial changes saved." : null;

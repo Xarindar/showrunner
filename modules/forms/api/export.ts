@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { recordAuditLog } from "@/lib/audit";
+import { getAccessibleFormSubmissionWhere, requireAdmin } from "@/lib/auth";
 import { recordFromUnknown } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { csvDocument } from "@/lib/api/csv";
@@ -28,7 +29,7 @@ function fieldLabel(data: unknown, fieldId: string) {
 }
 
 export async function GET(request: Request) {
-  await requireAdmin();
+  const user = await requireAdmin("forms:export");
   const settings = await getSiteSettings();
 
   const { searchParams } = new URL(request.url);
@@ -38,11 +39,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing formId." }, { status: 400 });
   }
 
+  const submissionWhere = await getAccessibleFormSubmissionWhere(user, settings.siteId);
   const form = await prisma.form.findFirst({
     where: { id: formId, siteId: settings.siteId },
     include: {
       fields: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
       submissions: {
+        where: submissionWhere,
         include: { client: true },
         orderBy: { createdAt: "desc" }
       }
@@ -88,6 +91,20 @@ export async function GET(request: Request) {
   ]);
   const csv = csvDocument([header, ...rows], { preventFormulaInjection: true });
   const filename = `${form.slug || "form"}-submissions.csv`;
+  await recordAuditLog({
+    action: "forms.exported",
+    actor: user,
+    metadata: {
+      formId: form.id,
+      formSlug: form.slug,
+      rowCount: form.submissions.length
+    },
+    request,
+    siteId: settings.siteId,
+    targetId: form.id,
+    targetLabel: form.name,
+    targetType: "form_export"
+  });
 
   return new NextResponse(csv, {
     headers: {

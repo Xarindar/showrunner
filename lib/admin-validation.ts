@@ -1,6 +1,6 @@
 import "server-only";
 
-import { BookingStatus, BookingWaitlistStatus, CouponType, MediaDriver, ProductStatus, ProductType } from "@prisma/client";
+import { AdminRole, BookingStatus, BookingWaitlistStatus, ClientPipelineStage, CouponType, MediaDriver, ProductStatus, ProductType } from "@prisma/client";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -20,6 +20,15 @@ export const optionalEmail = trimmed
 export const optionalEmailStored = trimmed
   .refine((value) => value === "" || z.email().safeParse(value).success, "Use a valid email address.")
   .transform((value) => (value ? value.toLowerCase() : ""));
+const optionalStoredDate = trimmed.transform((value, context) => {
+  if (!value) return undefined;
+  const date = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    context.addIssue({ code: "custom", message: "Use a valid date." });
+    return z.NEVER;
+  }
+  return date;
+});
 export const id = requiredText;
 export const nonNegativeInt = z.coerce.number().int().min(0);
 export const optionalNonNegativeInt = trimmed
@@ -162,17 +171,103 @@ export const clientFormSchema = z.object({
   name: requiredText,
   email: z.email().transform((value) => value.trim().toLowerCase()),
   phone: optionalStoredText,
+  status: z.enum(["active", "lead", "vip", "inactive"]).catch("active"),
+  pipelineStage: z.enum(ClientPipelineStage).catch(ClientPipelineStage.INQUIRY),
+  companyName: optionalStoredText,
+  familyName: optionalStoredText,
+  alternateEmails: trimmed
+    .refine(
+      (value) => value === "" || csvList(value).every((item) => z.email().safeParse(item).success),
+      "Use valid alternate email addresses."
+    )
+    .transform((value) => csvList(value).map((item) => item.toLowerCase())),
+  alternatePhones: trimmed.transform(csvList),
+  addressLine1: optionalStoredText,
+  addressLine2: optionalStoredText,
+  city: optionalStoredText,
+  region: optionalStoredText,
+  postalCode: optionalStoredText,
+  country: optionalStoredText,
+  timezone: optionalStoredText,
+  pronouns: optionalStoredText,
+  birthday: optionalStoredDate,
+  anniversary: optionalStoredDate,
+  tags: trimmed.transform(csvList),
+  preferences: optionalStoredText,
+  emailOptIn: z.literal("on").optional(),
+  smsOptIn: z.literal("on").optional(),
+  photoUsageRelease: z.literal("on").optional(),
+  policyAccepted: z.literal("on").optional(),
+  dataExportRequested: z.literal("on").optional(),
+  dataDeletionRequested: z.literal("on").optional(),
   privateNotes: optionalStoredText
 });
 
 export const clientUpdateFormSchema = clientFormSchema.extend({
-  id,
-  status: z.enum(["active", "lead", "vip", "inactive"]).catch("active")
+  id
 });
 
 export const clientNoteFormSchema = z.object({
   clientId: id,
   content: requiredText
+});
+
+export const clientNoteDeleteFormSchema = z.object({
+  id,
+  clientId: id,
+  confirmDelete: z.literal("on").optional()
+});
+
+export const clientFileFormSchema = z.object({
+  clientId: id,
+  title: requiredText,
+  url: requiredText.refine(
+    (value) => value.startsWith("/") || value.startsWith("https://"),
+    "Use a site path or public https URL."
+  ),
+  category: optionalStoredText,
+  notes: optionalStoredText
+});
+
+export const clientFileDeleteFormSchema = z.object({
+  id,
+  clientId: id,
+  confirmDelete: z.literal("on").optional()
+});
+
+export const clientSegmentFormSchema = z.object({
+  name: requiredText,
+  status: optionalStoredText,
+  pipelineStage: optionalStoredText,
+  tag: optionalStoredText,
+  pastDue: z.literal("on").optional(),
+  upcomingAppointment: z.literal("on").optional(),
+  recentPurchaseDays: optionalNonNegativeInt,
+  noRecentActivityDays: optionalNonNegativeInt
+});
+
+export const clientSegmentDeleteFormSchema = z.object({
+  id,
+  confirmDelete: z.literal("on").optional()
+});
+
+export const clientCsvImportFormSchema = z.object({
+  file: z
+    .custom<File>(
+      (value) =>
+        Boolean(value) &&
+        typeof (value as File).text === "function" &&
+        typeof (value as File).size === "number" &&
+        (value as File).size > 0,
+      "Choose a CSV file."
+    )
+    .refine((file) => file.size <= 1_000_000, "Use a CSV file under 1 MB.")
+});
+
+export const clientMergeFormSchema = z.object({
+  survivorId: id,
+  duplicateId: id,
+  confirmMerge: z.literal("on").optional()
 });
 
 export const settingsFormSchema = z.object({
@@ -184,7 +279,28 @@ export const settingsFormSchema = z.object({
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)
     .catch("#116466"),
-  mediaDriver: z.enum(MediaDriver).catch(MediaDriver.REPO)
+  mediaDriver: z.enum(MediaDriver).catch(MediaDriver.REPO),
+  ga4MeasurementId: optionalStoredText,
+  googleAdsTagId: optionalStoredText,
+  metaPixelId: optionalStoredText,
+  searchConsoleVerification: optionalStoredText,
+  analyticsRetentionDays: z.coerce.number().int().min(30).max(3650).catch(365)
+});
+
+export const adminUserCreateFormSchema = z.object({
+  email: z.email().transform((value) => value.trim().toLowerCase()),
+  password: z.string().min(12, "Use at least 12 characters."),
+  role: z.enum(AdminRole).catch(AdminRole.STAFF)
+});
+
+export const adminUserRoleFormSchema = z.object({
+  id,
+  role: z.enum(AdminRole)
+});
+
+export const adminUserDeleteFormSchema = z.object({
+  id,
+  confirmDelete: z.literal("on").optional()
 });
 
 export const productFormSchema = z
