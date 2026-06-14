@@ -19,5 +19,11 @@ export const portfolioEvents = {
     analyticsEventType: AnalyticsEventType.CUSTOM,
     automationTrigger: AutomationTrigger.GALLERY_APPROVED,
     relatedType: "portfolio_gallery"
+  },
+  "gallery.changes_requested": {
+    analyticsEventName: "gallery changes requested",
+    analyticsEventType: AnalyticsEventType.CUSTOM,
+    automationTrigger: AutomationTrigger.GALLERY_CHANGES_REQUESTED,
+    relatedType: "portfolio_gallery"
   }
 } as const satisfies ModuleEventSlice;
