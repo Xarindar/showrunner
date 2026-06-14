@@ -105,24 +105,59 @@ model MessageTemplate {
   body             String
   htmlBody         String                 @default("")
   textBody         String                 @default("")
+  builderJson      Json                   @default("{}")
+  builderRenderer  String                 @default("first_party_v1")
   tokens           Json                   @default("[]")
   requiredTokens   Json                   @default("[]")
   optionalTokens   Json                   @default("[]")
   version          Int                    @default(1)
+  sourceTemplateId String?
+  sourceTemplate   MessageTemplate?       @relation("MessageTemplateSource", fields: [sourceTemplateId], references: [id], onDelete: SetNull)
+  clonedTemplates  MessageTemplate[]      @relation("MessageTemplateSource")
   senderIdentityId String?
   senderIdentity   EmailSenderIdentity?   @relation(fields: [senderIdentityId], references: [id], onDelete: SetNull)
   isMarketing      Boolean                @default(false)
   isActive         Boolean                @default(true)
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
+  automations      Automation[]
   logs             MessageLog[]
   outbox           EmailOutbox[]
+  versions         MessageTemplateVersion[]
 
   @@unique([siteId, key])
   @@index([siteId, purpose])
   @@index([channel])
   @@index([isActive])
+  @@index([sourceTemplateId])
   @@index([senderIdentityId])
+}
+
+model MessageTemplateVersion {
+  id               String          @id @default(cuid())
+  siteId           String
+  templateId       String
+  template         MessageTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  version          Int
+  name             String
+  subject          String          @default("")
+  previewText      String          @default("")
+  body             String
+  htmlBody         String          @default("")
+  textBody         String          @default("")
+  builderJson      Json            @default("{}")
+  builderRenderer  String          @default("first_party_v1")
+  tokens           Json            @default("[]")
+  requiredTokens   Json            @default("[]")
+  optionalTokens   Json            @default("[]")
+  senderIdentityId String?
+  isMarketing      Boolean         @default(false)
+  isActive         Boolean         @default(true)
+  note             String          @default("")
+  createdAt        DateTime        @default(now())
+
+  @@unique([templateId, version])
+  @@index([siteId, templateId])
 }
 
 model MessageLog {
@@ -334,13 +369,14 @@ model EmailSubscriber {
   consentSource    String                @default("")
   consentedAt      DateTime?
   unsubscribedAt   DateTime?
-  unsubscribeToken String                @unique
+  unsubscribeToken String
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
   memberships      EmailListMembership[]
   outbox           EmailOutbox[]
 
   @@unique([siteId, email])
+  @@unique([siteId, unsubscribeToken])
   @@index([clientId])
   @@index([siteId, status])
 }

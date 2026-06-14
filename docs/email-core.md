@@ -239,6 +239,8 @@ Email sending is not performed inline by user-facing actions. User-facing writes
 - Failed queue attempts and missing recipients should be visible as failed or suppressed `EmailOutbox` rows, not only as console output.
 - Worker code must pass explicit `siteId` values into template lookup, sender resolution, recipient routing, suppression checks, and failure rows because it does not have a browser request host to resolve the site from.
 
+Booking reminders reuse the email outbox and worker pattern, but the reminder worker is pre-audit until the roadmap confirms it. Until then, do not treat reminder email delivery as part of the shipped handoff checklist.
+
 For marketing email, the provider input must include:
 
 - `List-Unsubscribe`

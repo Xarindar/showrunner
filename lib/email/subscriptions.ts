@@ -86,9 +86,10 @@ export async function subscribeToList(input: SubscribeInput) {
   return subscriber;
 }
 
-export async function unsubscribeByToken(token: string) {
+export async function unsubscribeByToken(token: string, siteId?: string) {
+  const currentSiteId = siteId || (await getCurrentSiteId());
   const subscriber = await prisma.emailSubscriber.findUnique({
-    where: { unsubscribeToken: token },
+    where: { siteId_unsubscribeToken: { siteId: currentSiteId, unsubscribeToken: token } },
     include: { memberships: true }
   });
 

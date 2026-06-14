@@ -5,6 +5,7 @@ export type EmailTokens = Record<string, EmailTokenValue>;
 export type EmailHeaders = Record<string, string>;
 
 export type QueueEmailInput = {
+  siteId?: string;
   templateKey: string;
   recipientEmail: string;
   recipientName?: string;
@@ -22,6 +23,7 @@ export type QueueEmailInput = {
 };
 
 export type QueueAdminEmailInput = {
+  siteId?: string;
   templateKey: string;
   groupKey: string;
   overrideEmail?: string | null;

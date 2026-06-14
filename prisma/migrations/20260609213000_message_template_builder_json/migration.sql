@@ -1,0 +1,2 @@
+ALTER TABLE "MessageTemplate"
+  ADD COLUMN IF NOT EXISTS "builderJson" JSONB NOT NULL DEFAULT '{}';

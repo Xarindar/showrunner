@@ -1,33 +1,112 @@
-import { EmailOutboxStatus, EmailSuppressionScope, MessageChannel, MessageLogStatus, MessageTemplatePurpose } from "@prisma/client";
-import { Mail, MessageSquareText, Plus, Save, ShieldOff } from "lucide-react";
+import {
+  EmailOutboxStatus,
+  EmailSendingDomainStatus,
+  EmailSuppressionScope,
+  MessageChannel,
+  MessageLogStatus,
+  MessageTemplatePurpose
+} from "@prisma/client";
+import { Copy, Mail, MessageSquareText, Plus, RotateCcw, Save, ShieldOff } from "lucide-react";
 import Link from "next/link";
+import { requireAdmin } from "@/lib/auth";
 import { renderEmailTemplate } from "@/lib/email/render";
 import { enumLabel, formatDateTime, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
+  cloneMessageTemplateAction,
   createMessageTemplateAction,
   createSuppressionEntryAction,
   deleteSuppressionEntryAction,
   recordMessageLogAction,
   resendEmailOutboxAction,
+  restoreMessageTemplateVersionAction,
   sendTemplateTestEmailAction,
+  updateMessageTemplateBuilderAction,
   updateBookingTemplateSettingsAction,
   updateMessageTemplateStatusAction
 } from "./actions";
 import { bookingTemplateKeys, bookingTemplateSortIndex } from "./booking-templates";
+import { EmailTemplateBuilder } from "./components/email-template-builder";
 
 export const dynamic = "force-dynamic";
 
 type CommunicationsPageProps = {
-  searchParams: Promise<{ saved?: string; error?: string; previewTemplate?: string; tokensJson?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; previewTemplate?: string; sampleEvent?: string; tokensJson?: string }>;
 };
 
-function sampleTokensFor(template: { requiredTokens: unknown; optionalTokens: unknown } | null) {
-  const tokenNames = [...stringArrayFromUnknown(template?.requiredTokens), ...stringArrayFromUnknown(template?.optionalTokens)];
+function defaultSampleEventFor(purpose?: MessageTemplatePurpose) {
+  if (purpose === MessageTemplatePurpose.ORDER_RECEIPT) return "order";
+  if (purpose === MessageTemplatePurpose.INVOICE_NOTICE) return "invoice";
+  if (purpose === MessageTemplatePurpose.FORM_SUBMISSION) return "form";
+  if (purpose === MessageTemplatePurpose.GALLERY_ACCESS) return "gallery";
+  if (purpose === MessageTemplatePurpose.BOOKING_CONFIRMATION || purpose === MessageTemplatePurpose.BOOKING_REMINDER) return "booking";
+  return "general";
+}
+
+function sampleTokensFor(
+  template: { purpose?: MessageTemplatePurpose; requiredTokens: unknown; optionalTokens: unknown; tokens: unknown } | null,
+  sampleEvent: string
+) {
+  const tokenNames = [
+    ...new Set([
+      ...stringArrayFromUnknown(template?.requiredTokens),
+      ...stringArrayFromUnknown(template?.optionalTokens),
+      ...stringArrayFromUnknown(template?.tokens)
+    ])
+  ];
+  const presets: Record<string, Record<string, string>> = {
+    booking: {
+      appointmentTime: "Tuesday, June 16 at 10:00 AM",
+      bookingDate: "June 16, 2026",
+      bookingTime: "10:00 AM",
+      businessName: "Willow Studio",
+      customerEmail: "client@example.com",
+      customerName: "Jordan Lee",
+      serviceName: "Portrait session"
+    },
+    order: {
+      businessName: "Willow Studio",
+      customerEmail: "client@example.com",
+      customerName: "Jordan Lee",
+      orderNumber: "ORD-1042",
+      orderUrl: "https://example.com/orders/ORD-1042",
+      total: "$125.00"
+    },
+    invoice: {
+      businessName: "Willow Studio",
+      customerEmail: "client@example.com",
+      customerName: "Jordan Lee",
+      invoiceNumber: "INV-2048",
+      invoiceUrl: "https://example.com/billing/sample",
+      total: "$425.00"
+    },
+    form: {
+      businessName: "Willow Studio",
+      customerEmail: "client@example.com",
+      customerName: "Jordan Lee",
+      formName: "Wedding inquiry",
+      submissionUrl: "https://example.com/admin/forms/submissions/sample"
+    },
+    gallery: {
+      businessName: "Willow Studio",
+      customerEmail: "client@example.com",
+      customerName: "Jordan Lee",
+      galleryName: "Engagement proofs",
+      galleryUrl: "https://example.com/galleries/sample"
+    },
+    general: {
+      businessName: "Willow Studio",
+      customerEmail: "client@example.com",
+      customerName: "Jordan Lee",
+      reviewUrl: "https://example.com/testimonials"
+    }
+  };
+  const selectedPreset = presets[sampleEvent] || presets[defaultSampleEventFor(template?.purpose)];
 
   return Object.fromEntries(
     tokenNames.map((token) => {
+      if (selectedPreset[token]) return [token, selectedPreset[token]];
       if (token.toLowerCase().includes("url")) return [token, "https://example.com"];
       if (token.toLowerCase().includes("total")) return [token, "$125.00"];
       if (token.toLowerCase().includes("email")) return [token, "client@example.com"];
@@ -76,7 +155,12 @@ function relatedRecordHref(type: string, id: string) {
   return "";
 }
 
+function hasBuilderJson(value: unknown) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length);
+}
+
 export default async function CommunicationsPage({ searchParams }: CommunicationsPageProps) {
+  await requireAdmin("communications:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const [
     templates,
@@ -85,6 +169,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
     outboxRows,
     manualLogs,
     suppressions,
+    templateVersions,
     activeTemplateCount,
     sentCount,
     suppressedCount
@@ -103,6 +188,11 @@ export default async function CommunicationsPage({ searchParams }: Communication
     }),
     prisma.emailSenderIdentity.findMany({
       where: { siteId: settings.siteId },
+      include: {
+        sendingDomain: {
+          select: { status: true }
+        }
+      },
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }]
     }),
     prisma.emailOutbox.findMany({
@@ -128,26 +218,40 @@ export default async function CommunicationsPage({ searchParams }: Communication
       orderBy: { createdAt: "desc" },
       take: 12
     }),
+    prisma.messageTemplateVersion.findMany({
+      where: { siteId: settings.siteId },
+      orderBy: [{ templateId: "asc" }, { version: "desc" }],
+      take: 100
+    }),
     prisma.messageTemplate.count({ where: { siteId: settings.siteId, isActive: true } }),
     prisma.emailOutbox.count({ where: { siteId: settings.siteId, status: EmailOutboxStatus.SENT } }),
     prisma.suppressionListEntry.count({ where: { siteId: settings.siteId } })
   ]);
 
   const bookingTemplates = bookingTemplatesRaw.sort((a, b) => bookingTemplateSortIndex(a.key) - bookingTemplateSortIndex(b.key));
+  const verifiedSenderIdentities = senderIdentities.filter(
+    (sender) => sender.isVerified && (!sender.sendingDomain || sender.sendingDomain.status === EmailSendingDomainStatus.VERIFIED)
+  );
   const savedMessage = params.saved ? "Communications changes saved." : null;
   const errorMessage = params.error || null;
   const previewTemplate = templates.find((template) => template.id === params.previewTemplate) || templates[0] || null;
+  const selectedSampleEvent = params.sampleEvent || defaultSampleEventFor(previewTemplate?.purpose);
   const previewTokensText =
-    params.tokensJson || (previewTemplate ? JSON.stringify(sampleTokensFor(previewTemplate), null, 2) : "{}");
+    params.tokensJson || (previewTemplate ? JSON.stringify(sampleTokensFor(previewTemplate, selectedSampleEvent), null, 2) : "{}");
   const preview = previewTemplate
-    ? (() => {
+    ? await (async () => {
         try {
-          return { rendered: renderEmailTemplate(previewTemplate, parsePreviewTokens(previewTokensText)), error: "" };
+          return { rendered: await renderEmailTemplate(previewTemplate, parsePreviewTokens(previewTokensText)), error: "" };
         } catch (error) {
           return { rendered: null, error: error instanceof Error ? error.message : "Could not render preview." };
         }
       })()
     : null;
+  const emailTemplates = templates.filter((template) => template.channel === MessageChannel.EMAIL);
+  const versionsByTemplateId = new Map<string, typeof templateVersions>();
+  for (const version of templateVersions) {
+    versionsByTemplateId.set(version.templateId, [...(versionsByTemplateId.get(version.templateId) || []), version]);
+  }
 
   return (
     <div className="stack">
@@ -196,6 +300,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
             const availableTokens = stringArrayCsv([
               ...new Set([...stringArrayFromUnknown(template.requiredTokens), ...stringArrayFromUnknown(template.optionalTokens)])
             ]);
+            const requiredTokens = stringArrayCsv(stringArrayFromUnknown(template.requiredTokens));
 
             return (
               <details key={template.id} className="subpanel" open={index === 0}>
@@ -221,7 +326,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                     <label htmlFor={`booking-template-sender-${template.id}`}>Sender</label>
                     <select id={`booking-template-sender-${template.id}`} name="senderIdentityId" defaultValue={template.senderIdentityId || ""}>
                       <option value="">Default sender</option>
-                      {senderIdentities.map((sender) => (
+                      {verifiedSenderIdentities.map((sender) => (
                         <option key={sender.id} value={sender.id}>
                           {sender.name} &lt;{sender.fromEmail}&gt;
                         </option>
@@ -241,12 +346,44 @@ export default async function CommunicationsPage({ searchParams }: Communication
                     <label htmlFor={`booking-template-html-${template.id}`}>HTML body</label>
                     <textarea id={`booking-template-html-${template.id}`} name="htmlBody" defaultValue={template.htmlBody} />
                   </div>
-                  <small style={{ color: "var(--muted)" }}>Available tokens: {availableTokens || "none"}</small>
+                  <small style={{ color: "var(--muted)" }}>
+                    Required event tokens: {requiredTokens || "none"}. Available tokens: {availableTokens || "none"}. Only verified senders can
+                    be assigned.
+                  </small>
                   <button className="button secondary" type="submit">
                     <Save size={18} />
                     Save booking template
                   </button>
                 </form>
+                <div className="subpanel stack" style={{ marginTop: 16 }}>
+                  <h3 style={{ fontSize: "1.05rem" }}>Version history</h3>
+                  {(versionsByTemplateId.get(template.id) || []).slice(0, 5).map((version) => (
+                    <form action={restoreMessageTemplateVersionAction} className="grid-2" key={version.id}>
+                      <input type="hidden" name="templateId" value={template.id} />
+                      <input type="hidden" name="versionId" value={version.id} />
+                      <div>
+                        <strong>Version {version.version}</strong>
+                        <br />
+                        <small style={{ color: "var(--muted)" }}>
+                          {formatDateTime(version.createdAt, settings.timezone)} {version.note ? `- ${version.note}` : ""}
+                        </small>
+                      </div>
+                      <div style={{ alignItems: "center", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                          <input name="confirmRestore" type="checkbox" required />
+                          Restore
+                        </label>
+                        <button className="button secondary" type="submit">
+                          <RotateCcw size={16} />
+                          Restore version
+                        </button>
+                      </div>
+                    </form>
+                  ))}
+                  {!(versionsByTemplateId.get(template.id) || []).length ? (
+                    <small style={{ color: "var(--muted)" }}>Versions appear after the first visual-template save.</small>
+                  ) : null}
+                </div>
               </details>
             );
           })}
@@ -255,6 +392,60 @@ export default async function CommunicationsPage({ searchParams }: Communication
       </section>
 
       <section className="grid-2">
+        <div className="card stack">
+          <h2 style={{ fontSize: "1.35rem" }}>Visual email builder</h2>
+          <p>Build email HTML from structured blocks while keeping a required text fallback.</p>
+          {emailTemplates.map((template, index) => {
+            const requiredTokens = stringArrayFromUnknown(template.requiredTokens);
+            const availableTokens = [
+              ...new Set([...requiredTokens, ...stringArrayFromUnknown(template.optionalTokens), ...stringArrayFromUnknown(template.tokens)])
+            ];
+
+            return (
+              <details className="subpanel" key={template.id} open={index === 0}>
+                <summary style={{ alignItems: "center", cursor: "pointer", display: "flex", gap: 12, justifyContent: "space-between" }}>
+                  <span>
+                    <strong>{template.name}</strong>
+                    <br />
+                    <small style={{ color: "var(--muted)" }}>{template.key || enumLabel(template.purpose)}</small>
+                  </span>
+                  <span className={hasBuilderJson(template.builderJson) ? "pill success" : "pill"}>
+                    {hasBuilderJson(template.builderJson) ? "builder" : "text"}
+                  </span>
+                </summary>
+                <form action={updateMessageTemplateBuilderAction} className="form-grid" style={{ marginTop: 16 }}>
+                  <input type="hidden" name="id" value={template.id} />
+                  <div className="field">
+                    <label htmlFor={`builder-template-sender-${template.id}`}>Sender</label>
+                    <select id={`builder-template-sender-${template.id}`} name="senderIdentityId" defaultValue={template.senderIdentityId || ""}>
+                      <option value="">Default sender</option>
+                      {verifiedSenderIdentities.map((sender) => (
+                        <option key={sender.id} value={sender.id}>
+                          {sender.name} &lt;{sender.fromEmail}&gt;
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <EmailTemplateBuilder
+                    availableTokens={availableTokens}
+                    builderJson={template.builderJson}
+                    idPrefix={`builder-${template.id}`}
+                    previewText={template.previewText}
+                    requiredTokens={requiredTokens}
+                    subject={template.subject}
+                    textBody={template.textBody || template.body}
+                  />
+                  <button className="button" type="submit">
+                    <Save size={18} />
+                    Save visual template
+                  </button>
+                </form>
+              </details>
+            );
+          })}
+          {!emailTemplates.length ? <div className="subpanel">No email templates found.</div> : null}
+        </div>
+
         <form action={createMessageTemplateAction} className="card form-grid">
           <h2 style={{ fontSize: "1.35rem" }}>Create manual template</h2>
           <div className="grid-2">
@@ -337,17 +528,27 @@ export default async function CommunicationsPage({ searchParams }: Communication
                     <span className={template.isActive ? "pill success" : "pill danger"}>{template.isActive ? "active" : "inactive"}</span>
                   </td>
                   <td>
-                    {template.key ? (
-                      <span className="pill">Status locked</span>
-                    ) : (
-                      <form action={updateMessageTemplateStatusAction}>
-                        <input type="hidden" name="id" value={template.id} />
-                        <input type="hidden" name="isActive" value={template.isActive ? "false" : "true"} />
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {template.key ? (
+                        <span className="pill">Status locked</span>
+                      ) : (
+                        <form action={updateMessageTemplateStatusAction}>
+                          <input type="hidden" name="id" value={template.id} />
+                          <input type="hidden" name="isActive" value={template.isActive ? "false" : "true"} />
+                          <button className="button secondary" type="submit">
+                            {template.isActive ? "Pause" : "Activate"}
+                          </button>
+                        </form>
+                      )}
+                      <form action={cloneMessageTemplateAction}>
+                        <input type="hidden" name="sourceTemplateId" value={template.id} />
+                        <input type="hidden" name="name" value={`Copy of ${template.name}`} />
                         <button className="button secondary" type="submit">
-                          {template.isActive ? "Pause" : "Activate"}
+                          <Copy size={16} />
+                          Clone
                         </button>
                       </form>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -370,6 +571,16 @@ export default async function CommunicationsPage({ searchParams }: Communication
               {templates.map((template) => (
                 <option key={template.id} value={template.id}>
                   {template.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="preview-sample-event">Sample event data</label>
+            <select id="preview-sample-event" name="sampleEvent" defaultValue={selectedSampleEvent}>
+              {["booking", "order", "invoice", "form", "gallery", "general"].map((event) => (
+                <option key={event} value={event}>
+                  {event}
                 </option>
               ))}
             </select>
@@ -399,6 +610,15 @@ export default async function CommunicationsPage({ searchParams }: Communication
               <div>
                 <p style={{ color: "var(--muted)", marginBottom: 8 }}>Text body</p>
                 <pre style={{ overflow: "auto", whiteSpace: "pre-wrap" }}>{preview.rendered.textBody}</pre>
+              </div>
+              <div>
+                <p style={{ color: "var(--muted)", marginBottom: 8 }}>HTML preview</p>
+                <iframe
+                  sandbox=""
+                  srcDoc={preview.rendered.htmlBody}
+                  style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: 8, minHeight: 360, width: "100%" }}
+                  title="Rendered email HTML preview"
+                />
               </div>
             </div>
           ) : null}

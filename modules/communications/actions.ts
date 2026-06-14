@@ -1,13 +1,24 @@
 "use server";
 
-import { EmailOutboxStatus, EmailSuppressionScope, MessageChannel, MessageLogStatus, MessageTemplatePurpose, Prisma } from "@prisma/client";
+import {
+  EmailOutboxStatus,
+  EmailSendingDomainStatus,
+  EmailSuppressionScope,
+  MessageChannel,
+  MessageLogStatus,
+  MessageTemplatePurpose,
+  Prisma
+} from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { csvList, optionalEmailStored, optionalStoredText, parseForm, requiredText } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
+import { extractEmailBuilderTokens, normalizeEmailBuilderDocument } from "@/lib/email-builder/document";
+import { renderEmailBuilderHtml } from "@/lib/email-builder/render";
 import { queueTemplateTestEmail } from "@/lib/email";
 import { extractEmailTemplateTokens } from "@/lib/email/render";
+import { sanitizeEmailHtml } from "@/lib/email/sanitize";
 import { stringArrayFromUnknown } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -45,6 +56,15 @@ const bookingTemplateSettingsSchema = z.object({
   previewText: optionalStoredText,
   textBody: requiredText,
   htmlBody: optionalStoredText,
+  senderIdentityId: optionalStoredText
+});
+
+const builderTemplateSettingsSchema = z.object({
+  id: requiredText,
+  subject: requiredText,
+  previewText: optionalStoredText,
+  textBody: requiredText,
+  builderJson: requiredText,
   senderIdentityId: optionalStoredText
 });
 
@@ -89,6 +109,17 @@ const outboxResendSchema = z.object({
   id: requiredText
 });
 
+const cloneTemplateSchema = z.object({
+  sourceTemplateId: requiredText,
+  name: optionalStoredText
+});
+
+const restoreTemplateVersionSchema = z.object({
+  templateId: requiredText,
+  versionId: requiredText,
+  confirmRestore: z.literal("on", { error: "Confirm restore before replacing this template." })
+});
+
 function refreshCommunications() {
   revalidatePath("/admin");
   revalidatePath("/admin/modules/communications");
@@ -117,7 +148,59 @@ function parseTokenJson(value: string) {
   );
 }
 
-function outboxJsonInput(value: Prisma.JsonValue) {
+async function requireVerifiedSender(senderIdentityId: string, siteId: string) {
+  if (!senderIdentityId) return;
+  const sender = await prisma.emailSenderIdentity.findFirst({
+    where: { id: senderIdentityId, siteId },
+    select: {
+      id: true,
+      isVerified: true,
+      sendingDomain: {
+        select: { status: true }
+      }
+    }
+  });
+
+  if (!sender) {
+    communicationsError("Sender identity not found.");
+  }
+
+  if (!sender.isVerified || (sender.sendingDomain && sender.sendingDomain.status !== EmailSendingDomainStatus.VERIFIED)) {
+    communicationsError("Choose a verified sender identity before assigning it to a template.");
+  }
+}
+
+function templateAllowedTokens(template: { optionalTokens: unknown; requiredTokens: unknown; tokens: unknown }) {
+  const requiredTokens = stringArrayFromUnknown(template.requiredTokens);
+  const allowedTokens = new Set([
+    ...stringArrayFromUnknown(template.tokens),
+    ...requiredTokens,
+    ...stringArrayFromUnknown(template.optionalTokens)
+  ]);
+
+  return { allowedTokens, requiredTokens };
+}
+
+function assertTemplateTokens(input: {
+  allowedTokens: Set<string>;
+  requiredTokens: string[];
+  usedTokens: Set<string>;
+}) {
+  const unsupportedTokens = Array.from(input.usedTokens).filter((token) => !input.allowedTokens.has(token));
+
+  if (unsupportedTokens.length) {
+    communicationsError(`Unsupported token${unsupportedTokens.length === 1 ? "" : "s"}: ${unsupportedTokens.join(", ")}.`);
+  }
+
+  const missingRequiredTokens = input.requiredTokens.filter((token) => !input.usedTokens.has(token));
+  if (missingRequiredTokens.length) {
+    communicationsError(
+      `Required token${missingRequiredTokens.length === 1 ? "" : "s"} missing from the template: ${missingRequiredTokens.join(", ")}.`
+    );
+  }
+}
+
+function jsonInput(value: Prisma.JsonValue) {
   return value === null ? Prisma.JsonNull : (value as Prisma.InputJsonValue);
 }
 
@@ -133,8 +216,60 @@ async function outboxSuppressionReason(input: { category: string; email: string;
   return blocks ? entry.reason || `Suppressed by ${entry.source || "admin"}.` : "";
 }
 
+type MessageTemplateSnapshot = {
+  id: string;
+  siteId: string;
+  version: number;
+  name: string;
+  subject: string;
+  previewText: string;
+  body: string;
+  htmlBody: string;
+  textBody: string;
+  builderJson: Prisma.JsonValue;
+  builderRenderer: string;
+  tokens: Prisma.JsonValue;
+  requiredTokens: Prisma.JsonValue;
+  optionalTokens: Prisma.JsonValue;
+  senderIdentityId: string | null;
+  isMarketing: boolean;
+  isActive: boolean;
+};
+
+async function snapshotMessageTemplate(template: MessageTemplateSnapshot, note: string) {
+  await prisma.messageTemplateVersion.upsert({
+    where: {
+      templateId_version: {
+        templateId: template.id,
+        version: template.version
+      }
+    },
+    update: {},
+    create: {
+      siteId: template.siteId,
+      templateId: template.id,
+      version: template.version,
+      name: template.name,
+      subject: template.subject,
+      previewText: template.previewText,
+      body: template.body,
+      htmlBody: template.htmlBody,
+      textBody: template.textBody,
+      builderJson: jsonInput(template.builderJson),
+      builderRenderer: template.builderRenderer,
+      tokens: jsonInput(template.tokens),
+      requiredTokens: jsonInput(template.requiredTokens),
+      optionalTokens: jsonInput(template.optionalTokens),
+      senderIdentityId: template.senderIdentityId,
+      isMarketing: template.isMarketing,
+      isActive: template.isActive,
+      note
+    }
+  });
+}
+
 export async function createMessageTemplateAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("communications:manage");
   const input = await parseForm(messageTemplateSchema, formData, "/admin/modules/communications");
   const settings = await getSiteSettings();
 
@@ -146,6 +281,7 @@ export async function createMessageTemplateAction(formData: FormData) {
       channel: input.channel,
       subject: input.subject,
       body: input.body,
+      textBody: input.body,
       tokens: input.tokens,
       isActive: input.isActive
     }
@@ -156,7 +292,7 @@ export async function createMessageTemplateAction(formData: FormData) {
 }
 
 export async function updateMessageTemplateStatusAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("communications:manage");
   const input = await parseForm(templateStatusSchema, formData, "/admin/modules/communications");
   const settings = await getSiteSettings();
 
@@ -182,7 +318,7 @@ export async function updateMessageTemplateStatusAction(formData: FormData) {
 }
 
 export async function updateBookingTemplateSettingsAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("communications:manage");
   const input = await parseForm(bookingTemplateSettingsSchema, formData, "/admin/modules/communications");
   const settings = await getSiteSettings();
 
@@ -205,39 +341,26 @@ export async function updateBookingTemplateSettingsAction(formData: FormData) {
     communicationsError("Booking template not found.");
   }
 
-  if (input.senderIdentityId) {
-    const sender = await prisma.emailSenderIdentity.findFirst({
-      where: { id: input.senderIdentityId, siteId: settings.siteId },
-      select: { id: true }
-    });
+  await requireVerifiedSender(input.senderIdentityId, settings.siteId);
 
-    if (!sender) {
-      communicationsError("Sender identity not found.");
-    }
+  const sanitizedHtmlBody = sanitizeEmailHtml(input.htmlBody);
+  if (input.htmlBody && !sanitizedHtmlBody) {
+    communicationsError("HTML body must contain allowed email markup.");
   }
 
-  const allowedTokens = new Set([
-    ...stringArrayFromUnknown(template.tokens),
-    ...stringArrayFromUnknown(template.requiredTokens),
-    ...stringArrayFromUnknown(template.optionalTokens)
-  ]);
+  const { allowedTokens, requiredTokens } = templateAllowedTokens(template);
   const usedTokens = new Set(
-    [input.subject, input.previewText, input.textBody, input.htmlBody].flatMap((value) => extractEmailTemplateTokens(value))
+    [input.subject, input.previewText, input.textBody, sanitizedHtmlBody].flatMap((value) => extractEmailTemplateTokens(value))
   );
-  const unsupportedTokens = Array.from(usedTokens).filter((token) => !allowedTokens.has(token));
-
-  if (unsupportedTokens.length) {
-    communicationsError(`Unsupported token${unsupportedTokens.length === 1 ? "" : "s"}: ${unsupportedTokens.join(", ")}.`);
-  }
+  assertTemplateTokens({ allowedTokens, requiredTokens, usedTokens });
 
   await prisma.messageTemplate.update({
     where: { id: template.id },
     data: {
       subject: input.subject,
       previewText: input.previewText,
-      body: input.textBody,
       textBody: input.textBody,
-      htmlBody: input.htmlBody,
+      htmlBody: sanitizedHtmlBody,
       senderIdentityId: input.senderIdentityId || null
     }
   });
@@ -246,8 +369,216 @@ export async function updateBookingTemplateSettingsAction(formData: FormData) {
   redirect("/admin/modules/communications?saved=booking-template");
 }
 
+export async function updateMessageTemplateBuilderAction(formData: FormData) {
+  await requireAdmin("communications:manage");
+  const input = await parseForm(builderTemplateSettingsSchema, formData, "/admin/modules/communications");
+  const settings = await getSiteSettings();
+  const template = await prisma.messageTemplate.findFirst({
+    where: {
+      id: input.id,
+      siteId: settings.siteId,
+      channel: MessageChannel.EMAIL
+    },
+    select: {
+      id: true,
+      siteId: true,
+      version: true,
+      name: true,
+      subject: true,
+      previewText: true,
+      body: true,
+      htmlBody: true,
+      textBody: true,
+      builderJson: true,
+      builderRenderer: true,
+      optionalTokens: true,
+      requiredTokens: true,
+      tokens: true,
+      senderIdentityId: true,
+      isMarketing: true,
+      isActive: true
+    }
+  });
+
+  if (!template) {
+    communicationsError("Template not found.");
+  }
+
+  await requireVerifiedSender(input.senderIdentityId, settings.siteId);
+
+  let builderDocument;
+  try {
+    builderDocument = normalizeEmailBuilderDocument(input.builderJson);
+  } catch {
+    communicationsError("Builder JSON is invalid.");
+  }
+
+  const renderedBuilderHtml = await renderEmailBuilderHtml(builderDocument);
+  if (!renderedBuilderHtml) {
+    communicationsError("The visual builder must contain at least one renderable block.");
+  }
+
+  const { allowedTokens, requiredTokens } = templateAllowedTokens(template);
+  const usedTokens = new Set([
+    ...extractEmailTemplateTokens(input.subject),
+    ...extractEmailTemplateTokens(input.previewText),
+    ...extractEmailTemplateTokens(input.textBody),
+    ...extractEmailBuilderTokens(builderDocument)
+  ]);
+  assertTemplateTokens({ allowedTokens, requiredTokens, usedTokens });
+
+  await snapshotMessageTemplate(template, "Before visual builder save");
+
+  await prisma.messageTemplate.update({
+    where: { id: template.id },
+    data: {
+      subject: input.subject,
+      previewText: input.previewText,
+      textBody: input.textBody,
+      htmlBody: renderedBuilderHtml,
+      builderJson: builderDocument,
+      builderRenderer: "first_party_v1",
+      senderIdentityId: input.senderIdentityId || null,
+      version: { increment: 1 }
+    }
+  });
+
+  refreshCommunications();
+  redirect("/admin/modules/communications?saved=builder-template");
+}
+
+export async function cloneMessageTemplateAction(formData: FormData) {
+  await requireAdmin("communications:manage");
+  const input = await parseForm(cloneTemplateSchema, formData, "/admin/modules/communications");
+  const settings = await getSiteSettings();
+  const source = await prisma.messageTemplate.findFirst({
+    where: { id: input.sourceTemplateId, siteId: settings.siteId },
+    select: {
+      id: true,
+      siteId: true,
+      name: true,
+      description: true,
+      purpose: true,
+      channel: true,
+      subject: true,
+      previewText: true,
+      body: true,
+      htmlBody: true,
+      textBody: true,
+      builderJson: true,
+      builderRenderer: true,
+      tokens: true,
+      requiredTokens: true,
+      optionalTokens: true,
+      senderIdentityId: true,
+      isMarketing: true
+    }
+  });
+
+  if (!source) {
+    communicationsError("Template not found.");
+  }
+
+  const cloneName = input.name || `Copy of ${source.name}`;
+  const cloned = await prisma.messageTemplate.create({
+    data: {
+      siteId: source.siteId,
+      sourceTemplateId: source.id,
+      name: cloneName,
+      description: source.description ? `Cloned from ${source.name}: ${source.description}` : `Cloned from ${source.name}`,
+      purpose: source.purpose,
+      channel: source.channel,
+      subject: source.subject,
+      previewText: source.previewText,
+      body: source.body,
+      htmlBody: source.htmlBody,
+      textBody: source.textBody,
+      builderJson: jsonInput(source.builderJson),
+      builderRenderer: source.builderRenderer,
+      tokens: jsonInput(source.tokens),
+      requiredTokens: jsonInput(source.requiredTokens),
+      optionalTokens: jsonInput(source.optionalTokens),
+      senderIdentityId: source.senderIdentityId,
+      isMarketing: source.isMarketing,
+      isActive: false
+    }
+  });
+
+  await snapshotMessageTemplate({ ...cloned, builderRenderer: cloned.builderRenderer }, "Initial cloned version");
+
+  refreshCommunications();
+  redirect(`/admin/modules/communications?saved=template-cloned&previewTemplate=${cloned.id}`);
+}
+
+export async function restoreMessageTemplateVersionAction(formData: FormData) {
+  await requireAdmin("communications:manage");
+  const input = await parseForm(restoreTemplateVersionSchema, formData, "/admin/modules/communications");
+  const settings = await getSiteSettings();
+  const [template, version] = await Promise.all([
+    prisma.messageTemplate.findFirst({
+      where: { id: input.templateId, siteId: settings.siteId },
+      select: {
+        id: true,
+        siteId: true,
+        version: true,
+        name: true,
+        subject: true,
+        previewText: true,
+        body: true,
+        htmlBody: true,
+        textBody: true,
+        builderJson: true,
+        builderRenderer: true,
+        tokens: true,
+        requiredTokens: true,
+        optionalTokens: true,
+        senderIdentityId: true,
+        isMarketing: true,
+        isActive: true
+      }
+    }),
+    prisma.messageTemplateVersion.findFirst({
+      where: {
+        id: input.versionId,
+        templateId: input.templateId,
+        siteId: settings.siteId
+      }
+    })
+  ]);
+
+  if (!template || !version) {
+    communicationsError("Template version not found.");
+  }
+
+  await snapshotMessageTemplate(template, "Before restore");
+
+  await prisma.messageTemplate.update({
+    where: { id: template.id },
+    data: {
+      name: version.name,
+      subject: version.subject,
+      previewText: version.previewText,
+      body: version.body,
+      htmlBody: version.htmlBody,
+      textBody: version.textBody,
+      builderJson: jsonInput(version.builderJson),
+      builderRenderer: version.builderRenderer,
+      tokens: jsonInput(version.tokens),
+      requiredTokens: jsonInput(version.requiredTokens),
+      optionalTokens: jsonInput(version.optionalTokens),
+      senderIdentityId: version.senderIdentityId,
+      isMarketing: version.isMarketing,
+      isActive: version.isActive,
+      version: { increment: 1 }
+    }
+  });
+
+  refreshCommunications();
+  redirect(`/admin/modules/communications?saved=template-restored&previewTemplate=${template.id}`);
+}
+
 export async function recordMessageLogAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("communications:manage");
   const input = await parseForm(messageLogSchema, formData, "/admin/modules/communications");
   const settings = await getSiteSettings();
   const sentAt = input.status === MessageLogStatus.SENT ? new Date() : undefined;
@@ -275,7 +606,7 @@ export async function recordMessageLogAction(formData: FormData) {
 }
 
 export async function createSuppressionEntryAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("communications:manage");
   const input = await parseForm(suppressionSchema, formData, "/admin/modules/communications");
   const settings = await getSiteSettings();
 
@@ -302,7 +633,7 @@ export async function createSuppressionEntryAction(formData: FormData) {
 }
 
 export async function deleteSuppressionEntryAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("communications:manage");
   const input = await parseForm(suppressionDeleteSchema, formData, "/admin/modules/communications");
   const settings = await getSiteSettings();
 
@@ -315,7 +646,7 @@ export async function deleteSuppressionEntryAction(formData: FormData) {
 }
 
 export async function sendTemplateTestEmailAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("communications:manage");
   const input = await parseForm(templateTestSendSchema, formData, "/admin/modules/communications");
   const settings = await getSiteSettings();
 
@@ -377,7 +708,7 @@ export async function resendEmailOutboxAction(formData: FormData) {
       previewText: row.previewText,
       htmlBody: row.htmlBody,
       textBody: row.textBody,
-      headers: outboxJsonInput(row.headers),
+      headers: jsonInput(row.headers),
       purpose: row.purpose,
       category: row.category,
       relatedType: row.relatedType,

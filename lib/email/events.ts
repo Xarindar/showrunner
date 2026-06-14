@@ -281,6 +281,7 @@ export async function queueOrderCheckoutEmail(order: OrderForEmail) {
     customerEmail: order.customerEmail,
     orderNumber: order.orderNumber,
     orderTotal: formatMoney(order.totalCents, order.currency),
+    checkoutUrl: order.checkoutUrl || "",
     paymentProvider: "Stripe Checkout",
     paymentStatus: "pending"
   };

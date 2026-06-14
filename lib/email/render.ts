@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
+import { renderEmailBuilderHtml } from "@/lib/email-builder/render";
 import { stringArrayFromUnknown } from "@/lib/format";
+import { sanitizeEmailHtml } from "./sanitize";
 import type { EmailTokens } from "./types";
 
 type StoredTemplate = {
@@ -8,6 +10,7 @@ type StoredTemplate = {
   body: string;
   htmlBody: string;
   textBody: string;
+  builderJson?: Prisma.JsonValue;
   requiredTokens: Prisma.JsonValue;
 };
 
@@ -54,7 +57,7 @@ function renderHtml(source: string, tokens: EmailTokens) {
   return source.replace(tokenPattern, (_match, key: string) => escapeHtml(tokenText(tokens[key])));
 }
 
-export function renderEmailTemplate(template: StoredTemplate, tokens: EmailTokens) {
+export async function renderEmailTemplate(template: StoredTemplate, tokens: EmailTokens) {
   const missing = stringArrayFromUnknown(template.requiredTokens).filter((key) => tokens[key] === null || tokens[key] === undefined);
 
   if (missing.length) {
@@ -62,12 +65,18 @@ export function renderEmailTemplate(template: StoredTemplate, tokens: EmailToken
   }
 
   const textSource = template.textBody || template.body;
-  const htmlSource = template.htmlBody || textToHtml(textSource);
+  const hasBuilderJson =
+    template.builderJson &&
+    typeof template.builderJson === "object" &&
+    !Array.isArray(template.builderJson) &&
+    Object.keys(template.builderJson).length > 0;
+  // Builder JSON is the canonical source for visual templates; htmlBody is a cached admin preview.
+  const htmlSource = hasBuilderJson ? await renderEmailBuilderHtml(template.builderJson) : template.htmlBody || textToHtml(textSource);
 
   return {
     subject: renderText(template.subject, tokens),
     previewText: renderText(template.previewText, tokens),
-    htmlBody: renderHtml(htmlSource, tokens),
+    htmlBody: sanitizeEmailHtml(renderHtml(htmlSource, tokens)),
     textBody: renderText(textSource, tokens)
   };
 }
