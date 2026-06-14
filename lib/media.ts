@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHmac, randomUUID, timingSafeEqual } from "crypto";
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { MediaDriver, MediaVariantType, type MediaAsset } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import sharp from "sharp";
@@ -272,6 +272,15 @@ const repoAdapter: MediaAdapter = {
 const r2Adapter: MediaAdapter = {
   driver: MediaDriver.R2,
   canUpload: isR2Configured,
+  delete: async (asset) => {
+    if (!process.env.R2_BUCKET || !asset.key) return;
+    await getR2Client().send(
+      new DeleteObjectCommand({
+        Bucket: process.env.R2_BUCKET,
+        Key: asset.key
+      })
+    );
+  },
   generateVariantUrl: (asset, type) => (asset.isPrivate ? appMediaRoute(asset.id, type) : asset.url || appMediaRoute(asset.id, type)),
   signPrivateUrl: (asset, type = MediaVariantType.FULL, ttlSeconds = signedUrlTtlSeconds) => createSignedMediaUrl(asset.id, type, ttlSeconds),
   upload: async (file, metadata) => {
@@ -471,6 +480,33 @@ export async function uploadMedia(
   });
 
   return asset;
+}
+
+/**
+ * Permanently removes a media asset — its stored object (via the driver's delete
+ * hook) and its DB row (variants cascade). Use this to clean up orphaned uploads
+ * that were never linked to a record (e.g. a form submission that failed
+ * validation after files were already uploaded). Scoped by siteId when provided
+ * so a caller can't delete another tenant's asset. Best-effort and never throws:
+ * cleanup must not mask the original failure that triggered it.
+ */
+export async function deleteMediaAsset(assetId: string, siteId?: string) {
+  try {
+    const asset = await prisma.mediaAsset.findFirst({
+      where: siteId ? { id: assetId, siteId } : { id: assetId },
+      select: { id: true, driver: true, key: true, storageProviderId: true }
+    });
+    if (!asset) return;
+
+    const adapter = getMediaAdapter(asset.driver);
+    if (adapter.delete) {
+      await adapter.delete({ key: asset.key, storageProviderId: asset.storageProviderId }).catch(() => {});
+    }
+    await prisma.mediaAsset.delete({ where: { id: asset.id } });
+  } catch {
+    // Swallow — orphan cleanup is best-effort and must not throw over the
+    // original control flow (e.g. a validation redirect being re-raised).
+  }
 }
 
 function absoluteUrl(pathOrUrl: string, request: NextRequest) {

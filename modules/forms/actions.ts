@@ -19,7 +19,7 @@ import { recordAuditLog } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth";
 import { queueFormSubmittedEmail } from "@/lib/email";
 import { emitAnalyticsEvent, emitModuleEvent, requestAttribution } from "@/lib/events/emit";
-import { uploadMedia } from "@/lib/media";
+import { deleteMediaAsset, uploadMedia } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
@@ -37,6 +37,9 @@ const formAttachmentQueryKeyByType: Record<FormAttachmentTargetType, string> = {
   [FormAttachmentTargetType.GALLERY]: "gallery"
 };
 const hiddenHoneypotField = "companyWebsite";
+// Cap the combined size of all file uploads in a single submission so a form with
+// many FILE fields can't be used to push an unbounded total payload to storage.
+const maxSubmissionUploadBytes = 25 * 1024 * 1024;
 
 const formSchema = z
   .object({
@@ -797,6 +800,12 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
     redirectWithPublicError(form.slug, rateLimitMessage, attachmentContext);
   }
 
+  // Track every private upload so a later validation failure / persistence error
+  // can clean up the orphaned R2 objects instead of leaking them.
+  const uploadedAssetIds: string[] = [];
+  let uploadedBytesTotal = 0;
+  let submissionPersisted = false;
+
   const data: Record<
     string,
     {
@@ -838,6 +847,7 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
 
   const visibleFieldIds = computeVisibleFieldIds(form.fields, submittedValues);
 
+  try {
   for (const field of form.fields) {
     const rawValue = submittedValues[field.id] || "";
     const value = field.type === FormFieldType.HIDDEN ? field.placeholder : rawValue;
@@ -942,6 +952,12 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
         redirectWithPublicError(form.slug, message, attachmentContext);
       }
 
+      uploadedAssetIds.push(asset.id);
+      uploadedBytesTotal += asset.sizeBytes;
+      if (uploadedBytesTotal > maxSubmissionUploadBytes) {
+        redirectWithPublicError(form.slug, "Total upload size is too large for one submission.", attachmentContext);
+      }
+
       data[field.id] = {
         file: {
           assetId: asset.id,
@@ -1038,6 +1054,9 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
       }
     }
   });
+  // From here on the uploads are referenced by the persisted submission, so a
+  // later failure (signatures / email / events) must NOT delete them.
+  submissionPersisted = true;
 
   if (signatureRecords.length) {
     await prisma.formSignature.createMany({
@@ -1123,4 +1142,13 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
   refreshForms(form.slug);
   if (clientId) revalidatePath("/admin/modules/clients");
   redirect(publicFormPath(form.slug, attachmentContext, { submitted: "1" }));
+  } catch (error) {
+    // A validation redirect or a persistence error before the submission was
+    // saved leaves the already-uploaded private files orphaned in storage —
+    // delete them, then re-raise so the original redirect/error still flows.
+    if (!submissionPersisted && uploadedAssetIds.length) {
+      await Promise.all(uploadedAssetIds.map((assetId) => deleteMediaAsset(assetId, settings.siteId)));
+    }
+    throw error;
+  }
 }
