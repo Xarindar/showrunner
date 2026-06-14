@@ -620,10 +620,16 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               <h2 style={{ fontSize: "1.35rem" }}>Orders and payments</h2>
               <p>{orders.length} recent orders from storefront cart checkout prep.</p>
             </div>
-            <Link className="button secondary" href="/admin/modules/products/fulfillment-export">
-              <Download size={18} />
-              Export fulfillment CSV
-            </Link>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <Link className="button secondary" href="/admin/modules/products/fulfillment-export">
+                <Download size={18} />
+                Export fulfillment CSV
+              </Link>
+              <Link className="button secondary" href="/admin/modules/products/fulfillment-export?unexportedOnly=1">
+                <Download size={18} />
+                Export new orders only
+              </Link>
+            </div>
           </div>
           <table className="table">
             <thead>

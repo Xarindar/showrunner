@@ -57,10 +57,15 @@ function isoDate(value: Date | null | undefined) {
 export async function GET(request: Request) {
   const user = await requireAdmin("products:manage");
   const settings = await getSiteSettings();
+  // Opt-in "since last export" scoping: ?unexportedOnly=1 emits only orders that
+  // haven't been marked exported yet, so a lab can pull deltas without
+  // re-receiving already-handed-off orders. Default stays the full snapshot.
+  const unexportedOnly = new URL(request.url).searchParams.get("unexportedOnly") === "1";
   const orders = await prisma.order.findMany({
     where: {
       siteId: settings.siteId,
       status: OrderStatus.PAID,
+      ...(unexportedOnly ? { fulfillmentExportedAt: null } : {}),
       items: {
         some: {
           product: { type: ProductType.PHYSICAL }
@@ -205,7 +210,8 @@ export async function GET(request: Request) {
     actor: user,
     metadata: {
       orderCount: orders.length,
-      rowCount: rows.length
+      rowCount: rows.length,
+      unexportedOnly
     },
     request,
     siteId: settings.siteId,
