@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { EmailOutboxStatus, MessageLogStatus } from "@prisma/client";
+import { ClientPipelineStage, EmailOutboxStatus, MessageLogStatus } from "@prisma/client";
 import { CalendarCheck, Save } from "lucide-react";
+import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { enumLabel, formatDateTime, formatMoney, stringArrayFromUnknown } from "@/lib/format";
+import { enumLabel, formatDateTime, formatMoney, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
 import { isRecord } from "@/lib/objects";
 import { getSiteSettings } from "@/lib/site";
-import { addClientNoteAction, updateClientAction } from "../actions";
+import {
+  addClientFileAction,
+  addClientNoteAction,
+  deleteClientFileAction,
+  deleteClientNoteAction,
+  updateClientAction
+} from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +33,14 @@ type TimelineItem = {
 
 function truncate(value: string, length = 140) {
   return value.length > length ? `${value.slice(0, length - 1)}...` : value;
+}
+
+function dateInputValue(value: Date | null | undefined) {
+  return value ? value.toISOString().slice(0, 10) : "";
+}
+
+function preferencesNotes(value: unknown) {
+  return isRecord(value) && typeof value.notes === "string" ? value.notes : "";
 }
 
 function clientEmailSet(client: { alternateEmails: unknown; email: string }) {
@@ -79,39 +94,43 @@ function summarizeSubmission(value: unknown) {
 
 export default async function ClientDetailPage({ params, searchParams }: ClientDetailPageProps) {
   const [{ id }, { saved, error }] = await Promise.all([params, searchParams]);
+  const user = await requireAdmin("clients:manage");
   const settings = await getSiteSettings();
   const client = await prisma.client.findFirst({
-    where: { id, siteId: settings.siteId },
+    where: await getAccessibleClientWhere(user, settings.siteId, { id }),
     include: {
-        notes: { orderBy: { createdAt: "desc" } },
-        bookings: {
-          include: { service: true },
-          orderBy: { startsAt: "desc" },
-          take: 40
-        },
-        formSubmissions: {
-          include: { form: { select: { id: true, name: true, slug: true, destination: true } } },
-          orderBy: { createdAt: "desc" },
-          take: 40
-        },
-        testimonials: {
-          orderBy: { submittedAt: "desc" },
-          take: 40
-        },
-        billingDocuments: {
-          orderBy: { updatedAt: "desc" },
-          take: 40
-        },
-        orders: {
-          orderBy: { updatedAt: "desc" },
-          take: 20
-        },
-        messageLogs: {
-          include: { template: { select: { name: true, purpose: true } } },
-          orderBy: { createdAt: "desc" },
-          take: 40
-        }
+      tags: { orderBy: { label: "asc" } },
+      files: { orderBy: { uploadedAt: "desc" }, take: 40 },
+      notes: { orderBy: { createdAt: "desc" } },
+      bookings: {
+        include: { service: true },
+        orderBy: { startsAt: "desc" },
+        take: 40
+      },
+      formSubmissions: {
+        include: { form: { select: { id: true, name: true, slug: true, destination: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 40
+      },
+      testimonials: {
+        orderBy: { submittedAt: "desc" },
+        take: 40
+      },
+      billingDocuments: {
+        orderBy: { updatedAt: "desc" },
+        take: 40
+      },
+      orders: {
+        include: { payments: true },
+        orderBy: { updatedAt: "desc" },
+        take: 20
+      },
+      messageLogs: {
+        include: { template: { select: { name: true, purpose: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 40
       }
+    }
   });
 
   if (!client) notFound();
@@ -130,24 +149,57 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
     relatedOutboxFilters.push({ relatedType: "form_submission", relatedId: { in: formSubmissionIds } });
   }
 
-  const emailOutboxRows = await prisma.emailOutbox.findMany({
-    where: {
-      siteId: settings.siteId,
-      OR: [{ recipientEmail: { in: clientEmails } }, ...relatedOutboxFilters]
-    },
-    include: { template: { select: { name: true, key: true, purpose: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 80
-  });
+  const [galleryAccesses, galleryFavorites, proofApprovals, proofDecisions, emailOutboxRows] = await Promise.all([
+    prisma.portfolioGalleryAccess.findMany({
+      where: { siteId: settings.siteId, clientId: client.id },
+      include: { gallery: { select: { slug: true, title: true } } },
+      orderBy: { updatedAt: "desc" },
+      take: 20
+    }),
+    prisma.portfolioGalleryFavorite.findMany({
+      where: { clientId: client.id },
+      include: {
+        gallery: { select: { slug: true, title: true } },
+        item: { select: { title: true, imageUrl: true } }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 30
+    }),
+    prisma.portfolioProofApproval.findMany({
+      where: { siteId: settings.siteId, clientId: client.id },
+      include: { gallery: { select: { slug: true, title: true } }, round: { select: { roundNumber: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 20
+    }),
+    prisma.portfolioProofItemDecision.findMany({
+      where: { siteId: settings.siteId, clientId: client.id },
+      include: {
+        gallery: { select: { slug: true, title: true } },
+        item: { select: { title: true, imageUrl: true } },
+        round: { select: { roundNumber: true } }
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 30
+    }),
+    prisma.emailOutbox.findMany({
+      where: {
+        siteId: settings.siteId,
+        OR: [{ recipientEmail: { in: clientEmails } }, ...relatedOutboxFilters]
+      },
+      include: { template: { select: { name: true, key: true, purpose: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 80
+    })
+  ]);
 
   const timelineItems: TimelineItem[] = [
-    ...emailOutboxRows.map((message) => ({
-      id: `email-outbox-${message.id}`,
-      at: message.sentAt || message.updatedAt,
-      badge: "email",
-      title: message.subject || message.template?.name || message.templateKey,
-      detail: `${enumLabel(message.status)} | ${message.recipientEmail}`
-    })),
+    {
+      id: `profile-${client.id}`,
+      at: client.updatedAt,
+      badge: "profile",
+      title: "Profile status",
+      detail: `${client.status} | ${enumLabel(client.pipelineStage)}`
+    },
     ...client.bookings.map((booking) => ({
       id: `booking-${booking.id}`,
       at: booking.startsAt,
@@ -195,12 +247,69 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
       detail: `${enumLabel(order.status)} | ${formatMoney(order.totalCents, order.currency)}`,
       href: `/admin/modules/products?order=${order.id}`
     })),
+    ...client.orders.flatMap((order) =>
+      order.payments.map((payment) => ({
+        id: `payment-${payment.id}`,
+        at: payment.createdAt,
+        badge: "payment",
+        title: `${enumLabel(payment.status)} payment`,
+        detail: `${formatMoney(payment.amountCents, payment.currency)} | ${enumLabel(payment.provider)}`,
+        href: `/admin/modules/products?order=${order.id}`
+      }))
+    ),
     ...client.messageLogs.map((message) => ({
       id: `message-${message.id}`,
       at: message.sentAt || message.createdAt,
       badge: message.channel.toLowerCase(),
       title: message.subject || message.template?.name || message.purpose,
       detail: `${enumLabel(message.status)} | ${truncate(message.bodyPreview || message.recipientEmail || "No preview")}`
+    })),
+    ...emailOutboxRows.map((message) => ({
+      id: `email-outbox-${message.id}`,
+      at: message.sentAt || message.updatedAt,
+      badge: "email",
+      title: message.subject || message.template?.name || message.templateKey,
+      detail: `${enumLabel(message.status)} | ${message.recipientEmail}`
+    })),
+    ...client.files.map((file) => ({
+      id: `file-${file.id}`,
+      at: file.uploadedAt,
+      badge: "upload",
+      title: file.title,
+      detail: `${file.category || "file"} | ${truncate(file.notes || file.url)}`,
+      href: file.url
+    })),
+    ...galleryAccesses.map((access) => ({
+      id: `gallery-access-${access.id}`,
+      at: access.lastViewedAt || access.createdAt,
+      badge: "gallery access",
+      title: access.gallery.title,
+      detail: `${enumLabel(access.status)} | ${access.recipientEmail}`,
+      href: `/galleries/access/${access.accessToken}`
+    })),
+    ...galleryFavorites.map((favorite) => ({
+      id: `gallery-favorite-${favorite.id}`,
+      at: favorite.createdAt,
+      badge: "favorite",
+      title: favorite.gallery.title,
+      detail: `${favorite.item.title || favorite.item.imageUrl} | ${truncate(favorite.notes || "No notes")}`,
+      href: `/galleries/${favorite.gallery.slug}`
+    })),
+    ...proofApprovals.map((approval) => ({
+      id: `proof-approval-${approval.id}`,
+      at: approval.createdAt,
+      badge: "proof response",
+      title: approval.gallery.title,
+      detail: `Round ${approval.round.roundNumber} | ${enumLabel(approval.status)} | ${truncate(approval.notes || "No notes")}`,
+      href: `/galleries/${approval.gallery.slug}`
+    })),
+    ...proofDecisions.map((decision) => ({
+      id: `proof-decision-${decision.id}`,
+      at: decision.updatedAt,
+      badge: "proof image",
+      title: decision.gallery.title,
+      detail: `Round ${decision.round.roundNumber} | ${enumLabel(decision.status)} | ${decision.item.title || decision.item.imageUrl}`,
+      href: `/galleries/${decision.gallery.slug}`
     }))
   ]
     .sort((first, second) => second.at.getTime() - first.at.getTime())
@@ -238,6 +347,16 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           </div>
           <div className="grid-2">
             <div className="field">
+              <label htmlFor="companyName">Company</label>
+              <input id="companyName" name="companyName" defaultValue={client.companyName} />
+            </div>
+            <div className="field">
+              <label htmlFor="familyName">Family or household</label>
+              <input id="familyName" name="familyName" defaultValue={client.familyName} />
+            </div>
+          </div>
+          <div className="grid-2">
+            <div className="field">
               <label htmlFor="phone">Phone</label>
               <input id="phone" name="phone" defaultValue={client.phone || ""} />
             </div>
@@ -250,6 +369,112 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                 <option value="inactive">Inactive</option>
               </select>
             </div>
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="pipelineStage">Pipeline</label>
+              <select id="pipelineStage" name="pipelineStage" defaultValue={client.pipelineStage}>
+                {Object.values(ClientPipelineStage).map((stage) => (
+                  <option key={stage} value={stage}>
+                    {enumLabel(stage)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="tags">Tags</label>
+              <input id="tags" name="tags" defaultValue={client.tags.map((tag) => tag.label).join(", ")} />
+            </div>
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="alternateEmails">Alternate emails</label>
+              <input id="alternateEmails" name="alternateEmails" defaultValue={stringArrayCsv(client.alternateEmails)} />
+            </div>
+            <div className="field">
+              <label htmlFor="alternatePhones">Alternate phones</label>
+              <input id="alternatePhones" name="alternatePhones" defaultValue={stringArrayCsv(client.alternatePhones)} />
+            </div>
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="addressLine1">Address</label>
+              <input id="addressLine1" name="addressLine1" defaultValue={client.addressLine1} />
+            </div>
+            <div className="field">
+              <label htmlFor="addressLine2">Address 2</label>
+              <input id="addressLine2" name="addressLine2" defaultValue={client.addressLine2} />
+            </div>
+          </div>
+          <div className="grid-3">
+            <div className="field">
+              <label htmlFor="city">City</label>
+              <input id="city" name="city" defaultValue={client.city} />
+            </div>
+            <div className="field">
+              <label htmlFor="region">State/region</label>
+              <input id="region" name="region" defaultValue={client.region} />
+            </div>
+            <div className="field">
+              <label htmlFor="postalCode">Postal code</label>
+              <input id="postalCode" name="postalCode" defaultValue={client.postalCode} />
+            </div>
+          </div>
+          <div className="grid-3">
+            <div className="field">
+              <label htmlFor="country">Country</label>
+              <input id="country" name="country" defaultValue={client.country} />
+            </div>
+            <div className="field">
+              <label htmlFor="timezone">Timezone</label>
+              <input id="timezone" name="timezone" defaultValue={client.timezone} placeholder={settings.timezone} />
+            </div>
+            <div className="field">
+              <label htmlFor="pronouns">Pronouns</label>
+              <input id="pronouns" name="pronouns" defaultValue={client.pronouns} />
+            </div>
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="birthday">Birthday</label>
+              <input id="birthday" name="birthday" type="date" defaultValue={dateInputValue(client.birthday)} />
+            </div>
+            <div className="field">
+              <label htmlFor="anniversary">Anniversary</label>
+              <input id="anniversary" name="anniversary" type="date" defaultValue={dateInputValue(client.anniversary)} />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="preferences">Preferences</label>
+            <textarea id="preferences" name="preferences" defaultValue={preferencesNotes(client.preferences)} />
+          </div>
+          <div className="grid-3">
+            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <input name="emailOptIn" type="checkbox" defaultChecked={client.emailOptIn} />
+              Email opt-in
+            </label>
+            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <input name="smsOptIn" type="checkbox" defaultChecked={client.smsOptIn} />
+              SMS opt-in
+            </label>
+            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <input name="photoUsageRelease" type="checkbox" defaultChecked={client.photoUsageRelease} />
+              Photo release
+            </label>
+          </div>
+          <div className="grid-3">
+            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <input name="policyAccepted" type="checkbox" />
+              Record policy acceptance
+            </label>
+            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <input name="dataExportRequested" type="checkbox" defaultChecked={Boolean(client.dataExportRequestedAt)} />
+              Data export requested
+            </label>
+            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <input name="dataDeletionRequested" type="checkbox" defaultChecked={Boolean(client.dataDeletionRequestedAt)} />
+              Deletion requested
+            </label>
           </div>
           <div className="field">
             <label htmlFor="privateNotes">Private summary</label>
@@ -273,6 +498,83 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             Save note
           </button>
         </form>
+      </section>
+
+      <section className="grid-2">
+        <form action={addClientFileAction} className="card form-grid">
+          <input type="hidden" name="clientId" value={client.id} />
+          <h2 style={{ fontSize: "1.35rem" }}>Attach file</h2>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="file-title">Title</label>
+              <input id="file-title" name="title" required />
+            </div>
+            <div className="field">
+              <label htmlFor="file-category">Category</label>
+              <input id="file-category" name="category" placeholder="contract, gallery, upload" />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="file-url">URL or site path</label>
+            <input id="file-url" name="url" placeholder="/uploads/file.pdf" required />
+          </div>
+          <div className="field">
+            <label htmlFor="file-notes">Notes</label>
+            <textarea id="file-notes" name="notes" />
+          </div>
+          <button className="button secondary" type="submit">
+            <Save size={18} />
+            Attach file
+          </button>
+        </form>
+
+        <div className="card stack">
+          <h2 style={{ fontSize: "1.35rem" }}>CRM snapshot</h2>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <span className="pill">{client.status}</span>
+            <span className="pill">{enumLabel(client.pipelineStage)}</span>
+            {client.emailOptIn ? <span className="pill success">email opt-in</span> : null}
+            {client.smsOptIn ? <span className="pill success">sms opt-in</span> : null}
+            {client.photoUsageRelease ? <span className="pill success">photo release</span> : null}
+            {client.dataExportRequestedAt ? <span className="pill danger">export requested</span> : null}
+            {client.dataDeletionRequestedAt ? <span className="pill danger">deletion requested</span> : null}
+          </div>
+          <div>
+            <h3 style={{ fontSize: "1rem" }}>Tags</h3>
+            {client.tags.map((tag) => (
+              <span className="pill" key={tag.id} style={{ marginRight: 4 }}>
+                {tag.label}
+              </span>
+            ))}
+            {!client.tags.length ? <p className="empty-state">No tags yet.</p> : null}
+          </div>
+          <div>
+            <h3 style={{ fontSize: "1rem" }}>Files</h3>
+            {client.files.slice(0, 5).map((file) => (
+              <div className="subpanel" key={file.id}>
+                <p style={{ margin: "0 0 8px" }}>
+                  <a href={file.url}>{file.title}</a>
+                  <br />
+                  <span style={{ color: "var(--muted)" }}>
+                    {file.category || "file"} - {formatDateTime(file.uploadedAt, settings.timezone)}
+                  </span>
+                </p>
+                <form action={deleteClientFileAction} className="form-grid">
+                  <input type="hidden" name="id" value={file.id} />
+                  <input type="hidden" name="clientId" value={client.id} />
+                  <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                    <input name="confirmDelete" type="checkbox" />
+                    Confirm file delete
+                  </label>
+                  <button className="button secondary" type="submit">
+                    Delete file
+                  </button>
+                </form>
+              </div>
+            ))}
+            {!client.files.length ? <p className="empty-state">No files attached.</p> : null}
+          </div>
+        </div>
       </section>
 
       <section className="card">
@@ -428,6 +730,17 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               <div className="subpanel" key={note.id}>
                 <p>{note.content}</p>
                 <span className="pill">{formatDateTime(note.createdAt, settings.timezone)}</span>
+                <form action={deleteClientNoteAction} className="form-grid" style={{ marginTop: 12 }}>
+                  <input type="hidden" name="id" value={note.id} />
+                  <input type="hidden" name="clientId" value={client.id} />
+                  <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                    <input name="confirmDelete" type="checkbox" />
+                    Confirm note delete
+                  </label>
+                  <button className="button secondary" type="submit">
+                    Delete note
+                  </button>
+                </form>
               </div>
             ))}
             {!client.notes.length ? <p>No client notes yet.</p> : null}
