@@ -1,11 +1,13 @@
 import { requireAdmin } from "@/lib/auth";
+import { enforceAnalyticsRetention } from "@/lib/analytics/retention";
 import { prisma } from "@/lib/prisma";
 import { csvDocument } from "@/lib/api/csv";
 import { getSiteSettings } from "@/lib/site";
 
 export async function GET() {
-  await requireAdmin();
+  await requireAdmin("analytics:read");
   const settings = await getSiteSettings();
+  await enforceAnalyticsRetention(settings.siteId, settings.analyticsRetentionDays);
 
   const events = await prisma.analyticsEvent.findMany({
     where: { siteId: settings.siteId },

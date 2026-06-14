@@ -3,6 +3,7 @@ import Link from "next/link";
 import NextImage from "next/image";
 import { notFound } from "next/navigation";
 import { ProductStatus, ProductType } from "@prisma/client";
+import { TrackedAnalyticsForm } from "@/components/analytics/tracker";
 import { JsonLd } from "@/components/structured-data";
 import { ShoppingCart } from "lucide-react";
 import { addToCartAction } from "@/app/cart/actions";
@@ -116,7 +117,22 @@ export default async function ShopPage() {
                     Details
                   </Link>
                   {variant && product.type !== ProductType.GIFT_CARD ? (
-                    <form action={addToCartAction}>
+                    <TrackedAnalyticsForm
+                      action={addToCartAction}
+                      analyticsData={JSON.stringify({
+                        currency: product.currency,
+                        productId: product.id,
+                        productName: product.name,
+                        variants: [
+                          {
+                            id: variant.id,
+                            name: variant.name,
+                            priceCents: variant.priceCents ?? product.basePriceCents
+                          }
+                        ]
+                      })}
+                      mode="add_to_cart"
+                    >
                       <input type="hidden" name="productId" value={product.id} />
                       <input type="hidden" name="variantId" value={variant.id} />
                       <input type="hidden" name="quantity" value="1" />
@@ -124,7 +140,7 @@ export default async function ShopPage() {
                         <ShoppingCart size={18} />
                         Add
                       </button>
-                    </form>
+                    </TrackedAnalyticsForm>
                   ) : product.type === ProductType.GIFT_CARD ? (
                     <Link className="button" href={`/shop/${product.slug}`}>
                       Gift

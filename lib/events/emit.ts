@@ -2,6 +2,7 @@ import "server-only";
 
 import crypto from "node:crypto";
 import {
+  AnalyticsEventType,
   AutomationAction,
   AutomationRunStatus,
   AutomationStatus,
@@ -12,8 +13,8 @@ import { cookies, headers } from "next/headers";
 import { moduleEventCatalog, type ModuleEventName } from "@/lib/events/catalog";
 import { queueWebhookDelivery } from "@/lib/events/webhook-delivery";
 import { prisma } from "@/lib/prisma";
+import { getCurrentSiteId } from "@/lib/site";
 import { queueCommunicationsEventEmails } from "@/modules/communications/auto-send";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -40,17 +41,28 @@ export type EmitModuleEventInput = EventAttribution & {
   valueCents?: number;
 };
 
+export type EmitAnalyticsEventInput = EmitModuleEventInput & {
+  eventName: string;
+  eventType: AnalyticsEventType;
+};
+
 type EventEnvelope = Required<Pick<EmitModuleEventInput, "metadata">> &
   EventAttribution & {
     actorEmail: string;
     currency: string;
     eventId: string;
-    name: ModuleEventName;
+    name: string;
     occurredAt: string;
     relatedId: string;
     relatedType: string;
+    siteId: string;
     valueCents?: number;
   };
+
+type AnalyticsEventDefinition = {
+  analyticsEventName: string;
+  analyticsEventType: AnalyticsEventType;
+};
 
 function toJsonValue(value: unknown): Prisma.InputJsonValue | undefined {
   if (value === undefined) return undefined;
@@ -157,9 +169,7 @@ function matchesConditions(conditions: Prisma.JsonValue, envelope: EventEnvelope
   return true;
 }
 
-async function recordAnalyticsEvent(envelope: EventEnvelope, dedupeWindowMinutes = 0) {
-  const definition = moduleEventCatalog[envelope.name];
-
+async function recordAnalyticsEvent(envelope: EventEnvelope, definition: AnalyticsEventDefinition, dedupeWindowMinutes = 0) {
   if (dedupeWindowMinutes > 0) {
     const occurredAfter = new Date(Date.now() - dedupeWindowMinutes * 60 * 1000);
     const identityWhere = envelope.visitorId
@@ -173,7 +183,7 @@ async function recordAnalyticsEvent(envelope: EventEnvelope, dedupeWindowMinutes
     if (identityWhere) {
       const existing = await prisma.analyticsEvent.findFirst({
         where: {
-          siteId: DEFAULT_SITE_ID,
+          siteId: envelope.siteId,
           ...identityWhere,
           eventName: definition.analyticsEventName,
           eventType: definition.analyticsEventType,
@@ -191,7 +201,7 @@ async function recordAnalyticsEvent(envelope: EventEnvelope, dedupeWindowMinutes
 
   await prisma.analyticsEvent.create({
     data: {
-      siteId: DEFAULT_SITE_ID,
+      siteId: envelope.siteId,
       eventType: definition.analyticsEventType,
       eventName: definition.analyticsEventName,
       source: envelope.source || "",
@@ -223,7 +233,9 @@ function automationRunSummary(action: AutomationAction, eventName: ModuleEventNa
       : `Matched ${eventName}. No webhook URL is configured, so no delivery was queued.`;
   }
 
-  return `Matched ${eventName}. The ${action.toLowerCase()} action executor is not wired yet.`;
+  return queued
+    ? `Matched ${eventName}. ${action.toLowerCase()} action was queued for execution.`
+    : `Matched ${eventName}. ${action.toLowerCase()} action was not queued.`;
 }
 
 async function ensureAutomationWebhookSecret(automation: { id: string; webhookSigningSecret: string }) {
@@ -238,16 +250,15 @@ async function ensureAutomationWebhookSecret(automation: { id: string; webhookSi
   return webhookSigningSecret;
 }
 
-async function recordMatchedAutomationRuns(envelope: EventEnvelope) {
-  const definition = moduleEventCatalog[envelope.name];
+async function recordMatchedAutomationRuns(eventName: ModuleEventName, envelope: EventEnvelope) {
+  const definition = moduleEventCatalog[eventName];
   const automations = await prisma.automation.findMany({
     where: {
-      siteId: DEFAULT_SITE_ID,
+      siteId: envelope.siteId,
       status: AutomationStatus.ACTIVE,
       trigger: definition.automationTrigger
     }
   });
-
   for (const automation of automations) {
     if (!matchesConditions(automation.conditions, envelope)) continue;
 
@@ -266,16 +277,16 @@ async function recordMatchedAutomationRuns(envelope: EventEnvelope) {
           data: {
             automationId: automation.id,
             status: AutomationRunStatus.QUEUED,
-            triggerKey: envelope.name,
+            triggerKey: eventName,
             relatedType: envelope.relatedType,
             relatedId: envelope.relatedId,
-            summary: automationRunSummary(automation.action, envelope.name, true)
+            summary: automationRunSummary(automation.action, eventName, true)
           }
         });
         await tx.webhookDelivery.create({
           data: {
             automationId: automation.id,
-            event: envelope.name,
+            event: eventName,
             payload,
             status: WebhookDeliveryStatus.PENDING,
             targetUrl: webhookUrl
@@ -289,22 +300,25 @@ async function recordMatchedAutomationRuns(envelope: EventEnvelope) {
       continue;
     }
 
-    await prisma.$transaction([
-      prisma.automationRun.create({
+    const payload = JSON.parse(JSON.stringify(envelope)) as Prisma.InputJsonObject;
+    await prisma.$transaction(async (tx) => {
+      await tx.automationRun.create({
         data: {
           automationId: automation.id,
-          status: AutomationRunStatus.SKIPPED,
-          triggerKey: envelope.name,
+          status: AutomationRunStatus.QUEUED,
+          triggerKey: eventName,
           relatedType: envelope.relatedType,
           relatedId: envelope.relatedId,
-          summary: automationRunSummary(automation.action, envelope.name)
+          summary: automationRunSummary(automation.action, eventName, true),
+          payload,
+          nextAttemptAt: new Date()
         }
-      }),
-      prisma.automation.update({
+      });
+      await tx.automation.update({
         where: { id: automation.id },
         data: { lastRunAt: new Date() }
-      })
-    ]);
+      });
+    });
   }
 }
 
@@ -314,7 +328,7 @@ function endpointEvents(value: Prisma.JsonValue) {
 
 async function queueSubscribedWebhookEndpoints(envelope: EventEnvelope) {
   const endpoints = await prisma.webhookEndpoint.findMany({
-    where: { siteId: DEFAULT_SITE_ID, status: AutomationStatus.ACTIVE }
+    where: { siteId: envelope.siteId, status: AutomationStatus.ACTIVE }
   });
   const subscribed = endpoints.filter((endpoint) => endpointEvents(endpoint.events).includes(envelope.name));
   const body = JSON.stringify(envelope);
@@ -334,6 +348,7 @@ async function queueSubscribedWebhookEndpoints(envelope: EventEnvelope) {
 
 export async function emitModuleEvent(name: ModuleEventName, input: EmitModuleEventInput = {}) {
   const definition = moduleEventCatalog[name];
+  const siteId = await getCurrentSiteId();
   const envelope: EventEnvelope = {
     actorEmail: input.actorEmail || "",
     campaign: input.campaign || "",
@@ -348,6 +363,7 @@ export async function emitModuleEvent(name: ModuleEventName, input: EmitModuleEv
     referrer: input.referrer || "",
     relatedId: input.relatedId || "",
     relatedType: input.relatedType || definition.relatedType,
+    siteId,
     sessionId: input.sessionId || "",
     source: input.source || "",
     trackingConsent: input.trackingConsent || "unset",
@@ -356,9 +372,9 @@ export async function emitModuleEvent(name: ModuleEventName, input: EmitModuleEv
   };
 
   const results = await Promise.allSettled([
-    recordAnalyticsEvent(envelope, input.dedupeWindowMinutes),
+    recordAnalyticsEvent(envelope, definition, input.dedupeWindowMinutes),
     queueCommunicationsEventEmails(name, envelope),
-    recordMatchedAutomationRuns(envelope),
+    recordMatchedAutomationRuns(name, envelope),
     queueSubscribedWebhookEndpoints(envelope)
   ]);
 
@@ -367,4 +383,38 @@ export async function emitModuleEvent(name: ModuleEventName, input: EmitModuleEv
       console.error("[events:emit-failed]", name, result.reason);
     }
   }
+}
+
+export async function emitAnalyticsEvent(input: EmitAnalyticsEventInput) {
+  const siteId = await getCurrentSiteId();
+  const envelope: EventEnvelope = {
+    actorEmail: input.actorEmail || "",
+    campaign: input.campaign || "",
+    currency: input.currency || "USD",
+    eventId: input.idempotencyKey || crypto.randomUUID(),
+    landingPage: input.landingPage || "",
+    medium: input.medium || "",
+    metadata: compactMetadata(input.metadata),
+    name: input.eventName,
+    occurredAt: new Date().toISOString(),
+    pathname: input.pathname || "",
+    referrer: input.referrer || "",
+    relatedId: input.relatedId || "",
+    relatedType: input.relatedType || "",
+    siteId,
+    sessionId: input.sessionId || "",
+    source: input.source || "",
+    trackingConsent: input.trackingConsent || "unset",
+    valueCents: input.valueCents,
+    visitorId: input.visitorId || ""
+  };
+
+  await recordAnalyticsEvent(
+    envelope,
+    {
+      analyticsEventName: input.eventName,
+      analyticsEventType: input.eventType
+    },
+    input.dedupeWindowMinutes
+  );
 }

@@ -2,10 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import NextImage from "next/image";
 import { notFound } from "next/navigation";
-import { ProductStatus, ProductType } from "@prisma/client";
+import { AnalyticsEventType, ProductStatus, ProductType } from "@prisma/client";
+import { TrackAnalyticsEvent, TrackedAnalyticsForm } from "@/components/analytics/tracker";
 import { JsonLd } from "@/components/structured-data";
 import { ShoppingCart } from "lucide-react";
 import { addToCartAction } from "@/app/cart/actions";
+import { buildViewItemEvent } from "@/lib/analytics/ecommerce";
+import { emitAnalyticsEvent, requestAttribution } from "@/lib/events/emit";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { buildBreadcrumbJsonLd, buildImageObjectJsonLd, buildPageMetadata, buildProductJsonLd, getCanonicalBaseUrl } from "@/lib/seo";
@@ -68,6 +71,26 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const defaultPriceCents = defaultVariant?.priceCents ?? product.basePriceCents;
   const isGiftCard = product.type === ProductType.GIFT_CARD;
   const categories = product.collectionProducts.map(({ collection }) => collection.name);
+  const viewItemEvent = buildViewItemEvent({
+    categories,
+    currency: product.currency,
+    productId: product.id,
+    productName: product.name,
+    unitPriceCents: defaultPriceCents,
+    variantName: defaultVariant && !defaultVariant.isDefault ? defaultVariant.name : undefined
+  });
+
+  await emitAnalyticsEvent({
+    ...(await requestAttribution(undefined, `/shop/${product.slug}`)),
+    currency: product.currency,
+    dedupeWindowMinutes: 60,
+    eventName: "view_item",
+    eventType: AnalyticsEventType.VIEW_ITEM,
+    metadata: viewItemEvent,
+    relatedId: product.id,
+    relatedType: "product",
+    valueCents: defaultPriceCents
+  });
 
   return (
     <main className="site-shell" style={themeToCssVars(settings)}>
@@ -102,6 +125,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           )
         ].filter((item) => Object.keys(item).length)}
       />
+      <TrackAnalyticsEvent event={viewItemEvent} onceKey={`view-item:${product.id}:${defaultVariant?.id || "default"}`} />
       <nav className="site-nav">
         <Link href="/" className="brand">
           <span className="brand-mark" />
@@ -156,7 +180,22 @@ export default async function ProductPage({ params }: ProductPageProps) {
             ) : null}
 
             {defaultVariant ? (
-              <form action={addToCartAction} className="form-grid">
+              <TrackedAnalyticsForm
+                action={addToCartAction}
+                analyticsData={JSON.stringify({
+                  categories,
+                  currency: product.currency,
+                  productId: product.id,
+                  productName: product.name,
+                  variants: product.variants.map((variant) => ({
+                    id: variant.id,
+                    name: variantLabel(variant),
+                    priceCents: variant.priceCents ?? product.basePriceCents
+                  }))
+                })}
+                className="form-grid"
+                mode="add_to_cart"
+              >
                 <input type="hidden" name="productId" value={product.id} />
                 <div className="grid-2">
                   <div className="field">
@@ -201,7 +240,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   <ShoppingCart size={18} />
                   Add to cart
                 </button>
-              </form>
+              </TrackedAnalyticsForm>
             ) : (
               <span className="pill">No active variants</span>
             )}

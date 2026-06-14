@@ -4,6 +4,7 @@ import { AnalyticsEventType, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { enforceAnalyticsRetention } from "@/lib/analytics/retention";
 import { parseForm } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
 import { enumLabel } from "@/lib/format";
@@ -99,9 +100,10 @@ function refreshAnalytics() {
 }
 
 export async function recordAnalyticsEventAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("analytics:manage");
   const input = await parseForm(eventSchema, formData, "/admin/modules/analytics");
   const settings = await getSiteSettings();
+  await enforceAnalyticsRetention(settings.siteId, settings.analyticsRetentionDays);
 
   await prisma.analyticsEvent.create({
     data: {
@@ -131,7 +133,7 @@ export async function recordAnalyticsEventAction(formData: FormData) {
 }
 
 export async function createAnalyticsGoalAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("analytics:manage");
   const input = await parseForm(goalSchema, formData, "/admin/modules/analytics");
   const settings = await getSiteSettings();
 
@@ -162,7 +164,7 @@ export async function createAnalyticsGoalAction(formData: FormData) {
 }
 
 export async function updateAnalyticsGoalStatusAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdmin("analytics:manage");
   const input = await parseForm(goalStatusSchema, formData, "/admin/modules/analytics");
   const settings = await getSiteSettings();
 

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { AnalyticsEventType, BookingStatus, OrderStatus, PortfolioGalleryStatus, Prisma } from "@prisma/client";
 import { BarChart3, CheckCircle2, MousePointerClick, Plus, TrendingUp } from "lucide-react";
+import { enforceAnalyticsRetention } from "@/lib/analytics/retention";
+import { requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -38,7 +40,9 @@ function goalWhere(goal: { eventType: AnalyticsEventType; eventName: string }, s
 }
 
 export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
+  await requireAdmin("analytics:read");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
+  await enforceAnalyticsRetention(settings.siteId, settings.analyticsRetentionDays);
   const [
     recentEvents,
     goals,

@@ -1,0 +1,6 @@
+ALTER TABLE "SiteSettings"
+ADD COLUMN "ga4MeasurementId" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "googleAdsTagId" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "metaPixelId" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "searchConsoleVerification" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "analyticsRetentionDays" INTEGER NOT NULL DEFAULT 365;
