@@ -236,6 +236,17 @@ export async function promoteWaitlistEntryAction(formData: FormData) {
     redirect(`/admin/modules/appointments?error=${encodeURIComponent("Choose a staff member assigned to that service.")}`);
   }
 
+  // Atomically claim the entry before creating the booking so two concurrent
+  // promotions (or a retry after a crash mid-create) can't both create a booking
+  // from one entry. Only the request that flips WAITING -> PROMOTED proceeds.
+  const claim = await prisma.bookingWaitlistEntry.updateMany({
+    where: { id: entry.id, status: BookingWaitlistStatus.WAITING },
+    data: { status: BookingWaitlistStatus.PROMOTED }
+  });
+  if (claim.count !== 1) {
+    redirect(`/admin/modules/appointments?error=${encodeURIComponent("That waitlist entry was already handled.")}`);
+  }
+
   let booking;
   try {
     booking = await nativeSchedulingAdapter.createBooking({
@@ -251,6 +262,12 @@ export async function promoteWaitlistEntryAction(formData: FormData) {
       status: BookingStatus.CONFIRMED
     });
   } catch (error) {
+    // Booking creation failed (e.g. slot just taken) — release the claim so the
+    // entry can be promoted again to a different time.
+    await prisma.bookingWaitlistEntry.update({
+      where: { id: entry.id },
+      data: { status: BookingWaitlistStatus.WAITING }
+    });
     redirect(
       `/admin/modules/appointments?error=${encodeURIComponent(error instanceof Error ? error.message : "Unable to promote waitlist entry.")}`
     );
@@ -258,10 +275,7 @@ export async function promoteWaitlistEntryAction(formData: FormData) {
 
   await prisma.bookingWaitlistEntry.update({
     where: { id: entry.id },
-    data: {
-      promotedBookingId: booking.id,
-      status: BookingWaitlistStatus.PROMOTED
-    }
+    data: { promotedBookingId: booking.id }
   });
 
   await emitModuleEvent("booking.created", {

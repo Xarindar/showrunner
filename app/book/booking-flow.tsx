@@ -407,6 +407,14 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
 
         {step === "review" ? (
           <form action={selectedSlotDetails ? action : waitlistAction} className={panelClass}>
+            <input
+              aria-hidden="true"
+              autoComplete="off"
+              name="companyWebsite"
+              style={{ display: "none" }}
+              tabIndex={-1}
+              type="text"
+            />
             <input name="serviceId" type="hidden" value={selectedService?.id || ""} />
             <input name="staffId" type="hidden" value={selectedSlotDetails?.staffId || (!selectedSlotDetails ? staffFilterId : "")} />
             <input name="resourceIds" type="hidden" value={selectedSlotDetails?.resourceIds.join(",") || ""} />

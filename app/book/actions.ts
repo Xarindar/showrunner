@@ -5,12 +5,16 @@ import { FormAttachmentTargetType } from "@prisma/client";
 import { z } from "zod";
 import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
 import { bookingSelfServicePath } from "@/lib/bookings/self-service";
+import { upsertPublicClient } from "@/lib/clients/public-client";
 import { getPublicFormAttachments, publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { prisma } from "@/lib/prisma";
+import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { icsCalendarAdapter } from "@/lib/scheduling/calendar";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import { getSiteSettings } from "@/lib/site";
 import { parseZonedDateKey } from "@/lib/timezone";
+
+const hiddenHoneypotField = "companyWebsite";
 
 const bookingSchema = z.object({
   serviceId: z.string().min(1),
@@ -57,6 +61,15 @@ export type WaitlistFormState = {
 };
 
 export async function createPublicBookingAction(_state: BookingFormState, formData: FormData): Promise<BookingFormState> {
+  if (String(formData.get(hiddenHoneypotField) || "").trim()) {
+    return { ok: true };
+  }
+
+  const rateLimitMessage = await publicRateLimitMessage("booking_submission", { limit: 6, windowMinutes: 10 });
+  if (rateLimitMessage) {
+    return { error: rateLimitMessage };
+  }
+
   const parsed = bookingSchema.safeParse({
     serviceId: formData.get("serviceId"),
     staffId: formData.get("staffId") || undefined,
@@ -132,6 +145,15 @@ export async function createPublicBookingAction(_state: BookingFormState, formDa
 }
 
 export async function joinPublicWaitlistAction(_state: WaitlistFormState, formData: FormData): Promise<WaitlistFormState> {
+  if (String(formData.get(hiddenHoneypotField) || "").trim()) {
+    return { ok: true };
+  }
+
+  const rateLimitMessage = await publicRateLimitMessage("waitlist_join", { limit: 6, windowMinutes: 10 });
+  if (rateLimitMessage) {
+    return { error: rateLimitMessage };
+  }
+
   const parsed = waitlistSchema.safeParse({
     serviceId: formData.get("serviceId"),
     staffId: formData.get("staffId") || undefined,
@@ -181,18 +203,11 @@ export async function joinPublicWaitlistAction(_state: WaitlistFormState, formDa
   }
 
   const entry = await prisma.$transaction(async (tx) => {
-    await tx.client.upsert({
-      where: { siteId_email: { siteId: service.siteId, email: parsed.data.customerEmail } },
-      update: {
-        name: parsed.data.customerName,
-        phone: parsed.data.customerPhone || undefined
-      },
-      create: {
-        siteId: service.siteId,
-        name: parsed.data.customerName,
-        email: parsed.data.customerEmail,
-        phone: parsed.data.customerPhone
-      }
+    await upsertPublicClient(tx, {
+      siteId: service.siteId,
+      email: parsed.data.customerEmail,
+      name: parsed.data.customerName,
+      phone: parsed.data.customerPhone
     });
 
     return tx.bookingWaitlistEntry.create({

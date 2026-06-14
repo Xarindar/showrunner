@@ -1,6 +1,7 @@
 import "server-only";
 
 import { BookingStatus, Prisma, SchedulingCalendarOwnerType } from "@prisma/client";
+import { upsertPublicClient } from "@/lib/clients/public-client";
 import { queueBookingCreatedEmails } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
@@ -486,24 +487,17 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
             throw new Error("That time was just booked or blocked. Please choose another time.");
           }
 
-          const client = await tx.client.upsert({
-            where: { siteId_email: { siteId: service.siteId, email: input.customerEmail.toLowerCase() } },
-            update: {
-              name: input.customerName,
-              phone: input.customerPhone || undefined
-            },
-            create: {
-              siteId: service.siteId,
-              name: input.customerName,
-              email: input.customerEmail.toLowerCase(),
-              phone: input.customerPhone
-            }
+          const clientId = await upsertPublicClient(tx, {
+            siteId: service.siteId,
+            email: input.customerEmail,
+            name: input.customerName,
+            phone: input.customerPhone
           });
 
           return tx.booking.create({
             data: {
               siteId: service.siteId,
-              clientId: client.id,
+              clientId,
               serviceId: input.serviceId,
               staffId: selectedStaff?.id,
               startsAt: input.startsAt,
