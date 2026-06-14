@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
+import { getCurrentSiteId } from "@/lib/site";
 import { slugify } from "@/lib/slug";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 
 type CommerceSlugModel = "product" | "collection";
 
@@ -27,7 +27,7 @@ export async function generateUniqueCommerceSlug(
   model: CommerceSlugModel,
   input: { name: string; slug?: string; siteId?: string; exceptId?: string }
 ) {
-  const siteId = input.siteId || DEFAULT_SITE_ID;
+  const siteId = input.siteId || (await getCurrentSiteId());
   const base = slugify(input.slug || input.name) || model;
   let candidate = base;
   let suffix = 2;

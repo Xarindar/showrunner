@@ -3,7 +3,7 @@ import "server-only";
 import crypto from "node:crypto";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getCurrentSiteId } from "@/lib/site";
 
 type PublicRateLimitOptions = {
   limit?: number;
@@ -29,7 +29,7 @@ async function publicIdentifier() {
 }
 
 export async function publicRateLimitMessage(scope: string, options: PublicRateLimitOptions = {}) {
-  const siteId = DEFAULT_SITE_ID;
+  const siteId = await getCurrentSiteId();
   const limit = options.limit ?? 8;
   const windowMinutes = options.windowMinutes ?? 10;
   const identifier = await publicIdentifier();

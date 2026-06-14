@@ -2,15 +2,16 @@ import "server-only";
 
 import { PortfolioAccessStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
+import { getCurrentSiteId } from "@/lib/site";
 
-export async function findActiveGalleryAccess(accessToken: string, galleryId?: string, siteId = DEFAULT_SITE_ID) {
+export async function findActiveGalleryAccess(accessToken: string, galleryId?: string, siteId?: string) {
   const token = accessToken.trim();
   if (!token) return null;
 
+  const currentSiteId = siteId || (await getCurrentSiteId());
   return prisma.portfolioGalleryAccess.findFirst({
     where: {
-      siteId,
+      siteId: currentSiteId,
       accessToken: token,
       galleryId,
       status: PortfolioAccessStatus.ACTIVE,
@@ -22,9 +23,10 @@ export async function findActiveGalleryAccess(accessToken: string, galleryId?: s
   });
 }
 
-export async function markGalleryAccessViewed(accessId: string, siteId = DEFAULT_SITE_ID) {
+export async function markGalleryAccessViewed(accessId: string, siteId?: string) {
+  const currentSiteId = siteId || (await getCurrentSiteId());
   await prisma.portfolioGalleryAccess.updateMany({
-    where: { id: accessId, siteId },
+    where: { id: accessId, siteId: currentSiteId },
     data: { lastViewedAt: new Date() }
   });
 }
