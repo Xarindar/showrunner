@@ -87,9 +87,16 @@ export async function recordProviderEvent(input: ProviderEventInput) {
   if (!outbox) return;
 
   if (input.eventType === EmailProviderEventType.DELIVERED) {
+    // A late or duplicate DELIVERED arriving after a bounce/complaint must not
+    // overwrite the terminal FAILED state: record the delivery timestamp for the
+    // event log, but keep the FAILED status + lastError so the admin table still
+    // reflects the real outcome (suppression already persisted).
+    const hasTerminalFailure = Boolean(outbox.bouncedAt || outbox.complainedAt);
     await prisma.emailOutbox.update({
       where: { id: outbox.id },
-      data: { deliveredAt: now, lastError: "", status: EmailOutboxStatus.SENT }
+      data: hasTerminalFailure
+        ? { deliveredAt: now }
+        : { deliveredAt: now, lastError: "", status: EmailOutboxStatus.SENT }
     });
     return;
   }
