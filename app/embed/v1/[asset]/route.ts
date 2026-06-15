@@ -64,6 +64,11 @@ const bookingWidgetSource = String.raw`
     return String(value) === String(selected) ? " selected" : "";
   }
 
+  function slotKey(slot) {
+    var resourceIds = Array.isArray(slot.resourceIds) ? slot.resourceIds.join(",") : "";
+    return [slot.startsAt || "", slot.staffId || "", resourceIds].join("|");
+  }
+
   function readThemeAttribute(element) {
     var theme = {};
     var rawTheme = element.getAttribute("theme");
@@ -196,6 +201,11 @@ const bookingWidgetSource = String.raw`
       this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail: detail || {} }));
     }
 
+    setError(message) {
+      this.error = message;
+      this.dispatch("showrunner:error", { message: message });
+    }
+
     async fetchJson(path, options) {
       var headers = {
         Accept: "application/json",
@@ -213,7 +223,7 @@ const bookingWidgetSource = String.raw`
     async loadServices() {
       if (!this.isConnected) return;
       if (!this.publishableKey()) {
-        this.error = "Missing publishable key.";
+        this.setError("Missing publishable key.");
         this.render();
         return;
       }
@@ -240,7 +250,7 @@ const bookingWidgetSource = String.raw`
         await this.loadAvailability();
         this.dispatch("showrunner:ready", { services: this.services });
       } catch (error) {
-        this.error = error instanceof Error ? error.message : "Unable to load booking options.";
+        this.setError(error instanceof Error ? error.message : "Unable to load booking options.");
         this.slots = [];
         this.render();
       } finally {
@@ -271,7 +281,7 @@ const bookingWidgetSource = String.raw`
         this.slots = data && data.diagnostics && Array.isArray(data.diagnostics.slots) ? data.diagnostics.slots : [];
         this.dispatch("showrunner:availability", { serviceId: this.selectedServiceId, date: this.date, slots: this.slots });
       } catch (error) {
-        this.error = error instanceof Error ? error.message : "Unable to load available times.";
+        this.setError(error instanceof Error ? error.message : "Unable to load available times.");
         this.slots = [];
       } finally {
         this.loading = false;
@@ -286,7 +296,7 @@ const bookingWidgetSource = String.raw`
       var service = this.currentService();
       var body = {
         serviceId: this.selectedServiceId,
-        staffId: this.selectedStaffId || undefined,
+        staffId: this.selectedSlot.staffId || this.selectedStaffId || undefined,
         resourceIds: this.selectedSlot.resourceIds || [],
         startsAt: this.selectedSlot.startsAt,
         customerName: form.customerName.value,
@@ -299,7 +309,7 @@ const bookingWidgetSource = String.raw`
       };
 
       if (service && service.requirePolicy && service.policyText && !body.policyAccepted) {
-        this.error = "Please accept the appointment policy before booking.";
+        this.setError("Please accept the appointment policy before booking.");
         this.render();
         return;
       }
@@ -316,8 +326,7 @@ const bookingWidgetSource = String.raw`
         this.success = data.booking || { ok: true };
         this.dispatch("showrunner:booking-created", { booking: data.booking });
       } catch (error) {
-        this.error = error instanceof Error ? error.message : "Unable to complete booking.";
-        this.dispatch("showrunner:error", { message: this.error });
+        this.setError(error instanceof Error ? error.message : "Unable to complete booking.");
       } finally {
         this.submitting = false;
         this.render();
@@ -369,8 +378,8 @@ const bookingWidgetSource = String.raw`
 
       this.shadowRoot.querySelectorAll("[data-slot]").forEach((button) => {
         button.addEventListener("click", () => {
-          var startsAt = button.getAttribute("data-slot");
-          this.selectedSlot = this.slots.find(function (slot) { return slot.startsAt === startsAt; }) || null;
+          var key = button.getAttribute("data-slot");
+          this.selectedSlot = this.slots.find(function (slot) { return slotKey(slot) === key; }) || null;
           this.render();
         });
       });
@@ -401,8 +410,11 @@ const bookingWidgetSource = String.raw`
       if (!this.selectedServiceId) return "<div class='sr-empty'>No services are available.</div>";
       if (!this.slots.length) return "<div class='sr-empty'>No times are available for this date.</div>";
       return "<div class='sr-slots' aria-label='Available times'>" + this.slots.map((slot) => {
-        var selected = this.selectedSlot && this.selectedSlot.startsAt === slot.startsAt;
-        return "<button class='sr-slot' type='button' data-slot='" + escapeHtml(slot.startsAt) + "' aria-pressed='" + (selected ? "true" : "false") + "'>" + escapeHtml(slot.label || formatDateTime(slot.startsAt)) + "</button>";
+        var key = slotKey(slot);
+        var selected = this.selectedSlot && slotKey(this.selectedSlot) === key;
+        var label = slot.label || formatDateTime(slot.startsAt);
+        if (!this.selectedStaffId && slot.staffName) label += " - " + slot.staffName;
+        return "<button class='sr-slot' type='button' data-slot='" + escapeHtml(key) + "' aria-pressed='" + (selected ? "true" : "false") + "'>" + escapeHtml(label) + "</button>";
       }).join("") + "</div>";
     }
 
