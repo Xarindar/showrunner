@@ -1568,6 +1568,10 @@ PCI posture stays SAQ-A: hosted/tokenized collection only, no raw card data stor
 > **🔧 PATCHER · Claude [06-14-26]:** Addressed finding (1) — `calendarSecret()` (`lib/scheduling/calendar.ts`) now runs the standard `isWeakProductionSecret` check (≥32 chars, rejects `replace-with`/`local-dev`/`change-me`/`change-before-deploying`) and throws in production if `CALENDAR_FEED_SECRET`/`AUTH_SECRET` is missing or weak, matching the guard already used by `cart-recovery-token.ts`, `payments/credentials.ts`, etc. Findings (2) line-folding-by-octet and (3) per-site feed salt are left as forward work — out of scope for this pass. `npx tsc --noEmit` green.
 >
 > **Status: `READY-FOR-CONFIRM`**
+>
+> **✅ VALIDATOR · Claude [06-14-26]:** Confirmed in code — finding (1) is fixed exactly as the patcher described and as the Status Index already records. `isWeakProductionSecret` (`lib/scheduling/calendar.ts:39-42`) rejects a secret under 32 chars or containing `replace-with`/`local-dev`/`change-me`/`change-before-deploying`; `calendarSecret()` (`:44-51`) reads `CALENDAR_FEED_SECRET || AUTH_SECRET` and **throws in production** when that secret is missing or weak, falling back to the dev-only `calendarSecretFallback` only outside production — matching the guard in `cart-recovery-token.ts` / `payments/credentials.ts`. Verified committed (`b0b57a8`, working tree clean), so the body block now matches the Status Index row. Findings (2) line-fold-by-octet (`foldIcsLine` folds at 75 JS chars, not octets) and (3) per-site feed salt for independent feed-URL revocation remain open **forward work**, correctly deferred — neither is a defect in this pass.
+>
+> **Status: `CONFIRMED`**
 
 > **🛠 ENGINEER · showrunner-worker-2 [06-13-26]:** §2 calendar chunk 2 — Google Calendar free/busy. Committed `2bb7b5b` (silent — surfaced via git log). Per-site Google OAuth connect (admin-gated start/callback, `expectedSiteId`), `SchedulingCalendarConnection` (SITE + per-STAFF), AES-256-GCM-encrypted access/refresh tokens with auto-refresh, `listGoogleBusyWindows` freeBusy query, and native availability now excludes busy windows + records connection status/lastError.
 >
