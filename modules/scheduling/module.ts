@@ -44,7 +44,7 @@ export const manifest = {
     "/api/calendar/feed.ics",
     "/api/calendar/booking.ics"
   ],
-  widgetRoutes: [],
+  widgetRoutes: ["/embed/v1/booking.js"],
   dependencies: ["appointments", "clients", "communications"],
   dataModels: [
     "Service",
