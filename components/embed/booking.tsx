@@ -15,10 +15,29 @@ export type ShowrunnerBookingTheme = {
 };
 
 export type ShowrunnerBookingService = {
+  description: string | null;
+  durationMinutes: number;
   id: string;
+  intakePrompt: string | null;
+  location: string | null;
+  maxAdvanceDays: number;
+  minimumNoticeHours: number;
   name: string;
+  policyText: string | null;
+  requirePolicy: boolean;
+  requestOnly: boolean;
+  resources: ShowrunnerBookingResource[];
   slug: string;
-  staff?: Array<{ id: string; name: string; title?: string | null }>;
+  slotIntervalMinutes: number;
+  staff: Array<{ id: string; name: string; title: string | null }>;
+  waitlistEnabled: boolean;
+};
+
+export type ShowrunnerBookingResource = {
+  id: string;
+  location: string | null;
+  name: string;
+  type: string;
 };
 
 export type ShowrunnerBookingSlot = {
@@ -103,6 +122,25 @@ function eventDetail<T>(event: Event) {
   return (event as CustomEvent<T>).detail;
 }
 
+function applyBookingAttributes(
+  element: HTMLElement,
+  input: {
+    apiBase: string;
+    publishableKey: string;
+    serviceId?: string;
+    serviceSlug?: string;
+    staffId?: string;
+    themeJson?: string;
+  }
+) {
+  setOrRemoveAttribute(element, "publishable-key", input.publishableKey);
+  setOrRemoveAttribute(element, "api-base", input.apiBase);
+  setOrRemoveAttribute(element, "service-id", input.serviceId);
+  setOrRemoveAttribute(element, "service-slug", input.serviceSlug);
+  setOrRemoveAttribute(element, "staff-id", input.staffId);
+  setOrRemoveAttribute(element, "theme", input.themeJson);
+}
+
 export function ShowrunnerBooking({
   apiBase,
   className,
@@ -127,6 +165,14 @@ export function ShowrunnerBooking({
   const resolvedApiBase = apiBase ? trimTrailingSlash(apiBase) : "";
   const resolvedScriptSrc = scriptSrc || `${resolvedApiBase}/embed/v1/booking.js`;
   const themeJson = useMemo(() => (theme ? JSON.stringify(theme) : undefined), [theme]);
+  const initialAttributesRef = useRef({
+    apiBase: resolvedApiBase,
+    publishableKey,
+    serviceId,
+    serviceSlug,
+    staffId,
+    themeJson
+  });
 
   useEffect(() => {
     callbacksRef.current = {
@@ -152,6 +198,7 @@ export function ShowrunnerBooking({
     element.addEventListener("showrunner:availability", handleAvailability);
     element.addEventListener("showrunner:booking-created", handleCreated);
     element.addEventListener("showrunner:error", handleError);
+    applyBookingAttributes(element, initialAttributesRef.current);
     containerRef.current.appendChild(element);
     elementRef.current = element;
 
@@ -169,17 +216,24 @@ export function ShowrunnerBooking({
     const element = elementRef.current;
     if (!element) return;
 
-    setOrRemoveAttribute(element, "publishable-key", publishableKey);
-    setOrRemoveAttribute(element, "api-base", resolvedApiBase);
-    setOrRemoveAttribute(element, "service-id", serviceId);
-    setOrRemoveAttribute(element, "service-slug", serviceSlug);
-    setOrRemoveAttribute(element, "staff-id", staffId);
-    setOrRemoveAttribute(element, "theme", themeJson);
+    applyBookingAttributes(element, {
+      apiBase: resolvedApiBase,
+      publishableKey,
+      serviceId,
+      serviceSlug,
+      staffId,
+      themeJson
+    });
   }, [publishableKey, resolvedApiBase, serviceId, serviceSlug, staffId, themeJson]);
 
   return (
     <>
-      <Script id={scriptId} src={resolvedScriptSrc} strategy={scriptStrategy} />
+      <Script
+        id={scriptId}
+        onError={() => callbacksRef.current.onError?.({ message: `Unable to load Showrunner booking script: ${resolvedScriptSrc}` })}
+        src={resolvedScriptSrc}
+        strategy={scriptStrategy}
+      />
       <div className={className} data-showrunner-booking-wrapper="" id={id} ref={containerRef} style={style} />
     </>
   );

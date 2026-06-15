@@ -6,6 +6,7 @@ export {
   type ShowrunnerBookingProps,
   type ShowrunnerBookingReadyDetail,
   type ShowrunnerBookingResult,
+  type ShowrunnerBookingResource,
   type ShowrunnerBookingService,
   type ShowrunnerBookingSlot,
   type ShowrunnerBookingTheme
