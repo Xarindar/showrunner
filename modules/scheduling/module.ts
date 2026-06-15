@@ -38,6 +38,9 @@ export const manifest = {
     "/bookings/[id]",
     "/api/availability",
     "/bookings/[id]/availability",
+    "/api/public/v1/services",
+    "/api/public/v1/availability",
+    "/api/public/v1/bookings",
     "/api/calendar/feed.ics",
     "/api/calendar/booking.ics"
   ],

@@ -5,7 +5,7 @@ import { upsertPublicClient } from "@/lib/clients/public-client";
 import { queueBookingCreatedEmails } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
-import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
+import { getCurrentSiteId, getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
 import { addMinutesToZonedDay, getZonedDayBounds, getZonedWeekday } from "@/lib/timezone";
 import type { BookingRequest, SchedulingAdapter, Slot, SlotDiagnostic, SlotDiagnosticReason } from "@/lib/scheduling/types";
 
@@ -52,8 +52,8 @@ function sameIds(left: string[], right: string[]) {
 }
 
 export const nativeSchedulingAdapter: SchedulingAdapter = {
-  async listActiveServices() {
-    const siteId = await getCurrentSiteId();
+  async listActiveServices(options?: { siteId?: string }) {
+    const siteId = options?.siteId || (await getCurrentSiteId());
     return prisma.service.findMany({
       where: { siteId, isActive: true },
       include: {
@@ -75,7 +75,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
   async getAvailableSlots(
     serviceId: string,
     date: Date,
-    options?: { resourceId?: string; staffId?: string; excludeBookingId?: string }
+    options?: { resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
   ): Promise<Slot[]> {
     const diagnostics = await nativeSchedulingAdapter.getSlotDiagnostics(serviceId, date, options);
     if (!diagnostics) return [];
@@ -96,9 +96,9 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
   async getSlotDiagnostics(
     serviceId: string,
     date: Date,
-    options?: { resourceId?: string; staffId?: string; excludeBookingId?: string }
+    options?: { resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
   ) {
-    const settings = await getSiteSettings();
+    const settings = options?.siteId ? await getSiteSettingsForSite(options.siteId) : await getSiteSettings();
     const service = await prisma.service.findFirst({
       where: { id: serviceId, siteId: settings.siteId },
       include: {
@@ -379,7 +379,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
   },
 
   async createBooking(input: BookingRequest) {
-    const siteId = await getCurrentSiteId();
+    const siteId = input.siteId || (await getCurrentSiteId());
     const service = await prisma.service.findFirst({
       where: { id: input.serviceId, siteId },
       include: {
@@ -425,6 +425,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     }
 
     const offeredSlots = await nativeSchedulingAdapter.getAvailableSlots(input.serviceId, input.startsAt, {
+      siteId,
       staffId: selectedStaff?.id
     });
     const matchingSlot = offeredSlots.find(

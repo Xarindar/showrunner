@@ -1,0 +1,213 @@
+import "server-only";
+
+import { revalidatePath } from "next/cache";
+import { FormAttachmentTargetType } from "@prisma/client";
+import { z } from "zod";
+import { bookingSelfServicePath } from "@/lib/bookings/self-service";
+import { EmbedRequestError } from "@/lib/embed/gateway";
+import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
+import { getPublicFormAttachments, publicFormAttachmentHref } from "@/lib/forms/attachments";
+import { icsCalendarAdapter } from "@/lib/scheduling/calendar";
+import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
+import type { Slot, SlotDiagnostics } from "@/lib/scheduling/types";
+import { getSiteSettingsForSite } from "@/lib/site";
+import { parseZonedDateKey } from "@/lib/timezone";
+
+const hiddenHoneypotField = "companyWebsite";
+
+const bookingSchema = z.object({
+  serviceId: z.string().min(1, "Choose a service."),
+  staffId: z.string().trim().optional(),
+  resourceIds: z.array(z.string().trim().min(1)).optional(),
+  startsAt: z.string().min(1).refine((value) => !Number.isNaN(new Date(value).getTime()), "Choose a valid appointment time."),
+  customerName: z.string().trim().min(2, "Add your name."),
+  customerEmail: z.email("Add a valid email.").transform((value) => value.trim().toLowerCase()),
+  customerPhone: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+  intakeResponse: z.string().trim().optional(),
+  policyAccepted: z.boolean().optional(),
+  [hiddenHoneypotField]: z.string().trim().optional()
+});
+
+type PublicService = Awaited<ReturnType<typeof nativeSchedulingAdapter.listActiveServices>>[number];
+
+function cleanOptionalString(value: string | null) {
+  const text = value?.trim();
+  return text || null;
+}
+
+export function serializePublicSlot(slot: Slot) {
+  return {
+    startsAt: slot.startsAt.toISOString(),
+    endsAt: slot.endsAt.toISOString(),
+    label: slot.label,
+    resourceIds: slot.resourceIds,
+    resourceNames: slot.resourceNames,
+    staffId: slot.staffId || null,
+    staffName: slot.staffName || null
+  };
+}
+
+export function serializePublicSlotDiagnostics(diagnostics: SlotDiagnostics) {
+  return {
+    serviceId: diagnostics.serviceId,
+    serviceName: diagnostics.serviceName,
+    resourceIds: diagnostics.resourceIds,
+    resourceNames: diagnostics.resourceNames,
+    staffId: diagnostics.staffId || null,
+    staffName: diagnostics.staffName || null,
+    timezone: diagnostics.timezone,
+    ruleCount: diagnostics.ruleCount,
+    slotCount: diagnostics.slotCount,
+    availableCount: diagnostics.availableCount,
+    messages: diagnostics.messages,
+    slots: diagnostics.slots.map((slot) => ({
+      ...serializePublicSlot(slot),
+      available: slot.available,
+      reasons: slot.reasons
+    }))
+  };
+}
+
+export function serializePublicService(service: PublicService) {
+  return {
+    id: service.id,
+    slug: service.slug,
+    name: service.name,
+    description: cleanOptionalString(service.description),
+    durationMinutes: service.durationMinutes,
+    location: cleanOptionalString(service.location),
+    minimumNoticeHours: service.minimumNoticeHours,
+    maxAdvanceDays: service.maxAdvanceDays,
+    slotIntervalMinutes: service.slotIntervalMinutes,
+    intakePrompt: cleanOptionalString(service.intakePrompt),
+    policyText: cleanOptionalString(service.policyText),
+    requirePolicy: service.requirePolicy,
+    requestOnly: service.requestOnly,
+    waitlistEnabled: service.waitlistEnabled,
+    staff: service.staffAssignments.map((assignment) => ({
+      id: assignment.staff.id,
+      name: assignment.staff.name,
+      title: assignment.staff.title || null
+    })),
+    resources: service.resourceAssignments.map((assignment) => ({
+      id: assignment.resource.id,
+      name: assignment.resource.name,
+      type: assignment.resource.type,
+      location: assignment.resource.location || null
+    }))
+  };
+}
+
+export async function listPublicSchedulingServices(siteId: string) {
+  const services = await nativeSchedulingAdapter.listActiveServices({ siteId });
+  return services.map(serializePublicService);
+}
+
+export async function getPublicSchedulingDiagnostics(input: {
+  date: string | null;
+  resourceId?: string;
+  serviceId: string | null;
+  siteId: string;
+  staffId?: string;
+}) {
+  if (!input.serviceId) throw new EmbedRequestError("serviceId is required.", 400);
+  if (!input.date) throw new EmbedRequestError("date is required.", 400);
+
+  const settings = await getSiteSettingsForSite(input.siteId);
+  const day = parseZonedDateKey(input.date, settings.timezone);
+  if (!day) throw new EmbedRequestError("Choose a valid date in YYYY-MM-DD format.", 400);
+
+  const diagnostics = await nativeSchedulingAdapter.getSlotDiagnostics(input.serviceId, day, {
+    resourceId: input.resourceId,
+    siteId: input.siteId,
+    staffId: input.staffId
+  });
+  if (!diagnostics) throw new EmbedRequestError("That service is not available.", 404);
+
+  return serializePublicSlotDiagnostics(diagnostics);
+}
+
+export async function createPublicSchedulingBooking(input: {
+  body: unknown;
+  searchParams?: Record<string, string | undefined>;
+  siteId: string;
+}) {
+  const parsed = bookingSchema.safeParse(input.body);
+  if (!parsed.success) {
+    throw new EmbedRequestError(parsed.error.issues[0]?.message || "Check the booking request.", 400);
+  }
+
+  if (parsed.data[hiddenHoneypotField]) {
+    return { ok: true, booking: null };
+  }
+
+  const booking = await nativeSchedulingAdapter.createBooking({
+    siteId: input.siteId,
+    serviceId: parsed.data.serviceId,
+    staffId: parsed.data.staffId,
+    resourceIds: parsed.data.resourceIds,
+    startsAt: new Date(parsed.data.startsAt),
+    customerName: parsed.data.customerName,
+    customerEmail: parsed.data.customerEmail,
+    customerPhone: parsed.data.customerPhone,
+    notes: parsed.data.notes,
+    intakeResponse: parsed.data.intakeResponse,
+    policyAccepted: parsed.data.policyAccepted === true
+  });
+
+  await emitModuleEvent("booking.created", {
+    ...(await requestAttribution(input.searchParams, "/api/public/v1/bookings")),
+    actorEmail: booking.customerEmail,
+    metadata: {
+      serviceId: booking.serviceId,
+      resourceIds: parsed.data.resourceIds,
+      staffId: booking.staffId,
+      startsAt: booking.startsAt.toISOString(),
+      status: booking.status
+    },
+    relatedId: booking.id,
+    relatedType: "booking",
+    siteId: input.siteId
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/modules/appointments");
+  revalidatePath("/admin/modules/clients");
+  revalidatePath("/admin/modules/scheduling");
+  revalidatePath("/book");
+
+  const formAttachments = await getPublicFormAttachments({
+    siteId: booking.siteId,
+    targetId: booking.id,
+    targetType: FormAttachmentTargetType.BOOKING
+  });
+
+  return {
+    ok: true,
+    booking: {
+      id: booking.id,
+      status: booking.status,
+      serviceId: booking.serviceId,
+      staffId: booking.staffId || null,
+      startsAt: booking.startsAt.toISOString(),
+      endsAt: booking.endsAt.toISOString(),
+      calendarUrl: icsCalendarAdapter.bookingPath({ bookingId: booking.id, siteId: booking.siteId }),
+      manageUrl: bookingSelfServicePath({
+        bookingId: booking.id,
+        customerEmail: booking.customerEmail,
+        siteId: booking.siteId
+      }),
+      formLinks: formAttachments.map((attachment) => ({
+        description: attachment.form.description,
+        href: publicFormAttachmentHref({
+          formSlug: attachment.form.slug,
+          targetId: attachment.targetId,
+          targetType: attachment.targetType
+        }),
+        isRequired: attachment.isRequired,
+        name: attachment.form.name
+      }))
+    }
+  };
+}

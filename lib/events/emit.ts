@@ -38,6 +38,7 @@ export type EmitModuleEventInput = EventAttribution & {
   metadata?: Record<string, unknown>;
   relatedId?: string;
   relatedType?: string;
+  siteId?: string;
   valueCents?: number;
 };
 
@@ -348,7 +349,7 @@ async function queueSubscribedWebhookEndpoints(envelope: EventEnvelope) {
 
 export async function emitModuleEvent(name: ModuleEventName, input: EmitModuleEventInput = {}) {
   const definition = moduleEventCatalog[name];
-  const siteId = await getCurrentSiteId();
+  const siteId = input.siteId || (await getCurrentSiteId());
   const envelope: EventEnvelope = {
     actorEmail: input.actorEmail || "",
     campaign: input.campaign || "",
@@ -386,7 +387,7 @@ export async function emitModuleEvent(name: ModuleEventName, input: EmitModuleEv
 }
 
 export async function emitAnalyticsEvent(input: EmitAnalyticsEventInput) {
-  const siteId = await getCurrentSiteId();
+  const siteId = input.siteId || (await getCurrentSiteId());
   const envelope: EventEnvelope = {
     actorEmail: input.actorEmail || "",
     campaign: input.campaign || "",

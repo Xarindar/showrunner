@@ -1,4 +1,4 @@
-import type { Booking, BookingStatus, Service } from "@prisma/client";
+import type { Booking, BookingStatus, Prisma } from "@prisma/client";
 
 export type Slot = {
   startsAt: Date;
@@ -35,7 +35,19 @@ export type SlotDiagnostics = {
   slots: SlotDiagnostic[];
 };
 
+export type ActiveService = Prisma.ServiceGetPayload<{
+  include: {
+    resourceAssignments: {
+      include: { resource: true };
+    };
+    staffAssignments: {
+      include: { staff: true };
+    };
+  };
+}>;
+
 export type BookingRequest = {
+  siteId?: string;
   serviceId: string;
   staffId?: string;
   resourceIds?: string[];
@@ -65,12 +77,16 @@ export type CalendarFileAdapter = {
 };
 
 export type SchedulingAdapter = {
-  listActiveServices(): Promise<Service[]>;
-  getAvailableSlots(serviceId: string, date: Date, options?: { resourceId?: string; staffId?: string; excludeBookingId?: string }): Promise<Slot[]>;
+  listActiveServices(options?: { siteId?: string }): Promise<ActiveService[]>;
+  getAvailableSlots(
+    serviceId: string,
+    date: Date,
+    options?: { resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
+  ): Promise<Slot[]>;
   getSlotDiagnostics(
     serviceId: string,
     date: Date,
-    options?: { resourceId?: string; staffId?: string; excludeBookingId?: string }
+    options?: { resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
   ): Promise<SlotDiagnostics | null>;
   createBooking(input: BookingRequest): Promise<Booking>;
 };
