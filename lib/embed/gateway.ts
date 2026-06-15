@@ -5,11 +5,12 @@ import type { SiteApiKey } from "@prisma/client";
 import {
   normalizeOrigin,
   normalizeOrigins,
+  isPublicKeyFormatValid,
   resolveActiveSiteApiKey,
   touchSiteApiKeyUsage
 } from "@/lib/embed/keys";
 import { normalizeScopes, type EmbedScope } from "@/lib/embed/scopes";
-import { publicRateLimitForSite } from "@/lib/public-rate-limit";
+import { publicGlobalRateLimitMessage, publicRateLimitForSite } from "@/lib/public-rate-limit";
 import { getSiteSettingsForSite } from "@/lib/site";
 
 export class EmbedRequestError extends Error {
@@ -39,6 +40,11 @@ type AuthorizeOptions = {
   rateLimit?: { limit?: number; windowMinutes?: number };
 };
 
+type ParsedOrigin =
+  | { state: "absent"; origin: null }
+  | { state: "valid"; origin: string }
+  | { state: "invalid"; origin: null };
+
 function readKeyFromRequest(request: NextRequest): string {
   const auth = request.headers.get("authorization") || "";
   if (auth.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
@@ -60,26 +66,59 @@ export function embedCorsHeaders(origin: string | null): Record<string, string> 
 }
 
 export function requestOrigin(request: NextRequest): string | null {
-  return normalizeOrigin(request.headers.get("origin") || "");
+  const parsed = parseRequestOrigin(request);
+  return parsed.state === "valid" ? parsed.origin : null;
+}
+
+export function parseRequestOrigin(request: NextRequest): ParsedOrigin {
+  const rawOrigin = request.headers.get("origin");
+  if (rawOrigin === null) return { state: "absent", origin: null };
+  const origin = normalizeOrigin(rawOrigin);
+  return origin ? { state: "valid", origin } : { state: "invalid", origin: null };
+}
+
+async function enforcePreAuthKeyProtection(request: NextRequest, publicKey: string) {
+  const limited = await publicGlobalRateLimitMessage("embed_api_key_attempt", request.headers, {
+    limit: 60,
+    windowMinutes: 1
+  });
+  if (limited) throw new EmbedRequestError(limited, 429);
+
+  if (!publicKey) throw new EmbedRequestError("Missing API key.", 401);
+  if (!isPublicKeyFormatValid(publicKey)) throw new EmbedRequestError("Invalid API key.", 401);
+}
+
+function enforceOriginBoundary(key: SiteApiKey, parsedOrigin: ParsedOrigin) {
+  if (parsedOrigin.state === "invalid") {
+    throw new EmbedRequestError("Invalid Origin header.", 403);
+  }
+
+  if (parsedOrigin.state === "absent") {
+    if (key.allowServerToServer) return null;
+    throw new EmbedRequestError("Origin header is required for this publishable API key.", 403);
+  }
+
+  const allowedOrigins = normalizeOrigins(key.allowedOrigins);
+  if (!allowedOrigins.length || !allowedOrigins.includes(parsedOrigin.origin)) {
+    throw new EmbedRequestError("Origin not allowed for this API key.", 403);
+  }
+
+  return parsedOrigin.origin;
+}
+
+async function resolveEmbedKeyForRequest(request: NextRequest) {
+  const publicKey = readKeyFromRequest(request);
+  await enforcePreAuthKeyProtection(request, publicKey);
+  const key = await resolveActiveSiteApiKey(publicKey);
+  if (!key) throw new EmbedRequestError("Invalid or revoked API key.", 401);
+  return key;
 }
 
 // Resolve + authorize an embed/public-API request:
 //   key -> site, origin allowlist, optional scope + module-enabled checks, per-site rate limit.
 export async function authorizeEmbedRequest(request: NextRequest, options: AuthorizeOptions = {}): Promise<EmbedContext> {
-  const publicKey = readKeyFromRequest(request);
-  if (!publicKey) throw new EmbedRequestError("Missing API key.", 401);
-
-  const key = await resolveActiveSiteApiKey(publicKey);
-  if (!key) throw new EmbedRequestError("Invalid or revoked API key.", 401);
-
-  const allowedOrigins = normalizeOrigins(key.allowedOrigins);
-  const origin = requestOrigin(request);
-
-  // A browser request always carries Origin; if present it MUST be on the key's allowlist.
-  // Requests without an Origin header (server-to-server) are allowed — the key is the credential.
-  if (origin && (!allowedOrigins.length || !allowedOrigins.includes(origin))) {
-    throw new EmbedRequestError("Origin not allowed for this API key.", 403);
-  }
+  const key = await resolveEmbedKeyForRequest(request);
+  const origin = enforceOriginBoundary(key, parseRequestOrigin(request));
 
   const scopes = normalizeScopes(key.scopes);
   if (options.scope && !scopes.includes(options.scope)) {
@@ -115,8 +154,24 @@ export function embedError(error: unknown, context: { origin: string | null }) {
   return Response.json({ error: message }, { status, headers: embedCorsHeaders(context.origin) });
 }
 
-// CORS preflight is a browser handshake, not a security boundary — the actual request still
-// enforces key + origin allowlist. Reflect the requested origin so the real call can proceed.
-export function handleEmbedPreflight(request: NextRequest) {
-  return new Response(null, { status: 204, headers: embedCorsHeaders(requestOrigin(request)) });
+// CORS preflight is a browser handshake, not a security boundary. If the request supplies a key
+// (for example during diagnostics), enforce the same key + origin boundary without touching usage.
+export async function handleEmbedPreflight(request: NextRequest) {
+  try {
+    const parsedOrigin = parseRequestOrigin(request);
+    const publicKey = readKeyFromRequest(request);
+    if (publicKey) {
+      const key = await resolveEmbedKeyForRequest(request);
+      const origin = enforceOriginBoundary(key, parsedOrigin);
+      return new Response(null, { status: 204, headers: embedCorsHeaders(origin) });
+    }
+
+    if (parsedOrigin.state === "invalid") throw new EmbedRequestError("Invalid Origin header.", 403);
+    return new Response(null, {
+      status: 204,
+      headers: embedCorsHeaders(parsedOrigin.state === "valid" ? parsedOrigin.origin : null)
+    });
+  } catch (error) {
+    return embedError(error, { origin: null });
+  }
 }

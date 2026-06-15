@@ -8,9 +8,14 @@ import { DEFAULT_EMBED_SCOPES, normalizeScopes, type EmbedScope } from "@/lib/em
 // Publishable key prefix — safe to expose in browser embeds (like a Stripe pk_). The real
 // access boundary is the per-key allowedOrigins allowlist enforced by the gateway, not secrecy.
 const PUBLIC_KEY_PREFIX = "pk_live_";
+const PUBLIC_KEY_PATTERN = /^pk_live_[A-Za-z0-9_-]{32}$/;
 
 export function generatePublicKey() {
   return PUBLIC_KEY_PREFIX + crypto.randomBytes(24).toString("base64url");
+}
+
+export function isPublicKeyFormatValid(value: string) {
+  return PUBLIC_KEY_PATTERN.test(value.trim());
 }
 
 // An origin is scheme://host[:port] with no path/query/fragment. We normalize to URL.origin so an
@@ -48,6 +53,7 @@ export type SiteApiKeyView = {
   publicKey: string;
   allowedOrigins: string[];
   scopes: EmbedScope[];
+  allowServerToServer: boolean;
   enabled: boolean;
   lastUsedAt: Date | null;
   revokedAt: Date | null;
@@ -61,6 +67,7 @@ export function toSiteApiKeyView(key: SiteApiKey): SiteApiKeyView {
     publicKey: key.publicKey,
     allowedOrigins: normalizeOrigins(key.allowedOrigins),
     scopes: normalizeScopes(key.scopes),
+    allowServerToServer: key.allowServerToServer,
     enabled: key.enabled && !key.revokedAt,
     lastUsedAt: key.lastUsedAt,
     revokedAt: key.revokedAt,
@@ -80,6 +87,7 @@ export async function createSiteApiKey(input: {
   siteId: string;
   name: string;
   allowedOrigins: string[];
+  allowServerToServer?: boolean;
   scopes?: EmbedScope[];
 }): Promise<SiteApiKeyView> {
   const requestedScopes = input.scopes ? normalizeScopes(input.scopes) : [];
@@ -89,6 +97,7 @@ export async function createSiteApiKey(input: {
       name: input.name.trim().slice(0, 120),
       publicKey: generatePublicKey(),
       allowedOrigins: normalizeOrigins(input.allowedOrigins),
+      allowServerToServer: input.allowServerToServer === true,
       scopes: requestedScopes.length ? requestedScopes : DEFAULT_EMBED_SCOPES
     }
   });
@@ -113,7 +122,7 @@ export async function updateSiteApiKeyOrigins(siteId: string, keyId: string, all
 
 export async function resolveActiveSiteApiKey(publicKey: string) {
   const trimmed = publicKey.trim();
-  if (!trimmed) return null;
+  if (!isPublicKeyFormatValid(trimmed)) return null;
   const key = await prisma.siteApiKey.findUnique({ where: { publicKey: trimmed } });
   if (!key || !key.enabled || key.revokedAt) return null;
   return key;

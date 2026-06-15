@@ -419,8 +419,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           <h2 style={{ fontSize: "1.2rem" }}>Embeds &amp; public API</h2>
           <p>
             Publishable keys let booking, gallery, and storefront widgets call the public API from another website.
-            A key only works from the origins you list below, so the key itself is safe to ship in page source
-            (like a Stripe publishable key). Test a key against <code>/api/public/v1/ping</code>.
+            Browser use only works from the origins you list below, so widget keys are safe to ship in page source
+            (like a Stripe publishable key). Originless backend use must be enabled explicitly. Test a key against <code>/api/public/v1/ping</code>.
           </p>
         </div>
 
@@ -438,12 +438,17 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                       Scopes: {key.scopes.length ? key.scopes.join(", ") : "none"} · Last used:{" "}
                       {key.lastUsedAt ? key.lastUsedAt.toISOString().slice(0, 10) : "never"}
                     </small>
+                    <small style={{ display: "block", color: "var(--muted)" }}>
+                      Server-to-server without Origin: {key.allowServerToServer ? "allowed" : "blocked"}
+                    </small>
                   </div>
                   <div style={{ alignItems: "center", display: "flex", gap: 12, justifyContent: "flex-end" }}>
                     <span className={key.enabled ? "pill success" : "pill warning"}>{key.enabled ? "Active" : "Revoked"}</span>
                     {key.enabled ? (
-                      <form action={revokeSiteApiKeyAction}>
+                      <form action={revokeSiteApiKeyAction} className="field" style={{ margin: 0, maxWidth: 180 }}>
                         <input type="hidden" name="keyId" value={key.id} />
+                        <label htmlFor={`revoke-${key.id}`}>Type REVOKE</label>
+                        <input id={`revoke-${key.id}`} name="confirmRevoke" placeholder="REVOKE" />
                         <button className="button secondary" type="submit">Revoke</button>
                       </form>
                     ) : null}
@@ -480,9 +485,16 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
             <label htmlFor="embedKeyOrigins">Allowed origins (one per line)</label>
             <textarea id="embedKeyOrigins" name="allowedOrigins" rows={3} placeholder="https://clientsite.com" />
             <small style={{ color: "var(--muted)" }}>
-              Leave blank for server-to-server use only; a browser widget needs every site origin it loads on.
+              Browser widgets need every site origin they load on. Originless server calls are blocked unless enabled below.
             </small>
           </div>
+          <label className="module-toggle-row">
+            <input type="checkbox" name="allowServerToServer" />
+            <span className="module-toggle-main">
+              <strong>Allow server-to-server calls without Origin</strong>
+              <small>Use only for deliberate backend integrations; browser widgets should rely on the origin allowlist.</small>
+            </span>
+          </label>
           <div className="module-toggle-grid">
             {EMBED_SCOPES.map((scope) => (
               <label className="module-toggle-row" key={scope}>

@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server";
-import { authorizeEmbedRequest, embedError, embedJson, handleEmbedPreflight, requestOrigin } from "@/lib/embed/gateway";
+import { authorizeEmbedRequest, embedError, embedJson, handleEmbedPreflight } from "@/lib/embed/gateway";
 
 export const dynamic = "force-dynamic";
 
-export function OPTIONS(request: NextRequest) {
+export async function OPTIONS(request: NextRequest) {
   return handleEmbedPreflight(request);
 }
 
@@ -22,6 +22,6 @@ export async function GET(request: NextRequest) {
       context
     );
   } catch (error) {
-    return embedError(error, { origin: requestOrigin(request) });
+    return embedError(error, { origin: null });
   }
 }

@@ -3,14 +3,16 @@ import "server-only";
 import crypto from "node:crypto";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { getCurrentSiteId } from "@/lib/site";
+import { ensureDefaultSite, getCurrentSiteId } from "@/lib/site";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 
 type PublicRateLimitOptions = {
+  identifier?: string;
   limit?: number;
   windowMinutes?: number;
 };
 
-function firstForwardedIp(value: string | null) {
+export function firstForwardedIp(value: string | null) {
   return value?.split(",")[0]?.trim() || "";
 }
 
@@ -20,6 +22,10 @@ function rateLimitKey(scope: string, identifier: string, siteId: string) {
 
 async function publicIdentifier() {
   const headerStore = await headers();
+  return publicIdentifierFromHeaders(headerStore);
+}
+
+export function publicIdentifierFromHeaders(headerStore: Pick<Headers, "get">) {
   return (
     firstForwardedIp(headerStore.get("x-forwarded-for")) ||
     headerStore.get("x-real-ip")?.trim() ||
@@ -34,7 +40,7 @@ async function publicIdentifier() {
 export async function publicRateLimitForSite(siteId: string, scope: string, options: PublicRateLimitOptions = {}) {
   const limit = options.limit ?? 8;
   const windowMinutes = options.windowMinutes ?? 10;
-  const identifier = await publicIdentifier();
+  const identifier = options.identifier || (await publicIdentifier());
   const key = rateLimitKey(scope, identifier, siteId);
   const now = new Date();
   const windowMs = windowMinutes * 60 * 1000;
@@ -75,4 +81,16 @@ export async function publicRateLimitForSite(siteId: string, scope: string, opti
 export async function publicRateLimitMessage(scope: string, options: PublicRateLimitOptions = {}) {
   const siteId = await getCurrentSiteId();
   return publicRateLimitForSite(siteId, scope, options);
+}
+
+export async function publicGlobalRateLimitMessage(
+  scope: string,
+  headerStore: Pick<Headers, "get">,
+  options: Omit<PublicRateLimitOptions, "identifier"> = {}
+) {
+  await ensureDefaultSite();
+  return publicRateLimitForSite(DEFAULT_SITE_ID, `global:${scope}`, {
+    ...options,
+    identifier: publicIdentifierFromHeaders(headerStore)
+  });
 }

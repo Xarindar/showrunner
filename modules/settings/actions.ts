@@ -132,19 +132,21 @@ export async function createSiteApiKeyAction(formData: FormData) {
   const site = await resolveCurrentSite();
   const name = String(formData.get("name") || "").trim();
   const allowedOrigins = parseOriginsInput(String(formData.get("allowedOrigins") || ""));
+  const allowServerToServer = formData.get("allowServerToServer") === "on";
   const scopes = normalizeScopes(formData.getAll("scopes").map(String));
 
   if (!name) {
     redirect(`/admin/modules/settings?error=${encodeURIComponent("Name the embed key so you can recognize it later.")}`);
   }
 
-  const key = await createSiteApiKey({ siteId: site.id, name, allowedOrigins, scopes });
+  const key = await createSiteApiKey({ siteId: site.id, name, allowedOrigins, allowServerToServer, scopes });
 
   await recordAuditLog({
     action: "embed.api_key.created",
     actor: user,
     metadata: {
       allowedOrigins: key.allowedOrigins,
+      allowServerToServer: key.allowServerToServer,
       scopes: key.scopes
     },
     siteId: site.id,
@@ -161,9 +163,14 @@ export async function revokeSiteApiKeyAction(formData: FormData) {
   const user = await requireAdmin("settings:update");
   const site = await resolveCurrentSite();
   const keyId = String(formData.get("keyId") || "").trim();
+  const confirmRevoke = String(formData.get("confirmRevoke") || "").trim();
 
   if (!keyId) {
     redirect(`/admin/modules/settings?error=${encodeURIComponent("Missing embed key to revoke.")}`);
+  }
+
+  if (confirmRevoke !== "REVOKE") {
+    redirect(`/admin/modules/settings?error=${encodeURIComponent("Type REVOKE to confirm API key revocation.")}`);
   }
 
   const result = await revokeSiteApiKey(site.id, keyId);

@@ -181,6 +181,7 @@ model SiteApiKey {
   allowedOrigins Json      @default("[]")
   scopes         Json      @default("[]")
   embedTheme     Json      @default("{}")
+  allowServerToServer Boolean @default(false)
   enabled        Boolean   @default(true)
   lastUsedAt     DateTime?
   revokedAt      DateTime?
