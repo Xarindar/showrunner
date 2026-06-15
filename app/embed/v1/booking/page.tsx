@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import Script from "next/script";
+import { actualEmbeddingOrigin, createIframeEmbedSession } from "@/lib/embed/iframe-session";
 
 type EmbedBookingPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -6,6 +9,7 @@ type EmbedBookingPageProps = {
 
 type EmbedConfig = {
   id: string;
+  initialError?: string;
   parentOrigin: string;
 };
 
@@ -50,31 +54,21 @@ function safeHttpOrigin(value: string) {
   }
 }
 
-function safeApiBase(value: string) {
-  if (!value) return "";
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : "";
-  } catch {
-    return "";
-  }
-}
-
 function escapeAttribute(value: string) {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
-function widgetAttributes(params: Record<string, string | string[] | undefined>) {
+function widgetAttributes(params: Record<string, string | string[] | undefined>, sessionToken: string) {
   const attrs: Record<string, string> = {};
   const publishableKey = firstParam(params, "key", "publishableKey", "publishable-key");
-  const apiBase = safeApiBase(firstParam(params, "apiBase", "api-base"));
   const serviceId = firstParam(params, "serviceId", "service-id");
   const serviceSlug = firstParam(params, "serviceSlug", "service-slug");
   const staffId = firstParam(params, "staffId", "staff-id");
   const theme = firstParam(params, "theme");
 
   if (publishableKey) attrs["publishable-key"] = safeAttributeValue(publishableKey, 120);
-  if (apiBase) attrs["api-base"] = apiBase;
+  if (sessionToken) attrs["iframe-session-token"] = sessionToken;
+  attrs["api-base"] = "/embed/v1/booking/api";
   if (serviceId) attrs["service-id"] = safeAttributeValue(serviceId, 120);
   if (!serviceId && serviceSlug) attrs["service-slug"] = safeAttributeValue(serviceSlug, 160);
   if (staffId) attrs["staff-id"] = safeAttributeValue(staffId, 120);
@@ -164,6 +158,11 @@ function resizeBridgeScript(config: EmbedConfig) {
     post("showrunner:booking:error", event.detail);
     scheduleResize();
   });
+  if (config.initialError) {
+    window.requestAnimationFrame(function () {
+      post("showrunner:booking:error", { message: config.initialError });
+    });
+  }
   if ("ResizeObserver" in window) {
     new ResizeObserver(scheduleResize).observe(document.documentElement);
   } else {
@@ -176,11 +175,27 @@ function resizeBridgeScript(config: EmbedConfig) {
 
 export default async function EmbedBookingPage({ searchParams }: EmbedBookingPageProps) {
   const params = searchParams ? await searchParams : {};
-  const attrs = widgetAttributes(params);
+  const requestHeaders = await headers();
+  const parentOrigin = safeHttpOrigin(firstParam(params, "parentOrigin", "parent-origin"));
+  const embeddingOrigin = actualEmbeddingOrigin({
+    parentOrigin,
+    referer: requestHeaders.get("referer") || ""
+  });
   const config: EmbedConfig = {
     id: safeAttributeValue(firstParam(params, "id", "embedId", "embed-id"), 120),
-    parentOrigin: safeHttpOrigin(firstParam(params, "parentOrigin", "parent-origin"))
+    parentOrigin: embeddingOrigin || parentOrigin
   };
+  let attrs: Record<string, string> = {};
+  try {
+    if (!embeddingOrigin) throw new Error("Embedding origin could not be verified.");
+    const sessionToken = await createIframeEmbedSession({
+      embeddingOrigin,
+      publicKey: firstParam(params, "key", "publishableKey", "publishable-key")
+    });
+    attrs = widgetAttributes(params, sessionToken);
+  } catch {
+    config.initialError = "This booking embed is not authorized for this page.";
+  }
 
   return (
     <main className="embed-booking-page">
@@ -191,13 +206,21 @@ export default async function EmbedBookingPage({ searchParams }: EmbedBookingPag
             body{background:#fff;}
             .embed-booking-page{background:#fff;color:#111827;margin:0;min-height:0;padding:0;}
             .embed-booking-shell{margin:0 auto;max-width:720px;padding:0;}
+            .embed-booking-error{box-sizing:border-box;color:#991b1b;font:14px/1.4 system-ui,sans-serif;padding:12px;}
             showrunner-booking{display:block;width:100%;}
           `
         }}
       />
-      <div className="embed-booking-shell" dangerouslySetInnerHTML={{ __html: widgetMarkup(attrs) }} />
-      <script src="/embed/v1/booking.js" async />
-      <script dangerouslySetInnerHTML={{ __html: resizeBridgeScript(config) }} />
+      <Script id="showrunner-booking-iframe-bridge" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: resizeBridgeScript(config) }} />
+      <div
+        className="embed-booking-shell"
+        dangerouslySetInnerHTML={{
+          __html: config.initialError
+            ? `<div class="embed-booking-error" role="alert">${escapeAttribute(config.initialError)}</div>`
+            : widgetMarkup(attrs)
+        }}
+      />
+      {config.initialError ? null : <Script src="/embed/v1/booking.js" strategy="afterInteractive" />}
     </main>
   );
 }

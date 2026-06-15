@@ -141,7 +141,8 @@ const bookingWidgetSource = String.raw`
         "border-color",
         "muted-color",
         "text-color",
-        "radius"
+        "radius",
+        "iframe-session-token"
       ];
     }
 
@@ -182,6 +183,10 @@ const bookingWidgetSource = String.raw`
       return this.getAttribute("publishable-key") || this.getAttribute("key") || "";
     }
 
+    iframeSessionToken() {
+      return this.getAttribute("iframe-session-token") || "";
+    }
+
     serviceDefault() {
       return this.getAttribute("service-id") || this.getAttribute("service-slug") || "";
     }
@@ -211,6 +216,8 @@ const bookingWidgetSource = String.raw`
         Accept: "application/json",
         "X-Showrunner-Key": this.publishableKey()
       };
+      var iframeSessionToken = this.iframeSessionToken();
+      if (iframeSessionToken) headers["X-Showrunner-Iframe-Session"] = iframeSessionToken;
       if (options && options.body) headers["Content-Type"] = "application/json";
       var response = await fetch(this.apiBase() + path, Object.assign({ headers: headers }, options || {}));
       var payload = await response.json().catch(function () {
