@@ -14,8 +14,8 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Public forms, builder CRUD, template cloning, submission storage, client/inquiry linking, honeypot, and rate limits are live.",
-    primaryGap: "File uploads, conditional logic, field versioning, exports, and booking/order/gallery attachments are pending."
+    summary: "Public forms, builder CRUD, template cloning, submission storage, client/inquiry linking, honeypot, rate limits, and lead-form embeds are live.",
+    primaryGap: "Field versioning and richer conditional workflows are pending."
   },
   capabilities: [
     { label: "Public form route", status: "live" },
@@ -24,8 +24,9 @@ export const manifest = {
     { label: "Booking, order, and gallery attachments", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/forms"],
-  publicRoutes: ["/forms/[slug]"],
+  publicRoutes: ["/forms/[slug]", "/api/public/v1/forms/[slug]", "/api/public/v1/forms/[slug]/submissions"],
   dependencies: ["clients", "communications"],
+  widgetRoutes: ["/embed/v1/form.js"],
   dataModels: ["Form", "FormField", "FormSubmission", "PublicRateLimit"],
   permissions: ["forms:manage", "forms:export"],
   settingsSections: ["Forms", "Notifications"],

@@ -13,8 +13,8 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Catalog admin, public storefront/cart, order creation, hosted checkout handoff records, and abandoned-cart recovery are live.",
-    primaryGap: "Automatic Stripe session creation, payment webhooks, shipping/tax, refunds, and fulfillment exports are pending."
+    summary: "Catalog admin, public storefront/cart, order creation, hosted checkout handoff records, buy-button embed API, and abandoned-cart recovery are live.",
+    primaryGap: "Refunds and fulfillment exports are pending."
   },
   capabilities: [
     { label: "Catalog admin", status: "foundation" },
@@ -24,8 +24,8 @@ export const manifest = {
     { label: "Order dashboard", status: "foundation" }
   ],
   adminRoutes: ["/admin/modules/products"],
-  publicRoutes: ["/shop", "/shop/[slug]", "/cart"],
-  widgetRoutes: [],
+  publicRoutes: ["/shop", "/shop/[slug]", "/cart", "/api/public/v1/products", "/api/public/v1/checkout"],
+  widgetRoutes: ["/embed/v1/buy-button.js"],
   dependencies: ["media", "billing"],
   dataModels: ["Product", "ProductVariant", "Collection", "Coupon", "Cart", "Order", "Payment"],
   permissions: ["products:manage"],

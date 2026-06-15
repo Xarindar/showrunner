@@ -384,8 +384,9 @@ export async function addCartItem(input: {
   productId: string;
   variantId?: string;
   quantity: number;
+  siteId?: string;
 }) {
-  const siteId = await getCurrentSiteId();
+  const siteId = input.siteId || (await getCurrentSiteId());
   return prisma.$transaction(async (tx) => {
     let quantity = Math.min(Math.max(1, input.quantity), maxCartQuantity);
     const resolved = await resolvePurchasableVariant(tx, {
@@ -602,8 +603,8 @@ async function findOrCreateOrderClient(
   return client.id;
 }
 
-export async function createCheckoutOrderFromCart(input: { cartId: string; customerName: string; customerEmail: string }) {
-  const siteId = await getCurrentSiteId();
+export async function createCheckoutOrderFromCart(input: { cartId: string; customerName: string; customerEmail: string; siteId?: string }) {
+  const siteId = input.siteId || (await getCurrentSiteId());
   const result = await prisma.$transaction(async (tx) => {
     const customerEmail = input.customerEmail.trim().toLowerCase();
     const claimedCart = await tx.cart.updateMany({

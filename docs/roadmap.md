@@ -306,8 +306,8 @@ Authoritative current state. `§` = Architecture-Roadmap section number; `—` =
 | 1b | Embed/API — public scheduling API (E2) | ✅ CONFIRMED | VALIDATOR confirmed `813d35c`: public availability now exposes only available/bookable public slot fields with no native messages, unavailable slots, availability flags, or reason strings; expected native booking validation/conflict failures map to public `EmbedRequestError` statuses while unexpected exceptions return generic 500 bodies; and honeypot JSON is parsed/discarded before the `booking_submission` limiter. Static checks green: `prisma validate`, `prisma generate`, `tsc --noEmit`, touched-file `eslint`, `git diff --check`. | 06-15-26 |
 | 1b | Embed/API — booking Web Component (E3) | ✅ CONFIRMED | VALIDATOR confirmed `9c5057e`: slot identity keys on start time + staff + resources, the widget submits the selected slot's staff/resource identity so "Any available staff" can book staff-assigned services, duplicate same-time staff slots remain distinct, and `showrunner:error` fires for missing-key, services-load, availability-load, policy, and submit failures. Static/runtime checks green: `prisma validate`, `prisma generate`, `tsc --noEmit`, touched-file `eslint`, route import + `vm.Script`, DOM-shim smoke, `git diff --check`. | 06-15-26 |
 | 1b | Embed/API — iframe embed fallback (E4) | ✅ CONFIRMED | VALIDATOR confirmed `6befa71`: iframe loads verify the embedding origin from `Referer` against the publishable key allowlist before minting a short-lived signed iframe session, widget calls are forced through a same-origin iframe proxy that verifies active key/revocation and current allowlist before reusing the E2 scheduling helpers, and the resize/status bridge loads before the widget script so initial `showrunner:ready` cannot race the listeners. Static/runtime checks green. | 06-15-26 |
-| 1b | Embed/API — Next.js embed package (E5) | 🛠 RESOLVED | PATCHER resolved the E5 audit findings: required custom-element attrs are applied before `<showrunner-booking>` connects, script load failures surface through typed `onError`, and the typed ready service payload now includes the public service/resource fields emitted by E2/E3. Awaiting validator confirmation. | 06-15-26 |
-| 1b | Embed/API — generalize to commerce/galleries/forms (E6) | ⬜ PENDING | reuse gateway + embed runtime for buy-button (hosted checkout, SAQ-A), galleries, lead forms | 06-14-26 |
+| 1b | Embed/API — Next.js embed package (E5) | ✅ CONFIRMED | VALIDATOR confirmed `1d54119`: required custom-element attrs are applied before `<showrunner-booking>` connects, script load failures surface through typed `onError`, and the typed ready service payload includes the public service/resource fields emitted by E2/E3. Static checks green: `prisma validate`, `prisma generate`, `tsc --noEmit`, focused `eslint`, source contract smoke, `git diff --check`. | 06-15-26 |
+| 1b | Embed/API — generalize to commerce/galleries/forms (E6) | 🔵 READY-FOR-AUDIT | commerce buy-button checkout, gallery read/embed, and form definition/submission APIs now reuse the confirmed gateway + existing module helpers; widgets served from `/embed/v1/*.js` | 06-15-26 |
 
 ### Cross-Cutting Email Controller Audit Log
 
@@ -578,6 +578,26 @@ This is the §1 "embed layer" + "public API layer" turned into a tracked build. 
   > Verification: `npx prisma validate`, `npx prisma generate`, `npx tsc --noEmit --pretty false`, focused `npx eslint components/embed/booking.tsx components/embed/index.ts --max-warnings=0`, and `git diff --check` pass. No schema changes.
   >
   > **Status: `READY-FOR-CONFIRM`**
+
+  > **✅ VALIDATOR · showrunner-validator [06-15-26]:** Confirmed E5 fixes from PATCHER commit `1d54119` in code.
+  > - 🟠 Pre-connect attribute ordering is fixed: the mount effect creates `<showrunner-booking>`, registers listeners, calls `applyBookingAttributes(element, initialAttributesRef.current)`, and only then appends the element, so an already-registered Web Component cannot run `connectedCallback()` with missing key/API/default/theme attrs.
+  > - 🟡 Script-load failures are surfaced: the `next/script` loader now wires `onError` to the typed `onError` callback with the failing `scriptSrc`, covering blocked/404 script loads where the custom element never upgrades.
+  > - 🟡 Ready service typing is aligned: `ShowrunnerBookingService` now includes the confirmed E2/E3 public service payload fields, including description/location, duration/notice/advance/interval, intake/policy, request/waitlist flags, staff, and exported `ShowrunnerBookingResource`.
+  >
+  > Verification: `npx prisma validate`, `npx prisma generate`, `npx tsc --noEmit --pretty false`, `npx eslint components/embed/booking.tsx components/embed/index.ts --max-warnings=0`, a source contract smoke for pre-connect attr order, script `onError`, service/resource fields, and `git diff --check` all pass. Working tree was clean before validation; only this roadmap confirmation block/status was edited.
+  >
+  > **Status: `CONFIRMED`**
+
+  > **🛠 ENGINEER · showrunner-engineer [06-15-26 01:55 CDT]:** READY-FOR-AUDIT for **E6 generalize embed/public API to commerce, galleries, and forms**.
+  > - Added commerce public API endpoints `GET /api/public/v1/products` and `POST /api/public/v1/checkout` behind the confirmed E1 gateway with `commerce:read/write` scopes and the `products` module gate. The write path uses existing cart/order/payment helpers for a one-product buy-button checkout and hands off to hosted provider checkout, preserving SAQ-A (no raw card collection in the embed).
+  > - Added gallery public API endpoints `GET /api/public/v1/galleries` and `GET /api/public/v1/galleries/[slug]` behind `galleries:read` and the `portfolio` module gate. Private galleries still require an active gallery access token, and returned item URLs point at the existing gated `/galleries/[slug]/media/[itemId]` delivery route rather than bypassing media checks.
+  > - Added form public API endpoints `GET /api/public/v1/forms/[slug]` and `POST /api/public/v1/forms/[slug]/submissions` behind `forms:write` and the `forms` module gate. Submission preserves honeypot-before-quota behavior, public rate limits, field validation, conditional visibility, signatures, private file upload validation/cleanup, attachment context checks, client lead linking, notifications, analytics, and `form.submitted` events through existing module primitives.
+  > - Generalized the embed runtime route to serve `buy-button.js`, `gallery.js`, and `form.js` alongside the confirmed `booking.js`. The new custom elements call only the new versioned public API surfaces and do not implement separate checkout, media, or form persistence engines.
+  > - Updated products, portfolio, and forms manifests to declare the new API/widget routes.
+  >
+  > Verification: `npx prisma validate`, `npx prisma generate`, `npx tsc --noEmit --pretty false`, focused `npx eslint` on all touched E6 files, `git diff --check`, and direct route-import + `vm.Script` parse smoke for `/embed/v1/booking.js`, `/embed/v1/buy-button.js`, `/embed/v1/gallery.js`, and `/embed/v1/form.js` all pass. No schema changes.
+  >
+  > **Status: `READY-FOR-AUDIT`**
 
 ### 2. Scheduling Module
 

@@ -479,13 +479,392 @@ const bookingWidgetSource = String.raw`
 })();
 `;
 
+const buyButtonWidgetSource = String.raw`
+(function () {
+  "use strict";
+  if (window.customElements && window.customElements.get("showrunner-buy-button")) return;
+
+  var scriptOrigin = (function () {
+    try {
+      var script = document.currentScript;
+      return script && script.src ? new URL(script.src, window.location.href).origin : window.location.origin;
+    } catch (_error) {
+      return window.location.origin;
+    }
+  })();
+
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (character) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character];
+    });
+  }
+
+  function normalizeApiBase(value) {
+    return String(value || scriptOrigin).replace(/\/+$/, "");
+  }
+
+  function css() {
+    return [
+      ":host{display:block;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}",
+      ".sr-card{--sr-accent:#0f766e;--sr-border:#d5d9df;--sr-muted:#64748b;--sr-text:#111827;background:#fff;border:1px solid var(--sr-border);border-radius:8px;color:var(--sr-text);box-sizing:border-box;display:grid;gap:12px;max-width:420px;padding:16px;}",
+      ".sr-row{display:grid;gap:6px}.sr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{font-size:.82rem;font-weight:650}input{border:1px solid var(--sr-border);border-radius:6px;box-sizing:border-box;font:inherit;min-height:40px;padding:8px 10px;width:100%;}",
+      "button{background:var(--sr-accent);border:0;border-radius:6px;color:#fff;cursor:pointer;font:inherit;font-weight:700;min-height:42px;padding:9px 12px;}button:disabled{cursor:not-allowed;opacity:.6}.sr-error{background:#fef2f2;border-radius:6px;color:#991b1b;padding:10px}.sr-note{color:var(--sr-muted);font-size:.9rem}"
+    ].join("");
+  }
+
+  class ShowrunnerBuyButton extends HTMLElement {
+    static get observedAttributes() {
+      return ["publishable-key", "key", "api-base", "product-id", "product-slug", "variant-id", "quantity", "label"];
+    }
+
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" });
+      this.error = "";
+      this.loading = false;
+    }
+
+    connectedCallback() {
+      this.render();
+    }
+
+    attributeChangedCallback() {
+      if (this.shadowRoot) this.render();
+    }
+
+    apiBase() {
+      return normalizeApiBase(this.getAttribute("api-base"));
+    }
+
+    publishableKey() {
+      return this.getAttribute("publishable-key") || this.getAttribute("key") || "";
+    }
+
+    dispatch(name, detail) {
+      this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail: detail || {} }));
+    }
+
+    async submit(event) {
+      event.preventDefault();
+      if (this.loading) return;
+      if (!this.publishableKey()) {
+        this.error = "Missing publishable key.";
+        this.dispatch("showrunner:error", { message: this.error });
+        this.render();
+        return;
+      }
+      var form = event.currentTarget;
+      var body = {
+        customerEmail: form.customerEmail.value,
+        customerName: form.customerName.value,
+        productId: this.getAttribute("product-id") || undefined,
+        productSlug: this.getAttribute("product-slug") || undefined,
+        quantity: Number(this.getAttribute("quantity") || "1"),
+        variantId: this.getAttribute("variant-id") || undefined
+      };
+      this.loading = true;
+      this.error = "";
+      this.render();
+      try {
+        var response = await fetch(this.apiBase() + "/api/public/v1/checkout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Showrunner-Key": this.publishableKey()
+          },
+          body: JSON.stringify(body)
+        });
+        var payload = await response.json().catch(function () { return {}; });
+        if (!response.ok) throw new Error(payload.error || "Checkout failed.");
+        var checkout = payload.data && payload.data.checkout ? payload.data.checkout : {};
+        this.dispatch("showrunner:checkout-created", { checkout: checkout });
+        if (checkout.checkoutUrl) {
+          window.location.assign(checkout.checkoutUrl);
+        } else {
+          this.error = "Order complete.";
+        }
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : "Checkout failed.";
+        this.dispatch("showrunner:error", { message: this.error });
+      } finally {
+        this.loading = false;
+        this.render();
+      }
+    }
+
+    render() {
+      this.shadowRoot.innerHTML = "<style>" + css() + "</style><form class='sr-card'>" +
+        (this.error ? "<div class='sr-error'>" + escapeHtml(this.error) + "</div>" : "") +
+        "<div class='sr-grid'><div class='sr-row'><label for='sr-name'>Name</label><input id='sr-name' name='customerName' autocomplete='name' required minlength='2'></div>" +
+        "<div class='sr-row'><label for='sr-email'>Email</label><input id='sr-email' name='customerEmail' type='email' autocomplete='email' required></div></div>" +
+        "<button type='submit'" + (this.loading ? " disabled" : "") + ">" + escapeHtml(this.loading ? "Preparing checkout..." : this.getAttribute("label") || "Buy now") + "</button>" +
+        "<div class='sr-note'>Secure hosted checkout. Card details are collected by the payment provider.</div>" +
+      "</form>";
+      this.shadowRoot.querySelector("form").addEventListener("submit", this.submit.bind(this));
+    }
+  }
+
+  window.customElements.define("showrunner-buy-button", ShowrunnerBuyButton);
+})();
+`;
+
+const galleryWidgetSource = String.raw`
+(function () {
+  "use strict";
+  if (window.customElements && window.customElements.get("showrunner-gallery")) return;
+  var scriptOrigin = (function () {
+    try {
+      var script = document.currentScript;
+      return script && script.src ? new URL(script.src, window.location.href).origin : window.location.origin;
+    } catch (_error) {
+      return window.location.origin;
+    }
+  })();
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (character) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character];
+    });
+  }
+  function normalizeApiBase(value) {
+    return String(value || scriptOrigin).replace(/\/+$/, "");
+  }
+  function css() {
+    return [
+      ":host{display:block;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}",
+      ".sr-gallery{--sr-border:#d5d9df;--sr-muted:#64748b;--sr-text:#111827;color:var(--sr-text);display:grid;gap:12px}.sr-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}.sr-item{background:#f8fafc;border:1px solid var(--sr-border);border-radius:8px;overflow:hidden}.sr-item img{aspect-ratio:4/3;display:block;object-fit:cover;width:100%;}.sr-body{padding:10px}.sr-title{font-weight:700;margin:0}.sr-caption{color:var(--sr-muted);font-size:.9rem;margin:4px 0 0}.sr-error,.sr-empty{border-radius:6px;padding:10px}.sr-error{background:#fef2f2;color:#991b1b}.sr-empty{background:#f8fafc;color:var(--sr-muted)}"
+    ].join("");
+  }
+  class ShowrunnerGallery extends HTMLElement {
+    static get observedAttributes() {
+      return ["publishable-key", "key", "api-base", "slug", "access-token"];
+    }
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" });
+      this.gallery = null;
+      this.error = "";
+      this.loading = false;
+    }
+    connectedCallback() {
+      this.render();
+      this.load();
+    }
+    attributeChangedCallback(oldName, oldValue, newValue) {
+      if (oldValue !== newValue && this.isConnected) this.load();
+    }
+    apiBase() {
+      return normalizeApiBase(this.getAttribute("api-base"));
+    }
+    publishableKey() {
+      return this.getAttribute("publishable-key") || this.getAttribute("key") || "";
+    }
+    dispatch(name, detail) {
+      this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail: detail || {} }));
+    }
+    async load() {
+      var slug = this.getAttribute("slug") || "";
+      if (!this.publishableKey() || !slug) {
+        this.error = "Missing gallery configuration.";
+        this.render();
+        return;
+      }
+      this.loading = true;
+      this.error = "";
+      this.render();
+      try {
+        var params = new URLSearchParams();
+        var accessToken = this.getAttribute("access-token") || "";
+        if (accessToken) params.set("access", accessToken);
+        var response = await fetch(this.apiBase() + "/api/public/v1/galleries/" + encodeURIComponent(slug) + (params.toString() ? "?" + params.toString() : ""), {
+          headers: { "X-Showrunner-Key": this.publishableKey() }
+        });
+        var payload = await response.json().catch(function () { return {}; });
+        if (!response.ok) throw new Error(payload.error || "Gallery failed to load.");
+        this.gallery = payload.data && payload.data.gallery ? payload.data.gallery : null;
+        this.dispatch("showrunner:gallery-ready", { gallery: this.gallery });
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : "Gallery failed to load.";
+        this.dispatch("showrunner:error", { message: this.error });
+      } finally {
+        this.loading = false;
+        this.render();
+      }
+    }
+    render() {
+      var items = this.gallery && Array.isArray(this.gallery.items) ? this.gallery.items : [];
+      this.shadowRoot.innerHTML = "<style>" + css() + "</style><div class='sr-gallery'>" +
+        (this.error ? "<div class='sr-error'>" + escapeHtml(this.error) + "</div>" : "") +
+        (this.loading ? "<div class='sr-empty'>Loading gallery...</div>" : "") +
+        (!this.loading && this.gallery ? "<div><h2 class='sr-title'>" + escapeHtml(this.gallery.title) + "</h2>" + (this.gallery.description ? "<p class='sr-caption'>" + escapeHtml(this.gallery.description) + "</p>" : "") + "</div>" : "") +
+        (!this.loading && this.gallery && items.length ? "<div class='sr-grid'>" + items.map(function (item) {
+          return "<article class='sr-item'><img src='" + escapeHtml(item.imageUrl || "") + "' alt='" + escapeHtml(item.altText || item.title || item.caption || "Gallery image") + "' loading='lazy'><div class='sr-body'>" +
+            (item.title ? "<p class='sr-title'>" + escapeHtml(item.title) + "</p>" : "") +
+            (item.caption ? "<p class='sr-caption'>" + escapeHtml(item.caption) + "</p>" : "") +
+          "</div></article>";
+        }).join("") + "</div>" : "") +
+        (!this.loading && this.gallery && !items.length ? "<div class='sr-empty'>No gallery images are available.</div>" : "") +
+      "</div>";
+    }
+  }
+  window.customElements.define("showrunner-gallery", ShowrunnerGallery);
+})();
+`;
+
+const formWidgetSource = String.raw`
+(function () {
+  "use strict";
+  if (window.customElements && window.customElements.get("showrunner-form")) return;
+  var scriptOrigin = (function () {
+    try {
+      var script = document.currentScript;
+      return script && script.src ? new URL(script.src, window.location.href).origin : window.location.origin;
+    } catch (_error) {
+      return window.location.origin;
+    }
+  })();
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (character) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character];
+    });
+  }
+  function normalizeApiBase(value) {
+    return String(value || scriptOrigin).replace(/\/+$/, "");
+  }
+  function css() {
+    return [
+      ":host{display:block;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}",
+      ".sr-form{--sr-accent:#0f766e;--sr-border:#d5d9df;--sr-muted:#64748b;--sr-text:#111827;background:#fff;border:1px solid var(--sr-border);border-radius:8px;color:var(--sr-text);display:grid;gap:12px;max-width:680px;padding:16px}.sr-field{display:grid;gap:6px}label{font-size:.82rem;font-weight:650}input,select,textarea{border:1px solid var(--sr-border);border-radius:6px;box-sizing:border-box;font:inherit;min-height:40px;padding:8px 10px;width:100%;}textarea{min-height:90px}.sr-error,.sr-success,.sr-empty{border-radius:6px;padding:10px}.sr-error{background:#fef2f2;color:#991b1b}.sr-success{background:#ecfdf5;color:#065f46}.sr-empty{background:#f8fafc;color:var(--sr-muted)}button{background:var(--sr-accent);border:0;border-radius:6px;color:#fff;cursor:pointer;font:inherit;font-weight:700;min-height:42px;padding:9px 12px}.sr-honeypot{height:0;left:-10000px;opacity:0;overflow:hidden;position:absolute;width:0}"
+    ].join("");
+  }
+  function fieldHtml(field) {
+    var required = field.isRequired ? " required" : "";
+    var label = "<label for='" + escapeHtml(field.inputName) + "'>" + escapeHtml(field.label) + (field.isRequired ? " *" : "") + "</label>";
+    if (field.type === "TEXTAREA") return "<div class='sr-field'>" + label + "<textarea id='" + escapeHtml(field.inputName) + "' name='" + escapeHtml(field.inputName) + "'" + required + "></textarea></div>";
+    if (field.type === "SELECT") return "<div class='sr-field'>" + label + "<select id='" + escapeHtml(field.inputName) + "' name='" + escapeHtml(field.inputName) + "'" + required + "><option value=''>Select one</option>" + (field.options || []).map(function (option) { return "<option value='" + escapeHtml(option) + "'>" + escapeHtml(option) + "</option>"; }).join("") + "</select></div>";
+    if (field.type === "CHECKBOX") return "<div class='sr-field'><label><input name='" + escapeHtml(field.inputName) + "' type='checkbox'" + required + "> " + escapeHtml(field.label) + "</label></div>";
+    if (field.type === "RADIO") return "<fieldset class='sr-field'><legend>" + escapeHtml(field.label) + (field.isRequired ? " *" : "") + "</legend>" + (field.options || []).map(function (option) { return "<label><input name='" + escapeHtml(field.inputName) + "' type='radio' value='" + escapeHtml(option) + "'" + required + "> " + escapeHtml(option) + "</label>"; }).join("") + "</fieldset>";
+    if (field.type === "FILE") return "<div class='sr-field'>" + label + "<input id='" + escapeHtml(field.inputName) + "' name='" + escapeHtml(field.inputName) + "' type='file'" + required + "></div>";
+    if (field.type === "HIDDEN") return "<input name='" + escapeHtml(field.inputName) + "' type='hidden' value='" + escapeHtml(field.placeholder || "") + "'>";
+    var type = field.type === "EMAIL" ? "email" : field.type === "PHONE" ? "tel" : field.type === "DATE" ? "date" : "text";
+    return "<div class='sr-field'>" + label + "<input id='" + escapeHtml(field.inputName) + "' name='" + escapeHtml(field.inputName) + "' type='" + type + "' placeholder='" + escapeHtml(field.placeholder || "") + "'" + required + "></div>";
+  }
+  class ShowrunnerForm extends HTMLElement {
+    static get observedAttributes() {
+      return ["publishable-key", "key", "api-base", "slug", "attachment-target-type", "attachment-target-id"];
+    }
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" });
+      this.form = null;
+      this.error = "";
+      this.success = "";
+      this.loading = false;
+      this.submitting = false;
+    }
+    connectedCallback() {
+      this.render();
+      this.load();
+    }
+    attributeChangedCallback(oldName, oldValue, newValue) {
+      if (oldValue !== newValue && this.isConnected) this.load();
+    }
+    apiBase() {
+      return normalizeApiBase(this.getAttribute("api-base"));
+    }
+    publishableKey() {
+      return this.getAttribute("publishable-key") || this.getAttribute("key") || "";
+    }
+    dispatch(name, detail) {
+      this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail: detail || {} }));
+    }
+    async load() {
+      var slug = this.getAttribute("slug") || "";
+      if (!this.publishableKey() || !slug) {
+        this.error = "Missing form configuration.";
+        this.render();
+        return;
+      }
+      this.loading = true;
+      this.error = "";
+      this.render();
+      try {
+        var response = await fetch(this.apiBase() + "/api/public/v1/forms/" + encodeURIComponent(slug), {
+          headers: { "X-Showrunner-Key": this.publishableKey() }
+        });
+        var payload = await response.json().catch(function () { return {}; });
+        if (!response.ok) throw new Error(payload.error || "Form failed to load.");
+        this.form = payload.data && payload.data.form ? payload.data.form : null;
+        this.dispatch("showrunner:form-ready", { form: this.form });
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : "Form failed to load.";
+        this.dispatch("showrunner:error", { message: this.error });
+      } finally {
+        this.loading = false;
+        this.render();
+      }
+    }
+    async submit(event) {
+      event.preventDefault();
+      if (!this.form || this.submitting) return;
+      this.submitting = true;
+      this.error = "";
+      this.success = "";
+      this.render();
+      try {
+        var htmlForm = event.currentTarget;
+        var body = new FormData(htmlForm);
+        var targetType = this.getAttribute("attachment-target-type") || "";
+        var targetId = this.getAttribute("attachment-target-id") || "";
+        if (targetType) body.set("attachmentTargetType", targetType);
+        if (targetId) body.set("attachmentTargetId", targetId);
+        var response = await fetch(this.apiBase() + "/api/public/v1/forms/" + encodeURIComponent(this.form.slug) + "/submissions", {
+          method: "POST",
+          headers: { "X-Showrunner-Key": this.publishableKey() },
+          body: body
+        });
+        var payload = await response.json().catch(function () { return {}; });
+        if (!response.ok) throw new Error(payload.error || "Submission failed.");
+        this.success = payload.data && payload.data.successMessage ? payload.data.successMessage : "Thanks. Your form was submitted.";
+        this.dispatch("showrunner:form-submitted", payload.data || {});
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : "Submission failed.";
+        this.dispatch("showrunner:error", { message: this.error });
+      } finally {
+        this.submitting = false;
+        this.render();
+      }
+    }
+    render() {
+      var fields = this.form && Array.isArray(this.form.fields) ? this.form.fields : [];
+      this.shadowRoot.innerHTML = "<style>" + css() + "</style><form class='sr-form' enctype='multipart/form-data'>" +
+        (this.form ? "<div><h2>" + escapeHtml(this.form.name) + "</h2>" + (this.form.description ? "<p>" + escapeHtml(this.form.description) + "</p>" : "") + "</div>" : "") +
+        (this.error ? "<div class='sr-error'>" + escapeHtml(this.error) + "</div>" : "") +
+        (this.success ? "<div class='sr-success'>" + escapeHtml(this.success) + "</div>" : "") +
+        (this.loading ? "<div class='sr-empty'>Loading form...</div>" : "") +
+        (!this.loading && this.form && !this.success ? fields.map(fieldHtml).join("") + "<div class='sr-honeypot'><label>Company website <input name='companyWebsite' tabindex='-1' autocomplete='off'></label></div><button type='submit'" + (this.submitting ? " disabled" : "") + ">" + escapeHtml(this.submitting ? "Submitting..." : this.form.submitButtonLabel || "Submit") + "</button>" : "") +
+      "</form>";
+      var form = this.shadowRoot.querySelector("form");
+      if (form && this.form && !this.success) form.addEventListener("submit", this.submit.bind(this));
+    }
+  }
+  window.customElements.define("showrunner-form", ShowrunnerForm);
+})();
+`;
+
 export const dynamic = "force-static";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ asset: string }> }) {
   const { asset } = await params;
-  if (asset !== "booking.js") return new Response("Not found", { status: 404 });
+  const sources: Record<string, string> = {
+    "booking.js": bookingWidgetSource,
+    "buy-button.js": buyButtonWidgetSource,
+    "form.js": formWidgetSource,
+    "gallery.js": galleryWidgetSource
+  };
+  const source = sources[asset];
+  if (!source) return new Response("Not found", { status: 404 });
 
-  return new Response(bookingWidgetSource, {
+  return new Response(source, {
     headers: {
       "Cache-Control": "public, max-age=300, stale-while-revalidate=86400",
       "Content-Type": "application/javascript; charset=utf-8",
