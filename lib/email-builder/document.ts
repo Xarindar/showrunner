@@ -12,6 +12,7 @@ const optionalColorSchema = z
   .string()
   .trim()
   .regex(/^#[0-9a-fA-F]{6}$/)
+  .catch("#ffffff")
   .optional()
   .default("#ffffff");
 const fontFamilySchema = z

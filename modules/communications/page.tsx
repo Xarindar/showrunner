@@ -9,7 +9,7 @@ import {
 import { Copy, Mail, MessageSquareText, Plus, RotateCcw, Save, ShieldOff } from "lucide-react";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
-import { renderEmailTemplate } from "@/lib/email/render";
+import { hasBuilderJson, renderEmailTemplate } from "@/lib/email/render";
 import { enumLabel, formatDateTime, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -23,10 +23,8 @@ import {
   restoreMessageTemplateVersionAction,
   sendTemplateTestEmailAction,
   updateMessageTemplateBuilderAction,
-  updateBookingTemplateSettingsAction,
   updateMessageTemplateStatusAction
 } from "./actions";
-import { bookingTemplateKeys, bookingTemplateSortIndex } from "./booking-templates";
 import { EmailTemplateBuilder } from "./components/email-template-builder";
 
 export const dynamic = "force-dynamic";
@@ -155,16 +153,11 @@ function relatedRecordHref(type: string, id: string) {
   return "";
 }
 
-function hasBuilderJson(value: unknown) {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length);
-}
-
 export default async function CommunicationsPage({ searchParams }: CommunicationsPageProps) {
   await requireAdmin("communications:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const [
     templates,
-    bookingTemplatesRaw,
     senderIdentities,
     outboxRows,
     manualLogs,
@@ -178,13 +171,6 @@ export default async function CommunicationsPage({ searchParams }: Communication
       where: { siteId: settings.siteId },
       orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
       take: 30
-    }),
-    prisma.messageTemplate.findMany({
-      where: {
-        siteId: settings.siteId,
-        key: { in: [...bookingTemplateKeys] },
-        channel: MessageChannel.EMAIL
-      }
     }),
     prisma.emailSenderIdentity.findMany({
       where: { siteId: settings.siteId },
@@ -228,7 +214,6 @@ export default async function CommunicationsPage({ searchParams }: Communication
     prisma.suppressionListEntry.count({ where: { siteId: settings.siteId } })
   ]);
 
-  const bookingTemplates = bookingTemplatesRaw.sort((a, b) => bookingTemplateSortIndex(a.key) - bookingTemplateSortIndex(b.key));
   const verifiedSenderIdentities = senderIdentities.filter(
     (sender) => sender.isVerified && (!sender.sendingDomain || sender.sendingDomain.status === EmailSendingDomainStatus.VERIFIED)
   );
@@ -290,111 +275,13 @@ export default async function CommunicationsPage({ searchParams }: Communication
         </div>
       </section>
 
-      <section className="card stack">
-        <div>
-          <h2 style={{ fontSize: "1.35rem" }}>Booking email settings</h2>
-          <p>Customer and staff templates used by the live booking workflow.</p>
-        </div>
-        <div className="grid-2">
-          {bookingTemplates.map((template, index) => {
-            const availableTokens = stringArrayCsv([
-              ...new Set([...stringArrayFromUnknown(template.requiredTokens), ...stringArrayFromUnknown(template.optionalTokens)])
-            ]);
-            const requiredTokens = stringArrayCsv(stringArrayFromUnknown(template.requiredTokens));
-
-            return (
-              <details key={template.id} className="subpanel" open={index === 0}>
-                <summary style={{ alignItems: "center", cursor: "pointer", display: "flex", gap: 12, justifyContent: "space-between" }}>
-                  <span>
-                    <strong>{template.name}</strong>
-                    <br />
-                    <small style={{ color: "var(--muted)" }}>{template.description || template.key}</small>
-                  </span>
-                  <span className="pill">{template.key}</span>
-                </summary>
-                <form action={updateBookingTemplateSettingsAction} className="form-grid" style={{ marginTop: 16 }}>
-                  <input type="hidden" name="id" value={template.id} />
-                  <div className="field">
-                    <label htmlFor={`booking-template-subject-${template.id}`}>Subject</label>
-                    <input id={`booking-template-subject-${template.id}`} name="subject" defaultValue={template.subject} required />
-                  </div>
-                  <div className="field">
-                    <label htmlFor={`booking-template-preview-${template.id}`}>Preview text</label>
-                    <input id={`booking-template-preview-${template.id}`} name="previewText" defaultValue={template.previewText} />
-                  </div>
-                  <div className="field">
-                    <label htmlFor={`booking-template-sender-${template.id}`}>Sender</label>
-                    <select id={`booking-template-sender-${template.id}`} name="senderIdentityId" defaultValue={template.senderIdentityId || ""}>
-                      <option value="">Default sender</option>
-                      {verifiedSenderIdentities.map((sender) => (
-                        <option key={sender.id} value={sender.id}>
-                          {sender.name} &lt;{sender.fromEmail}&gt;
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label htmlFor={`booking-template-text-${template.id}`}>Text body</label>
-                    <textarea
-                      id={`booking-template-text-${template.id}`}
-                      name="textBody"
-                      defaultValue={template.textBody || template.body}
-                      required
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor={`booking-template-html-${template.id}`}>HTML body</label>
-                    <textarea id={`booking-template-html-${template.id}`} name="htmlBody" defaultValue={template.htmlBody} />
-                  </div>
-                  <small style={{ color: "var(--muted)" }}>
-                    Required event tokens: {requiredTokens || "none"}. Available tokens: {availableTokens || "none"}. Only verified senders can
-                    be assigned.
-                  </small>
-                  <button className="button secondary" type="submit">
-                    <Save size={18} />
-                    Save booking template
-                  </button>
-                </form>
-                <div className="subpanel stack" style={{ marginTop: 16 }}>
-                  <h3 style={{ fontSize: "1.05rem" }}>Version history</h3>
-                  {(versionsByTemplateId.get(template.id) || []).slice(0, 5).map((version) => (
-                    <form action={restoreMessageTemplateVersionAction} className="grid-2" key={version.id}>
-                      <input type="hidden" name="templateId" value={template.id} />
-                      <input type="hidden" name="versionId" value={version.id} />
-                      <div>
-                        <strong>Version {version.version}</strong>
-                        <br />
-                        <small style={{ color: "var(--muted)" }}>
-                          {formatDateTime(version.createdAt, settings.timezone)} {version.note ? `- ${version.note}` : ""}
-                        </small>
-                      </div>
-                      <div style={{ alignItems: "center", display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
-                          <input name="confirmRestore" type="checkbox" required />
-                          Restore
-                        </label>
-                        <button className="button secondary" type="submit">
-                          <RotateCcw size={16} />
-                          Restore version
-                        </button>
-                      </div>
-                    </form>
-                  ))}
-                  {!(versionsByTemplateId.get(template.id) || []).length ? (
-                    <small style={{ color: "var(--muted)" }}>Versions appear after the first visual-template save.</small>
-                  ) : null}
-                </div>
-              </details>
-            );
-          })}
-          {!bookingTemplates.length ? <div className="subpanel">No booking templates found.</div> : null}
-        </div>
-      </section>
-
       <section className="grid-2">
         <div className="card stack">
           <h2 style={{ fontSize: "1.35rem" }}>Visual email builder</h2>
-          <p>Build email HTML from structured blocks while keeping a required text fallback.</p>
+          <p>
+            The single editor for every email — booking, order, invoice, form, and admin notifications. Build the HTML from structured blocks
+            while keeping a required text fallback, with version history per template.
+          </p>
           {emailTemplates.map((template, index) => {
             const requiredTokens = stringArrayFromUnknown(template.requiredTokens);
             const availableTokens = [
@@ -440,6 +327,35 @@ export default async function CommunicationsPage({ searchParams }: Communication
                     Save visual template
                   </button>
                 </form>
+                <div className="subpanel stack" style={{ marginTop: 16 }}>
+                  <h3 style={{ fontSize: "1.05rem" }}>Version history</h3>
+                  {(versionsByTemplateId.get(template.id) || []).slice(0, 5).map((version) => (
+                    <form action={restoreMessageTemplateVersionAction} className="grid-2" key={version.id}>
+                      <input type="hidden" name="templateId" value={template.id} />
+                      <input type="hidden" name="versionId" value={version.id} />
+                      <div>
+                        <strong>Version {version.version}</strong>
+                        <br />
+                        <small style={{ color: "var(--muted)" }}>
+                          {formatDateTime(version.createdAt, settings.timezone)} {version.note ? `- ${version.note}` : ""}
+                        </small>
+                      </div>
+                      <div style={{ alignItems: "center", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                          <input name="confirmRestore" type="checkbox" required />
+                          Restore
+                        </label>
+                        <button className="button secondary" type="submit">
+                          <RotateCcw size={16} />
+                          Restore version
+                        </button>
+                      </div>
+                    </form>
+                  ))}
+                  {!(versionsByTemplateId.get(template.id) || []).length ? (
+                    <small style={{ color: "var(--muted)" }}>Versions appear after the first save.</small>
+                  ) : null}
+                </div>
               </details>
             );
           })}

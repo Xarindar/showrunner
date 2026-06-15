@@ -25,6 +25,12 @@ export function extractEmailTemplateTokens(value: string) {
   return Array.from(tokens);
 }
 
+// Builder JSON is the canonical source for visual templates; a non-empty object means
+// the email body is rendered from blocks and any stored htmlBody is only a cached preview.
+export function hasBuilderJson(value: unknown): boolean {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value as object).length > 0);
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -65,13 +71,9 @@ export async function renderEmailTemplate(template: StoredTemplate, tokens: Emai
   }
 
   const textSource = template.textBody || template.body;
-  const hasBuilderJson =
-    template.builderJson &&
-    typeof template.builderJson === "object" &&
-    !Array.isArray(template.builderJson) &&
-    Object.keys(template.builderJson).length > 0;
-  // Builder JSON is the canonical source for visual templates; htmlBody is a cached admin preview.
-  const htmlSource = hasBuilderJson ? await renderEmailBuilderHtml(template.builderJson) : template.htmlBody || textToHtml(textSource);
+  const htmlSource = hasBuilderJson(template.builderJson)
+    ? await renderEmailBuilderHtml(template.builderJson)
+    : template.htmlBody || textToHtml(textSource);
 
   return {
     subject: renderText(template.subject, tokens),

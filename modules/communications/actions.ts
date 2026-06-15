@@ -17,12 +17,10 @@ import { requireAdmin } from "@/lib/auth";
 import { extractEmailBuilderTokens, normalizeEmailBuilderDocument } from "@/lib/email-builder/document";
 import { renderEmailBuilderHtml } from "@/lib/email-builder/render";
 import { queueTemplateTestEmail } from "@/lib/email";
-import { extractEmailTemplateTokens } from "@/lib/email/render";
-import { sanitizeEmailHtml } from "@/lib/email/sanitize";
+import { extractEmailTemplateTokens, hasBuilderJson } from "@/lib/email/render";
 import { stringArrayFromUnknown } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { bookingTemplateKeySet } from "./booking-templates";
 
 const messageTemplateSchema = z
   .object({
@@ -49,15 +47,6 @@ const templateStatusSchema = z
     id: value.id,
     isActive: value.isActive === "true"
   }));
-
-const bookingTemplateSettingsSchema = z.object({
-  id: requiredText,
-  subject: requiredText,
-  previewText: optionalStoredText,
-  textBody: requiredText,
-  htmlBody: optionalStoredText,
-  senderIdentityId: optionalStoredText
-});
 
 const builderTemplateSettingsSchema = z.object({
   id: requiredText,
@@ -317,58 +306,6 @@ export async function updateMessageTemplateStatusAction(formData: FormData) {
   refreshCommunications();
 }
 
-export async function updateBookingTemplateSettingsAction(formData: FormData) {
-  await requireAdmin("communications:manage");
-  const input = await parseForm(bookingTemplateSettingsSchema, formData, "/admin/modules/communications");
-  const settings = await getSiteSettings();
-
-  const template = await prisma.messageTemplate.findFirst({
-    where: {
-      id: input.id,
-      siteId: settings.siteId,
-      channel: MessageChannel.EMAIL
-    },
-    select: {
-      id: true,
-      key: true,
-      requiredTokens: true,
-      optionalTokens: true,
-      tokens: true
-    }
-  });
-
-  if (!template || !template.key || !bookingTemplateKeySet.has(template.key)) {
-    communicationsError("Booking template not found.");
-  }
-
-  await requireVerifiedSender(input.senderIdentityId, settings.siteId);
-
-  const sanitizedHtmlBody = sanitizeEmailHtml(input.htmlBody);
-  if (input.htmlBody && !sanitizedHtmlBody) {
-    communicationsError("HTML body must contain allowed email markup.");
-  }
-
-  const { allowedTokens, requiredTokens } = templateAllowedTokens(template);
-  const usedTokens = new Set(
-    [input.subject, input.previewText, input.textBody, sanitizedHtmlBody].flatMap((value) => extractEmailTemplateTokens(value))
-  );
-  assertTemplateTokens({ allowedTokens, requiredTokens, usedTokens });
-
-  await prisma.messageTemplate.update({
-    where: { id: template.id },
-    data: {
-      subject: input.subject,
-      previewText: input.previewText,
-      textBody: input.textBody,
-      htmlBody: sanitizedHtmlBody,
-      senderIdentityId: input.senderIdentityId || null
-    }
-  });
-
-  refreshCommunications();
-  redirect("/admin/modules/communications?saved=booking-template");
-}
-
 export async function updateMessageTemplateBuilderAction(formData: FormData) {
   await requireAdmin("communications:manage");
   const input = await parseForm(builderTemplateSettingsSchema, formData, "/admin/modules/communications");
@@ -504,7 +441,7 @@ export async function cloneMessageTemplateAction(formData: FormData) {
     }
   });
 
-  await snapshotMessageTemplate({ ...cloned, builderRenderer: cloned.builderRenderer }, "Initial cloned version");
+  await snapshotMessageTemplate(cloned, "Initial cloned version");
 
   refreshCommunications();
   redirect(`/admin/modules/communications?saved=template-cloned&previewTemplate=${cloned.id}`);
@@ -549,6 +486,29 @@ export async function restoreMessageTemplateVersionAction(formData: FormData) {
   if (!template || !version) {
     communicationsError("Template version not found.");
   }
+
+  // Re-validate the restored content against the version's own token metadata before
+  // it goes live — a snapshot taken under an older allowlist shouldn't bypass token checks.
+  const restoredUsedTokens = new Set([
+    ...extractEmailTemplateTokens(version.subject),
+    ...extractEmailTemplateTokens(version.previewText),
+    ...extractEmailTemplateTokens(version.textBody)
+  ]);
+  if (hasBuilderJson(version.builderJson)) {
+    for (const token of extractEmailBuilderTokens(normalizeEmailBuilderDocument(version.builderJson))) {
+      restoredUsedTokens.add(token);
+    }
+  } else {
+    for (const token of extractEmailTemplateTokens(version.htmlBody)) {
+      restoredUsedTokens.add(token);
+    }
+  }
+  const restoredTokenScope = templateAllowedTokens(version);
+  assertTemplateTokens({
+    allowedTokens: restoredTokenScope.allowedTokens,
+    requiredTokens: restoredTokenScope.requiredTokens,
+    usedTokens: restoredUsedTokens
+  });
 
   await snapshotMessageTemplate(template, "Before restore");
 
