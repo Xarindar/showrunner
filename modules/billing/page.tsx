@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { BillingDocumentStatus, BillingDocumentType, PaymentStatus } from "@prisma/client";
+import { BillingDocumentStatus, BillingDocumentType, PaymentStatus, Prisma } from "@prisma/client";
 import { FileText, Plus, ReceiptText, WalletCards } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
+import { isRejectedCapturedPayment } from "@/lib/billing/payments";
 import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -57,9 +58,20 @@ function paidCents(payments: { amountCents: number; refundedCents?: number; stat
     .reduce((sum, payment) => sum + Math.max(0, payment.amountCents - (payment.refundedCents || 0)), 0);
 }
 
-function refundablePaymentCents(payment: { amountCents: number; refundedCents: number; status: PaymentStatus | string }) {
-  if (payment.status !== PaymentStatus.PAID && payment.status !== PaymentStatus.AUTHORIZED) return 0;
-  return Math.max(0, payment.amountCents - payment.refundedCents);
+function refundablePaymentCents(payment: {
+  amountCents: number;
+  externalPaymentId: string | null;
+  rawSummary: Prisma.JsonValue;
+  refundedCents: number;
+  status: PaymentStatus | string;
+}) {
+  if (payment.status === PaymentStatus.PAID || payment.status === PaymentStatus.AUTHORIZED) {
+    return Math.max(0, payment.amountCents - payment.refundedCents);
+  }
+  if (isRejectedCapturedPayment({ ...payment, status: payment.status as PaymentStatus })) {
+    return payment.amountCents;
+  }
+  return 0;
 }
 
 function openBalanceTotalsLabel(documents: {

@@ -232,6 +232,11 @@ export async function applyPublicGiftCardAction(formData: FormData) {
     cartError(parsed.error.issues[0]?.message || "Add a gift card code.");
   }
 
+  const rateLimitMessage = await publicRateLimitMessage("gift_card_apply", { limit: 8, windowMinutes: 10 });
+  if (rateLimitMessage) {
+    cartError(rateLimitMessage);
+  }
+
   try {
     await applyGiftCardToCart({ cartId, code: parsed.data.code });
   } catch (error) {

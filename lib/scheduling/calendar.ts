@@ -36,10 +36,15 @@ type CalendarBooking = {
   }>;
 };
 
+function isWeakProductionSecret(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return normalized.length < 32 || normalized.includes("replace-with") || normalized.includes("local-dev") || normalized.includes("change-me") || normalized.includes("change-before-deploying");
+}
+
 function calendarSecret() {
-  const secret = process.env.CALENDAR_FEED_SECRET || process.env.AUTH_SECRET;
-  if (!secret && process.env.NODE_ENV === "production") {
-    throw new Error("CALENDAR_FEED_SECRET or AUTH_SECRET must be set in production.");
+  const secret = process.env.CALENDAR_FEED_SECRET || process.env.AUTH_SECRET || "";
+  if (process.env.NODE_ENV === "production" && (!secret || isWeakProductionSecret(secret))) {
+    throw new Error("CALENDAR_FEED_SECRET or AUTH_SECRET must be strong before calendar feed links can be used.");
   }
 
   return secret || calendarSecretFallback;

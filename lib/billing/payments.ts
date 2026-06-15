@@ -151,6 +151,27 @@ export async function settleBillingPayment(input: {
   return result.summary;
 }
 
+export const REJECTED_OVERPAYMENT_REASON = "payment_would_exceed_remaining_balance";
+
+export function isRejectedCapturedPayment(payment: {
+  externalPaymentId: string | null;
+  rawSummary: Prisma.JsonValue;
+  refundedCents: number;
+  status: PaymentStatus;
+}) {
+  if (payment.status !== PaymentStatus.FAILED) return false;
+  if (payment.refundedCents !== 0) return false;
+  if (!payment.externalPaymentId) return false;
+
+  const rawSummary = payment.rawSummary;
+  return (
+    typeof rawSummary === "object" &&
+    rawSummary !== null &&
+    !Array.isArray(rawSummary) &&
+    rawSummary.rejectedReason === REJECTED_OVERPAYMENT_REASON
+  );
+}
+
 export async function markBillingPaymentFailed(input: {
   billingPaymentId: string;
   externalCheckoutSession?: string;

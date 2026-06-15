@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { hasAdminPermission } from "@/lib/admin-permissions";
 import { requireAdmin } from "@/lib/auth";
 import { absoluteCalendarUrl, icsCalendarAdapter, requestBaseUrl } from "@/lib/scheduling/calendar";
 import { getGoogleCalendarConnections } from "@/lib/scheduling/google-calendar";
@@ -28,10 +29,11 @@ type SchedulingPageProps = {
 };
 
 export default async function SchedulingPage({ searchParams }: SchedulingPageProps) {
-  await requireAdmin("scheduling:manage");
+  const adminUser = await requireAdmin("scheduling:manage");
+  const canLinkStaffAccounts = hasAdminPermission(adminUser, "users:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const baseUrl = await requestBaseUrl();
-  const [services, staff, resources, availability, blockouts, schedulingSettings, googleCalendarConnections] = await Promise.all([
+  const [services, staff, resources, availability, blockouts, schedulingSettings, googleCalendarConnections, adminUsers] = await Promise.all([
     prisma.service.findMany({
       where: { siteId: settings.siteId },
       include: {
@@ -49,7 +51,10 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
     }),
     prisma.blockedTime.findMany({ where: { siteId: settings.siteId }, include: { resource: true }, orderBy: { startsAt: "asc" }, take: 20 }),
     prisma.schedulingSettings.findUnique({ where: { siteId: settings.siteId } }),
-    getGoogleCalendarConnections(settings.siteId)
+    getGoogleCalendarConnections(settings.siteId),
+    canLinkStaffAccounts
+      ? prisma.adminUser.findMany({ select: { id: true, email: true, role: true }, orderBy: { email: "asc" } })
+      : Promise.resolve([])
   ]);
   const staffIdsWithAvailability = new Set(
     availability.flatMap((rule) => (rule.staffId ? [rule.staffId] : []))
@@ -95,7 +100,13 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
         <div className="error">{params.error === "blockout" ? "Blockouts must use valid start and end times." : params.error}</div>
       ) : null}
 
-      <StaffPanel staff={staff} assignedStaffIds={assignedStaffIds} staffIdsWithAvailability={staffIdsWithAvailability} />
+      <StaffPanel
+        staff={staff}
+        assignedStaffIds={assignedStaffIds}
+        staffIdsWithAvailability={staffIdsWithAvailability}
+        adminUsers={adminUsers}
+        canLinkStaffAccounts={canLinkStaffAccounts}
+      />
       <RemindersPanel
         enabled={schedulingSettings?.bookingReminderEnabled ?? true}
         leadMinutes={schedulingSettings?.bookingReminderLeadMinutes ?? 1440}

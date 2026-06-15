@@ -15,10 +15,15 @@ function base64Url(value: string | Buffer) {
   return Buffer.from(value).toString("base64url");
 }
 
+function isWeakProductionSecret(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return normalized.length < 32 || normalized.includes("replace-with") || normalized.includes("local-dev") || normalized.includes("change-me");
+}
+
 function recoverySecret() {
   const secret = process.env.CART_RECOVERY_SIGNING_SECRET || process.env.AUTH_SECRET || "";
-  if (!secret && process.env.NODE_ENV === "production") {
-    throw new Error("CART_RECOVERY_SIGNING_SECRET or AUTH_SECRET is required for cart recovery links.");
+  if (process.env.NODE_ENV === "production" && (!secret || isWeakProductionSecret(secret))) {
+    throw new Error("CART_RECOVERY_SIGNING_SECRET or AUTH_SECRET must be strong before cart recovery links can be used.");
   }
 
   return secret || "local-dev-cart-recovery-secret";

@@ -1,14 +1,16 @@
-import type { StaffMember } from "@prisma/client";
-import { Plus, Save } from "lucide-react";
-import { createStaffMemberAction, updateStaffMemberAction } from "../actions";
+import type { AdminRole, StaffMember } from "@prisma/client";
+import { Link2, Plus, Save } from "lucide-react";
+import { createStaffMemberAction, linkStaffMemberAdminUserAction, updateStaffMemberAction } from "../actions";
 
 type StaffPanelProps = {
   staff: StaffMember[];
   assignedStaffIds: Set<string>;
   staffIdsWithAvailability: Set<string>;
+  adminUsers: { id: string; email: string; role: AdminRole }[];
+  canLinkStaffAccounts: boolean;
 };
 
-export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability }: StaffPanelProps) {
+export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, adminUsers, canLinkStaffAccounts }: StaffPanelProps) {
   return (
     <section className="grid-2">
       <form action={createStaffMemberAction} className="card form-grid">
@@ -106,6 +108,30 @@ export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability }
                         Save staff
                       </button>
                     </form>
+                    {canLinkStaffAccounts ? (
+                      <form
+                        action={linkStaffMemberAdminUserAction}
+                        className="form-grid"
+                        style={{ alignItems: "end", display: "flex", gap: 8, marginTop: 12 }}
+                      >
+                        <input type="hidden" name="staffId" value={member.id} />
+                        <div className="field" style={{ flex: 1 }}>
+                          <label htmlFor={`staff-${member.id}-admin-link`}>Linked admin account</label>
+                          <select id={`staff-${member.id}-admin-link`} name="adminUserId" defaultValue={member.adminUserId || ""}>
+                            <option value="">Not linked</option>
+                            {adminUsers.map((adminUser) => (
+                              <option key={adminUser.id} value={adminUser.id}>
+                                {adminUser.email} ({adminUser.role})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <button className="button secondary" type="submit">
+                          <Link2 size={16} />
+                          Update link
+                        </button>
+                      </form>
+                    ) : null}
                   </details>
                 </td>
               </tr>

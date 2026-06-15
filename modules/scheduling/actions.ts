@@ -285,6 +285,56 @@ export async function updateStaffMemberAction(formData: FormData) {
   redirect("/admin/modules/scheduling?saved=staff");
 }
 
+const staffAdminLinkFormSchema = z.object({
+  staffId: z.string().trim().min(1),
+  adminUserId: z.string().trim().optional()
+});
+
+export async function linkStaffMemberAdminUserAction(formData: FormData) {
+  await requireAdmin("users:manage");
+  const parsed = staffAdminLinkFormSchema.safeParse({
+    staffId: formData.get("staffId"),
+    adminUserId: formData.get("adminUserId") || ""
+  });
+  if (!parsed.success) {
+    redirect(`/admin/modules/scheduling?error=${encodeURIComponent(parsed.error.issues[0]?.message || "Choose a staff member to link.")}`);
+  }
+  const settings = await getSiteSettings();
+  const adminUserId = parsed.data.adminUserId || null;
+
+  const staffMember = await prisma.staffMember.findFirst({
+    where: { id: parsed.data.staffId, siteId: settings.siteId },
+    select: { id: true }
+  });
+  if (!staffMember) {
+    redirect("/admin/modules/scheduling?error=Staff%20member%20not%20found.");
+  }
+
+  if (adminUserId) {
+    const adminUser = await prisma.adminUser.findUnique({ where: { id: adminUserId }, select: { id: true } });
+    if (!adminUser) {
+      redirect("/admin/modules/scheduling?error=Admin%20user%20not%20found.");
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (adminUserId) {
+      await tx.staffMember.updateMany({
+        where: { siteId: settings.siteId, adminUserId, id: { not: parsed.data.staffId } },
+        data: { adminUserId: null }
+      });
+    }
+
+    await tx.staffMember.update({
+      where: { id: parsed.data.staffId },
+      data: { adminUserId }
+    });
+  });
+
+  refreshScheduling();
+  redirect("/admin/modules/scheduling?saved=staff-link");
+}
+
 export async function createResourceAction(formData: FormData) {
   await requireAdmin("scheduling:manage");
   const parsed = resourceFormSchema.safeParse({

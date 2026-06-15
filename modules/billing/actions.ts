@@ -13,6 +13,7 @@ import {
   publicBillingUrl,
   snapshotBillingDocument
 } from "@/lib/billing/documents";
+import { isRejectedCapturedPayment } from "@/lib/billing/payments";
 import { updateBillingDocumentStatus } from "@/lib/billing/status";
 import {
   currencyCode,
@@ -656,11 +657,12 @@ export async function refundBillingPaymentAction(formData: FormData) {
 
     if (!payment) throw new Error("Billing payment not found.");
     documentId = payment.billingDocumentId;
-    if (payment.status !== PaymentStatus.PAID && payment.status !== PaymentStatus.AUTHORIZED) {
+    const rejectedButCaptured = isRejectedCapturedPayment(payment);
+    if (payment.status !== PaymentStatus.PAID && payment.status !== PaymentStatus.AUTHORIZED && !rejectedButCaptured) {
       throw new Error("Only paid billing payments can be refunded.");
     }
 
-    const remainingCents = Math.max(0, payment.amountCents - payment.refundedCents);
+    const remainingCents = rejectedButCaptured ? payment.amountCents : Math.max(0, payment.amountCents - payment.refundedCents);
     if (input.amount <= 0 || input.amount > remainingCents) {
       throw new Error("Refund amount must be greater than zero and no more than the refundable balance.");
     }
@@ -670,7 +672,7 @@ export async function refundBillingPaymentAction(formData: FormData) {
       where: {
         id: payment.id,
         billingDocument: { siteId },
-        status: { in: [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] },
+        status: rejectedButCaptured ? PaymentStatus.FAILED : { in: [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] },
         refundedCents: { lte: payment.amountCents - input.amount }
       },
       data: {
@@ -701,7 +703,7 @@ export async function refundBillingPaymentAction(formData: FormData) {
       where: {
         id: payment.id,
         refundedCents: { gte: payment.amountCents },
-        status: { in: [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] }
+        status: rejectedButCaptured ? PaymentStatus.FAILED : { in: [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] }
       },
       data: { status: PaymentStatus.REFUNDED }
     });
