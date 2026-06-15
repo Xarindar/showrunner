@@ -150,7 +150,7 @@ export function embedJson(data: unknown, context: { origin: string | null }, ini
 
 export function embedError(error: unknown, context: { origin: string | null }) {
   const status = error instanceof EmbedRequestError ? error.status : 500;
-  const message = error instanceof Error ? error.message : "Request failed.";
+  const message = error instanceof EmbedRequestError ? error.message : "Request failed.";
   return Response.json({ error: message }, { status, headers: embedCorsHeaders(context.origin) });
 }
 

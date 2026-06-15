@@ -36,6 +36,32 @@ function cleanOptionalString(value: string | null) {
   return text || null;
 }
 
+const expectedBookingErrorStatuses = new Map<string, number>([
+  ["That service is not available.", 404],
+  ["Choose an available staff member for this service.", 400],
+  ["Choose an available resource-backed slot for this service.", 400],
+  ["Choose a valid appointment time.", 400],
+  ["That service is not configured for online booking.", 400],
+  ["Please accept the appointment policy before booking.", 400],
+  ["That time is no longer available. Please choose another time.", 409],
+  ["That time was just booked or blocked. Please choose another time.", 409]
+]);
+
+function mapPublicBookingError(error: unknown): never {
+  if (error instanceof EmbedRequestError) throw error;
+  if (error instanceof Error) {
+    const status = expectedBookingErrorStatuses.get(error.message);
+    if (status) throw new EmbedRequestError(error.message, status);
+  }
+  throw error;
+}
+
+export function hasPublicSchedulingBookingHoneypot(body: unknown) {
+  if (!body || typeof body !== "object") return false;
+  const value = (body as Record<string, unknown>)[hiddenHoneypotField];
+  return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
+}
+
 export function serializePublicSlot(slot: Slot) {
   return {
     startsAt: slot.startsAt.toISOString(),
@@ -49,6 +75,7 @@ export function serializePublicSlot(slot: Slot) {
 }
 
 export function serializePublicSlotDiagnostics(diagnostics: SlotDiagnostics) {
+  const slots = diagnostics.slots.filter((slot) => slot.available).map(serializePublicSlot);
   return {
     serviceId: diagnostics.serviceId,
     serviceName: diagnostics.serviceName,
@@ -57,15 +84,9 @@ export function serializePublicSlotDiagnostics(diagnostics: SlotDiagnostics) {
     staffId: diagnostics.staffId || null,
     staffName: diagnostics.staffName || null,
     timezone: diagnostics.timezone,
-    ruleCount: diagnostics.ruleCount,
-    slotCount: diagnostics.slotCount,
-    availableCount: diagnostics.availableCount,
-    messages: diagnostics.messages,
-    slots: diagnostics.slots.map((slot) => ({
-      ...serializePublicSlot(slot),
-      available: slot.available,
-      reasons: slot.reasons
-    }))
+    slotCount: slots.length,
+    availableCount: slots.length,
+    slots
   };
 }
 
@@ -138,23 +159,28 @@ export async function createPublicSchedulingBooking(input: {
     throw new EmbedRequestError(parsed.error.issues[0]?.message || "Check the booking request.", 400);
   }
 
-  if (parsed.data[hiddenHoneypotField]) {
+  if (hasPublicSchedulingBookingHoneypot(parsed.data)) {
     return { ok: true, booking: null };
   }
 
-  const booking = await nativeSchedulingAdapter.createBooking({
-    siteId: input.siteId,
-    serviceId: parsed.data.serviceId,
-    staffId: parsed.data.staffId,
-    resourceIds: parsed.data.resourceIds,
-    startsAt: new Date(parsed.data.startsAt),
-    customerName: parsed.data.customerName,
-    customerEmail: parsed.data.customerEmail,
-    customerPhone: parsed.data.customerPhone,
-    notes: parsed.data.notes,
-    intakeResponse: parsed.data.intakeResponse,
-    policyAccepted: parsed.data.policyAccepted === true
-  });
+  let booking: Awaited<ReturnType<typeof nativeSchedulingAdapter.createBooking>>;
+  try {
+    booking = await nativeSchedulingAdapter.createBooking({
+      siteId: input.siteId,
+      serviceId: parsed.data.serviceId,
+      staffId: parsed.data.staffId,
+      resourceIds: parsed.data.resourceIds,
+      startsAt: new Date(parsed.data.startsAt),
+      customerName: parsed.data.customerName,
+      customerEmail: parsed.data.customerEmail,
+      customerPhone: parsed.data.customerPhone,
+      notes: parsed.data.notes,
+      intakeResponse: parsed.data.intakeResponse,
+      policyAccepted: parsed.data.policyAccepted === true
+    });
+  } catch (error) {
+    mapPublicBookingError(error);
+  }
 
   await emitModuleEvent("booking.created", {
     ...(await requestAttribution(input.searchParams, "/api/public/v1/bookings")),
