@@ -7,6 +7,8 @@ import { recordAuditLog } from "@/lib/audit";
 import { applyDataScopePreset, dataScopeConfigFromFormData, dataScopePresets, requireAdmin, type DataScopePreset } from "@/lib/auth";
 import { parseForm, settingsFormSchema } from "@/lib/admin-validation";
 import { setModuleEnablement } from "@/lib/modules/installation";
+import { createSiteApiKey, parseOriginsInput, revokeSiteApiKey, updateSiteApiKeyOrigins } from "@/lib/embed/keys";
+import { normalizeScopes } from "@/lib/embed/scopes";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { updateStripePaymentMethodSettings } from "@/lib/payments/methods";
 import { normalizeModules } from "@/shell/modules";
@@ -123,6 +125,92 @@ export async function updateStripePaymentMethodsAction(formData: FormData) {
 
   revalidatePath("/", "layout");
   redirect("/admin/modules/settings?saved=payments");
+}
+
+export async function createSiteApiKeyAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+  const name = String(formData.get("name") || "").trim();
+  const allowedOrigins = parseOriginsInput(String(formData.get("allowedOrigins") || ""));
+  const scopes = normalizeScopes(formData.getAll("scopes").map(String));
+
+  if (!name) {
+    redirect(`/admin/modules/settings?error=${encodeURIComponent("Name the embed key so you can recognize it later.")}`);
+  }
+
+  const key = await createSiteApiKey({ siteId: site.id, name, allowedOrigins, scopes });
+
+  await recordAuditLog({
+    action: "embed.api_key.created",
+    actor: user,
+    metadata: {
+      allowedOrigins: key.allowedOrigins,
+      scopes: key.scopes
+    },
+    siteId: site.id,
+    targetId: key.id,
+    targetLabel: key.name,
+    targetType: "site_api_key"
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/admin/modules/settings?saved=embed");
+}
+
+export async function revokeSiteApiKeyAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+  const keyId = String(formData.get("keyId") || "").trim();
+
+  if (!keyId) {
+    redirect(`/admin/modules/settings?error=${encodeURIComponent("Missing embed key to revoke.")}`);
+  }
+
+  const result = await revokeSiteApiKey(site.id, keyId);
+  if (result.count === 0) {
+    redirect(`/admin/modules/settings?error=${encodeURIComponent("That embed key was not found for this site.")}`);
+  }
+
+  await recordAuditLog({
+    action: "embed.api_key.revoked",
+    actor: user,
+    siteId: site.id,
+    targetId: keyId,
+    targetLabel: keyId,
+    targetType: "site_api_key"
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/admin/modules/settings?saved=embed");
+}
+
+export async function updateSiteApiKeyOriginsAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+  const keyId = String(formData.get("keyId") || "").trim();
+  const allowedOrigins = parseOriginsInput(String(formData.get("allowedOrigins") || ""));
+
+  if (!keyId) {
+    redirect(`/admin/modules/settings?error=${encodeURIComponent("Missing embed key to update.")}`);
+  }
+
+  const result = await updateSiteApiKeyOrigins(site.id, keyId, allowedOrigins);
+  if (result.count === 0) {
+    redirect(`/admin/modules/settings?error=${encodeURIComponent("That embed key was not found for this site.")}`);
+  }
+
+  await recordAuditLog({
+    action: "embed.api_key.origins_updated",
+    actor: user,
+    metadata: { allowedOrigins },
+    siteId: site.id,
+    targetId: keyId,
+    targetLabel: keyId,
+    targetType: "site_api_key"
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/admin/modules/settings?saved=embed");
 }
 
 function parseCheckoutProvider(value: FormDataEntryValue | null) {

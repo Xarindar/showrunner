@@ -28,8 +28,10 @@ async function publicIdentifier() {
   );
 }
 
-export async function publicRateLimitMessage(scope: string, options: PublicRateLimitOptions = {}) {
-  const siteId = await getCurrentSiteId();
+// Site-explicit limiter: the embed/public-API gateway resolves the site from the API key,
+// not the request hostname, so it can't use publicRateLimitMessage (which calls getCurrentSiteId).
+// The hostname-resolving function below delegates here so there is a single limiter implementation.
+export async function publicRateLimitForSite(siteId: string, scope: string, options: PublicRateLimitOptions = {}) {
   const limit = options.limit ?? 8;
   const windowMinutes = options.windowMinutes ?? 10;
   const identifier = await publicIdentifier();
@@ -68,4 +70,9 @@ export async function publicRateLimitMessage(scope: string, options: PublicRateL
     data: { count: { increment: 1 } }
   });
   return "";
+}
+
+export async function publicRateLimitMessage(scope: string, options: PublicRateLimitOptions = {}) {
+  const siteId = await getCurrentSiteId();
+  return publicRateLimitForSite(siteId, scope, options);
 }

@@ -302,6 +302,12 @@ Authoritative current state. `§` = Architecture-Roadmap section number; `—` =
 | 13 | Analytics & Reporting | ✅ CONFIRMED (2 patches) · 🟠 consent deferred | client adapters + canonical GA4/Meta ecommerce mappings + server retention all built & sound; consent plumbed end-to-end. 🟡 CONFIRMED: retention sweep off the per-event hot path (emit.ts grep-clean) to scheduled `analytics:process` worker; admin/export calls unchanged; 🟡 CONFIRMED: GA4/Ads/Meta ids validated against strict allowlists (config.ts:5-7,13-16) before inline `<Script>` (non-matching → dropped). 🟠 tracking default-ON → DEFERRED/low-pri per @user [06-10-26]: US-only; revisit deny-until-granted + consent UI before any EU/UK/EEA launch. 🟢 dedupe drops repeats open/forward. Cron = deploy config to provision | 06-10-26 |
 | — | Email controller (`lib/email` outbox) — full report in `Claude Audit - Email Controller 06-07-26.md` | ✅ CONFIRMED | code confirmed; Railway cron remains deploy config to provision | 06-07-26 |
 | 1 | Core Platform — tenancy retrofit (`DEFAULT_SITE_ID` → request-resolved site) | ✅ CONFIRMED | slice A ✅ CONFIRMED (products+billing actions, `2d8ae46`); slice B ✅ CONFIRMED (automation worker + login-limiter + email-lib `siteId` threading, `d7c9320`; email-controller reach-in verified backward-compatible — `siteId?` optional w/ request fallback, no regression); final four ✅ CONFIRMED (clients/forms/testimonials scoped, portfolio already on resolver, `04cd79e`) — full `DEFAULT_SITE_ID` retrofit COMPLETE | 06-13-26 |
+| 1b | Embed/API — site keys + public API gateway (E1) | 🔵 READY-FOR-AUDIT | `SiteApiKey` + migration, publishable-key gateway (`lib/embed/*`), origin allowlist + CORS + per-site rate limit (reuses `publicRateLimitForSite`), `/api/public/v1/ping`, admin key-mgmt panel. Foundation that unblocks E2–E6 | 06-14-26 |
+| 1b | Embed/API — public scheduling API (E2) | ⬜ PENDING | `services`/`availability`/`bookings` under the gateway, reusing the native availability + Serializable booking engine (no fork) | 06-14-26 |
+| 1b | Embed/API — booking Web Component (E3) | ⬜ PENDING | Shadow-DOM `<showrunner-booking>` served from `/embed/v1/booking.js`, publishable-key + origin-bound, theme via tokens | 06-14-26 |
+| 1b | Embed/API — iframe embed fallback (E4) | ⬜ PENDING | `/embed/v1/booking` page + postMessage auto-resize for hostile-CSS/strict sites | 06-14-26 |
+| 1b | Embed/API — Next.js embed package (E5) | ⬜ PENDING | thin React wrapper for first-party Next hosts (multi-zone) | 06-14-26 |
+| 1b | Embed/API — generalize to commerce/galleries/forms (E6) | ⬜ PENDING | reuse gateway + embed runtime for buy-button (hosted checkout, SAQ-A), galleries, lead forms | 06-14-26 |
 
 ### Cross-Cutting Email Controller Audit Log
 
@@ -381,6 +387,34 @@ Build a stable platform core that every module uses.
   > **🔍 LINTER · Claude [06-14-26]:** No fresh code to audit — this umbrella carries no diff of its own; the three code-bearing slices (A `2d8ae46`, B `d7c9320`, final-four `04cd79e`) are each already ✅ CONFIRMED above with boss in-code verification. Re-ran the grep to confirm the reconciliation claim: `DEFAULT_SITE_ID` is clean across all six `modules/{products,billing,clients,forms,testimonials,portfolio}/actions.ts` and the automation/event + login-limiter paths. The only surviving references are non-request-path and expected: the constant definition (`lib/site-boundary.ts:3`), create-side install defaults (`lib/modules/installation.ts:22,37,54`), the explicit ensure-default-site comparison (`lib/site.ts:99`, already cleared in slice B), and seed data (`prisma/seed.ts`). The ENGINEER block's enumeration omitted the `site.ts`/`seed.ts` refs but neither is a silent request-path write, so the core claim — no `DEFAULT_SITE_ID` silent writes on the admin action surface — holds. No findings.
   > **✅ CONFIRMED · Claude [06-14-26]:** Status reconciliation, not new self-approval (same pattern as the §4 foundation roll-up at the Status Index). The body marker was stale against the Status Index, which is the source of truth and already carries §1 ✅ CONFIRMED; aligning the body to match. §1 tenancy retrofit is complete and confirmed.
   > **Status: `CONFIRMED`**
+
+### 1b. Embed + Public API Layer
+
+This is the §1 "embed layer" + "public API layer" turned into a tracked build. It is the critical path for the deploy-to-users product direction: every business module is built and confirmed, but there is currently **no way to mount them on a customer's own website**. This layer adds that, reusing existing module logic rather than forking it.
+
+**Three delivery modes** (per §1): a framework-agnostic **Web Component** widget for any site, an **iframe** fallback for hostile-CSS/strict hosts, and a **Next.js package** for first-party sites — all talking to a **versioned public API** (`/api/public/v1/…`) authenticated by per-site keys with origin allowlists, CORS, and rate limits.
+
+**Guiding principles (every chunk):**
+- **Reuse, don't fork (Prime Directive).** The public API is a thin transport over existing module logic — availability through `lib/scheduling/native.ts`, bookings through the validated public-booking path, cart through the existing reprice/checkout. No second engine.
+- **The origin allowlist is the real boundary**, not key secrecy. Browser widgets use a publishable key (safe in page source, like a Stripe `pk_`); abuse is gated by the per-key origin allowlist + the existing per-IP rate limiter + honeypot + server-side validation on writes.
+- **PCI stays SAQ-A.** The commerce widget (E6) hands off to hosted gateway checkout; the embed never touches card data.
+- **Tenancy via key, not hostname.** Cross-origin requests can't use hostname resolution; the API key resolves the site and everything stays site-scoped.
+- **Versioned + stable** under `/api/public/v1/`, additive only.
+
+**Chunks** (each → READY-FOR-AUDIT): **E1** site keys + gateway (foundation) · **E2** public scheduling API · **E3** booking Web Component · **E4** iframe fallback · **E5** Next.js package · **E6** generalize to commerce/galleries/forms. Sequencing: E1 unblocks all; E2 before E3 (widget consumes the API); E3 before E4 (iframe is the fallback); E6 last (once the seam is proven on scheduling).
+
+  > **🛠 ENGINEER · Claude [06-14-26]:** Built **E1** — per-site publishable API keys + the public API gateway.
+  > - **Schema:** `SiteApiKey` (`prisma/schema/core.prisma`) + migration `20260614130000_embed_api_keys` — publishable `publicKey @unique`, `allowedOrigins`/`scopes`/`embedTheme` as `Json` (project convention), `enabled`/`revokedAt`/`lastUsedAt`, `siteId` FK `ON DELETE CASCADE`, `Site.siteApiKeys` relation.
+  > - **`lib/embed/keys.ts`:** publishable-key generation (`pk_live_` + 24 random bytes), origin normalization to `URL.origin` (http(s) only, lowercased, deduped), and site-scoped CRUD — create/list/`revokeSiteApiKey`/`updateSiteApiKeyOrigins` all via `updateMany({where:{id,siteId}})` so a key can only be touched within its own site (**no IDOR**); `resolveActiveSiteApiKey` (enabled + not revoked) and best-effort `touchSiteApiKeyUsage`.
+  > - **`lib/embed/scopes.ts`:** typed scope catalog (`scheduling:read/write`, `commerce:read/write`, `galleries:read`, `forms:write`) + normalizer.
+  > - **`lib/embed/gateway.ts`:** `authorizeEmbedRequest` (key→site, origin-allowlist check, optional scope + module-enabled check, per-site rate limit) + a CORS envelope (`embedJson`/`embedError` — only ever reflects a concrete origin, **never `*`**) + `handleEmbedPreflight`. `EmbedRequestError` carries the HTTP status.
+  > - **Reuse (Prime Directive):** extended `lib/public-rate-limit.ts` with `publicRateLimitForSite(siteId, scope, opts)` and made `publicRateLimitMessage` delegate to it — **single limiter implementation, all existing callers byte-unchanged**; module-enablement reuses `getSiteSettingsForSite(siteId).enabledModuleIds`.
+  > - **`app/api/public/v1/ping/route.ts`:** `GET` + `OPTIONS` proving the whole chain (key→site, origin, CORS, rate limit) in one call.
+  > - **Admin:** `createSiteApiKeyAction`/`revokeSiteApiKeyAction`/`updateSiteApiKeyOriginsAction` (`modules/settings/actions.ts`) — `settings:update`-gated, site-scoped, audit-logged (`embed.api_key.created/revoked/origins_updated`) — and an "Embeds & public API" panel in `modules/settings/page.tsx` (create/list/revoke keys, edit origins).
+  > - **Decisions for the auditor:** (1) **publishable-only keys** for E1 — the origin allowlist + rate limit + server-side validation are the boundary, so the key is safe in page source; server-to-server *secret* keys deferred until there's a use case. (2) **CORS posture:** a request *with* an `Origin` must be allowlisted (else 403); a request *without* `Origin` (server-to-server) is allowed since the key is the credential; preflight is a non-enforcing handshake — the actual request enforces. (3) widget bundler/framework (Lit + esbuild) is an **E3** decision, not needed here.
+  > - **Verification:** `npx prisma validate` ✓, `npx prisma generate` ✓, `npx tsc --noEmit --pretty false` exit 0 (tree-wide), `npx eslint` clean on all touched files.
+  >
+  > **Status: `READY-FOR-AUDIT`**
 
 ### 2. Scheduling Module
 

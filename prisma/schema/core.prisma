@@ -44,6 +44,7 @@ model Site {
   schedulingSettings       SchedulingSettings?
   moduleInstallations      ModuleInstallation[]
   publicRateLimits         PublicRateLimit[]
+  siteApiKeys              SiteApiKey[]
   services                 Service[]
   staffMembers             StaffMember[]
   resources                Resource[]
@@ -166,6 +167,28 @@ model PublicRateLimit {
   @@unique([siteId, key])
   @@index([siteId, scope, identifier])
   @@index([windowStart])
+}
+
+// Publishable per-site keys for cross-origin embed widgets + the public API gateway.
+// The publicKey is safe to expose in the browser (like a Stripe pk_); the real boundary
+// is the per-key allowedOrigins allowlist + the public rate limiter + server-side validation.
+model SiteApiKey {
+  id             String    @id @default(cuid())
+  siteId         String
+  site           Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  name           String    @default("")
+  publicKey      String    @unique
+  allowedOrigins Json      @default("[]")
+  scopes         Json      @default("[]")
+  embedTheme     Json      @default("{}")
+  enabled        Boolean   @default(true)
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([siteId])
+  @@index([enabled])
 }
 
 model AuditLog {

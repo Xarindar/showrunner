@@ -1,6 +1,8 @@
 import { CreditCard, Save } from "lucide-react";
 import { PaymentGatewayConnectionStatus, PaymentProvider } from "@prisma/client";
 import { dataScopePresets, parseDataScopeConfig, requireAdmin, scopableModules } from "@/lib/auth";
+import { listSiteApiKeys } from "@/lib/embed/keys";
+import { EMBED_SCOPES } from "@/lib/embed/scopes";
 import { enumLabel } from "@/lib/format";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { getStripePaymentMethodSettings } from "@/lib/payments/methods";
@@ -9,7 +11,14 @@ import type { ModuleStatus } from "@/shell/module-types";
 import { getPlatformStatus, platformFoundationItems } from "@/lib/platform-status";
 import { getSiteSettings } from "@/lib/site";
 import { normalizeThemePreset, themePresetOptions } from "@/lib/theme/tokens";
-import { updateCheckoutProviderAction, updateSettingsAction, updateStripePaymentMethodsAction } from "./actions";
+import {
+  createSiteApiKeyAction,
+  revokeSiteApiKeyAction,
+  updateCheckoutProviderAction,
+  updateSettingsAction,
+  updateSiteApiKeyOriginsAction,
+  updateStripePaymentMethodsAction
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -20,11 +29,12 @@ type SettingsPageProps = {
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   await requireAdmin("settings:update");
   const [{ saved, error }, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [platformStatus, stripePaymentMethods, squareCredential, paypalCredential] = await Promise.all([
+  const [platformStatus, stripePaymentMethods, squareCredential, paypalCredential, apiKeys] = await Promise.all([
     getPlatformStatus(settings),
     getStripePaymentMethodSettings(settings.siteId),
     getConnectedGatewayCredential(settings.siteId, PaymentProvider.SQUARE),
-    getConnectedGatewayCredential(settings.siteId, PaymentProvider.PAYPAL)
+    getConnectedGatewayCredential(settings.siteId, PaymentProvider.PAYPAL),
+    listSiteApiKeys(settings.siteId)
   ]);
   const dataScopeConfig = parseDataScopeConfig(settings.dataScopeConfig);
   const dataScopeModules = scopableModules();
@@ -403,6 +413,89 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           Save settings
         </button>
       </form>
+
+      <section className="card form-grid" aria-label="Embeds and public API">
+        <div>
+          <h2 style={{ fontSize: "1.2rem" }}>Embeds &amp; public API</h2>
+          <p>
+            Publishable keys let booking, gallery, and storefront widgets call the public API from another website.
+            A key only works from the origins you list below, so the key itself is safe to ship in page source
+            (like a Stripe publishable key). Test a key against <code>/api/public/v1/ping</code>.
+          </p>
+        </div>
+
+        {apiKeys.length ? (
+          <div className="foundation-list">
+            {apiKeys.map((key) => (
+              <div className="subpanel form-grid" key={key.id}>
+                <div className="grid-2">
+                  <div>
+                    <strong>{key.name || "Untitled key"}</strong>
+                    <small style={{ display: "block", color: "var(--muted)" }}>
+                      <code>{key.publicKey}</code>
+                    </small>
+                    <small style={{ display: "block", color: "var(--muted)" }}>
+                      Scopes: {key.scopes.length ? key.scopes.join(", ") : "none"} · Last used:{" "}
+                      {key.lastUsedAt ? key.lastUsedAt.toISOString().slice(0, 10) : "never"}
+                    </small>
+                  </div>
+                  <div style={{ alignItems: "center", display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                    <span className={key.enabled ? "pill success" : "pill warning"}>{key.enabled ? "Active" : "Revoked"}</span>
+                    {key.enabled ? (
+                      <form action={revokeSiteApiKeyAction}>
+                        <input type="hidden" name="keyId" value={key.id} />
+                        <button className="button secondary" type="submit">Revoke</button>
+                      </form>
+                    ) : null}
+                  </div>
+                </div>
+                {key.enabled ? (
+                  <form action={updateSiteApiKeyOriginsAction} className="field">
+                    <label htmlFor={`origins-${key.id}`}>Allowed origins (one per line)</label>
+                    <textarea
+                      id={`origins-${key.id}`}
+                      name="allowedOrigins"
+                      rows={2}
+                      defaultValue={key.allowedOrigins.join("\n")}
+                      placeholder="https://clientsite.com"
+                    />
+                    <input type="hidden" name="keyId" value={key.id} />
+                    <button className="button secondary" type="submit" style={{ marginTop: 8 }}>Save origins</button>
+                  </form>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: "var(--muted)" }}>No embed keys yet. Create one to start embedding widgets on another site.</p>
+        )}
+
+        <form action={createSiteApiKeyAction} className="subpanel form-grid">
+          <h3 style={{ fontSize: "1rem" }}>Create an embed key</h3>
+          <div className="field">
+            <label htmlFor="embedKeyName">Key name</label>
+            <input id="embedKeyName" name="name" placeholder="Client marketing site" required />
+          </div>
+          <div className="field">
+            <label htmlFor="embedKeyOrigins">Allowed origins (one per line)</label>
+            <textarea id="embedKeyOrigins" name="allowedOrigins" rows={3} placeholder="https://clientsite.com" />
+            <small style={{ color: "var(--muted)" }}>
+              Leave blank for server-to-server use only; a browser widget needs every site origin it loads on.
+            </small>
+          </div>
+          <div className="module-toggle-grid">
+            {EMBED_SCOPES.map((scope) => (
+              <label className="module-toggle-row" key={scope}>
+                <input type="checkbox" name="scopes" value={scope} defaultChecked={scope === "scheduling:read"} />
+                <span className="module-toggle-main">
+                  <strong>{scope}</strong>
+                </span>
+              </label>
+            ))}
+          </div>
+          <button className="button" type="submit">Create key</button>
+        </form>
+      </section>
     </div>
   );
 }
