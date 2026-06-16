@@ -910,9 +910,8 @@ const formWidgetSource = String.raw`
       }
       if (field.type === "SIGNATURE") {
         var signature = this.shadowRoot.querySelector("[data-signature-field='" + cssIdent(field.inputName) + "']");
-        var typed = signature ? signature.querySelector("[data-signature-typed]") : null;
         var payload = signature ? signature.querySelector("[data-signature-payload]") : null;
-        return typed && typed.value.trim() ? typed.value.trim() : payload && payload.value.trim() ? payload.value.trim() : "";
+        return payload && payload.value.trim() ? payload.value.trim() : "";
       }
       return namedControls[0] && namedControls[0].value ? namedControls[0].value.trim() : "";
     }
@@ -937,6 +936,7 @@ const formWidgetSource = String.raw`
     }
     applyVisibility(htmlForm) {
       if (!this.form) return;
+      this.updateSignatureControls();
       var fields = Array.isArray(this.form.fields) ? this.form.fields : [];
       var visibleFieldIds = computeVisibleFieldIds(fields, this.fieldValues(htmlForm));
       var hasSteps = this.hasSteps();
@@ -952,6 +952,7 @@ const formWidgetSource = String.raw`
     }
     enableVisibleFieldsForSubmit(htmlForm) {
       if (!this.form) return;
+      this.updateSignatureControls();
       var fields = Array.isArray(this.form.fields) ? this.form.fields : [];
       var visibleFieldIds = computeVisibleFieldIds(fields, this.fieldValues(htmlForm));
       fields.forEach((field) => {
