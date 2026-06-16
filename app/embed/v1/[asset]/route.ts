@@ -498,7 +498,6 @@ const buyButtonWidgetSource = String.raw`
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character];
     });
   }
-
   function normalizeApiBase(value) {
     return String(value || scriptOrigin).replace(/\/+$/, "");
   }
@@ -727,26 +726,101 @@ const formWidgetSource = String.raw`
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character];
     });
   }
+  function cssIdent(value) {
+    if (window.CSS && typeof window.CSS.escape === "function") return window.CSS.escape(String(value || ""));
+    return String(value || "").replace(/[^a-zA-Z0-9_-]/g, "\\\\$&");
+  }
   function normalizeApiBase(value) {
     return String(value || scriptOrigin).replace(/\/+$/, "");
   }
   function css() {
     return [
       ":host{display:block;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}",
-      ".sr-form{--sr-accent:#0f766e;--sr-border:#d5d9df;--sr-muted:#64748b;--sr-text:#111827;background:#fff;border:1px solid var(--sr-border);border-radius:8px;color:var(--sr-text);display:grid;gap:12px;max-width:680px;padding:16px}.sr-field{display:grid;gap:6px}label{font-size:.82rem;font-weight:650}input,select,textarea{border:1px solid var(--sr-border);border-radius:6px;box-sizing:border-box;font:inherit;min-height:40px;padding:8px 10px;width:100%;}textarea{min-height:90px}.sr-error,.sr-success,.sr-empty{border-radius:6px;padding:10px}.sr-error{background:#fef2f2;color:#991b1b}.sr-success{background:#ecfdf5;color:#065f46}.sr-empty{background:#f8fafc;color:var(--sr-muted)}button{background:var(--sr-accent);border:0;border-radius:6px;color:#fff;cursor:pointer;font:inherit;font-weight:700;min-height:42px;padding:9px 12px}.sr-honeypot{height:0;left:-10000px;opacity:0;overflow:hidden;position:absolute;width:0}"
+      ".sr-form{--sr-accent:#0f766e;--sr-border:#d5d9df;--sr-muted:#64748b;--sr-panel:#f8fafc;--sr-text:#111827;background:#fff;border:1px solid var(--sr-border);border-radius:8px;color:var(--sr-text);display:grid;gap:12px;max-width:680px;padding:16px}.sr-field{display:grid;gap:6px}label{font-size:.82rem;font-weight:650}fieldset{border:0;margin:0;padding:0}legend{color:var(--sr-muted);font-size:.86rem;font-weight:700;margin-bottom:6px}input,select,textarea{border:1px solid var(--sr-border);border-radius:6px;box-sizing:border-box;font:inherit;min-height:40px;padding:8px 10px;width:100%;}input[type=checkbox],input[type=radio]{min-height:auto;padding:0;width:auto}textarea{min-height:90px}.sr-error,.sr-success,.sr-empty{border-radius:6px;padding:10px}.sr-error{background:#fef2f2;color:#991b1b}.sr-success{background:#ecfdf5;color:#065f46}.sr-empty{background:var(--sr-panel);color:var(--sr-muted)}button{background:var(--sr-accent);border:0;border-radius:6px;color:#fff;cursor:pointer;font:inherit;font-weight:700;min-height:42px;padding:9px 12px}button[disabled]{cursor:not-allowed;opacity:.6}.sr-secondary{background:#eef2f7;color:#111827}.sr-honeypot{height:0;left:-10000px;opacity:0;overflow:hidden;position:absolute;width:0}.sr-actions{align-items:center;display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}.sr-step{background:var(--sr-panel);border-radius:999px;color:var(--sr-muted);font-size:.78rem;font-weight:750;padding:4px 9px}.sr-choice{align-items:center;display:flex;gap:8px}.sr-signature-panel{display:grid;gap:8px}.sr-signature-pad{background:var(--sr-panel);border:1px solid var(--sr-border);border-radius:6px;height:150px;touch-action:none;width:100%}.sr-consent{align-items:flex-start;display:flex;gap:8px}.sr-help{color:var(--sr-muted);font-size:.82rem}"
     ].join("");
+  }
+  function isRecord(value) {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  }
+  function includesValue(values, value) {
+    return typeof value === "string" && values.indexOf(value) !== -1;
+  }
+  function normalizeConditionalLogic(value) {
+    if (!isRecord(value)) {
+      return { action: "SHOW", enabled: false, operator: "EQUALS", sourceFieldId: "", value: "" };
+    }
+    var sourceFieldId = typeof value.sourceFieldId === "string" ? value.sourceFieldId.trim() : "";
+    return {
+      action: includesValue(["SHOW", "HIDE"], value.action) ? value.action : "SHOW",
+      enabled: value.enabled === true && Boolean(sourceFieldId),
+      operator: includesValue(["EQUALS", "NOT_EQUALS", "CONTAINS", "NOT_EMPTY", "EMPTY"], value.operator) ? value.operator : "EQUALS",
+      sourceFieldId: sourceFieldId,
+      value: typeof value.value === "string" ? value.value.trim() : ""
+    };
+  }
+  function conditionalMatches(logic, sourceValue) {
+    var actual = String(sourceValue || "").trim();
+    var expected = String(logic.value || "").trim();
+    var actualComparable = actual.toLowerCase();
+    var expectedComparable = expected.toLowerCase();
+    if (logic.operator === "NOT_EMPTY") return Boolean(actual);
+    if (logic.operator === "EMPTY") return !actual;
+    if (logic.operator === "CONTAINS") return expected ? actualComparable.indexOf(expectedComparable) !== -1 : Boolean(actual);
+    if (logic.operator === "NOT_EQUALS") return actualComparable !== expectedComparable;
+    return actualComparable === expectedComparable;
+  }
+  function computeVisibleFieldIds(fields, values) {
+    var visibleIds = new Set(fields.map(function (field) { return field.id; }));
+    for (var index = 0; index < fields.length + 1; index += 1) {
+      var nextVisibleIds = new Set();
+      fields.forEach(function (field) {
+        var logic = normalizeConditionalLogic(field.conditionalLogic);
+        if (!logic.enabled) {
+          nextVisibleIds.add(field.id);
+          return;
+        }
+        var sourceValue = visibleIds.has(logic.sourceFieldId) ? values[logic.sourceFieldId] || "" : "";
+        var matches = conditionalMatches(logic, sourceValue);
+        var shouldShow = logic.action === "SHOW" ? matches : !matches;
+        if (shouldShow) nextVisibleIds.add(field.id);
+      });
+      if (nextVisibleIds.size === visibleIds.size && Array.from(nextVisibleIds).every(function (fieldId) { return visibleIds.has(fieldId); })) {
+        return nextVisibleIds;
+      }
+      visibleIds = nextVisibleIds;
+    }
+    return visibleIds;
+  }
+  var signatureConsentStatement = "I agree that this electronic signature is the legal equivalent of my handwritten signature and that the information submitted with this form is accurate.";
+  function wrapField(field, html, forceHidden) {
+    return "<div data-form-field-id='" + escapeHtml(field.id) + "' data-form-field-page='" + escapeHtml(field.pageNumber || 1) + "'" + (forceHidden ? " hidden aria-hidden='true'" : "") + ">" + html + "</div>";
+  }
+  function helpHtml(field) {
+    return field.helpText ? "<small class='sr-help' id='" + escapeHtml(field.id) + "-help'>" + escapeHtml(field.helpText) + "</small>" : "";
   }
   function fieldHtml(field) {
     var required = field.isRequired ? " required" : "";
+    var helpAttrs = field.helpText ? " aria-describedby='" + escapeHtml(field.id) + "-help'" : "";
     var label = "<label for='" + escapeHtml(field.inputName) + "'>" + escapeHtml(field.label) + (field.isRequired ? " *" : "") + "</label>";
-    if (field.type === "TEXTAREA") return "<div class='sr-field'>" + label + "<textarea id='" + escapeHtml(field.inputName) + "' name='" + escapeHtml(field.inputName) + "'" + required + "></textarea></div>";
-    if (field.type === "SELECT") return "<div class='sr-field'>" + label + "<select id='" + escapeHtml(field.inputName) + "' name='" + escapeHtml(field.inputName) + "'" + required + "><option value=''>Select one</option>" + (field.options || []).map(function (option) { return "<option value='" + escapeHtml(option) + "'>" + escapeHtml(option) + "</option>"; }).join("") + "</select></div>";
-    if (field.type === "CHECKBOX") return "<div class='sr-field'><label><input name='" + escapeHtml(field.inputName) + "' type='checkbox'" + required + "> " + escapeHtml(field.label) + "</label></div>";
-    if (field.type === "RADIO") return "<fieldset class='sr-field'><legend>" + escapeHtml(field.label) + (field.isRequired ? " *" : "") + "</legend>" + (field.options || []).map(function (option) { return "<label><input name='" + escapeHtml(field.inputName) + "' type='radio' value='" + escapeHtml(option) + "'" + required + "> " + escapeHtml(option) + "</label>"; }).join("") + "</fieldset>";
-    if (field.type === "FILE") return "<div class='sr-field'>" + label + "<input id='" + escapeHtml(field.inputName) + "' name='" + escapeHtml(field.inputName) + "' type='file'" + required + "></div>";
-    if (field.type === "HIDDEN") return "<input name='" + escapeHtml(field.inputName) + "' type='hidden' value='" + escapeHtml(field.placeholder || "") + "'>";
+    if (field.type === "TEXTAREA") return wrapField(field, "<div class='sr-field'>" + label + "<textarea id='" + escapeHtml(field.inputName) + "' name='" + escapeHtml(field.inputName) + "'" + required + helpAttrs + "></textarea>" + helpHtml(field) + "</div>");
+    if (field.type === "SELECT") return wrapField(field, "<div class='sr-field'>" + label + "<select id='" + escapeHtml(field.inputName) + "' name='" + escapeHtml(field.inputName) + "'" + required + helpAttrs + "><option value=''>Select one</option>" + (field.options || []).map(function (option) { return "<option value='" + escapeHtml(option) + "'>" + escapeHtml(option) + "</option>"; }).join("") + "</select>" + helpHtml(field) + "</div>");
+    if (field.type === "CHECKBOX") return wrapField(field, "<div class='sr-field'><label class='sr-choice'><input name='" + escapeHtml(field.inputName) + "' type='checkbox'" + required + helpAttrs + "> " + escapeHtml(field.label) + (field.isRequired ? " *" : "") + "</label>" + helpHtml(field) + "</div>");
+    if (field.type === "RADIO") return wrapField(field, "<fieldset class='sr-field'" + helpAttrs + "><legend>" + escapeHtml(field.label) + (field.isRequired ? " *" : "") + "</legend>" + (field.options || []).map(function (option) { return "<label class='sr-choice'><input name='" + escapeHtml(field.inputName) + "' type='radio' value='" + escapeHtml(option) + "'" + required + "> " + escapeHtml(option) + "</label>"; }).join("") + helpHtml(field) + "</fieldset>");
+    if (field.type === "FILE") return wrapField(field, "<div class='sr-field'>" + label + "<input id='" + escapeHtml(field.inputName) + "' name='" + escapeHtml(field.inputName) + "' type='file'" + required + helpAttrs + ">" + helpHtml(field) + "</div>");
+    if (field.type === "HIDDEN") return wrapField(field, "<input name='" + escapeHtml(field.inputName) + "' type='hidden' value='" + escapeHtml(field.placeholder || "") + "'>", true);
+    if (field.type === "SIGNATURE") {
+      return wrapField(field, "<div class='sr-field' data-signature-field='" + escapeHtml(field.inputName) + "' data-signature-required='" + (field.isRequired ? "true" : "false") + "'>" +
+        label +
+        "<input data-signature-payload name='" + escapeHtml(field.inputName) + "' type='hidden'>" +
+        "<div class='sr-actions' style='justify-content:flex-start'><label class='sr-choice'><input data-signature-mode name='" + escapeHtml(field.inputName) + "-mode' type='radio' value='TYPED' checked> Type</label><label class='sr-choice'><input data-signature-mode name='" + escapeHtml(field.inputName) + "-mode' type='radio' value='DRAWN'> Draw</label></div>" +
+        "<input data-signature-typed id='" + escapeHtml(field.inputName) + "' autocomplete='name' placeholder='" + escapeHtml(field.placeholder || "Type your full legal name") + "'" + required + helpAttrs + ">" +
+        "<div class='sr-signature-panel' data-signature-draw-panel hidden><canvas class='sr-signature-pad' data-signature-canvas aria-label='" + escapeHtml(field.label) + " drawing area'></canvas><button class='sr-secondary' data-signature-clear type='button'>Clear signature</button></div>" +
+        helpHtml(field) +
+        "<label class='sr-consent'><input data-signature-consent name='" + escapeHtml(field.inputName) + "-consent' type='checkbox'" + required + "> <span>" + escapeHtml(signatureConsentStatement) + "</span></label>" +
+      "</div>");
+    }
     var type = field.type === "EMAIL" ? "email" : field.type === "PHONE" ? "tel" : field.type === "DATE" ? "date" : "text";
-    return "<div class='sr-field'>" + label + "<input id='" + escapeHtml(field.inputName) + "' name='" + escapeHtml(field.inputName) + "' type='" + type + "' placeholder='" + escapeHtml(field.placeholder || "") + "'" + required + "></div>";
+    return wrapField(field, "<div class='sr-field'>" + label + "<input id='" + escapeHtml(field.inputName) + "' name='" + escapeHtml(field.inputName) + "' type='" + type + "' placeholder='" + escapeHtml(field.placeholder || "") + "'" + required + helpAttrs + ">" + helpHtml(field) + "</div>");
   }
   class ShowrunnerForm extends HTMLElement {
     static get observedAttributes() {
@@ -760,6 +834,7 @@ const formWidgetSource = String.raw`
       this.success = "";
       this.loading = false;
       this.submitting = false;
+      this.currentPage = null;
     }
     connectedCallback() {
       this.render();
@@ -794,6 +869,8 @@ const formWidgetSource = String.raw`
         var payload = await response.json().catch(function () { return {}; });
         if (!response.ok) throw new Error(payload.error || "Form failed to load.");
         this.form = payload.data && payload.data.form ? payload.data.form : null;
+        var pages = this.pages();
+        this.currentPage = pages[0] || 1;
         this.dispatch("showrunner:form-ready", { form: this.form });
       } catch (error) {
         this.error = error instanceof Error ? error.message : "Form failed to load.";
@@ -803,16 +880,238 @@ const formWidgetSource = String.raw`
         this.render();
       }
     }
+    pages() {
+      var fields = this.form && Array.isArray(this.form.fields) ? this.form.fields : [];
+      return Array.from(new Set(fields.map(function (field) { return Math.max(1, Number(field.pageNumber || 1)); }))).sort(function (left, right) { return left - right; });
+    }
+    hasSteps() {
+      return Boolean(this.form && this.form.enableSteps && this.pages().length > 1);
+    }
+    activePage() {
+      var pages = this.pages();
+      if (!pages.length) return 1;
+      return pages.indexOf(this.currentPage) !== -1 ? this.currentPage : pages[0];
+    }
+    fieldControlValue(htmlForm, field) {
+      var controls = Array.from(htmlForm.elements).filter(function (control) {
+        return control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement;
+      });
+      var namedControls = controls.filter(function (control) { return control.name === field.inputName; });
+      if (field.type === "CHECKBOX") {
+        return namedControls.some(function (control) { return control instanceof HTMLInputElement && control.checked; }) ? "yes" : "";
+      }
+      if (field.type === "RADIO") {
+        var checked = namedControls.find(function (control) { return control instanceof HTMLInputElement && control.checked; });
+        return checked && checked.value ? checked.value.trim() : "";
+      }
+      if (field.type === "FILE") {
+        var fileControl = namedControls.find(function (control) { return control instanceof HTMLInputElement && control.type === "file"; });
+        return fileControl && fileControl.files && fileControl.files[0] ? fileControl.files[0].name.trim() : "";
+      }
+      if (field.type === "SIGNATURE") {
+        var signature = this.shadowRoot.querySelector("[data-signature-field='" + cssIdent(field.inputName) + "']");
+        var typed = signature ? signature.querySelector("[data-signature-typed]") : null;
+        var payload = signature ? signature.querySelector("[data-signature-payload]") : null;
+        return typed && typed.value.trim() ? typed.value.trim() : payload && payload.value.trim() ? payload.value.trim() : "";
+      }
+      return namedControls[0] && namedControls[0].value ? namedControls[0].value.trim() : "";
+    }
+    fieldValues(htmlForm) {
+      var fields = this.form && Array.isArray(this.form.fields) ? this.form.fields : [];
+      var values = {};
+      fields.forEach((field) => {
+        values[field.id] = field.type === "HIDDEN" ? field.placeholder || "" : this.fieldControlValue(htmlForm, field);
+      });
+      return values;
+    }
+    setFieldEnabled(wrapper, enabled, forceHidden) {
+      wrapper.hidden = forceHidden || !enabled;
+      wrapper.setAttribute("aria-hidden", forceHidden || !enabled ? "true" : "false");
+      Array.from(wrapper.querySelectorAll("input, select, textarea")).forEach(function (control) {
+        if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement)) return;
+        if (!control.dataset.originalRequired) control.dataset.originalRequired = control.required ? "true" : "false";
+        control.disabled = !enabled;
+        control.required = enabled && control.dataset.originalRequired === "true";
+        if (!enabled) control.setCustomValidity("");
+      });
+    }
+    applyVisibility(htmlForm) {
+      if (!this.form) return;
+      var fields = Array.isArray(this.form.fields) ? this.form.fields : [];
+      var visibleFieldIds = computeVisibleFieldIds(fields, this.fieldValues(htmlForm));
+      var hasSteps = this.hasSteps();
+      var activePage = this.activePage();
+      fields.forEach((field) => {
+        var wrapper = this.shadowRoot.querySelector("[data-form-field-id='" + cssIdent(field.id) + "']");
+        if (!wrapper) return;
+        var conditionVisible = visibleFieldIds.has(field.id);
+        var pageVisible = !hasSteps || Number(field.pageNumber || 1) === activePage;
+        this.setFieldEnabled(wrapper, conditionVisible && pageVisible, field.type === "HIDDEN");
+      });
+      this.updateSignatureControls();
+    }
+    enableVisibleFieldsForSubmit(htmlForm) {
+      if (!this.form) return;
+      var fields = Array.isArray(this.form.fields) ? this.form.fields : [];
+      var visibleFieldIds = computeVisibleFieldIds(fields, this.fieldValues(htmlForm));
+      fields.forEach((field) => {
+        var wrapper = this.shadowRoot.querySelector("[data-form-field-id='" + cssIdent(field.id) + "']");
+        if (!wrapper) return;
+        this.setFieldEnabled(wrapper, visibleFieldIds.has(field.id), field.type === "HIDDEN");
+      });
+      this.updateSignatureControls();
+    }
+    signaturePayload(input) {
+      return JSON.stringify({
+        consentStatement: signatureConsentStatement,
+        capturedSignature: input.mode === "DRAWN" ? input.drawnDataUrl : input.typedName.trim(),
+        signerName: input.typedName.trim(),
+        type: input.mode
+      });
+    }
+    updateSignatureControls() {
+      Array.from(this.shadowRoot.querySelectorAll("[data-signature-field]")).forEach((wrapper) => {
+        var typed = wrapper.querySelector("[data-signature-typed]");
+        var payload = wrapper.querySelector("[data-signature-payload]");
+        var consent = wrapper.querySelector("[data-signature-consent]");
+        var panel = wrapper.querySelector("[data-signature-draw-panel]");
+        var selectedMode = wrapper.querySelector("[data-signature-mode]:checked");
+        var mode = selectedMode && selectedMode.value === "DRAWN" ? "DRAWN" : "TYPED";
+        var typedName = typed && typed.value ? typed.value.trim() : "";
+        var drawnDataUrl = wrapper.dataset.signatureDrawn || "";
+        var hasSignature = mode === "DRAWN" ? Boolean(typedName || drawnDataUrl) : Boolean(typedName);
+        var isRequired = wrapper.dataset.signatureRequired === "true";
+        if (panel) panel.hidden = mode !== "DRAWN";
+        if (payload) payload.value = hasSignature ? this.signaturePayload({ drawnDataUrl: drawnDataUrl, mode: mode, typedName: typedName }) : "";
+        if (consent) consent.required = !consent.disabled && (isRequired || hasSignature);
+        if (typed) {
+          typed.setCustomValidity("");
+          if (!typed.disabled && mode === "DRAWN") {
+            if (drawnDataUrl && !typedName) typed.setCustomValidity("Type your full legal name.");
+            if (typedName && !drawnDataUrl) typed.setCustomValidity("Draw a signature.");
+          }
+        }
+      });
+    }
+    bindSignatureControls() {
+      Array.from(this.shadowRoot.querySelectorAll("[data-signature-field]")).forEach((wrapper) => {
+        var canvas = wrapper.querySelector("[data-signature-canvas]");
+        var clear = wrapper.querySelector("[data-signature-clear]");
+        if (canvas instanceof HTMLCanvasElement && !canvas.dataset.bound) {
+          canvas.dataset.bound = "true";
+          var ratio = window.devicePixelRatio || 1;
+          var rect = canvas.getBoundingClientRect();
+          canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+          canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+          var context = canvas.getContext("2d");
+          if (context) {
+            context.scale(ratio, ratio);
+            context.lineCap = "round";
+            context.lineJoin = "round";
+            context.lineWidth = 2.4;
+            context.strokeStyle = "#111827";
+          }
+          var drawing = false;
+          var point = function (event) {
+            var bounds = canvas.getBoundingClientRect();
+            return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+          };
+          var finish = () => {
+            if (!drawing) return;
+            drawing = false;
+            wrapper.dataset.signatureDrawn = canvas.toDataURL("image/png");
+            this.updateSignatureControls();
+          };
+          canvas.addEventListener("pointerdown", (event) => {
+            var ctx = canvas.getContext("2d");
+            if (!ctx) return;
+            var current = point(event);
+            drawing = true;
+            canvas.setPointerCapture(event.pointerId);
+            ctx.beginPath();
+            ctx.moveTo(current.x, current.y);
+          });
+          canvas.addEventListener("pointermove", (event) => {
+            if (!drawing) return;
+            var ctx = canvas.getContext("2d");
+            if (!ctx) return;
+            var current = point(event);
+            ctx.lineTo(current.x, current.y);
+            ctx.stroke();
+          });
+          canvas.addEventListener("pointerup", finish);
+          canvas.addEventListener("pointercancel", finish);
+        }
+        if (clear && !clear.dataset.bound) {
+          clear.dataset.bound = "true";
+          clear.addEventListener("click", () => {
+            if (!(canvas instanceof HTMLCanvasElement)) return;
+            var context = canvas.getContext("2d");
+            if (context) context.clearRect(0, 0, canvas.width, canvas.height);
+            wrapper.dataset.signatureDrawn = "";
+            this.updateSignatureControls();
+          });
+        }
+      });
+      this.updateSignatureControls();
+    }
+    controlsHtml(fields) {
+      if (!fields.length) return "";
+      if (!this.hasSteps()) {
+        return "<button type='submit'" + (this.submitting ? " disabled" : "") + ">" + escapeHtml(this.submitting ? "Submitting..." : this.form.submitButtonLabel || "Submit") + "</button>";
+      }
+      return "<div data-step-actions>" + this.stepControlsHtml() + "</div>";
+    }
+    stepControlsHtml() {
+      var pages = this.pages();
+      var activePage = this.activePage();
+      var currentPageIndex = Math.max(0, pages.indexOf(activePage));
+      return "<div class='sr-actions'><span class='sr-step'>Step " + (currentPageIndex + 1) + " of " + pages.length + "</span><span class='sr-actions'>" +
+        "<button class='sr-secondary' data-step='previous' type='button'" + (currentPageIndex <= 0 ? " disabled" : "") + ">Previous</button>" +
+        (currentPageIndex < pages.length - 1 ? "<button data-step='next' type='button'>Next</button>" : "<button type='submit'" + (this.submitting ? " disabled" : "") + ">" + escapeHtml(this.submitting ? "Submitting..." : this.form.submitButtonLabel || "Submit") + "</button>") +
+      "</span></div>";
+    }
+    updateStepControls(htmlForm) {
+      var container = this.shadowRoot.querySelector("[data-step-actions]");
+      if (!container) return;
+      container.innerHTML = this.stepControlsHtml();
+      this.bindStepButtons(htmlForm);
+    }
+    bindStepButtons(htmlForm) {
+      var previous = this.shadowRoot.querySelector("[data-step='previous']");
+      var next = this.shadowRoot.querySelector("[data-step='next']");
+      if (previous) previous.addEventListener("click", () => {
+        var pages = this.pages();
+        var index = Math.max(0, pages.indexOf(this.activePage()));
+        this.currentPage = pages[Math.max(0, index - 1)] || this.activePage();
+        this.updateStepControls(htmlForm);
+        this.applyVisibility(htmlForm);
+      });
+      if (next) next.addEventListener("click", () => {
+        this.applyVisibility(htmlForm);
+        if (!htmlForm.reportValidity()) return;
+        var pages = this.pages();
+        var index = Math.max(0, pages.indexOf(this.activePage()));
+        this.currentPage = pages[Math.min(pages.length - 1, index + 1)] || this.activePage();
+        this.updateStepControls(htmlForm);
+        this.applyVisibility(htmlForm);
+      });
+    }
     async submit(event) {
       event.preventDefault();
       if (!this.form || this.submitting) return;
+      var htmlForm = event.currentTarget;
+      this.enableVisibleFieldsForSubmit(htmlForm);
+      if (!htmlForm.reportValidity()) {
+        this.applyVisibility(htmlForm);
+        return;
+      }
+      var body = new FormData(htmlForm);
       this.submitting = true;
       this.error = "";
       this.success = "";
       this.render();
       try {
-        var htmlForm = event.currentTarget;
-        var body = new FormData(htmlForm);
         var targetType = this.getAttribute("attachment-target-type") || "";
         var targetId = this.getAttribute("attachment-target-id") || "";
         if (targetType) body.set("attachmentTargetType", targetType);
@@ -841,10 +1140,17 @@ const formWidgetSource = String.raw`
         (this.error ? "<div class='sr-error'>" + escapeHtml(this.error) + "</div>" : "") +
         (this.success ? "<div class='sr-success'>" + escapeHtml(this.success) + "</div>" : "") +
         (this.loading ? "<div class='sr-empty'>Loading form...</div>" : "") +
-        (!this.loading && this.form && !this.success ? fields.map(fieldHtml).join("") + "<div class='sr-honeypot'><label>Company website <input name='companyWebsite' tabindex='-1' autocomplete='off'></label></div><button type='submit'" + (this.submitting ? " disabled" : "") + ">" + escapeHtml(this.submitting ? "Submitting..." : this.form.submitButtonLabel || "Submit") + "</button>" : "") +
+        (!this.loading && this.form && !this.success ? (fields.length ? fields.map(fieldHtml).join("") : "<div class='sr-empty'>This form does not have fields yet.</div>") + "<div class='sr-honeypot'><label>Company website <input name='companyWebsite' tabindex='-1' autocomplete='off'></label></div>" + this.controlsHtml(fields) : "") +
       "</form>";
       var form = this.shadowRoot.querySelector("form");
-      if (form && this.form && !this.success) form.addEventListener("submit", this.submit.bind(this));
+      if (form && this.form && !this.success) {
+        form.addEventListener("submit", this.submit.bind(this));
+        form.addEventListener("input", () => this.applyVisibility(form));
+        form.addEventListener("change", () => this.applyVisibility(form));
+        this.bindStepButtons(form);
+        this.bindSignatureControls();
+        this.applyVisibility(form);
+      }
     }
   }
   window.customElements.define("showrunner-form", ShowrunnerForm);
