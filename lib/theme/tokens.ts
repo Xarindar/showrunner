@@ -81,7 +81,7 @@ const typeScale = {
   display: "3rem",
   h1: "2.05rem",
   h2: "1.55rem",
-  h3: "1rem",
+  h3: "1.12rem",
   body: "0.94rem",
   small: "0.84rem",
   caption: "0.76rem"
@@ -260,7 +260,7 @@ export function normalizeThemePreset(value: unknown): ThemePresetId {
 function withBrandOverride(preset: ThemePreset, primary?: string | null): ThemePreset {
   if (!primary || !/^#[0-9a-fA-F]{6}$/.test(primary)) return preset;
   const brandDark = mixHex(primary, "#000000", 0.32);
-  const accent = rotateHue(primary, 42);
+  const accent = ensureContrast(rotateHue(primary, 42), preset.colors.surface, 4.5);
 
   return {
     ...preset,
@@ -294,6 +294,31 @@ function mixHex(a: string, b: string, weight: number) {
     first.g * (1 - weight) + second.g * weight,
     first.b * (1 - weight) + second.b * weight
   );
+}
+
+function relativeLuminance(hex: string) {
+  const { r, g, b } = hexToRgb(hex);
+  const channels = [r, g, b].map((value) => {
+    const channel = value / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+function contrastRatio(a: string, b: string) {
+  const first = relativeLuminance(a);
+  const second = relativeLuminance(b);
+  const lighter = Math.max(first, second);
+  const darker = Math.min(first, second);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function ensureContrast(foreground: string, background: string, minRatio: number) {
+  let color = foreground;
+  for (let step = 0; step < 12 && contrastRatio(color, background) < minRatio; step += 1) {
+    color = mixHex(color, "#000000", 0.08);
+  }
+  return color;
 }
 
 function rgbToHsl({ r, g, b }: { r: number; g: number; b: number }) {

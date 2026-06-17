@@ -82,4 +82,4 @@ Reusable components live under `components/ui/*` and consume the token variables
 - `Field`, `Input`, `Select`, and `Textarea` for labelled controls with reserved hint space.
 - `Badge`, `Table`, `Tabs`, `EmptyState`, `Feedback`, and skeleton primitives for module states.
 
-New client modules should render through these primitives or through existing compatibility classes that map to the same tokens.
+New client modules should render through these primitives. Compatibility classes that map to the same tokens are temporary migration shims for legacy surfaces only; they are not an acceptable substitute when an item is scoped to move a surface onto `components/ui/*`.
