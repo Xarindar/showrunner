@@ -96,7 +96,7 @@ const bookingWidgetSource = String.raw`
   function css() {
     return [
       ":host{display:block;color:inherit;font-family:var(--font-sans,Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif);}",
-      ".sr-widget{--sr-accent:#0f766e;--sr-bg:var(--color-surface,#ffffff);--sr-border:var(--color-border,#d5d9df);--sr-muted:var(--color-muted,#64748b);--sr-text:var(--color-text,#111827);--sr-radius:var(--radius-card,8px);--sr-space-2:var(--space-2,8px);--sr-space-3:var(--space-3,12px);--sr-space-4:var(--space-4,16px);--sr-space-5:var(--space-5,20px);--sr-control:var(--control-height,42px);--sr-row:var(--row-height,58px);color:var(--sr-text);background:var(--sr-bg);border:1px solid var(--sr-border);border-radius:var(--sr-radius);box-sizing:border-box;max-width:680px;min-height:420px;overflow:hidden;}",
+      ".sr-widget{--sr-accent:var(--color-brand,#0f766e);--sr-bg:var(--color-surface,#ffffff);--sr-border:var(--color-border,#d5d9df);--sr-muted:var(--color-muted,#64748b);--sr-text:var(--color-text,#111827);--sr-radius:var(--radius-card,8px);--sr-space-2:var(--space-2,8px);--sr-space-3:var(--space-3,12px);--sr-space-4:var(--space-4,16px);--sr-space-5:var(--space-5,20px);--sr-control:var(--control-height,42px);--sr-row:var(--row-height,58px);color:var(--sr-text);background:var(--sr-bg);border:1px solid var(--sr-border);border-radius:var(--sr-radius);box-sizing:border-box;max-width:680px;min-height:420px;overflow:hidden;}",
       ".sr-shell{display:grid;gap:var(--sr-space-5);padding:var(--sr-space-5);}",
       ".sr-header{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sr-space-3);border-bottom:1px solid var(--sr-border);min-height:86px;padding:var(--sr-space-5) var(--sr-space-5) var(--sr-space-4);}",
       ".sr-title{font-size:1.15rem;font-weight:700;line-height:1.25;margin:0;}",
@@ -501,19 +501,62 @@ const buyButtonWidgetSource = String.raw`
   function normalizeApiBase(value) {
     return String(value || scriptOrigin).replace(/\/+$/, "");
   }
+  var tokenAttrs = {
+    accentColor: ["accent-color", "primary-color"],
+    backgroundColor: ["background-color"],
+    borderColor: ["border-color"],
+    mutedColor: ["muted-color"],
+    radius: ["radius"],
+    textColor: ["text-color"]
+  };
+  function readThemeAttribute(element) {
+    var theme = {};
+    var rawTheme = element.getAttribute("theme");
+    if (rawTheme) {
+      try {
+        var parsed = JSON.parse(rawTheme);
+        if (parsed && typeof parsed === "object") theme = parsed;
+      } catch (_error) {}
+    }
+    Object.keys(tokenAttrs).forEach(function (key) {
+      tokenAttrs[key].some(function (attr) {
+        var value = element.getAttribute(attr);
+        if (value) {
+          theme[key] = value;
+          return true;
+        }
+        return false;
+      });
+    });
+    return theme;
+  }
+  function applyTheme(element, root) {
+    var theme = readThemeAttribute(element);
+    var variables = {
+      accentColor: "--sr-accent",
+      backgroundColor: "--sr-bg",
+      borderColor: "--sr-border",
+      mutedColor: "--sr-muted",
+      radius: "--sr-radius",
+      textColor: "--sr-text"
+    };
+    Object.keys(variables).forEach(function (key) {
+      if (theme[key]) root.style.setProperty(variables[key], String(theme[key]));
+    });
+  }
 
   function css() {
     return [
-      ":host{display:block;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}",
-      ".sr-card{--sr-accent:#0f766e;--sr-border:#d5d9df;--sr-muted:#64748b;--sr-text:#111827;background:#fff;border:1px solid var(--sr-border);border-radius:8px;color:var(--sr-text);box-sizing:border-box;display:grid;gap:12px;max-width:420px;padding:16px;}",
-      ".sr-row{display:grid;gap:6px}.sr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{font-size:.82rem;font-weight:650}input{border:1px solid var(--sr-border);border-radius:6px;box-sizing:border-box;font:inherit;min-height:40px;padding:8px 10px;width:100%;}",
-      "button{background:var(--sr-accent);border:0;border-radius:6px;color:#fff;cursor:pointer;font:inherit;font-weight:700;min-height:42px;padding:9px 12px;}button:disabled{cursor:not-allowed;opacity:.6}.sr-error{background:#fef2f2;border-radius:6px;color:#991b1b;padding:10px}.sr-note{color:var(--sr-muted);font-size:.9rem}"
+      ":host{display:block;font-family:var(--font-sans,Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif);}",
+      ".sr-card{--sr-accent:var(--color-brand,#0f766e);--sr-bg:var(--color-surface,#ffffff);--sr-border:var(--color-border,#d5d9df);--sr-muted:var(--color-muted,#64748b);--sr-text:var(--color-text,#111827);--sr-radius:var(--radius-card,8px);--sr-space-3:var(--space-3,12px);--sr-space-4:var(--space-4,16px);--sr-control:var(--control-height,42px);background:var(--sr-bg);border:1px solid var(--sr-border);border-radius:var(--sr-radius);color:var(--sr-text);box-sizing:border-box;display:grid;gap:var(--sr-space-3);max-width:420px;min-height:236px;padding:var(--sr-space-4);}",
+      ".sr-row{display:grid;gap:6px}.sr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{font-size:.82rem;font-weight:650}input{background:var(--sr-bg);border:1px solid var(--sr-border);border-radius:calc(var(--sr-radius) - 2px);box-sizing:border-box;color:var(--sr-text);font:inherit;min-height:var(--sr-control);padding:8px 10px;width:100%;}",
+      "button{background:var(--sr-accent);border:0;border-radius:calc(var(--sr-radius) - 2px);color:#fff;cursor:pointer;font:inherit;font-weight:700;min-height:var(--sr-control);padding:9px 12px;}button:disabled{cursor:not-allowed;opacity:.6}.sr-error{background:color-mix(in srgb,var(--color-danger,#991b1b) 8%,var(--sr-bg));border-radius:calc(var(--sr-radius) - 2px);color:var(--color-danger,#991b1b);min-height:42px;padding:10px}.sr-note{color:var(--sr-muted);font-size:.9rem;min-height:22px}"
     ].join("");
   }
 
   class ShowrunnerBuyButton extends HTMLElement {
     static get observedAttributes() {
-      return ["publishable-key", "key", "api-base", "product-id", "product-slug", "variant-id", "quantity", "label"];
+      return ["publishable-key", "key", "api-base", "product-id", "product-slug", "variant-id", "quantity", "label", "theme", "accent-color", "primary-color", "background-color", "border-color", "muted-color", "text-color", "radius"];
     }
 
     constructor() {
@@ -599,6 +642,7 @@ const buyButtonWidgetSource = String.raw`
         "<button type='submit'" + (this.loading ? " disabled" : "") + ">" + escapeHtml(this.loading ? "Preparing checkout..." : this.getAttribute("label") || "Buy now") + "</button>" +
         "<div class='sr-note'>Secure hosted checkout. Card details are collected by the payment provider.</div>" +
       "</form>";
+      applyTheme(this, this.shadowRoot.querySelector(".sr-card"));
       this.shadowRoot.querySelector("form").addEventListener("submit", this.submit.bind(this));
     }
   }
@@ -627,15 +671,58 @@ const galleryWidgetSource = String.raw`
   function normalizeApiBase(value) {
     return String(value || scriptOrigin).replace(/\/+$/, "");
   }
+  var tokenAttrs = {
+    accentColor: ["accent-color", "primary-color"],
+    backgroundColor: ["background-color"],
+    borderColor: ["border-color"],
+    mutedColor: ["muted-color"],
+    radius: ["radius"],
+    textColor: ["text-color"]
+  };
+  function readThemeAttribute(element) {
+    var theme = {};
+    var rawTheme = element.getAttribute("theme");
+    if (rawTheme) {
+      try {
+        var parsed = JSON.parse(rawTheme);
+        if (parsed && typeof parsed === "object") theme = parsed;
+      } catch (_error) {}
+    }
+    Object.keys(tokenAttrs).forEach(function (key) {
+      tokenAttrs[key].some(function (attr) {
+        var value = element.getAttribute(attr);
+        if (value) {
+          theme[key] = value;
+          return true;
+        }
+        return false;
+      });
+    });
+    return theme;
+  }
+  function applyTheme(element, root) {
+    var theme = readThemeAttribute(element);
+    var variables = {
+      accentColor: "--sr-accent",
+      backgroundColor: "--sr-bg",
+      borderColor: "--sr-border",
+      mutedColor: "--sr-muted",
+      radius: "--sr-radius",
+      textColor: "--sr-text"
+    };
+    Object.keys(variables).forEach(function (key) {
+      if (theme[key]) root.style.setProperty(variables[key], String(theme[key]));
+    });
+  }
   function css() {
     return [
-      ":host{display:block;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}",
-      ".sr-gallery{--sr-border:#d5d9df;--sr-muted:#64748b;--sr-text:#111827;color:var(--sr-text);display:grid;gap:12px}.sr-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}.sr-item{background:#f8fafc;border:1px solid var(--sr-border);border-radius:8px;overflow:hidden}.sr-item img{aspect-ratio:4/3;display:block;object-fit:cover;width:100%;}.sr-body{padding:10px}.sr-title{font-weight:700;margin:0}.sr-caption{color:var(--sr-muted);font-size:.9rem;margin:4px 0 0}.sr-error,.sr-empty{border-radius:6px;padding:10px}.sr-error{background:#fef2f2;color:#991b1b}.sr-empty{background:#f8fafc;color:var(--sr-muted)}"
+      ":host{display:block;font-family:var(--font-sans,Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif);}",
+      ".sr-gallery{--sr-accent:var(--color-brand,#0f766e);--sr-bg:var(--color-surface,#ffffff);--sr-border:var(--color-border,#d5d9df);--sr-muted:var(--color-muted,#64748b);--sr-text:var(--color-text,#111827);--sr-radius:var(--radius-card,8px);--sr-space-3:var(--space-3,12px);color:var(--sr-text);display:grid;gap:var(--sr-space-3);min-height:160px}.sr-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}.sr-item{background:color-mix(in srgb,var(--sr-bg) 88%,var(--sr-border));border:1px solid var(--sr-border);border-radius:var(--sr-radius);overflow:hidden}.sr-item img{aspect-ratio:4/3;display:block;object-fit:cover;width:100%;}.sr-body{padding:10px}.sr-title{font-weight:700;margin:0}.sr-caption{color:var(--sr-muted);font-size:.9rem;margin:4px 0 0}.sr-error,.sr-empty{border-radius:calc(var(--sr-radius) - 2px);min-height:48px;padding:10px}.sr-error{background:color-mix(in srgb,var(--color-danger,#991b1b) 8%,var(--sr-bg));color:var(--color-danger,#991b1b)}.sr-empty{background:color-mix(in srgb,var(--sr-bg) 88%,var(--sr-border));color:var(--sr-muted)}"
     ].join("");
   }
   class ShowrunnerGallery extends HTMLElement {
     static get observedAttributes() {
-      return ["publishable-key", "key", "api-base", "slug", "access-token"];
+      return ["publishable-key", "key", "api-base", "slug", "access-token", "theme", "accent-color", "primary-color", "background-color", "border-color", "muted-color", "text-color", "radius"];
     }
     constructor() {
       super();
@@ -703,6 +790,7 @@ const galleryWidgetSource = String.raw`
         }).join("") + "</div>" : "") +
         (!this.loading && this.gallery && !items.length ? "<div class='sr-empty'>No gallery images are available.</div>" : "") +
       "</div>";
+      applyTheme(this, this.shadowRoot.querySelector(".sr-gallery"));
     }
   }
   window.customElements.define("showrunner-gallery", ShowrunnerGallery);
@@ -733,10 +821,53 @@ const formWidgetSource = String.raw`
   function normalizeApiBase(value) {
     return String(value || scriptOrigin).replace(/\/+$/, "");
   }
+  var tokenAttrs = {
+    accentColor: ["accent-color", "primary-color"],
+    backgroundColor: ["background-color"],
+    borderColor: ["border-color"],
+    mutedColor: ["muted-color"],
+    radius: ["radius"],
+    textColor: ["text-color"]
+  };
+  function readThemeAttribute(element) {
+    var theme = {};
+    var rawTheme = element.getAttribute("theme");
+    if (rawTheme) {
+      try {
+        var parsed = JSON.parse(rawTheme);
+        if (parsed && typeof parsed === "object") theme = parsed;
+      } catch (_error) {}
+    }
+    Object.keys(tokenAttrs).forEach(function (key) {
+      tokenAttrs[key].some(function (attr) {
+        var value = element.getAttribute(attr);
+        if (value) {
+          theme[key] = value;
+          return true;
+        }
+        return false;
+      });
+    });
+    return theme;
+  }
+  function applyTheme(element, root) {
+    var theme = readThemeAttribute(element);
+    var variables = {
+      accentColor: "--sr-accent",
+      backgroundColor: "--sr-bg",
+      borderColor: "--sr-border",
+      mutedColor: "--sr-muted",
+      radius: "--sr-radius",
+      textColor: "--sr-text"
+    };
+    Object.keys(variables).forEach(function (key) {
+      if (theme[key]) root.style.setProperty(variables[key], String(theme[key]));
+    });
+  }
   function css() {
     return [
-      ":host{display:block;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}",
-      ".sr-form{--sr-accent:#0f766e;--sr-border:#d5d9df;--sr-muted:#64748b;--sr-panel:#f8fafc;--sr-text:#111827;background:#fff;border:1px solid var(--sr-border);border-radius:8px;color:var(--sr-text);display:grid;gap:12px;max-width:680px;padding:16px}.sr-field{display:grid;gap:6px}label{font-size:.82rem;font-weight:650}fieldset{border:0;margin:0;padding:0}legend{color:var(--sr-muted);font-size:.86rem;font-weight:700;margin-bottom:6px}input,select,textarea{border:1px solid var(--sr-border);border-radius:6px;box-sizing:border-box;font:inherit;min-height:40px;padding:8px 10px;width:100%;}input[type=checkbox],input[type=radio]{min-height:auto;padding:0;width:auto}textarea{min-height:90px}.sr-error,.sr-success,.sr-empty{border-radius:6px;padding:10px}.sr-error{background:#fef2f2;color:#991b1b}.sr-success{background:#ecfdf5;color:#065f46}.sr-empty{background:var(--sr-panel);color:var(--sr-muted)}button{background:var(--sr-accent);border:0;border-radius:6px;color:#fff;cursor:pointer;font:inherit;font-weight:700;min-height:42px;padding:9px 12px}button[disabled]{cursor:not-allowed;opacity:.6}.sr-secondary{background:#eef2f7;color:#111827}.sr-honeypot{height:0;left:-10000px;opacity:0;overflow:hidden;position:absolute;width:0}.sr-actions{align-items:center;display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}.sr-step{background:var(--sr-panel);border-radius:999px;color:var(--sr-muted);font-size:.78rem;font-weight:750;padding:4px 9px}.sr-choice{align-items:center;display:flex;gap:8px}.sr-signature-panel{display:grid;gap:8px}.sr-signature-pad{background:var(--sr-panel);border:1px solid var(--sr-border);border-radius:6px;height:150px;touch-action:none;width:100%}.sr-consent{align-items:flex-start;display:flex;gap:8px}.sr-help{color:var(--sr-muted);font-size:.82rem}"
+      ":host{display:block;font-family:var(--font-sans,Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif);}",
+      ".sr-form{--sr-accent:var(--color-brand,#0f766e);--sr-bg:var(--color-surface,#ffffff);--sr-border:var(--color-border,#d5d9df);--sr-muted:var(--color-muted,#64748b);--sr-panel:var(--color-surface-sunken,#f8fafc);--sr-text:var(--color-text,#111827);--sr-radius:var(--radius-card,8px);--sr-space-2:var(--space-2,8px);--sr-space-3:var(--space-3,12px);--sr-space-4:var(--space-4,16px);--sr-control:var(--control-height,42px);background:var(--sr-bg);border:1px solid var(--sr-border);border-radius:var(--sr-radius);color:var(--sr-text);display:grid;gap:var(--sr-space-3);max-width:680px;min-height:280px;padding:var(--sr-space-4)}.sr-field{display:grid;gap:6px}label{font-size:.82rem;font-weight:650}fieldset{border:0;margin:0;padding:0}legend{color:var(--sr-muted);font-size:.86rem;font-weight:700;margin-bottom:6px}input,select,textarea{background:var(--sr-bg);border:1px solid var(--sr-border);border-radius:calc(var(--sr-radius) - 2px);box-sizing:border-box;color:var(--sr-text);font:inherit;min-height:var(--sr-control);padding:8px 10px;width:100%;}input[type=checkbox],input[type=radio]{min-height:auto;padding:0;width:auto}textarea{min-height:90px}.sr-error,.sr-success,.sr-empty{border-radius:calc(var(--sr-radius) - 2px);min-height:48px;padding:10px}.sr-error{background:color-mix(in srgb,var(--color-danger,#991b1b) 8%,var(--sr-bg));color:var(--color-danger,#991b1b)}.sr-success{background:color-mix(in srgb,var(--color-success,#065f46) 9%,var(--sr-bg));color:var(--color-success,#065f46)}.sr-empty{background:var(--sr-panel);color:var(--sr-muted)}button{background:var(--sr-accent);border:0;border-radius:calc(var(--sr-radius) - 2px);color:#fff;cursor:pointer;font:inherit;font-weight:700;min-height:var(--sr-control);padding:9px 12px}button[disabled]{cursor:not-allowed;opacity:.6}.sr-secondary{background:var(--sr-panel);color:var(--sr-text)}.sr-honeypot{height:0;left:-10000px;opacity:0;overflow:hidden;position:absolute;width:0}.sr-actions{align-items:center;display:flex;flex-wrap:wrap;gap:var(--sr-space-2);justify-content:space-between}.sr-step{background:var(--sr-panel);border-radius:999px;color:var(--sr-muted);font-size:.78rem;font-weight:750;padding:4px 9px}.sr-choice{align-items:center;display:flex;gap:8px}.sr-signature-panel{display:grid;gap:8px}.sr-signature-pad{background:var(--sr-panel);border:1px solid var(--sr-border);border-radius:calc(var(--sr-radius) - 2px);height:150px;touch-action:none;width:100%}.sr-consent{align-items:flex-start;display:flex;gap:8px}.sr-help{color:var(--sr-muted);font-size:.82rem}"
     ].join("");
   }
   function isRecord(value) {
@@ -824,7 +955,7 @@ const formWidgetSource = String.raw`
   }
   class ShowrunnerForm extends HTMLElement {
     static get observedAttributes() {
-      return ["publishable-key", "key", "api-base", "slug", "attachment-target-type", "attachment-target-id"];
+      return ["publishable-key", "key", "api-base", "slug", "attachment-target-type", "attachment-target-id", "theme", "accent-color", "primary-color", "background-color", "border-color", "muted-color", "text-color", "radius"];
     }
     constructor() {
       super();
@@ -1010,7 +1141,7 @@ const formWidgetSource = String.raw`
             context.lineCap = "round";
             context.lineJoin = "round";
             context.lineWidth = 2.4;
-            context.strokeStyle = "#111827";
+            context.strokeStyle = getComputedStyle(this.shadowRoot.querySelector(".sr-form")).getPropertyValue("--sr-text").trim() || "#111827";
           }
           var drawing = false;
           var point = function (event) {
@@ -1143,6 +1274,7 @@ const formWidgetSource = String.raw`
         (this.loading ? "<div class='sr-empty'>Loading form...</div>" : "") +
         (!this.loading && this.form && !this.success ? (fields.length ? fields.map(fieldHtml).join("") : "<div class='sr-empty'>This form does not have fields yet.</div>") + "<div class='sr-honeypot'><label>Company website <input name='companyWebsite' tabindex='-1' autocomplete='off'></label></div>" + this.controlsHtml(fields) : "") +
       "</form>";
+      applyTheme(this, this.shadowRoot.querySelector(".sr-form"));
       var form = this.shadowRoot.querySelector("form");
       if (form && this.form && !this.success) {
         form.addEventListener("submit", this.submit.bind(this));

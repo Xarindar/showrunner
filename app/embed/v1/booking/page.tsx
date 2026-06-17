@@ -202,7 +202,6 @@ export default async function EmbedBookingPage({ searchParams }: EmbedBookingPag
       <style
         dangerouslySetInnerHTML={{
           __html: `
-            :root{--color-page:#fff;--color-surface:#fff;--color-text:#111827;--color-muted:#6b7280;--color-border:#e5e7eb;--color-danger:#991b1b;--radius-card:8px;--space-3:12px;--space-4:16px;--font-sans:system-ui,sans-serif;}
             html,body{background:var(--color-page);margin:0;min-height:0;}
             body{background:var(--color-page);}
             .embed-booking-page{background:var(--color-page);color:var(--color-text);font-family:var(--font-sans);margin:0;min-height:0;padding:0;}
