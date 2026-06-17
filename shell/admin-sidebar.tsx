@@ -8,6 +8,7 @@ import { hasAdminPermission } from "@/lib/admin-permissions";
 import { moduleIcons, moduleRegistry, type ModuleId } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
 import { logoutAction } from "@/app/admin/(protected)/actions";
+import { Button } from "@/components/ui";
 import { useState } from "react";
 
 type AdminSidebarProps = {
@@ -89,10 +90,10 @@ export function AdminSidebar({ businessName, enabledModules, userRole }: AdminSi
         </nav>
 
         <form action={logoutAction} className="admin-sidebar-actions">
-          <button className="button ghost" type="submit">
+          <Button variant="ghost" type="submit">
             <LogOut size={18} />
             Sign out
-          </button>
+          </Button>
         </form>
       </aside>
     </>

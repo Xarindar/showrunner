@@ -13,14 +13,21 @@ import { formatDateTime } from "@/lib/format";
 import { getPlatformStatus, type PlatformWarningSeverity } from "@/lib/platform-status";
 import { getSiteSettings } from "@/lib/site";
 import type { ModuleId } from "@/shell/modules";
-import { ButtonLink, EmptyState, EqualGrid, Table } from "@/components/ui";
+import { Badge, ButtonLink, Card, EmptyState, EqualGrid, StatTile, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-function warningPillClassName(severity: PlatformWarningSeverity) {
-  if (severity === "critical") return "pill danger";
-  if (severity === "warning") return "pill warning";
-  return "pill";
+function warningBadgeTone(severity: PlatformWarningSeverity) {
+  if (severity === "critical") return "danger";
+  if (severity === "warning") return "warning";
+  return "neutral";
+}
+
+function readinessBadgeTone(className: string) {
+  if (className.includes("danger")) return "danger";
+  if (className.includes("warning")) return "warning";
+  if (className.includes("success")) return "success";
+  return "neutral";
 }
 
 export default async function AdminDashboardPage() {
@@ -122,49 +129,22 @@ export default async function AdminDashboardPage() {
       </header>
 
       <EqualGrid className="dashboard-stat-grid" min="180px" aria-label="Business snapshot">
-        <Link className="ui-stat-tile" href="/admin/modules/appointments">
-          <span>Upcoming</span>
-          <strong>{upcomingCount}</strong>
-          <small>appointments ahead</small>
-        </Link>
-        <Link className="ui-stat-tile" href="/admin/modules/appointments">
-          <span>Needs review</span>
-          <strong>{pendingCount}</strong>
-          <small>pending requests</small>
-        </Link>
-        <Link className="ui-stat-tile" href="/admin/modules/clients">
-          <span>Clients</span>
-          <strong>{clientCount}</strong>
-          <small>saved records</small>
-        </Link>
-        <Link className="ui-stat-tile" href="/admin/modules/scheduling">
-          <span>Services</span>
-          <strong>{activeServiceCount}</strong>
-          <small>active offerings</small>
-        </Link>
+        <StatTile href="/admin/modules/appointments" label="Upcoming" value={upcomingCount} detail="appointments ahead" />
+        <StatTile href="/admin/modules/appointments" label="Needs review" value={pendingCount} detail="pending requests" />
+        <StatTile href="/admin/modules/clients" label="Clients" value={clientCount} detail="saved records" />
+        <StatTile href="/admin/modules/scheduling" label="Services" value={activeServiceCount} detail="active offerings" />
       </EqualGrid>
 
       <EqualGrid className="dashboard-stat-grid" min="180px" aria-label="Platform readiness snapshot">
-        <Link className="ui-stat-tile" href="/admin/modules/settings">
-          <span>Modules</span>
-          <strong>{platformStatus.enabledCount}</strong>
-          <small>enabled in the shell</small>
-        </Link>
-        <Link className="ui-stat-tile" href="/admin/modules/help">
-          <span>Live or mixed</span>
-          <strong>{platformStatus.liveCount}</strong>
-          <small>modules with runtime behavior</small>
-        </Link>
-        <Link className="ui-stat-tile" href="/admin/modules/help">
-          <span>Manual/foundation</span>
-          <strong>{platformStatus.manualCount + platformStatus.adminFoundationCount}</strong>
-          <small>modules not fully live</small>
-        </Link>
-        <Link className="ui-stat-tile" href="/admin/modules/help">
-          <span>Warnings</span>
-          <strong>{platformStatus.warnings.length}</strong>
-          <small>setup or operations notes</small>
-        </Link>
+        <StatTile href="/admin/modules/settings" label="Modules" value={platformStatus.enabledCount} detail="enabled in the shell" />
+        <StatTile href="/admin/modules/help" label="Live or mixed" value={platformStatus.liveCount} detail="modules with runtime behavior" />
+        <StatTile
+          href="/admin/modules/help"
+          label="Manual/foundation"
+          value={platformStatus.manualCount + platformStatus.adminFoundationCount}
+          detail="modules not fully live"
+        />
+        <StatTile href="/admin/modules/help" label="Warnings" value={platformStatus.warnings.length} detail="setup or operations notes" />
       </EqualGrid>
 
       <section className="dashboard-action-grid" aria-label="Admin shortcuts">
@@ -201,7 +181,7 @@ export default async function AdminDashboardPage() {
         <EqualGrid className="module-readiness-grid" min="240px">
           {enabledModuleStatus.map((item) => (
             <Link className="module-readiness-card" href={item.module.href} key={item.module.id}>
-              <span className={item.pillClassName}>{item.readinessLabel}</span>
+              <Badge tone={readinessBadgeTone(item.pillClassName)}>{item.readinessLabel}</Badge>
               <strong>{item.module.label}</strong>
               <small>{item.modeLabel}</small>
               <p>{item.module.readiness.summary}</p>
@@ -214,15 +194,20 @@ export default async function AdminDashboardPage() {
         </EqualGrid>
       </section>
 
-      <section className="card dashboard-panel">
-        <div className="page-header">
-          <div>
-            <h2>Operational warnings</h2>
-            <p>Setup gaps, manual-mode modules, and live checks that need attention.</p>
+      <Card
+        as="section"
+        className="dashboard-panel"
+        minHeight="lg"
+        reservedHeader={
+          <div className="page-header">
+            <div>
+              <h2>Operational warnings</h2>
+              <p>Setup gaps, manual-mode modules, and live checks that need attention.</p>
+            </div>
+            <AlertTriangle size={22} aria-hidden="true" />
           </div>
-          <AlertTriangle size={22} aria-hidden="true" />
-        </div>
-
+        }
+      >
         {topWarnings.length ? (
           <Table className="dashboard-table">
             <thead>
@@ -236,7 +221,7 @@ export default async function AdminDashboardPage() {
               {topWarnings.map((item) => (
                 <tr key={`${item.moduleId || "platform"}-${item.title}`}>
                   <td>
-                    <span className={warningPillClassName(item.severity)}>{item.severity}</span>
+                    <Badge tone={warningBadgeTone(item.severity)}>{item.severity}</Badge>
                   </td>
                   <td>{item.title}</td>
                   <td>{item.href ? <Link href={item.href}>{item.detail}</Link> : item.detail}</td>
@@ -247,20 +232,25 @@ export default async function AdminDashboardPage() {
         ) : (
           <EmptyState title="No platform warnings" description="All enabled modules are clear right now." />
         )}
-      </section>
+      </Card>
 
-      <section className="card dashboard-panel">
-        <div className="page-header">
-          <div>
-            <h2>Upcoming bookings</h2>
-            <p>Newest appointments that still need attention.</p>
+      <Card
+        as="section"
+        className="dashboard-panel"
+        minHeight="lg"
+        reservedHeader={
+          <div className="page-header">
+            <div>
+              <h2>Upcoming bookings</h2>
+              <p>Newest appointments that still need attention.</p>
+            </div>
+            <ButtonLink variant="secondary" href="/admin/modules/appointments">
+              <CalendarCheck size={18} />
+              Manage appointments
+            </ButtonLink>
           </div>
-          <ButtonLink variant="secondary" href="/admin/modules/appointments">
-            <CalendarCheck size={18} />
-            Manage appointments
-          </ButtonLink>
-        </div>
-
+        }
+      >
         <Table className="dashboard-table">
           <thead>
             <tr>
@@ -279,7 +269,7 @@ export default async function AdminDashboardPage() {
                 <td>{booking.service.name}</td>
                 <td>{formatDateTime(booking.startsAt, settings.timezone)}</td>
                 <td>
-                  <span className="pill">{booking.status.toLowerCase()}</span>
+                  <Badge>{booking.status.toLowerCase()}</Badge>
                 </td>
               </tr>
             ))}
@@ -301,7 +291,7 @@ export default async function AdminDashboardPage() {
                 </span>
                 <span>
                   <small>{formatDateTime(booking.startsAt, settings.timezone)}</small>
-                  <span className="pill">{booking.status.toLowerCase()}</span>
+                  <Badge>{booking.status.toLowerCase()}</Badge>
                 </span>
               </Link>
             ))}
@@ -311,7 +301,7 @@ export default async function AdminDashboardPage() {
             <EmptyState title="No upcoming bookings" description="New bookings will appear here with the same reserved row height." />
           </div>
         )}
-      </section>
+      </Card>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { Card, EqualGrid, SkeletonBlock, SkeletonLine } from "@/components/ui";
+
 type AdminSkeletonProps = {
   rows?: number;
 };
@@ -6,33 +8,32 @@ export function AdminSkeleton({ rows = 6 }: AdminSkeletonProps) {
   return (
     <div className="skeleton-screen" aria-busy="true" aria-label="Loading">
       <div className="skeleton-header">
-        <span className="skeleton-line short" />
-        <span className="skeleton-block" />
-        <span className="skeleton-line medium" />
+        <SkeletonLine width="short" />
+        <SkeletonBlock />
+        <SkeletonLine width="medium" />
       </div>
 
-      <div className="skeleton-grid">
+      <EqualGrid className="skeleton-grid" min="180px">
         {Array.from({ length: 4 }, (_, index) => (
-          <div className="skeleton-card" key={index}>
-            <span className="skeleton-line short" />
-            <span className="skeleton-block" />
-            <span className="skeleton-line medium" />
-          </div>
+          <Card className="skeleton-card" key={index} minHeight="sm">
+            <SkeletonLine width="short" />
+            <SkeletonBlock />
+            <SkeletonLine width="medium" />
+          </Card>
         ))}
-      </div>
+      </EqualGrid>
 
-      <div className="skeleton-panel">
-        <span className="skeleton-line short" />
+      <Card className="skeleton-panel" minHeight="lg" reservedHeader={<SkeletonLine width="short" />}>
         <div className="skeleton-stack">
           {Array.from({ length: rows }, (_, index) => (
             <div className="skeleton-row" key={index}>
               <span className="skeleton-dot" />
-              <span className="skeleton-line long" />
-              <span className="skeleton-line medium" />
+              <SkeletonLine width="long" />
+              <SkeletonLine width="medium" />
             </div>
           ))}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
