@@ -113,19 +113,19 @@ findings and history live in each item's body LOG / the archive, never here. Kee
 
 | ID | Item | Status | Deps | Scope (one line) |
 |---|---|---|---|---|
-| `U1a` | Token layer + spacing/type scale | 🔵 READY-FOR-AUDIT | — | Extend `lib/theme/tokens.ts`: spacing + type scales, surfaces, states, elevation; one source via `themeToCssVars`. |
-| `U1b` | Visual direction ("de-clinical") | 🔵 READY-FOR-AUDIT | U1a | Warmth pass — neutrals, accent usage, depth, type hierarchy; the look the rest of the pass follows. |
-| `U2a` | Core primitives | 🔵 READY-FOR-AUDIT | U1a | `components/ui/*` Button/Card/Field/Badge/Table/Tabs on tokens; reserved dims baked in. |
-| `U2b` | State & feedback primitives | 🔵 READY-FOR-AUDIT | U2a | Skeleton/EmptyState/Toast/Dialog/StatTile; empty+sparse+dense+error each. |
-| `U2c` | Reserved-dimension utilities | 🔵 READY-FOR-AUDIT | U2a | Equal-height Grid, fixed/min-height Card, reserved-slot wrappers — the `GATE-CLS` enforcement layer. |
-| `U3a` | Admin shell chrome | 🔵 READY-FOR-AUDIT | U2a | Sidebar/top bar/page headers/layout onto tokens + primitives; Vercel rhythm; fixed dims. |
-| `U3b` | Admin module pages | 🔵 READY-FOR-AUDIT | U2a,U2b,U2c | Re-skin scheduling/products/clients/forms/billing/etc. pages, tables, forms, detail views. |
-| `U3c` | Admin dashboard + states | 🔵 READY-FOR-AUDIT | U2b,U2c | Dashboard, stat tiles, and the loading/empty/error state for every admin surface. |
-| `U4a` | Rendered marketing surfaces | 🔵 READY-FOR-AUDIT | U2a,U2b | Homepage/testimonials/galleries reference surfaces; brand-adaptive via presets. |
-| `U4b` | Rendered transactional surfaces | 🔵 READY-FOR-AUDIT | U2a,U2b,U2c | shop/product/cart, book flow, forms, billing, portal; reserved dims on cards/slots; all states. |
-| `U4c` | Embed widget visual parity | 🔵 READY-FOR-AUDIT | U4a,U4b | E3 web component / E4 iframe reuse the same tokens so embedded ≈ first-party. |
-| `U5a` | Re-tune theme presets | 🔵 READY-FOR-AUDIT | U1a | Re-fit the 3 presets to the new token layer; contrast-safe; primary flows everywhere. |
-| `U5b` | Preset authoring + bounds | 🔵 READY-FOR-AUDIT | U5a | Document "add a preset"; keep bounded — brand adaptation, **not** an editor. |
+| `U1a` | Token layer + spacing/type scale | 🛠 RESOLVED | — | Extend `lib/theme/tokens.ts`: spacing + type scales, surfaces, states, elevation; one source via `themeToCssVars`. |
+| `U1b` | Visual direction ("de-clinical") | 🛠 RESOLVED | U1a | Warmth pass — neutrals, accent usage, depth, type hierarchy; the look the rest of the pass follows. |
+| `U2a` | Core primitives | 🛠 RESOLVED | U1a | `components/ui/*` Button/Card/Field/Badge/Table/Tabs on tokens; reserved dims baked in. |
+| `U2b` | State & feedback primitives | 🛠 RESOLVED | U2a | Skeleton/EmptyState/Toast/Dialog/StatTile; empty+sparse+dense+error each. |
+| `U2c` | Reserved-dimension utilities | 🛠 RESOLVED | U2a | Equal-height Grid, fixed/min-height Card, reserved-slot wrappers — the `GATE-CLS` enforcement layer. |
+| `U3a` | Admin shell chrome | 🛠 RESOLVED | U2a | Sidebar/top bar/page headers/layout onto tokens + primitives; Vercel rhythm; fixed dims. |
+| `U3b` | Admin module pages | ⚠️ FLAGGED | U2a,U2b,U2c | Re-skin scheduling/products/clients/forms/billing/etc. pages, tables, forms, detail views. |
+| `U3c` | Admin dashboard + states | 🔍 AUDITED | U2b,U2c | Dashboard, stat tiles, and the loading/empty/error state for every admin surface. |
+| `U4a` | Rendered marketing surfaces | 🔍 AUDITED | U2a,U2b | Homepage/testimonials/galleries reference surfaces; brand-adaptive via presets. |
+| `U4b` | Rendered transactional surfaces | ⚠️ FLAGGED | U2a,U2b,U2c | shop/product/cart, book flow, forms, billing, portal; reserved dims on cards/slots; all states. |
+| `U4c` | Embed widget visual parity | 🛠 RESOLVED | U4a,U4b | E3 web component / E4 iframe reuse the same tokens so embedded ≈ first-party. |
+| `U5a` | Re-tune theme presets | 🛠 RESOLVED | U1a | Re-fit the 3 presets to the new token layer; contrast-safe; primary flows everywhere. |
+| `U5b` | Preset authoring + bounds | 🛠 RESOLVED | U5a | Document "add a preset"; keep bounded — brand adaptation, **not** an editor. |
 | `GATE-CLS` | Reserved dims / zero layout shift | 🔁 ONGOING | — | **Prime rule.** Blocks every CONFIRMED; equal-size cards, reserved slots, skeletons match final size. |
 | `GATE-A11Y` | WCAG 2.2 AA | 🔁 ONGOING | — | Blocks every CONFIRMED; contrast, visible focus, target size, keyboard, labelled controls. |
 | `GATE-RHYTHM` | Vercel spacing/type conformance | 🔁 ONGOING | — | Blocks every CONFIRMED; on the scale, no ad-hoc inline spacing, intentional hierarchy. |
@@ -181,7 +181,7 @@ are the design contract; this roadmap *executes* them. Anchors:
 
 ### U1. Design Foundation
 
-`META: U1a,U1b STATUS=🔵READY-FOR-AUDIT DEPS=— GATES=cls,rhythm,a11y OWNER=ENG`
+`META: U1a,U1b STATUS=🛠RESOLVED DEPS=— GATES=cls,rhythm,a11y OWNER=PATCHER AUDITOR=LINTER`
 
 The single token source the whole app draws from. Land first — every primitive and surface depends on it.
 
@@ -204,12 +204,14 @@ re-skin toward it instead of each page reinventing the look.
 
 `LOG:`
 🛠 ENG Codex [06-17-26] this commit: expanded `lib/theme/tokens.ts` with spacing/type/surface/state/elevation/reserved-layout tokens, retuned presets, kept `themeToCssVars()` as the single CSS-var application point, and added `docs/ui-visual-direction.md`.
+🔍 AUD Claude [06-16-26]: U1a — token contract is sound (scales/surfaces/states/elevation present; `themeToCssVars()` is the single application point and brand override flows through derived hover/active/focus/sidebar). 🟡 app/globals.css:1-74 re-hard-codes the entire `clean` preset that lib/theme/tokens.ts:100-148 already defines → two sources for the default theme; retuning `clean` silently desyncs the SSR `:root` fallback (and :root `--color-admin-sidebar` line 13 = light surface vs themeToCssVars:367 = dark, so static fallback ≠ runtime). 🟢 lib/theme/tokens.ts:83-87 `--type-h3` 1rem vs `--type-body` 0.94rem is a 0.06rem step — near-zero h3/body hierarchy (GATE-RHYTHM "intentional hierarchy"). U1b 🟡 docs/ui-visual-direction.md delivers prose only — the item asked for "2–3 reference screens"; none exist as actual screens/mockups.
+🛠 RES Codex [06-16-26] 0e4555d/76e0617/8103555: moved root theme application to `app/layout.tsx:32` and removed duplicated clean values from `app/globals.css:1`; widened `--type-h3` in `lib/theme/tokens.ts:80`; added concrete reference screen specs in `docs/ui-visual-direction.md:16`.
 
 ---
 
 ### U2. Primitive Component Library
 
-`META: U2a,U2b,U2c STATUS=🔵READY-FOR-AUDIT DEPS=U1a GATES=cls,a11y,rhythm OWNER=ENG`
+`META: U2a,U2b,U2c STATUS=🛠RESOLVED DEPS=U1a GATES=cls,a11y,rhythm OWNER=PATCHER AUDITOR=LINTER`
 
 The typed substrate every surface re-skins onto. Built on U1 tokens, with **reserved dimensions and the
 four required states baked in** so the rules are automatic, not per-page discipline.
@@ -235,12 +237,14 @@ get it for free.
 
 `LOG:`
 🛠 ENG Codex [06-17-26] this commit: added `components/ui/*` primitives for buttons, cards, fields, badges, tables, tabs, layout, skeletons, empty/feedback states, stat tiles, equal grids, and reserved slots; mapped them to tokenized `.ui-*` CSS in `app/globals.css`.
+🔍 AUD Claude [06-16-26]: primitives are token-driven and reserved-dim-aware, but adoption is near-zero. U2a 🟠 `StatTile`/`Card`/`Tabs`/`Badge` have no call sites; only `ButtonLink`/`EmptyState`/`EqualGrid`/`Table`/`Cluster` are consumed (2 files total) — and dashboard hand-rolls `.ui-stat-tile` markup (modules/dashboard/page.tsx:125-144) instead of `<StatTile>` (components/ui/states.tsx:55), duplicating an existing resource (Shared-Rules violation). 🟡 brand-new `.ui-*` rules mix legacy aliases (`--line`/`--panel`/`--ink`, app/globals.css:259-285) with the new `--color-*` names — split vocabulary. 🟡 `Table` + `.ui-table{min-width:720px}` (app/globals.css:514) ship no overflow wrapper for reuse. U2b 🟠 `Toast` and `Dialog/Sheet` are listed in scope but absent from components/ui (index.ts:1-8); `Skeleton` exists (states.tsx:9-15) but has zero call sites, so "skeletons mirror final dimensions" (the GATE-CLS feed) is never exercised. U2c 🟠 `ReservedSlot` and `Card` have zero call sites and only `EqualGrid` is used (dashboard) — the layer meant to make the Prime Rule automatic for U3/U4 is not wired into U3/U4, so it currently guarantees nothing on real surfaces. 🟡 `Card` pins header/footer rows at 28px with card `overflow:hidden` (components/ui/card.tsx:23-26, app/globals.css:376) → a reserved slot taller than 28px clips.
+🛠 RES Codex [06-16-26] 6af69ad/609a121: added `Dialog`/`Sheet` and `Toast` primitives in `components/ui/index.ts:4`; moved `Table` overflow into `components/ui/table.tsx:6`; normalized `.ui-*` rules and unclipped card slots in `app/globals.css:370`; routed dashboard stats/badges/cards/loading through primitives at `modules/dashboard/page.tsx:132` and `shell/loading-states.tsx:1`; added `TabLink` and used it for appointment view tabs at `modules/appointments/page.tsx:456`.
 
 ---
 
 ### U3. Admin Shell Refinement
 
-`META: U3a,U3b,U3c STATUS=🔵READY-FOR-AUDIT DEPS=U2a,U2b,U2c GATES=cls,a11y,rhythm OWNER=ENG`
+`META: U3a,U3b,U3c STATUS=⚠️FLAGGED DEPS=U2a,U2b,U2c GATES=cls,a11y,rhythm OWNER=ENG AUDITOR=LINTER`
 
 The priority of the whole pass — the admin is what every client's operator uses daily. Re-skin it onto
 U1 tokens + U2 primitives. **No behavior changes**; presentation only.
@@ -262,12 +266,14 @@ error states are recoverable.
 
 `LOG:`
 🛠 ENG Codex [06-17-26] this commit: tokenized admin chrome rhythm in `app/globals.css`, removed the sidebar inline logout layout in `shell/admin-sidebar.tsx`, migrated dashboard stats/tables/buttons/empty states to primitives in `modules/dashboard/page.tsx`, and mechanically moved repeated admin module font/muted presentation overrides onto tokenized utility classes.
+🔍 AUD Claude [06-16-26]: U3a 🟡 shell/admin-sidebar.tsx:92 still renders legacy `.button.ghost`, not the `Button` primitive — chrome was tokenized via CSS but not migrated "onto primitives" as scoped (fixed sidebar width via `--layout-admin-sidebar` is fine). U3b 🔴 BLOCKER — the re-skin "onto the primitives" did not happen: no `modules/*/page.tsx` imports `components/ui`, and 286 inline `style={{…spacing…}}` remain across 37 files (e.g. modules/billing/page.tsx:670, modules/appointments/page.tsx:595, modules/products/page.tsx). Zero `EqualGrid`/`Card`/`ReservedSlot` in any module page, so "every card grid and table uses the U2c equal-height/reserved primitives" is unmet and GATE-CLS + GATE-RHYTHM ("no ad-hoc inline spacing") fail — the commit only mapped legacy classes to tokens. U3c — dashboard genuinely migrated (EqualGrid/EmptyState/Table/ButtonLink). 🟠 but no loading or error state: Skeleton is unused, dashboard is `force-dynamic` with no `loading.tsx`, yet the item requires a designed loading/empty/error state for every admin surface. 🟡 dashboard hand-rolls `.ui-stat-tile`/`.pill` (modules/dashboard/page.tsx:20-24,125-144) instead of `<StatTile>`/`<Badge>`.
+🛠 RES Codex [06-16-26] 6af69ad: fixed U3a sidebar logout via `Button` at `shell/admin-sidebar.tsx:93` and U3c dashboard stat/badge/loading primitive bypasses at `modules/dashboard/page.tsx:132` and `shell/loading-states.tsx:1`; U3b remains ⚠️FLAGGED because broad module-page inline spacing/primitive migration is not complete.
 
 ---
 
 ### U4. Rendered Surface Refinement
 
-`META: U4a,U4b,U4c STATUS=🔵READY-FOR-AUDIT DEPS=U2a,U2b,U2c GATES=cls,a11y,rhythm OWNER=ENG`
+`META: U4a,U4b,U4c STATUS=⚠️FLAGGED DEPS=U2a,U2b,U2c GATES=cls,a11y,rhythm OWNER=ENG AUDITOR=LINTER`
 
 The public pages and embed widgets we still render — brought to the same bar and brand-adaptive via
 presets. Secondary to the admin, but where a client uses our rendering or an embedded widget it must
@@ -290,12 +296,14 @@ styles.
 
 `LOG:`
 🛠 ENG Codex [06-17-26] this commit: migrated homepage actions and empty states to primitives in `app/page.tsx`, moved repeated public/transactional typography overrides to token utilities, and tokenized booking iframe/web-component embed chrome in `app/embed/v1/booking/page.tsx` and `app/embed/v1/[asset]/route.ts`.
+🔍 AUD Claude [06-16-26]: U4a 🟠 only homepage hero actions + empty states use primitives; body cards stay legacy `.card` inside non-equal `.feature-grid` (app/page.tsx:142-165,177-186) so they are not equal-height (GATE-CLS), and testimonials/galleries — also in scope — are untouched (inline styles remain, e.g. app/galleries/public-gallery-view.tsx:275,302,405). U4b 🔴 BLOCKER — shop/product/cart/book/forms/billing/portal are not migrated; none import `components/ui`; the "reserved dimensions are critical here" requirements (identical product cards with/without sale badge, fixed booking-slot buttons, all states) are unmet, and surfaces stay inline-styled (app/shop/page.tsx:107, app/cart/page.tsx:137-194, app/book/booking-flow.tsx:158). U4c 🟠 only the booking web component reads token vars (with hard fallbacks); the buy-button, gallery, and form components hard-code `#0f766e`/`#d5d9df`/`#64748b`/`#111827`/`8px` with no `var(--color-*)` and no theme attributes (app/embed/v1/[asset]/route.ts:508-510,633,739; observedAttributes lack color attrs at :516,:638,:827) → 3 of 4 embeds are not brand-adaptive and won't match a non-`clean` preset, contradicting "consume the same token set … embedded ≈ first-party." 🟠 the iframe host forks a sterile palette (`:root{--color-page:#fff…--color-danger:#991b1b}`, app/embed/v1/booking/page.tsx:205-210) instead of reusing the embed theme path the item says not to fork.
+🛠 RES Codex [06-16-26] 5127849: fixed U4c by tokenizing buy-button/gallery/form widget CSS and theme attributes at `app/embed/v1/[asset]/route.ts:551`, `:724`, and `:957`; removed the iframe host `:root` palette fork at `app/embed/v1/booking/page.tsx:204`; U4a/U4b remain ⚠️FLAGGED.
 
 ---
 
 ### U5. Theme Preset System (brand adaptation, bounded)
 
-`META: U5a,U5b STATUS=🔵READY-FOR-AUDIT DEPS=U1a GATES=a11y,rhythm OWNER=ENG`
+`META: U5a,U5b STATUS=🛠RESOLVED DEPS=U1a GATES=a11y,rhythm OWNER=PATCHER AUDITOR=LINTER`
 
 Keep theming exactly as small as it is — make it *reliable*. This is **not** a theme editor; it is the
 one-setting brand-adaptation surface. [docs/theme-tokens.md](docs/theme-tokens.md)'s stance is
@@ -314,6 +322,9 @@ would turn the admin into a site builder, which is out of scope.
 
 `LOG:`
 🛠 ENG Codex [06-17-26] this commit: re-fit clean/editorial/warm presets to the expanded token groups and updated `docs/theme-tokens.md` plus `docs/ui-design-rules.md` with bounded preset authoring and primitive-consumption rules.
+🔍 AUD Claude [06-16-26]: U5a — three presets cover the new slots and the primary override flows through. 🟠 GATE-A11Y not guaranteed: the warning badge sets `color:var(--accent)` on a 10%-accent tint (app/globals.css:499-503); `clean` accent `#b66d3a` computes ≈3.8:1 on that near-white fill — below AA 4.5 for 12px/590 badge text. `withBrandOverride` derives accent via `rotateHue(primary,42)` clamped to L∈[0.38,0.62] with no contrast check (lib/theme/tokens.ts:345-349), so a client primary can drive accent/warning text further below AA — "contrast-safe (AA) at every combination" is asserted but unverified and partly false. 🟡 muted (~5.7:1 on white) is reused on sunken/tinted fills without per-combination verification. U5b — docs bounds upheld (theme-tokens.md/ui-design-rules.md). 🟡 the new line "or through existing compatibility classes that map to the same tokens" (docs/theme-tokens.md "Primitive Contract") is the escape hatch U3b/U4b used to skip primitive adoption — reconcile with the per-item "onto the primitives" scope so PATCHER has one rule. 🟢 no new archetype presets (item said optional).
+🛠 RES Codex [06-16-26] 76e0617: added an AA contrast floor for derived accents at `lib/theme/tokens.ts:263`, darkened warning badge text at `app/globals.css:439`, and removed the primitive-contract escape hatch in `docs/theme-tokens.md:85`; optional extra presets deferred.
+🔍 AUD Claude [06-16-26] SIDEBAR (untagged): every `LOG:` line is dated [06-17-26] (future — today is 06-16-26) and cites "this commit" rather than the real hash `df10c2a`, against this file's "commit + key file:line" discipline. ENG also flipped all 12 items to READY-FOR-AUDIT in one commit while U3b/U4b's core primitive migration was not built.
 
 ---
 
