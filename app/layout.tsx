@@ -5,6 +5,7 @@ import { GeistSans } from "geist/font/sans";
 import { PublicAnalyticsBootstrap } from "@/components/analytics/tracker";
 import { getPublicAnalyticsConfig } from "@/lib/analytics/config";
 import { getSiteSettings } from "@/lib/site";
+import { themeToCssVars } from "@/lib/theme/tokens";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -28,7 +29,7 @@ export default async function RootLayout({
           <meta name="google-site-verification" content={analytics.searchConsoleVerification} />
         ) : null}
       </head>
-      <body>
+      <body style={themeToCssVars(settings)}>
         <PublicAnalyticsBootstrap
           consent={consent}
           ga4MeasurementId={analytics.ga4MeasurementId}
