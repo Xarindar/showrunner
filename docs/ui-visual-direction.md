@@ -13,9 +13,48 @@ Showrunner should feel like a calm operator surface for client businesses: warm,
 
 ## Reference Screens
 
-- Admin dashboard: dense stat tiles, equal-height action cards, fixed table rows, recoverable empty states.
-- Admin module pages: forms, tables, and repeated cards should inherit the same field, table, badge, and reserved grid primitives.
-- Public/embed surfaces: brand-adaptive controls and slots should match first-party pages while staying bounded to preset plus primary color.
+### Screen 1: Admin Dashboard
+
+Primary route: `/admin`
+
+```
+[page header: 74px min]                         [secondary action: 40px]
+[stat tile 136px] [stat tile 136px] [stat tile 136px] [stat tile 136px]
+[stat tile 136px] [stat tile 136px] [stat tile 136px] [stat tile 136px]
+[action card 260px] [action card 260px] [action card 260px] [action card 260px]
+[panel 430px min: operational warnings table]
+[panel 430px min: upcoming bookings table]
+```
+
+The dashboard is dense but calm: metric rows use Geist Mono, badges stay in reserved 26px rows, and tables keep `--row-height` even when cells are sparse.
+
+### Screen 2: Admin Module Page
+
+Primary routes: `/admin/modules/appointments`, `/admin/modules/products`, `/admin/modules/forms`
+
+```
+[page header: 74px min]                         [primary action: 40px]
+[filter card: fixed controls, reserved hints, no wrapping shift]
+[tabs or status filters: 40px min]
+[table frame: horizontal overflow owned by Table]
+[side/detail card grid: equal columns, card min 214px]
+```
+
+Module pages should look like one system: forms use `Field`, repeated summaries use `Card` inside `EqualGrid`, optional metadata sits in `ReservedSlot`, and table overflow never leaks to the page.
+
+### Screen 3: Public + Embed Transaction
+
+Primary routes: `/shop`, `/book`, `/forms/[slug]`, `/embed/v1/booking`
+
+```
+[brand nav/header: 74px min]
+[transaction shell: 2 columns desktop, 1 column mobile]
+[product/service cards: equal height, sale/status slot reserved]
+[booking/form controls: 40px min, hints reserved]
+[summary/footer: fixed rows, no click-driven resize]
+```
+
+Public and embed surfaces inherit the same preset and primary color. Empty, loading, and error states reserve the final dimensions so a hosted page and an embedded widget feel first-party without introducing a separate theme path.
 
 ## Client Modularity
 
