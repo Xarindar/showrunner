@@ -10,6 +10,7 @@ import { addDaysToDateKey, getTodayDateKey, parseZonedDateKey } from "@/lib/time
 import { promoteWaitlistEntryAction, updateWaitlistEntryStatusAction } from "./actions";
 import { AppointmentCalendar, type AppointmentCalendarBooking, type AppointmentCalendarDay } from "./components/appointment-calendar";
 import { AppointmentsTable } from "./components/appointments-table";
+import { TabLink, Tabs } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -450,10 +451,10 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
           </button>
         </form>
 
-        <div className="appointment-calendar-view-tabs">
+        <Tabs className="appointment-calendar-view-tabs" aria-label="Calendar view">
           {calendarViews.map((item) => (
-            <Link
-              className={item === view ? "button" : "button secondary"}
+            <TabLink
+              aria-selected={item === view}
               href={calendarHref({
                 dateKey: selectedDateKey,
                 resourceId: selectedResourceId,
@@ -464,9 +465,9 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
               key={item}
             >
               {item}
-            </Link>
+            </TabLink>
           ))}
-        </div>
+        </Tabs>
 
         <AppointmentCalendar bookings={calendarItems} days={days} hours={calendarHours} view={view} />
       </section>
