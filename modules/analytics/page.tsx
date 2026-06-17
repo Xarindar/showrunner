@@ -1,11 +1,11 @@
-import Link from "next/link";
 import { AnalyticsEventType, BookingStatus, OrderStatus, PortfolioGalleryStatus, Prisma } from "@prisma/client";
-import { BarChart3, CheckCircle2, MousePointerClick, Plus, TrendingUp } from "lucide-react";
+import { Plus } from "lucide-react";
 import { enforceAnalyticsRetention } from "@/lib/analytics/retention";
 import { requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
+import { Badge, Button, ButtonLink, Card, EqualGrid, Feedback, Field, Input, Select, Stack, StatTile, Table } from "@/components/ui";
 import { createAnalyticsGoalAction, recordAnalyticsEventAction, updateAnalyticsGoalStatusAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -110,215 +110,114 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           <h1>Events, attribution, and reporting</h1>
           <p>Track standard events, summarize module performance, and define conversion goals for future widgets and automations.</p>
         </div>
-        <Link className="button secondary" href="/admin/modules/analytics/export">
+        <ButtonLink variant="secondary" href="/admin/modules/analytics/export">
           Export CSV
-        </Link>
+        </ButtonLink>
       </header>
 
-      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-      {errorMessage ? <div className="error">{errorMessage}</div> : null}
+      {savedMessage ? <Feedback tone="success">{savedMessage}</Feedback> : null}
+      {errorMessage ? <Feedback tone="danger">{errorMessage}</Feedback> : null}
 
-      <section className="grid-3">
-        <div className="card">
-          <MousePointerClick size={22} />
-          <h3>{eventCount} events</h3>
-          <p className="lead lead-compact">
-            Captured analytics rows across public pages, server events, manual records, and future embedded widgets.
-          </p>
-        </div>
-        <div className="card">
-          <CheckCircle2 size={22} />
-          <h3>
-            {completedBookingCount}/{bookingCount} bookings
-          </h3>
-          <p className="lead lead-compact">
-            Completed bookings compared with the total appointment queue.
-          </p>
-        </div>
-        <div className="card">
-          <TrendingUp size={22} />
-          <h3>{formatMoney(paidRevenue._sum.totalCents || 0)}</h3>
-          <p className="lead lead-compact">
-            Paid order revenue across {paidOrders} paid commerce orders.
-          </p>
-        </div>
-      </section>
-
-      <section className="grid-3">
-        <div className="card">
-          <BarChart3 size={22} />
-          <h3>{leadSubmissionCount} form leads</h3>
-          <p className="lead lead-compact">
-            Public form submissions available for lead attribution and follow-up.
-          </p>
-        </div>
-        <div className="card">
-          <BarChart3 size={22} />
-          <h3>{publishedGalleryCount} published galleries</h3>
-          <p className="lead lead-compact">
-            Portfolio surfaces that can emit gallery and proofing engagement.
-          </p>
-        </div>
-        <div className="card">
-          <BarChart3 size={22} />
-          <h3>
-            {galleryViewCount} views / {favoriteCount} favorites
-          </h3>
-          <p className="lead lead-compact">
-            Gallery engagement from tracked events and proofing selections.
-          </p>
-        </div>
-      </section>
+      <EqualGrid min="220px" aria-label="Analytics summary">
+        <StatTile label="Events" value={eventCount} detail="Captured across public pages, server events, manual records, and widgets." />
+        <StatTile label="Bookings" value={`${completedBookingCount}/${bookingCount}`} detail="Completed bookings compared with the appointment queue." />
+        <StatTile label="Paid revenue" value={formatMoney(paidRevenue._sum.totalCents || 0)} detail={`Across ${paidOrders} paid commerce orders.`} />
+        <StatTile label="Form leads" value={leadSubmissionCount} detail="Public form submissions available for attribution and follow-up." />
+        <StatTile label="Published galleries" value={publishedGalleryCount} detail="Portfolio surfaces emitting gallery and proofing engagement." />
+        <StatTile label="Gallery engagement" value={`${galleryViewCount} / ${favoriteCount}`} detail="Tracked gallery views and proofing favorites." />
+      </EqualGrid>
 
       <section className="grid-2">
-        <form action={recordAnalyticsEventAction} className="card form-grid">
+        <Card as="section" minHeight="none">
+        <form action={recordAnalyticsEventAction} className="form-grid">
           <h2 className="section-title">Record manual event</h2>
           <div className="grid-2">
-            <div className="field">
-              <label htmlFor="event-type">Event type</label>
-              <select id="event-type" name="eventType" defaultValue={AnalyticsEventType.CUSTOM}>
+            <Field label="Event type" htmlFor="event-type">
+              <Select id="event-type" name="eventType" defaultValue={AnalyticsEventType.CUSTOM}>
                 {Object.values(AnalyticsEventType).map((type) => (
                   <option key={type} value={type}>
                     {enumLabel(type)}
                   </option>
                 ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="event-name">Event name</label>
-              <input id="event-name" name="eventName" placeholder="custom_event_name" />
-            </div>
+              </Select>
+            </Field>
+            <Field label="Event name" htmlFor="event-name">
+              <Input id="event-name" name="eventName" placeholder="custom_event_name" />
+            </Field>
           </div>
           <div className="grid-3">
-            <div className="field">
-              <label htmlFor="event-source">Source</label>
-              <input id="event-source" name="source" placeholder="google" />
-            </div>
-            <div className="field">
-              <label htmlFor="event-medium">Medium</label>
-              <input id="event-medium" name="medium" placeholder="organic" />
-            </div>
-            <div className="field">
-              <label htmlFor="event-campaign">Campaign</label>
-              <input id="event-campaign" name="campaign" />
-            </div>
+            <Field label="Source" htmlFor="event-source"><Input id="event-source" name="source" placeholder="google" /></Field>
+            <Field label="Medium" htmlFor="event-medium"><Input id="event-medium" name="medium" placeholder="organic" /></Field>
+            <Field label="Campaign" htmlFor="event-campaign"><Input id="event-campaign" name="campaign" /></Field>
           </div>
           <div className="grid-2">
-            <div className="field">
-              <label htmlFor="event-pathname">Pathname</label>
-              <input id="event-pathname" name="pathname" placeholder="/book" />
-            </div>
-            <div className="field">
-              <label htmlFor="event-landing">Landing page</label>
-              <input id="event-landing" name="landingPage" placeholder="/" />
-            </div>
+            <Field label="Pathname" htmlFor="event-pathname"><Input id="event-pathname" name="pathname" placeholder="/book" /></Field>
+            <Field label="Landing page" htmlFor="event-landing"><Input id="event-landing" name="landingPage" placeholder="/" /></Field>
           </div>
           <div className="grid-2">
-            <div className="field">
-              <label htmlFor="event-client-email">Client email</label>
-              <input id="event-client-email" name="clientEmail" type="email" />
-            </div>
-            <div className="field">
-              <label htmlFor="event-referrer">Referrer</label>
-              <input id="event-referrer" name="referrer" />
-            </div>
+            <Field label="Client email" htmlFor="event-client-email"><Input id="event-client-email" name="clientEmail" type="email" /></Field>
+            <Field label="Referrer" htmlFor="event-referrer"><Input id="event-referrer" name="referrer" /></Field>
           </div>
           <div className="grid-3">
-            <div className="field">
-              <label htmlFor="event-value">Value</label>
-              <input id="event-value" name="value" inputMode="decimal" placeholder="125.00" />
-            </div>
-            <div className="field">
-              <label htmlFor="event-currency">Currency</label>
-              <input id="event-currency" name="currency" defaultValue="USD" maxLength={3} />
-            </div>
-            <div className="field">
-              <label htmlFor="event-occurred">Occurred at</label>
-              <input id="event-occurred" name="occurredAt" type="datetime-local" />
-            </div>
+            <Field label="Value" htmlFor="event-value"><Input id="event-value" name="value" inputMode="decimal" placeholder="125.00" /></Field>
+            <Field label="Currency" htmlFor="event-currency"><Input id="event-currency" name="currency" defaultValue="USD" maxLength={3} /></Field>
+            <Field label="Occurred at" htmlFor="event-occurred"><Input id="event-occurred" name="occurredAt" type="datetime-local" /></Field>
           </div>
           <div className="grid-2">
-            <div className="field">
-              <label htmlFor="event-related-type">Related type</label>
-              <input id="event-related-type" name="relatedType" placeholder="booking" />
-            </div>
-            <div className="field">
-              <label htmlFor="event-related-id">Related id</label>
-              <input id="event-related-id" name="relatedId" />
-            </div>
+            <Field label="Related type" htmlFor="event-related-type"><Input id="event-related-type" name="relatedType" placeholder="booking" /></Field>
+            <Field label="Related id" htmlFor="event-related-id"><Input id="event-related-id" name="relatedId" /></Field>
           </div>
           <div className="grid-2">
-            <div className="field">
-              <label htmlFor="event-metadata-key">Metadata key</label>
-              <input id="event-metadata-key" name="metadataKey" placeholder="service" />
-            </div>
-            <div className="field">
-              <label htmlFor="event-metadata-value">Metadata value</label>
-              <input id="event-metadata-value" name="metadataValue" />
-            </div>
+            <Field label="Metadata key" htmlFor="event-metadata-key"><Input id="event-metadata-key" name="metadataKey" placeholder="service" /></Field>
+            <Field label="Metadata value" htmlFor="event-metadata-value"><Input id="event-metadata-value" name="metadataValue" /></Field>
           </div>
-          <button className="button" type="submit">
+          <Button type="submit">
             <Plus size={18} />
             Record manual event
-          </button>
+          </Button>
         </form>
+        </Card>
 
-        <form action={createAnalyticsGoalAction} className="card form-grid">
+        <Card as="section" minHeight="none">
+        <form action={createAnalyticsGoalAction} className="form-grid">
           <h2 className="section-title">Create conversion goal</h2>
           <div className="grid-2">
-            <div className="field">
-              <label htmlFor="goal-name">Name</label>
-              <input id="goal-name" name="name" required />
-            </div>
-            <div className="field">
-              <label htmlFor="goal-key">Key</label>
-              <input id="goal-key" name="key" placeholder="bookings-completed" />
-            </div>
+            <Field label="Name" htmlFor="goal-name"><Input id="goal-name" name="name" required /></Field>
+            <Field label="Key" htmlFor="goal-key"><Input id="goal-key" name="key" placeholder="bookings-completed" /></Field>
           </div>
           <div className="grid-2">
-            <div className="field">
-              <label htmlFor="goal-event-type">Event type</label>
-              <select id="goal-event-type" name="eventType" defaultValue={AnalyticsEventType.BOOKING_COMPLETED}>
+            <Field label="Event type" htmlFor="goal-event-type">
+              <Select id="goal-event-type" name="eventType" defaultValue={AnalyticsEventType.BOOKING_COMPLETED}>
                 {Object.values(AnalyticsEventType).map((type) => (
                   <option key={type} value={type}>
                     {enumLabel(type)}
                   </option>
                 ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="goal-event-name">Event name</label>
-              <input id="goal-event-name" name="eventName" placeholder="booking completed" />
-            </div>
+              </Select>
+            </Field>
+            <Field label="Event name" htmlFor="goal-event-name"><Input id="goal-event-name" name="eventName" placeholder="booking completed" /></Field>
           </div>
           <div className="grid-3">
-            <div className="field">
-              <label htmlFor="goal-target-count">Target count</label>
-              <input id="goal-target-count" name="targetCount" type="number" min="1" defaultValue="10" required />
-            </div>
-            <div className="field">
-              <label htmlFor="goal-target-value">Target value</label>
-              <input id="goal-target-value" name="targetValue" inputMode="decimal" />
-            </div>
-            <div className="field">
-              <label htmlFor="goal-currency">Currency</label>
-              <input id="goal-currency" name="currency" defaultValue="USD" maxLength={3} />
-            </div>
+            <Field label="Target count" htmlFor="goal-target-count"><Input id="goal-target-count" name="targetCount" type="number" min="1" defaultValue="10" required /></Field>
+            <Field label="Target value" htmlFor="goal-target-value"><Input id="goal-target-value" name="targetValue" inputMode="decimal" /></Field>
+            <Field label="Currency" htmlFor="goal-currency"><Input id="goal-currency" name="currency" defaultValue="USD" maxLength={3} /></Field>
           </div>
-          <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+          <label className="ui-check-row">
             <input name="isActive" type="checkbox" defaultChecked />
             Active
           </label>
-          <button className="button secondary" type="submit">
+          <Button variant="secondary" type="submit">
             Add goal
-          </button>
+          </Button>
         </form>
+        </Card>
       </section>
 
       <section className="grid-2">
-        <div className="card stack">
+        <Card as="section" minHeight="none">
+        <Stack>
           <h2 className="section-title">Conversion goals</h2>
-          <table className="table">
+          <Table>
             <thead>
               <tr>
                 <th>Goal</th>
@@ -342,20 +241,20 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                     <td>
                       {progress.count}/{goal.targetCount}
                       {goal.targetValueCents ? ` - ${formatMoney(progress.valueCents, goal.currency)}` : ""}
-                      <div style={{ background: "var(--bg)", borderRadius: 999, height: 8, marginTop: 6, overflow: "hidden" }}>
-                        <div style={{ background: "var(--primary)", height: "100%", width: `${progressPercent}%` }} />
-                      </div>
+                      <span className="ui-progress" aria-hidden="true">
+                        <span className={`ui-progress-fill ui-progress-fill-${Math.ceil(progressPercent / 10) * 10}`} />
+                      </span>
                     </td>
                     <td>
-                      <span className={goal.isActive ? "pill success" : "pill danger"}>{goal.isActive ? "active" : "paused"}</span>
+                      <Badge tone={goal.isActive ? "success" : "danger"}>{goal.isActive ? "active" : "paused"}</Badge>
                     </td>
                     <td>
                       <form action={updateAnalyticsGoalStatusAction}>
                         <input type="hidden" name="id" value={goal.id} />
                         <input type="hidden" name="isActive" value={goal.isActive ? "false" : "true"} />
-                        <button className="button secondary" type="submit">
+                        <Button variant="secondary" type="submit">
                           {goal.isActive ? "Pause" : "Activate"}
-                        </button>
+                        </Button>
                       </form>
                     </td>
                   </tr>
@@ -367,12 +266,14 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                 </tr>
               ) : null}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Stack>
+        </Card>
 
-        <div className="card stack">
+        <Card as="section" minHeight="none">
+        <Stack>
           <h2 className="section-title">Top events</h2>
-          <table className="table">
+          <Table>
             <thead>
               <tr>
                 <th>Event</th>
@@ -392,14 +293,16 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                 </tr>
               ) : null}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Stack>
+        </Card>
       </section>
 
       <section className="grid-2">
-        <div className="card stack">
+        <Card as="section" minHeight="none">
+        <Stack>
           <h2 className="section-title">Source attribution</h2>
-          <table className="table">
+          <Table>
             <thead>
               <tr>
                 <th>Source</th>
@@ -419,12 +322,14 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                 </tr>
               ) : null}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Stack>
+        </Card>
 
-        <div className="card stack">
+        <Card as="section" minHeight="none">
+        <Stack>
           <h2 className="section-title">Recent events</h2>
-          <table className="table">
+          <Table>
             <thead>
               <tr>
                 <th>Event</th>
@@ -452,8 +357,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                 </tr>
               ) : null}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Stack>
+        </Card>
       </section>
     </div>
   );

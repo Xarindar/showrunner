@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
+import { Badge, Button, Card, EqualGrid, Feedback, Field, Input, Select, StatTile, Table } from "@/components/ui";
 import { createAdminUserAction, deleteAdminUserAction, updateAdminUserRoleAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -40,58 +41,46 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
         </div>
       </header>
 
-      {params.saved ? <div className="success-message">Admin user changes saved.</div> : null}
-      {params.error ? <div className="error">{params.error}</div> : null}
+      {params.saved ? <Feedback tone="success">Admin user changes saved.</Feedback> : null}
+      {params.error ? <Feedback tone="danger">{params.error}</Feedback> : null}
 
-      <section className="grid-3" aria-label="Access summary">
-        <div className="card">
-          <h2 className="compact-title">Admins</h2>
-          <p>{users.length} active admin accounts.</p>
-        </div>
-        <div className="card">
-          <h2 className="compact-title">Owners</h2>
-          <p>{ownerCount} owner account{ownerCount === 1 ? "" : "s"} with role-management access.</p>
-        </div>
-        <div className="card">
-          <h2 className="compact-title">Current role</h2>
-          <p>{enumLabel(actor.role)}</p>
-        </div>
-      </section>
+      <EqualGrid min="220px" aria-label="Access summary">
+        <StatTile label="Admins" value={users.length} detail="Active admin accounts." />
+        <StatTile label="Owners" value={ownerCount} detail={`Owner account${ownerCount === 1 ? "" : "s"} with role-management access.`} />
+        <StatTile label="Current role" value={enumLabel(actor.role)} detail="Role assigned to your current session." />
+      </EqualGrid>
 
-      <section className="card form-grid">
+      <Card as="section" minHeight="none">
         <div>
           <p className="eyebrow">Create admin</p>
           <h2 className="section-title">Invite with a temporary password</h2>
         </div>
         <form action={createAdminUserAction} className="grid-3">
-          <div className="field">
-            <label htmlFor="email">Email</label>
-            <input id="email" name="email" type="email" required />
-          </div>
-          <div className="field">
-            <label htmlFor="password">Temporary password</label>
-            <input id="password" name="password" type="password" minLength={12} required />
-          </div>
-          <div className="field">
-            <label htmlFor="role">Role</label>
-            <select id="role" name="role" defaultValue={AdminRole.STAFF}>
+          <Field label="Email" htmlFor="email">
+            <Input id="email" name="email" type="email" required />
+          </Field>
+          <Field label="Temporary password" htmlFor="password">
+            <Input id="password" name="password" type="password" minLength={12} required />
+          </Field>
+          <Field label="Role" htmlFor="role">
+            <Select id="role" name="role" defaultValue={AdminRole.STAFF}>
               {Object.values(AdminRole).map((role) => (
                 <option key={role} value={role}>
                   {enumLabel(role)}
                 </option>
               ))}
-            </select>
-          </div>
-          <div className="field field-end">
-            <button className="button" type="submit">
+            </Select>
+          </Field>
+          <div className="ui-submit-slot">
+            <Button type="submit">
               <UserPlus size={16} />
               Create admin
-            </button>
+            </Button>
           </div>
         </form>
-      </section>
+      </Card>
 
-      <section className="card">
+      <Card as="section" minHeight="none">
         <div className="page-header compact-header">
           <div>
             <p className="eyebrow">Role assignments</p>
@@ -99,8 +88,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
           </div>
         </div>
 
-        <div className="table-wrap">
-          <table>
+          <Table>
             <thead>
               <tr>
                 <th>Email</th>
@@ -119,46 +107,45 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
                   <tr key={user.id}>
                     <td>
                       <strong>{user.email}</strong>
-                      {isSelf ? <span className="pill">you</span> : null}
+                      {isSelf ? <Badge>you</Badge> : null}
                     </td>
                     <td>
-                      <form action={updateAdminUserRoleAction} style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      <form action={updateAdminUserRoleAction} className="ui-inline-actions">
                         <input type="hidden" name="id" value={user.id} />
-                        <select name="role" defaultValue={user.role} disabled={isSelf || isLastOwner}>
+                        <Select name="role" defaultValue={user.role} disabled={isSelf || isLastOwner}>
                           {Object.values(AdminRole).map((role) => (
                             <option key={role} value={role}>
                               {enumLabel(role)}
                             </option>
                           ))}
-                        </select>
-                        <button className="button secondary" type="submit" disabled={isSelf || isLastOwner}>
+                        </Select>
+                        <Button variant="secondary" type="submit" disabled={isSelf || isLastOwner}>
                           <Shield size={16} />
                           Save
-                        </button>
+                        </Button>
                       </form>
                     </td>
                     <td>{formatDateTime(user.createdAt, settings.timezone)}</td>
                     <td>{formatDateTime(user.updatedAt, settings.timezone)}</td>
                     <td>
-                      <form action={deleteAdminUserAction} style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      <form action={deleteAdminUserAction} className="ui-inline-actions">
                         <input type="hidden" name="id" value={user.id} />
-                        <label style={{ alignItems: "center", display: "flex", gap: 6 }}>
+                        <label className="ui-check-row">
                           <input name="confirmDelete" type="checkbox" disabled={isSelf || isLastOwner} />
                           Confirm
                         </label>
-                        <button className="button danger" type="submit" disabled={isSelf || isLastOwner}>
+                        <Button variant="danger" type="submit" disabled={isSelf || isLastOwner}>
                           <Trash2 size={16} />
                           Delete
-                        </button>
+                        </Button>
                       </form>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
-          </table>
-        </div>
-      </section>
+          </Table>
+      </Card>
     </div>
   );
 }
