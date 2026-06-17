@@ -330,7 +330,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
           <h1>Active appointment desk</h1>
           <p>Review upcoming bookings, confirm requests, cancel conflicts, and mark completed work.</p>
         </div>
-        <Link className="button secondary" href="/admin/modules/scheduling">
+        <Link className="ui-button ui-button-secondary" href="/admin/modules/scheduling">
           <CalendarDays size={18} />
           Scheduling setup
         </Link>
@@ -340,21 +340,21 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
       {params.error ? <div className="error">{params.error}</div> : null}
 
       <section className="grid-3">
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <Clock size={22} />
           <h3>{upcomingCount} upcoming</h3>
           <p className="lead lead-compact">
             Non-canceled appointments from today forward.
           </p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <ListChecks size={22} />
           <h3>{pendingCount} pending</h3>
           <p className="lead lead-compact">
             Requests that may need confirmation.
           </p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <CalendarDays size={22} />
           <h3>{waitlistCount} waitlisted</h3>
           <p className="lead lead-compact">
@@ -363,17 +363,17 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
         </div>
       </section>
 
-      <section className="card appointment-calendar-card">
+      <section className="ui-card ui-card-density-normal ui-card-min-md appointment-calendar-card">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Calendar</h2>
-            <p style={{ color: "var(--muted)", margin: 0 }}>
+            <p className="ui-zero">
               {selectedRangeLabel} | {calendarItems.length} appointments
             </p>
           </div>
           <div className="appointment-calendar-toolbar">
             <Link
-              className="button secondary"
+              className="ui-button ui-button-secondary"
               href={calendarHref({
                 dateKey: calendarRange.previousDateKey,
                 resourceId: selectedResourceId,
@@ -386,13 +386,13 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
               Previous
             </Link>
             <Link
-              className="button secondary"
+              className="ui-button ui-button-secondary"
               href={calendarHref({ dateKey: todayKey, resourceId: selectedResourceId, staffId: selectedStaffId, statusFilter, view })}
             >
               Today
             </Link>
             <Link
-              className="button secondary"
+              className="ui-button ui-button-secondary"
               href={calendarHref({
                 dateKey: calendarRange.nextDateKey,
                 resourceId: selectedResourceId,
@@ -445,7 +445,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
               ))}
             </select>
           </label>
-          <button className="button secondary" type="submit">
+          <button className="ui-button ui-button-secondary" type="submit">
             <Filter size={18} />
             Apply
           </button>
@@ -472,16 +472,16 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
         <AppointmentCalendar bookings={calendarItems} days={days} hours={calendarHours} view={view} />
       </section>
 
-      <section className="card">
+      <section className="ui-card ui-card-density-normal ui-card-min-md">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Waitlist</h2>
-            <p style={{ color: "var(--muted)", margin: 0 }}>
+            <p className="ui-zero">
               {waitlistCount} waiting clients. Promote by choosing a real available slot.
             </p>
           </div>
         </div>
-        <table className="table">
+        <table className="ui-table">
           <thead>
             <tr>
               <th>Client</th>
@@ -518,9 +518,9 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
                 </td>
                 <td>{formatDateTime(entry.startsAt, settings.timezone)}</td>
                 <td>
-                  <form action={promoteWaitlistEntryAction} className="form-grid" style={{ gap: 8 }}>
+                  <form action={promoteWaitlistEntryAction} className="form-grid ui-zero">
                     <input type="hidden" name="id" value={entry.id} />
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor={`waitlist-${entry.id}-startsAt`}>Start time</label>
                       <input
                         id={`waitlist-${entry.id}-startsAt`}
@@ -531,7 +531,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
                       />
                     </div>
                     {entry.service.staffAssignments.length ? (
-                      <div className="field">
+                      <div className="ui-field">
                         <label htmlFor={`waitlist-${entry.id}-staffId`}>Staff</label>
                         <select id={`waitlist-${entry.id}-staffId`} name="staffId" defaultValue={entry.staffId || ""} required>
                           <option value="">Choose staff</option>
@@ -543,7 +543,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
                         </select>
                       </div>
                     ) : null}
-                    <button className="button secondary" type="submit">
+                    <button className="ui-button ui-button-secondary" type="submit">
                       Promote
                     </button>
                   </form>
@@ -552,7 +552,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
                   <form action={updateWaitlistEntryStatusAction}>
                     <input type="hidden" name="id" value={entry.id} />
                     <input type="hidden" name="status" value={BookingWaitlistStatus.DECLINED} />
-                    <button className="button danger" type="submit">
+                    <button className="ui-button ui-button-danger" type="submit">
                       decline
                     </button>
                   </form>
@@ -568,16 +568,16 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
         </table>
       </section>
 
-      <section className="card">
+      <section className="ui-card ui-card-density-normal ui-card-min-md">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Appointment list</h2>
-            <p style={{ color: "var(--muted)", margin: 0 }}>{bookingCount} matching appointments</p>
+            <p className="ui-zero">{bookingCount} matching appointments</p>
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div className="ui-zero">
             {statusFilters.map((filter) => (
               <Link
-                className={filter === statusFilter ? "button" : "button secondary"}
+                className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"}
                 href={calendarHref({
                   dateKey: selectedDateKey,
                   resourceId: selectedResourceId,
@@ -593,10 +593,10 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
           </div>
         </div>
         <AppointmentsTable bookings={bookings} timezone={settings.timezone} />
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+        <div className="ui-zero">
           <Link
             aria-disabled={page <= 1}
-            className="button secondary"
+            className="ui-button ui-button-secondary"
             href={calendarHref({
               dateKey: selectedDateKey,
               page: Math.max(1, page - 1),
@@ -608,12 +608,12 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
           >
             Previous
           </Link>
-          <span className="pill">
+          <span className="ui-badge">
             Page {Math.min(page, pageCount)} of {pageCount}
           </span>
           <Link
             aria-disabled={page >= pageCount}
-            className="button secondary"
+            className="ui-button ui-button-secondary"
             href={calendarHref({
               dateKey: selectedDateKey,
               page: Math.min(pageCount, page + 1),

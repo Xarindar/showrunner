@@ -30,7 +30,7 @@ export default async function BillingPrintPage({ params }: BillingPrintPageProps
   const remainingCents = Math.max(0, document.totalCents - paidCents);
 
   return (
-    <main style={{ background: "white", color: "#111", minHeight: "100vh", padding: 32 }}>
+    <main className="ui-zero">
       <style>
         {`
           @media print {
@@ -39,56 +39,56 @@ export default async function BillingPrintPage({ params }: BillingPrintPageProps
           }
         `}
       </style>
-      <section style={{ margin: "0 auto", maxWidth: 860 }}>
-        <header style={{ borderBottom: "1px solid #ddd", marginBottom: 28, paddingBottom: 22 }}>
-          <p style={{ fontWeight: 700, letterSpacing: 0, margin: 0, textTransform: "uppercase" }}>{enumLabel(document.type)}</p>
-          <h1 style={{ fontSize: 40, margin: "8px 0" }}>{document.documentNumber}</h1>
-          <p style={{ margin: 0 }}>
+      <section className="ui-zero">
+        <header className="ui-zero">
+          <p className="ui-zero">{enumLabel(document.type)}</p>
+          <h1 className="ui-zero">{document.documentNumber}</h1>
+          <p className="ui-zero">
             {settings.businessName} - {document.customerName} - {enumLabel(document.status)}
           </p>
         </header>
 
-        <table style={{ borderCollapse: "collapse", marginBottom: 28, width: "100%" }}>
+        <table className="ui-zero">
           <tbody>
             <tr>
-              <td style={{ padding: "8px 0" }}>Customer email</td>
-              <td style={{ padding: "8px 0", textAlign: "right" }}>{document.customerEmail}</td>
+              <td className="ui-zero">Customer email</td>
+              <td className="ui-zero">{document.customerEmail}</td>
             </tr>
             <tr>
-              <td style={{ padding: "8px 0" }}>Due</td>
-              <td style={{ padding: "8px 0", textAlign: "right" }}>
+              <td className="ui-zero">Due</td>
+              <td className="ui-zero">
                 {document.dueAt ? formatDateTime(document.dueAt, settings.timezone) : "No due date"}
               </td>
             </tr>
             <tr>
-              <td style={{ padding: "8px 0" }}>Accepted</td>
-              <td style={{ padding: "8px 0", textAlign: "right" }}>
+              <td className="ui-zero">Accepted</td>
+              <td className="ui-zero">
                 {document.acceptedAt ? formatDateTime(document.acceptedAt, settings.timezone) : "Not accepted"}
               </td>
             </tr>
           </tbody>
         </table>
 
-        {document.publicMemo ? <p style={{ lineHeight: 1.6, marginBottom: 28 }}>{document.publicMemo}</p> : null}
+        {document.publicMemo ? <p className="ui-zero">{document.publicMemo}</p> : null}
 
-        <table style={{ borderCollapse: "collapse", marginBottom: 28, width: "100%" }}>
+        <table className="ui-zero">
           <thead>
             <tr>
-              <th style={{ borderBottom: "1px solid #ddd", padding: "10px 0", textAlign: "left" }}>Description</th>
-              <th style={{ borderBottom: "1px solid #ddd", padding: "10px 0", textAlign: "right" }}>Qty</th>
-              <th style={{ borderBottom: "1px solid #ddd", padding: "10px 0", textAlign: "right" }}>Unit</th>
-              <th style={{ borderBottom: "1px solid #ddd", padding: "10px 0", textAlign: "right" }}>Total</th>
+              <th className="ui-zero">Description</th>
+              <th className="ui-zero">Qty</th>
+              <th className="ui-zero">Unit</th>
+              <th className="ui-zero">Total</th>
             </tr>
           </thead>
           <tbody>
             {document.lineItems.map((item) => (
               <tr key={item.id}>
-                <td style={{ borderBottom: "1px solid #eee", padding: "12px 0" }}>{item.description}</td>
-                <td style={{ borderBottom: "1px solid #eee", padding: "12px 0", textAlign: "right" }}>{item.quantity}</td>
-                <td style={{ borderBottom: "1px solid #eee", padding: "12px 0", textAlign: "right" }}>
+                <td className="ui-zero">{item.description}</td>
+                <td className="ui-zero">{item.quantity}</td>
+                <td className="ui-zero">
                   {formatMoney(item.unitPriceCents, document.currency)}
                 </td>
-                <td style={{ borderBottom: "1px solid #eee", padding: "12px 0", textAlign: "right" }}>
+                <td className="ui-zero">
                   {formatMoney(item.lineTotalCents, document.currency)}
                 </td>
               </tr>
@@ -96,33 +96,33 @@ export default async function BillingPrintPage({ params }: BillingPrintPageProps
           </tbody>
         </table>
 
-        <table style={{ borderCollapse: "collapse", marginLeft: "auto", width: 320 }}>
+        <table className="ui-zero">
           <tbody>
             <tr>
-              <td style={{ padding: "8px 0" }}>Subtotal</td>
-              <td style={{ padding: "8px 0", textAlign: "right" }}>{formatMoney(document.subtotalCents, document.currency)}</td>
+              <td className="ui-zero">Subtotal</td>
+              <td className="ui-zero">{formatMoney(document.subtotalCents, document.currency)}</td>
             </tr>
             <tr>
-              <td style={{ padding: "8px 0" }}>Discount</td>
-              <td style={{ padding: "8px 0", textAlign: "right" }}>{formatMoney(document.discountCents, document.currency)}</td>
+              <td className="ui-zero">Discount</td>
+              <td className="ui-zero">{formatMoney(document.discountCents, document.currency)}</td>
             </tr>
             <tr>
-              <td style={{ padding: "8px 0" }}>Tax</td>
-              <td style={{ padding: "8px 0", textAlign: "right" }}>{formatMoney(document.taxCents, document.currency)}</td>
+              <td className="ui-zero">Tax</td>
+              <td className="ui-zero">{formatMoney(document.taxCents, document.currency)}</td>
             </tr>
             <tr>
-              <td style={{ borderTop: "1px solid #222", fontWeight: 700, padding: "12px 0" }}>Total</td>
-              <td style={{ borderTop: "1px solid #222", fontWeight: 700, padding: "12px 0", textAlign: "right" }}>
+              <td className="ui-zero">Total</td>
+              <td className="ui-zero">
                 {formatMoney(document.totalCents, document.currency)}
               </td>
             </tr>
             <tr>
-              <td style={{ padding: "8px 0" }}>Paid</td>
-              <td style={{ padding: "8px 0", textAlign: "right" }}>{formatMoney(paidCents, document.currency)}</td>
+              <td className="ui-zero">Paid</td>
+              <td className="ui-zero">{formatMoney(paidCents, document.currency)}</td>
             </tr>
             <tr>
-              <td style={{ fontWeight: 700, padding: "8px 0" }}>Remaining</td>
-              <td style={{ fontWeight: 700, padding: "8px 0", textAlign: "right" }}>{formatMoney(remainingCents, document.currency)}</td>
+              <td className="ui-zero">Remaining</td>
+              <td className="ui-zero">{formatMoney(remainingCents, document.currency)}</td>
             </tr>
           </tbody>
         </table>

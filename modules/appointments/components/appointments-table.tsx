@@ -17,7 +17,7 @@ type AppointmentsTableProps = {
 export function AppointmentsTable({ bookings, timezone }: AppointmentsTableProps) {
   return (
     <div>
-      <table className="table">
+      <table className="ui-table">
         <thead>
           <tr>
             <th>Customer</th>
@@ -50,15 +50,15 @@ export function AppointmentsTable({ bookings, timezone }: AppointmentsTableProps
               </td>
               <td>{formatDateTime(booking.startsAt, timezone)}</td>
               <td>
-                <span className="pill">{booking.status.toLowerCase()}</span>
+                <span className="ui-badge">{booking.status.toLowerCase()}</span>
               </td>
               <td>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <div className="ui-zero">
                   {(["CONFIRMED", "CANCELED", "COMPLETED"] as const).map((status) => (
                     <form key={status} action={updateBookingStatusAction}>
                       <input type="hidden" name="id" value={booking.id} />
                       <input type="hidden" name="status" value={status} />
-                      <button className={status === "CANCELED" ? "button danger" : "button secondary"} type="submit">
+                      <button className={status === "CANCELED" ? "ui-button ui-button-danger" : "ui-button ui-button-secondary"} type="submit">
                         {status.toLowerCase()}
                       </button>
                     </form>

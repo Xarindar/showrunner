@@ -143,22 +143,22 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
               : "Check your email for confirmation details. The business will follow up if anything needs to change."}
         </p>
         {!isWaitlist && state.calendarUrl ? (
-          <a className="button secondary" href={state.calendarUrl}>
+          <a className="ui-button ui-button-secondary" href={state.calendarUrl}>
             <CalendarDays size={18} />
             Add to calendar
           </a>
         ) : null}
         {!isWaitlist && state.manageUrl ? (
-          <a className="button" href={state.manageUrl}>
+          <a className="ui-button" href={state.manageUrl}>
             <CalendarCheck size={18} />
             Manage appointment
           </a>
         ) : null}
         {state.formLinks?.length ? (
-          <div className="subpanel form-grid" style={{ marginTop: 16, textAlign: "left" }}>
-            <h2 style={{ fontSize: "1.2rem", margin: 0 }}>Appointment forms</h2>
+          <div className="subpanel form-grid ui-zero">
+            <h2 className="ui-zero">Appointment forms</h2>
             {state.formLinks.map((formLink) => (
-              <a className={formLink.isRequired ? "button" : "button secondary"} href={formLink.href} key={formLink.href}>
+              <a className={formLink.isRequired ? "ui-button" : "ui-button ui-button-secondary"} href={formLink.href} key={formLink.href}>
                 <FileText size={18} />
                 {formLink.isRequired ? "Required: " : ""}
                 {formLink.name}
@@ -256,7 +256,7 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
               ))}
             </div>
             <div className="booking-actions">
-              <button className="button" onClick={goNext} type="button">
+              <button className="ui-button" onClick={goNext} type="button">
                 Continue
                 <ChevronRight size={18} />
               </button>
@@ -343,11 +343,11 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
             </div>
 
             <div className="booking-actions">
-              <button className="button secondary" onClick={goBack} type="button">
+              <button className="ui-button ui-button-secondary" onClick={goBack} type="button">
                 <ChevronLeft size={18} />
                 Back
               </button>
-              <button className="button" disabled={!selectedSlot && !canJoinWaitlist} onClick={goNext} type="button">
+              <button className="ui-button" disabled={!selectedSlot && !canJoinWaitlist} onClick={goNext} type="button">
                 {canJoinWaitlist && !selectedSlot ? "Join waitlist" : "Continue"}
                 <ChevronRight size={18} />
               </button>
@@ -360,11 +360,11 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
             <p className="eyebrow">Step 3</p>
             <h2>Tell us who is coming.</h2>
             <div className="booking-detail-fields">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="customerName">Name</label>
                 <input id="customerName" value={customerName} onChange={(event) => setCustomerName(event.target.value)} />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="customerEmail">Email</label>
                 <input
                   id="customerEmail"
@@ -373,16 +373,16 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
                   onChange={(event) => setCustomerEmail(event.target.value)}
                 />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="customerPhone">Phone</label>
                 <input id="customerPhone" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="notes">Anything else?</label>
                 <textarea id="notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
               </div>
               {selectedService?.intakePrompt ? (
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="intakeResponse">{selectedService.intakePrompt}</label>
                   <textarea
                     id="intakeResponse"
@@ -393,11 +393,11 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
               ) : null}
             </div>
             <div className="booking-actions">
-              <button className="button secondary" onClick={goBack} type="button">
+              <button className="ui-button ui-button-secondary" onClick={goBack} type="button">
                 <ChevronLeft size={18} />
                 Back
               </button>
-              <button className="button" disabled={!detailsReady} onClick={goNext} type="button">
+              <button className="ui-button" disabled={!detailsReady} onClick={goNext} type="button">
                 Review
                 <ChevronRight size={18} />
               </button>
@@ -407,11 +407,11 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
 
         {step === "review" ? (
           <form action={selectedSlotDetails ? action : waitlistAction} className={panelClass}>
-            <input
+            <input className="ui-zero"
               aria-hidden="true"
               autoComplete="off"
               name="companyWebsite"
-              style={{ display: "none" }}
+             
               tabIndex={-1}
               type="text"
             />
@@ -473,12 +473,12 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
             ) : null}
 
             <div className="booking-actions">
-              <button className="button secondary" onClick={goBack} type="button">
+              <button className="ui-button ui-button-secondary" onClick={goBack} type="button">
                 <ChevronLeft size={18} />
                 Back
               </button>
               <button
-                className="button"
+                className="ui-button"
                 aria-busy={submitting}
                 disabled={submitting || !reviewReady || (requiresPolicyAcceptance && !policyAccepted)}
                 type="submit"

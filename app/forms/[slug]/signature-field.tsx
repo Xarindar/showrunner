@@ -93,15 +93,15 @@ export function SignatureField({ fieldId, helpText, isRequired, label, name, pla
   }
 
   return (
-    <div className="field">
+    <div className="ui-field">
       <label htmlFor={`${fieldId}-typed`}>{label}{isRequired ? <span aria-hidden="true"> *</span> : null}</label>
       <input type="hidden" name={name} value={signaturePayload({ drawnDataUrl, mode, typedName })} />
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+      <div className="ui-zero">
+        <label className="ui-zero">
           <input checked={mode === "TYPED"} onChange={() => setMode("TYPED")} name={`${name}-mode`} type="radio" value="TYPED" />
           Type
         </label>
-        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+        <label className="ui-zero">
           <input checked={mode === "DRAWN"} onChange={() => setMode("DRAWN")} name={`${name}-mode`} type="radio" value="DRAWN" />
           Draw
         </label>
@@ -125,33 +125,26 @@ export function SignatureField({ fieldId, helpText, isRequired, label, name, pla
       />
       {mode === "DRAWN" ? (
         <div className="form-grid">
-          <canvas
+          <canvas className="ui-zero"
             aria-label={`${label} drawing area`}
             onPointerDown={beginDrawing}
             onPointerMove={draw}
             onPointerUp={endDrawing}
             onPointerCancel={endDrawing}
             ref={canvasRef}
-            style={{
-              background: "var(--panel)",
-              border: "1px solid var(--line)",
-              borderRadius: "var(--radius)",
-              height: 150,
-              touchAction: "none",
-              width: "100%"
-            }}
+           
           />
-          <button className="button secondary" onClick={clearDrawing} type="button">
+          <button className="ui-button ui-button-secondary" onClick={clearDrawing} type="button">
             Clear signature
           </button>
         </div>
       ) : null}
       {helpText ? (
-        <small id={helpId} style={{ color: "var(--muted)" }}>
+        <small className="ui-zero" id={helpId}>
           {helpText}
         </small>
       ) : null}
-      <label htmlFor={consentId} style={{ alignItems: "flex-start", display: "flex", gap: 8 }}>
+      <label className="ui-zero" htmlFor={consentId}>
         <input id={consentId} name={`${name}-consent`} required={isRequired || Boolean(typedName || drawnDataUrl)} type="checkbox" />
         <span>{consentStatement}</span>
       </label>

@@ -180,7 +180,7 @@ export function PublicFormBehavior({ enableSteps, fields, formId, formPath, subm
   if (!hasSteps) {
     return (
       <div ref={containerRef}>
-        <button className="button" type="submit">
+        <button className="ui-button" type="submit">
           {submitButtonLabel}
         </button>
       </div>
@@ -189,13 +189,13 @@ export function PublicFormBehavior({ enableSteps, fields, formId, formPath, subm
 
   return (
     <div ref={containerRef} className="form-grid">
-      <div style={{ alignItems: "center", display: "flex", gap: 10, justifyContent: "space-between" }}>
-        <span className="pill">
+      <div className="ui-zero">
+        <span className="ui-badge">
           Step {currentPageIndex + 1} of {pages.length}
         </span>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="ui-zero">
           <button
-            className="button secondary"
+            className="ui-button ui-button-secondary"
             disabled={currentPageIndex <= 0}
             onClick={() => setCurrentPage(pages[Math.max(0, currentPageIndex - 1)] || activePage)}
             type="button"
@@ -203,11 +203,11 @@ export function PublicFormBehavior({ enableSteps, fields, formId, formPath, subm
             Previous
           </button>
           {currentPageIndex < pages.length - 1 ? (
-            <button className="button" onClick={goToNextPage} type="button">
+            <button className="ui-button" onClick={goToNextPage} type="button">
               Next
             </button>
           ) : (
-            <button className="button" type="submit">
+            <button className="ui-button" type="submit">
               {submitButtonLabel}
             </button>
           )}

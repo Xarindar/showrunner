@@ -47,15 +47,15 @@ function percentInput(basisPoints?: number | null) {
 }
 
 function productStatusClass(status: ProductStatus) {
-  if (status === ProductStatus.ACTIVE) return "pill success";
-  if (status === ProductStatus.ARCHIVED) return "pill danger";
-  return "pill";
+  if (status === ProductStatus.ACTIVE) return "ui-badge ui-badge-success";
+  if (status === ProductStatus.ARCHIVED) return "ui-badge ui-badge-danger";
+  return "ui-badge";
 }
 
 function orderStatusClass(status: OrderStatus) {
-  if (status === OrderStatus.PAID || status === OrderStatus.FULFILLED) return "pill success";
-  if (status === OrderStatus.CANCELED || status === OrderStatus.REFUNDED) return "pill danger";
-  return "pill";
+  if (status === OrderStatus.PAID || status === OrderStatus.FULFILLED) return "ui-badge ui-badge-success";
+  if (status === OrderStatus.CANCELED || status === OrderStatus.REFUNDED) return "ui-badge ui-badge-danger";
+  return "ui-badge";
 }
 
 function currencyTotalsLabel(totals: { currency: string; _sum: { totalCents: number | null } }[]) {
@@ -156,21 +156,21 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       {errorMessage ? <div className="error">{errorMessage}</div> : null}
 
       <section className="grid-3">
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <PackagePlus size={22} />
           <h3>{activeCount} active products</h3>
           <p className="lead lead-compact">
             Items available to the public storefront and cart.
           </p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <Boxes size={22} />
           <h3>{collections.length} collections</h3>
           <p className="lead lead-compact">
             Group products for shops, galleries, packages, and featured blocks.
           </p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <BadgeDollarSign size={22} />
           <h3>{currencyTotalsLabel(paidOrderTotals)}</h3>
           <p className="lead lead-compact">
@@ -179,7 +179,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </div>
       </section>
 
-      <section className="card form-grid">
+      <section className="ui-card ui-card-density-normal ui-card-min-none form-grid">
         <div className="page-header flush-header">
           <div>
             <h2 className="section-title">Checkout totals</h2>
@@ -191,21 +191,21 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           <div className="grid-2">
             <div className="subpanel form-grid">
               <h3 className="subsection-title">Tax</h3>
-              <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <label className="ui-zero">
                 <input name="commerceTaxEnabled" type="checkbox" defaultChecked={settings.commerceTaxEnabled} />
                 Enable tax
               </label>
               <div className="grid-2">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="commerceTaxLabel">Tax label</label>
                   <input id="commerceTaxLabel" name="commerceTaxLabel" defaultValue={settings.commerceTaxLabel} required />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="commerceTaxRate">Tax rate %</label>
                   <input id="commerceTaxRate" name="commerceTaxRate" inputMode="decimal" defaultValue={percentInput(settings.commerceTaxRateBps)} />
                 </div>
               </div>
-              <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <label className="ui-zero">
                 <input name="commerceTaxAppliesToShipping" type="checkbox" defaultChecked={settings.commerceTaxAppliesToShipping} />
                 Tax shipping
               </label>
@@ -213,16 +213,16 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
             <div className="subpanel form-grid">
               <h3 className="subsection-title">Shipping</h3>
-              <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <label className="ui-zero">
                 <input name="commerceShippingEnabled" type="checkbox" defaultChecked={settings.commerceShippingEnabled} />
                 Enable standard shipping
               </label>
               <div className="grid-2">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="commerceShippingLabel">Shipping label</label>
                   <input id="commerceShippingLabel" name="commerceShippingLabel" defaultValue={settings.commerceShippingLabel} required />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="commerceShippingFlat">Flat amount</label>
                   <input
                     id="commerceShippingFlat"
@@ -232,7 +232,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   />
                 </div>
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="commerceFreeShippingThreshold">Free shipping threshold</label>
                 <input
                   id="commerceFreeShippingThreshold"
@@ -243,27 +243,27 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               </div>
             </div>
           </div>
-          <button className="button" type="submit">
+          <button className="ui-button" type="submit">
             Save checkout totals
           </button>
         </form>
       </section>
 
       <section className="grid-2">
-        <form action={createProductAction} className="card form-grid">
+        <form action={createProductAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <h2 className="section-title">Add product</h2>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="name">Name</label>
               <input id="name" name="name" required />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="slug">Shop URL slug</label>
               <input id="slug" name="slug" placeholder="starter-package" />
             </div>
           </div>
           <div className="grid-3">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="type">Type</label>
               <select id="type" name="type" defaultValue={ProductType.PHYSICAL}>
                 {Object.values(ProductType).map((type) => (
@@ -273,7 +273,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="status">Status</label>
               <select id="status" name="status" defaultValue={ProductStatus.DRAFT}>
                 {Object.values(ProductStatus).map((status) => (
@@ -283,49 +283,49 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="currency">Currency</label>
               <input id="currency" name="currency" defaultValue="USD" maxLength={3} required />
             </div>
           </div>
           <div className="grid-3">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="basePrice">Price</label>
               <input id="basePrice" name="basePrice" inputMode="decimal" placeholder="125.00" required />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="compareAtPrice">Compare-at price</label>
               <input id="compareAtPrice" name="compareAtPrice" inputMode="decimal" />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="sku">SKU</label>
               <input id="sku" name="sku" />
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="summary">Summary</label>
             <input id="summary" name="summary" />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="description">Description</label>
             <textarea id="description" name="description" />
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="imageUrl">Image URL</label>
               <input id="imageUrl" name="imageUrl" placeholder="/hero.svg" />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="tags">Tags</label>
               <input id="tags" name="tags" placeholder="package, featured" />
             </div>
           </div>
           <div className="grid-2">
-            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <label className="ui-zero">
               <input name="trackInventory" type="checkbox" />
               Track default variant inventory
             </label>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="inventoryQuantity">Inventory quantity</label>
               <input id="inventoryQuantity" name="inventoryQuantity" min="0" type="number" />
             </div>
@@ -333,27 +333,27 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           <p className="lead lead-compact">
             Inventory is governed per variant. This product-level value seeds and mirrors the default variant.
           </p>
-          <button className="button" type="submit">
+          <button className="ui-button" type="submit">
             <PackagePlus size={18} />
             Add product
           </button>
         </form>
 
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <div className="page-header compact-header">
             <div>
               <h2 className="section-title">Catalog list</h2>
               <p>{productCount} matching products</p>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <div className="ui-zero">
               {statusFilters.map((filter) => (
-                <a className={filter === statusFilter ? "button" : "button secondary"} href={`/admin/modules/products?status=${filter}`} key={filter}>
+                <a className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"} href={`/admin/modules/products?status=${filter}`} key={filter}>
                   {filter}
                 </a>
               ))}
             </div>
           </div>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Product</th>
@@ -379,8 +379,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     <span className={productStatusClass(product.status)}>{product.status.toLowerCase()}</span>
                   </td>
                   <td>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      <a className="button secondary" href={`/admin/modules/products?status=${statusFilter}&product=${product.id}`}>
+                    <div className="ui-zero">
+                      <a className="ui-button ui-button-secondary" href={`/admin/modules/products?status=${statusFilter}&product=${product.id}`}>
                         Edit
                       </a>
                       <form action={updateProductStatusAction}>
@@ -390,7 +390,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                           name="status"
                           value={product.status === ProductStatus.ACTIVE ? ProductStatus.DRAFT : ProductStatus.ACTIVE}
                         />
-                        <button className="button secondary" type="submit">
+                        <button className="ui-button ui-button-secondary" type="submit">
                           {product.status === ProductStatus.ACTIVE ? "Draft" : "Activate"}
                         </button>
                       </form>
@@ -405,15 +405,15 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               ) : null}
             </tbody>
           </table>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-            <a className="button secondary" href={`/admin/modules/products?status=${statusFilter}&page=${Math.max(1, page - 1)}`} aria-disabled={page <= 1}>
+          <div className="ui-zero">
+            <a className="ui-button ui-button-secondary" href={`/admin/modules/products?status=${statusFilter}&page=${Math.max(1, page - 1)}`} aria-disabled={page <= 1}>
               Previous
             </a>
-            <span className="pill">
+            <span className="ui-badge">
               Page {Math.min(page, pageCount)} of {pageCount}
             </span>
             <a
-              className="button secondary"
+              className="ui-button ui-button-secondary"
               href={`/admin/modules/products?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
               aria-disabled={page >= pageCount}
             >
@@ -425,21 +425,21 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
       {selectedProduct ? (
         <section className="grid-2">
-          <form action={updateProductAction} className="card form-grid">
+          <form action={updateProductAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
             <h2 className="section-title">Edit selected product</h2>
             <input type="hidden" name="id" value={selectedProduct.id} />
             <div className="grid-2">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`product-${selectedProduct.id}-name`}>Name</label>
                 <input id={`product-${selectedProduct.id}-name`} name="name" defaultValue={selectedProduct.name} required />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`product-${selectedProduct.id}-slug`}>Shop URL slug</label>
                 <input id={`product-${selectedProduct.id}-slug`} name="slug" defaultValue={selectedProduct.slug} />
               </div>
             </div>
             <div className="grid-3">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`product-${selectedProduct.id}-type`}>Type</label>
                 <select id={`product-${selectedProduct.id}-type`} name="type" defaultValue={selectedProduct.type}>
                   {Object.values(ProductType).map((type) => (
@@ -449,7 +449,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   ))}
                 </select>
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`product-${selectedProduct.id}-status`}>Status</label>
                 <select id={`product-${selectedProduct.id}-status`} name="status" defaultValue={selectedProduct.status}>
                   {Object.values(ProductStatus).map((status) => (
@@ -459,49 +459,49 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   ))}
                 </select>
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`product-${selectedProduct.id}-currency`}>Currency</label>
                 <input id={`product-${selectedProduct.id}-currency`} name="currency" defaultValue={selectedProduct.currency} maxLength={3} required />
               </div>
             </div>
             <div className="grid-3">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`product-${selectedProduct.id}-base-price`}>Price</label>
                 <input id={`product-${selectedProduct.id}-base-price`} name="basePrice" defaultValue={moneyInput(selectedProduct.basePriceCents)} required />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`product-${selectedProduct.id}-compare-price`}>Compare-at price</label>
                 <input id={`product-${selectedProduct.id}-compare-price`} name="compareAtPrice" defaultValue={moneyInput(selectedProduct.compareAtPriceCents)} />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`product-${selectedProduct.id}-sku`}>SKU</label>
                 <input id={`product-${selectedProduct.id}-sku`} name="sku" defaultValue={selectedProduct.sku || ""} />
               </div>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor={`product-${selectedProduct.id}-summary`}>Summary</label>
               <input id={`product-${selectedProduct.id}-summary`} name="summary" defaultValue={selectedProduct.summary} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor={`product-${selectedProduct.id}-description`}>Description</label>
               <textarea id={`product-${selectedProduct.id}-description`} name="description" defaultValue={selectedProduct.description} />
             </div>
             <div className="grid-2">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`product-${selectedProduct.id}-image`}>Image URL</label>
                 <input id={`product-${selectedProduct.id}-image`} name="imageUrl" defaultValue={selectedProduct.imageUrl} />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`product-${selectedProduct.id}-tags`}>Tags</label>
                 <input id={`product-${selectedProduct.id}-tags`} name="tags" defaultValue={stringArrayCsv(selectedProduct.tags)} />
               </div>
             </div>
             <div className="grid-2">
-              <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <label className="ui-zero">
                 <input name="trackInventory" type="checkbox" defaultChecked={selectedProduct.trackInventory} />
                 Track default variant inventory
               </label>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`product-${selectedProduct.id}-inventory`}>Inventory quantity</label>
                 <input
                   id={`product-${selectedProduct.id}-inventory`}
@@ -515,17 +515,17 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             <p className="lead lead-compact">
               Inventory is governed per variant. Saving this product syncs price, status, SKU, and inventory to the default variant.
             </p>
-            <button className="button" type="submit">
+            <button className="ui-button" type="submit">
               Save product
             </button>
           </form>
 
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <div>
               <h2 className="section-title">Variants for {selectedProduct.name}</h2>
-              <p style={{ color: "var(--muted)" }}>Variants let the same product support sizes, packages, print formats, or add-on choices.</p>
+              <p className="ui-zero">Variants let the same product support sizes, packages, print formats, or add-on choices.</p>
             </div>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Name</th>
@@ -548,7 +548,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     </td>
                     <td>{formatMoney(variant.priceCents ?? selectedProduct.basePriceCents, selectedProduct.currency)}</td>
                     <td>
-                      <span className={variant.isActive ? "pill success" : "pill danger"}>{variant.isActive ? "active" : "inactive"}</span>
+                      <span className={variant.isActive ? "ui-badge ui-badge-success" : "ui-badge ui-badge-danger"}>{variant.isActive ? "active" : "inactive"}</span>
                     </td>
                   </tr>
                 ))}
@@ -558,54 +558,54 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               <input type="hidden" name="productId" value={selectedProduct.id} />
               <h3 className="subsection-title">Add variant</h3>
               <div className="grid-2">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="variantName">Name</label>
                   <input id="variantName" name="name" placeholder="Large print" required />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="variantSku">SKU</label>
                   <input id="variantSku" name="sku" />
                 </div>
               </div>
               <div className="grid-2">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="optionName">Option name</label>
                   <input id="optionName" name="optionName" placeholder="Size" />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="optionValue">Option value</label>
                   <input id="optionValue" name="optionValue" placeholder="16x20" />
                 </div>
               </div>
               <div className="grid-3">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="variantPrice">Price override</label>
                   <input id="variantPrice" name="price" inputMode="decimal" />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="variantCompareAt">Compare-at price</label>
                   <input id="variantCompareAt" name="compareAtPrice" inputMode="decimal" />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="variantInventory">Inventory quantity</label>
                   <input id="variantInventory" name="inventoryQuantity" min="0" type="number" />
                 </div>
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-                <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <div className="ui-zero">
+                <label className="ui-zero">
                   <input name="trackInventory" type="checkbox" />
                   Track inventory
                 </label>
-                <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                <label className="ui-zero">
                   <input name="isDefault" type="checkbox" />
                   Default
                 </label>
-                <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                <label className="ui-zero">
                   <input name="isActive" type="checkbox" defaultChecked />
                   Active
                 </label>
               </div>
-              <button className="button secondary" type="submit">
+              <button className="ui-button ui-button-secondary" type="submit">
                 Add variant
               </button>
             </form>
@@ -614,24 +614,24 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       ) : null}
 
       <section className="grid-2">
-        <div className="card stack">
+        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <div className="page-header compact-header">
             <div>
               <h2 className="section-title">Orders and payments</h2>
               <p>{orders.length} recent orders from storefront cart checkout prep.</p>
             </div>
-            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-              <Link className="button secondary" href="/admin/modules/products/fulfillment-export">
+            <div className="ui-zero">
+              <Link className="ui-button ui-button-secondary" href="/admin/modules/products/fulfillment-export">
                 <Download size={18} />
                 Export fulfillment CSV
               </Link>
-              <Link className="button secondary" href="/admin/modules/products/fulfillment-export?unexportedOnly=1">
+              <Link className="ui-button ui-button-secondary" href="/admin/modules/products/fulfillment-export?unexportedOnly=1">
                 <Download size={18} />
                 Export new orders only
               </Link>
             </div>
           </div>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Order</th>
@@ -673,7 +673,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </div>
 
         {selectedOrder ? (
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <div className="page-header compact-header">
               <div>
                 <h2 className="section-title">{selectedOrder.orderNumber}</h2>
@@ -684,7 +684,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               <span className={orderStatusClass(selectedOrder.status)}>{enumLabel(selectedOrder.status)}</span>
             </div>
 
-            <table className="table">
+            <table className="ui-table">
               <tbody>
                 <tr>
                   <td>Subtotal</td>
@@ -733,18 +733,18 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               </tbody>
             </table>
 
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <div className="ui-zero">
               {selectedOrderNextStatuses.filter((status) => status !== OrderStatus.FULFILLED).map((status) => (
                 <form action={updateCommerceOrderStatusAction} key={status}>
                   <input type="hidden" name="id" value={selectedOrder.id} />
                   <input type="hidden" name="status" value={status} />
-                  <button className="button secondary" type="submit">
+                  <button className="ui-button ui-button-secondary" type="submit">
                     Mark {enumLabel(status)}
                   </button>
                 </form>
               ))}
               {!selectedOrderNextStatuses.filter((status) => status !== OrderStatus.FULFILLED).length && !selectedOrderCanFulfill ? (
-                <span className="pill">Final state</span>
+                <span className="ui-badge">Final state</span>
               ) : null}
             </div>
 
@@ -761,7 +761,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 <Boxes size={22} />
               </div>
               {selectedOrderHasPhysicalItems ? (
-                <table className="table">
+                <table className="ui-table">
                   <tbody>
                     <tr>
                       <td>Exported</td>
@@ -797,7 +797,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               {selectedOrderCanMarkFulfillmentExported ? (
                 <form action={markCommerceOrderFulfillmentExportedAction} className="form-grid">
                   <input type="hidden" name="id" value={selectedOrder.id} />
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`order-${selectedOrder.id}-export-batch`}>Export batch</label>
                     <input
                       id={`order-${selectedOrder.id}-export-batch`}
@@ -806,7 +806,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       defaultValue={selectedOrder.fulfillmentExportBatch}
                     />
                   </div>
-                  <button className="button secondary" type="submit">
+                  <button className="ui-button ui-button-secondary" type="submit">
                     <Download size={18} />
                     Mark exported
                   </button>
@@ -816,7 +816,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 <form action={recordCommerceOrderPrintLabHandoffAction} className="form-grid">
                   <input type="hidden" name="id" value={selectedOrder.id} />
                   <div className="grid-2">
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor={`order-${selectedOrder.id}-lab-name`}>Print lab</label>
                       <input
                         id={`order-${selectedOrder.id}-lab-name`}
@@ -826,7 +826,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                         required
                       />
                     </div>
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor={`order-${selectedOrder.id}-lab-reference`}>Lab reference</label>
                       <input
                         id={`order-${selectedOrder.id}-lab-reference`}
@@ -836,7 +836,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       />
                     </div>
                   </div>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`order-${selectedOrder.id}-lab-notes`}>Lab notes</label>
                     <textarea
                       id={`order-${selectedOrder.id}-lab-notes`}
@@ -846,7 +846,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       defaultValue={selectedOrder.printLabNotes}
                     />
                   </div>
-                  <button className="button secondary" type="submit">
+                  <button className="ui-button ui-button-secondary" type="submit">
                     <Boxes size={18} />
                     Record lab handoff
                   </button>
@@ -869,7 +869,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 <Truck size={22} />
               </div>
               {selectedOrder.fulfilledAt ? (
-                <table className="table">
+                <table className="ui-table">
                   <tbody>
                     <tr>
                       <td>Carrier</td>
@@ -886,16 +886,16 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 <form action={fulfillCommerceOrderAction} className="form-grid">
                   <input type="hidden" name="id" value={selectedOrder.id} />
                   <div className="grid-2">
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor={`order-${selectedOrder.id}-carrier`}>Carrier</label>
                       <input id={`order-${selectedOrder.id}-carrier`} name="carrier" placeholder="UPS, USPS, FedEx" />
                     </div>
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor={`order-${selectedOrder.id}-tracking`}>Tracking number</label>
                       <input id={`order-${selectedOrder.id}-tracking`} name="trackingNumber" />
                     </div>
                   </div>
-                  <button className="button" type="submit">
+                  <button className="ui-button" type="submit">
                     <Truck size={18} />
                     Mark fulfilled
                   </button>
@@ -910,7 +910,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   <p>{selectedOrder.checkoutUrl ? "Stripe Checkout link attached." : "No Stripe Checkout link attached."}</p>
                 </div>
                 {selectedOrder.checkoutUrl ? (
-                  <a className="button secondary" href={selectedOrder.checkoutUrl} target="_blank" rel="noreferrer">
+                  <a className="ui-button ui-button-secondary" href={selectedOrder.checkoutUrl} target="_blank" rel="noreferrer">
                     <CreditCard size={18} />
                     Open link
                   </a>
@@ -920,7 +920,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 <form action={setCommerceOrderCheckoutLinkAction} className="form-grid">
                   <input type="hidden" name="id" value={selectedOrder.id} />
                   <div className="grid-2">
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor={`order-${selectedOrder.id}-checkout`}>Stripe Checkout URL</label>
                       <input
                         id={`order-${selectedOrder.id}-checkout`}
@@ -930,7 +930,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                         required
                       />
                     </div>
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor={`order-${selectedOrder.id}-session`}>Stripe session/reference</label>
                       <input
                         id={`order-${selectedOrder.id}-session`}
@@ -940,7 +940,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       />
                     </div>
                   </div>
-                  <button className="button secondary" type="submit">
+                  <button className="ui-button ui-button-secondary" type="submit">
                     Save checkout link
                   </button>
                 </form>
@@ -948,11 +948,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               {selectedOrder.checkoutUrl && (selectedOrder.status === OrderStatus.DRAFT || selectedOrder.status === OrderStatus.PENDING) ? (
                 <form action={clearCommerceOrderCheckoutLinkAction} className="form-grid">
                   <input type="hidden" name="id" value={selectedOrder.id} />
-                  <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                  <label className="ui-zero">
                     <input name="confirmClear" type="checkbox" required />
                     Clear this hosted checkout link.
                   </label>
-                  <button className="button danger" type="submit">
+                  <button className="ui-button ui-button-danger" type="submit">
                     Clear checkout link
                   </button>
                 </form>
@@ -961,7 +961,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
             <div className="subpanel">
               <h3 className="subsection-title">Items</h3>
-              <table className="table">
+              <table className="ui-table">
                 <thead>
                   <tr>
                     <th>Item</th>
@@ -987,7 +987,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
             <div className="subpanel">
               <h3 className="subsection-title">Payment records</h3>
-              <table className="table">
+              <table className="ui-table">
                 <thead>
                   <tr>
                     <th>Provider</th>
@@ -1019,9 +1019,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                         </td>
                         <td>
                           {refundableCents > 0 ? (
-                            <form action={refundCommercePaymentAction} className="form-grid" style={{ minWidth: 180 }}>
+                            <form action={refundCommercePaymentAction} className="form-grid ui-zero">
                               <input type="hidden" name="paymentId" value={payment.id} />
-                              <div className="field">
+                              <div className="ui-field">
                                 <label htmlFor={`refund-${payment.id}`}>Amount</label>
                                 <input
                                   id={`refund-${payment.id}`}
@@ -1031,12 +1031,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                                   required
                                 />
                               </div>
-                              <button className="button danger" type="submit">
+                              <button className="ui-button ui-button-danger" type="submit">
                                 Refund
                               </button>
                             </form>
                           ) : (
-                            <span className="pill">Not refundable</span>
+                            <span className="ui-badge">Not refundable</span>
                           )}
                         </td>
                       </tr>
@@ -1052,7 +1052,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             </div>
           </div>
         ) : (
-          <div className="card">
+          <div className="ui-card ui-card-density-normal ui-card-min-md">
             <ReceiptText size={22} />
             <h2 className="section-title">No selected order</h2>
             <p className="lead lead-compact">
@@ -1063,21 +1063,21 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       </section>
 
       <section className="grid-2">
-        <div className="card stack">
+        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <h2 className="section-title">Collections</h2>
           <form action={createCollectionAction} className="subpanel form-grid">
             <div className="grid-2">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="collectionName">Name</label>
                 <input id="collectionName" name="name" required />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="collectionSlug">Slug</label>
                 <input id="collectionSlug" name="slug" />
               </div>
             </div>
             <div className="grid-3">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="collectionStatus">Status</label>
                 <select id="collectionStatus" name="status" defaultValue={ProductStatus.DRAFT}>
                   {Object.values(ProductStatus).map((status) => (
@@ -1087,20 +1087,20 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   ))}
                 </select>
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="sortOrder">Sort order</label>
                 <input id="sortOrder" name="sortOrder" type="number" defaultValue="0" />
               </div>
-              <label style={{ alignItems: "center", display: "flex", gap: 8, paddingTop: 27 }}>
+              <label className="ui-zero">
                 <input name="isFeatured" type="checkbox" />
                 Featured
               </label>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="collectionDescription">Description</label>
               <textarea id="collectionDescription" name="description" />
             </div>
-            <button className="button secondary" type="submit">
+            <button className="ui-button ui-button-secondary" type="submit">
               <Tags size={18} />
               Add collection
             </button>
@@ -1108,7 +1108,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           {selectedProduct && collections.length ? (
             <form action={addProductToCollectionAction} className="subpanel form-grid">
               <input type="hidden" name="productId" value={selectedProduct.id} />
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="collectionId">Add {selectedProduct.name} to collection</label>
                 <select id="collectionId" name="collectionId">
                   {collections.map((collection) => (
@@ -1118,12 +1118,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   ))}
                 </select>
               </div>
-              <button className="button secondary" type="submit">
+              <button className="ui-button ui-button-secondary" type="submit">
                 Add to collection
               </button>
             </form>
           ) : null}
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Name</th>
@@ -1149,45 +1149,45 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           </table>
         </div>
 
-        <div className="card stack">
+        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <h2 className="section-title">Coupons</h2>
           <form action={createCouponAction} className="subpanel form-grid">
             <div className="grid-3">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="couponCode">Code</label>
                 <input id="couponCode" name="code" placeholder="WELCOME10" required />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="couponType">Type</label>
                 <select id="couponType" name="type" defaultValue={CouponType.PERCENT}>
                   <option value={CouponType.PERCENT}>percent</option>
                   <option value={CouponType.FIXED}>fixed amount</option>
                 </select>
               </div>
-              <label style={{ alignItems: "center", display: "flex", gap: 8, paddingTop: 27 }}>
+              <label className="ui-zero">
                 <input name="isActive" type="checkbox" defaultChecked />
                 Active
               </label>
             </div>
             <div className="grid-3">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="percentOff">Percent off</label>
                 <input id="percentOff" name="percentOff" min="0" max="100" type="number" />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="amount">Fixed amount</label>
                 <input id="amount" name="amount" inputMode="decimal" />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="maxRedemptions">Max redemptions</label>
                 <input id="maxRedemptions" name="maxRedemptions" min="0" type="number" />
               </div>
             </div>
-            <button className="button secondary" type="submit">
+            <button className="ui-button ui-button-secondary" type="submit">
               Add coupon
             </button>
           </form>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Code</th>
@@ -1209,7 +1209,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       : formatMoney(coupon.amountCents || 0)}
                   </td>
                   <td>
-                    <span className={coupon.isActive ? "pill success" : "pill danger"}>{coupon.isActive ? "active" : "inactive"}</span>
+                    <span className={coupon.isActive ? "ui-badge ui-badge-success" : "ui-badge ui-badge-danger"}>{coupon.isActive ? "active" : "inactive"}</span>
                   </td>
                 </tr>
               ))}
@@ -1225,56 +1225,56 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             <h3 className="subsection-title">Issue gift card</h3>
             <form action={createGiftCardAction} className="form-grid">
               <div className="grid-3">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="giftCardCode">Code</label>
                   <input id="giftCardCode" name="code" placeholder="Auto-generate" />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="giftCardAmount">Amount</label>
                   <input id="giftCardAmount" name="amount" inputMode="decimal" required />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="giftCardCurrency">Currency</label>
                   <input id="giftCardCurrency" name="currency" defaultValue="USD" maxLength={3} required />
                 </div>
               </div>
               <div className="grid-2">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="giftCardRecipientName">Recipient name</label>
                   <input id="giftCardRecipientName" name="recipientName" />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="giftCardRecipientEmail">Recipient email</label>
                   <input id="giftCardRecipientEmail" name="recipientEmail" type="email" />
                 </div>
               </div>
               <div className="grid-2">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="giftCardPurchaserName">Purchaser name</label>
                   <input id="giftCardPurchaserName" name="purchaserName" />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="giftCardPurchaserEmail">Purchaser email</label>
                   <input id="giftCardPurchaserEmail" name="purchaserEmail" type="email" />
                 </div>
               </div>
               <div className="grid-2">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="giftCardExpiresAt">Expires</label>
                   <input id="giftCardExpiresAt" name="expiresAt" type="date" />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="giftCardNote">Note</label>
                   <input id="giftCardNote" name="note" />
                 </div>
               </div>
-              <button className="button secondary" type="submit">
+              <button className="ui-button ui-button-secondary" type="submit">
                 Issue gift card
               </button>
             </form>
           </div>
 
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Gift card</th>
@@ -1298,7 +1298,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     <span className="muted-text">of {formatMoney(giftCard.initialAmountCents, giftCard.currency)}</span>
                   </td>
                   <td>
-                    <span className={giftCard.status === GiftCardStatus.ACTIVE ? "pill success" : "pill danger"}>
+                    <span className={giftCard.status === GiftCardStatus.ACTIVE ? "ui-badge ui-badge-success" : "ui-badge ui-badge-danger"}>
                       {enumLabel(giftCard.status)}
                     </span>
                   </td>

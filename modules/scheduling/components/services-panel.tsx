@@ -24,15 +24,15 @@ function StaffCheckboxes({
   staff: StaffMember[];
 }) {
   if (!staff.length) {
-    return <p style={{ color: "var(--muted)", margin: 0 }}>Add staff to assign this service to specific people.</p>;
+    return <p className="ui-zero">Add staff to assign this service to specific people.</p>;
   }
 
   return (
-    <div className="field">
+    <div className="ui-field">
       <label>Staff who can take this service</label>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+      <div className="ui-zero">
         {staff.map((member) => (
-          <label key={member.id} style={{ alignItems: "center", display: "flex", gap: 6 }}>
+          <label className="ui-zero" key={member.id}>
             <input
               id={`${checkboxIdPrefix}-${member.id}`}
               name="staffIds"
@@ -59,15 +59,15 @@ function ResourceCheckboxes({
   resources: Resource[];
 }) {
   if (!resources.length) {
-    return <p style={{ color: "var(--muted)", margin: 0 }}>Add rooms or equipment before requiring resources for a service.</p>;
+    return <p className="ui-zero">Add rooms or equipment before requiring resources for a service.</p>;
   }
 
   return (
-    <div className="field">
+    <div className="ui-field">
       <label>Required rooms or equipment</label>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+      <div className="ui-zero">
         {resources.map((resource) => (
-          <label key={resource.id} style={{ alignItems: "center", display: "flex", gap: 6 }}>
+          <label className="ui-zero" key={resource.id}>
             <input
               id={`${checkboxIdPrefix}-${resource.id}`}
               name="resourceIds"
@@ -87,90 +87,90 @@ function ResourceCheckboxes({
 export function ServicesPanel({ resources, services, staff }: ServicesPanelProps) {
   return (
     <section className="grid-2">
-      <form action={createServiceAction} className="card form-grid">
+      <form action={createServiceAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
         <h2 className="section-title">Add service</h2>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor="name">Name</label>
           <input id="name" name="name" required />
         </div>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor="slug">Booking URL slug</label>
           <input id="slug" name="slug" placeholder="consultation" />
-          <span style={{ color: "var(--muted)", fontSize: "0.86rem" }}>Leave blank to generate one from the service name.</span>
+          <span className="ui-zero">Leave blank to generate one from the service name.</span>
         </div>
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="durationMinutes">Duration</label>
             <input id="durationMinutes" name="durationMinutes" type="number" min="5" step="5" defaultValue="30" required />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="location">Location</label>
             <input id="location" name="location" placeholder="Online, studio, client location" />
           </div>
         </div>
         <div className="grid-3">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="minimumNoticeHours">Minimum notice</label>
             <input id="minimumNoticeHours" name="minimumNoticeHours" type="number" min="0" defaultValue="12" />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="maxAdvanceDays">Max advance days</label>
             <input id="maxAdvanceDays" name="maxAdvanceDays" type="number" min="1" defaultValue="60" />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="slotIntervalMinutes">Slot interval</label>
             <input id="slotIntervalMinutes" name="slotIntervalMinutes" type="number" min="5" step="5" defaultValue="30" />
           </div>
         </div>
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="bufferBeforeMinutes">Buffer before</label>
             <input id="bufferBeforeMinutes" name="bufferBeforeMinutes" type="number" min="0" step="5" defaultValue="0" />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="bufferAfterMinutes">Buffer after</label>
             <input id="bufferAfterMinutes" name="bufferAfterMinutes" type="number" min="0" step="5" defaultValue="15" />
           </div>
         </div>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor="description">Description</label>
           <textarea id="description" name="description" />
         </div>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor="intakePrompt">Intake question</label>
           <input id="intakePrompt" name="intakePrompt" placeholder="What should we know before this appointment?" />
         </div>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor="policyText">Booking policy</label>
           <textarea id="policyText" name="policyText" placeholder="Cancellation, deposit, or preparation policy" />
         </div>
-        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+        <label className="ui-zero">
           <input name="requirePolicy" type="checkbox" defaultChecked />
           Require policy acceptance
         </label>
-        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+        <label className="ui-zero">
           <input name="requestOnly" type="checkbox" />
           Request-only approval
         </label>
-        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+        <label className="ui-zero">
           <input name="waitlistEnabled" type="checkbox" />
           Offer waitlist when full
         </label>
-        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+        <label className="ui-zero">
           <input name="isActive" type="checkbox" defaultChecked />
           Active
         </label>
         <StaffCheckboxes assignedStaffIds={[]} checkboxIdPrefix="new-service-staff" staff={staff} />
         <ResourceCheckboxes assignedResourceIds={[]} checkboxIdPrefix="new-service-resource" resources={resources} />
-        <button className="button" type="submit">
+        <button className="ui-button" type="submit">
           <Plus size={18} />
           Add service
         </button>
       </form>
 
-      <div className="card">
+      <div className="ui-card ui-card-density-normal ui-card-min-md">
         <h2 className="section-title">Current services</h2>
-        <table className="table">
+        <table className="ui-table">
           <thead>
             <tr>
               <th>Name</th>
@@ -190,19 +190,19 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                   </td>
                   <td>{service.durationMinutes} min</td>
                   <td>
-                    <span className={service.isActive ? "pill success" : "pill danger"}>
+                    <span className={service.isActive ? "ui-badge ui-badge-success" : "ui-badge ui-badge-danger"}>
                       {service.isActive ? "active" : "inactive"}
                     </span>
                     {service.requestOnly ? (
                       <>
                         <br />
-                        <span className="pill">request-only</span>
+                        <span className="ui-badge">request-only</span>
                       </>
                     ) : null}
                     {service.waitlistEnabled ? (
                       <>
                         <br />
-                        <span className="pill">waitlist</span>
+                        <span className="ui-badge">waitlist</span>
                       </>
                     ) : null}
                   </td>
@@ -210,7 +210,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                     <form action={toggleServiceAction}>
                       <input type="hidden" name="id" value={service.id} />
                       <input type="hidden" name="isActive" value={service.isActive ? "false" : "true"} />
-                      <button className="button secondary" type="submit">
+                      <button className="ui-button ui-button-secondary" type="submit">
                         {service.isActive ? <CircleOff size={16} /> : <Check size={16} />}
                         {service.isActive ? "Disable" : "Enable"}
                       </button>
@@ -218,7 +218,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                   </td>
                 </tr>
                 <tr>
-                  <td colSpan={4} style={{ color: "var(--muted)", paddingTop: 0 }}>
+                  <td className="ui-zero" colSpan={4}>
                     Notice: {service.minimumNoticeHours}h - Advance: {service.maxAdvanceDays}d - Interval:{" "}
                     {service.slotIntervalMinutes}m - Buffer: {service.bufferBeforeMinutes}/{service.bufferAfterMinutes}m
                     <br />
@@ -237,20 +237,20 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                   <td colSpan={4}>
                     <details>
                       <summary>Edit service</summary>
-                      <form action={updateServiceAction} className="form-grid" style={{ marginTop: 12 }}>
+                      <form action={updateServiceAction} className="form-grid ui-zero">
                         <input type="hidden" name="id" value={service.id} />
                         <div className="grid-2">
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`service-${service.id}-name`}>Name</label>
                             <input id={`service-${service.id}-name`} name="name" defaultValue={service.name} required />
                           </div>
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`service-${service.id}-location`}>Location</label>
                             <input id={`service-${service.id}-location`} name="location" defaultValue={service.location || ""} />
                           </div>
                         </div>
                         <div className="grid-3">
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`service-${service.id}-duration`}>Duration</label>
                             <input
                               id={`service-${service.id}-duration`}
@@ -262,7 +262,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                               required
                             />
                           </div>
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`service-${service.id}-notice`}>Minimum notice</label>
                             <input
                               id={`service-${service.id}-notice`}
@@ -272,7 +272,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                               defaultValue={service.minimumNoticeHours}
                             />
                           </div>
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`service-${service.id}-advance`}>Max advance days</label>
                             <input
                               id={`service-${service.id}-advance`}
@@ -284,7 +284,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                           </div>
                         </div>
                         <div className="grid-3">
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`service-${service.id}-interval`}>Slot interval</label>
                             <input
                               id={`service-${service.id}-interval`}
@@ -295,7 +295,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                               defaultValue={service.slotIntervalMinutes}
                             />
                           </div>
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`service-${service.id}-before`}>Buffer before</label>
                             <input
                               id={`service-${service.id}-before`}
@@ -306,7 +306,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                               defaultValue={service.bufferBeforeMinutes}
                             />
                           </div>
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`service-${service.id}-after`}>Buffer after</label>
                             <input
                               id={`service-${service.id}-after`}
@@ -318,7 +318,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                             />
                           </div>
                         </div>
-                        <div className="field">
+                        <div className="ui-field">
                           <label htmlFor={`service-${service.id}-description`}>Description</label>
                           <textarea
                             id={`service-${service.id}-description`}
@@ -326,7 +326,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                             defaultValue={service.description || ""}
                           />
                         </div>
-                        <div className="field">
+                        <div className="ui-field">
                           <label htmlFor={`service-${service.id}-intake`}>Intake question</label>
                           <input
                             id={`service-${service.id}-intake`}
@@ -334,23 +334,23 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                             defaultValue={service.intakePrompt || ""}
                           />
                         </div>
-                        <div className="field">
+                        <div className="ui-field">
                           <label htmlFor={`service-${service.id}-policy`}>Booking policy</label>
                           <textarea id={`service-${service.id}-policy`} name="policyText" defaultValue={service.policyText || ""} />
                         </div>
-                        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                        <label className="ui-zero">
                           <input name="requirePolicy" type="checkbox" defaultChecked={service.requirePolicy && Boolean(service.policyText?.trim())} />
                           Require policy acceptance
                         </label>
-                        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                        <label className="ui-zero">
                           <input name="requestOnly" type="checkbox" defaultChecked={service.requestOnly} />
                           Request-only approval
                         </label>
-                        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                        <label className="ui-zero">
                           <input name="waitlistEnabled" type="checkbox" defaultChecked={service.waitlistEnabled} />
                           Offer waitlist when full
                         </label>
-                        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                        <label className="ui-zero">
                           <input name="isActive" type="checkbox" defaultChecked={service.isActive} />
                           Active
                         </label>
@@ -364,7 +364,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                           checkboxIdPrefix={`service-${service.id}-resource`}
                           resources={resources}
                         />
-                        <button className="button" type="submit">
+                        <button className="ui-button" type="submit">
                           <Save size={18} />
                           Save service
                         </button>

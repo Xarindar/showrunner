@@ -27,9 +27,9 @@ type BillingPageProps = {
 };
 
 function statusClass(status: BillingDocumentStatus) {
-  if (status === BillingDocumentStatus.PAID || status === BillingDocumentStatus.ACCEPTED) return "pill success";
-  if (status === BillingDocumentStatus.VOID || status === BillingDocumentStatus.OVERDUE) return "pill danger";
-  return "pill";
+  if (status === BillingDocumentStatus.PAID || status === BillingDocumentStatus.ACCEPTED) return "ui-badge ui-badge-success";
+  if (status === BillingDocumentStatus.VOID || status === BillingDocumentStatus.OVERDUE) return "ui-badge ui-badge-danger";
+  return "ui-badge";
 }
 
 function moneyInput(cents: number) {
@@ -197,21 +197,21 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       {errorMessage ? <div className="error">{errorMessage}</div> : null}
 
       <section className="grid-3">
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <ReceiptText size={22} />
           <h3>{documentCount} documents</h3>
           <p className="lead lead-compact">
             Quotes, invoices, and contracts in the billing workspace.
           </p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <WalletCards size={22} />
           <h3>{paymentTotalsLabel(paidTotals)}</h3>
           <p className="lead lead-compact">
             Total marked paid across all billing records.
           </p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <FileText size={22} />
           <h3>{openBalanceTotalsLabel(openDocuments)}</h3>
           <p className="lead lead-compact">
@@ -221,10 +221,10 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       </section>
 
       <section className="grid-2">
-        <form action={createBillingDocumentAction} className="card form-grid">
+        <form action={createBillingDocumentAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <h2 className="section-title">Create billing document</h2>
           <div className="grid-3">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="billing-type">Type</label>
               <select id="billing-type" name="type" defaultValue={BillingDocumentType.INVOICE}>
                 {Object.values(BillingDocumentType).map((type) => (
@@ -234,7 +234,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="billing-status">Status</label>
               <select id="billing-status" name="status" defaultValue={BillingDocumentStatus.DRAFT}>
                 {[BillingDocumentStatus.DRAFT, BillingDocumentStatus.SENT].map((status) => (
@@ -244,13 +244,13 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="billing-currency">Currency</label>
               <input id="billing-currency" name="currency" defaultValue="USD" maxLength={3} required />
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="billing-client">Client</label>
               <select id="billing-client" name="clientId" defaultValue="">
                 <option value="">No linked client</option>
@@ -261,62 +261,62 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="billing-due">Due date</label>
               <input id="billing-due" name="dueAt" type="date" />
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="billing-name">Customer name</label>
               <input id="billing-name" name="customerName" required />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="billing-email">Customer email</label>
               <input id="billing-email" name="customerEmail" type="email" required />
             </div>
           </div>
           <div className="grid-3">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="line-description">First line item</label>
               <input id="line-description" name="lineDescription" required />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="line-quantity">Quantity</label>
               <input id="line-quantity" name="quantity" type="number" min="1" defaultValue="1" required />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="line-price">Unit price</label>
               <input id="line-price" name="unitPrice" inputMode="decimal" placeholder="250.00" required />
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="billing-discount">Discount</label>
               <input id="billing-discount" name="discount" inputMode="decimal" />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="billing-tax">Tax</label>
               <input id="billing-tax" name="tax" inputMode="decimal" />
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="billing-memo">Customer memo</label>
             <textarea id="billing-memo" name="publicMemo" />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="billing-notes">Internal notes</label>
             <textarea id="billing-notes" name="notes" />
           </div>
-          <button className="button" type="submit">
+          <button className="ui-button" type="submit">
             <Plus size={18} />
             Create document
           </button>
         </form>
 
-        <div className="card stack">
+        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <h2 className="section-title">Billing queue</h2>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Document</th>
@@ -368,7 +368,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
       {selectedDocument ? (
         <section className="grid-2">
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <div className="page-header compact-header">
               <div>
                 <h2 className="section-title">{selectedDocument.documentNumber}</h2>
@@ -378,7 +378,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
               </div>
               <span className={statusClass(selectedDocument.status)}>{enumLabel(selectedDocument.status)}</span>
             </div>
-            <table className="table">
+            <table className="ui-table">
               <tbody>
                 <tr>
                   <td>Subtotal</td>
@@ -414,44 +414,44 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 </tr>
               </tbody>
             </table>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <div className="ui-zero">
               {nextStatuses(selectedDocument.status).map((status) => (
                 <form action={updateBillingDocumentStatusAction} key={status}>
                   <input type="hidden" name="id" value={selectedDocument.id} />
                   <input type="hidden" name="status" value={status} />
-                  <button className="button secondary" type="submit">
+                  <button className="ui-button ui-button-secondary" type="submit">
                     Mark {enumLabel(status)}
                   </button>
                 </form>
               ))}
               {!nextStatuses(selectedDocument.status).length ? (
-                <span className="pill">Final state</span>
+                <span className="ui-badge">Final state</span>
               ) : null}
             </div>
             <div className="subpanel form-grid">
               <h3 className="subsection-title">Client link and payment handoff</h3>
               <div className="grid-2">
                 <div>
-                  <p style={{ color: "var(--muted)", marginBottom: 8 }}>Public document</p>
+                  <p className="ui-zero">Public document</p>
                   {selectedDocument.publicAccessToken && !selectedDocumentIsDraft ? (
-                    <a className="button secondary" href={`/billing/${selectedDocument.publicAccessToken}`} target="_blank" rel="noreferrer">
+                    <a className="ui-button ui-button-secondary" href={`/billing/${selectedDocument.publicAccessToken}`} target="_blank" rel="noreferrer">
                       Open client view
                     </a>
                   ) : (
-                    <span className="pill">Available after send</span>
+                    <span className="ui-badge">Available after send</span>
                   )}
                 </div>
                 <div>
-                  <p style={{ color: "var(--muted)", marginBottom: 8 }}>Customer notice</p>
+                  <p className="ui-zero">Customer notice</p>
                   {!selectedDocumentIsDraft ? (
                     <form action={queueBillingDocumentEmailAction}>
                       <input type="hidden" name="id" value={selectedDocument.id} />
-                      <button className="button secondary" type="submit">
+                      <button className="ui-button ui-button-secondary" type="submit">
                         Queue email
                       </button>
                     </form>
                   ) : (
-                    <span className="pill">Send first</span>
+                    <span className="ui-badge">Send first</span>
                   )}
                 </div>
               </div>
@@ -466,7 +466,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                     </p>
                   </div>
                   {selectedDocument.checkoutUrl ? (
-                    <a className="button secondary" href={selectedDocument.checkoutUrl} target="_blank" rel="noreferrer">
+                    <a className="ui-button ui-button-secondary" href={selectedDocument.checkoutUrl} target="_blank" rel="noreferrer">
                       Open link
                     </a>
                   ) : null}
@@ -475,7 +475,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                   <form action={setBillingCheckoutLinkAction} className="form-grid">
                     <input type="hidden" name="id" value={selectedDocument.id} />
                     <div className="grid-2">
-                      <div className="field">
+                      <div className="ui-field">
                         <label htmlFor={`billing-${selectedDocument.id}-checkout`}>Stripe Checkout URL</label>
                         <input
                           id={`billing-${selectedDocument.id}-checkout`}
@@ -485,7 +485,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                           required
                         />
                       </div>
-                      <div className="field">
+                      <div className="ui-field">
                         <label htmlFor={`billing-${selectedDocument.id}-payment-ref`}>Stripe reference</label>
                         <input
                           id={`billing-${selectedDocument.id}-payment-ref`}
@@ -495,7 +495,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                         />
                       </div>
                     </div>
-                    <button className="button secondary" type="submit">
+                    <button className="ui-button ui-button-secondary" type="submit">
                       Save hosted payment link
                     </button>
                   </form>
@@ -503,11 +503,11 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 {selectedDocument.checkoutUrl && !selectedDocumentIsFinal ? (
                   <form action={clearBillingCheckoutLinkAction} className="form-grid">
                     <input type="hidden" name="id" value={selectedDocument.id} />
-                    <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                    <label className="ui-zero">
                       <input name="confirmClear" type="checkbox" required />
                       Clear this hosted payment link.
                     </label>
-                    <button className="button danger" type="submit">
+                    <button className="ui-button ui-button-danger" type="submit">
                       Clear payment link
                     </button>
                   </form>
@@ -517,7 +517,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
             {selectedDocument.payments.length ? (
               <div className="subpanel">
                 <h3 className="subsection-title">Payment history</h3>
-                <table className="table" style={{ minWidth: 0 }}>
+                <table className="ui-table ui-zero">
                   <thead>
                     <tr>
                       <th>Status</th>
@@ -545,9 +545,9 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                           <td>{formatDateTime(payment.createdAt, settings.timezone)}</td>
                           <td>
                             {refundableCents > 0 ? (
-                              <form action={refundBillingPaymentAction} className="form-grid" style={{ minWidth: 180 }}>
+                              <form action={refundBillingPaymentAction} className="form-grid ui-zero">
                                 <input type="hidden" name="paymentId" value={payment.id} />
-                                <div className="field">
+                                <div className="ui-field">
                                   <label htmlFor={`billing-refund-${payment.id}`}>Amount</label>
                                   <input
                                     id={`billing-refund-${payment.id}`}
@@ -557,12 +557,12 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                                     required
                                   />
                                 </div>
-                                <button className="button danger" type="submit">
+                                <button className="ui-button ui-button-danger" type="submit">
                                   Refund
                                 </button>
                               </form>
                             ) : (
-                              <span className="pill">Not refundable</span>
+                              <span className="ui-badge">Not refundable</span>
                             )}
                           </td>
                         </tr>
@@ -577,7 +577,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 <h3 className="subsection-title">Edit draft details</h3>
                 <input type="hidden" name="id" value={selectedDocument.id} />
                 <div className="grid-2">
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`billing-${selectedDocument.id}-client`}>Client</label>
                     <select id={`billing-${selectedDocument.id}-client`} name="clientId" defaultValue={selectedDocument.clientId || ""}>
                       <option value="">No linked client</option>
@@ -588,7 +588,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                       ))}
                     </select>
                   </div>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`billing-${selectedDocument.id}-currency`}>Currency</label>
                     <input
                       id={`billing-${selectedDocument.id}-currency`}
@@ -600,11 +600,11 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                   </div>
                 </div>
                 <div className="grid-2">
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`billing-${selectedDocument.id}-name`}>Customer name</label>
                     <input id={`billing-${selectedDocument.id}-name`} name="customerName" defaultValue={selectedDocument.customerName} required />
                   </div>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`billing-${selectedDocument.id}-email`}>Customer email</label>
                     <input
                       id={`billing-${selectedDocument.id}-email`}
@@ -616,39 +616,39 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                   </div>
                 </div>
                 <div className="grid-3">
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`billing-${selectedDocument.id}-due`}>Due date</label>
                     <input id={`billing-${selectedDocument.id}-due`} name="dueAt" type="date" defaultValue={dateInputValue(selectedDocument.dueAt)} />
                   </div>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`billing-${selectedDocument.id}-discount`}>Discount</label>
                     <input id={`billing-${selectedDocument.id}-discount`} name="discount" inputMode="decimal" defaultValue={moneyInput(selectedDocument.discountCents)} />
                   </div>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`billing-${selectedDocument.id}-tax`}>Tax</label>
                     <input id={`billing-${selectedDocument.id}-tax`} name="tax" inputMode="decimal" defaultValue={moneyInput(selectedDocument.taxCents)} />
                   </div>
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor={`billing-${selectedDocument.id}-memo`}>Customer memo</label>
                   <textarea id={`billing-${selectedDocument.id}-memo`} name="publicMemo" defaultValue={selectedDocument.publicMemo} />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor={`billing-${selectedDocument.id}-notes`}>Internal notes</label>
                   <textarea id={`billing-${selectedDocument.id}-notes`} name="notes" defaultValue={selectedDocument.notes} />
                 </div>
-                <button className="button secondary" type="submit">
+                <button className="ui-button ui-button-secondary" type="submit">
                   Save draft details
                 </button>
               </form>
             ) : (
-              <p style={{ color: "var(--muted)", margin: 0 }}>Finalized documents are locked. Create a replacement or void the document when a correction is needed.</p>
+              <p className="ui-zero">Finalized documents are locked. Create a replacement or void the document when a correction is needed.</p>
             )}
           </div>
 
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <h2 className="section-title">Line items</h2>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Description</th>
@@ -667,45 +667,45 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                       {selectedDocumentIsDraft ? (
                         <details>
                           <summary>Edit</summary>
-                          <form action={updateBillingLineItemAction} className="form-grid" style={{ marginTop: 12, minWidth: 280 }}>
+                          <form action={updateBillingLineItemAction} className="form-grid ui-zero">
                             <input type="hidden" name="id" value={item.id} />
                             <input type="hidden" name="billingDocumentId" value={selectedDocument.id} />
-                            <div className="field">
+                            <div className="ui-field">
                               <label htmlFor={`line-${item.id}-description`}>Description</label>
                               <input id={`line-${item.id}-description`} name="description" defaultValue={item.description} required />
                             </div>
                             <div className="grid-3">
-                              <div className="field">
+                              <div className="ui-field">
                                 <label htmlFor={`line-${item.id}-quantity`}>Qty</label>
                                 <input id={`line-${item.id}-quantity`} name="quantity" type="number" min="1" defaultValue={item.quantity} required />
                               </div>
-                              <div className="field">
+                              <div className="ui-field">
                                 <label htmlFor={`line-${item.id}-price`}>Unit price</label>
                                 <input id={`line-${item.id}-price`} name="unitPrice" inputMode="decimal" defaultValue={moneyInput(item.unitPriceCents)} required />
                               </div>
-                              <div className="field">
+                              <div className="ui-field">
                                 <label htmlFor={`line-${item.id}-sort`}>Sort</label>
                                 <input id={`line-${item.id}-sort`} name="sortOrder" type="number" defaultValue={item.sortOrder} />
                               </div>
                             </div>
-                            <button className="button secondary" type="submit">
+                            <button className="ui-button ui-button-secondary" type="submit">
                               Save line
                             </button>
                           </form>
-                          <form action={deleteBillingLineItemAction} className="form-grid" style={{ marginTop: 12, minWidth: 280 }}>
+                          <form action={deleteBillingLineItemAction} className="form-grid ui-zero">
                             <input type="hidden" name="id" value={item.id} />
                             <input type="hidden" name="billingDocumentId" value={selectedDocument.id} />
-                            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                            <label className="ui-zero">
                               <input name="confirmDelete" type="checkbox" required />
                               Delete this line item.
                             </label>
-                            <button className="button danger" type="submit">
+                            <button className="ui-button ui-button-danger" type="submit">
                               Delete line
                             </button>
                           </form>
                         </details>
                       ) : (
-                        <span className="pill">Locked</span>
+                        <span className="ui-badge">Locked</span>
                       )}
                     </td>
                   </tr>
@@ -716,20 +716,20 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
               <form action={addBillingLineItemAction} className="subpanel form-grid">
                 <input type="hidden" name="billingDocumentId" value={selectedDocument.id} />
                 <div className="grid-3">
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor="new-line-description">Description</label>
                     <input id="new-line-description" name="description" required />
                   </div>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor="new-line-quantity">Quantity</label>
                     <input id="new-line-quantity" name="quantity" type="number" min="1" defaultValue="1" required />
                   </div>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor="new-line-price">Unit price</label>
                     <input id="new-line-price" name="unitPrice" inputMode="decimal" required />
                   </div>
                 </div>
-                <button className="button secondary" type="submit">
+                <button className="ui-button ui-button-secondary" type="submit">
                   Add line item
                 </button>
               </form>
@@ -741,37 +741,37 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       {selectedDocument ? (
         <section className="grid-2">
           {selectedDocumentIsDraft ? (
-            <form action={addBillingAttachmentAction} className="card form-grid">
+            <form action={addBillingAttachmentAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
               <input type="hidden" name="billingDocumentId" value={selectedDocument.id} />
               <h2 className="section-title">Attach document</h2>
               <div className="grid-2">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="attachment-title">Title</label>
                   <input id="attachment-title" name="title" required />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="attachment-url">URL</label>
                   <input id="attachment-url" name="url" placeholder="https://example.com/file.pdf" required />
                 </div>
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="attachment-notes">Notes</label>
                 <input id="attachment-notes" name="notes" />
               </div>
-              <button className="button secondary" type="submit">
+              <button className="ui-button ui-button-secondary" type="submit">
                 Attach file
               </button>
             </form>
           ) : (
-            <div className="card">
+            <div className="ui-card ui-card-density-normal ui-card-min-md">
               <h2 className="section-title">Attach document</h2>
-              <p style={{ color: "var(--muted)", margin: 0 }}>Attachments are locked once the document leaves draft.</p>
+              <p className="ui-zero">Attachments are locked once the document leaves draft.</p>
             </div>
           )}
 
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <h2 className="section-title">Attachments</h2>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Title</th>

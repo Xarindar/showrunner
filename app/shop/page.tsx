@@ -64,14 +64,14 @@ export default async function ShopPage() {
           <span>{settings.businessName}</span>
         </Link>
         <div className="site-nav-links">
-          <Link href="/cart" className="button">
+          <Link href="/cart" className="ui-button">
             <ShoppingCart size={18} />
             Cart
           </Link>
         </div>
       </nav>
 
-      <section className="section" style={{ paddingTop: 22 }}>
+      <section className="section ui-zero">
         <div className="page-header">
           <div>
             <p className="eyebrow">Shop</p>
@@ -81,9 +81,9 @@ export default async function ShopPage() {
         </div>
 
         {collections.length ? (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+          <div className="ui-zero">
             {collections.map((collection) => (
-              <span className="pill" key={collection.id}>
+              <span className="ui-badge" key={collection.id}>
                 {collection.name}
               </span>
             ))}
@@ -96,24 +96,24 @@ export default async function ShopPage() {
             const priceCents = variant?.priceCents ?? product.basePriceCents;
 
             return (
-              <article className="card stack" key={product.id}>
+              <article className="ui-card ui-card-density-normal ui-card-min-md ui-stack" key={product.id}>
                 {product.imageUrl ? (
-                  <NextImage
+                  <NextImage className="ui-zero"
                     alt={product.name}
                     src={product.imageUrl}
                     width={720}
                     height={450}
                     unoptimized
-                    style={{ aspectRatio: "16 / 10", borderRadius: 6, objectFit: "cover", width: "100%" }}
+                   
                   />
                 ) : null}
                 <div>
-                  <h2 style={{ fontSize: "1.25rem" }}>{product.name}</h2>
+                  <h2 className="ui-zero">{product.name}</h2>
                   <p>{product.summary || product.description || "Catalog item"}</p>
                 </div>
                 <strong>{formatMoney(priceCents, product.currency)}</strong>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: "auto" }}>
-                  <Link className="button secondary" href={`/shop/${product.slug}`}>
+                <div className="ui-zero">
+                  <Link className="ui-button ui-button-secondary" href={`/shop/${product.slug}`}>
                     Details
                   </Link>
                   {variant && product.type !== ProductType.GIFT_CARD ? (
@@ -136,13 +136,13 @@ export default async function ShopPage() {
                       <input type="hidden" name="productId" value={product.id} />
                       <input type="hidden" name="variantId" value={variant.id} />
                       <input type="hidden" name="quantity" value="1" />
-                      <button className="button" type="submit" aria-label={`Add ${product.name} to cart`}>
+                      <button className="ui-button" type="submit" aria-label={`Add ${product.name} to cart`}>
                         <ShoppingCart size={18} />
                         Add
                       </button>
                     </TrackedAnalyticsForm>
                   ) : product.type === ProductType.GIFT_CARD ? (
-                    <Link className="button" href={`/shop/${product.slug}`}>
+                    <Link className="ui-button" href={`/shop/${product.slug}`}>
                       Gift
                     </Link>
                   ) : null}

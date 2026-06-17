@@ -48,17 +48,17 @@ function clientEmailSet(client: { alternateEmails: unknown; email: string }) {
 }
 
 function emailOutboxStatusClass(status: EmailOutboxStatus) {
-  if (status === EmailOutboxStatus.SENT) return "pill success";
+  if (status === EmailOutboxStatus.SENT) return "ui-badge ui-badge-success";
   if (status === EmailOutboxStatus.FAILED || status === EmailOutboxStatus.SUPPRESSED || status === EmailOutboxStatus.CANCELED) {
-    return "pill danger";
+    return "ui-badge ui-badge-danger";
   }
-  return "pill";
+  return "ui-badge";
 }
 
 function messageLogStatusClass(status: MessageLogStatus) {
-  if (status === MessageLogStatus.SENT) return "pill success";
-  if (status === MessageLogStatus.FAILED || status === MessageLogStatus.SUPPRESSED) return "pill danger";
-  return "pill";
+  if (status === MessageLogStatus.SENT) return "ui-badge ui-badge-success";
+  if (status === MessageLogStatus.FAILED || status === MessageLogStatus.SUPPRESSED) return "ui-badge ui-badge-danger";
+  return "ui-badge";
 }
 
 function relatedRecordHref(type: string, id: string) {
@@ -323,7 +323,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           <h1>{client.name}</h1>
           <p>{client.email}</p>
         </div>
-        <Link className="button secondary" href="/admin/modules/clients">
+        <Link className="ui-button ui-button-secondary" href="/admin/modules/clients">
           Back to clients
         </Link>
       </header>
@@ -332,35 +332,35 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
       {error ? <div className="error">{error}</div> : null}
 
       <section className="grid-2">
-        <form action={updateClientAction} className="card form-grid">
+        <form action={updateClientAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <input type="hidden" name="id" value={client.id} />
           <h2 className="section-title">Profile</h2>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="name">Name</label>
               <input id="name" name="name" defaultValue={client.name} required />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="email">Email</label>
               <input id="email" name="email" type="email" defaultValue={client.email} required />
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="companyName">Company</label>
               <input id="companyName" name="companyName" defaultValue={client.companyName} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="familyName">Family or household</label>
               <input id="familyName" name="familyName" defaultValue={client.familyName} />
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="phone">Phone</label>
               <input id="phone" name="phone" defaultValue={client.phone || ""} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="status">Status</label>
               <select id="status" name="status" defaultValue={client.status}>
                 <option value="active">Active</option>
@@ -371,7 +371,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="pipelineStage">Pipeline</label>
               <select id="pipelineStage" name="pipelineStage" defaultValue={client.pipelineStage}>
                 {Object.values(ClientPipelineStage).map((stage) => (
@@ -381,119 +381,119 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="tags">Tags</label>
               <input id="tags" name="tags" defaultValue={client.tags.map((tag) => tag.label).join(", ")} />
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="alternateEmails">Alternate emails</label>
               <input id="alternateEmails" name="alternateEmails" defaultValue={stringArrayCsv(client.alternateEmails)} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="alternatePhones">Alternate phones</label>
               <input id="alternatePhones" name="alternatePhones" defaultValue={stringArrayCsv(client.alternatePhones)} />
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="addressLine1">Address</label>
               <input id="addressLine1" name="addressLine1" defaultValue={client.addressLine1} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="addressLine2">Address 2</label>
               <input id="addressLine2" name="addressLine2" defaultValue={client.addressLine2} />
             </div>
           </div>
           <div className="grid-3">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="city">City</label>
               <input id="city" name="city" defaultValue={client.city} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="region">State/region</label>
               <input id="region" name="region" defaultValue={client.region} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="postalCode">Postal code</label>
               <input id="postalCode" name="postalCode" defaultValue={client.postalCode} />
             </div>
           </div>
           <div className="grid-3">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="country">Country</label>
               <input id="country" name="country" defaultValue={client.country} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="timezone">Timezone</label>
               <input id="timezone" name="timezone" defaultValue={client.timezone} placeholder={settings.timezone} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="pronouns">Pronouns</label>
               <input id="pronouns" name="pronouns" defaultValue={client.pronouns} />
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="birthday">Birthday</label>
               <input id="birthday" name="birthday" type="date" defaultValue={dateInputValue(client.birthday)} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="anniversary">Anniversary</label>
               <input id="anniversary" name="anniversary" type="date" defaultValue={dateInputValue(client.anniversary)} />
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="preferences">Preferences</label>
             <textarea id="preferences" name="preferences" defaultValue={preferencesNotes(client.preferences)} />
           </div>
           <div className="grid-3">
-            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <label className="ui-zero">
               <input name="emailOptIn" type="checkbox" defaultChecked={client.emailOptIn} />
               Email opt-in
             </label>
-            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <label className="ui-zero">
               <input name="smsOptIn" type="checkbox" defaultChecked={client.smsOptIn} />
               SMS opt-in
             </label>
-            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <label className="ui-zero">
               <input name="photoUsageRelease" type="checkbox" defaultChecked={client.photoUsageRelease} />
               Photo release
             </label>
           </div>
           <div className="grid-3">
-            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <label className="ui-zero">
               <input name="policyAccepted" type="checkbox" />
               Record policy acceptance
             </label>
-            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <label className="ui-zero">
               <input name="dataExportRequested" type="checkbox" defaultChecked={Boolean(client.dataExportRequestedAt)} />
               Data export requested
             </label>
-            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <label className="ui-zero">
               <input name="dataDeletionRequested" type="checkbox" defaultChecked={Boolean(client.dataDeletionRequestedAt)} />
               Deletion requested
             </label>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="privateNotes">Private summary</label>
             <textarea id="privateNotes" name="privateNotes" defaultValue={client.privateNotes || ""} />
           </div>
-          <button className="button" type="submit">
+          <button className="ui-button" type="submit">
             <Save size={18} />
             Save profile
           </button>
         </form>
 
-        <form action={addClientNoteAction} className="card form-grid">
+        <form action={addClientNoteAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <input type="hidden" name="clientId" value={client.id} />
           <h2 className="section-title">Add note</h2>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="content">Note</label>
             <textarea id="content" name="content" required />
           </div>
-          <button className="button" type="submit">
+          <button className="ui-button" type="submit">
             <Save size={18} />
             Save note
           </button>
@@ -501,48 +501,48 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
       </section>
 
       <section className="grid-2">
-        <form action={addClientFileAction} className="card form-grid">
+        <form action={addClientFileAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <input type="hidden" name="clientId" value={client.id} />
           <h2 className="section-title">Attach file</h2>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="file-title">Title</label>
               <input id="file-title" name="title" required />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="file-category">Category</label>
               <input id="file-category" name="category" placeholder="contract, gallery, upload" />
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="file-url">URL or site path</label>
             <input id="file-url" name="url" placeholder="/uploads/file.pdf" required />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="file-notes">Notes</label>
             <textarea id="file-notes" name="notes" />
           </div>
-          <button className="button secondary" type="submit">
+          <button className="ui-button ui-button-secondary" type="submit">
             <Save size={18} />
             Attach file
           </button>
         </form>
 
-        <div className="card stack">
+        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <h2 className="section-title">CRM snapshot</h2>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            <span className="pill">{client.status}</span>
-            <span className="pill">{enumLabel(client.pipelineStage)}</span>
-            {client.emailOptIn ? <span className="pill success">email opt-in</span> : null}
-            {client.smsOptIn ? <span className="pill success">sms opt-in</span> : null}
-            {client.photoUsageRelease ? <span className="pill success">photo release</span> : null}
-            {client.dataExportRequestedAt ? <span className="pill danger">export requested</span> : null}
-            {client.dataDeletionRequestedAt ? <span className="pill danger">deletion requested</span> : null}
+          <div className="ui-zero">
+            <span className="ui-badge">{client.status}</span>
+            <span className="ui-badge">{enumLabel(client.pipelineStage)}</span>
+            {client.emailOptIn ? <span className="ui-badge ui-badge-success">email opt-in</span> : null}
+            {client.smsOptIn ? <span className="ui-badge ui-badge-success">sms opt-in</span> : null}
+            {client.photoUsageRelease ? <span className="ui-badge ui-badge-success">photo release</span> : null}
+            {client.dataExportRequestedAt ? <span className="ui-badge ui-badge-danger">export requested</span> : null}
+            {client.dataDeletionRequestedAt ? <span className="ui-badge ui-badge-danger">deletion requested</span> : null}
           </div>
           <div>
             <h3>Tags</h3>
             {client.tags.map((tag) => (
-              <span className="pill" key={tag.id} style={{ marginRight: 4 }}>
+              <span className="ui-badge ui-zero" key={tag.id}>
                 {tag.label}
               </span>
             ))}
@@ -552,7 +552,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             <h3>Files</h3>
             {client.files.slice(0, 5).map((file) => (
               <div className="subpanel" key={file.id}>
-                <p style={{ margin: "0 0 8px" }}>
+                <p className="ui-zero">
                   <a href={file.url}>{file.title}</a>
                   <br />
                   <span className="muted-text">
@@ -562,11 +562,11 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                 <form action={deleteClientFileAction} className="form-grid">
                   <input type="hidden" name="id" value={file.id} />
                   <input type="hidden" name="clientId" value={client.id} />
-                  <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                  <label className="ui-zero">
                     <input name="confirmDelete" type="checkbox" />
                     Confirm file delete
                   </label>
-                  <button className="button secondary" type="submit">
+                  <button className="ui-button ui-button-secondary" type="submit">
                     Delete file
                   </button>
                 </form>
@@ -577,11 +577,11 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         </div>
       </section>
 
-      <section className="card">
+      <section className="ui-card ui-card-density-normal ui-card-min-md">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Unified timeline</h2>
-            <p style={{ color: "var(--muted)", margin: 0 }}>
+            <p className="ui-zero">
               Appointments, forms, testimonials, billing, orders, messages, and notes for this client.
             </p>
           </div>
@@ -589,15 +589,15 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         <div className="stack">
           {timelineItems.map((item) => (
             <div className="subpanel" key={item.id}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "space-between" }}>
+              <div className="ui-zero">
                 <div>
-                  <span className="pill">{item.badge}</span>
-                  <h3 style={{ fontSize: "1rem", margin: "8px 0 4px" }}>
+                  <span className="ui-badge">{item.badge}</span>
+                  <h3 className="ui-zero">
                     {item.href ? <Link href={item.href}>{item.title}</Link> : item.title}
                   </h3>
-                  <p style={{ color: "var(--muted)", margin: 0 }}>{item.detail}</p>
+                  <p className="ui-zero">{item.detail}</p>
                 </div>
-                <span className="pill">{formatDateTime(item.at, settings.timezone)}</span>
+                <span className="ui-badge">{formatDateTime(item.at, settings.timezone)}</span>
               </div>
             </div>
           ))}
@@ -605,16 +605,16 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         </div>
       </section>
 
-      <section className="card stack">
+      <section className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Email delivery history</h2>
-            <p style={{ color: "var(--muted)", margin: 0 }}>
+            <p className="ui-zero">
               Outbox and manual message records matched by client email, appointments, orders, billing documents, and form submissions.
             </p>
           </div>
         </div>
-        <table className="table">
+        <table className="ui-table">
           <thead>
             <tr>
               <th>Recipient</th>
@@ -654,7 +654,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         </table>
         <div className="subpanel">
           <h3 className="subsection-title">Manual message notes</h3>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Recipient</th>
@@ -696,9 +696,9 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
       </section>
 
       <section className="grid-2">
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <h2 className="section-title">Appointment history</h2>
-          <table className="table">
+          <table className="ui-table">
             <tbody>
               {client.bookings.map((booking) => (
                 <tr key={booking.id}>
@@ -710,7 +710,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                     <span className="muted-text">{formatDateTime(booking.startsAt, settings.timezone)}</span>
                   </td>
                   <td>
-                    <span className="pill">{booking.status.toLowerCase()}</span>
+                    <span className="ui-badge">{booking.status.toLowerCase()}</span>
                   </td>
                 </tr>
               ))}
@@ -723,21 +723,21 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           </table>
         </div>
 
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <h2 className="section-title">Notes</h2>
           <div className="stack">
             {client.notes.map((note) => (
               <div className="subpanel" key={note.id}>
                 <p>{note.content}</p>
-                <span className="pill">{formatDateTime(note.createdAt, settings.timezone)}</span>
-                <form action={deleteClientNoteAction} className="form-grid" style={{ marginTop: 12 }}>
+                <span className="ui-badge">{formatDateTime(note.createdAt, settings.timezone)}</span>
+                <form action={deleteClientNoteAction} className="form-grid ui-zero">
                   <input type="hidden" name="id" value={note.id} />
                   <input type="hidden" name="clientId" value={client.id} />
-                  <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                  <label className="ui-zero">
                     <input name="confirmDelete" type="checkbox" />
                     Confirm note delete
                   </label>
-                  <button className="button secondary" type="submit">
+                  <button className="ui-button ui-button-secondary" type="submit">
                     Delete note
                   </button>
                 </form>
@@ -748,7 +748,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         </div>
       </section>
 
-      <section className="card">
+      <section className="ui-card ui-card-density-normal ui-card-min-md">
         <CalendarCheck size={22} />
         <h2 className="section-title">Service history</h2>
         <p className="lead lead-compact">

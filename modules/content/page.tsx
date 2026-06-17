@@ -26,49 +26,49 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
 
       {saved ? <div className="success-message">Content saved.</div> : null}
 
-      <form action={updateContentAction} className="card form-grid">
+      <form action={updateContentAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="heroHeadline">Hero headline</label>
             <input id="heroHeadline" name="heroHeadline" defaultValue={settings.heroHeadline} required />
           </div>
 
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="heroImageUrl">Hero image URL</label>
             <input id="heroImageUrl" name="heroImageUrl" defaultValue={settings.heroImageUrl} required />
           </div>
         </div>
 
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor="heroSubheadline">Hero supporting copy</label>
           <textarea id="heroSubheadline" name="heroSubheadline" defaultValue={settings.heroSubheadline} />
         </div>
 
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="introTitle">Intro section title</label>
             <input id="introTitle" name="introTitle" defaultValue={settings.introTitle} required />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="introBody">Intro section body</label>
             <textarea id="introBody" name="introBody" defaultValue={settings.introBody} />
           </div>
         </div>
 
-        <button className="button" type="submit">
+        <button className="ui-button" type="submit">
           <Save size={18} />
           Save content
         </button>
       </form>
 
       <section className="grid-2" aria-label="Content readiness">
-        <div className="card">
-          <span className="pill warning">Partial</span>
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
+          <span className="ui-badge ui-badge-warning">Partial</span>
           <h2 className="compact-title">Current content scope</h2>
           <p>{manifest.readiness.summary}</p>
         </div>
-        <div className="card">
-          <span className="pill">Planned</span>
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
+          <span className="ui-badge">Planned</span>
           <h2 className="compact-title">SEO foundation</h2>
           <p>{manifest.readiness.primaryGap}</p>
         </div>

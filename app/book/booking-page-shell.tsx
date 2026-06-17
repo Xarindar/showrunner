@@ -46,7 +46,7 @@ export async function BookingPageShell({ initialServiceSlug }: BookingPageShellP
           <span className="brand-mark" />
           <span>{settings.businessName}</span>
         </Link>
-        <Link href="/admin" className="button secondary">
+        <Link href="/admin" className="ui-button ui-button-secondary">
           Admin
         </Link>
       </nav>

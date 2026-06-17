@@ -130,7 +130,7 @@ function AppointmentCard({
               <form action={updateBookingStatusAction} key={action.status}>
                 <input name="id" type="hidden" value={booking.id} />
                 <input name="status" type="hidden" value={action.status} />
-                <button className={action.status === "CANCELED" ? "button danger" : "button secondary"} type="submit">
+                <button className={action.status === "CANCELED" ? "ui-button ui-button-danger" : "ui-button ui-button-secondary"} type="submit">
                   <Icon size={14} />
                   {action.label}
                 </button>
@@ -253,7 +253,7 @@ export function AppointmentCalendar({ bookings, days, hours, view }: Appointment
                       onDragStart={(item) => setDraggedBooking(item)}
                     />
                   ))}
-                  {dayBookings.length > 4 ? <span className="pill">+{dayBookings.length - 4} more</span> : null}
+                  {dayBookings.length > 4 ? <span className="ui-badge">+{dayBookings.length - 4} more</span> : null}
                 </div>
               </section>
             );

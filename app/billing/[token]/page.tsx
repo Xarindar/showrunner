@@ -16,9 +16,9 @@ type BillingDocumentPageProps = {
 };
 
 function statusClass(status: BillingDocumentStatus) {
-  if (status === BillingDocumentStatus.PAID || status === BillingDocumentStatus.ACCEPTED) return "pill success";
-  if (status === BillingDocumentStatus.VOID || status === BillingDocumentStatus.OVERDUE) return "pill danger";
-  return "pill";
+  if (status === BillingDocumentStatus.PAID || status === BillingDocumentStatus.ACCEPTED) return "ui-badge ui-badge-success";
+  if (status === BillingDocumentStatus.VOID || status === BillingDocumentStatus.OVERDUE) return "ui-badge ui-badge-danger";
+  return "ui-badge";
 }
 
 function canAccept(type: BillingDocumentType, status: BillingDocumentStatus) {
@@ -63,25 +63,25 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
           <span>{settings.businessName}</span>
         </Link>
         <div className="site-nav-links">
-          <Link href={`/billing/${token}/print`} className="button secondary">
+          <Link href={`/billing/${token}/print`} className="ui-button ui-button-secondary">
             <Printer size={18} />
             Print
           </Link>
-          <Link href={`/billing/${token}/pdf`} className="button secondary">
+          <Link href={`/billing/${token}/pdf`} className="ui-button ui-button-secondary">
             <FileText size={18} />
             PDF
           </Link>
         </div>
       </nav>
 
-      <section className="section" style={{ paddingTop: 22 }}>
+      <section className="section ui-zero">
         <div className="stack">
           {query.accepted ? <div className="success-message">Document accepted.</div> : null}
           {query.checkout === "success" ? <div className="success-message">Payment received. Your balance is updated below.</div> : null}
           {query.checkout === "cancel" ? <div className="error">Payment was canceled before completion.</div> : null}
           {query.error ? <div className="error">{query.error}</div> : null}
 
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <div className="page-header flush-header">
               <div>
                 <p className="eyebrow">{enumLabel(document.type)}</p>
@@ -113,7 +113,7 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
 
             {document.publicMemo ? <p className="lead">{document.publicMemo}</p> : null}
 
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Description</th>
@@ -137,7 +137,7 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
             <div className="grid-2">
               <div className="subpanel">
                 <h3>Summary</h3>
-                <table className="table" style={{ minWidth: 0 }}>
+                <table className="ui-table ui-zero">
                   <tbody>
                     <tr>
                       <td>Subtotal</td>
@@ -176,7 +176,7 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
                 {acceptable ? (
                   <form action={acceptPublicBillingDocumentAction}>
                     <input type="hidden" name="token" value={token} />
-                    <button className="button" type="submit">
+                    <button className="ui-button" type="submit">
                       <CheckCircle size={18} />
                       Accept document
                     </button>
@@ -185,7 +185,7 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
                 {payable && remainingCents > 0 ? (
                   <form action={createPublicBillingCheckoutAction} className="form-grid">
                     <input type="hidden" name="token" value={token} />
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor="billing-payment-amount">Payment amount</label>
                       <input
                         id="billing-payment-amount"
@@ -195,25 +195,25 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
                         required
                       />
                     </div>
-                    <button className="button" type="submit">
+                    <button className="ui-button" type="submit">
                       <CreditCard size={18} />
                       Pay with Stripe Checkout
                     </button>
                   </form>
                 ) : null}
                 {payable && document.checkoutUrl && remainingCents > 0 ? (
-                  <a className="button secondary" href={document.checkoutUrl}>
+                  <a className="ui-button ui-button-secondary" href={document.checkoutUrl}>
                     <CreditCard size={18} />
                     Resume latest checkout
                   </a>
                 ) : null}
-                {payable && remainingCents <= 0 ? <span className="pill success">Paid in full</span> : null}
-                {!acceptable && !payable ? <span className="pill">No action needed</span> : null}
-                <Link className="button secondary" href={`/billing/${token}/print`}>
+                {payable && remainingCents <= 0 ? <span className="ui-badge ui-badge-success">Paid in full</span> : null}
+                {!acceptable && !payable ? <span className="ui-badge">No action needed</span> : null}
+                <Link className="ui-button ui-button-secondary" href={`/billing/${token}/print`}>
                   <Printer size={18} />
                   Print or save PDF
                 </Link>
-                <Link className="button secondary" href={`/billing/${token}/pdf`}>
+                <Link className="ui-button ui-button-secondary" href={`/billing/${token}/pdf`}>
                   <FileText size={18} />
                   Download PDF
                 </Link>
@@ -223,7 +223,7 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
             {document.payments.length ? (
               <div className="subpanel">
                 <h3>Payment history</h3>
-                <table className="table" style={{ minWidth: 0 }}>
+                <table className="ui-table ui-zero">
                   <tbody>
                     {document.payments.map((payment) => (
                       <tr key={payment.id}>

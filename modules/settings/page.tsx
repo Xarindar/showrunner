@@ -62,39 +62,39 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       {error ? <div className="error">{error}</div> : null}
 
       <section className="grid-3" aria-label="Settings structure">
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <h2 className="compact-title">Business</h2>
           <p>Identity, contact email, and timezone for public pages and notifications.</p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <h2 className="compact-title">Modules</h2>
           <p>{platformStatus.enabledCount} modules enabled, including required platform modules for the admin shell.</p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <h2 className="compact-title">Security and data</h2>
           <p>{platformFoundationItems.length} foundation items tracked for roles, audit logs, site scoping, and policy controls.</p>
         </div>
       </section>
 
-      <section className="card form-grid">
+      <section className="ui-card ui-card-density-normal ui-card-min-none form-grid">
         <div className="grid-2">
           <div>
             <h2 className="compact-title">Payments</h2>
             <p>Connected payment accounts, hosted checkout routing, and refunds.</p>
           </div>
-          <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "flex-end" }}>
-            <span className={stripeConnected ? "pill success" : "pill warning"}>{stripeConnected ? "Connected" : "Not connected"}</span>
-            <a className="button" href="/api/payments/stripe/connect/start">
+          <div className="ui-zero">
+            <span className={stripeConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{stripeConnected ? "Connected" : "Not connected"}</span>
+            <a className="ui-button" href="/api/payments/stripe/connect/start">
               <CreditCard size={18} />
               {stripeConnected ? "Reconnect Stripe" : "Connect Stripe"}
             </a>
-            <span className={squareConnected ? "pill success" : "pill warning"}>{squareConnected ? "Connected" : "Not connected"}</span>
-            <a className="button secondary" href="/api/payments/square/connect/start">
+            <span className={squareConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{squareConnected ? "Connected" : "Not connected"}</span>
+            <a className="ui-button ui-button-secondary" href="/api/payments/square/connect/start">
               <CreditCard size={18} />
               {squareConnected ? "Reconnect Square" : "Connect Square"}
             </a>
-            <span className={paypalConnected ? "pill success" : "pill warning"}>{paypalConnected ? "Connected" : "Not connected"}</span>
-            <a className="button secondary" href="/api/payments/paypal/connect/start">
+            <span className={paypalConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{paypalConnected ? "Connected" : "Not connected"}</span>
+            <a className="ui-button ui-button-secondary" href="/api/payments/paypal/connect/start">
               <CreditCard size={18} />
               {paypalConnected ? "Reconnect PayPal" : "Connect PayPal"}
             </a>
@@ -103,9 +103,9 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <form action={updateCheckoutProviderAction} className="subpanel form-grid">
           <div>
             <h3>Checkout provider</h3>
-            <p style={{ color: "var(--muted)", margin: 0 }}>Choose which connected provider creates new public checkout sessions.</p>
+            <p className="ui-zero">Choose which connected provider creates new public checkout sessions.</p>
             {selectedProviderDisconnected ? (
-              <p className="error" style={{ marginTop: 8 }}>
+              <p className="error ui-zero">
                 {settings.checkoutProvider === PaymentProvider.SQUARE ? "Square" : "PayPal"} is disconnected, so new checkout sessions are using Stripe until it is connected again.
               </p>
             ) : null}
@@ -121,7 +121,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               <span className="module-toggle-main">
                 <span>
                   <strong>Stripe</strong>
-                  <span className={stripeConnected ? "pill success" : "pill warning"}>{stripeConnected ? "Connected account" : "Platform fallback"}</span>
+                  <span className={stripeConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{stripeConnected ? "Connected account" : "Platform fallback"}</span>
                 </span>
                 <small>Hosted Stripe Checkout with connected-account settlement when Stripe is connected.</small>
               </span>
@@ -137,7 +137,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               <span className="module-toggle-main">
                 <span>
                   <strong>Square</strong>
-                  <span className={squareConnected ? "pill success" : "pill warning"}>{squareConnected ? "Connected account" : "Connect first"}</span>
+                  <span className={squareConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{squareConnected ? "Connected account" : "Connect first"}</span>
                 </span>
                 <small>
                   {squareConnected
@@ -157,7 +157,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               <span className="module-toggle-main">
                 <span>
                   <strong>PayPal</strong>
-                  <span className={paypalConnected ? "pill success" : "pill warning"}>{paypalConnected ? "Connected account" : "Connect first"}</span>
+                  <span className={paypalConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{paypalConnected ? "Connected account" : "Connect first"}</span>
                 </span>
                 <small>
                   {paypalConnected
@@ -167,7 +167,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               </span>
             </label>
           </div>
-          <button className="button secondary" type="submit">
+          <button className="ui-button ui-button-secondary" type="submit">
             <CreditCard size={18} />
             Save checkout provider
           </button>
@@ -181,7 +181,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
             <form action={updateStripePaymentMethodsAction} className="subpanel form-grid">
               <div>
                 <h3>Checkout methods</h3>
-                <p style={{ color: "var(--muted)", margin: 0 }}>Choose which Stripe-backed options can appear at checkout.</p>
+                <p className="ui-zero">Choose which Stripe-backed options can appear at checkout.</p>
               </div>
               <div className="module-toggle-grid">
                 {stripePaymentMethods.options.map((option) => {
@@ -197,8 +197,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                       <span className="module-toggle-main">
                         <span>
                           <strong>{option.label}</strong>
-                          <span className="pill">{option.type}</span>
-                          {applePayStatus ? <span className={applePayStatus === "verified" ? "pill success" : "pill warning"}>{applePayStatus}</span> : null}
+                          <span className="ui-badge">{option.type}</span>
+                          {applePayStatus ? <span className={applePayStatus === "verified" ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{applePayStatus}</span> : null}
                         </span>
                         <small>
                           {option.stripePaymentMethod === "card"
@@ -210,7 +210,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                   );
                 })}
               </div>
-              <button className="button secondary" type="submit">
+              <button className="ui-button ui-button-secondary" type="submit">
                 <CreditCard size={18} />
                 Save payment methods
               </button>
@@ -219,21 +219,21 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         ) : null}
       </section>
 
-      <form action={updateSettingsAction} className="card form-grid">
+      <form action={updateSettingsAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
         <section className="subpanel form-grid">
           <h2 className="compact-title">Business</h2>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="businessName">Business name</label>
               <input id="businessName" name="businessName" defaultValue={settings.businessName} required />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="contactEmail">Contact email</label>
               <input id="contactEmail" name="contactEmail" type="email" defaultValue={settings.contactEmail} required />
             </div>
           </div>
 
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="timezone">Timezone</label>
             <input id="timezone" name="timezone" defaultValue={settings.timezone} required />
           </div>
@@ -242,7 +242,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <section className="subpanel form-grid">
           <h2 className="compact-title">Theme and media</h2>
           <div className="grid-3">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="themePreset">Style preset</label>
               <select id="themePreset" name="themePreset" defaultValue={normalizeThemePreset(settings.themePreset)}>
                 {themePresetOptions.map((preset) => (
@@ -252,11 +252,11 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="themePrimary">Primary color</label>
               <input id="themePrimary" name="themePrimary" type="color" defaultValue={settings.themePrimary} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="mediaDriver">Media mode</label>
               <select id="mediaDriver" name="mediaDriver" defaultValue={settings.mediaDriver}>
                 <option value="REPO">Repo assets</option>
@@ -273,21 +273,21 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
             <p>Configure client-side adapter IDs and the server-enforced retention window. Consent UI remains a separate release gate.</p>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="ga4MeasurementId">GA4 measurement ID</label>
               <input id="ga4MeasurementId" name="ga4MeasurementId" defaultValue={settings.ga4MeasurementId} placeholder="G-XXXXXXXXXX" />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="googleAdsTagId">Google Ads tag ID</label>
               <input id="googleAdsTagId" name="googleAdsTagId" defaultValue={settings.googleAdsTagId} placeholder="AW-XXXXXXXXX" />
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="metaPixelId">Meta Pixel ID</label>
               <input id="metaPixelId" name="metaPixelId" defaultValue={settings.metaPixelId} placeholder="123456789012345" />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="analyticsRetentionDays">Analytics retention (days)</label>
               <input
                 id="analyticsRetentionDays"
@@ -299,7 +299,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               />
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="searchConsoleVerification">Google Search Console verification</label>
             <input
               id="searchConsoleVerification"
@@ -333,7 +333,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                   <span className="module-toggle-main">
                     <span>
                       <strong>{item.module.label}</strong>
-                      {required ? <span className="pill">Required</span> : null}
+                      {required ? <span className="ui-badge">Required</span> : null}
                     </span>
                     <small>{item.module.readiness.summary}</small>
                     {item.module.readiness.primaryGap ? <small>{item.module.readiness.primaryGap}</small> : null}
@@ -355,11 +355,11 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               <div className="grid-2">
                 <div>
                   <h3>Record access scope</h3>
-                  <p style={{ color: "var(--muted)", margin: 0 }}>
+                  <p className="ui-zero">
                     Choose whether constrained roles can see all records in a module or only records they own.
                   </p>
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="dataScopePreset">Apply preset on save</label>
                   <select id="dataScopePreset" name="dataScopePreset" defaultValue="custom">
                     <option value="custom">Keep matrix below</option>
@@ -378,9 +378,9 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                       <strong>{module.label}</strong>
                       <small>Manifest-owned scope for {module.id} records.</small>
                     </span>
-                    <span style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end" }}>
+                    <span className="ui-zero">
                       {module.scopableRoles.map((role) => (
-                        <label className="field" key={`${module.id}-${role}`} style={{ margin: 0, minWidth: 150 }}>
+                        <label className="ui-field ui-zero" key={`${module.id}-${role}`}>
                           <span>{enumLabel(role)}</span>
                           <select name={`dataScope:${module.id}:${role}`} defaultValue={dataScopeConfig[module.id]?.[role] || "OWN"}>
                             <option value="OWN">Own records</option>
@@ -397,7 +397,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           <div className="foundation-list">
             {platformFoundationItems.map((item) => (
               <div className="foundation-row" key={item.key}>
-                <span className={item.status === "schema-ready" ? "pill success" : "pill warning"}>{item.status.replaceAll("-", " ")}</span>
+                <span className={item.status === "schema-ready" ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{item.status.replaceAll("-", " ")}</span>
                 <span>
                   <strong>{item.title}</strong>
                   <small>{item.detail}</small>
@@ -408,13 +408,13 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           </div>
         </section>
 
-        <button className="button" type="submit">
+        <button className="ui-button" type="submit">
           <Save size={18} />
           Save settings
         </button>
       </form>
 
-      <section className="card form-grid" aria-label="Embeds and public API">
+      <section className="ui-card ui-card-density-normal ui-card-min-none form-grid" aria-label="Embeds and public API">
         <div>
           <h2 className="compact-title">Embeds &amp; public API</h2>
           <p>
@@ -431,31 +431,31 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                 <div className="grid-2">
                   <div>
                     <strong>{key.name || "Untitled key"}</strong>
-                    <small style={{ display: "block", color: "var(--muted)" }}>
+                    <small className="ui-zero">
                       <code>{key.publicKey}</code>
                     </small>
-                    <small style={{ display: "block", color: "var(--muted)" }}>
+                    <small className="ui-zero">
                       Scopes: {key.scopes.length ? key.scopes.join(", ") : "none"} · Last used:{" "}
                       {key.lastUsedAt ? key.lastUsedAt.toISOString().slice(0, 10) : "never"}
                     </small>
-                    <small style={{ display: "block", color: "var(--muted)" }}>
+                    <small className="ui-zero">
                       Server-to-server without Origin: {key.allowServerToServer ? "allowed" : "blocked"}
                     </small>
                   </div>
-                  <div style={{ alignItems: "center", display: "flex", gap: 12, justifyContent: "flex-end" }}>
-                    <span className={key.enabled ? "pill success" : "pill warning"}>{key.enabled ? "Active" : "Revoked"}</span>
+                  <div className="ui-zero">
+                    <span className={key.enabled ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{key.enabled ? "Active" : "Revoked"}</span>
                     {key.enabled ? (
-                      <form action={revokeSiteApiKeyAction} className="field" style={{ margin: 0, maxWidth: 180 }}>
+                      <form action={revokeSiteApiKeyAction} className="ui-field ui-zero">
                         <input type="hidden" name="keyId" value={key.id} />
                         <label htmlFor={`revoke-${key.id}`}>Type REVOKE</label>
                         <input id={`revoke-${key.id}`} name="confirmRevoke" placeholder="REVOKE" />
-                        <button className="button secondary" type="submit">Revoke</button>
+                        <button className="ui-button ui-button-secondary" type="submit">Revoke</button>
                       </form>
                     ) : null}
                   </div>
                 </div>
                 {key.enabled ? (
-                  <form action={updateSiteApiKeyOriginsAction} className="field">
+                  <form action={updateSiteApiKeyOriginsAction} className="ui-field">
                     <label htmlFor={`origins-${key.id}`}>Allowed origins (one per line)</label>
                     <textarea
                       id={`origins-${key.id}`}
@@ -465,23 +465,23 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                       placeholder="https://clientsite.com"
                     />
                     <input type="hidden" name="keyId" value={key.id} />
-                    <button className="button secondary" type="submit" style={{ marginTop: 8 }}>Save origins</button>
+                    <button className="ui-button ui-button-secondary ui-zero" type="submit">Save origins</button>
                   </form>
                 ) : null}
               </div>
             ))}
           </div>
         ) : (
-          <p style={{ color: "var(--muted)" }}>No embed keys yet. Create one to start embedding widgets on another site.</p>
+          <p className="ui-zero">No embed keys yet. Create one to start embedding widgets on another site.</p>
         )}
 
         <form action={createSiteApiKeyAction} className="subpanel form-grid">
           <h3>Create an embed key</h3>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="embedKeyName">Key name</label>
             <input id="embedKeyName" name="name" placeholder="Client marketing site" required />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="embedKeyOrigins">Allowed origins (one per line)</label>
             <textarea id="embedKeyOrigins" name="allowedOrigins" rows={3} placeholder="https://clientsite.com" />
             <small className="muted-text">
@@ -505,7 +505,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               </label>
             ))}
           </div>
-          <button className="button" type="submit">Create key</button>
+          <button className="ui-button" type="submit">Create key</button>
         </form>
       </section>
     </div>

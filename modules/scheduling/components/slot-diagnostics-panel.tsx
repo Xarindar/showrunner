@@ -32,17 +32,17 @@ export function SlotDiagnosticsPanel({
   const hiddenSlotCount = Math.max(0, (diagnostics?.slots.length || 0) - shownSlots.length);
 
   return (
-    <section className="card stack">
+    <section className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
       <div className="page-header flush-header">
         <div>
           <h2 className="section-title">Slot diagnostics</h2>
-          <p style={{ color: "var(--muted)", margin: 0 }}>Trace generated openings and the rules blocking unavailable times.</p>
+          <p className="ui-zero">Trace generated openings and the rules blocking unavailable times.</p>
         </div>
       </div>
 
       <form action="/admin/modules/scheduling" className="subpanel form-grid">
         <div className="grid-3">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="diagnosticServiceId">Service</label>
             <select id="diagnosticServiceId" name="diagnosticServiceId" defaultValue={selectedServiceId}>
               {services.map((service) => (
@@ -52,7 +52,7 @@ export function SlotDiagnosticsPanel({
               ))}
             </select>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="diagnosticStaffId">Staff</label>
             <select id="diagnosticStaffId" name="diagnosticStaffId" defaultValue={selectedStaffId}>
               <option value="">Any assigned staff</option>
@@ -63,7 +63,7 @@ export function SlotDiagnosticsPanel({
               ))}
             </select>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="diagnosticResourceId">Resource</label>
             <select id="diagnosticResourceId" name="diagnosticResourceId" defaultValue={selectedResourceId}>
               <option value="">Required resources</option>
@@ -74,12 +74,12 @@ export function SlotDiagnosticsPanel({
               ))}
             </select>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="diagnosticDate">Date</label>
             <input id="diagnosticDate" name="diagnosticDate" type="date" defaultValue={selectedDate} required />
           </div>
         </div>
-        <button className="button secondary" type="submit">
+        <button className="ui-button ui-button-secondary" type="submit">
           <Search size={18} />
           Diagnose slots
         </button>
@@ -87,21 +87,21 @@ export function SlotDiagnosticsPanel({
 
       {diagnostics ? (
         <div className="subpanel">
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-            <span className="pill">{diagnostics.serviceName}</span>
-            {diagnostics.staffName ? <span className="pill">{diagnostics.staffName}</span> : null}
-            {diagnostics.resourceNames.length ? <span className="pill">{diagnostics.resourceNames.join(", ")}</span> : null}
-            <span className="pill">{diagnostics.ruleCount} rules</span>
-            <span className="pill success">{diagnostics.availableCount} available</span>
-            <span className="pill">{diagnostics.slotCount} generated</span>
-            <span className="pill">{diagnostics.timezone}</span>
+          <div className="ui-zero">
+            <span className="ui-badge">{diagnostics.serviceName}</span>
+            {diagnostics.staffName ? <span className="ui-badge">{diagnostics.staffName}</span> : null}
+            {diagnostics.resourceNames.length ? <span className="ui-badge">{diagnostics.resourceNames.join(", ")}</span> : null}
+            <span className="ui-badge">{diagnostics.ruleCount} rules</span>
+            <span className="ui-badge ui-badge-success">{diagnostics.availableCount} available</span>
+            <span className="ui-badge">{diagnostics.slotCount} generated</span>
+            <span className="ui-badge">{diagnostics.timezone}</span>
           </div>
           {diagnostics.messages.length ? (
-            <div className="error" style={{ marginBottom: 12 }}>
+            <div className="error ui-zero">
               {diagnostics.messages.join(" ")}
             </div>
           ) : null}
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Time</th>
@@ -118,7 +118,7 @@ export function SlotDiagnosticsPanel({
                   <td>{slot.staffName || "Business-wide"}</td>
                   <td>{slot.resourceNames.length ? slot.resourceNames.join(", ") : "None"}</td>
                   <td>
-                    <span className={slot.available ? "pill success" : "pill danger"}>
+                    <span className={slot.available ? "ui-badge ui-badge-success" : "ui-badge ui-badge-danger"}>
                       {slot.available ? "available" : "blocked"}
                     </span>
                   </td>
@@ -133,7 +133,7 @@ export function SlotDiagnosticsPanel({
             </tbody>
           </table>
           {hiddenSlotCount ? (
-            <p style={{ color: "var(--muted)", marginBottom: 0 }}>{hiddenSlotCount} additional slots hidden.</p>
+            <p className="ui-zero">{hiddenSlotCount} additional slots hidden.</p>
           ) : null}
         </div>
       ) : (

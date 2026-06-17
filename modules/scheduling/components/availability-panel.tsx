@@ -13,10 +13,10 @@ type AvailabilityPanelProps = {
 export function AvailabilityPanel({ availability, resources, staff }: AvailabilityPanelProps) {
   return (
     <section className="grid-2">
-      <form action={createAvailabilityAction} className="card form-grid">
+      <form action={createAvailabilityAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
         <h2 className="section-title">Weekly availability</h2>
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="availability-staff">Staff</label>
             <select id="availability-staff" name="staffId" defaultValue="">
               <option value="">Business-wide</option>
@@ -27,7 +27,7 @@ export function AvailabilityPanel({ availability, resources, staff }: Availabili
               ))}
             </select>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="availability-resource">Resource</label>
             <select id="availability-resource" name="resourceId" defaultValue="">
               <option value="">None</option>
@@ -39,9 +39,9 @@ export function AvailabilityPanel({ availability, resources, staff }: Availabili
             </select>
           </div>
         </div>
-        <p style={{ color: "var(--muted)", margin: 0 }}>Choose either staff or resource for scoped hours, or leave both empty for business-wide hours.</p>
+        <p className="ui-zero">Choose either staff or resource for scoped hours, or leave both empty for business-wide hours.</p>
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="weekday">Day</label>
             <select id="weekday" name="weekday" defaultValue="1">
               {weekdays.map((day, index) => (
@@ -53,24 +53,24 @@ export function AvailabilityPanel({ availability, resources, staff }: Availabili
           </div>
         </div>
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="startTime">Start</label>
             <input id="startTime" name="startTime" type="time" defaultValue="09:00" required />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="endTime">End</label>
             <input id="endTime" name="endTime" type="time" defaultValue="17:00" required />
           </div>
         </div>
-        <button className="button" type="submit">
+        <button className="ui-button" type="submit">
           <Clock size={18} />
           Add availability
         </button>
       </form>
 
-      <div className="card">
+      <div className="ui-card ui-card-density-normal ui-card-min-md">
         <h2 className="section-title">Availability rules</h2>
-        <table className="table">
+        <table className="ui-table">
           <thead>
             <tr>
               <th>Owner</th>
@@ -90,7 +90,7 @@ export function AvailabilityPanel({ availability, resources, staff }: Availabili
                 <td>
                   <form action={deleteAvailabilityAction}>
                     <input type="hidden" name="id" value={rule.id} />
-                    <button className="button secondary" type="submit" title="Delete availability">
+                    <button className="ui-button ui-button-secondary" type="submit" title="Delete availability">
                       <Trash2 size={16} />
                     </button>
                   </form>

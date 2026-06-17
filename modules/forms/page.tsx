@@ -67,9 +67,9 @@ function normalizeStatusFilter(value?: string) {
 }
 
 function statusClass(status: FormStatus) {
-  if (status === FormStatus.ACTIVE) return "pill success";
-  if (status === FormStatus.ARCHIVED) return "pill danger";
-  return "pill";
+  if (status === FormStatus.ACTIVE) return "ui-badge ui-badge-success";
+  if (status === FormStatus.ARCHIVED) return "ui-badge ui-badge-danger";
+  return "ui-badge";
 }
 
 function summarizeSubmission(value: unknown) {
@@ -167,13 +167,13 @@ function conditionalControls(input: { field?: BuilderField; fields: BuilderField
   return (
     <details>
       <summary>Conditional visibility</summary>
-      <div className="form-grid" style={{ marginTop: 12 }}>
-        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+      <div className="form-grid ui-zero">
+        <label className="ui-zero">
           <input name="conditionEnabled" type="checkbox" defaultChecked={logic.enabled} disabled={!hasSourceFields} />
           Enable rule
         </label>
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor={`${input.idPrefix}-condition-action`}>Action</label>
             <select id={`${input.idPrefix}-condition-action`} name="conditionAction" defaultValue={logic.action}>
               {conditionalActions.map((action) => (
@@ -183,7 +183,7 @@ function conditionalControls(input: { field?: BuilderField; fields: BuilderField
               ))}
             </select>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor={`${input.idPrefix}-condition-source`}>When field</label>
             <select
               id={`${input.idPrefix}-condition-source`}
@@ -201,7 +201,7 @@ function conditionalControls(input: { field?: BuilderField; fields: BuilderField
           </div>
         </div>
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor={`${input.idPrefix}-condition-operator`}>Operator</label>
             <select id={`${input.idPrefix}-condition-operator`} name="conditionOperator" defaultValue={logic.operator}>
               {conditionalOperators.map((operator) => (
@@ -211,7 +211,7 @@ function conditionalControls(input: { field?: BuilderField; fields: BuilderField
               ))}
             </select>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor={`${input.idPrefix}-condition-value`}>Value</label>
             <input id={`${input.idPrefix}-condition-value`} name="conditionValue" defaultValue={logic.value} />
           </div>
@@ -247,32 +247,32 @@ function validationControls(input: { field?: BuilderField; idPrefix: string }) {
   return (
     <details>
       <summary>Validation rules</summary>
-      <div className="form-grid" style={{ marginTop: 12 }}>
+      <div className="form-grid ui-zero">
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor={`${input.idPrefix}-validation-min-length`}>Min length</label>
             <input id={`${input.idPrefix}-validation-min-length`} name="validationMinLength" type="number" min={0} defaultValue={rules.minLength ?? ""} />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor={`${input.idPrefix}-validation-max-length`}>Max length</label>
             <input id={`${input.idPrefix}-validation-max-length`} name="validationMaxLength" type="number" min={0} defaultValue={rules.maxLength ?? ""} />
           </div>
         </div>
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor={`${input.idPrefix}-validation-min-value`}>Min value</label>
             <input id={`${input.idPrefix}-validation-min-value`} name="validationMinValue" inputMode="decimal" defaultValue={rules.minValue ?? ""} />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor={`${input.idPrefix}-validation-max-value`}>Max value</label>
             <input id={`${input.idPrefix}-validation-max-value`} name="validationMaxValue" inputMode="decimal" defaultValue={rules.maxValue ?? ""} />
           </div>
         </div>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor={`${input.idPrefix}-validation-pattern`}>Regex pattern</label>
           <input id={`${input.idPrefix}-validation-pattern`} name="validationPattern" defaultValue={rules.pattern || ""} placeholder="^[A-Z0-9-]+$" />
         </div>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor={`${input.idPrefix}-validation-required-message`}>Required message</label>
           <input
             id={`${input.idPrefix}-validation-required-message`}
@@ -292,8 +292,8 @@ function uploadControls(input: { field?: BuilderField; idPrefix: string }) {
   return (
     <details>
       <summary>File upload config</summary>
-      <div className="form-grid" style={{ marginTop: 12 }}>
-        <div className="field">
+      <div className="form-grid ui-zero">
+        <div className="ui-field">
           <label htmlFor={`${input.idPrefix}-upload-mime-types`}>Allowed MIME types</label>
           <input
             id={`${input.idPrefix}-upload-mime-types`}
@@ -302,7 +302,7 @@ function uploadControls(input: { field?: BuilderField; idPrefix: string }) {
             placeholder="image/jpeg, image/png, application/pdf"
           />
         </div>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor={`${input.idPrefix}-upload-max-size`}>Max size (MB)</label>
           <input
             id={`${input.idPrefix}-upload-max-size`}
@@ -460,7 +460,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
           <p>Build lead, intake, inquiry, and attachment-ready forms with a submission inbox.</p>
         </div>
         {selectedForm ? (
-          <Link className="button secondary" href={`/forms/${selectedForm.slug}`}>
+          <Link className="ui-button ui-button-secondary" href={`/forms/${selectedForm.slug}`}>
             <FileText size={18} />
             Public form
           </Link>
@@ -471,21 +471,21 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
       {errorMessage ? <div className="error">{errorMessage}</div> : null}
 
       <section className="grid-3">
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <ClipboardList size={22} />
           <h3>{activeCount} active forms</h3>
           <p className="lead lead-compact">
             Available for public pages, inquiry flows, and intake links.
           </p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <Inbox size={22} />
           <h3>{submissionCount} submissions</h3>
           <p className="lead lead-compact">
             Captured across all active and archived forms.
           </p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <FileText size={22} />
           <h3>{fieldCount} fields</h3>
           <p className="lead lead-compact">
@@ -494,7 +494,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
         </div>
       </section>
 
-      <section className="card stack">
+      <section className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
         <div className="page-header flush-header">
           <div>
             <h2 className="section-title">Start from template</h2>
@@ -506,14 +506,14 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
             <form action={createFormFromTemplateAction} className="subpanel form-grid" key={template.key}>
               <input type="hidden" name="templateKey" value={template.key} />
               <div>
-                <span className="pill">{template.category}</span>
-                <h3 style={{ fontSize: "1.05rem", marginBottom: 6 }}>{template.name}</h3>
-                <p style={{ color: "var(--muted)", margin: 0 }}>{template.description}</p>
+                <span className="ui-badge">{template.category}</span>
+                <h3 className="ui-zero">{template.name}</h3>
+                <p className="ui-zero">{template.description}</p>
               </div>
-              <p style={{ color: "var(--muted)", margin: 0 }}>
+              <p className="ui-zero">
                 {template.fields.length} fields · {enumLabel(template.destination)}
               </p>
-              <button className="button secondary" type="submit">
+              <button className="ui-button ui-button-secondary" type="submit">
                 <CopyPlus size={18} />
                 Use template
               </button>
@@ -523,20 +523,20 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
       </section>
 
       <section className="grid-2">
-        <form action={createFormAction} className="card form-grid">
+        <form action={createFormAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <h2 className="section-title">Create form</h2>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="form-name">Name</label>
               <input id="form-name" name="name" required />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="form-slug">Public URL slug</label>
               <input id="form-slug" name="slug" placeholder="contact-inquiry" />
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="form-status">Status</label>
               <select id="form-status" name="status" defaultValue={FormStatus.DRAFT}>
                 {Object.values(FormStatus).map((status) => (
@@ -546,7 +546,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="form-destination">Destination</label>
               <select id="form-destination" name="destination" defaultValue={FormDestination.INQUIRY}>
                 {supportedDestinations.map((destination) => (
@@ -557,49 +557,49 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               </select>
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="form-description">Description</label>
             <textarea id="form-description" name="description" />
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="submitButtonLabel">Submit button</label>
               <input id="submitButtonLabel" name="submitButtonLabel" placeholder="Submit" />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="notificationEmail">Notify email</label>
               <input id="notificationEmail" name="notificationEmail" type="email" placeholder={settings.contactEmail} />
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="successMessage">Success message</label>
             <input id="successMessage" name="successMessage" placeholder="Thanks. Your form was submitted." />
           </div>
-          <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+          <label className="ui-zero">
             <input name="enableSteps" type="checkbox" />
             Use multi-step pages
           </label>
-          <button className="button" type="submit">
+          <button className="ui-button" type="submit">
             <Plus size={18} />
             Create form
           </button>
         </form>
 
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <div className="page-header compact-header">
             <div>
               <h2 className="section-title">Form library</h2>
               <p>{formCount} matching forms</p>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <div className="ui-zero">
               {statusFilters.map((filter) => (
-                <Link className={filter === statusFilter ? "button" : "button secondary"} href={`/admin/modules/forms?status=${filter}`} key={filter}>
+                <Link className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"} href={`/admin/modules/forms?status=${filter}`} key={filter}>
                   {filter}
                 </Link>
               ))}
             </div>
           </div>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Form</th>
@@ -634,14 +634,14 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                       <span className={statusClass(form.status)}>{enumLabel(form.status)}</span>
                     </td>
                     <td>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        <Link className="button secondary" href={`/admin/modules/forms?status=${statusFilter}&form=${form.id}`}>
+                      <div className="ui-zero">
+                        <Link className="ui-button ui-button-secondary" href={`/admin/modules/forms?status=${statusFilter}&form=${form.id}`}>
                           Edit
                         </Link>
                         <form action={updateFormStatusAction}>
                           <input type="hidden" name="id" value={form.id} />
                           <input type="hidden" name="status" value={form.status === FormStatus.ACTIVE ? FormStatus.DRAFT : FormStatus.ACTIVE} />
-                          <button className="button secondary" type="submit">
+                          <button className="ui-button ui-button-secondary" type="submit">
                             {form.status === FormStatus.ACTIVE ? "Draft" : "Activate"}
                           </button>
                         </form>
@@ -657,15 +657,15 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               ) : null}
             </tbody>
           </table>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-            <Link className="button secondary" href={`/admin/modules/forms?status=${statusFilter}&page=${Math.max(1, page - 1)}`} aria-disabled={page <= 1}>
+          <div className="ui-zero">
+            <Link className="ui-button ui-button-secondary" href={`/admin/modules/forms?status=${statusFilter}&page=${Math.max(1, page - 1)}`} aria-disabled={page <= 1}>
               Previous
             </Link>
-            <span className="pill">
+            <span className="ui-badge">
               Page {Math.min(page, pageCount)} of {pageCount}
             </span>
             <Link
-              className="button secondary"
+              className="ui-button ui-button-secondary"
               href={`/admin/modules/forms?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
               aria-disabled={page >= pageCount}
             >
@@ -677,21 +677,21 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
 
       {selectedForm ? (
         <section className="grid-2">
-          <form action={updateFormAction} className="card form-grid">
+          <form action={updateFormAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
             <h2 className="section-title">Edit selected form</h2>
             <input type="hidden" name="id" value={selectedForm.id} />
             <div className="grid-2">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`selected-${selectedForm.id}-name`}>Name</label>
                 <input id={`selected-${selectedForm.id}-name`} name="name" defaultValue={selectedForm.name} required />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`selected-${selectedForm.id}-slug`}>Public URL slug</label>
                 <input id={`selected-${selectedForm.id}-slug`} name="slug" defaultValue={selectedForm.slug} />
               </div>
             </div>
             <div className="grid-2">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`selected-${selectedForm.id}-status`}>Status</label>
                 <select id={`selected-${selectedForm.id}-status`} name="status" defaultValue={selectedForm.status}>
                   {Object.values(FormStatus).map((status) => (
@@ -701,7 +701,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                   ))}
                 </select>
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`selected-${selectedForm.id}-destination`}>Destination</label>
                 <select id={`selected-${selectedForm.id}-destination`} name="destination" defaultValue={selectedForm.destination}>
                   {destinationOptions(selectedForm.destination).map((destination) => (
@@ -712,82 +712,82 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                 </select>
               </div>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor={`selected-${selectedForm.id}-description`}>Description</label>
               <textarea id={`selected-${selectedForm.id}-description`} name="description" defaultValue={selectedForm.description} />
             </div>
             <div className="grid-2">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`selected-${selectedForm.id}-button`}>Submit button</label>
                 <input id={`selected-${selectedForm.id}-button`} name="submitButtonLabel" defaultValue={selectedForm.submitButtonLabel} />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`selected-${selectedForm.id}-notify`}>Notify email</label>
                 <input id={`selected-${selectedForm.id}-notify`} name="notificationEmail" type="email" defaultValue={selectedForm.notificationEmail || ""} />
               </div>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor={`selected-${selectedForm.id}-success`}>Success message</label>
               <input id={`selected-${selectedForm.id}-success`} name="successMessage" defaultValue={selectedForm.successMessage} />
             </div>
-            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <label className="ui-zero">
               <input name="enableSteps" type="checkbox" defaultChecked={selectedForm.enableSteps} />
               Use multi-step pages
             </label>
-            <button className="button" type="submit">
+            <button className="ui-button" type="submit">
               Save form
             </button>
           </form>
 
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <h2 className="section-title">Form actions</h2>
             {selectedFunnel ? (
               <div className="subpanel">
-                <span className="pill">Conversion {conversionRate(selectedFunnel)}</span>
-                <h3 style={{ fontSize: "1.05rem", marginBottom: 6 }}>Submission funnel</h3>
-                <p style={{ color: "var(--muted)", margin: 0 }}>
+                <span className="ui-badge">Conversion {conversionRate(selectedFunnel)}</span>
+                <h3 className="ui-zero">Submission funnel</h3>
+                <p className="ui-zero">
                   {selectedFunnel.views} views · {selectedFunnel.starts} starts · {selectedFunnel.submits} submits
                 </p>
               </div>
             ) : null}
             <form action={duplicateFormAction} className="subpanel form-grid">
               <input type="hidden" name="id" value={selectedForm.id} />
-              <p style={{ color: "var(--muted)", margin: 0 }}>Clone this form and its fields into a draft template you can edit safely.</p>
-              <button className="button secondary" type="submit">
+              <p className="ui-zero">Clone this form and its fields into a draft template you can edit safely.</p>
+              <button className="ui-button ui-button-secondary" type="submit">
                 Duplicate form
               </button>
             </form>
             <form action={updateFormStatusAction} className="subpanel form-grid">
               <input type="hidden" name="id" value={selectedForm.id} />
               <input type="hidden" name="status" value={FormStatus.ARCHIVED} />
-              <p style={{ color: "var(--muted)", margin: 0 }}>Archive hides the form from public use without deleting submissions.</p>
-              <button className="button secondary" type="submit">
+              <p className="ui-zero">Archive hides the form from public use without deleting submissions.</p>
+              <button className="ui-button ui-button-secondary" type="submit">
                 Archive form
               </button>
             </form>
             <form action={deleteFormAction} className="subpanel form-grid">
               <input type="hidden" name="id" value={selectedForm.id} />
-              <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <label className="ui-zero">
                 <input name="confirmDelete" type="checkbox" required />
                 Delete this form, its fields, and its submissions.
               </label>
-              <button className="button danger" type="submit">
+              <button className="ui-button ui-button-danger" type="submit">
                 Delete form
               </button>
             </form>
           </div>
 
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <div>
               <h2 className="section-title">Attachments</h2>
-              <p style={{ color: "var(--muted)" }}>Attach this form to a booking, order, or gallery and mark it required when it blocks follow-up.</p>
+              <p className="ui-zero">Attach this form to a booking, order, or gallery and mark it required when it blocks follow-up.</p>
             </div>
             <div className="grid-3">
               {targetGroups.map((group) => (
                 <form action={createFormAttachmentAction} className="subpanel form-grid" key={group.targetType}>
                   <input type="hidden" name="formId" value={selectedForm.id} />
                   <input type="hidden" name="targetType" value={group.targetType} />
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`attachment-${selectedForm.id}-${group.targetType}`}>{group.label}</label>
                     <select
                       id={`attachment-${selectedForm.id}-${group.targetType}`}
@@ -803,19 +803,19 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                       ))}
                     </select>
                   </div>
-                  {group.targets[0]?.meta ? <p style={{ color: "var(--muted)", margin: 0 }}>{group.targets[0].meta}</p> : null}
-                  <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                  {group.targets[0]?.meta ? <p className="ui-zero">{group.targets[0].meta}</p> : null}
+                  <label className="ui-zero">
                     <input name="isRequired" type="checkbox" />
                     Required
                   </label>
-                  <button className="button secondary" disabled={!group.targets.length} type="submit">
+                  <button className="ui-button ui-button-secondary" disabled={!group.targets.length} type="submit">
                     <Paperclip size={16} />
                     Attach
                   </button>
                 </form>
               ))}
             </div>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Target</th>
@@ -834,7 +834,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                       <span className="muted-text">{attachment.targetId}</span>
                     </td>
                     <td>
-                      <span className={attachment.isRequired ? "pill success" : "pill"}>{attachment.isRequired ? "required" : "optional"}</span>
+                      <span className={attachment.isRequired ? "ui-badge ui-badge-success" : "ui-badge"}>{attachment.isRequired ? "required" : "optional"}</span>
                     </td>
                     <td>{attachment._count.submissions}</td>
                     <td>
@@ -852,7 +852,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                       <form action={deleteFormAttachmentAction}>
                         <input type="hidden" name="id" value={attachment.id} />
                         <input type="hidden" name="formId" value={selectedForm.id} />
-                        <button className="button secondary" type="submit" aria-label={`Remove attachment ${attachment.id}`}>
+                        <button className="ui-button ui-button-secondary" type="submit" aria-label={`Remove attachment ${attachment.id}`}>
                           <Trash2 size={16} />
                         </button>
                       </form>
@@ -868,19 +868,19 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
             </table>
           </div>
 
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <div>
               <h2 className="section-title">Fields for {selectedForm.name}</h2>
-              <p style={{ color: "var(--muted)" }}>Choice fields use comma-separated options. File fields store private uploads for gated admin download.</p>
+              <p className="ui-zero">Choice fields use comma-separated options. File fields store private uploads for gated admin download.</p>
             </div>
             <form action={createFormFieldAction} className="subpanel form-grid">
               <input type="hidden" name="formId" value={selectedForm.id} />
               <div className="grid-2">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="field-label">Label</label>
                   <input id="field-label" name="label" required />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="field-type">Type</label>
                   <select id="field-type" name="type" defaultValue={FormFieldType.TEXT}>
                     {Object.values(FormFieldType).map((type) => (
@@ -891,7 +891,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                   </select>
                 </div>
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="field-role">Identity role</label>
                 <select id="field-role" name="fieldRole" defaultValue={FormFieldRole.NONE}>
                   {Object.values(FormFieldRole).map((role) => (
@@ -902,35 +902,35 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                 </select>
               </div>
               <div className="grid-2">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="field-placeholder">Placeholder or hidden value</label>
                   <input id="field-placeholder" name="placeholder" />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="field-options">Options</label>
                   <input id="field-options" name="options" placeholder="Email, Phone, Text" />
                 </div>
               </div>
               <div className="grid-3">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="field-help">Help text</label>
                   <input id="field-help" name="helpText" />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="field-page">Page</label>
                   <input id="field-page" name="pageNumber" type="number" min={1} defaultValue={1} />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor="field-sort">Sort order</label>
                   <input id="field-sort" name="sortOrder" type="number" defaultValue={selectedForm.fields.length * 10 + 10} />
                 </div>
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-                <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <div className="ui-zero">
+                <label className="ui-zero">
                   <input name="isRequired" type="checkbox" />
                   Required
                 </label>
-                <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                <label className="ui-zero">
                   <input name="isHidden" type="checkbox" />
                   Hidden metadata
                 </label>
@@ -938,11 +938,11 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               {conditionalControls({ fields: selectedForm.fields, idPrefix: "field-new" })}
               {validationControls({ idPrefix: "field-new" })}
               {uploadControls({ idPrefix: "field-new" })}
-              <button className="button secondary" type="submit">
+              <button className="ui-button ui-button-secondary" type="submit">
                 Add field
               </button>
             </form>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Field</th>
@@ -963,9 +963,9 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                     <td>{enumLabel(field.type)}</td>
                     <td>{stringArrayCsv(field.options) || "None"}</td>
                     <td>
-                      <span className="pill">{field.isRequired ? "required" : "optional"}</span>{" "}
-                      {field.isHidden ? <span className="pill">hidden</span> : null}
-                      {field.fieldRole !== FormFieldRole.NONE ? <span className="pill">{enumLabel(field.fieldRole)}</span> : null}
+                      <span className="ui-badge">{field.isRequired ? "required" : "optional"}</span>{" "}
+                      {field.isHidden ? <span className="ui-badge">hidden</span> : null}
+                      {field.fieldRole !== FormFieldRole.NONE ? <span className="ui-badge">{enumLabel(field.fieldRole)}</span> : null}
                       <br />
                       <span className="muted-text">
                         Page {field.pageNumber} · Sort {field.sortOrder}
@@ -992,15 +992,15 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                     <td>
                       <details>
                         <summary>Edit</summary>
-                        <form action={updateFormFieldAction} className="form-grid" style={{ marginTop: 12, minWidth: 280 }}>
+                        <form action={updateFormFieldAction} className="form-grid ui-zero">
                           <input type="hidden" name="id" value={field.id} />
                           <input type="hidden" name="formId" value={selectedForm.id} />
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`field-${field.id}-label`}>Label</label>
                             <input id={`field-${field.id}-label`} name="label" defaultValue={field.label} required />
                           </div>
                           <div className="grid-3">
-                            <div className="field">
+                            <div className="ui-field">
                               <label htmlFor={`field-${field.id}-type`}>Type</label>
                               <select id={`field-${field.id}-type`} name="type" defaultValue={field.type}>
                                 {Object.values(FormFieldType).map((type) => (
@@ -1010,16 +1010,16 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                                 ))}
                               </select>
                             </div>
-                            <div className="field">
+                            <div className="ui-field">
                               <label htmlFor={`field-${field.id}-page`}>Page</label>
                               <input id={`field-${field.id}-page`} name="pageNumber" type="number" min={1} defaultValue={field.pageNumber} />
                             </div>
-                            <div className="field">
+                            <div className="ui-field">
                               <label htmlFor={`field-${field.id}-sort`}>Sort order</label>
                               <input id={`field-${field.id}-sort`} name="sortOrder" type="number" defaultValue={field.sortOrder} />
                             </div>
                           </div>
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`field-${field.id}-role`}>Identity role</label>
                             <select id={`field-${field.id}-role`} name="fieldRole" defaultValue={field.fieldRole}>
                               {Object.values(FormFieldRole).map((role) => (
@@ -1029,24 +1029,24 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                               ))}
                             </select>
                           </div>
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`field-${field.id}-placeholder`}>Placeholder or hidden value</label>
                             <input id={`field-${field.id}-placeholder`} name="placeholder" defaultValue={field.placeholder} />
                           </div>
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`field-${field.id}-options`}>Options</label>
                             <input id={`field-${field.id}-options`} name="options" defaultValue={stringArrayCsv(field.options)} />
                           </div>
-                          <div className="field">
+                          <div className="ui-field">
                             <label htmlFor={`field-${field.id}-help`}>Help text</label>
                             <input id={`field-${field.id}-help`} name="helpText" defaultValue={field.helpText} />
                           </div>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-                            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                          <div className="ui-zero">
+                            <label className="ui-zero">
                               <input name="isRequired" type="checkbox" defaultChecked={field.isRequired} />
                               Required
                             </label>
-                            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                            <label className="ui-zero">
                               <input name="isHidden" type="checkbox" defaultChecked={field.isHidden} />
                               Hidden metadata
                             </label>
@@ -1054,18 +1054,18 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                           {conditionalControls({ field, fields: selectedForm.fields, idPrefix: `field-${field.id}` })}
                           {validationControls({ field, idPrefix: `field-${field.id}` })}
                           {uploadControls({ field, idPrefix: `field-${field.id}` })}
-                          <button className="button secondary" type="submit">
+                          <button className="ui-button ui-button-secondary" type="submit">
                             Save field
                           </button>
                         </form>
-                        <form action={deleteFormFieldAction} className="form-grid" style={{ marginTop: 12, minWidth: 280 }}>
+                        <form action={deleteFormFieldAction} className="form-grid ui-zero">
                           <input type="hidden" name="id" value={field.id} />
                           <input type="hidden" name="formId" value={selectedForm.id} />
-                          <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                          <label className="ui-zero">
                             <input name="confirmDelete" type="checkbox" required />
                             Delete this field.
                           </label>
-                          <button className="button danger" type="submit">
+                          <button className="ui-button ui-button-danger" type="submit">
                             Delete field
                           </button>
                         </form>
@@ -1085,22 +1085,22 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
       ) : null}
 
       {selectedForm ? (
-        <section className="card">
+        <section className="ui-card ui-card-density-normal ui-card-min-md">
           <div className="page-header compact-header">
             <div>
               <h2 className="section-title">Recent submissions</h2>
               <p>Newest responses for {selectedForm.name}.</p>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              <Link className="button secondary" href={`/admin/modules/forms/export?formId=${selectedForm.id}`}>
+            <div className="ui-zero">
+              <Link className="ui-button ui-button-secondary" href={`/admin/modules/forms/export?formId=${selectedForm.id}`}>
                 Export CSV
               </Link>
-              <Link className="button secondary" href={`/forms/${selectedForm.slug}`}>
+              <Link className="ui-button ui-button-secondary" href={`/forms/${selectedForm.slug}`}>
                 Open public form
               </Link>
             </div>
           </div>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Submitter</th>
@@ -1119,57 +1119,50 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                   </td>
                   <td>
                     {summarizeSubmission(submission.data)}
-                    <details style={{ marginTop: 8 }}>
+                    <details className="ui-zero">
                       <summary>View response</summary>
-                      <div className="subpanel" style={{ marginTop: 8 }}>
+                      <div className="subpanel ui-zero">
                         {submissionEntries(submission.data).map((entry) => (
-                          <div key={entry.id} style={{ marginBottom: 10 }}>
+                          <div className="ui-zero" key={entry.id}>
                             <strong>{entry.label}</strong>{" "}
-                            <span className="pill">{entry.type.toLowerCase()}</span>
+                            <span className="ui-badge">{entry.type.toLowerCase()}</span>
                             {entry.file ? (
-                              <p style={{ color: "var(--muted)", margin: "4px 0 0" }}>
+                              <p className="ui-zero">
                                 <a href={`/admin/modules/forms/submissions/${submission.id}/files/${entry.file.assetId}`}>
                                   {entry.file.filename || entry.value || "Download file"}
                                 </a>{" "}
-                                {entry.file.mimeType ? <span className="pill">{entry.file.mimeType}</span> : null}{" "}
+                                {entry.file.mimeType ? <span className="ui-badge">{entry.file.mimeType}</span> : null}{" "}
                                 {entry.file.sizeBytes ? <span>{formatUploadSize(entry.file.sizeBytes)}</span> : null}
                               </p>
                             ) : (
-                              <p style={{ color: "var(--muted)", margin: "4px 0 0" }}>{entry.value || "No answer"}</p>
+                              <p className="ui-zero">{entry.value || "No answer"}</p>
                             )}
                           </div>
                         ))}
                         {!submissionEntries(submission.data).length ? <p>No response data.</p> : null}
                         {submission.signatures.length ? (
-                          <div style={{ marginTop: 12 }}>
-                            <h4 style={{ fontSize: "1rem", margin: "0 0 8px" }}>Signatures</h4>
+                          <div className="ui-zero">
+                            <h4 className="ui-zero">Signatures</h4>
                             {submission.signatures.map((signature) => (
-                              <div key={signature.id} style={{ marginBottom: 12 }}>
+                              <div className="ui-zero" key={signature.id}>
                                 <strong>{signature.formField.label}</strong>{" "}
-                                <span className="pill">{enumLabel(signature.captureType)}</span>
-                                <p style={{ color: "var(--muted)", margin: "4px 0" }}>
+                                <span className="ui-badge">{enumLabel(signature.captureType)}</span>
+                                <p className="ui-zero">
                                   Signed by {signature.signerName}
                                   {signature.signerEmail ? ` (${signature.signerEmail})` : ""} on{" "}
                                   {formatDateTime(signature.signedAt, settings.timezone)}
                                 </p>
                                 {signature.captureType === "DRAWN" ? (
-                                  <NextImage
+                                  <NextImage className="ui-zero"
                                     alt={`Signature for ${signature.signerName}`}
                                     height={120}
                                     unoptimized
                                     width={360}
                                     src={signature.capturedSignature}
-                                    style={{
-                                      background: "var(--panel)",
-                                      border: "1px solid var(--line)",
-                                      borderRadius: "var(--radius)",
-                                      height: "auto",
-                                      maxHeight: 120,
-                                      maxWidth: "100%"
-                                    }}
+                                   
                                   />
                                 ) : (
-                                  <p style={{ fontFamily: "cursive", fontSize: "1.4rem", margin: "4px 0" }}>
+                                  <p className="ui-zero">
                                     {signature.capturedSignature}
                                   </p>
                                 )}
@@ -1178,7 +1171,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                             ))}
                           </div>
                         ) : null}
-                        <p style={{ color: "var(--muted)", marginBottom: 0 }}>
+                        <p className="ui-zero">
                           Submission data stores field IDs with submission-time labels and field types.
                         </p>
                       </div>

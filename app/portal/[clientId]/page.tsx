@@ -16,9 +16,9 @@ type ClientPortalPageProps = {
 };
 
 function statusClass(status: string) {
-  if (["PAID", "ACCEPTED", "CONFIRMED", "COMPLETED", "FULFILLED"].includes(status)) return "pill success";
-  if (["CANCELED", "VOID", "OVERDUE", "REFUNDED", "FAILED"].includes(status)) return "pill danger";
-  return "pill";
+  if (["PAID", "ACCEPTED", "CONFIRMED", "COMPLETED", "FULFILLED"].includes(status)) return "ui-badge ui-badge-success";
+  if (["CANCELED", "VOID", "OVERDUE", "REFUNDED", "FAILED"].includes(status)) return "ui-badge ui-badge-danger";
+  return "ui-badge";
 }
 
 function paidCents(payments: Array<{ amountCents: number; refundedCents?: number; status: PaymentStatus }>) {
@@ -124,7 +124,7 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
         </Link>
       </nav>
 
-      <section className="section" style={{ paddingTop: 22 }}>
+      <section className="section ui-zero">
         <div className="stack">
           <header className="page-header">
             <div>
@@ -132,45 +132,45 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
               <h1>{client.name}</h1>
               <p>{client.email}</p>
             </div>
-            <span className="pill">{settings.businessName}</span>
+            <span className="ui-badge">{settings.businessName}</span>
           </header>
 
           <section className="grid-3">
-            <div className="card">
+            <div className="ui-card ui-card-density-normal ui-card-min-md">
               <CalendarCheck size={22} />
-              <h2 style={{ fontSize: "1.25rem" }}>Upcoming</h2>
+              <h2 className="ui-zero">Upcoming</h2>
               <p>{upcomingBookings.length} appointments</p>
             </div>
-            <div className="card">
+            <div className="ui-card ui-card-density-normal ui-card-min-md">
               <Package size={22} />
-              <h2 style={{ fontSize: "1.25rem" }}>Orders</h2>
+              <h2 className="ui-zero">Orders</h2>
               <p>{client.orders.length} orders</p>
             </div>
-            <div className="card">
+            <div className="ui-card ui-card-density-normal ui-card-min-md">
               <Receipt size={22} />
-              <h2 style={{ fontSize: "1.25rem" }}>Open billing</h2>
+              <h2 className="ui-zero">Open billing</h2>
               <p>{openBillingDocuments.length} documents</p>
             </div>
-            <div className="card">
+            <div className="ui-card ui-card-density-normal ui-card-min-md">
               <PenLine size={22} />
-              <h2 style={{ fontSize: "1.25rem" }}>Signed forms</h2>
+              <h2 className="ui-zero">Signed forms</h2>
               <p>{client.formSubmissions.length} records</p>
             </div>
-            <div className="card">
+            <div className="ui-card ui-card-density-normal ui-card-min-md">
               <Images size={22} />
-              <h2 style={{ fontSize: "1.25rem" }}>Galleries</h2>
+              <h2 className="ui-zero">Galleries</h2>
               <p>{client.portfolioGalleryAccesses.length} galleries</p>
             </div>
           </section>
 
-          <section className="card">
+          <section className="ui-card ui-card-density-normal ui-card-min-md">
             <div className="page-header compact-header">
               <div>
                 <CalendarCheck size={22} />
                 <h2 className="section-title">Appointments</h2>
               </div>
             </div>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Service</th>
@@ -219,14 +219,14 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
             </table>
           </section>
 
-          <section className="card">
+          <section className="ui-card ui-card-density-normal ui-card-min-md">
             <div className="page-header compact-header">
               <div>
                 <PenLine size={22} />
                 <h2 className="section-title">Signed forms and documents</h2>
               </div>
             </div>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Document</th>
@@ -253,7 +253,7 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                     </td>
                     <td>
                       {submission.signatures.map((signature) => (
-                        <div key={signature.id} style={{ marginBottom: 8 }}>
+                        <div className="ui-zero" key={signature.id}>
                           <strong>{signature.formField.label}</strong>
                           <br />
                           {signature.captureType === FormSignatureCaptureType.TYPED ? (
@@ -278,14 +278,14 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
             </table>
           </section>
 
-          <section className="card">
+          <section className="ui-card ui-card-density-normal ui-card-min-md">
             <div className="page-header compact-header">
               <div>
                 <Images size={22} />
                 <h2 className="section-title">Galleries</h2>
               </div>
             </div>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Gallery</th>
@@ -332,14 +332,14 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
             </table>
           </section>
 
-          <section className="card">
+          <section className="ui-card ui-card-density-normal ui-card-min-md">
             <div className="page-header compact-header">
               <div>
                 <Package size={22} />
                 <h2 className="section-title">Orders</h2>
               </div>
             </div>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Order</th>
@@ -384,14 +384,14 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
             </table>
           </section>
 
-          <section className="card">
+          <section className="ui-card ui-card-density-normal ui-card-min-md">
             <div className="page-header compact-header">
               <div>
                 <FileText size={22} />
                 <h2 className="section-title">Invoices and documents</h2>
               </div>
             </div>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Document</th>
@@ -429,7 +429,7 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
             </table>
           </section>
 
-          <section className="card">
+          <section className="ui-card ui-card-density-normal ui-card-min-md">
             <User size={22} />
             <h2 className="section-title">Profile</h2>
             <p>

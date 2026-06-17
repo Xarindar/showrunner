@@ -132,47 +132,47 @@ export default async function ProductPage({ params }: ProductPageProps) {
           <span>{settings.businessName}</span>
         </Link>
         <div className="site-nav-links">
-          <Link href="/shop" className="button secondary">
+          <Link href="/shop" className="ui-button ui-button-secondary">
             Shop
           </Link>
-          <Link href="/cart" className="button">
+          <Link href="/cart" className="ui-button">
             <ShoppingCart size={18} />
             Cart
           </Link>
         </div>
       </nav>
 
-      <section className="section" style={{ paddingTop: 22 }}>
-        <div className="grid-2" style={{ alignItems: "start" }}>
-          <div className="card">
+      <section className="section ui-zero">
+        <div className="grid-2 ui-zero">
+          <div className="ui-card ui-card-density-normal ui-card-min-md">
             {product.imageUrl ? (
-              <NextImage
+              <NextImage className="ui-zero"
                 alt={product.name}
                 src={product.imageUrl}
                 width={1000}
                 height={720}
                 priority
                 unoptimized
-                style={{ aspectRatio: "4 / 3", borderRadius: 6, objectFit: "cover", width: "100%" }}
+               
               />
             ) : (
               <div className="empty-state">No product image</div>
             )}
           </div>
 
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <div>
               <p className="eyebrow">Product</p>
               <h1>{product.name}</h1>
               <p className="lead">{product.summary || product.description}</p>
             </div>
 
-            <strong style={{ fontSize: "1.5rem" }}>{formatMoney(defaultPriceCents, product.currency)}</strong>
+            <strong className="ui-zero">{formatMoney(defaultPriceCents, product.currency)}</strong>
 
             {product.collectionProducts.length ? (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div className="ui-zero">
                 {product.collectionProducts.map(({ collection }) => (
-                  <span className="pill" key={collection.id}>
+                  <span className="ui-badge" key={collection.id}>
                     {collection.name}
                   </span>
                 ))}
@@ -198,7 +198,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
               >
                 <input type="hidden" name="productId" value={product.id} />
                 <div className="grid-2">
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor="variantId">Option</label>
                     <select id="variantId" name="variantId" defaultValue={defaultVariant.id}>
                       {product.variants.map((variant) => (
@@ -211,7 +211,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   {isGiftCard ? (
                     <input type="hidden" name="quantity" value="1" />
                   ) : (
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor="quantity">Quantity</label>
                       <input id="quantity" name="quantity" type="number" min="1" max="999" defaultValue="1" required />
                     </div>
@@ -219,30 +219,30 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 </div>
                 {isGiftCard ? (
                   <div className="subpanel form-grid">
-                    <h2 style={{ fontSize: "1.05rem" }}>Gift recipient</h2>
+                    <h2 className="ui-zero">Gift recipient</h2>
                     <div className="grid-2">
-                      <div className="field">
+                      <div className="ui-field">
                         <label htmlFor="giftCardRecipientName">Recipient name</label>
                         <input id="giftCardRecipientName" name="giftCardRecipientName" />
                       </div>
-                      <div className="field">
+                      <div className="ui-field">
                         <label htmlFor="giftCardRecipientEmail">Recipient email</label>
                         <input id="giftCardRecipientEmail" name="giftCardRecipientEmail" type="email" required />
                       </div>
                     </div>
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor="giftCardMessage">Message</label>
                       <textarea id="giftCardMessage" name="giftCardMessage" />
                     </div>
                   </div>
                 ) : null}
-                <button className="button" type="submit" aria-label={`Add ${product.name} to cart`}>
+                <button className="ui-button" type="submit" aria-label={`Add ${product.name} to cart`}>
                   <ShoppingCart size={18} />
                   Add to cart
                 </button>
               </TrackedAnalyticsForm>
             ) : (
-              <span className="pill">No active variants</span>
+              <span className="ui-badge">No active variants</span>
             )}
 
             {product.description && product.description !== product.summary ? (

@@ -13,45 +13,45 @@ type StaffPanelProps = {
 export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, adminUsers, canLinkStaffAccounts }: StaffPanelProps) {
   return (
     <section className="grid-2">
-      <form action={createStaffMemberAction} className="card form-grid">
+      <form action={createStaffMemberAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
         <h2 className="section-title">Add staff</h2>
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="staff-name">Name</label>
             <input id="staff-name" name="name" required />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="staff-title">Title</label>
             <input id="staff-title" name="title" placeholder="Photographer, stylist, consultant" />
           </div>
         </div>
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="staff-email">Email</label>
             <input id="staff-email" name="email" type="email" />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="staff-phone">Phone</label>
             <input id="staff-phone" name="phone" />
           </div>
         </div>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor="staff-bio">Bio</label>
           <textarea id="staff-bio" name="bio" />
         </div>
-        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+        <label className="ui-zero">
           <input name="isActive" type="checkbox" defaultChecked />
           Active for booking
         </label>
-        <button className="button" type="submit">
+        <button className="ui-button" type="submit">
           <Plus size={18} />
           Add staff
         </button>
       </form>
 
-      <div className="card">
+      <div className="ui-card ui-card-density-normal ui-card-min-md">
         <h2 className="section-title">Staff roster</h2>
-        <table className="table">
+        <table className="ui-table">
           <tbody>
             {staff.map((member) => {
               const needsAvailability = member.isActive && assignedStaffIds.has(member.id) && !staffIdsWithAvailability.has(member.id);
@@ -61,49 +61,49 @@ export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, 
                   <details>
                     <summary>
                       <strong>{member.name}</strong>{" "}
-                      <span className={member.isActive ? "pill success" : "pill danger"}>
+                      <span className={member.isActive ? "ui-badge ui-badge-success" : "ui-badge ui-badge-danger"}>
                         {member.isActive ? "active" : "inactive"}
                       </span>{" "}
-                      {needsAvailability ? <span className="pill warning">no hours set — not bookable</span> : null}
+                      {needsAvailability ? <span className="ui-badge ui-badge-warning">no hours set — not bookable</span> : null}
                     </summary>
                     {needsAvailability ? (
-                      <p style={{ color: "var(--muted)", marginTop: 8 }}>
+                      <p className="ui-zero">
                         {member.name} is assigned to a service but has no personal weekly availability rules, so they
                         won&apos;t appear as a bookable option. Add their hours in Availability rules below to make
                         them bookable.
                       </p>
                     ) : null}
-                    <form action={updateStaffMemberAction} className="form-grid" style={{ marginTop: 12 }}>
+                    <form action={updateStaffMemberAction} className="form-grid ui-zero">
                       <input type="hidden" name="id" value={member.id} />
                       <div className="grid-2">
-                        <div className="field">
+                        <div className="ui-field">
                           <label htmlFor={`staff-${member.id}-name`}>Name</label>
                           <input id={`staff-${member.id}-name`} name="name" defaultValue={member.name} required />
                         </div>
-                        <div className="field">
+                        <div className="ui-field">
                           <label htmlFor={`staff-${member.id}-title`}>Title</label>
                           <input id={`staff-${member.id}-title`} name="title" defaultValue={member.title} />
                         </div>
                       </div>
                       <div className="grid-2">
-                        <div className="field">
+                        <div className="ui-field">
                           <label htmlFor={`staff-${member.id}-email`}>Email</label>
                           <input id={`staff-${member.id}-email`} name="email" type="email" defaultValue={member.email} />
                         </div>
-                        <div className="field">
+                        <div className="ui-field">
                           <label htmlFor={`staff-${member.id}-phone`}>Phone</label>
                           <input id={`staff-${member.id}-phone`} name="phone" defaultValue={member.phone} />
                         </div>
                       </div>
-                      <div className="field">
+                      <div className="ui-field">
                         <label htmlFor={`staff-${member.id}-bio`}>Bio</label>
                         <textarea id={`staff-${member.id}-bio`} name="bio" defaultValue={member.bio} />
                       </div>
-                      <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                      <label className="ui-zero">
                         <input name="isActive" type="checkbox" defaultChecked={member.isActive} />
                         Active for booking
                       </label>
-                      <button className="button secondary" type="submit">
+                      <button className="ui-button ui-button-secondary" type="submit">
                         <Save size={16} />
                         Save staff
                       </button>
@@ -111,11 +111,9 @@ export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, 
                     {canLinkStaffAccounts ? (
                       <form
                         action={linkStaffMemberAdminUserAction}
-                        className="form-grid"
-                        style={{ alignItems: "end", display: "flex", gap: 8, marginTop: 12 }}
-                      >
+                        className="form-grid ui-zero">
                         <input type="hidden" name="staffId" value={member.id} />
-                        <div className="field" style={{ flex: 1 }}>
+                        <div className="ui-field ui-zero">
                           <label htmlFor={`staff-${member.id}-admin-link`}>Linked admin account</label>
                           <select id={`staff-${member.id}-admin-link`} name="adminUserId" defaultValue={member.adminUserId || ""}>
                             <option value="">Not linked</option>
@@ -126,7 +124,7 @@ export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, 
                             ))}
                           </select>
                         </div>
-                        <button className="button secondary" type="submit">
+                        <button className="ui-button ui-button-secondary" type="submit">
                           <Link2 size={16} />
                           Update link
                         </button>

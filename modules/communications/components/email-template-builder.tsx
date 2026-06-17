@@ -131,18 +131,18 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
     <div className="form-grid">
       <input name="builderJson" type="hidden" value={serializedDocument} readOnly />
       <div className="grid-2">
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor={`${props.idPrefix}-subject`}>Subject</label>
           <input id={`${props.idPrefix}-subject`} name="subject" value={subject} onChange={(event) => setSubject(event.target.value)} required />
         </div>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor={`${props.idPrefix}-preview`}>Preview text</label>
           <input id={`${props.idPrefix}-preview`} name="previewText" value={previewText} onChange={(event) => setPreviewText(event.target.value)} />
         </div>
       </div>
 
       <div className="grid-2">
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor={`${props.idPrefix}-background`}>Background</label>
           <input
             id={`${props.idPrefix}-background`}
@@ -153,7 +153,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
             }
           />
         </div>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor={`${props.idPrefix}-text-color`}>Text color</label>
           <input
             id={`${props.idPrefix}-text-color`}
@@ -165,9 +165,9 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
       </div>
 
       <div className="subpanel form-grid">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <div className="ui-zero">
           {(["heading", "text", "button", "image", "divider", "spacer"] as BlockType[]).map((type) => (
-            <button className="button secondary" key={type} type="button" onClick={() => addBlock(type)}>
+            <button className="ui-button ui-button-secondary" key={type} type="button" onClick={() => addBlock(type)}>
               {blockIcon(type)}
               {type}
             </button>
@@ -176,16 +176,16 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
 
         {document.blocks.map((block) => (
           <div className="subpanel form-grid" key={block.id}>
-            <div className="page-header" style={{ marginBottom: 4 }}>
+            <div className="page-header ui-zero">
               <strong>{blockLabel(block)}</strong>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="button secondary" type="button" onClick={() => moveBlock(block.id, -1)} aria-label="Move up">
+              <div className="ui-zero">
+                <button className="ui-button ui-button-secondary" type="button" onClick={() => moveBlock(block.id, -1)} aria-label="Move up">
                   <ArrowUp size={16} />
                 </button>
-                <button className="button secondary" type="button" onClick={() => moveBlock(block.id, 1)} aria-label="Move down">
+                <button className="ui-button ui-button-secondary" type="button" onClick={() => moveBlock(block.id, 1)} aria-label="Move down">
                   <ArrowDown size={16} />
                 </button>
-                <button className="button danger" type="button" onClick={() => removeBlock(block.id)} aria-label="Delete block">
+                <button className="ui-button ui-button-danger" type="button" onClick={() => removeBlock(block.id)} aria-label="Delete block">
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -193,7 +193,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
 
             {block.type === "heading" && (
               <>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor={`${block.id}-level`}>Level</label>
                   <select
                     id={`${block.id}-level`}
@@ -205,7 +205,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
                     <option value="h3">h3</option>
                   </select>
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor={`${block.id}-text`}>Text</label>
                   <textarea
                     id={`${block.id}-text`}
@@ -217,7 +217,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
             )}
 
             {block.type === "text" && (
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`${block.id}-text`}>Text</label>
                 <textarea
                   id={`${block.id}-text`}
@@ -229,7 +229,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
 
             {block.type === "button" && (
               <div className="grid-2">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor={`${block.id}-button-text`}>Button text</label>
                   <input
                     id={`${block.id}-button-text`}
@@ -237,7 +237,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
                     onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, text: event.target.value } })}
                   />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor={`${block.id}-button-url`}>Button URL</label>
                   <input
                     id={`${block.id}-button-url`}
@@ -250,7 +250,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
 
             {block.type === "image" && (
               <div className="grid-2">
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor={`${block.id}-image-src`}>Image URL</label>
                   <input
                     id={`${block.id}-image-src`}
@@ -258,7 +258,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
                     onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, src: event.target.value } })}
                   />
                 </div>
-                <div className="field">
+                <div className="ui-field">
                   <label htmlFor={`${block.id}-image-alt`}>Alt text</label>
                   <input
                     id={`${block.id}-image-alt`}
@@ -270,7 +270,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
             )}
 
             {block.type === "divider" && (
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`${block.id}-divider-color`}>Divider color</label>
                 <input
                   id={`${block.id}-divider-color`}
@@ -282,7 +282,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
             )}
 
             {block.type === "spacer" && (
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`${block.id}-spacer-height`}>Height</label>
                 <input
                   id={`${block.id}-spacer-height`}
@@ -296,7 +296,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
             )}
 
             {"align" in block.props ? (
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`${block.id}-align`}>Align</label>
                 <select
                   id={`${block.id}-align`}
@@ -313,11 +313,11 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
         ))}
       </div>
 
-      <div className="field">
+      <div className="ui-field">
         <label htmlFor={`${props.idPrefix}-text-fallback`}>Text fallback</label>
         <textarea id={`${props.idPrefix}-text-fallback`} name="textBody" value={textBody} onChange={(event) => setTextBody(event.target.value)} required />
       </div>
-      <button className="button secondary" type="button" onClick={syncTextFallback}>
+      <button className="ui-button ui-button-secondary" type="button" onClick={syncTextFallback}>
         <Type size={16} />
         Sync text fallback
       </button>

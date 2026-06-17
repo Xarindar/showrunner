@@ -6,9 +6,9 @@ import { moduleIcons } from "@/shell/modules";
 export const dynamic = "force-dynamic";
 
 function warningPillClassName(severity: PlatformWarningSeverity) {
-  if (severity === "critical") return "pill danger";
-  if (severity === "warning") return "pill warning";
-  return "pill";
+  if (severity === "critical") return "ui-badge ui-badge-danger";
+  if (severity === "warning") return "ui-badge ui-badge-warning";
+  return "ui-badge";
 }
 
 const commonWorkflows = [
@@ -59,7 +59,7 @@ export default async function HelpPage() {
           <h1>Admin user guide</h1>
           <p>Operating notes, setup status, and readiness context for the modules currently enabled in this admin.</p>
         </div>
-        <Link className="button secondary" href="/admin/modules/settings">
+        <Link className="ui-button ui-button-secondary" href="/admin/modules/settings">
           Settings
         </Link>
       </header>
@@ -87,7 +87,7 @@ export default async function HelpPage() {
         </Link>
       </section>
 
-      <section className="card">
+      <section className="ui-card ui-card-density-normal ui-card-min-md">
         <div className="page-header">
           <div>
             <h2 className="section-title">Current setup notes</h2>
@@ -95,7 +95,7 @@ export default async function HelpPage() {
           </div>
         </div>
         {warnings.length ? (
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Severity</th>
@@ -123,7 +123,7 @@ export default async function HelpPage() {
       <section className="stack" aria-label="Enabled module guide">
         <div className="page-header">
           <div>
-            <h2 style={{ fontSize: "1.5rem" }}>Enabled modules</h2>
+            <h2 className="ui-zero">Enabled modules</h2>
             <p>Live, manual, and admin-foundation status for the modules visible in the sidebar.</p>
           </div>
         </div>
@@ -149,9 +149,9 @@ export default async function HelpPage() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="ui-card ui-card-density-normal ui-card-min-md">
         <h2 className="section-title">Common workflows</h2>
-        <table className="table">
+        <table className="ui-table">
           <tbody>
             {commonWorkflows.map((workflow) => (
               <tr key={workflow.label}>
@@ -165,12 +165,12 @@ export default async function HelpPage() {
         </table>
       </section>
 
-      <section className="card">
+      <section className="ui-card ui-card-density-normal ui-card-min-md">
         <h2 className="section-title">Security and compliance foundations</h2>
         <div className="foundation-list">
           {platformFoundationItems.map((item) => (
             <div className="foundation-row" key={item.key}>
-              <span className={item.status === "schema-ready" ? "pill success" : "pill warning"}>{item.status.replaceAll("-", " ")}</span>
+              <span className={item.status === "schema-ready" ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{item.status.replaceAll("-", " ")}</span>
               <span>
                 <strong>{item.title}</strong>
                 <small>{item.detail}</small>
@@ -181,7 +181,7 @@ export default async function HelpPage() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="ui-card ui-card-density-normal ui-card-min-md">
         <h2 className="section-title">If a time is missing from booking</h2>
         <p className="lead lead-compact">
           Check that the service is active, weekly availability exists, there is no blockout, minimum notice has passed,

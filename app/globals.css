@@ -368,10 +368,23 @@ button.button:disabled,
   scrollbar-gutter: stable;
 }
 
+.ui-card:not(:has(.ui-card-body)) {
+  gap: var(--space-2);
+  grid-template-rows: none;
+}
+
 .ui-field {
   display: grid;
   gap: var(--space-2);
   min-width: 0;
+}
+
+.ui-field > label,
+.ui-field > legend {
+  color: var(--color-muted);
+  font-size: var(--type-small);
+  font-weight: 610;
+  min-height: 20px;
 }
 
 .ui-field-label {
@@ -405,6 +418,196 @@ button.button:disabled,
   align-items: end;
   display: flex;
   min-height: var(--control-height);
+}
+
+.ui-inline-actions-spread {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: space-between;
+}
+
+.ui-inline-actions-end {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.ui-inline-actions-loose {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.ui-column-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ui-offset-2 { margin-top: var(--space-2); }
+.ui-offset-3 { margin-top: var(--space-3); }
+.ui-offset-4 { margin-top: var(--space-4); }
+.ui-inset-top { padding-top: var(--space-5); }
+.ui-muted { color: var(--color-muted); }
+.ui-muted-flush { color: var(--color-muted); margin: 0; }
+.ui-muted-compact { color: var(--color-muted); margin: var(--space-1) 0 0; }
+.ui-muted-gap { color: var(--color-muted); margin-bottom: var(--space-2); }
+.ui-link-accent { color: var(--color-primary-strong); }
+.ui-zero { margin: 0; }
+.ui-hidden { display: none; }
+.ui-flex-1 { flex: 1; }
+.ui-min-0 { min-width: 0; }
+.ui-min-180 { min-width: 180px; }
+.ui-min-280 { min-width: 280px; }
+.ui-min-300 { min-width: 300px; }
+.ui-max-84 { max-width: 84px; }
+.ui-max-180 { max-width: 180px; }
+.ui-title-sm { font-size: var(--type-h3); }
+.ui-title-md { font-size: var(--type-h2); }
+.ui-title-lg { font-size: var(--type-h1); }
+.ui-title-tight { margin: var(--space-2) 0 var(--space-1); }
+.ui-media-wide,
+.ui-media-standard {
+  border-radius: var(--radius-card);
+  object-fit: cover;
+  width: 100%;
+}
+.ui-media-wide { aspect-ratio: 16 / 10; }
+.ui-media-standard { aspect-ratio: 4 / 3; }
+.ui-summary-row {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+}
+.ui-preview-frame {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  min-height: 360px;
+  width: 100%;
+}
+.ui-pre-wrap {
+  overflow: auto;
+  white-space: pre-wrap;
+}
+.ui-public-narrow { max-width: 860px; }
+.ui-signature-text {
+  font-family: cursive;
+  font-size: 1.4rem;
+  margin: var(--space-1) 0;
+}
+.ui-fieldset-reset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.ui-print-page {
+  background: white;
+  color: #111;
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.ui-print-sheet {
+  margin: 0 auto;
+  max-width: 860px;
+}
+
+.ui-print-header {
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 28px;
+  padding-bottom: 22px;
+}
+
+.ui-print-kicker {
+  font-weight: 700;
+  letter-spacing: 0;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.ui-print-title {
+  font-size: 40px;
+  margin: 8px 0;
+}
+
+.ui-print-copy {
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+
+.ui-print-table {
+  border-collapse: collapse;
+  margin-bottom: 28px;
+  width: 100%;
+}
+
+.ui-print-total-table {
+  border-collapse: collapse;
+  margin-left: auto;
+  width: 320px;
+}
+
+.ui-print-cell { padding: 8px 0; }
+
+.ui-print-cell-right {
+  padding: 8px 0;
+  text-align: right;
+}
+
+.ui-print-head-left {
+  border-bottom: 1px solid #ddd;
+  padding: 10px 0;
+  text-align: left;
+}
+
+.ui-print-head-right {
+  border-bottom: 1px solid #ddd;
+  padding: 10px 0;
+  text-align: right;
+}
+
+.ui-print-line-cell {
+  border-bottom: 1px solid #eee;
+  padding: 12px 0;
+}
+
+.ui-print-line-cell-right {
+  border-bottom: 1px solid #eee;
+  padding: 12px 0;
+  text-align: right;
+}
+
+.ui-print-total-cell {
+  border-top: 1px solid #222;
+  font-weight: 700;
+  padding: 12px 0;
+}
+
+.ui-print-total-cell-right {
+  border-top: 1px solid #222;
+  font-weight: 700;
+  padding: 12px 0;
+  text-align: right;
+}
+
+.ui-print-strong-cell {
+  font-weight: 700;
+  padding: 8px 0;
+}
+
+.ui-print-strong-cell-right {
+  font-weight: 700;
+  padding: 8px 0;
+  text-align: right;
 }
 
 .ui-progress {
@@ -446,6 +649,21 @@ button.button:disabled,
     background-color var(--motion-fast) ease,
     border-color var(--motion-fast) ease,
     box-shadow var(--motion-fast) ease;
+  width: 100%;
+}
+
+.ui-field > input,
+.ui-field > select,
+.ui-field > textarea,
+.ui-field input:not([type="checkbox"]):not([type="radio"]),
+.ui-field select,
+.ui-field textarea {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  min-height: var(--control-height);
+  padding: 9px 11px;
   width: 100%;
 }
 

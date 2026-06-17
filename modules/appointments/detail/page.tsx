@@ -69,7 +69,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
             {booking.service.name} - {formatDateTime(booking.startsAt, settings.timezone)}
           </p>
         </div>
-        <Link className="button secondary" href="/admin/modules/appointments">
+        <Link className="ui-button ui-button-secondary" href="/admin/modules/appointments">
           Back to appointments
         </Link>
       </header>
@@ -78,14 +78,14 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
       {error ? <div className="error">{error}</div> : null}
 
       <section className="grid-2">
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <h2 className="section-title">Appointment details</h2>
-          <table className="table">
+          <table className="ui-table">
             <tbody>
               <tr>
                 <td>Status</td>
                 <td>
-                  <span className="pill">{booking.status.toLowerCase()}</span>
+                  <span className="ui-badge">{booking.status.toLowerCase()}</span>
                 </td>
               </tr>
               <tr>
@@ -139,14 +139,14 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
           </table>
         </div>
 
-        <div className="card form-grid">
+        <div className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <h2 className="section-title">Status actions</h2>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div className="ui-zero">
             {(["CONFIRMED", "CANCELED", "COMPLETED"] as const).map((status) => (
               <form key={status} action={updateBookingStatusAction}>
                 <input type="hidden" name="id" value={booking.id} />
                 <input type="hidden" name="status" value={status} />
-                <button className={status === "CANCELED" ? "button danger" : "button secondary"} type="submit">
+                <button className={status === "CANCELED" ? "ui-button ui-button-danger" : "ui-button ui-button-secondary"} type="submit">
                   {status.toLowerCase()}
                 </button>
               </form>
@@ -156,9 +156,9 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
       </section>
 
       {formAttachments.length ? (
-        <section className="card stack">
+        <section className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <h2 className="section-title">Attached forms</h2>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Form</th>
@@ -176,7 +176,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
                     <span className="muted-text">{attachment.form.status.toLowerCase()}</span>
                   </td>
                   <td>
-                    <span className={attachment.isRequired ? "pill success" : "pill"}>{attachment.isRequired ? "required" : "optional"}</span>
+                    <span className={attachment.isRequired ? "ui-badge ui-badge-success" : "ui-badge"}>{attachment.isRequired ? "required" : "optional"}</span>
                   </td>
                   <td>{attachment._count.submissions}</td>
                   <td>
@@ -197,11 +197,11 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
         </section>
       ) : null}
 
-      <form action={rescheduleBookingAction} className="card form-grid">
+      <form action={rescheduleBookingAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
         <input type="hidden" name="id" value={booking.id} />
         <h2 className="section-title">Reschedule</h2>
         <div className="grid-2">
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="startsAt">New start time</label>
             <input
               id="startsAt"
@@ -211,29 +211,29 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
               required
             />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label>Validation</label>
-            <span className="pill">availability, buffers, blockouts, conflicts</span>
+            <span className="ui-badge">availability, buffers, blockouts, conflicts</span>
           </div>
         </div>
-        <button className="button secondary" type="submit">
+        <button className="ui-button ui-button-secondary" type="submit">
           <CalendarClock size={18} />
           Reschedule appointment
         </button>
       </form>
 
-      <form action={updateBookingDetailAction} className="card form-grid">
+      <form action={updateBookingDetailAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
         <input type="hidden" name="id" value={booking.id} />
         <h2 className="section-title">Internal appointment notes</h2>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor="adminNotes">Admin notes</label>
           <textarea id="adminNotes" name="adminNotes" defaultValue={booking.adminNotes || ""} />
         </div>
-        <div className="field">
+        <div className="ui-field">
           <label htmlFor="cancellationReason">Cancellation reason</label>
           <input id="cancellationReason" name="cancellationReason" defaultValue={booking.cancellationReason || ""} />
         </div>
-        <button className="button" type="submit">
+        <button className="ui-button" type="submit">
           <Save size={18} />
           Save appointment notes
         </button>

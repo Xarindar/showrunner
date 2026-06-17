@@ -130,15 +130,15 @@ function parsePreviewTokens(value: string) {
 }
 
 function logStatusClass(status: MessageLogStatus) {
-  if (status === MessageLogStatus.SENT) return "pill success";
-  if (status === MessageLogStatus.FAILED || status === MessageLogStatus.SUPPRESSED) return "pill danger";
-  return "pill";
+  if (status === MessageLogStatus.SENT) return "ui-badge ui-badge-success";
+  if (status === MessageLogStatus.FAILED || status === MessageLogStatus.SUPPRESSED) return "ui-badge ui-badge-danger";
+  return "ui-badge";
 }
 
 function outboxStatusClass(status: EmailOutboxStatus) {
-  if (status === EmailOutboxStatus.SENT) return "pill success";
-  if (status === EmailOutboxStatus.FAILED || status === EmailOutboxStatus.SUPPRESSED || status === EmailOutboxStatus.CANCELED) return "pill danger";
-  return "pill";
+  if (status === EmailOutboxStatus.SENT) return "ui-badge ui-badge-success";
+  if (status === EmailOutboxStatus.FAILED || status === EmailOutboxStatus.SUPPRESSED || status === EmailOutboxStatus.CANCELED) return "ui-badge ui-badge-danger";
+  return "ui-badge";
 }
 
 function canResendStatus(status: EmailOutboxStatus) {
@@ -252,21 +252,21 @@ export default async function CommunicationsPage({ searchParams }: Communication
       {errorMessage ? <div className="error">{errorMessage}</div> : null}
 
       <section className="grid-3">
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <Mail size={22} />
           <h3>{activeTemplateCount} active templates</h3>
           <p className="lead lead-compact">
             Ready for booking, order, invoice, form, and admin notification flows.
           </p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <MessageSquareText size={22} />
           <h3>{sentCount} sent emails</h3>
           <p className="lead lead-compact">
             Actual outbox rows marked sent by the email processor.
           </p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <ShieldOff size={22} />
           <h3>{suppressedCount} suppressed</h3>
           <p className="lead lead-compact">
@@ -276,7 +276,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
       </section>
 
       <section className="grid-2">
-        <div className="card stack">
+        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <h2 className="section-title">Visual email builder</h2>
           <p>
             The single editor for every email — booking, order, invoice, form, and admin notifications. Build the HTML from structured blocks
@@ -290,19 +290,19 @@ export default async function CommunicationsPage({ searchParams }: Communication
 
             return (
               <details className="subpanel" key={template.id} open={index === 0}>
-                <summary style={{ alignItems: "center", cursor: "pointer", display: "flex", gap: 12, justifyContent: "space-between" }}>
+                <summary className="ui-zero">
                   <span>
                     <strong>{template.name}</strong>
                     <br />
                     <small className="muted-text">{template.key || enumLabel(template.purpose)}</small>
                   </span>
-                  <span className={hasBuilderJson(template.builderJson) ? "pill success" : "pill"}>
+                  <span className={hasBuilderJson(template.builderJson) ? "ui-badge ui-badge-success" : "ui-badge"}>
                     {hasBuilderJson(template.builderJson) ? "builder" : "text"}
                   </span>
                 </summary>
-                <form action={updateMessageTemplateBuilderAction} className="form-grid" style={{ marginTop: 16 }}>
+                <form action={updateMessageTemplateBuilderAction} className="form-grid ui-zero">
                   <input type="hidden" name="id" value={template.id} />
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`builder-template-sender-${template.id}`}>Sender</label>
                     <select id={`builder-template-sender-${template.id}`} name="senderIdentityId" defaultValue={template.senderIdentityId || ""}>
                       <option value="">Default sender</option>
@@ -322,12 +322,12 @@ export default async function CommunicationsPage({ searchParams }: Communication
                     subject={template.subject}
                     textBody={template.textBody || template.body}
                   />
-                  <button className="button" type="submit">
+                  <button className="ui-button" type="submit">
                     <Save size={18} />
                     Save visual template
                   </button>
                 </form>
-                <div className="subpanel stack" style={{ marginTop: 16 }}>
+                <div className="subpanel stack ui-zero">
                   <h3 className="subsection-title">Version history</h3>
                   {(versionsByTemplateId.get(template.id) || []).slice(0, 5).map((version) => (
                     <form action={restoreMessageTemplateVersionAction} className="grid-2" key={version.id}>
@@ -340,12 +340,12 @@ export default async function CommunicationsPage({ searchParams }: Communication
                           {formatDateTime(version.createdAt, settings.timezone)} {version.note ? `- ${version.note}` : ""}
                         </small>
                       </div>
-                      <div style={{ alignItems: "center", display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                        <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                      <div className="ui-zero">
+                        <label className="ui-zero">
                           <input name="confirmRestore" type="checkbox" required />
                           Restore
                         </label>
-                        <button className="button secondary" type="submit">
+                        <button className="ui-button ui-button-secondary" type="submit">
                           <RotateCcw size={16} />
                           Restore version
                         </button>
@@ -362,14 +362,14 @@ export default async function CommunicationsPage({ searchParams }: Communication
           {!emailTemplates.length ? <div className="subpanel">No email templates found.</div> : null}
         </div>
 
-        <form action={createMessageTemplateAction} className="card form-grid">
+        <form action={createMessageTemplateAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <h2 className="section-title">Create manual template</h2>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="template-name">Name</label>
               <input id="template-name" name="name" required />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="template-purpose">Purpose</label>
               <select id="template-purpose" name="purpose" defaultValue={MessageTemplatePurpose.BOOKING_CONFIRMATION}>
                 {Object.values(MessageTemplatePurpose).map((purpose) => (
@@ -381,7 +381,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="template-channel">Channel</label>
               <select id="template-channel" name="channel" defaultValue={MessageChannel.EMAIL}>
                 {Object.values(MessageChannel).map((channel) => (
@@ -391,32 +391,32 @@ export default async function CommunicationsPage({ searchParams }: Communication
                 ))}
               </select>
             </div>
-            <label style={{ alignItems: "center", display: "flex", gap: 8, paddingTop: 27 }}>
+            <label className="ui-zero">
               <input name="isActive" type="checkbox" defaultChecked />
               Active
             </label>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="template-subject">Subject</label>
             <input id="template-subject" name="subject" placeholder="{{businessName}} appointment request" />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="template-body">Body</label>
             <textarea id="template-body" name="body" required />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="template-tokens">Allowed tokens</label>
             <input id="template-tokens" name="tokens" placeholder="businessName, customerName, appointmentTime" />
           </div>
-          <button className="button" type="submit">
+          <button className="ui-button" type="submit">
             <Plus size={18} />
             Add manual template
           </button>
         </form>
 
-        <div className="card stack">
+        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <h2 className="section-title">Template library</h2>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Template</th>
@@ -441,17 +441,17 @@ export default async function CommunicationsPage({ searchParams }: Communication
                     <span className="muted-text">{enumLabel(template.channel)}</span>
                   </td>
                   <td>
-                    <span className={template.isActive ? "pill success" : "pill danger"}>{template.isActive ? "active" : "inactive"}</span>
+                    <span className={template.isActive ? "ui-badge ui-badge-success" : "ui-badge ui-badge-danger"}>{template.isActive ? "active" : "inactive"}</span>
                   </td>
                   <td>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    <div className="ui-zero">
                       {template.key ? (
-                        <span className="pill">Status locked</span>
+                        <span className="ui-badge">Status locked</span>
                       ) : (
                         <form action={updateMessageTemplateStatusAction}>
                           <input type="hidden" name="id" value={template.id} />
                           <input type="hidden" name="isActive" value={template.isActive ? "false" : "true"} />
-                          <button className="button secondary" type="submit">
+                          <button className="ui-button ui-button-secondary" type="submit">
                             {template.isActive ? "Pause" : "Activate"}
                           </button>
                         </form>
@@ -459,7 +459,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                       <form action={cloneMessageTemplateAction}>
                         <input type="hidden" name="sourceTemplateId" value={template.id} />
                         <input type="hidden" name="name" value={`Copy of ${template.name}`} />
-                        <button className="button secondary" type="submit">
+                        <button className="ui-button ui-button-secondary" type="submit">
                           <Copy size={16} />
                           Clone
                         </button>
@@ -479,9 +479,9 @@ export default async function CommunicationsPage({ searchParams }: Communication
       </section>
 
       <section className="grid-2">
-        <form action="/admin/modules/communications" method="get" className="card form-grid">
+        <form action="/admin/modules/communications" method="get" className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <h2 className="section-title">Preview template</h2>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="preview-template">Template</label>
             <select id="preview-template" name="previewTemplate" defaultValue={previewTemplate?.id || ""}>
               {templates.map((template) => (
@@ -491,7 +491,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
               ))}
             </select>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="preview-sample-event">Sample event data</label>
             <select id="preview-sample-event" name="sampleEvent" defaultValue={selectedSampleEvent}>
               {["booking", "order", "invoice", "form", "gallery", "general"].map((event) => (
@@ -501,38 +501,38 @@ export default async function CommunicationsPage({ searchParams }: Communication
               ))}
             </select>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="preview-tokens">Token JSON</label>
             <textarea id="preview-tokens" name="tokensJson" defaultValue={previewTokensText} />
           </div>
-          <button className="button secondary" type="submit">
+          <button className="ui-button ui-button-secondary" type="submit">
             Render preview
           </button>
         </form>
 
-        <div className="card stack">
+        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <h2 className="section-title">Rendered email</h2>
           {preview?.error ? <div className="error">{preview.error}</div> : null}
           {preview?.rendered ? (
             <div className="subpanel stack">
               <div>
-                <p style={{ color: "var(--muted)", marginBottom: 8 }}>Subject</p>
+                <p className="ui-zero">Subject</p>
                 <strong>{preview.rendered.subject || "No subject"}</strong>
               </div>
               <div>
-                <p style={{ color: "var(--muted)", marginBottom: 8 }}>Preview text</p>
+                <p className="ui-zero">Preview text</p>
                 <p>{preview.rendered.previewText || "No preview text"}</p>
               </div>
               <div>
-                <p style={{ color: "var(--muted)", marginBottom: 8 }}>Text body</p>
-                <pre style={{ overflow: "auto", whiteSpace: "pre-wrap" }}>{preview.rendered.textBody}</pre>
+                <p className="ui-zero">Text body</p>
+                <pre className="ui-zero">{preview.rendered.textBody}</pre>
               </div>
               <div>
-                <p style={{ color: "var(--muted)", marginBottom: 8 }}>HTML preview</p>
-                <iframe
+                <p className="ui-zero">HTML preview</p>
+                <iframe className="ui-zero"
                   sandbox=""
                   srcDoc={preview.rendered.htmlBody}
-                  style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: 8, minHeight: 360, width: "100%" }}
+                 
                   title="Rendered email HTML preview"
                 />
               </div>
@@ -542,11 +542,11 @@ export default async function CommunicationsPage({ searchParams }: Communication
             <form action={sendTemplateTestEmailAction} className="subpanel form-grid">
               <input type="hidden" name="templateId" value={previewTemplate.id} />
               <input type="hidden" name="tokensJson" value={previewTokensText} />
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="test-recipient">Test recipient</label>
                 <input id="test-recipient" name="recipientEmail" type="email" defaultValue={settings.contactEmail} required />
               </div>
-              <button className="button secondary" type="submit">
+              <button className="ui-button ui-button-secondary" type="submit">
                 Queue test email
               </button>
             </form>
@@ -555,10 +555,10 @@ export default async function CommunicationsPage({ searchParams }: Communication
       </section>
 
       <section className="grid-2">
-        <form action={recordMessageLogAction} className="card form-grid">
+        <form action={recordMessageLogAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <h2 className="section-title">Record manual delivery note</h2>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="log-template">Template</label>
               <select id="log-template" name="templateId" defaultValue="">
                 <option value="">No template</option>
@@ -569,7 +569,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="log-status">Status</label>
               <select id="log-status" name="status" defaultValue={MessageLogStatus.SENT}>
                 {Object.values(MessageLogStatus).map((status) => (
@@ -581,7 +581,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="log-channel">Channel</label>
               <select id="log-channel" name="channel" defaultValue={MessageChannel.EMAIL}>
                 {Object.values(MessageChannel).map((channel) => (
@@ -591,51 +591,51 @@ export default async function CommunicationsPage({ searchParams }: Communication
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="log-purpose">Purpose</label>
               <input id="log-purpose" name="purpose" placeholder="booking_confirmation" />
             </div>
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="recipient-email">Recipient email</label>
               <input id="recipient-email" name="recipientEmail" type="email" />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="recipient-phone">Recipient phone</label>
               <input id="recipient-phone" name="recipientPhone" />
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="log-subject">Subject</label>
             <input id="log-subject" name="subject" />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="log-body">Body preview</label>
             <textarea id="log-body" name="bodyPreview" />
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="related-type">Related type</label>
               <input id="related-type" name="relatedType" placeholder="booking" />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="related-id">Related id</label>
               <input id="related-id" name="relatedId" />
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="log-error">Error message</label>
             <input id="log-error" name="errorMessage" />
           </div>
-          <button className="button secondary" type="submit">
+          <button className="ui-button ui-button-secondary" type="submit">
             Record manual note
           </button>
         </form>
 
-        <div className="card stack">
+        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <h2 className="section-title">Actual outbox delivery</h2>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Recipient</th>
@@ -683,7 +683,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                     <td>
                       {latestProviderEvent ? (
                         <>
-                          <span className="pill">{enumLabel(latestProviderEvent.eventType)}</span>
+                          <span className="ui-badge">{enumLabel(latestProviderEvent.eventType)}</span>
                           <br />
                           <span className="muted-text">{formatDateTime(latestProviderEvent.createdAt, settings.timezone)}</span>
                         </>
@@ -696,12 +696,12 @@ export default async function CommunicationsPage({ searchParams }: Communication
                       {canResendStatus(row.status) ? (
                         <form action={resendEmailOutboxAction}>
                           <input type="hidden" name="id" value={row.id} />
-                          <button className="button secondary" type="submit">
+                          <button className="ui-button ui-button-secondary" type="submit">
                             Resend
                           </button>
                         </form>
                       ) : (
-                        <span className="pill">Active</span>
+                        <span className="ui-badge">Active</span>
                       )}
                     </td>
                   </tr>
@@ -716,7 +716,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
           </table>
           <div className="subpanel">
             <h3 className="subsection-title">Manual notes</h3>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Recipient</th>
@@ -750,19 +750,19 @@ export default async function CommunicationsPage({ searchParams }: Communication
       </section>
 
       <section className="grid-2">
-        <form action={createSuppressionEntryAction} className="card form-grid">
+        <form action={createSuppressionEntryAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <h2 className="section-title">Add suppression</h2>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="suppression-email">Email</label>
               <input id="suppression-email" name="email" type="email" required />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="suppression-source">Source</label>
               <input id="suppression-source" name="source" placeholder="admin" />
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="suppression-scope">Scope</label>
             <select id="suppression-scope" name="scope" defaultValue={EmailSuppressionScope.MARKETING}>
               {Object.values(EmailSuppressionScope).map((scope) => (
@@ -772,18 +772,18 @@ export default async function CommunicationsPage({ searchParams }: Communication
               ))}
             </select>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="suppression-reason">Reason</label>
             <input id="suppression-reason" name="reason" placeholder="Unsubscribed from marketing" />
           </div>
-          <button className="button secondary" type="submit">
+          <button className="ui-button ui-button-secondary" type="submit">
             Suppress email
           </button>
         </form>
 
-        <div className="card stack">
+        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <h2 className="section-title">Suppression list</h2>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Email</th>
@@ -803,11 +803,11 @@ export default async function CommunicationsPage({ searchParams }: Communication
                   <td>
                     <form action={deleteSuppressionEntryAction} className="form-grid">
                       <input type="hidden" name="id" value={entry.id} />
-                      <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                      <label className="ui-zero">
                         <input name="confirmDelete" type="checkbox" required />
                         Remove
                       </label>
-                      <button className="button secondary" type="submit">
+                      <button className="ui-button ui-button-secondary" type="submit">
                         Unsuppress
                       </button>
                     </form>

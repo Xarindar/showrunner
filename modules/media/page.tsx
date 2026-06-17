@@ -90,60 +90,60 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       {errorMessage ? <div className="error">{decodeURIComponent(errorMessage)}</div> : null}
 
       <section className="grid-2">
-        <form action={uploadMediaAction} className="card form-grid">
+        <form action={uploadMediaAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <h2 className="section-title">Upload to R2</h2>
           <p className="lead lead-compact">
             Current media mode: <strong>{settings.mediaDriver}</strong>. Uploads require the matching storage env vars in `.env`.
           </p>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="file">Image file</label>
             <input id="file" name="file" type="file" accept="image/*" disabled={!canUpload} />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="alt">Alt text</label>
             <input id="alt" name="alt" disabled={!canUpload} />
           </div>
-          <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+          <label className="ui-zero">
             <input name="isDecorative" type="checkbox" disabled={!canUpload} />
             Decorative image
           </label>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="folder">Folder</label>
               <input id="folder" name="folder" placeholder="portraits/spring" disabled={!canUpload} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="tags">Tags</label>
               <input id="tags" name="tags" placeholder="hero, portrait, proofing" disabled={!canUpload} />
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="caption">Caption</label>
             <input id="caption" name="caption" disabled={!canUpload} />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="credit">Credit</label>
             <input id="credit" name="credit" disabled={!canUpload} />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="usageContext">Usage context</label>
             <input id="usageContext" name="usageContext" placeholder="homepage, proofing, product" disabled={!canUpload} />
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="focalPointX">Focal X</label>
               <input id="focalPointX" name="focalPointX" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="focalPointY">Focal Y</label>
               <input id="focalPointY" name="focalPointY" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
             </div>
           </div>
-          <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+          <label className="ui-zero">
             <input name="isPrivate" type="checkbox" disabled={!canUpload} />
             Private delivery asset
           </label>
-          <button className="button" type="submit" disabled={!canUpload}>
+          <button className="ui-button" type="submit" disabled={!canUpload}>
             <ImagePlus size={18} />
             Upload image
           </button>
@@ -154,17 +154,17 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
           ) : null}
         </form>
 
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <h2 className="section-title">Repo assets</h2>
           <div className="stack">
             {repoAssets.map((asset) => (
               <div key={asset.url} className="asset-tile">
                 <NextImage src={asset.url} alt={asset.alt} width={500} height={375} unoptimized />
-                <div className="page-header" style={{ marginBottom: 0, marginTop: 12 }}>
+                <div className="page-header ui-zero">
                   <span>{asset.filename}</span>
                   <form action={setHeroImageAction}>
                     <input type="hidden" name="url" value={asset.url} />
-                    <button className="button secondary" type="submit">
+                    <button className="ui-button ui-button-secondary" type="submit">
                       <Star size={16} />
                       Use hero
                     </button>
@@ -176,19 +176,19 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
         </div>
       </section>
 
-      <section className="card">
+      <section className="ui-card ui-card-density-normal ui-card-min-md">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Uploaded assets</h2>
-            <p style={{ color: "var(--muted)", margin: 0 }}>
+            <p className="ui-zero">
               {assetCount} active assets {archivedCount ? `- ${archivedCount} archived` : ""}
             </p>
           </div>
         </div>
         {folderGroups.length ? (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+          <div className="ui-zero">
             {folderGroups.map((folder) => (
-              <span className="pill" key={folder.folder || "root"}>
+              <span className="ui-badge" key={folder.folder || "root"}>
                 <Folder size={14} />
                 {folder.folder || "root"} ({folder._count._all})
               </span>
@@ -205,30 +205,30 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                 height={375}
                 unoptimized
               />
-              <div style={{ display: "grid", gap: 8 }}>
+              <div className="ui-zero">
                 <strong>{asset.filename}</strong>
                 <span className="muted-text">
                   {asset.mimeType || "image"} - {fileSizeLabel(asset.sizeBytes)} - {asset.driver}
                 </span>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                <div className="ui-zero">
                   {asset.folder ? (
-                    <span className="pill">
+                    <span className="ui-badge">
                       <Folder size={14} />
                       {asset.folder}
                     </span>
                   ) : null}
-                  {asset.isPrivate ? <span className="pill danger">private</span> : null}
-                  {asset.isDecorative ? <span className="pill">decorative</span> : null}
-                  {asset.usageContext ? <span className="pill">{asset.usageContext}</span> : null}
+                  {asset.isPrivate ? <span className="ui-badge ui-badge-danger">private</span> : null}
+                  {asset.isDecorative ? <span className="ui-badge">decorative</span> : null}
+                  {asset.usageContext ? <span className="ui-badge">{asset.usageContext}</span> : null}
                   {nonEmptyStringArrayFromUnknown(asset.tags).map((tag) => (
-                    <span className="pill" key={tag}>
+                    <span className="ui-badge" key={tag}>
                       <Tag size={14} />
                       {tag}
                     </span>
                   ))}
                 </div>
                 {asset.caption || asset.credit ? (
-                  <p style={{ color: "var(--muted)", margin: 0 }}>
+                  <p className="ui-zero">
                     {asset.caption}
                     {asset.caption && asset.credit ? " - " : ""}
                     {asset.credit}
@@ -239,10 +239,10 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                 </span>
               </div>
               {!asset.isPrivate ? (
-                <div className="page-header" style={{ marginBottom: 0, marginTop: 0, minHeight: 0 }}>
+                <div className="page-header ui-zero">
                 <form action={setHeroImageAction}>
                   <input type="hidden" name="url" value={mediaAssetDisplayUrl(asset, MediaVariantType.HERO)} />
-                  <button className="button secondary" type="submit">
+                  <button className="ui-button ui-button-secondary" type="submit">
                     <Star size={16} />
                     Use hero
                   </button>
@@ -251,65 +251,65 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
               ) : null}
               <details className="subpanel">
                 <summary>Edit metadata</summary>
-                <form action={updateMediaAssetAction} className="form-grid" style={{ marginTop: 12 }}>
+                <form action={updateMediaAssetAction} className="form-grid ui-zero">
                   <input type="hidden" name="id" value={asset.id} />
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`asset-${asset.id}-alt`}>Alt text</label>
                     <input id={`asset-${asset.id}-alt`} name="alt" defaultValue={asset.alt || ""} />
                   </div>
                   <div className="grid-2">
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor={`asset-${asset.id}-folder`}>Folder</label>
                       <input id={`asset-${asset.id}-folder`} name="folder" defaultValue={asset.folder} />
                     </div>
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor={`asset-${asset.id}-tags`}>Tags</label>
                       <input id={`asset-${asset.id}-tags`} name="tags" defaultValue={stringArrayCsv(asset.tags)} />
                     </div>
                   </div>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`asset-${asset.id}-caption`}>Caption</label>
                     <input id={`asset-${asset.id}-caption`} name="caption" defaultValue={asset.caption} />
                   </div>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`asset-${asset.id}-credit`}>Credit</label>
                     <input id={`asset-${asset.id}-credit`} name="credit" defaultValue={asset.credit} />
                   </div>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor={`asset-${asset.id}-usageContext`}>Usage context</label>
                     <input id={`asset-${asset.id}-usageContext`} name="usageContext" defaultValue={asset.usageContext} />
                   </div>
                   <div className="grid-2">
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor={`asset-${asset.id}-focalPointX`}>Focal X</label>
                       <input id={`asset-${asset.id}-focalPointX`} name="focalPointX" defaultValue={asset.focalPointX} inputMode="decimal" />
                     </div>
-                    <div className="field">
+                    <div className="ui-field">
                       <label htmlFor={`asset-${asset.id}-focalPointY`}>Focal Y</label>
                       <input id={`asset-${asset.id}-focalPointY`} name="focalPointY" defaultValue={asset.focalPointY} inputMode="decimal" />
                     </div>
                   </div>
                   <div className="grid-2">
-                    <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                    <label className="ui-zero">
                       <input name="isDecorative" type="checkbox" defaultChecked={asset.isDecorative} />
                       Decorative
                     </label>
-                    <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                    <label className="ui-zero">
                       <input name="isPrivate" type="checkbox" defaultChecked={asset.isPrivate} />
                       Private
                     </label>
                   </div>
-                  <button className="button secondary" type="submit">
+                  <button className="ui-button ui-button-secondary" type="submit">
                     Save metadata
                   </button>
                 </form>
-                <form action={archiveMediaAssetAction} className="form-grid" style={{ marginTop: 12 }}>
+                <form action={archiveMediaAssetAction} className="form-grid ui-zero">
                   <input type="hidden" name="id" value={asset.id} />
-                  <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                  <label className="ui-zero">
                     <input name="confirmArchive" type="checkbox" required />
                     Archive this asset.
                   </label>
-                  <button className="button danger" type="submit">
+                  <button className="ui-button ui-button-danger" type="submit">
                     <Archive size={16} />
                     Archive asset
                   </button>
@@ -319,23 +319,23 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
           ))}
           {!mediaAssets.length ? <p>No uploaded media yet.</p> : null}
         </div>
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-          <a className="button secondary" href={`/admin/modules/media?page=${Math.max(1, page - 1)}`} aria-disabled={page <= 1}>
+        <div className="ui-zero">
+          <a className="ui-button ui-button-secondary" href={`/admin/modules/media?page=${Math.max(1, page - 1)}`} aria-disabled={page <= 1}>
             Previous
           </a>
-          <span className="pill">
+          <span className="ui-badge">
             Page {Math.min(page, pageCount)} of {pageCount}
           </span>
-          <a className="button secondary" href={`/admin/modules/media?page=${Math.min(pageCount, page + 1)}`} aria-disabled={page >= pageCount}>
+          <a className="ui-button ui-button-secondary" href={`/admin/modules/media?page=${Math.min(pageCount, page + 1)}`} aria-disabled={page >= pageCount}>
             Next
           </a>
         </div>
       </section>
 
       {archivedAssets.length ? (
-        <section className="card stack">
+        <section className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <h2 className="section-title">Archived assets</h2>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Asset</th>
@@ -355,7 +355,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                   <td>
                     <form action={restoreMediaAssetAction}>
                       <input type="hidden" name="id" value={asset.id} />
-                      <button className="button secondary" type="submit">
+                      <button className="ui-button ui-button-secondary" type="submit">
                         <RotateCcw size={16} />
                         Restore
                       </button>

@@ -24,9 +24,9 @@ function connectionFor(
 }
 
 function connectionStatus(connection?: SchedulingCalendarConnection) {
-  if (!connection) return <span className="pill warning">Not connected</span>;
-  if (connection.status === SchedulingCalendarConnectionStatus.CONNECTED) return <span className="pill success">Connected</span>;
-  return <span className="pill danger">Needs attention</span>;
+  if (!connection) return <span className="ui-badge ui-badge-warning">Not connected</span>;
+  if (connection.status === SchedulingCalendarConnectionStatus.CONNECTED) return <span className="ui-badge ui-badge-success">Connected</span>;
+  return <span className="ui-badge ui-badge-danger">Needs attention</span>;
 }
 
 function connectionDetail(item?: CalendarFeedsPanelProps["googleConnections"][number]) {
@@ -41,10 +41,10 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
   const siteGoogleConnection = connectionFor(googleConnections, SchedulingCalendarOwnerType.SITE);
 
   return (
-    <section className="card form-grid">
+    <section className="ui-card ui-card-density-normal ui-card-min-none form-grid">
       <div>
         <h2 className="section-title">Calendars</h2>
-        <p style={{ color: "var(--muted)" }}>
+        <p className="ui-zero">
           Subscribe to bookings with ICS feeds and connect Google Calendar to remove busy time from public availability.
         </p>
       </div>
@@ -53,22 +53,22 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
         <div className="grid-2">
           <div>
             <h3>Google free/busy</h3>
-            <p style={{ color: "var(--muted)", margin: 0 }}>
+            <p className="ui-zero">
               Connected calendars are read for busy blocks only; Showrunner does not write events to Google Calendar.
             </p>
           </div>
-          <div style={{ alignItems: "center", display: "flex", gap: 12, justifyContent: "flex-end" }}>
+          <div className="ui-zero">
             {connectionStatus(siteGoogleConnection?.connection)}
-            <a className="button secondary" href={googleCalendarConnectPath({ ownerType: SchedulingCalendarOwnerType.SITE })}>
+            <a className="ui-button ui-button-secondary" href={googleCalendarConnectPath({ ownerType: SchedulingCalendarOwnerType.SITE })}>
               <CalendarClock size={18} />
               {siteGoogleConnection ? "Reconnect business calendar" : "Connect business calendar"}
             </a>
           </div>
         </div>
-        <p style={{ color: "var(--muted)", margin: 0 }}>{connectionDetail(siteGoogleConnection)}</p>
+        <p className="ui-zero">{connectionDetail(siteGoogleConnection)}</p>
 
         {staff.length ? (
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Staff</th>
@@ -87,7 +87,7 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
                     </td>
                     <td>{connectionStatus(item?.connection)}</td>
                     <td>
-                      <a className="button secondary" href={googleCalendarConnectPath({ ownerId: member.id, ownerType: SchedulingCalendarOwnerType.STAFF })}>
+                      <a className="ui-button ui-button-secondary" href={googleCalendarConnectPath({ ownerId: member.id, ownerType: SchedulingCalendarOwnerType.STAFF })}>
                         <CalendarClock size={18} />
                         {item ? "Reconnect" : "Connect"}
                       </a>
@@ -102,16 +102,16 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
 
       <div>
         <h3>ICS feeds</h3>
-        <p style={{ color: "var(--muted)", margin: 0 }}>Token-protected read-only feeds for upcoming pending and confirmed bookings.</p>
+        <p className="ui-zero">Token-protected read-only feeds for upcoming pending and confirmed bookings.</p>
       </div>
 
-      <div className="field">
+      <div className="ui-field">
         <label htmlFor="site-calendar-feed">All bookings</label>
         <input id="site-calendar-feed" readOnly value={siteFeedUrl} />
       </div>
 
       {staffFeedUrls.length ? (
-        <table className="table">
+        <table className="ui-table">
           <thead>
             <tr>
               <th>Staff</th>

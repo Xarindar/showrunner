@@ -88,14 +88,14 @@ export default async function CartPage({ searchParams }: CartPageProps) {
           <span>{settings.businessName}</span>
         </Link>
         <div className="site-nav-links">
-          <Link href="/shop" className="button secondary">
+          <Link href="/shop" className="ui-button ui-button-secondary">
             <ShoppingBag size={18} />
             Shop
           </Link>
         </div>
       </nav>
 
-      <section className="section" style={{ paddingTop: 22 }}>
+      <section className="section ui-zero">
         <div className="stack">
           <div className="page-header">
             <div>
@@ -132,12 +132,12 @@ export default async function CartPage({ searchParams }: CartPageProps) {
             </div>
           ) : null}
           {orderFormAttachments.length ? (
-            <div className="card stack">
+            <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
               <h2 className="section-title">Order forms</h2>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <div className="ui-zero">
                 {orderFormAttachments.map((attachment) => (
                   <Link
-                    className={attachment.isRequired ? "button" : "button secondary"}
+                    className={attachment.isRequired ? "ui-button" : "ui-button ui-button-secondary"}
                     href={publicFormAttachmentHref({
                       formSlug: attachment.form.slug,
                       targetId: attachment.targetId,
@@ -155,19 +155,19 @@ export default async function CartPage({ searchParams }: CartPageProps) {
           ) : null}
 
           {!cartResult || !cartResult.cart.items.length ? (
-            <div className="card stack">
+            <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
               <h2>Your cart is empty</h2>
               <p className="lead">Browse the storefront to add an active product or package.</p>
-              <Link className="button" href="/shop">
+              <Link className="ui-button" href="/shop">
                 <ShoppingBag size={18} />
                 Browse products
               </Link>
             </div>
           ) : (
             <section className="grid-2">
-              <div className="card stack">
+              <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
                 <h2 className="section-title">Items</h2>
-                <table className="table">
+                <table className="ui-table">
                   <thead>
                     <tr>
                       <th>Item</th>
@@ -191,18 +191,18 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                           ) : null}
                         </td>
                         <td>
-                          <form action={updatePublicCartItemAction} style={{ display: "flex", gap: 8 }}>
+                          <form className="ui-zero" action={updatePublicCartItemAction}>
                             <input type="hidden" name="itemId" value={item.id} />
-                            <input
+                            <input className="ui-zero"
                               aria-label={`Quantity for ${item.product.name}`}
                               name="quantity"
                               min="0"
                               max="999"
-                              style={{ maxWidth: 84 }}
+                             
                               type="number"
                               defaultValue={item.quantity}
                             />
-                            <button className="button secondary" style={{ minWidth: 76 }} type="submit">
+                            <button className="ui-button ui-button-secondary ui-zero" type="submit">
                               Save
                             </button>
                           </form>
@@ -212,7 +212,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                           <form action={updatePublicCartItemAction}>
                             <input type="hidden" name="itemId" value={item.id} />
                             <input type="hidden" name="quantity" value="0" />
-                            <button className="button secondary" style={{ minWidth: 44 }} type="submit" aria-label={`Remove ${item.product.name}`}>
+                            <button className="ui-button ui-button-secondary ui-zero" type="submit" aria-label={`Remove ${item.product.name}`}>
                               <Trash2 size={16} />
                             </button>
                           </form>
@@ -223,9 +223,9 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                 </table>
               </div>
 
-              <div className="card stack">
+              <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
                 <h2 className="section-title">Totals</h2>
-                <table className="table" style={{ minWidth: 0 }}>
+                <table className="ui-table ui-zero">
                   <tbody>
                     <tr>
                       <td>Subtotal</td>
@@ -261,17 +261,17 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                   {cartResult.cart.coupon ? (
                     <form action={removePublicCartCouponAction} className="form-grid">
                       <p>Applied: {cartResult.cart.coupon.code}</p>
-                      <button className="button secondary" type="submit">
+                      <button className="ui-button ui-button-secondary" type="submit">
                         Remove coupon
                       </button>
                     </form>
                   ) : (
                     <form action={applyPublicCartCouponAction} className="form-grid">
-                      <div className="field">
+                      <div className="ui-field">
                         <label htmlFor="coupon-code">Coupon code</label>
                         <input id="coupon-code" name="code" />
                       </div>
-                      <button className="button secondary" type="submit">
+                      <button className="ui-button ui-button-secondary" type="submit">
                         Apply coupon
                       </button>
                     </form>
@@ -285,17 +285,17 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                       <p>
                         Applied: {cartResult.cart.giftCard.code} ({formatMoney(cartResult.cart.giftCardCreditCents, cartResult.cart.currency)})
                       </p>
-                      <button className="button secondary" type="submit">
+                      <button className="ui-button ui-button-secondary" type="submit">
                         Remove gift card
                       </button>
                     </form>
                   ) : (
                     <form action={applyPublicGiftCardAction} className="form-grid">
-                      <div className="field">
+                      <div className="ui-field">
                         <label htmlFor="gift-card-code">Gift card code</label>
                         <input id="gift-card-code" name="code" />
                       </div>
-                      <button className="button secondary" type="submit">
+                      <button className="ui-button ui-button-secondary" type="submit">
                         Apply gift card
                       </button>
                     </form>
@@ -304,11 +304,11 @@ export default async function CartPage({ searchParams }: CartPageProps) {
 
                 <form action={saveCartForRecoveryAction} className="subpanel form-grid">
                   <h3>Save this cart</h3>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor="recovery-name">Name</label>
                     <input id="recovery-name" name="customerName" />
                   </div>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor="recovery-email">Email</label>
                     <input id="recovery-email" name="customerEmail" type="email" required />
                   </div>
@@ -316,7 +316,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                     <input name="marketingConsent" type="checkbox" required />
                     <span>Email me only about this saved cart if I do not finish checkout.</span>
                   </label>
-                  <button className="button secondary" type="submit">
+                  <button className="ui-button ui-button-secondary" type="submit">
                     Save cart
                   </button>
                 </form>
@@ -339,15 +339,15 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                   mode="begin_checkout"
                 >
                   <h3>Checkout</h3>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor="checkout-name">Name</label>
                     <input id="checkout-name" name="customerName" required />
                   </div>
-                  <div className="field">
+                  <div className="ui-field">
                     <label htmlFor="checkout-email">Email</label>
                     <input id="checkout-email" name="customerEmail" type="email" required />
                   </div>
-                  <button className="button" type="submit">
+                  <button className="ui-button" type="submit">
                     <CreditCard size={18} />
                     Continue to checkout
                   </button>

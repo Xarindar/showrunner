@@ -115,11 +115,11 @@ function renderField(field: FormField) {
 
   if (field.type === FormFieldType.TEXTAREA) {
     return wrapField(
-      <div className="field">
+      <div className="ui-field">
         <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
         <textarea {...commonProps} {...validationAttributes} placeholder={field.placeholder} />
         {field.helpText ? (
-          <small id={helpId} style={{ color: "var(--muted)" }}>
+          <small className="ui-zero" id={helpId}>
             {field.helpText}
           </small>
         ) : null}
@@ -129,7 +129,7 @@ function renderField(field: FormField) {
 
   if (field.type === FormFieldType.SELECT) {
     return wrapField(
-      <div className="field">
+      <div className="ui-field">
         <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
         <select {...commonProps} defaultValue="">
           <option value="" disabled>
@@ -142,7 +142,7 @@ function renderField(field: FormField) {
           ))}
         </select>
         {field.helpText ? (
-          <small id={helpId} style={{ color: "var(--muted)" }}>
+          <small className="ui-zero" id={helpId}>
             {field.helpText}
           </small>
         ) : null}
@@ -152,20 +152,20 @@ function renderField(field: FormField) {
 
   if (field.type === FormFieldType.RADIO) {
     return wrapField(
-      <fieldset className="field" style={{ border: 0, margin: 0, padding: 0 }} aria-describedby={helpId}>
-        <legend style={{ color: "var(--muted)", fontSize: "0.88rem", fontWeight: 700 }}>
+      <fieldset className="ui-field ui-zero" aria-describedby={helpId}>
+        <legend className="ui-zero">
           {labelText(field.label, field.isRequired)}
         </legend>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        <div className="ui-zero">
           {options.map((option) => (
-            <label key={option} style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <label className="ui-zero" key={option}>
               <input name={name} required={field.isRequired} type="radio" value={option} />
               {option}
             </label>
           ))}
         </div>
         {field.helpText ? (
-          <small id={helpId} style={{ color: "var(--muted)" }}>
+          <small className="ui-zero" id={helpId}>
             {field.helpText}
           </small>
         ) : null}
@@ -175,8 +175,8 @@ function renderField(field: FormField) {
 
   if (field.type === FormFieldType.CHECKBOX) {
     return wrapField(
-      <div className="field">
-        <label style={{ alignItems: "center", color: "var(--ink)", display: "flex", gap: 8 }}>
+      <div className="ui-field">
+        <label className="ui-zero">
           <input
             name={name}
             required={field.isRequired}
@@ -187,7 +187,7 @@ function renderField(field: FormField) {
           {labelText(field.label, field.isRequired)}
         </label>
         {field.helpText ? (
-          <small id={helpId} style={{ color: "var(--muted)" }}>
+          <small className="ui-zero" id={helpId}>
             {field.helpText}
           </small>
         ) : null}
@@ -199,11 +199,11 @@ function renderField(field: FormField) {
     const uploadRules = normalizeUploadRules(field.validationRules);
 
     return wrapField(
-      <div className="field">
+      <div className="ui-field">
         <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
         <input {...commonProps} accept={uploadRules.allowedMimeTypes.join(",")} type="file" />
         {field.helpText ? (
-          <small id={helpId} style={{ color: "var(--muted)" }}>
+          <small className="ui-zero" id={helpId}>
             {field.helpText}
           </small>
         ) : null}
@@ -229,11 +229,11 @@ function renderField(field: FormField) {
     field.type === FormFieldType.EMAIL ? "email" : field.type === FormFieldType.PHONE ? "tel" : field.type === FormFieldType.DATE ? "date" : "text";
 
   return wrapField(
-    <div className="field">
+    <div className="ui-field">
       <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
       <input {...commonProps} {...inputValidationAttributes} placeholder={field.placeholder} type={inputType} />
       {field.helpText ? (
-        <small id={helpId} style={{ color: "var(--muted)" }}>
+        <small className="ui-zero" id={helpId}>
           {field.helpText}
         </small>
       ) : null}
@@ -311,12 +311,12 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
           <span>{settings.businessName}</span>
         </Link>
         <div className="site-nav-links">
-          <Link href="/book" className="button secondary">
+          <Link href="/book" className="ui-button ui-button-secondary">
             <CalendarDays size={18} />
             Book
           </Link>
           {testimonialsEnabled ? (
-            <Link href="/testimonials" className="button secondary">
+            <Link href="/testimonials" className="ui-button ui-button-secondary">
               <MessageSquare size={18} />
               Reviews
             </Link>
@@ -324,13 +324,13 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
         </div>
       </nav>
 
-      <section className="section" style={{ maxWidth: 860 }}>
+      <section className="section ui-zero">
         <div className="booking-intro">
           <p className="eyebrow">Form</p>
           <h1>{form.name}</h1>
           {form.description ? <p className="lead">{form.description}</p> : null}
           {attachment ? (
-            <p className={attachment.isRequired ? "pill success" : "pill"}>
+            <p className={attachment.isRequired ? "ui-badge ui-badge-success" : "ui-badge"}>
               {attachment.isRequired ? "Required" : "Optional"} attached form
             </p>
           ) : null}
@@ -347,7 +347,7 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
           </div>
         ) : null}
 
-        <form action={createPublicFormSubmissionAction} className="card form-grid" encType="multipart/form-data">
+        <form action={createPublicFormSubmissionAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid" encType="multipart/form-data">
           <input type="hidden" name="formId" value={form.id} />
           {attachment ? (
             <>
@@ -355,11 +355,11 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
               <input type="hidden" name="attachmentTargetId" value={attachment.targetId} />
             </>
           ) : null}
-          <input
+          <input className="ui-zero"
             aria-hidden="true"
             autoComplete="off"
             name="companyWebsite"
-            style={{ display: "none" }}
+           
             tabIndex={-1}
             type="text"
           />

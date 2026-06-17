@@ -32,15 +32,15 @@ type PortfolioPageProps = {
 };
 
 function galleryStatusClass(status: PortfolioGalleryStatus) {
-  if (status === PortfolioGalleryStatus.PUBLISHED) return "pill success";
-  if (status === PortfolioGalleryStatus.ARCHIVED) return "pill danger";
-  return "pill";
+  if (status === PortfolioGalleryStatus.PUBLISHED) return "ui-badge ui-badge-success";
+  if (status === PortfolioGalleryStatus.ARCHIVED) return "ui-badge ui-badge-danger";
+  return "ui-badge";
 }
 
 function accessStatusClass(status: PortfolioAccessStatus) {
-  if (status === PortfolioAccessStatus.ACTIVE) return "pill success";
-  if (status === PortfolioAccessStatus.REVOKED) return "pill danger";
-  return "pill";
+  if (status === PortfolioAccessStatus.ACTIVE) return "ui-badge ui-badge-success";
+  if (status === PortfolioAccessStatus.REVOKED) return "ui-badge ui-badge-danger";
+  return "ui-badge";
 }
 
 export default async function PortfolioPage({ searchParams }: PortfolioPageProps) {
@@ -143,21 +143,21 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
       {errorMessage ? <div className="error">{errorMessage}</div> : null}
 
       <section className="grid-3">
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <Camera size={22} />
           <h3>{publishedCount} published galleries</h3>
           <p className="lead lead-compact">
             Portfolio collections ready for public gallery and campaign surfaces.
           </p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <KeyRound size={22} />
           <h3>{privateCount} private galleries</h3>
           <p className="lead lead-compact">
             Password or private-link collections for proofing and client delivery.
           </p>
         </div>
-        <div className="card">
+        <div className="ui-card ui-card-density-normal ui-card-min-md">
           <Star size={22} />
           <h3>{favoriteCount} favorites</h3>
           <p className="lead lead-compact">
@@ -167,20 +167,20 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
       </section>
 
       <section className="grid-2">
-        <form action={createPortfolioGalleryAction} className="card form-grid">
+        <form action={createPortfolioGalleryAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
           <h2 className="section-title">Create gallery</h2>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="gallery-title">Title</label>
               <input id="gallery-title" name="title" required />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="gallery-slug">Slug</label>
               <input id="gallery-slug" name="slug" placeholder="spring-portraits" />
             </div>
           </div>
           <div className="grid-3">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="gallery-status">Status</label>
               <select id="gallery-status" name="status" defaultValue={PortfolioGalleryStatus.DRAFT}>
                 {Object.values(PortfolioGalleryStatus).map((status) => (
@@ -190,7 +190,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="gallery-visibility">Visibility</label>
               <select id="gallery-visibility" name="visibility" defaultValue={PortfolioGalleryVisibility.PUBLIC}>
                 {Object.values(PortfolioGalleryVisibility).map((visibility) => (
@@ -200,12 +200,12 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="gallery-sort">Sort order</label>
               <input id="gallery-sort" name="sortOrder" type="number" defaultValue="0" />
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="gallery-layout">Layout</label>
             <select id="gallery-layout" name="layout" defaultValue={PortfolioGalleryLayout.GRID}>
               {Object.values(PortfolioGalleryLayout).map((layout) => (
@@ -216,64 +216,64 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             </select>
           </div>
           <div className="grid-3">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="gallery-category">Category</label>
               <input id="gallery-category" name="category" placeholder="Portraits" />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="gallery-location">Location</label>
               <input id="gallery-location" name="location" />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="gallery-shot-at">Shoot date</label>
               <input id="gallery-shot-at" name="shotAt" type="date" />
             </div>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="gallery-description">Description</label>
             <textarea id="gallery-description" name="description" />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="gallery-cover">Cover image URL</label>
             <input id="gallery-cover" name="coverImageUrl" placeholder="/hero.svg" />
           </div>
           <div className="grid-2">
-            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <label className="ui-zero">
               <input name="proofingEnabled" type="checkbox" defaultChecked />
               Proofing enabled
             </label>
-            <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <label className="ui-zero">
               <input name="downloadEnabled" type="checkbox" />
               Downloads enabled
             </label>
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="gallery-access-code">Password access code</label>
             <input id="gallery-access-code" name="accessCode" type="password" />
           </div>
-          <div className="field">
+          <div className="ui-field">
             <label htmlFor="gallery-rights">Rights notes</label>
             <textarea id="gallery-rights" name="rightsNotes" />
           </div>
           <div className="grid-2">
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="gallery-seo-title">SEO title</label>
               <input id="gallery-seo-title" name="seoTitle" />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="gallery-seo-description">SEO description</label>
               <input id="gallery-seo-description" name="seoDescription" />
             </div>
           </div>
-          <button className="button" type="submit">
+          <button className="ui-button" type="submit">
             <ImageIcon size={18} />
             Create gallery
           </button>
         </form>
 
-        <div className="card stack">
+        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
           <h2 className="section-title">Gallery queue</h2>
-          <table className="table">
+          <table className="ui-table">
             <thead>
               <tr>
                 <th>Gallery</th>
@@ -313,7 +313,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
 
       {selectedGallery ? (
         <section className="grid-2">
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <div className="page-header compact-header">
               <div>
                 <h2 className="section-title">{selectedGallery.title}</h2>
@@ -323,20 +323,12 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               </div>
               <span className={galleryStatusClass(selectedGallery.status)}>{enumLabel(selectedGallery.status)}</span>
             </div>
-            <div
+            <div className="ui-zero"
               aria-label={selectedGallery.title}
               role="img"
-              style={{
-                aspectRatio: "16 / 9",
-                backgroundColor: "var(--panel)",
-                backgroundImage: cssBackgroundImage(selectedGallery.coverImageUrl || selectedGallery.items[0]?.imageUrl || ""),
-                backgroundPosition: "center",
-                backgroundSize: "cover",
-                border: "1px solid var(--line)",
-                borderRadius: "var(--radius)"
-              }}
+             
             />
-            <table className="table">
+            <table className="ui-table">
               <tbody>
                 <tr>
                   <td>Slug</td>
@@ -345,7 +337,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                     {selectedGallery.status === PortfolioGalleryStatus.PUBLISHED ? (
                       <>
                         <br />
-                        <a href={`/galleries/${selectedGallery.slug}`} style={{ color: "var(--primary-dark)" }}>
+                        <a className="ui-zero" href={`/galleries/${selectedGallery.slug}`}>
                           Open public gallery
                         </a>
                       </>
@@ -386,7 +378,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             </table>
             <form action={updatePortfolioGalleryLayoutAction} className="form-grid">
               <input type="hidden" name="id" value={selectedGallery.id} />
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor={`gallery-${selectedGallery.id}-layout`}>Gallery layout</label>
                 <select id={`gallery-${selectedGallery.id}-layout`} name="layout" defaultValue={selectedGallery.layout}>
                   {Object.values(PortfolioGalleryLayout).map((layout) => (
@@ -396,22 +388,22 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                   ))}
                 </select>
               </div>
-              <button className="button secondary" type="submit">
+              <button className="ui-button ui-button-secondary" type="submit">
                 Save layout
               </button>
             </form>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <div className="ui-zero">
               {[PortfolioGalleryStatus.PUBLISHED, PortfolioGalleryStatus.DRAFT, PortfolioGalleryStatus.ARCHIVED].map((status) => (
-                <form action={updatePortfolioGalleryStatusAction} className="stack" key={status} style={{ gap: 6 }}>
+                <form action={updatePortfolioGalleryStatusAction} className="stack ui-zero" key={status}>
                   <input type="hidden" name="id" value={selectedGallery.id} />
                   <input type="hidden" name="status" value={status} />
                   {status === PortfolioGalleryStatus.ARCHIVED ? (
-                    <label style={{ alignItems: "center", display: "flex", gap: 6 }}>
+                    <label className="ui-zero">
                       <input name="confirmArchive" type="checkbox" />
                       Confirm archive
                     </label>
                   ) : null}
-                  <button className="button secondary" type="submit">
+                  <button className="ui-button ui-button-secondary" type="submit">
                     Mark {enumLabel(status)}
                   </button>
                 </form>
@@ -419,11 +411,11 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             </div>
           </div>
 
-          <form action={addPortfolioGalleryItemAction} className="card form-grid">
+          <form action={addPortfolioGalleryItemAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
             <input type="hidden" name="galleryId" value={selectedGallery.id} />
             <h2 className="section-title">Add image or delivery item</h2>
             <div className="grid-2">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="item-media">Uploaded media</label>
                 <select id="item-media" name="mediaAssetId" defaultValue="">
                   <option value="">Use a URL instead</option>
@@ -434,7 +426,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                   ))}
                 </select>
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="item-type">Type</label>
                 <select id="item-type" name="type" defaultValue={PortfolioItemType.IMAGE}>
                   {Object.values(PortfolioItemType).map((type) => (
@@ -445,47 +437,47 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 </select>
               </div>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="item-url">Image or file URL</label>
               <input id="item-url" name="imageUrl" placeholder="/hero.svg" />
             </div>
             <div className="grid-2">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="item-title">Title</label>
                 <input id="item-title" name="title" />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="item-sort">Sort order</label>
                 <input id="item-sort" name="sortOrder" type="number" defaultValue={selectedGallery.items.length * 10 + 10} />
               </div>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="item-alt">Alt text</label>
               <input id="item-alt" name="altText" />
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="item-caption">Caption</label>
               <textarea id="item-caption" name="caption" />
             </div>
             <div className="grid-3">
-              <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <label className="ui-zero">
                 <input name="isCover" type="checkbox" />
                 Use as cover
               </label>
-              <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <label className="ui-zero">
                 <input name="isDownloadable" type="checkbox" />
                 Downloadable
               </label>
-              <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+              <label className="ui-zero">
                 <input name="isWatermarked" type="checkbox" defaultChecked />
                 Watermarked
               </label>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="item-license">License notes</label>
               <input id="item-license" name="licenseNotes" />
             </div>
-            <button className="button secondary" type="submit">
+            <button className="ui-button ui-button-secondary" type="submit">
               Add item
             </button>
           </form>
@@ -494,32 +486,32 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
 
       {selectedGallery ? (
         <section className="grid-2">
-          <form action={createPortfolioProofRoundAction} className="card form-grid">
+          <form action={createPortfolioProofRoundAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
             <input type="hidden" name="galleryId" value={selectedGallery.id} />
             <h2 className="section-title">Start revision round</h2>
             <div className="grid-2">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="round-title">Title</label>
                 <input id="round-title" name="title" placeholder={`Round ${(latestProofRound?.roundNumber || 0) + 1}`} />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="round-due">Due date</label>
                 <input id="round-due" name="dueAt" type="date" />
               </div>
             </div>
-            <div className="field">
+            <div className="ui-field">
               <label htmlFor="round-instructions">Instructions</label>
               <textarea id="round-instructions" name="instructions" />
             </div>
-            <button className="button secondary" type="submit">
+            <button className="ui-button ui-button-secondary" type="submit">
               <RotateCcw size={16} />
               Start round
             </button>
           </form>
 
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <h2 className="section-title">Proofing rounds</h2>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Round</th>
@@ -546,22 +538,22 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                       </span>
                     </td>
                     <td>
-                      <span className={round.status === PortfolioProofRoundStatus.OPEN ? "pill success" : "pill"}>
+                      <span className={round.status === PortfolioProofRoundStatus.OPEN ? "ui-badge ui-badge-success" : "ui-badge"}>
                         {enumLabel(round.status)}
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div className="ui-zero">
                         {[PortfolioProofRoundStatus.LOCKED, PortfolioProofRoundStatus.CHANGES_REQUESTED, PortfolioProofRoundStatus.APPROVED].map(
                           (status) => (
-                            <form action={updatePortfolioProofRoundStatusAction} className="stack" key={status} style={{ gap: 6 }}>
+                            <form action={updatePortfolioProofRoundStatusAction} className="stack ui-zero" key={status}>
                               <input type="hidden" name="id" value={round.id} />
                               <input type="hidden" name="status" value={status} />
-                              <label style={{ alignItems: "center", display: "flex", gap: 6 }}>
+                              <label className="ui-zero">
                                 <input name="confirmTransition" type="checkbox" />
                                 Confirm {enumLabel(status).toLowerCase()}
                               </label>
-                              <button className="button secondary" type="submit">
+                              <button className="ui-button ui-button-secondary" type="submit">
                                 Mark {enumLabel(status)}
                               </button>
                             </form>
@@ -584,26 +576,19 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
 
       {selectedGallery ? (
         <section className="grid-2">
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <h2 className="section-title">Gallery items</h2>
             <div className="grid-3">
               {selectedGallery.items.map((item) => (
                 <div className="asset-tile" key={item.id}>
-                  <div
+                  <div className="ui-zero"
                     aria-label={item.altText || item.title || "Portfolio item"}
                     role="img"
-                    style={{
-                      aspectRatio: "4 / 3",
-                      backgroundColor: "var(--panel)",
-                      backgroundImage: cssBackgroundImage(item.thumbnailUrl || item.imageUrl),
-                      backgroundPosition: "center",
-                      backgroundSize: "cover",
-                      borderRadius: "var(--radius)"
-                    }}
+                   
                   />
                   <div>
                     <strong>{item.title || item.imageUrl}</strong>
-                    <p style={{ color: "var(--muted)", margin: "4px 0 0" }}>
+                    <p className="ui-zero">
                       {item.caption || enumLabel(item.type)}
                       {item.isCover ? " - cover" : ""}
                     </p>
@@ -614,9 +599,9 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             </div>
           </div>
 
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <h2 className="section-title">Recent favorites</h2>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Viewer</th>
@@ -645,11 +630,11 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
 
       {selectedGallery ? (
         <section className="grid-2">
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <h2 className="section-title">Proof decisions and comments</h2>
             {!latestProofRound ? <p className="empty-state">No proofing round selected.</p> : null}
             {latestProofRound ? (
-              <table className="table">
+              <table className="ui-table">
                 <thead>
                   <tr>
                     <th>Image</th>
@@ -681,7 +666,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 {latestProofRound.comments.slice(0, 8).map((comment) => (
                   <div className="subpanel" key={comment.id}>
                     <strong>{comment.item?.title || comment.item?.imageUrl || "Round comment"}</strong>
-                    <p style={{ margin: "6px 0" }}>{comment.body}</p>
+                    <p className="ui-zero">{comment.body}</p>
                     <small className="muted-text">
                       {comment.authorName || comment.viewerEmail || "Viewer"} - {formatDateTime(comment.createdAt, settings.timezone)}
                     </small>
@@ -691,7 +676,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             ) : null}
           </div>
 
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <h2 className="section-title">Selected image export</h2>
             <textarea
               readOnly
@@ -700,13 +685,13 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             />
             <div className="subpanel stack">
               <h3>Delivery bundle</h3>
-              <p style={{ color: "var(--muted)" }}>
+              <p className="ui-zero">
                 {selectedDownloadableCount} media-backed downloadable item{selectedDownloadableCount === 1 ? "" : "s"} ready for a ZIP delivery bundle.
               </p>
               {selectedGallery.downloadEnabled && selectedDownloadableCount ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <div className="ui-zero">
                   {selectedGallery.visibility === PortfolioGalleryVisibility.PUBLIC ? (
-                    <a className="button secondary" href={`/galleries/${selectedGallery.slug}/bundle`}>
+                    <a className="ui-button ui-button-secondary" href={`/galleries/${selectedGallery.slug}/bundle`}>
                       <Download size={16} />
                       Public bundle
                     </a>
@@ -715,14 +700,14 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                     .filter((access) => access.status === PortfolioAccessStatus.ACTIVE)
                     .slice(0, 4)
                     .map((access) => (
-                      <a className="button secondary" href={`/galleries/${selectedGallery.slug}/bundle?access=${access.accessToken}`} key={access.id}>
+                      <a className="ui-button ui-button-secondary" href={`/galleries/${selectedGallery.slug}/bundle?access=${access.accessToken}`} key={access.id}>
                         <Download size={16} />
                         {access.recipientEmail}
                       </a>
                     ))}
                 </div>
               ) : (
-                <p style={{ color: "var(--muted)" }}>Enable gallery downloads and mark media-backed items downloadable to create a bundle.</p>
+                <p className="ui-zero">Enable gallery downloads and mark media-backed items downloadable to create a bundle.</p>
               )}
             </div>
             <div className="stack">
@@ -730,7 +715,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               {latestProofRound?.approvals.map((approval) => (
                 <div className="subpanel" key={approval.id}>
                   <strong>{enumLabel(approval.status)}</strong>
-                  <p style={{ margin: "6px 0" }}>{approval.notes || "-"}</p>
+                  <p className="ui-zero">{approval.notes || "-"}</p>
                   <small className="muted-text">
                     {approval.approverName || approval.viewerEmail || "Viewer"} - {formatDateTime(approval.createdAt, settings.timezone)}
                   </small>
@@ -744,11 +729,11 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
 
       {selectedGallery ? (
         <section className="grid-2">
-          <form action={createPortfolioAccessAction} className="card form-grid">
+          <form action={createPortfolioAccessAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
             <input type="hidden" name="galleryId" value={selectedGallery.id} />
             <h2 className="section-title">Create private access</h2>
             <div className="grid-2">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="access-client">Client</label>
                 <select id="access-client" name="clientId" defaultValue="">
                   <option value="">No linked client</option>
@@ -759,29 +744,29 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                   ))}
                 </select>
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="access-email">Recipient email</label>
                 <input id="access-email" name="recipientEmail" type="email" required />
               </div>
             </div>
             <div className="grid-2">
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="access-token">Access token</label>
                 <input id="access-token" name="accessToken" placeholder="Generated if blank" />
               </div>
-              <div className="field">
+              <div className="ui-field">
                 <label htmlFor="access-expires">Expires</label>
                 <input id="access-expires" name="expiresAt" type="date" />
               </div>
             </div>
-            <button className="button secondary" type="submit">
+            <button className="ui-button ui-button-secondary" type="submit">
               Create access
             </button>
           </form>
 
-          <div className="card stack">
+          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
             <h2 className="section-title">Access links</h2>
-            <table className="table">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Recipient</th>
@@ -801,7 +786,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                       </span>
                     </td>
                     <td>
-                      <a href={`/galleries/access/${access.accessToken}`} style={{ color: "var(--primary-dark)" }}>
+                      <a className="ui-zero" href={`/galleries/access/${access.accessToken}`}>
                         Open access route
                       </a>
                       <br />
@@ -818,7 +803,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                           name="status"
                           value={access.status === PortfolioAccessStatus.ACTIVE ? PortfolioAccessStatus.REVOKED : PortfolioAccessStatus.ACTIVE}
                         />
-                        <button className="button secondary" type="submit">
+                        <button className="ui-button ui-button-secondary" type="submit">
                           {access.status === PortfolioAccessStatus.ACTIVE ? "Revoke" : "Reactivate"}
                         </button>
                       </form>
