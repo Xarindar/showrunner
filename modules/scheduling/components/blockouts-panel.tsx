@@ -13,7 +13,7 @@ export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPane
   return (
     <section className="grid-2">
       <form action={createBlockoutAction} className="card form-grid">
-        <h2 style={{ fontSize: "1.35rem" }}>Manual blockout</h2>
+        <h2 className="section-title">Manual blockout</h2>
         <div className="grid-2">
           <div className="field">
             <label htmlFor="startsAt">Starts</label>
@@ -46,7 +46,7 @@ export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPane
       </form>
 
       <div className="card">
-        <h2 style={{ fontSize: "1.35rem" }}>Upcoming blockouts</h2>
+        <h2 className="section-title">Upcoming blockouts</h2>
         <table className="table">
           <tbody>
             {blockouts.map((block) => (
@@ -54,7 +54,7 @@ export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPane
                 <td>
                   {formatDateTime(block.startsAt, timezone)}
                   <br />
-                  <span style={{ color: "var(--muted)" }}>
+                  <span className="muted-text">
                     {block.resource ? `${block.resource.name} - ` : ""}
                     {block.reason || "No reason"}
                   </span>

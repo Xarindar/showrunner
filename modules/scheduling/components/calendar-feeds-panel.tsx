@@ -43,7 +43,7 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
   return (
     <section className="card form-grid">
       <div>
-        <h2 style={{ fontSize: "1.35rem" }}>Calendars</h2>
+        <h2 className="section-title">Calendars</h2>
         <p style={{ color: "var(--muted)" }}>
           Subscribe to bookings with ICS feeds and connect Google Calendar to remove busy time from public availability.
         </p>
@@ -52,7 +52,7 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
       <div className="subpanel form-grid">
         <div className="grid-2">
           <div>
-            <h3 style={{ fontSize: "1rem" }}>Google free/busy</h3>
+            <h3>Google free/busy</h3>
             <p style={{ color: "var(--muted)", margin: 0 }}>
               Connected calendars are read for busy blocks only; Showrunner does not write events to Google Calendar.
             </p>
@@ -83,7 +83,7 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
                   <tr key={member.id}>
                     <td>
                       <strong>{member.name}</strong>
-                      {member.title ? <span style={{ color: "var(--muted)" }}> {member.title}</span> : null}
+                      {member.title ? <span className="muted-text"> {member.title}</span> : null}
                     </td>
                     <td>{connectionStatus(item?.connection)}</td>
                     <td>
@@ -101,7 +101,7 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
       </div>
 
       <div>
-        <h3 style={{ fontSize: "1rem" }}>ICS feeds</h3>
+        <h3>ICS feeds</h3>
         <p style={{ color: "var(--muted)", margin: 0 }}>Token-protected read-only feeds for upcoming pending and confirmed bookings.</p>
       </div>
 
@@ -123,7 +123,7 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
               <tr key={staff.id}>
                 <td>
                   <strong>{staff.name}</strong>
-                  {staff.title ? <span style={{ color: "var(--muted)" }}> {staff.title}</span> : null}
+                  {staff.title ? <span className="muted-text"> {staff.title}</span> : null}
                 </td>
                 <td>
                   <input aria-label={`${staff.name} calendar feed`} readOnly value={url} />

@@ -33,9 +33,9 @@ export function SlotDiagnosticsPanel({
 
   return (
     <section className="card stack">
-      <div className="page-header" style={{ marginBottom: 0 }}>
+      <div className="page-header flush-header">
         <div>
-          <h2 style={{ fontSize: "1.35rem" }}>Slot diagnostics</h2>
+          <h2 className="section-title">Slot diagnostics</h2>
           <p style={{ color: "var(--muted)", margin: 0 }}>Trace generated openings and the rules blocking unavailable times.</p>
         </div>
       </div>

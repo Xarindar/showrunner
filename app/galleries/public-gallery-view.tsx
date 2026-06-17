@@ -120,7 +120,7 @@ function lockedGallery(settings: Awaited<ReturnType<typeof getSiteSettings>>) {
       <section className="section" style={{ maxWidth: 760 }}>
         <div className="card" style={{ minHeight: 260 }}>
           <LockKeyhole size={28} />
-          <h1 style={{ fontSize: "2.5rem" }}>Private gallery</h1>
+          <h1>Private gallery</h1>
           <p className="lead">Use an active gallery access link to view this collection.</p>
         </div>
       </section>
@@ -404,7 +404,7 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
             {roundComments.length || latestProofRound.approvals.length ? (
               <div className="grid-2" style={{ marginTop: 16 }}>
                 <div>
-                  <h3 style={{ fontSize: "1rem" }}>Round comments</h3>
+                  <h3>Round comments</h3>
                   {roundComments.slice(0, 4).map((comment) => (
                     <p key={comment.id} style={{ margin: "8px 0" }}>
                       <strong>{comment.authorName || comment.viewerEmail || "Viewer"}:</strong> {comment.body}
@@ -412,7 +412,7 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
                   ))}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: "1rem" }}>Responses</h3>
+                  <h3>Responses</h3>
                   {latestProofRound.approvals.map((approval) => (
                     <p key={approval.id} style={{ margin: "8px 0" }}>
                       <strong>{approval.approverName || approval.viewerEmail || "Viewer"}:</strong> {enumLabel(approval.status)}

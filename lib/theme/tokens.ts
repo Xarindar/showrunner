@@ -5,6 +5,8 @@ type ThemePreset = {
   colors: {
     page: string;
     surface: string;
+    surfaceRaised: string;
+    surfaceSunken: string;
     text: string;
     muted: string;
     border: string;
@@ -14,17 +16,35 @@ type ThemePreset = {
     danger: string;
     success: string;
   };
+  spacing: Record<"1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12", string>;
   radius: {
     control: string;
     card: string;
     pill: string;
   };
   shadow: {
+    hairline: string;
     panel: string;
+    raised: string;
     footer: string;
   };
   type: {
     sans: string;
+    mono: string;
+    scale: {
+      display: string;
+      h1: string;
+      h2: string;
+      h3: string;
+      body: string;
+      small: string;
+      caption: string;
+    };
+    leading: {
+      tight: string;
+      normal: string;
+      relaxed: string;
+    };
   };
   motion: {
     fast: string;
@@ -34,35 +54,82 @@ type ThemePreset = {
   layout: {
     adminSidebar: string;
     contentMax: string;
+    controlHeight: string;
+    rowHeight: string;
+    pageHeaderMin: string;
+    cardMin: string;
+    statMin: string;
   };
 };
+
+const spacingScale = {
+  "1": "4px",
+  "2": "8px",
+  "3": "12px",
+  "4": "16px",
+  "5": "20px",
+  "6": "24px",
+  "7": "32px",
+  "8": "40px",
+  "9": "48px",
+  "10": "64px",
+  "11": "80px",
+  "12": "96px"
+} satisfies ThemePreset["spacing"];
+
+const typeScale = {
+  display: "3rem",
+  h1: "2.05rem",
+  h2: "1.55rem",
+  h3: "1rem",
+  body: "0.94rem",
+  small: "0.84rem",
+  caption: "0.76rem"
+} satisfies ThemePreset["type"]["scale"];
+
+const leading = {
+  tight: "1.08",
+  normal: "1.5",
+  relaxed: "1.65"
+} satisfies ThemePreset["type"]["leading"];
+
+const sans = 'var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+const mono = 'var(--font-geist-mono), "SFMono-Regular", Consolas, "Liberation Mono", monospace';
 
 export const themePresets = {
   clean: {
     label: "Clean",
     colors: {
-      page: "#f4f7f5",
+      page: "#f6f4ef",
       surface: "#ffffff",
+      surfaceRaised: "#fffefa",
+      surfaceSunken: "#efeee8",
       text: "#17211f",
-      muted: "#65706c",
-      border: "#dae4df",
+      muted: "#5f6965",
+      border: "#ddd8cf",
       brand: "#0f766e",
       brandDark: "#0a4f49",
       accent: "#b66d3a",
       danger: "#b4433e",
       success: "#287c54"
     },
+    spacing: spacingScale,
     radius: {
       control: "8px",
       card: "8px",
       pill: "999px"
     },
     shadow: {
+      hairline: "0 1px 0 rgba(255, 255, 255, 0.78)",
       panel: "0 1px 2px rgba(22, 29, 27, 0.06), 0 18px 42px rgba(22, 29, 27, 0.07)",
+      raised: "0 1px 2px rgba(22, 29, 27, 0.08), 0 12px 28px rgba(22, 29, 27, 0.08)",
       footer: "0 -1px 2px rgba(22, 29, 27, 0.06), 0 -18px 42px rgba(22, 29, 27, 0.08)"
     },
     type: {
-      sans: 'var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+      sans,
+      mono,
+      scale: typeScale,
+      leading
     },
     motion: {
       fast: "160ms",
@@ -71,34 +138,47 @@ export const themePresets = {
     },
     layout: {
       adminSidebar: "260px",
-      contentMax: "1180px"
+      contentMax: "1180px",
+      controlHeight: "40px",
+      rowHeight: "58px",
+      pageHeaderMin: "74px",
+      cardMin: "214px",
+      statMin: "136px"
     }
   },
   editorial: {
     label: "Editorial",
     colors: {
-      page: "#f5f6f8",
+      page: "#f5f3ef",
       surface: "#ffffff",
+      surfaceRaised: "#fffefd",
+      surfaceSunken: "#edeee9",
       text: "#1d2026",
-      muted: "#666d78",
-      border: "#dce1e8",
+      muted: "#616874",
+      border: "#ddd9d2",
       brand: "#324d63",
       brandDark: "#203748",
       accent: "#a75c4a",
       danger: "#a23d38",
       success: "#337050"
     },
+    spacing: spacingScale,
     radius: {
       control: "6px",
       card: "6px",
       pill: "999px"
     },
     shadow: {
+      hairline: "0 1px 0 rgba(255, 255, 255, 0.74)",
       panel: "0 1px 2px rgba(32, 33, 35, 0.07), 0 18px 42px rgba(32, 33, 35, 0.08)",
+      raised: "0 1px 2px rgba(32, 33, 35, 0.09), 0 12px 28px rgba(32, 33, 35, 0.09)",
       footer: "0 -1px 2px rgba(32, 33, 35, 0.07), 0 -18px 42px rgba(32, 33, 35, 0.09)"
     },
     type: {
-      sans: 'var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+      sans,
+      mono,
+      scale: typeScale,
+      leading
     },
     motion: {
       fast: "150ms",
@@ -107,7 +187,12 @@ export const themePresets = {
     },
     layout: {
       adminSidebar: "268px",
-      contentMax: "1160px"
+      contentMax: "1160px",
+      controlHeight: "40px",
+      rowHeight: "58px",
+      pageHeaderMin: "74px",
+      cardMin: "214px",
+      statMin: "136px"
     }
   },
   warm: {
@@ -115,6 +200,8 @@ export const themePresets = {
     colors: {
       page: "#f7f4ef",
       surface: "#fffdf9",
+      surfaceRaised: "#fffaf1",
+      surfaceSunken: "#eee5dc",
       text: "#28241f",
       muted: "#716a61",
       border: "#ded5ca",
@@ -124,17 +211,23 @@ export const themePresets = {
       danger: "#a33d35",
       success: "#3b754c"
     },
+    spacing: spacingScale,
     radius: {
       control: "8px",
       card: "8px",
       pill: "999px"
     },
     shadow: {
+      hairline: "0 1px 0 rgba(255, 255, 255, 0.72)",
       panel: "0 1px 2px rgba(43, 39, 34, 0.07), 0 18px 42px rgba(43, 39, 34, 0.08)",
+      raised: "0 1px 2px rgba(43, 39, 34, 0.09), 0 12px 28px rgba(43, 39, 34, 0.09)",
       footer: "0 -1px 2px rgba(43, 39, 34, 0.07), 0 -18px 42px rgba(43, 39, 34, 0.09)"
     },
     type: {
-      sans: 'var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+      sans,
+      mono,
+      scale: typeScale,
+      leading
     },
     motion: {
       fast: "170ms",
@@ -143,7 +236,12 @@ export const themePresets = {
     },
     layout: {
       adminSidebar: "260px",
-      contentMax: "1180px"
+      contentMax: "1180px",
+      controlHeight: "40px",
+      rowHeight: "58px",
+      pageHeaderMin: "74px",
+      cardMin: "214px",
+      statMin: "136px"
     }
   }
 } satisfies Record<string, ThemePreset>;
@@ -257,6 +355,8 @@ export function themeToCssVars(input: { themePreset?: string | null; themePrimar
   return {
     "--color-page": preset.colors.page,
     "--color-surface": preset.colors.surface,
+    "--color-surface-raised": preset.colors.surfaceRaised,
+    "--color-surface-sunken": preset.colors.surfaceSunken,
     "--color-text": preset.colors.text,
     "--color-muted": preset.colors.muted,
     "--color-border": preset.colors.border,
@@ -268,16 +368,50 @@ export function themeToCssVars(input: { themePreset?: string | null; themePrimar
     "--color-accent": preset.colors.accent,
     "--color-danger": preset.colors.danger,
     "--color-success": preset.colors.success,
+    "--color-hover": `color-mix(in srgb, ${preset.colors.surface} 86%, ${preset.colors.brand} 14%)`,
+    "--color-active": `color-mix(in srgb, ${preset.colors.surface} 78%, ${preset.colors.brand} 22%)`,
+    "--color-focus": `color-mix(in srgb, ${preset.colors.brand} 28%, transparent)`,
+    "--color-disabled": `color-mix(in srgb, ${preset.colors.muted} 38%, ${preset.colors.surface})`,
+    "--space-1": preset.spacing["1"],
+    "--space-2": preset.spacing["2"],
+    "--space-3": preset.spacing["3"],
+    "--space-4": preset.spacing["4"],
+    "--space-5": preset.spacing["5"],
+    "--space-6": preset.spacing["6"],
+    "--space-7": preset.spacing["7"],
+    "--space-8": preset.spacing["8"],
+    "--space-9": preset.spacing["9"],
+    "--space-10": preset.spacing["10"],
+    "--space-11": preset.spacing["11"],
+    "--space-12": preset.spacing["12"],
     "--radius-control": preset.radius.control,
     "--radius-card": preset.radius.card,
     "--radius-pill": preset.radius.pill,
+    "--shadow-hairline": preset.shadow.hairline,
     "--shadow-panel": preset.shadow.panel,
+    "--shadow-raised": preset.shadow.raised,
     "--shadow-footer": preset.shadow.footer,
     "--font-sans": preset.type.sans,
+    "--font-mono": preset.type.mono,
+    "--type-display": preset.type.scale.display,
+    "--type-h1": preset.type.scale.h1,
+    "--type-h2": preset.type.scale.h2,
+    "--type-h3": preset.type.scale.h3,
+    "--type-body": preset.type.scale.body,
+    "--type-small": preset.type.scale.small,
+    "--type-caption": preset.type.scale.caption,
+    "--leading-tight": preset.type.leading.tight,
+    "--leading-normal": preset.type.leading.normal,
+    "--leading-relaxed": preset.type.leading.relaxed,
     "--motion-fast": preset.motion.fast,
     "--motion-standard": preset.motion.standard,
     "--motion-ease": preset.motion.ease,
     "--layout-admin-sidebar": preset.layout.adminSidebar,
-    "--layout-content-max": preset.layout.contentMax
+    "--layout-content-max": preset.layout.contentMax,
+    "--control-height": preset.layout.controlHeight,
+    "--row-height": preset.layout.rowHeight,
+    "--page-header-min": preset.layout.pageHeaderMin,
+    "--card-min": preset.layout.cardMin,
+    "--stat-min": preset.layout.statMin
   } as CSSProperties;
 }

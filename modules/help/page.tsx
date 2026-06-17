@@ -56,7 +56,7 @@ export default async function HelpPage() {
       <header className="page-header">
         <div>
           <p className="eyebrow">Help</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Admin user guide</h1>
+          <h1>Admin user guide</h1>
           <p>Operating notes, setup status, and readiness context for the modules currently enabled in this admin.</p>
         </div>
         <Link className="button secondary" href="/admin/modules/settings">
@@ -90,7 +90,7 @@ export default async function HelpPage() {
       <section className="card">
         <div className="page-header">
           <div>
-            <h2 style={{ fontSize: "1.35rem" }}>Current setup notes</h2>
+            <h2 className="section-title">Current setup notes</h2>
             <p>Warnings combine manifest readiness with live configuration and data checks.</p>
           </div>
         </div>
@@ -150,7 +150,7 @@ export default async function HelpPage() {
       </section>
 
       <section className="card">
-        <h2 style={{ fontSize: "1.35rem" }}>Common workflows</h2>
+        <h2 className="section-title">Common workflows</h2>
         <table className="table">
           <tbody>
             {commonWorkflows.map((workflow) => (
@@ -166,7 +166,7 @@ export default async function HelpPage() {
       </section>
 
       <section className="card">
-        <h2 style={{ fontSize: "1.35rem" }}>Security and compliance foundations</h2>
+        <h2 className="section-title">Security and compliance foundations</h2>
         <div className="foundation-list">
           {platformFoundationItems.map((item) => (
             <div className="foundation-row" key={item.key}>
@@ -182,8 +182,8 @@ export default async function HelpPage() {
       </section>
 
       <section className="card">
-        <h2 style={{ fontSize: "1.35rem" }}>If a time is missing from booking</h2>
-        <p className="lead" style={{ fontSize: "0.95rem" }}>
+        <h2 className="section-title">If a time is missing from booking</h2>
+        <p className="lead lead-compact">
           Check that the service is active, weekly availability exists, there is no blockout, minimum notice has passed,
           the selected date is inside the advance booking window, and no appointment or buffer is already using that time.
         </p>

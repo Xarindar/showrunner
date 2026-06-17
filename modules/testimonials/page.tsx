@@ -58,7 +58,7 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
       <header className="page-header">
         <div>
           <p className="eyebrow">Testimonials</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Reviews and social proof</h1>
+          <h1>Reviews and social proof</h1>
           <p>Collect first-party quotes, moderate submissions, and feature approved testimonials on the public site.</p>
         </div>
         <Link className="button secondary" href="/testimonials">
@@ -74,21 +74,21 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
         <div className="card">
           <ShieldCheck size={22} />
           <h3>{approvedCount} approved</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Quotes cleared for public display.
           </p>
         </div>
         <div className="card">
           <MessageSquare size={22} />
           <h3>{pendingCount} pending</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             New submissions waiting for moderation.
           </p>
         </div>
         <div className="card">
           <Star size={22} />
           <h3>{featuredCount} featured</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Approved quotes shown in the homepage proof block.
           </p>
         </div>
@@ -96,7 +96,7 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
 
       <section className="grid-2">
         <form action={createTestimonialAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Add testimonial</h2>
+          <h2 className="section-title">Add testimonial</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="authorName">Author name</label>
@@ -168,9 +168,9 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
         </form>
 
         <div className="card">
-          <div className="page-header" style={{ marginBottom: 16 }}>
+          <div className="page-header compact-header">
             <div>
-              <h2 style={{ fontSize: "1.35rem" }}>Moderation queue</h2>
+              <h2 className="section-title">Moderation queue</h2>
               <p>{testimonialCount} matching testimonials</p>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -200,11 +200,11 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
                   <td>
                     <strong>{testimonial.authorName}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>
+                    <span className="muted-text">
                       {testimonial.authorRole || testimonial.serviceName || "No context"} · {testimonial.rating}/5
                     </span>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>
+                    <span className="muted-text">
                       Consent:{" "}
                       {testimonial.permissionGrantedAt
                         ? formatDateTime(testimonial.permissionGrantedAt, settings.timezone)
@@ -222,7 +222,7 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
                   <td>
                     {testimonial.quote}
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{formatDateTime(testimonial.submittedAt, settings.timezone)}</span>
+                    <span className="muted-text">{formatDateTime(testimonial.submittedAt, settings.timezone)}</span>
                   </td>
                   <td>
                     <span className={statusClass(testimonial.status)}>{enumLabel(testimonial.status)}</span>{" "}

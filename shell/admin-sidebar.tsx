@@ -88,7 +88,7 @@ export function AdminSidebar({ businessName, enabledModules, userRole }: AdminSi
           })}
         </nav>
 
-        <form action={logoutAction} style={{ marginTop: "auto" }}>
+        <form action={logoutAction} className="admin-sidebar-actions">
           <button className="button ghost" type="submit">
             <LogOut size={18} />
             Sign out

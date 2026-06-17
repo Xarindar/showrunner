@@ -90,7 +90,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       <header className="page-header">
         <div>
           <p className="eyebrow">Scheduling</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Services, hours, and blockouts</h1>
+          <h1>Services, hours, and blockouts</h1>
           <p>Configure how booking works. Day-to-day appointment management now lives in Appointments.</p>
         </div>
       </header>

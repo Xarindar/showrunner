@@ -326,7 +326,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
       <header className="page-header">
         <div>
           <p className="eyebrow">Appointments</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Active appointment desk</h1>
+          <h1>Active appointment desk</h1>
           <p>Review upcoming bookings, confirm requests, cancel conflicts, and mark completed work.</p>
         </div>
         <Link className="button secondary" href="/admin/modules/scheduling">
@@ -342,30 +342,30 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
         <div className="card">
           <Clock size={22} />
           <h3>{upcomingCount} upcoming</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Non-canceled appointments from today forward.
           </p>
         </div>
         <div className="card">
           <ListChecks size={22} />
           <h3>{pendingCount} pending</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Requests that may need confirmation.
           </p>
         </div>
         <div className="card">
           <CalendarDays size={22} />
           <h3>{waitlistCount} waitlisted</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Clients waiting for a full service/date.
           </p>
         </div>
       </section>
 
       <section className="card appointment-calendar-card">
-        <div className="page-header" style={{ marginBottom: 16 }}>
+        <div className="page-header compact-header">
           <div>
-            <h2 style={{ fontSize: "1.35rem" }}>Calendar</h2>
+            <h2 className="section-title">Calendar</h2>
             <p style={{ color: "var(--muted)", margin: 0 }}>
               {selectedRangeLabel} | {calendarItems.length} appointments
             </p>
@@ -472,9 +472,9 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
       </section>
 
       <section className="card">
-        <div className="page-header" style={{ marginBottom: 16 }}>
+        <div className="page-header compact-header">
           <div>
-            <h2 style={{ fontSize: "1.35rem" }}>Waitlist</h2>
+            <h2 className="section-title">Waitlist</h2>
             <p style={{ color: "var(--muted)", margin: 0 }}>
               {waitlistCount} waiting clients. Promote by choosing a real available slot.
             </p>
@@ -496,22 +496,22 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
                 <td>
                   <strong>{entry.customerName}</strong>
                   <br />
-                  <span style={{ color: "var(--muted)" }}>{entry.customerEmail}</span>
+                  <span className="muted-text">{entry.customerEmail}</span>
                   {entry.customerPhone ? (
                     <>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{entry.customerPhone}</span>
+                      <span className="muted-text">{entry.customerPhone}</span>
                     </>
                   ) : null}
                 </td>
                 <td>
                   {entry.service.name}
                   <br />
-                  <span style={{ color: "var(--muted)" }}>{entry.staff?.name || "Any staff"}</span>
+                  <span className="muted-text">{entry.staff?.name || "Any staff"}</span>
                   {entry.notes ? (
                     <>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{entry.notes}</span>
+                      <span className="muted-text">{entry.notes}</span>
                     </>
                   ) : null}
                 </td>
@@ -568,9 +568,9 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
       </section>
 
       <section className="card">
-        <div className="page-header" style={{ marginBottom: 16 }}>
+        <div className="page-header compact-header">
           <div>
-            <h2 style={{ fontSize: "1.35rem" }}>Appointment list</h2>
+            <h2 className="section-title">Appointment list</h2>
             <p style={{ color: "var(--muted)", margin: 0 }}>{bookingCount} matching appointments</p>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

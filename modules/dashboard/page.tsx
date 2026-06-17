@@ -13,6 +13,7 @@ import { formatDateTime } from "@/lib/format";
 import { getPlatformStatus, type PlatformWarningSeverity } from "@/lib/platform-status";
 import { getSiteSettings } from "@/lib/site";
 import type { ModuleId } from "@/shell/modules";
+import { ButtonLink, EmptyState, EqualGrid, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -112,59 +113,59 @@ export default async function AdminDashboardPage() {
       <header className="page-header">
         <div>
           <p className="eyebrow">Dashboard</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Client control room</h1>
+          <h1>Client control room</h1>
           <p>Update the parts clients should touch without exposing the design system underneath.</p>
         </div>
-        <Link href="/book" className="button secondary">
+        <ButtonLink href="/book" variant="secondary">
           Public booking page
-        </Link>
+        </ButtonLink>
       </header>
 
-      <section className="dashboard-stat-grid" aria-label="Business snapshot">
-        <Link className="dashboard-stat" href="/admin/modules/appointments">
+      <EqualGrid className="dashboard-stat-grid" min="180px" aria-label="Business snapshot">
+        <Link className="ui-stat-tile" href="/admin/modules/appointments">
           <span>Upcoming</span>
           <strong>{upcomingCount}</strong>
           <small>appointments ahead</small>
         </Link>
-        <Link className="dashboard-stat" href="/admin/modules/appointments">
+        <Link className="ui-stat-tile" href="/admin/modules/appointments">
           <span>Needs review</span>
           <strong>{pendingCount}</strong>
           <small>pending requests</small>
         </Link>
-        <Link className="dashboard-stat" href="/admin/modules/clients">
+        <Link className="ui-stat-tile" href="/admin/modules/clients">
           <span>Clients</span>
           <strong>{clientCount}</strong>
           <small>saved records</small>
         </Link>
-        <Link className="dashboard-stat" href="/admin/modules/scheduling">
+        <Link className="ui-stat-tile" href="/admin/modules/scheduling">
           <span>Services</span>
           <strong>{activeServiceCount}</strong>
           <small>active offerings</small>
         </Link>
-      </section>
+      </EqualGrid>
 
-      <section className="dashboard-stat-grid" aria-label="Platform readiness snapshot">
-        <Link className="dashboard-stat" href="/admin/modules/settings">
+      <EqualGrid className="dashboard-stat-grid" min="180px" aria-label="Platform readiness snapshot">
+        <Link className="ui-stat-tile" href="/admin/modules/settings">
           <span>Modules</span>
           <strong>{platformStatus.enabledCount}</strong>
           <small>enabled in the shell</small>
         </Link>
-        <Link className="dashboard-stat" href="/admin/modules/help">
+        <Link className="ui-stat-tile" href="/admin/modules/help">
           <span>Live or mixed</span>
           <strong>{platformStatus.liveCount}</strong>
           <small>modules with runtime behavior</small>
         </Link>
-        <Link className="dashboard-stat" href="/admin/modules/help">
+        <Link className="ui-stat-tile" href="/admin/modules/help">
           <span>Manual/foundation</span>
           <strong>{platformStatus.manualCount + platformStatus.adminFoundationCount}</strong>
           <small>modules not fully live</small>
         </Link>
-        <Link className="dashboard-stat" href="/admin/modules/help">
+        <Link className="ui-stat-tile" href="/admin/modules/help">
           <span>Warnings</span>
           <strong>{platformStatus.warnings.length}</strong>
           <small>setup or operations notes</small>
         </Link>
-      </section>
+      </EqualGrid>
 
       <section className="dashboard-action-grid" aria-label="Admin shortcuts">
         {actionCards.map((card) => {
@@ -189,15 +190,15 @@ export default async function AdminDashboardPage() {
       <section className="stack" aria-label="Module readiness">
         <div className="page-header">
           <div>
-            <h2 style={{ fontSize: "1.5rem" }}>Module readiness</h2>
+            <h2>Module readiness</h2>
             <p>Enabled modules with their current operating mode and public-route status.</p>
           </div>
-          <Link className="button secondary" href="/admin/modules/settings">
+          <ButtonLink variant="secondary" href="/admin/modules/settings">
             Manage modules
-          </Link>
+          </ButtonLink>
         </div>
 
-        <div className="module-readiness-grid">
+        <EqualGrid className="module-readiness-grid" min="240px">
           {enabledModuleStatus.map((item) => (
             <Link className="module-readiness-card" href={item.module.href} key={item.module.id}>
               <span className={item.pillClassName}>{item.readinessLabel}</span>
@@ -210,20 +211,20 @@ export default async function AdminDashboardPage() {
               </span>
             </Link>
           ))}
-        </div>
+        </EqualGrid>
       </section>
 
       <section className="card dashboard-panel">
         <div className="page-header">
           <div>
-            <h2 style={{ fontSize: "1.5rem" }}>Operational warnings</h2>
+            <h2>Operational warnings</h2>
             <p>Setup gaps, manual-mode modules, and live checks that need attention.</p>
           </div>
           <AlertTriangle size={22} aria-hidden="true" />
         </div>
 
         {topWarnings.length ? (
-          <table className="table dashboard-table">
+          <Table className="dashboard-table">
             <thead>
               <tr>
                 <th>Severity</th>
@@ -242,25 +243,25 @@ export default async function AdminDashboardPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         ) : (
-          <p className="empty-state">No platform warnings are active.</p>
+          <EmptyState title="No platform warnings" description="All enabled modules are clear right now." />
         )}
       </section>
 
       <section className="card dashboard-panel">
         <div className="page-header">
           <div>
-            <h2 style={{ fontSize: "1.5rem" }}>Upcoming bookings</h2>
+            <h2>Upcoming bookings</h2>
             <p>Newest appointments that still need attention.</p>
           </div>
-          <Link className="button secondary" href="/admin/modules/appointments">
+          <ButtonLink variant="secondary" href="/admin/modules/appointments">
             <CalendarCheck size={18} />
             Manage appointments
-          </Link>
+          </ButtonLink>
         </div>
 
-        <table className="table dashboard-table">
+        <Table className="dashboard-table">
           <thead>
             <tr>
               <th>Customer</th>
@@ -288,7 +289,7 @@ export default async function AdminDashboardPage() {
               </tr>
             ) : null}
           </tbody>
-        </table>
+        </Table>
 
         {bookings.length ? (
           <div className="dashboard-appointment-list">
@@ -307,7 +308,7 @@ export default async function AdminDashboardPage() {
           </div>
         ) : (
           <div className="dashboard-appointment-list">
-            <p className="empty-state">No upcoming bookings yet.</p>
+            <EmptyState title="No upcoming bookings" description="New bookings will appear here with the same reserved row height." />
           </div>
         )}
       </section>

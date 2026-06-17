@@ -4,6 +4,7 @@ import NextImage from "next/image";
 import { CalendarDays, FileText, Image as ImageIcon, LockKeyhole, MessageSquare, ShoppingBag, Star } from "lucide-react";
 import { FormStatus, PortfolioGalleryStatus, PortfolioGalleryVisibility, TestimonialStatus } from "@prisma/client";
 import { JsonLd } from "@/components/structured-data";
+import { ButtonLink, Cluster, EmptyState } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import { buildImageObjectJsonLd, buildLocalBusinessJsonLd, buildPageMetadata, buildWebSiteJsonLd, getCanonicalBaseUrl } from "@/lib/seo";
 import { getSiteSettings } from "@/lib/site";
@@ -102,28 +103,28 @@ export default async function HomePage() {
           <p className="eyebrow">Showrunner</p>
           <h1>{settings.heroHeadline}</h1>
           <p className="lead">{settings.heroSubheadline}</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 28 }}>
-            <Link href="/book" className="button">
+          <Cluster className="hero-actions" gap="3">
+            <ButtonLink href="/book">
               <CalendarDays size={18} />
               Book an appointment
-            </Link>
-            <Link href="/admin/login" className="button secondary">
+            </ButtonLink>
+            <ButtonLink href="/admin/login" variant="secondary">
               <LockKeyhole size={18} />
               Admin login
-            </Link>
+            </ButtonLink>
             {testimonialsEnabled ? (
-              <Link href="/testimonials" className="button secondary">
+              <ButtonLink href="/testimonials" variant="secondary">
                 <MessageSquare size={18} />
                 Reviews
-              </Link>
+              </ButtonLink>
             ) : null}
             {productsEnabled ? (
-              <Link href="/shop" className="button secondary">
+              <ButtonLink href="/shop" variant="secondary">
                 <ShoppingBag size={18} />
                 Shop
-              </Link>
+              </ButtonLink>
             ) : null}
-          </div>
+          </Cluster>
         </div>
         <div className="hero-media">
           <NextImage src={settings.heroImageUrl} alt="" width={900} height={1000} priority unoptimized />
@@ -131,13 +132,13 @@ export default async function HomePage() {
       </section>
 
       <section className="section">
-        <div className="grid-2" style={{ alignItems: "start" }}>
+        <div className="grid-2 align-start">
           <div>
             <p className="eyebrow">Editable content</p>
             <h2>{settings.introTitle}</h2>
             <p className="lead">{settings.introBody}</p>
           </div>
-          <div className="feature-grid" style={{ gridTemplateColumns: "1fr" }}>
+          <div className="feature-grid feature-grid-single">
             <div className="card">
               <CalendarDays size={22} />
               <h3>Scheduling</h3>
@@ -167,13 +168,13 @@ export default async function HomePage() {
       </section>
 
       {formsEnabled || portfolioEnabled || testimonialsEnabled ? (
-        <section className="section" style={{ paddingTop: 0 }}>
-          <div className="grid-2" style={{ alignItems: "start" }}>
+        <section className="section section-flush-top">
+          <div className="grid-2 align-start">
             {formsEnabled ? (
               <div>
                 <p className="eyebrow">Forms</p>
                 <h2>Public intake examples</h2>
-                <div className="feature-grid" style={{ gridTemplateColumns: "1fr", marginTop: 18 }}>
+                <div className="feature-grid feature-grid-single section-list">
                   {forms.map((form) => (
                     <Link className="card" href={`/forms/${form.slug}`} key={form.id}>
                       <FileText size={22} />
@@ -181,7 +182,7 @@ export default async function HomePage() {
                       <p>{form.description || "Open this active form on the example front end."}</p>
                     </Link>
                   ))}
-                  {!forms.length ? <p className="empty-state">No active forms yet.</p> : null}
+                  {!forms.length ? <EmptyState title="No active forms" description="Published intake forms will keep this slot size stable." /> : null}
                 </div>
               </div>
             ) : null}
@@ -190,7 +191,7 @@ export default async function HomePage() {
               <div>
                 <p className="eyebrow">Portfolio</p>
                 <h2>Public galleries</h2>
-                <div className="feature-grid" style={{ gridTemplateColumns: "1fr", marginTop: 18 }}>
+                <div className="feature-grid feature-grid-single section-list">
                   {publicGalleries.map((gallery) => (
                     <Link className="card" href={`/galleries/${gallery.slug}`} key={gallery.id}>
                       <ImageIcon size={22} />
@@ -198,7 +199,7 @@ export default async function HomePage() {
                       <p>{gallery.description || gallery.category || "Open this published gallery."}</p>
                     </Link>
                   ))}
-                  {!publicGalleries.length ? <p className="empty-state">No public galleries yet.</p> : null}
+                  {!publicGalleries.length ? <EmptyState title="No public galleries" description="Published collections will appear in this reserved list." /> : null}
                 </div>
               </div>
             ) : null}
@@ -207,22 +208,22 @@ export default async function HomePage() {
               <div>
                 <p className="eyebrow">Social proof</p>
                 <h2>Featured testimonials</h2>
-                <div className="feature-grid" style={{ gridTemplateColumns: "1fr", marginTop: 18 }}>
+                <div className="feature-grid feature-grid-single section-list">
                   {testimonials.map((testimonial) => (
                     <article className="card" key={testimonial.id}>
                       <Star size={22} />
-                      <p style={{ lineHeight: 1.7 }}>&quot;{testimonial.quote}&quot;</p>
+                      <p className="testimonial-quote">&quot;{testimonial.quote}&quot;</p>
                       <strong>{testimonial.authorName}</strong>
-                      <span style={{ color: "var(--muted)" }}>
+                      <span className="muted-text">
                         {testimonial.authorRole || testimonial.serviceName || testimonial.source} - {testimonial.rating}/5
                       </span>
                     </article>
                   ))}
-                  {!testimonials.length ? <p className="empty-state">No featured testimonials yet.</p> : null}
-                  <Link href="/testimonials" className="button secondary" style={{ justifySelf: "start" }}>
+                  {!testimonials.length ? <EmptyState title="No featured testimonials" description="Approved reviews will reserve the same card rhythm." /> : null}
+                  <ButtonLink href="/testimonials" variant="secondary" className="justify-start">
                     <MessageSquare size={18} />
                     View all reviews
-                  </Link>
+                  </ButtonLink>
                 </div>
               </div>
             ) : null}

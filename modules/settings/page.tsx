@@ -53,7 +53,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       <header className="page-header">
         <div>
           <p className="eyebrow">Settings</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Client configuration</h1>
+          <h1>Client configuration</h1>
           <p>Business details, visual basics, media mode, module state, and platform foundations for multi-site, roles, audit, and policy controls.</p>
         </div>
       </header>
@@ -63,15 +63,15 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
       <section className="grid-3" aria-label="Settings structure">
         <div className="card">
-          <h2 style={{ fontSize: "1.2rem" }}>Business</h2>
+          <h2 className="compact-title">Business</h2>
           <p>Identity, contact email, and timezone for public pages and notifications.</p>
         </div>
         <div className="card">
-          <h2 style={{ fontSize: "1.2rem" }}>Modules</h2>
+          <h2 className="compact-title">Modules</h2>
           <p>{platformStatus.enabledCount} modules enabled, including required platform modules for the admin shell.</p>
         </div>
         <div className="card">
-          <h2 style={{ fontSize: "1.2rem" }}>Security and data</h2>
+          <h2 className="compact-title">Security and data</h2>
           <p>{platformFoundationItems.length} foundation items tracked for roles, audit logs, site scoping, and policy controls.</p>
         </div>
       </section>
@@ -79,7 +79,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       <section className="card form-grid">
         <div className="grid-2">
           <div>
-            <h2 style={{ fontSize: "1.2rem" }}>Payments</h2>
+            <h2 className="compact-title">Payments</h2>
             <p>Connected payment accounts, hosted checkout routing, and refunds.</p>
           </div>
           <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "flex-end" }}>
@@ -102,7 +102,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </div>
         <form action={updateCheckoutProviderAction} className="subpanel form-grid">
           <div>
-            <h3 style={{ fontSize: "1rem" }}>Checkout provider</h3>
+            <h3>Checkout provider</h3>
             <p style={{ color: "var(--muted)", margin: 0 }}>Choose which connected provider creates new public checkout sessions.</p>
             {selectedProviderDisconnected ? (
               <p className="error" style={{ marginTop: 8 }}>
@@ -180,7 +180,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
             </div>
             <form action={updateStripePaymentMethodsAction} className="subpanel form-grid">
               <div>
-                <h3 style={{ fontSize: "1rem" }}>Checkout methods</h3>
+                <h3>Checkout methods</h3>
                 <p style={{ color: "var(--muted)", margin: 0 }}>Choose which Stripe-backed options can appear at checkout.</p>
               </div>
               <div className="module-toggle-grid">
@@ -221,7 +221,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
       <form action={updateSettingsAction} className="card form-grid">
         <section className="subpanel form-grid">
-          <h2 style={{ fontSize: "1.2rem" }}>Business</h2>
+          <h2 className="compact-title">Business</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="businessName">Business name</label>
@@ -240,7 +240,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </section>
 
         <section className="subpanel form-grid">
-          <h2 style={{ fontSize: "1.2rem" }}>Theme and media</h2>
+          <h2 className="compact-title">Theme and media</h2>
           <div className="grid-3">
             <div className="field">
               <label htmlFor="themePreset">Style preset</label>
@@ -269,7 +269,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
         <section className="subpanel form-grid">
           <div>
-            <h2 style={{ fontSize: "1.2rem" }}>Analytics and privacy</h2>
+            <h2 className="compact-title">Analytics and privacy</h2>
             <p>Configure client-side adapter IDs and the server-enforced retention window. Consent UI remains a separate release gate.</p>
           </div>
           <div className="grid-2">
@@ -312,7 +312,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
         <section className="subpanel form-grid">
           <div>
-            <h2 style={{ fontSize: "1.2rem" }}>Modules</h2>
+            <h2 className="compact-title">Modules</h2>
             <p>Enabled modules appear in the sidebar. Required platform modules stay on so the admin shell remains reachable.</p>
           </div>
           <div className="module-toggle-grid">
@@ -347,14 +347,14 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
         <section className="subpanel form-grid">
           <div>
-            <h2 style={{ fontSize: "1.2rem" }}>Security and data foundations</h2>
+            <h2 className="compact-title">Security and data foundations</h2>
             <p>These schema and policy items track what is in place and what remains before multi-site rollout.</p>
           </div>
           {dataScopeModules.length ? (
             <div className="subpanel form-grid">
               <div className="grid-2">
                 <div>
-                  <h3 style={{ fontSize: "1rem" }}>Record access scope</h3>
+                  <h3>Record access scope</h3>
                   <p style={{ color: "var(--muted)", margin: 0 }}>
                     Choose whether constrained roles can see all records in a module or only records they own.
                   </p>
@@ -416,7 +416,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
       <section className="card form-grid" aria-label="Embeds and public API">
         <div>
-          <h2 style={{ fontSize: "1.2rem" }}>Embeds &amp; public API</h2>
+          <h2 className="compact-title">Embeds &amp; public API</h2>
           <p>
             Publishable keys let booking, gallery, and storefront widgets call the public API from another website.
             Browser use only works from the origins you list below, so widget keys are safe to ship in page source
@@ -476,7 +476,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         )}
 
         <form action={createSiteApiKeyAction} className="subpanel form-grid">
-          <h3 style={{ fontSize: "1rem" }}>Create an embed key</h3>
+          <h3>Create an embed key</h3>
           <div className="field">
             <label htmlFor="embedKeyName">Key name</label>
             <input id="embedKeyName" name="name" placeholder="Client marketing site" required />
@@ -484,7 +484,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           <div className="field">
             <label htmlFor="embedKeyOrigins">Allowed origins (one per line)</label>
             <textarea id="embedKeyOrigins" name="allowedOrigins" rows={3} placeholder="https://clientsite.com" />
-            <small style={{ color: "var(--muted)" }}>
+            <small className="muted-text">
               Browser widgets need every site origin they load on. Originless server calls are blocked unless enabled below.
             </small>
           </div>

@@ -35,16 +35,16 @@ export function AppointmentsTable({ bookings, timezone }: AppointmentsTableProps
                   <strong>{booking.customerName}</strong>
                 </Link>
                 <br />
-                <span style={{ color: "var(--muted)" }}>{booking.customerEmail}</span>
+                <span className="muted-text">{booking.customerEmail}</span>
               </td>
               <td>
                 {booking.service.name}
                 <br />
-                <span style={{ color: "var(--muted)" }}>{booking.staff?.name || "Any staff"}</span>
+                <span className="muted-text">{booking.staff?.name || "Any staff"}</span>
                 {booking.resources.length ? (
                   <>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{booking.resources.map((assignment) => assignment.resource.name).join(", ")}</span>
+                    <span className="muted-text">{booking.resources.map((assignment) => assignment.resource.name).join(", ")}</span>
                   </>
                 ) : null}
               </td>

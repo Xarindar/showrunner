@@ -134,7 +134,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
       <header className="page-header">
         <div>
           <p className="eyebrow">Portfolio</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Photography galleries and proofing</h1>
+          <h1>Photography galleries and proofing</h1>
           <p>Create public or private galleries, organize image records, issue access links, and prepare proofing workflows.</p>
         </div>
       </header>
@@ -146,21 +146,21 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
         <div className="card">
           <Camera size={22} />
           <h3>{publishedCount} published galleries</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Portfolio collections ready for public gallery and campaign surfaces.
           </p>
         </div>
         <div className="card">
           <KeyRound size={22} />
           <h3>{privateCount} private galleries</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Password or private-link collections for proofing and client delivery.
           </p>
         </div>
         <div className="card">
           <Star size={22} />
           <h3>{favoriteCount} favorites</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Client selections captured for approval, delivery, and future print workflows.
           </p>
         </div>
@@ -168,7 +168,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
 
       <section className="grid-2">
         <form action={createPortfolioGalleryAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Create gallery</h2>
+          <h2 className="section-title">Create gallery</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="gallery-title">Title</label>
@@ -272,7 +272,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
         </form>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Gallery queue</h2>
+          <h2 className="section-title">Gallery queue</h2>
           <table className="table">
             <thead>
               <tr>
@@ -287,14 +287,14 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                   <td>
                     <a href={`/admin/modules/portfolio?gallery=${gallery.id}`}>{gallery.title}</a>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>
+                    <span className="muted-text">
                       {gallery.slug} {gallery.category ? `- ${gallery.category}` : ""}
                     </span>
                   </td>
                   <td>
                     {gallery._count.items} items
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{gallery._count.accesses} access links</span>
+                    <span className="muted-text">{gallery._count.accesses} access links</span>
                   </td>
                   <td>
                     <span className={galleryStatusClass(gallery.status)}>{enumLabel(gallery.status)}</span>
@@ -314,9 +314,9 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
       {selectedGallery ? (
         <section className="grid-2">
           <div className="card stack">
-            <div className="page-header" style={{ marginBottom: 16 }}>
+            <div className="page-header compact-header">
               <div>
-                <h2 style={{ fontSize: "1.35rem" }}>{selectedGallery.title}</h2>
+                <h2 className="section-title">{selectedGallery.title}</h2>
                 <p>
                   {enumLabel(selectedGallery.visibility)} gallery with {selectedGallery.items.length} of {itemCount} portfolio items
                 </p>
@@ -363,7 +363,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                     {latestProofRound ? (
                       <>
                         <br />
-                        <span style={{ color: "var(--muted)" }}>
+                        <span className="muted-text">
                           Round {latestProofRound.roundNumber} - {enumLabel(latestProofRound.status)}
                         </span>
                       </>
@@ -421,7 +421,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
 
           <form action={addPortfolioGalleryItemAction} className="card form-grid">
             <input type="hidden" name="galleryId" value={selectedGallery.id} />
-            <h2 style={{ fontSize: "1.35rem" }}>Add image or delivery item</h2>
+            <h2 className="section-title">Add image or delivery item</h2>
             <div className="grid-2">
               <div className="field">
                 <label htmlFor="item-media">Uploaded media</label>
@@ -496,7 +496,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
         <section className="grid-2">
           <form action={createPortfolioProofRoundAction} className="card form-grid">
             <input type="hidden" name="galleryId" value={selectedGallery.id} />
-            <h2 style={{ fontSize: "1.35rem" }}>Start revision round</h2>
+            <h2 className="section-title">Start revision round</h2>
             <div className="grid-2">
               <div className="field">
                 <label htmlFor="round-title">Title</label>
@@ -518,7 +518,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
           </form>
 
           <div className="card stack">
-            <h2 style={{ fontSize: "1.35rem" }}>Proofing rounds</h2>
+            <h2 className="section-title">Proofing rounds</h2>
             <table className="table">
               <thead>
                 <tr>
@@ -534,14 +534,14 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                     <td>
                       <strong>{round.title || `Round ${round.roundNumber}`}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>
+                      <span className="muted-text">
                         Opened {formatDateTime(round.openedAt, settings.timezone)}
                       </span>
                     </td>
                     <td>
                       {round.decisions.length} decisions
                       <br />
-                      <span style={{ color: "var(--muted)" }}>
+                      <span className="muted-text">
                         {round.comments.length} comments - {round.approvals.length} responses
                       </span>
                     </td>
@@ -585,7 +585,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
       {selectedGallery ? (
         <section className="grid-2">
           <div className="card stack">
-            <h2 style={{ fontSize: "1.35rem" }}>Gallery items</h2>
+            <h2 className="section-title">Gallery items</h2>
             <div className="grid-3">
               {selectedGallery.items.map((item) => (
                 <div className="asset-tile" key={item.id}>
@@ -615,7 +615,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
           </div>
 
           <div className="card stack">
-            <h2 style={{ fontSize: "1.35rem" }}>Recent favorites</h2>
+            <h2 className="section-title">Recent favorites</h2>
             <table className="table">
               <thead>
                 <tr>
@@ -646,7 +646,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
       {selectedGallery ? (
         <section className="grid-2">
           <div className="card stack">
-            <h2 style={{ fontSize: "1.35rem" }}>Proof decisions and comments</h2>
+            <h2 className="section-title">Proof decisions and comments</h2>
             {!latestProofRound ? <p className="empty-state">No proofing round selected.</p> : null}
             {latestProofRound ? (
               <table className="table">
@@ -677,12 +677,12 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             ) : null}
             {latestProofRound?.comments.length ? (
               <div className="stack">
-                <h3 style={{ fontSize: "1rem" }}>Recent proof comments</h3>
+                <h3>Recent proof comments</h3>
                 {latestProofRound.comments.slice(0, 8).map((comment) => (
                   <div className="subpanel" key={comment.id}>
                     <strong>{comment.item?.title || comment.item?.imageUrl || "Round comment"}</strong>
                     <p style={{ margin: "6px 0" }}>{comment.body}</p>
-                    <small style={{ color: "var(--muted)" }}>
+                    <small className="muted-text">
                       {comment.authorName || comment.viewerEmail || "Viewer"} - {formatDateTime(comment.createdAt, settings.timezone)}
                     </small>
                   </div>
@@ -692,14 +692,14 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
           </div>
 
           <div className="card stack">
-            <h2 style={{ fontSize: "1.35rem" }}>Selected image export</h2>
+            <h2 className="section-title">Selected image export</h2>
             <textarea
               readOnly
               rows={Math.max(6, Math.min(14, selectedImageExport.length + 1))}
               value={selectedImageExport.map((entry) => `${entry.source},${entry.viewer},${entry.item}`).join("\n")}
             />
             <div className="subpanel stack">
-              <h3 style={{ fontSize: "1rem" }}>Delivery bundle</h3>
+              <h3>Delivery bundle</h3>
               <p style={{ color: "var(--muted)" }}>
                 {selectedDownloadableCount} media-backed downloadable item{selectedDownloadableCount === 1 ? "" : "s"} ready for a ZIP delivery bundle.
               </p>
@@ -726,12 +726,12 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               )}
             </div>
             <div className="stack">
-              <h3 style={{ fontSize: "1rem" }}>Round responses</h3>
+              <h3>Round responses</h3>
               {latestProofRound?.approvals.map((approval) => (
                 <div className="subpanel" key={approval.id}>
                   <strong>{enumLabel(approval.status)}</strong>
                   <p style={{ margin: "6px 0" }}>{approval.notes || "-"}</p>
-                  <small style={{ color: "var(--muted)" }}>
+                  <small className="muted-text">
                     {approval.approverName || approval.viewerEmail || "Viewer"} - {formatDateTime(approval.createdAt, settings.timezone)}
                   </small>
                 </div>
@@ -746,7 +746,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
         <section className="grid-2">
           <form action={createPortfolioAccessAction} className="card form-grid">
             <input type="hidden" name="galleryId" value={selectedGallery.id} />
-            <h2 style={{ fontSize: "1.35rem" }}>Create private access</h2>
+            <h2 className="section-title">Create private access</h2>
             <div className="grid-2">
               <div className="field">
                 <label htmlFor="access-client">Client</label>
@@ -780,7 +780,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
           </form>
 
           <div className="card stack">
-            <h2 style={{ fontSize: "1.35rem" }}>Access links</h2>
+            <h2 className="section-title">Access links</h2>
             <table className="table">
               <thead>
                 <tr>
@@ -796,7 +796,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                     <td>
                       {access.recipientEmail}
                       <br />
-                      <span style={{ color: "var(--muted)" }}>
+                      <span className="muted-text">
                         {access.expiresAt ? `Expires ${formatDateTime(access.expiresAt, settings.timezone)}` : "No expiry"}
                       </span>
                     </td>
@@ -805,7 +805,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                         Open access route
                       </a>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{access.accessToken}</span>
+                      <span className="muted-text">{access.accessToken}</span>
                     </td>
                     <td>
                       <span className={accessStatusClass(access.status)}>{enumLabel(access.status)}</span>

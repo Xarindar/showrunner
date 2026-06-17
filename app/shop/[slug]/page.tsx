@@ -163,7 +163,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           <div className="card stack">
             <div>
               <p className="eyebrow">Product</p>
-              <h1 style={{ fontSize: "2.4rem" }}>{product.name}</h1>
+              <h1>{product.name}</h1>
               <p className="lead">{product.summary || product.description}</p>
             </div>
 
@@ -247,7 +247,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
             {product.description && product.description !== product.summary ? (
               <div className="subpanel">
-                <h2 style={{ fontSize: "1.2rem" }}>Details</h2>
+                <h2 className="compact-title">Details</h2>
                 <p>{product.description}</p>
               </div>
             ) : null}

@@ -91,7 +91,7 @@ export default async function BookingSelfServicePage({ params, searchParams }: B
 
         <section className="grid-2">
           <div className="card">
-            <h2 style={{ fontSize: "1.35rem" }}>Current appointment</h2>
+            <h2 className="section-title">Current appointment</h2>
             <table className="table">
               <tbody>
                 <tr>
@@ -135,7 +135,7 @@ export default async function BookingSelfServicePage({ params, searchParams }: B
                   <td>
                     {booking.customerName}
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{booking.customerEmail}</span>
+                    <span className="muted-text">{booking.customerEmail}</span>
                   </td>
                 </tr>
               </tbody>
@@ -151,7 +151,7 @@ export default async function BookingSelfServicePage({ params, searchParams }: B
         </section>
 
         <section className="card">
-          <h2 style={{ fontSize: "1.35rem" }}>Appointment history</h2>
+          <h2 className="section-title">Appointment history</h2>
           <table className="table">
             <thead>
               <tr>

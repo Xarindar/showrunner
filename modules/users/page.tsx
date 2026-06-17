@@ -35,7 +35,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       <header className="page-header">
         <div>
           <p className="eyebrow">Users</p>
-          <h1 style={{ fontSize: "2.2rem" }}>Admin access</h1>
+          <h1>Admin access</h1>
           <p>Owner-managed admin accounts, role assignment, and access changes.</p>
         </div>
       </header>
@@ -45,15 +45,15 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
 
       <section className="grid-3" aria-label="Access summary">
         <div className="card">
-          <h2 style={{ fontSize: "1.1rem" }}>Admins</h2>
+          <h2 className="compact-title">Admins</h2>
           <p>{users.length} active admin accounts.</p>
         </div>
         <div className="card">
-          <h2 style={{ fontSize: "1.1rem" }}>Owners</h2>
+          <h2 className="compact-title">Owners</h2>
           <p>{ownerCount} owner account{ownerCount === 1 ? "" : "s"} with role-management access.</p>
         </div>
         <div className="card">
-          <h2 style={{ fontSize: "1.1rem" }}>Current role</h2>
+          <h2 className="compact-title">Current role</h2>
           <p>{enumLabel(actor.role)}</p>
         </div>
       </section>
@@ -61,7 +61,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       <section className="card form-grid">
         <div>
           <p className="eyebrow">Create admin</p>
-          <h2 style={{ fontSize: "1.3rem" }}>Invite with a temporary password</h2>
+          <h2 className="section-title">Invite with a temporary password</h2>
         </div>
         <form action={createAdminUserAction} className="grid-3">
           <div className="field">
@@ -82,7 +82,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
               ))}
             </select>
           </div>
-          <div className="field" style={{ justifyContent: "end" }}>
+          <div className="field field-end">
             <button className="button" type="submit">
               <UserPlus size={16} />
               Create admin
@@ -92,10 +92,10 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       </section>
 
       <section className="card">
-        <div className="page-header" style={{ marginBottom: 14 }}>
+        <div className="page-header compact-header">
           <div>
             <p className="eyebrow">Role assignments</p>
-            <h2 style={{ fontSize: "1.3rem" }}>Admin users</h2>
+            <h2 className="section-title">Admin users</h2>
           </div>
         </div>
 

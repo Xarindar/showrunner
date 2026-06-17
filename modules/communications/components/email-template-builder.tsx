@@ -321,7 +321,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
         <Type size={16} />
         Sync text fallback
       </button>
-      <small style={{ color: "var(--muted)" }}>
+      <small className="muted-text">
         Required tokens: {props.requiredTokens.join(", ") || "none"}. Available tokens: {props.availableTokens.join(", ") || "none"}.
       </small>
     </div>

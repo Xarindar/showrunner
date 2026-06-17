@@ -13,7 +13,7 @@ export function RemindersPanel({ enabled, leadMinutes }: RemindersPanelProps) {
     <section className="card form-grid">
       <div>
         <p className="eyebrow">Notifications</p>
-        <h2 style={{ fontSize: "1.35rem" }}>Booking reminders</h2>
+        <h2 className="section-title">Booking reminders</h2>
       </div>
       <form action={updateReminderSettingsAction} className="grid-2">
         <label style={{ alignItems: "center", display: "flex", gap: 8 }}>

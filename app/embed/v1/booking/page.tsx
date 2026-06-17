@@ -202,11 +202,12 @@ export default async function EmbedBookingPage({ searchParams }: EmbedBookingPag
       <style
         dangerouslySetInnerHTML={{
           __html: `
-            html,body{background:#fff;margin:0;min-height:0;}
-            body{background:#fff;}
-            .embed-booking-page{background:#fff;color:#111827;margin:0;min-height:0;padding:0;}
-            .embed-booking-shell{margin:0 auto;max-width:720px;padding:0;}
-            .embed-booking-error{box-sizing:border-box;color:#991b1b;font:14px/1.4 system-ui,sans-serif;padding:12px;}
+            :root{--color-page:#fff;--color-surface:#fff;--color-text:#111827;--color-muted:#6b7280;--color-border:#e5e7eb;--color-danger:#991b1b;--radius-card:8px;--space-3:12px;--space-4:16px;--font-sans:system-ui,sans-serif;}
+            html,body{background:var(--color-page);margin:0;min-height:0;}
+            body{background:var(--color-page);}
+            .embed-booking-page{background:var(--color-page);color:var(--color-text);font-family:var(--font-sans);margin:0;min-height:0;padding:0;}
+            .embed-booking-shell{margin:0 auto;max-width:720px;min-height:360px;padding:0;}
+            .embed-booking-error{background:color-mix(in srgb,var(--color-danger) 8%,var(--color-surface));border:1px solid color-mix(in srgb,var(--color-danger) 28%,transparent);border-radius:var(--radius-card);box-sizing:border-box;color:var(--color-danger);font:14px/1.4 var(--font-sans);margin:0;min-height:96px;padding:var(--space-4);}
             showrunner-booking{display:block;width:100%;}
           `
         }}

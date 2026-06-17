@@ -84,7 +84,7 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
                 <Star size={20} />
                 <p style={{ fontSize: "1.08rem", lineHeight: 1.7 }}>&quot;{testimonial.quote}&quot;</p>
                 <strong>{testimonial.authorName}</strong>
-                <span style={{ color: "var(--muted)" }}>
+                <span className="muted-text">
                   {testimonial.authorRole || testimonial.serviceName || testimonial.source} · {testimonial.rating}/5
                 </span>
               </article>
@@ -104,7 +104,7 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
             <div>
               <MessageSquare size={22} />
               <h2 style={{ fontSize: "1.35rem", marginTop: 12 }}>Share a testimonial</h2>
-              <p className="lead" style={{ fontSize: "0.95rem" }}>
+              <p className="lead lead-compact">
                 New submissions go to the admin queue before public display.
               </p>
             </div>

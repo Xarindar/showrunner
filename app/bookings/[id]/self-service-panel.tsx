@@ -61,7 +61,7 @@ export function SelfServicePanel({ bookingId, canManage, defaultDate, token }: S
 
   return (
     <div className="card form-grid">
-      <h2 style={{ fontSize: "1.35rem" }}>Manage appointment</h2>
+      <h2 className="section-title">Manage appointment</h2>
       {!canManage ? <p>This appointment can no longer be changed online.</p> : null}
 
       {canManage ? (

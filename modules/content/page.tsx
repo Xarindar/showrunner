@@ -19,7 +19,7 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
       <header className="page-header">
         <div>
           <p className="eyebrow">Content</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Editable public content</h1>
+          <h1>Editable public content</h1>
           <p>Keep this intentionally simple so clients can change copy and imagery without changing layout.</p>
         </div>
       </header>
@@ -64,12 +64,12 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
       <section className="grid-2" aria-label="Content readiness">
         <div className="card">
           <span className="pill warning">Partial</span>
-          <h2 style={{ fontSize: "1.2rem" }}>Current content scope</h2>
+          <h2 className="compact-title">Current content scope</h2>
           <p>{manifest.readiness.summary}</p>
         </div>
         <div className="card">
           <span className="pill">Planned</span>
-          <h2 style={{ fontSize: "1.2rem" }}>SEO foundation</h2>
+          <h2 className="compact-title">SEO foundation</h2>
           <p>{manifest.readiness.primaryGap}</p>
         </div>
       </section>

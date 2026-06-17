@@ -111,7 +111,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
       <header className="page-header">
         <div>
           <p className="eyebrow">Automation</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Rules, runs, and webhooks</h1>
+          <h1>Rules, runs, and webhooks</h1>
           <p>Define trigger-action rules, keep run records, and prepare signed outbound webhooks for integrations.</p>
         </div>
       </header>
@@ -123,21 +123,21 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
         <div className="card">
           <Workflow size={22} />
           <h3>{activeCount} active rules</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Trigger-action rules that can be wired into booking, forms, commerce, billing, and gallery events.
           </p>
         </div>
         <div className="card">
           <Play size={22} />
           <h3>{runCount} run records</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Live event matches, queued executors, and {deadLetterCount} dead-lettered runs.
           </p>
         </div>
         <div className="card">
           <Webhook size={22} />
           <h3>{endpoints.length} webhook endpoints</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Destinations ready for signed outbound event delivery.
           </p>
         </div>
@@ -145,7 +145,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
 
       <section className="grid-2">
         <form action={createAutomationAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Create automation</h2>
+          <h2 className="section-title">Create automation</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="automation-name">Name</label>
@@ -238,7 +238,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
         </form>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Automation rules</h2>
+          <h2 className="section-title">Automation rules</h2>
           <table className="table">
             <thead>
               <tr>
@@ -254,7 +254,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                   <td>
                     <a href={`/admin/modules/automation?automation=${automation.id}`}>{automation.name}</a>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{automation._count.runs} runs</span>
+                    <span className="muted-text">{automation._count.runs} runs</span>
                   </td>
                   <td>{enumLabel(automation.trigger)}</td>
                   <td>{enumLabel(automation.action)}</td>
@@ -281,7 +281,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
               return (
                 <form action={updateAutomationAction} className="subpanel form-grid">
                   <input type="hidden" name="id" value={selectedAutomation.id} />
-                  <h3 style={{ fontSize: "1.05rem" }}>Edit automation</h3>
+                  <h3 className="subsection-title">Edit automation</h3>
                   <div className="grid-2">
                     <div className="field">
                       <label htmlFor={`automation-${selectedAutomation.id}-name`}>Name</label>
@@ -387,9 +387,9 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                 </form>
               );
             })()}
-            <div className="page-header" style={{ marginBottom: 16 }}>
+            <div className="page-header compact-header">
               <div>
-                <h2 style={{ fontSize: "1.35rem" }}>{selectedAutomation.name}</h2>
+                <h2 className="section-title">{selectedAutomation.name}</h2>
                 <p>
                   {enumLabel(selectedAutomation.trigger)} -&gt; {enumLabel(selectedAutomation.action)}
                 </p>
@@ -409,7 +409,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
             </div>
             <form action={recordAutomationRunAction} className="subpanel form-grid">
               <input type="hidden" name="automationId" value={selectedAutomation.id} />
-              <h3 style={{ fontSize: "1.05rem" }}>Record manual run</h3>
+              <h3 className="subsection-title">Record manual run</h3>
               <div className="grid-2">
                 <div className="field">
                   <label htmlFor="run-status">Status</label>
@@ -457,7 +457,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
           </div>
 
           <div className="card stack">
-            <h2 style={{ fontSize: "1.35rem" }}>Run history</h2>
+            <h2 className="section-title">Run history</h2>
             <table className="table">
               <thead>
                 <tr>
@@ -483,7 +483,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                     <td>
                       {run.summary || run.triggerKey || "No summary"}
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{run.relatedType || "No related record"}</span>
+                      <span className="muted-text">{run.relatedType || "No related record"}</span>
                     </td>
                     <td>{formatDateTime(run.createdAt, settings.timezone)}</td>
                   </tr>
@@ -501,7 +501,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
 
       <section className="grid-2">
         <form action={createWebhookEndpointAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Create webhook endpoint</h2>
+          <h2 className="section-title">Create webhook endpoint</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="webhook-name">Name</label>
@@ -538,7 +538,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
         </form>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Webhook endpoints</h2>
+          <h2 className="section-title">Webhook endpoints</h2>
           <table className="table">
             <thead>
               <tr>
@@ -554,7 +554,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                   <td>
                     <strong>{endpoint.name}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{endpoint.url}</span>
+                    <span className="muted-text">{endpoint.url}</span>
                   </td>
                   <td>{stringArrayCsv(endpoint.events) || "No events"}</td>
                   <td>
@@ -623,7 +623,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
 
       <section className="grid-2">
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Automation tasks</h2>
+          <h2 className="section-title">Automation tasks</h2>
           <table className="table">
             <thead>
               <tr>
@@ -638,12 +638,12 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                   <td>
                     <strong>{task.title}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{task.assignedToEmail || task.actorEmail || "Unassigned"}</span>
+                    <span className="muted-text">{task.assignedToEmail || task.actorEmail || "Unassigned"}</span>
                   </td>
                   <td>
                     {task.relatedType || "No related record"}
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{task.relatedId}</span>
+                    <span className="muted-text">{task.relatedId}</span>
                   </td>
                   <td>
                     <span className={runStatusClass(task.status)}>{enumLabel(task.status)}</span>
@@ -660,7 +660,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
         </div>
 
         <form action={recordWebhookDeliveryAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Record manual webhook delivery</h2>
+          <h2 className="section-title">Record manual webhook delivery</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="delivery-endpoint">Endpoint</label>
@@ -709,7 +709,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
         </form>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Webhook delivery records</h2>
+          <h2 className="section-title">Webhook delivery records</h2>
           <table className="table">
             <thead>
               <tr>
@@ -725,7 +725,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                   <td>
                     {delivery.webhookEndpoint?.name || delivery.automation?.name || "Manual delivery"}
                     <br />
-                    <span style={{ color: "var(--muted)" }}>
+                    <span className="muted-text">
                       {delivery.targetUrl || delivery.webhookEndpoint?.url || delivery.automation?.webhookUrl || "No target URL"}
                     </span>
                   </td>

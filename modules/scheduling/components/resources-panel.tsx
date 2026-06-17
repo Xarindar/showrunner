@@ -12,7 +12,7 @@ export function ResourcesPanel({ assignedResourceIds, resources, resourceIdsWith
   return (
     <section className="grid-2">
       <form action={createResourceAction} className="card form-grid">
-        <h2 style={{ fontSize: "1.35rem" }}>Add resource</h2>
+        <h2 className="section-title">Add resource</h2>
         <div className="grid-2">
           <div className="field">
             <label htmlFor="resource-name">Name</label>
@@ -48,7 +48,7 @@ export function ResourcesPanel({ assignedResourceIds, resources, resourceIdsWith
       </form>
 
       <div className="card">
-        <h2 style={{ fontSize: "1.35rem" }}>Rooms and equipment</h2>
+        <h2 className="section-title">Rooms and equipment</h2>
         <div className="stack">
           {resources.map((resource) => {
             const needsAvailability =

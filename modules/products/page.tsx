@@ -147,7 +147,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       <header className="page-header">
         <div>
           <p className="eyebrow">Products</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Commerce catalog</h1>
+          <h1>Commerce catalog</h1>
           <p>Manage products, variants, collections, coupons, orders, and checkout status.</p>
         </div>
       </header>
@@ -159,30 +159,30 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         <div className="card">
           <PackagePlus size={22} />
           <h3>{activeCount} active products</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Items available to the public storefront and cart.
           </p>
         </div>
         <div className="card">
           <Boxes size={22} />
           <h3>{collections.length} collections</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Group products for shops, galleries, packages, and featured blocks.
           </p>
         </div>
         <div className="card">
           <BadgeDollarSign size={22} />
           <h3>{currencyTotalsLabel(paidOrderTotals)}</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Paid and fulfilled total across {orderCount} order records and {openCartCount} open carts.
           </p>
         </div>
       </section>
 
       <section className="card form-grid">
-        <div className="page-header" style={{ marginBottom: 0, minHeight: 0 }}>
+        <div className="page-header flush-header">
           <div>
-            <h2 style={{ fontSize: "1.35rem" }}>Checkout totals</h2>
+            <h2 className="section-title">Checkout totals</h2>
             <p>Configure the per-site tax rule and standard shipping option used by cart, orders, and hosted checkout.</p>
           </div>
           <CreditCard size={22} />
@@ -190,7 +190,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         <form action={updateCommerceCheckoutSettingsAction} className="form-grid">
           <div className="grid-2">
             <div className="subpanel form-grid">
-              <h3 style={{ fontSize: "1.05rem" }}>Tax</h3>
+              <h3 className="subsection-title">Tax</h3>
               <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
                 <input name="commerceTaxEnabled" type="checkbox" defaultChecked={settings.commerceTaxEnabled} />
                 Enable tax
@@ -212,7 +212,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             </div>
 
             <div className="subpanel form-grid">
-              <h3 style={{ fontSize: "1.05rem" }}>Shipping</h3>
+              <h3 className="subsection-title">Shipping</h3>
               <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
                 <input name="commerceShippingEnabled" type="checkbox" defaultChecked={settings.commerceShippingEnabled} />
                 Enable standard shipping
@@ -251,7 +251,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
       <section className="grid-2">
         <form action={createProductAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Add product</h2>
+          <h2 className="section-title">Add product</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="name">Name</label>
@@ -330,7 +330,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               <input id="inventoryQuantity" name="inventoryQuantity" min="0" type="number" />
             </div>
           </div>
-          <p className="lead" style={{ fontSize: "0.9rem" }}>
+          <p className="lead lead-compact">
             Inventory is governed per variant. This product-level value seeds and mirrors the default variant.
           </p>
           <button className="button" type="submit">
@@ -340,9 +340,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </form>
 
         <div className="card">
-          <div className="page-header" style={{ marginBottom: 16 }}>
+          <div className="page-header compact-header">
             <div>
-              <h2 style={{ fontSize: "1.35rem" }}>Catalog list</h2>
+              <h2 className="section-title">Catalog list</h2>
               <p>{productCount} matching products</p>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -368,12 +368,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   <td>
                     <strong>{product.name}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>/shop/{product.slug}</span>
+                    <span className="muted-text">/shop/{product.slug}</span>
                   </td>
                   <td>
                     {formatMoney(product.basePriceCents, product.currency)}
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{product.variants.length} variants</span>
+                    <span className="muted-text">{product.variants.length} variants</span>
                   </td>
                   <td>
                     <span className={productStatusClass(product.status)}>{product.status.toLowerCase()}</span>
@@ -426,7 +426,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       {selectedProduct ? (
         <section className="grid-2">
           <form action={updateProductAction} className="card form-grid">
-            <h2 style={{ fontSize: "1.35rem" }}>Edit selected product</h2>
+            <h2 className="section-title">Edit selected product</h2>
             <input type="hidden" name="id" value={selectedProduct.id} />
             <div className="grid-2">
               <div className="field">
@@ -512,7 +512,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 />
               </div>
             </div>
-            <p className="lead" style={{ fontSize: "0.9rem" }}>
+            <p className="lead lead-compact">
               Inventory is governed per variant. Saving this product syncs price, status, SKU, and inventory to the default variant.
             </p>
             <button className="button" type="submit">
@@ -522,7 +522,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
           <div className="card stack">
             <div>
-              <h2 style={{ fontSize: "1.35rem" }}>Variants for {selectedProduct.name}</h2>
+              <h2 className="section-title">Variants for {selectedProduct.name}</h2>
               <p style={{ color: "var(--muted)" }}>Variants let the same product support sizes, packages, print formats, or add-on choices.</p>
             </div>
             <table className="table">
@@ -540,7 +540,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     <td>
                       <strong>{variant.name}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{variant.sku || "No SKU"}</span>
+                      <span className="muted-text">{variant.sku || "No SKU"}</span>
                     </td>
                     <td>
                       {variant.optionName || "Default"}
@@ -556,7 +556,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             </table>
             <form action={createProductVariantAction} className="subpanel form-grid">
               <input type="hidden" name="productId" value={selectedProduct.id} />
-              <h3 style={{ fontSize: "1.05rem" }}>Add variant</h3>
+              <h3 className="subsection-title">Add variant</h3>
               <div className="grid-2">
                 <div className="field">
                   <label htmlFor="variantName">Name</label>
@@ -615,9 +615,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
       <section className="grid-2">
         <div className="card stack">
-          <div className="page-header" style={{ marginBottom: 16 }}>
+          <div className="page-header compact-header">
             <div>
-              <h2 style={{ fontSize: "1.35rem" }}>Orders and payments</h2>
+              <h2 className="section-title">Orders and payments</h2>
               <p>{orders.length} recent orders from storefront cart checkout prep.</p>
             </div>
             <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -648,14 +648,14 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       <strong>{order.orderNumber}</strong>
                     </a>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>
+                    <span className="muted-text">
                       {order._count.items} items - {formatDateTime(order.placedAt || order.createdAt)}
                     </span>
                   </td>
                   <td>
                     <strong>{order.customerName}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{order.customerEmail}</span>
+                    <span className="muted-text">{order.customerEmail}</span>
                   </td>
                   <td>{formatMoney(order.totalCents, order.currency)}</td>
                   <td>
@@ -674,9 +674,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
         {selectedOrder ? (
           <div className="card stack">
-            <div className="page-header" style={{ marginBottom: 16 }}>
+            <div className="page-header compact-header">
               <div>
-                <h2 style={{ fontSize: "1.35rem" }}>{selectedOrder.orderNumber}</h2>
+                <h2 className="section-title">{selectedOrder.orderNumber}</h2>
                 <p>
                   {selectedOrder.customerName} - {selectedOrder.customerEmail}
                 </p>
@@ -709,7 +709,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     {selectedOrder.giftCard ? (
                       <>
                         <br />
-                        <span style={{ color: "var(--muted)" }}>{selectedOrder.giftCard.code}</span>
+                        <span className="muted-text">{selectedOrder.giftCard.code}</span>
                       </>
                     ) : null}
                   </td>
@@ -749,9 +749,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             </div>
 
             <div className="subpanel form-grid">
-              <div className="page-header" style={{ marginBottom: 0, minHeight: 0 }}>
+              <div className="page-header flush-header">
                 <div>
-                  <h3 style={{ fontSize: "1.05rem" }}>Fulfillment export and print lab</h3>
+                  <h3 className="subsection-title">Fulfillment export and print lab</h3>
                   <p>
                     {selectedOrderHasPhysicalItems
                       ? "Track CSV handoff batches and print lab references for physical items."
@@ -855,9 +855,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             </div>
 
             <div className="subpanel form-grid">
-              <div className="page-header" style={{ marginBottom: 0, minHeight: 0 }}>
+              <div className="page-header flush-header">
                 <div>
-                  <h3 style={{ fontSize: "1.05rem" }}>Fulfillment</h3>
+                  <h3 className="subsection-title">Fulfillment</h3>
                   <p>
                     {selectedOrder.fulfilledAt
                       ? `Fulfilled ${formatDateTime(selectedOrder.fulfilledAt, settings.timezone)}`
@@ -904,9 +904,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             </div>
 
             <div className="subpanel form-grid">
-              <div className="page-header" style={{ marginBottom: 0, minHeight: 0 }}>
+              <div className="page-header flush-header">
                 <div>
-                  <h3 style={{ fontSize: "1.05rem" }}>Hosted checkout</h3>
+                  <h3 className="subsection-title">Hosted checkout</h3>
                   <p>{selectedOrder.checkoutUrl ? "Stripe Checkout link attached." : "No Stripe Checkout link attached."}</p>
                 </div>
                 {selectedOrder.checkoutUrl ? (
@@ -960,7 +960,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             </div>
 
             <div className="subpanel">
-              <h3 style={{ fontSize: "1.05rem" }}>Items</h3>
+              <h3 className="subsection-title">Items</h3>
               <table className="table">
                 <thead>
                   <tr>
@@ -975,7 +975,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       <td>
                         <strong>{item.name}</strong>
                         <br />
-                        <span style={{ color: "var(--muted)" }}>{item.sku || item.product.sku || "No SKU"}</span>
+                        <span className="muted-text">{item.sku || item.product.sku || "No SKU"}</span>
                       </td>
                       <td>{item.quantity}</td>
                       <td>{formatMoney(item.lineTotalCents, selectedOrder.currency)}</td>
@@ -986,7 +986,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             </div>
 
             <div className="subpanel">
-              <h3 style={{ fontSize: "1.05rem" }}>Payment records</h3>
+              <h3 className="subsection-title">Payment records</h3>
               <table className="table">
                 <thead>
                   <tr>
@@ -1005,7 +1005,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                         <td>
                           <strong>{enumLabel(payment.provider)}</strong>
                           <br />
-                          <span style={{ color: "var(--muted)" }}>{payment.externalCheckoutSession || payment.externalPaymentId || "No reference"}</span>
+                          <span className="muted-text">{payment.externalCheckoutSession || payment.externalPaymentId || "No reference"}</span>
                         </td>
                         <td>{enumLabel(payment.status)}</td>
                         <td>
@@ -1013,7 +1013,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                           {payment.refundedCents > 0 ? (
                             <>
                               <br />
-                              <span style={{ color: "var(--muted)" }}>{formatMoney(payment.refundedCents, payment.currency)} refunded</span>
+                              <span className="muted-text">{formatMoney(payment.refundedCents, payment.currency)} refunded</span>
                             </>
                           ) : null}
                         </td>
@@ -1054,8 +1054,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         ) : (
           <div className="card">
             <ReceiptText size={22} />
-            <h2 style={{ fontSize: "1.35rem" }}>No selected order</h2>
-            <p className="lead" style={{ fontSize: "0.95rem" }}>
+            <h2 className="section-title">No selected order</h2>
+            <p className="lead lead-compact">
               Orders appear here after a public cart is prepared for hosted checkout.
             </p>
           </div>
@@ -1064,7 +1064,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
       <section className="grid-2">
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Collections</h2>
+          <h2 className="section-title">Collections</h2>
           <form action={createCollectionAction} className="subpanel form-grid">
             <div className="grid-2">
               <div className="field">
@@ -1137,7 +1137,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   <td>
                     <strong>{collection.name}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>/shop/collections/{collection.slug}</span>
+                    <span className="muted-text">/shop/collections/{collection.slug}</span>
                   </td>
                   <td>
                     <span className={productStatusClass(collection.status)}>{collection.status.toLowerCase()}</span>
@@ -1150,7 +1150,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </div>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Coupons</h2>
+          <h2 className="section-title">Coupons</h2>
           <form action={createCouponAction} className="subpanel form-grid">
             <div className="grid-3">
               <div className="field">
@@ -1201,7 +1201,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   <td>
                     <strong>{coupon.code}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{coupon.redemptionCount} redemptions</span>
+                    <span className="muted-text">{coupon.redemptionCount} redemptions</span>
                   </td>
                   <td>
                     {coupon.type === CouponType.PERCENT
@@ -1222,7 +1222,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           </table>
 
           <div className="subpanel form-grid">
-            <h3 style={{ fontSize: "1.05rem" }}>Issue gift card</h3>
+            <h3 className="subsection-title">Issue gift card</h3>
             <form action={createGiftCardAction} className="form-grid">
               <div className="grid-3">
                 <div className="field">
@@ -1288,14 +1288,14 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   <td>
                     <strong>{giftCard.code}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>
+                    <span className="muted-text">
                       {giftCard.recipientEmail || giftCard.recipientName || "No recipient"}
                     </span>
                   </td>
                   <td>
                     {formatMoney(giftCard.balanceCents, giftCard.currency)}
                     <br />
-                    <span style={{ color: "var(--muted)" }}>of {formatMoney(giftCard.initialAmountCents, giftCard.currency)}</span>
+                    <span className="muted-text">of {formatMoney(giftCard.initialAmountCents, giftCard.currency)}</span>
                   </td>
                   <td>
                     <span className={giftCard.status === GiftCardStatus.ACTIVE ? "pill success" : "pill danger"}>

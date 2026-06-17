@@ -243,7 +243,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
       <header className="page-header">
         <div>
           <p className="eyebrow">Communications</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Messages and delivery records</h1>
+          <h1>Messages and delivery records</h1>
           <p>Email templates, manual delivery logs, and suppression controls for transactional and marketing guardrails.</p>
         </div>
       </header>
@@ -255,21 +255,21 @@ export default async function CommunicationsPage({ searchParams }: Communication
         <div className="card">
           <Mail size={22} />
           <h3>{activeTemplateCount} active templates</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Ready for booking, order, invoice, form, and admin notification flows.
           </p>
         </div>
         <div className="card">
           <MessageSquareText size={22} />
           <h3>{sentCount} sent emails</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Actual outbox rows marked sent by the email processor.
           </p>
         </div>
         <div className="card">
           <ShieldOff size={22} />
           <h3>{suppressedCount} suppressed</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Contacts that should not receive marketing or nonessential messages.
           </p>
         </div>
@@ -277,7 +277,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
 
       <section className="grid-2">
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Visual email builder</h2>
+          <h2 className="section-title">Visual email builder</h2>
           <p>
             The single editor for every email — booking, order, invoice, form, and admin notifications. Build the HTML from structured blocks
             while keeping a required text fallback, with version history per template.
@@ -294,7 +294,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                   <span>
                     <strong>{template.name}</strong>
                     <br />
-                    <small style={{ color: "var(--muted)" }}>{template.key || enumLabel(template.purpose)}</small>
+                    <small className="muted-text">{template.key || enumLabel(template.purpose)}</small>
                   </span>
                   <span className={hasBuilderJson(template.builderJson) ? "pill success" : "pill"}>
                     {hasBuilderJson(template.builderJson) ? "builder" : "text"}
@@ -328,7 +328,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                   </button>
                 </form>
                 <div className="subpanel stack" style={{ marginTop: 16 }}>
-                  <h3 style={{ fontSize: "1.05rem" }}>Version history</h3>
+                  <h3 className="subsection-title">Version history</h3>
                   {(versionsByTemplateId.get(template.id) || []).slice(0, 5).map((version) => (
                     <form action={restoreMessageTemplateVersionAction} className="grid-2" key={version.id}>
                       <input type="hidden" name="templateId" value={template.id} />
@@ -336,7 +336,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                       <div>
                         <strong>Version {version.version}</strong>
                         <br />
-                        <small style={{ color: "var(--muted)" }}>
+                        <small className="muted-text">
                           {formatDateTime(version.createdAt, settings.timezone)} {version.note ? `- ${version.note}` : ""}
                         </small>
                       </div>
@@ -353,7 +353,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                     </form>
                   ))}
                   {!(versionsByTemplateId.get(template.id) || []).length ? (
-                    <small style={{ color: "var(--muted)" }}>Versions appear after the first save.</small>
+                    <small className="muted-text">Versions appear after the first save.</small>
                   ) : null}
                 </div>
               </details>
@@ -363,7 +363,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
         </div>
 
         <form action={createMessageTemplateAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Create manual template</h2>
+          <h2 className="section-title">Create manual template</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="template-name">Name</label>
@@ -415,7 +415,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
         </form>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Template library</h2>
+          <h2 className="section-title">Template library</h2>
           <table className="table">
             <thead>
               <tr>
@@ -431,14 +431,14 @@ export default async function CommunicationsPage({ searchParams }: Communication
                   <td>
                     <strong>{template.name}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>
+                    <span className="muted-text">
                       {template.key ? `System key: ${template.key}` : stringArrayCsv(template.tokens) || "No token allowlist"}
                     </span>
                   </td>
                   <td>
                     {enumLabel(template.purpose)}
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{enumLabel(template.channel)}</span>
+                    <span className="muted-text">{enumLabel(template.channel)}</span>
                   </td>
                   <td>
                     <span className={template.isActive ? "pill success" : "pill danger"}>{template.isActive ? "active" : "inactive"}</span>
@@ -480,7 +480,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
 
       <section className="grid-2">
         <form action="/admin/modules/communications" method="get" className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Preview template</h2>
+          <h2 className="section-title">Preview template</h2>
           <div className="field">
             <label htmlFor="preview-template">Template</label>
             <select id="preview-template" name="previewTemplate" defaultValue={previewTemplate?.id || ""}>
@@ -511,7 +511,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
         </form>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Rendered email</h2>
+          <h2 className="section-title">Rendered email</h2>
           {preview?.error ? <div className="error">{preview.error}</div> : null}
           {preview?.rendered ? (
             <div className="subpanel stack">
@@ -556,7 +556,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
 
       <section className="grid-2">
         <form action={recordMessageLogAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Record manual delivery note</h2>
+          <h2 className="section-title">Record manual delivery note</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="log-template">Template</label>
@@ -634,7 +634,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
         </form>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Actual outbox delivery</h2>
+          <h2 className="section-title">Actual outbox delivery</h2>
           <table className="table">
             <thead>
               <tr>
@@ -657,7 +657,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                     <td>
                       <strong>{row.recipientEmail}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{row.subject || row.purpose}</span>
+                      <span className="muted-text">{row.subject || row.purpose}</span>
                     </td>
                     <td>{row.template?.name || row.templateKey || "Template removed"}</td>
                     <td>
@@ -665,7 +665,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                       {row.lastError ? (
                         <>
                           <br />
-                          <span style={{ color: "var(--muted)" }}>{row.lastError}</span>
+                          <span className="muted-text">{row.lastError}</span>
                         </>
                       ) : null}
                     </td>
@@ -685,7 +685,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                         <>
                           <span className="pill">{enumLabel(latestProviderEvent.eventType)}</span>
                           <br />
-                          <span style={{ color: "var(--muted)" }}>{formatDateTime(latestProviderEvent.createdAt, settings.timezone)}</span>
+                          <span className="muted-text">{formatDateTime(latestProviderEvent.createdAt, settings.timezone)}</span>
                         </>
                       ) : (
                         "None"
@@ -715,7 +715,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
             </tbody>
           </table>
           <div className="subpanel">
-            <h3 style={{ fontSize: "1.05rem" }}>Manual notes</h3>
+            <h3 className="subsection-title">Manual notes</h3>
             <table className="table">
               <thead>
                 <tr>
@@ -730,7 +730,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                     <td>
                       <strong>{log.recipientEmail || log.recipientPhone}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{log.subject || log.purpose}</span>
+                      <span className="muted-text">{log.subject || log.purpose}</span>
                     </td>
                     <td>
                       <span className={logStatusClass(log.status)}>{enumLabel(log.status)}</span>
@@ -751,7 +751,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
 
       <section className="grid-2">
         <form action={createSuppressionEntryAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Add suppression</h2>
+          <h2 className="section-title">Add suppression</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="suppression-email">Email</label>
@@ -782,7 +782,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
         </form>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Suppression list</h2>
+          <h2 className="section-title">Suppression list</h2>
           <table className="table">
             <thead>
               <tr>

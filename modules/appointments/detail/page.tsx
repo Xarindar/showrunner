@@ -64,7 +64,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
       <header className="page-header">
         <div>
           <p className="eyebrow">Appointment</p>
-          <h1 style={{ fontSize: "2.4rem" }}>{booking.customerName}</h1>
+          <h1>{booking.customerName}</h1>
           <p>
             {booking.service.name} - {formatDateTime(booking.startsAt, settings.timezone)}
           </p>
@@ -79,7 +79,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
 
       <section className="grid-2">
         <div className="card">
-          <h2 style={{ fontSize: "1.35rem" }}>Appointment details</h2>
+          <h2 className="section-title">Appointment details</h2>
           <table className="table">
             <tbody>
               <tr>
@@ -97,7 +97,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
                     booking.customerName
                   )}
                   <br />
-                  <span style={{ color: "var(--muted)" }}>{booking.customerEmail}</span>
+                  <span className="muted-text">{booking.customerEmail}</span>
                 </td>
               </tr>
               <tr>
@@ -140,7 +140,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
         </div>
 
         <div className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Status actions</h2>
+          <h2 className="section-title">Status actions</h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {(["CONFIRMED", "CANCELED", "COMPLETED"] as const).map((status) => (
               <form key={status} action={updateBookingStatusAction}>
@@ -157,7 +157,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
 
       {formAttachments.length ? (
         <section className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Attached forms</h2>
+          <h2 className="section-title">Attached forms</h2>
           <table className="table">
             <thead>
               <tr>
@@ -173,7 +173,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
                   <td>
                     <strong>{attachment.form.name}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{attachment.form.status.toLowerCase()}</span>
+                    <span className="muted-text">{attachment.form.status.toLowerCase()}</span>
                   </td>
                   <td>
                     <span className={attachment.isRequired ? "pill success" : "pill"}>{attachment.isRequired ? "required" : "optional"}</span>
@@ -199,7 +199,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
 
       <form action={rescheduleBookingAction} className="card form-grid">
         <input type="hidden" name="id" value={booking.id} />
-        <h2 style={{ fontSize: "1.35rem" }}>Reschedule</h2>
+        <h2 className="section-title">Reschedule</h2>
         <div className="grid-2">
           <div className="field">
             <label htmlFor="startsAt">New start time</label>
@@ -224,7 +224,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
 
       <form action={updateBookingDetailAction} className="card form-grid">
         <input type="hidden" name="id" value={booking.id} />
-        <h2 style={{ fontSize: "1.35rem" }}>Internal appointment notes</h2>
+        <h2 className="section-title">Internal appointment notes</h2>
         <div className="field">
           <label htmlFor="adminNotes">Admin notes</label>
           <textarea id="adminNotes" name="adminNotes" defaultValue={booking.adminNotes || ""} />

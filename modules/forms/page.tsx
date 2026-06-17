@@ -456,7 +456,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
       <header className="page-header">
         <div>
           <p className="eyebrow">Forms</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Intake and public forms</h1>
+          <h1>Intake and public forms</h1>
           <p>Build lead, intake, inquiry, and attachment-ready forms with a submission inbox.</p>
         </div>
         {selectedForm ? (
@@ -474,30 +474,30 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
         <div className="card">
           <ClipboardList size={22} />
           <h3>{activeCount} active forms</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Available for public pages, inquiry flows, and intake links.
           </p>
         </div>
         <div className="card">
           <Inbox size={22} />
           <h3>{submissionCount} submissions</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Captured across all active and archived forms.
           </p>
         </div>
         <div className="card">
           <FileText size={22} />
           <h3>{fieldCount} fields</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Fields support text, email, choices, dates, checkboxes, signatures, and hidden metadata.
           </p>
         </div>
       </section>
 
       <section className="card stack">
-        <div className="page-header" style={{ marginBottom: 0 }}>
+        <div className="page-header flush-header">
           <div>
-            <h2 style={{ fontSize: "1.35rem" }}>Start from template</h2>
+            <h2 className="section-title">Start from template</h2>
             <p>Clone a starter into a draft form, then customize fields, copy, and status before publishing.</p>
           </div>
         </div>
@@ -524,7 +524,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
 
       <section className="grid-2">
         <form action={createFormAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Create form</h2>
+          <h2 className="section-title">Create form</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="form-name">Name</label>
@@ -586,9 +586,9 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
         </form>
 
         <div className="card">
-          <div className="page-header" style={{ marginBottom: 16 }}>
+          <div className="page-header compact-header">
             <div>
-              <h2 style={{ fontSize: "1.35rem" }}>Form library</h2>
+              <h2 className="section-title">Form library</h2>
               <p>{formCount} matching forms</p>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -618,7 +618,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                     <td>
                       <strong>{form.name}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>
+                      <span className="muted-text">
                         /forms/{form.slug} · {form._count.fields} fields · {form._count.submissions} submissions
                       </span>
                     </td>
@@ -626,7 +626,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                     <td>
                       <strong>{conversionRate(funnel)}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>
+                      <span className="muted-text">
                         {funnel.views} views · {funnel.starts} starts · {funnel.submits} submits
                       </span>
                     </td>
@@ -678,7 +678,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
       {selectedForm ? (
         <section className="grid-2">
           <form action={updateFormAction} className="card form-grid">
-            <h2 style={{ fontSize: "1.35rem" }}>Edit selected form</h2>
+            <h2 className="section-title">Edit selected form</h2>
             <input type="hidden" name="id" value={selectedForm.id} />
             <div className="grid-2">
               <div className="field">
@@ -740,7 +740,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
           </form>
 
           <div className="card stack">
-            <h2 style={{ fontSize: "1.35rem" }}>Form actions</h2>
+            <h2 className="section-title">Form actions</h2>
             {selectedFunnel ? (
               <div className="subpanel">
                 <span className="pill">Conversion {conversionRate(selectedFunnel)}</span>
@@ -779,7 +779,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
 
           <div className="card stack">
             <div>
-              <h2 style={{ fontSize: "1.35rem" }}>Attachments</h2>
+              <h2 className="section-title">Attachments</h2>
               <p style={{ color: "var(--muted)" }}>Attach this form to a booking, order, or gallery and mark it required when it blocks follow-up.</p>
             </div>
             <div className="grid-3">
@@ -831,7 +831,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                     <td>
                       <strong>{targetLabelByKey.get(targetKey(attachment.targetType, attachment.targetId)) || enumLabel(attachment.targetType)}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{attachment.targetId}</span>
+                      <span className="muted-text">{attachment.targetId}</span>
                     </td>
                     <td>
                       <span className={attachment.isRequired ? "pill success" : "pill"}>{attachment.isRequired ? "required" : "optional"}</span>
@@ -870,7 +870,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
 
           <div className="card stack">
             <div>
-              <h2 style={{ fontSize: "1.35rem" }}>Fields for {selectedForm.name}</h2>
+              <h2 className="section-title">Fields for {selectedForm.name}</h2>
               <p style={{ color: "var(--muted)" }}>Choice fields use comma-separated options. File fields store private uploads for gated admin download.</p>
             </div>
             <form action={createFormFieldAction} className="subpanel form-grid">
@@ -958,7 +958,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                     <td>
                       <strong>{field.label}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{field.helpText || field.placeholder || "No helper text"}</span>
+                      <span className="muted-text">{field.helpText || field.placeholder || "No helper text"}</span>
                     </td>
                     <td>{enumLabel(field.type)}</td>
                     <td>{stringArrayCsv(field.options) || "None"}</td>
@@ -967,25 +967,25 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                       {field.isHidden ? <span className="pill">hidden</span> : null}
                       {field.fieldRole !== FormFieldRole.NONE ? <span className="pill">{enumLabel(field.fieldRole)}</span> : null}
                       <br />
-                      <span style={{ color: "var(--muted)" }}>
+                      <span className="muted-text">
                         Page {field.pageNumber} · Sort {field.sortOrder}
                       </span>
                       {conditionSummary(field, selectedForm.fields) ? (
                         <>
                           <br />
-                          <span style={{ color: "var(--muted)" }}>{conditionSummary(field, selectedForm.fields)}</span>
+                          <span className="muted-text">{conditionSummary(field, selectedForm.fields)}</span>
                         </>
                       ) : null}
                       {validationSummary(field) ? (
                         <>
                           <br />
-                          <span style={{ color: "var(--muted)" }}>{validationSummary(field)}</span>
+                          <span className="muted-text">{validationSummary(field)}</span>
                         </>
                       ) : null}
                       {uploadSummary(field) ? (
                         <>
                           <br />
-                          <span style={{ color: "var(--muted)" }}>{uploadSummary(field)}</span>
+                          <span className="muted-text">{uploadSummary(field)}</span>
                         </>
                       ) : null}
                     </td>
@@ -1086,9 +1086,9 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
 
       {selectedForm ? (
         <section className="card">
-          <div className="page-header" style={{ marginBottom: 16 }}>
+          <div className="page-header compact-header">
             <div>
-              <h2 style={{ fontSize: "1.35rem" }}>Recent submissions</h2>
+              <h2 className="section-title">Recent submissions</h2>
               <p>Newest responses for {selectedForm.name}.</p>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -1115,7 +1115,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                   <td>
                     <strong>{submission.submitterName || "Anonymous"}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{submission.submitterEmail || "No email"}</span>
+                    <span className="muted-text">{submission.submitterEmail || "No email"}</span>
                   </td>
                   <td>
                     {summarizeSubmission(submission.data)}
@@ -1173,7 +1173,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                                     {signature.capturedSignature}
                                   </p>
                                 )}
-                                <small style={{ color: "var(--muted)" }}>{signature.consentStatement}</small>
+                                <small className="muted-text">{signature.consentStatement}</small>
                               </div>
                             ))}
                           </div>
@@ -1188,7 +1188,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                     {submission.client ? (
                       <Link href={`/admin/clients/${submission.client.id}`}>{submission.client.name}</Link>
                     ) : (
-                      <span style={{ color: "var(--muted)" }}>Not linked</span>
+                      <span className="muted-text">Not linked</span>
                     )}
                   </td>
                   <td>{formatDateTime(submission.createdAt, settings.timezone)}</td>

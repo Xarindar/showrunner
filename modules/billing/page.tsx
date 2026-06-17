@@ -188,7 +188,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       <header className="page-header">
         <div>
           <p className="eyebrow">Billing</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Quotes, invoices, and documents</h1>
+          <h1>Quotes, invoices, and documents</h1>
           <p>Create billing records, compute totals server-side, attach documents, and track status through paid or accepted.</p>
         </div>
       </header>
@@ -200,21 +200,21 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         <div className="card">
           <ReceiptText size={22} />
           <h3>{documentCount} documents</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Quotes, invoices, and contracts in the billing workspace.
           </p>
         </div>
         <div className="card">
           <WalletCards size={22} />
           <h3>{paymentTotalsLabel(paidTotals)}</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Total marked paid across all billing records.
           </p>
         </div>
         <div className="card">
           <FileText size={22} />
           <h3>{openBalanceTotalsLabel(openDocuments)}</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Sent, accepted, and overdue documents still open.
           </p>
         </div>
@@ -222,7 +222,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
       <section className="grid-2">
         <form action={createBillingDocumentAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Create billing document</h2>
+          <h2 className="section-title">Create billing document</h2>
           <div className="grid-3">
             <div className="field">
               <label htmlFor="billing-type">Type</label>
@@ -315,7 +315,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         </form>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Billing queue</h2>
+          <h2 className="section-title">Billing queue</h2>
           <table className="table">
             <thead>
               <tr>
@@ -331,21 +331,21 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                   <td>
                     <Link href={`/admin/modules/billing?document=${document.id}`}>{document.documentNumber}</Link>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>
+                    <span className="muted-text">
                       {enumLabel(document.type)} - {document._count.lineItems} lines - {document._count.attachments} files
                     </span>
                   </td>
                   <td>
                     <strong>{document.customerName}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{document.customerEmail}</span>
+                    <span className="muted-text">{document.customerEmail}</span>
                   </td>
                   <td>
                     {formatMoney(document.totalCents, document.currency)}
                     {paidCents(document.payments) > 0 ? (
                       <>
                         <br />
-                        <span style={{ color: "var(--muted)" }}>
+                        <span className="muted-text">
                           {formatMoney(Math.max(0, document.totalCents - paidCents(document.payments)), document.currency)} due
                         </span>
                       </>
@@ -369,9 +369,9 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       {selectedDocument ? (
         <section className="grid-2">
           <div className="card stack">
-            <div className="page-header" style={{ marginBottom: 16 }}>
+            <div className="page-header compact-header">
               <div>
-                <h2 style={{ fontSize: "1.35rem" }}>{selectedDocument.documentNumber}</h2>
+                <h2 className="section-title">{selectedDocument.documentNumber}</h2>
                 <p>
                   {enumLabel(selectedDocument.type)} for {selectedDocument.customerName}
                 </p>
@@ -429,7 +429,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
               ) : null}
             </div>
             <div className="subpanel form-grid">
-              <h3 style={{ fontSize: "1.05rem" }}>Client link and payment handoff</h3>
+              <h3 className="subsection-title">Client link and payment handoff</h3>
               <div className="grid-2">
                 <div>
                   <p style={{ color: "var(--muted)", marginBottom: 8 }}>Public document</p>
@@ -456,9 +456,9 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 </div>
               </div>
               <div className="subpanel form-grid">
-                <div className="page-header" style={{ marginBottom: 0, minHeight: 0 }}>
+                <div className="page-header flush-header">
                   <div>
-                    <h3 style={{ fontSize: "1.05rem" }}>Stripe Checkout link</h3>
+                    <h3 className="subsection-title">Stripe Checkout link</h3>
                     <p>
                       {selectedDocument.checkoutUrl
                         ? "Hosted payment link is attached."
@@ -516,7 +516,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
             </div>
             {selectedDocument.payments.length ? (
               <div className="subpanel">
-                <h3 style={{ fontSize: "1.05rem" }}>Payment history</h3>
+                <h3 className="subsection-title">Payment history</h3>
                 <table className="table" style={{ minWidth: 0 }}>
                   <thead>
                     <tr>
@@ -538,7 +538,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                             {payment.refundedCents > 0 ? (
                               <>
                                 <br />
-                                <span style={{ color: "var(--muted)" }}>{formatMoney(payment.refundedCents, payment.currency)} refunded</span>
+                                <span className="muted-text">{formatMoney(payment.refundedCents, payment.currency)} refunded</span>
                               </>
                             ) : null}
                           </td>
@@ -574,7 +574,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
             ) : null}
             {selectedDocumentIsDraft ? (
               <form action={updateBillingDocumentAction} className="subpanel form-grid">
-                <h3 style={{ fontSize: "1.05rem" }}>Edit draft details</h3>
+                <h3 className="subsection-title">Edit draft details</h3>
                 <input type="hidden" name="id" value={selectedDocument.id} />
                 <div className="grid-2">
                   <div className="field">
@@ -647,7 +647,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
           </div>
 
           <div className="card stack">
-            <h2 style={{ fontSize: "1.35rem" }}>Line items</h2>
+            <h2 className="section-title">Line items</h2>
             <table className="table">
               <thead>
                 <tr>
@@ -743,7 +743,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
           {selectedDocumentIsDraft ? (
             <form action={addBillingAttachmentAction} className="card form-grid">
               <input type="hidden" name="billingDocumentId" value={selectedDocument.id} />
-              <h2 style={{ fontSize: "1.35rem" }}>Attach document</h2>
+              <h2 className="section-title">Attach document</h2>
               <div className="grid-2">
                 <div className="field">
                   <label htmlFor="attachment-title">Title</label>
@@ -764,13 +764,13 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
             </form>
           ) : (
             <div className="card">
-              <h2 style={{ fontSize: "1.35rem" }}>Attach document</h2>
+              <h2 className="section-title">Attach document</h2>
               <p style={{ color: "var(--muted)", margin: 0 }}>Attachments are locked once the document leaves draft.</p>
             </div>
           )}
 
           <div className="card stack">
-            <h2 style={{ fontSize: "1.35rem" }}>Attachments</h2>
+            <h2 className="section-title">Attachments</h2>
             <table className="table">
               <thead>
                 <tr>
@@ -785,7 +785,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                     <td>
                       <strong>{attachment.title}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{attachment.notes || "No notes"}</span>
+                      <span className="muted-text">{attachment.notes || "No notes"}</span>
                     </td>
                     <td>{attachment.url}</td>
                     <td>{formatDateTime(attachment.createdAt, settings.timezone)}</td>

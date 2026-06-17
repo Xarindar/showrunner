@@ -14,7 +14,7 @@ export function AvailabilityPanel({ availability, resources, staff }: Availabili
   return (
     <section className="grid-2">
       <form action={createAvailabilityAction} className="card form-grid">
-        <h2 style={{ fontSize: "1.35rem" }}>Weekly availability</h2>
+        <h2 className="section-title">Weekly availability</h2>
         <div className="grid-2">
           <div className="field">
             <label htmlFor="availability-staff">Staff</label>
@@ -69,7 +69,7 @@ export function AvailabilityPanel({ availability, resources, staff }: Availabili
       </form>
 
       <div className="card">
-        <h2 style={{ fontSize: "1.35rem" }}>Availability rules</h2>
+        <h2 className="section-title">Availability rules</h2>
         <table className="table">
           <thead>
             <tr>

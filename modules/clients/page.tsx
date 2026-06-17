@@ -142,7 +142,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
       <header className="page-header">
         <div>
           <p className="eyebrow">Clients</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Client book</h1>
+          <h1>Client book</h1>
           <p>Track long-term client relationships, appointment history, and private notes.</p>
         </div>
       </header>
@@ -152,7 +152,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
 
       <section className="grid-2">
         <form action={createClientAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Add client</h2>
+          <h2 className="section-title">Add client</h2>
           {[
             "alternateEmails",
             "alternatePhones",
@@ -227,8 +227,8 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
 
         <div className="card">
           <Users size={22} />
-          <h2 style={{ fontSize: "1.35rem" }}>{clientCount} clients</h2>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <h2 className="section-title">{clientCount} clients</h2>
+          <p className="lead lead-compact">
             Public bookings automatically create or update client records by email address.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
@@ -246,8 +246,8 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
 
       <section className="grid-2">
         <div className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>CSV tools</h2>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <h2 className="section-title">CSV tools</h2>
+          <p className="lead lead-compact">
             Import new client records from a mapped header row, or export the full client book for backup and analysis.
           </p>
           <form action={importClientsCsvAction} className="form-grid">
@@ -267,7 +267,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         </div>
 
         <form action={mergeClientsAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Merge duplicates</h2>
+          <h2 className="section-title">Merge duplicates</h2>
           <div className="field">
             <label htmlFor="survivorId">Keep this record</label>
             <select id="survivorId" name="survivorId" required>
@@ -303,7 +303,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
 
       <section className="grid-2">
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Saved segments</h2>
+          <h2 className="section-title">Saved segments</h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <Link className={!selectedSegment ? "button" : "button secondary"} href="/admin/modules/clients">
               All clients
@@ -334,7 +334,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         </div>
 
         <form action={createClientSegmentAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Save segment</h2>
+          <h2 className="section-title">Save segment</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="segment-name">Name</label>
@@ -396,9 +396,9 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
       </section>
 
       <section className="card">
-        <div className="page-header" style={{ marginBottom: 16 }}>
+        <div className="page-header compact-header">
           <div>
-            <h2 style={{ fontSize: "1.35rem" }}>Client list</h2>
+            <h2 className="section-title">Client list</h2>
             <p style={{ color: "var(--muted)", margin: 0 }}>{clientCount} matching clients</p>
           </div>
           <form action="/admin/modules/clients" style={{ display: "flex", gap: 8 }}>
@@ -426,7 +426,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                     <strong>{client.name}</strong>
                   </Link>
                   <br />
-                  <span style={{ color: "var(--muted)" }}>{client.companyName || client.familyName || client.email}</span>
+                  <span className="muted-text">{client.companyName || client.familyName || client.email}</span>
                   <br />
                   <Link
                     href={clientPortalPath({
@@ -455,7 +455,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                 <td>
                   {client._count.bookings} appointments, {client._count.orders} orders, {client._count.billingDocuments} billing docs
                   <br />
-                  <span style={{ color: "var(--muted)" }}>
+                  <span className="muted-text">
                     {client._count.formSubmissions} forms, {client._count.notes} notes
                   </span>
                 </td>

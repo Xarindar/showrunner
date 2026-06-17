@@ -129,7 +129,7 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
           <header className="page-header">
             <div>
               <p className="eyebrow">Client portal</p>
-              <h1 style={{ fontSize: "2.35rem" }}>{client.name}</h1>
+              <h1>{client.name}</h1>
               <p>{client.email}</p>
             </div>
             <span className="pill">{settings.businessName}</span>
@@ -164,10 +164,10 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
           </section>
 
           <section className="card">
-            <div className="page-header" style={{ marginBottom: 16 }}>
+            <div className="page-header compact-header">
               <div>
                 <CalendarCheck size={22} />
-                <h2 style={{ fontSize: "1.35rem" }}>Appointments</h2>
+                <h2 className="section-title">Appointments</h2>
               </div>
             </div>
             <table className="table">
@@ -187,13 +187,13 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                       {booking.service.location ? (
                         <>
                           <br />
-                          <span style={{ color: "var(--muted)" }}>{booking.service.location}</span>
+                          <span className="muted-text">{booking.service.location}</span>
                         </>
                       ) : null}
                       {booking.resources.length ? (
                         <>
                           <br />
-                          <span style={{ color: "var(--muted)" }}>
+                          <span className="muted-text">
                             {booking.resources.map((bookingResource) => bookingResource.resource.name).join(", ")}
                           </span>
                         </>
@@ -202,7 +202,7 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                     <td>
                       {formatDateTime(booking.startsAt, settings.timezone)}
                       <br />
-                      <span style={{ color: "var(--muted)" }}>Ends {formatDateTime(booking.endsAt, settings.timezone)}</span>
+                      <span className="muted-text">Ends {formatDateTime(booking.endsAt, settings.timezone)}</span>
                     </td>
                     <td>{booking.staff?.name || "Assigned by the business"}</td>
                     <td>
@@ -220,10 +220,10 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
           </section>
 
           <section className="card">
-            <div className="page-header" style={{ marginBottom: 16 }}>
+            <div className="page-header compact-header">
               <div>
                 <PenLine size={22} />
-                <h2 style={{ fontSize: "1.35rem" }}>Signed forms and documents</h2>
+                <h2 className="section-title">Signed forms and documents</h2>
               </div>
             </div>
             <table className="table">
@@ -241,7 +241,7 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                     <td>
                       <strong>{submission.form.name}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>
+                      <span className="muted-text">
                         {enumLabel(submission.form.destination)}
                         {submission.formAttachment ? ` for ${enumLabel(submission.formAttachment.targetType)}` : ""}
                       </span>
@@ -249,7 +249,7 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                     <td>
                       {submission.submitterName || submission.signatures[0]?.signerName || client.name}
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{submission.submitterEmail || submission.signatures[0]?.signerEmail || client.email}</span>
+                      <span className="muted-text">{submission.submitterEmail || submission.signatures[0]?.signerEmail || client.email}</span>
                     </td>
                     <td>
                       {submission.signatures.map((signature) => (
@@ -262,7 +262,7 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                             <span>Drawn signature on file</span>
                           )}
                           <br />
-                          <span style={{ color: "var(--muted)" }}>{signature.consentStatement}</span>
+                          <span className="muted-text">{signature.consentStatement}</span>
                         </div>
                       ))}
                     </td>
@@ -279,10 +279,10 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
           </section>
 
           <section className="card">
-            <div className="page-header" style={{ marginBottom: 16 }}>
+            <div className="page-header compact-header">
               <div>
                 <Images size={22} />
-                <h2 style={{ fontSize: "1.35rem" }}>Galleries</h2>
+                <h2 className="section-title">Galleries</h2>
               </div>
             </div>
             <table className="table">
@@ -304,21 +304,21 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                       {access.gallery.description ? (
                         <>
                           <br />
-                          <span style={{ color: "var(--muted)" }}>{access.gallery.description}</span>
+                          <span className="muted-text">{access.gallery.description}</span>
                         </>
                       ) : null}
                     </td>
                     <td>
                       <span className={statusClass(access.status)}>{enumLabel(access.status)}</span>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>
+                      <span className="muted-text">
                         {access.expiresAt ? `Expires ${formatDateTime(access.expiresAt, settings.timezone)}` : "No expiration"}
                       </span>
                     </td>
                     <td>
                       {access.gallery._count.items} items
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{access.gallery._count.proofRounds} proofing rounds</span>
+                      <span className="muted-text">{access.gallery._count.proofRounds} proofing rounds</span>
                     </td>
                     <td>{access.lastViewedAt ? formatDateTime(access.lastViewedAt, settings.timezone) : "Not viewed yet"}</td>
                   </tr>
@@ -333,10 +333,10 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
           </section>
 
           <section className="card">
-            <div className="page-header" style={{ marginBottom: 16 }}>
+            <div className="page-header compact-header">
               <div>
                 <Package size={22} />
-                <h2 style={{ fontSize: "1.35rem" }}>Orders</h2>
+                <h2 className="section-title">Orders</h2>
               </div>
             </div>
             <table className="table">
@@ -354,7 +354,7 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                     <td>
                       <strong>{order.orderNumber}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{formatDateTime(order.placedAt || order.createdAt, settings.timezone)}</span>
+                      <span className="muted-text">{formatDateTime(order.placedAt || order.createdAt, settings.timezone)}</span>
                     </td>
                     <td>
                       {order.items.slice(0, 3).map((item) => (
@@ -363,12 +363,12 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                           <br />
                         </span>
                       ))}
-                      {order.items.length > 3 ? <span style={{ color: "var(--muted)" }}>+{order.items.length - 3} more</span> : null}
+                      {order.items.length > 3 ? <span className="muted-text">+{order.items.length - 3} more</span> : null}
                     </td>
                     <td>
                       {formatMoney(order.totalCents, order.currency)}
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{formatMoney(remainingCents(order.totalCents, order.payments), order.currency)} balance</span>
+                      <span className="muted-text">{formatMoney(remainingCents(order.totalCents, order.payments), order.currency)} balance</span>
                     </td>
                     <td>
                       <span className={statusClass(order.status)}>{enumLabel(order.status)}</span>
@@ -385,10 +385,10 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
           </section>
 
           <section className="card">
-            <div className="page-header" style={{ marginBottom: 16 }}>
+            <div className="page-header compact-header">
               <div>
                 <FileText size={22} />
-                <h2 style={{ fontSize: "1.35rem" }}>Invoices and documents</h2>
+                <h2 className="section-title">Invoices and documents</h2>
               </div>
             </div>
             <table className="table">
@@ -408,7 +408,7 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                       <td>
                         <strong>{document.documentNumber}</strong>
                         <br />
-                        <span style={{ color: "var(--muted)" }}>
+                        <span className="muted-text">
                           {enumLabel(document.type)} {document.dueAt ? `due ${formatDateTime(document.dueAt, settings.timezone)}` : ""}
                         </span>
                       </td>
@@ -431,11 +431,11 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
 
           <section className="card">
             <User size={22} />
-            <h2 style={{ fontSize: "1.35rem" }}>Profile</h2>
+            <h2 className="section-title">Profile</h2>
             <p>
               {client.name}
               <br />
-              <span style={{ color: "var(--muted)" }}>{client.phone || client.email}</span>
+              <span className="muted-text">{client.phone || client.email}</span>
             </p>
           </section>
         </div>

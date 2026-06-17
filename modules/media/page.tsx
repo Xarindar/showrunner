@@ -81,7 +81,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       <header className="page-header">
         <div>
           <p className="eyebrow">Media</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Images and assets</h1>
+          <h1>Images and assets</h1>
           <p>Repo assets stay simple; R2 uploads turn on when this client needs editable media.</p>
         </div>
       </header>
@@ -91,8 +91,8 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
 
       <section className="grid-2">
         <form action={uploadMediaAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Upload to R2</h2>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <h2 className="section-title">Upload to R2</h2>
+          <p className="lead lead-compact">
             Current media mode: <strong>{settings.mediaDriver}</strong>. Uploads require the matching storage env vars in `.env`.
           </p>
           <div className="field">
@@ -148,14 +148,14 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
             Upload image
           </button>
           {!canUpload ? (
-            <p className="lead" style={{ fontSize: "0.9rem" }}>
+            <p className="lead lead-compact">
               Switch media mode to R2 or Cloudflare Images in Settings and add credentials to enable uploads.
             </p>
           ) : null}
         </form>
 
         <div className="card">
-          <h2 style={{ fontSize: "1.35rem" }}>Repo assets</h2>
+          <h2 className="section-title">Repo assets</h2>
           <div className="stack">
             {repoAssets.map((asset) => (
               <div key={asset.url} className="asset-tile">
@@ -177,9 +177,9 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       </section>
 
       <section className="card">
-        <div className="page-header" style={{ marginBottom: 16 }}>
+        <div className="page-header compact-header">
           <div>
-            <h2 style={{ fontSize: "1.35rem" }}>Uploaded assets</h2>
+            <h2 className="section-title">Uploaded assets</h2>
             <p style={{ color: "var(--muted)", margin: 0 }}>
               {assetCount} active assets {archivedCount ? `- ${archivedCount} archived` : ""}
             </p>
@@ -207,7 +207,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
               />
               <div style={{ display: "grid", gap: 8 }}>
                 <strong>{asset.filename}</strong>
-                <span style={{ color: "var(--muted)" }}>
+                <span className="muted-text">
                   {asset.mimeType || "image"} - {fileSizeLabel(asset.sizeBytes)} - {asset.driver}
                 </span>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -234,7 +234,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                     {asset.credit}
                   </p>
                 ) : null}
-                <span style={{ color: "var(--muted)" }}>
+                <span className="muted-text">
                   Focal point {asset.focalPointX.toFixed(2)}, {asset.focalPointY.toFixed(2)} - {asset.variants.length} variants
                 </span>
               </div>
@@ -334,7 +334,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
 
       {archivedAssets.length ? (
         <section className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Archived assets</h2>
+          <h2 className="section-title">Archived assets</h2>
           <table className="table">
             <thead>
               <tr>
@@ -349,7 +349,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                   <td>
                     <strong>{asset.filename}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{asset.caption || asset.url}</span>
+                    <span className="muted-text">{asset.caption || asset.url}</span>
                   </td>
                   <td>{asset.folder || "root"}</td>
                   <td>

@@ -82,10 +82,10 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
           {query.error ? <div className="error">{query.error}</div> : null}
 
           <div className="card stack">
-            <div className="page-header" style={{ marginBottom: 0 }}>
+            <div className="page-header flush-header">
               <div>
                 <p className="eyebrow">{enumLabel(document.type)}</p>
-                <h1 style={{ fontSize: "2.35rem" }}>{document.documentNumber}</h1>
+                <h1>{document.documentNumber}</h1>
                 <p>
                   Prepared for {document.customerName} by {settings.businessName}
                 </p>

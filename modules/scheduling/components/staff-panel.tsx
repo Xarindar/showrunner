@@ -14,7 +14,7 @@ export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, 
   return (
     <section className="grid-2">
       <form action={createStaffMemberAction} className="card form-grid">
-        <h2 style={{ fontSize: "1.35rem" }}>Add staff</h2>
+        <h2 className="section-title">Add staff</h2>
         <div className="grid-2">
           <div className="field">
             <label htmlFor="staff-name">Name</label>
@@ -50,7 +50,7 @@ export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, 
       </form>
 
       <div className="card">
-        <h2 style={{ fontSize: "1.35rem" }}>Staff roster</h2>
+        <h2 className="section-title">Staff roster</h2>
         <table className="table">
           <tbody>
             {staff.map((member) => {

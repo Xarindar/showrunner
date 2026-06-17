@@ -320,7 +320,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
       <header className="page-header">
         <div>
           <p className="eyebrow">Client</p>
-          <h1 style={{ fontSize: "2.4rem" }}>{client.name}</h1>
+          <h1>{client.name}</h1>
           <p>{client.email}</p>
         </div>
         <Link className="button secondary" href="/admin/modules/clients">
@@ -334,7 +334,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
       <section className="grid-2">
         <form action={updateClientAction} className="card form-grid">
           <input type="hidden" name="id" value={client.id} />
-          <h2 style={{ fontSize: "1.35rem" }}>Profile</h2>
+          <h2 className="section-title">Profile</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="name">Name</label>
@@ -488,7 +488,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
 
         <form action={addClientNoteAction} className="card form-grid">
           <input type="hidden" name="clientId" value={client.id} />
-          <h2 style={{ fontSize: "1.35rem" }}>Add note</h2>
+          <h2 className="section-title">Add note</h2>
           <div className="field">
             <label htmlFor="content">Note</label>
             <textarea id="content" name="content" required />
@@ -503,7 +503,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
       <section className="grid-2">
         <form action={addClientFileAction} className="card form-grid">
           <input type="hidden" name="clientId" value={client.id} />
-          <h2 style={{ fontSize: "1.35rem" }}>Attach file</h2>
+          <h2 className="section-title">Attach file</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="file-title">Title</label>
@@ -529,7 +529,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         </form>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>CRM snapshot</h2>
+          <h2 className="section-title">CRM snapshot</h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <span className="pill">{client.status}</span>
             <span className="pill">{enumLabel(client.pipelineStage)}</span>
@@ -540,7 +540,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             {client.dataDeletionRequestedAt ? <span className="pill danger">deletion requested</span> : null}
           </div>
           <div>
-            <h3 style={{ fontSize: "1rem" }}>Tags</h3>
+            <h3>Tags</h3>
             {client.tags.map((tag) => (
               <span className="pill" key={tag.id} style={{ marginRight: 4 }}>
                 {tag.label}
@@ -549,13 +549,13 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             {!client.tags.length ? <p className="empty-state">No tags yet.</p> : null}
           </div>
           <div>
-            <h3 style={{ fontSize: "1rem" }}>Files</h3>
+            <h3>Files</h3>
             {client.files.slice(0, 5).map((file) => (
               <div className="subpanel" key={file.id}>
                 <p style={{ margin: "0 0 8px" }}>
                   <a href={file.url}>{file.title}</a>
                   <br />
-                  <span style={{ color: "var(--muted)" }}>
+                  <span className="muted-text">
                     {file.category || "file"} - {formatDateTime(file.uploadedAt, settings.timezone)}
                   </span>
                 </p>
@@ -578,9 +578,9 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
       </section>
 
       <section className="card">
-        <div className="page-header" style={{ marginBottom: 16 }}>
+        <div className="page-header compact-header">
           <div>
-            <h2 style={{ fontSize: "1.35rem" }}>Unified timeline</h2>
+            <h2 className="section-title">Unified timeline</h2>
             <p style={{ color: "var(--muted)", margin: 0 }}>
               Appointments, forms, testimonials, billing, orders, messages, and notes for this client.
             </p>
@@ -606,9 +606,9 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
       </section>
 
       <section className="card stack">
-        <div className="page-header" style={{ marginBottom: 16 }}>
+        <div className="page-header compact-header">
           <div>
-            <h2 style={{ fontSize: "1.35rem" }}>Email delivery history</h2>
+            <h2 className="section-title">Email delivery history</h2>
             <p style={{ color: "var(--muted)", margin: 0 }}>
               Outbox and manual message records matched by client email, appointments, orders, billing documents, and form submissions.
             </p>
@@ -634,7 +634,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                   <td>
                     <strong>{row.recipientEmail}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{row.subject || row.purpose}</span>
+                    <span className="muted-text">{row.subject || row.purpose}</span>
                   </td>
                   <td>{row.template?.name || row.templateKey || "Template removed"}</td>
                   <td>
@@ -653,7 +653,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           </tbody>
         </table>
         <div className="subpanel">
-          <h3 style={{ fontSize: "1.05rem" }}>Manual message notes</h3>
+          <h3 className="subsection-title">Manual message notes</h3>
           <table className="table">
             <thead>
               <tr>
@@ -674,7 +674,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                     <td>
                       <strong>{log.recipientEmail || log.recipientPhone || client.email}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{log.subject || log.purpose}</span>
+                      <span className="muted-text">{log.subject || log.purpose}</span>
                     </td>
                     <td>{log.template?.name || log.purpose}</td>
                     <td>
@@ -697,7 +697,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
 
       <section className="grid-2">
         <div className="card">
-          <h2 style={{ fontSize: "1.35rem" }}>Appointment history</h2>
+          <h2 className="section-title">Appointment history</h2>
           <table className="table">
             <tbody>
               {client.bookings.map((booking) => (
@@ -707,7 +707,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                       <strong>{booking.service.name}</strong>
                     </Link>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{formatDateTime(booking.startsAt, settings.timezone)}</span>
+                    <span className="muted-text">{formatDateTime(booking.startsAt, settings.timezone)}</span>
                   </td>
                   <td>
                     <span className="pill">{booking.status.toLowerCase()}</span>
@@ -724,7 +724,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         </div>
 
         <div className="card">
-          <h2 style={{ fontSize: "1.35rem" }}>Notes</h2>
+          <h2 className="section-title">Notes</h2>
           <div className="stack">
             {client.notes.map((note) => (
               <div className="subpanel" key={note.id}>
@@ -750,8 +750,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
 
       <section className="card">
         <CalendarCheck size={22} />
-        <h2 style={{ fontSize: "1.35rem" }}>Service history</h2>
-        <p className="lead" style={{ fontSize: "0.95rem" }}>
+        <h2 className="section-title">Service history</h2>
+        <p className="lead lead-compact">
           This history is generated from appointments. Future product modules can attach purchases and packages here too.
         </p>
       </section>

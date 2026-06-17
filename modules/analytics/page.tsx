@@ -107,7 +107,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       <header className="page-header">
         <div>
           <p className="eyebrow">Analytics</p>
-          <h1 style={{ fontSize: "2.4rem" }}>Events, attribution, and reporting</h1>
+          <h1>Events, attribution, and reporting</h1>
           <p>Track standard events, summarize module performance, and define conversion goals for future widgets and automations.</p>
         </div>
         <Link className="button secondary" href="/admin/modules/analytics/export">
@@ -122,7 +122,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         <div className="card">
           <MousePointerClick size={22} />
           <h3>{eventCount} events</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Captured analytics rows across public pages, server events, manual records, and future embedded widgets.
           </p>
         </div>
@@ -131,14 +131,14 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           <h3>
             {completedBookingCount}/{bookingCount} bookings
           </h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Completed bookings compared with the total appointment queue.
           </p>
         </div>
         <div className="card">
           <TrendingUp size={22} />
           <h3>{formatMoney(paidRevenue._sum.totalCents || 0)}</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Paid order revenue across {paidOrders} paid commerce orders.
           </p>
         </div>
@@ -148,14 +148,14 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         <div className="card">
           <BarChart3 size={22} />
           <h3>{leadSubmissionCount} form leads</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Public form submissions available for lead attribution and follow-up.
           </p>
         </div>
         <div className="card">
           <BarChart3 size={22} />
           <h3>{publishedGalleryCount} published galleries</h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Portfolio surfaces that can emit gallery and proofing engagement.
           </p>
         </div>
@@ -164,7 +164,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           <h3>
             {galleryViewCount} views / {favoriteCount} favorites
           </h3>
-          <p className="lead" style={{ fontSize: "0.95rem" }}>
+          <p className="lead lead-compact">
             Gallery engagement from tracked events and proofing selections.
           </p>
         </div>
@@ -172,7 +172,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
       <section className="grid-2">
         <form action={recordAnalyticsEventAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Record manual event</h2>
+          <h2 className="section-title">Record manual event</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="event-type">Event type</label>
@@ -264,7 +264,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </form>
 
         <form action={createAnalyticsGoalAction} className="card form-grid">
-          <h2 style={{ fontSize: "1.35rem" }}>Create conversion goal</h2>
+          <h2 className="section-title">Create conversion goal</h2>
           <div className="grid-2">
             <div className="field">
               <label htmlFor="goal-name">Name</label>
@@ -317,7 +317,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
       <section className="grid-2">
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Conversion goals</h2>
+          <h2 className="section-title">Conversion goals</h2>
           <table className="table">
             <thead>
               <tr>
@@ -337,7 +337,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                     <td>
                       <strong>{goal.name}</strong>
                       <br />
-                      <span style={{ color: "var(--muted)" }}>{eventDisplayName(goal.eventType, goal.eventName)}</span>
+                      <span className="muted-text">{eventDisplayName(goal.eventType, goal.eventName)}</span>
                     </td>
                     <td>
                       {progress.count}/{goal.targetCount}
@@ -371,7 +371,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </div>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Top events</h2>
+          <h2 className="section-title">Top events</h2>
           <table className="table">
             <thead>
               <tr>
@@ -398,7 +398,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
       <section className="grid-2">
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Source attribution</h2>
+          <h2 className="section-title">Source attribution</h2>
           <table className="table">
             <thead>
               <tr>
@@ -423,7 +423,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </div>
 
         <div className="card stack">
-          <h2 style={{ fontSize: "1.35rem" }}>Recent events</h2>
+          <h2 className="section-title">Recent events</h2>
           <table className="table">
             <thead>
               <tr>
@@ -439,7 +439,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                   <td>
                     <strong>{eventDisplayName(event.eventType, event.eventName)}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>{event.pathname || event.relatedType || "No path"}</span>
+                    <span className="muted-text">{event.pathname || event.relatedType || "No path"}</span>
                   </td>
                   <td>{[event.source, event.medium].filter(Boolean).join(" / ") || "direct / unknown"}</td>
                   <td>{event.valueCents ? formatMoney(event.valueCents, event.currency) : "-"}</td>

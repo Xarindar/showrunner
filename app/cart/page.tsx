@@ -100,7 +100,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
           <div className="page-header">
             <div>
               <p className="eyebrow">Cart</p>
-              <h1 style={{ fontSize: "2.4rem" }}>Review order details</h1>
+              <h1>Review order details</h1>
               <p>Cart totals are repriced from the current catalog before checkout handoff records are created.</p>
             </div>
           </div>
@@ -133,7 +133,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
           ) : null}
           {orderFormAttachments.length ? (
             <div className="card stack">
-              <h2 style={{ fontSize: "1.35rem" }}>Order forms</h2>
+              <h2 className="section-title">Order forms</h2>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                 {orderFormAttachments.map((attachment) => (
                   <Link
@@ -166,7 +166,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
           ) : (
             <section className="grid-2">
               <div className="card stack">
-                <h2 style={{ fontSize: "1.35rem" }}>Items</h2>
+                <h2 className="section-title">Items</h2>
                 <table className="table">
                   <thead>
                     <tr>
@@ -182,11 +182,11 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                         <td>
                           <strong>{itemName(item)}</strong>
                           <br />
-                          <span style={{ color: "var(--muted)" }}>{formatMoney(item.unitPriceCents, cartResult.cart.currency)} each</span>
+                          <span className="muted-text">{formatMoney(item.unitPriceCents, cartResult.cart.currency)} each</span>
                           {item.giftCardRecipientEmail ? (
                             <>
                               <br />
-                              <span style={{ color: "var(--muted)" }}>Gift for {item.giftCardRecipientEmail}</span>
+                              <span className="muted-text">Gift for {item.giftCardRecipientEmail}</span>
                             </>
                           ) : null}
                         </td>
@@ -224,7 +224,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
               </div>
 
               <div className="card stack">
-                <h2 style={{ fontSize: "1.35rem" }}>Totals</h2>
+                <h2 className="section-title">Totals</h2>
                 <table className="table" style={{ minWidth: 0 }}>
                   <tbody>
                     <tr>

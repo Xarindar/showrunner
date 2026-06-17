@@ -88,7 +88,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
   return (
     <section className="grid-2">
       <form action={createServiceAction} className="card form-grid">
-        <h2 style={{ fontSize: "1.35rem" }}>Add service</h2>
+        <h2 className="section-title">Add service</h2>
         <div className="field">
           <label htmlFor="name">Name</label>
           <input id="name" name="name" required />
@@ -169,7 +169,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
       </form>
 
       <div className="card">
-        <h2 style={{ fontSize: "1.35rem" }}>Current services</h2>
+        <h2 className="section-title">Current services</h2>
         <table className="table">
           <thead>
             <tr>
@@ -186,7 +186,7 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                   <td>
                     <strong>{service.name}</strong>
                     <br />
-                    <span style={{ color: "var(--muted)" }}>/book/{service.slug}</span>
+                    <span className="muted-text">/book/{service.slug}</span>
                   </td>
                   <td>{service.durationMinutes} min</td>
                   <td>

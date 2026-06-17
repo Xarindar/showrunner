@@ -13,6 +13,8 @@ This app follows a clean, Vercel-influenced interface language without copying V
 ## Rules
 
 - Use Geist Sans for interface text and Geist Mono for metrics, timestamps, amounts, and tabular comparisons.
+- Draw spacing, type, color, state, and elevation from `lib/theme/tokens.ts` through `themeToCssVars()`.
+- Use `components/ui/*` primitives for new module UI so token usage, focus states, and reserved dimensions stay consistent.
 - Keep cards and controls at 8px radius or less.
 - Use fixed or reserved dimensions for cards, tables, booking steps, action rows, and media tiles.
 - If content can exist later, reserve space for it now.
