@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PaymentProvider } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { publicAppBaseUrl } from "@/lib/env";
+import { sanitizePaymentOnboardingError } from "@/lib/payments/onboarding-status";
 import { completeStripeConnectOnboarding } from "@/lib/payments/stripe-connect";
 import { getCurrentSiteId } from "@/lib/site";
 
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
     await completeStripeConnectOnboarding({ code, expectedSiteId: siteId, state });
     return settingsRedirect("saved", "payments");
   } catch (connectError) {
-    const message = connectError instanceof Error ? connectError.message : "Stripe Connect could not be completed.";
+    const message = sanitizePaymentOnboardingError(connectError, PaymentProvider.STRIPE, "Stripe Connect could not be completed.");
     return settingsRedirect("error", message);
   }
 }
