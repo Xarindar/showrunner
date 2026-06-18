@@ -17,12 +17,13 @@ import { normalizeUploadRules } from "@/modules/forms/upload-fields";
 import { normalizeValidationRules } from "@/modules/forms/validation-rules";
 import { PublicFormBehavior } from "./public-form-behavior";
 import { SignatureField } from "./signature-field";
+import { ButtonLink, Card } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type PublicFormPageProps = {
-  params: Promise<{ slug: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined> & { submitted?: string; error?: string }>;
+  params: Promise<{slug: string;}>;
+  searchParams: Promise<Record<string, string | string[] | undefined> & {submitted?: string;error?: string;}>;
 };
 
 export async function generateMetadata({ params }: PublicFormPageProps): Promise<Metadata> {
@@ -60,8 +61,8 @@ function labelText(label: string, isRequired: boolean) {
     <>
       {label}
       {isRequired ? <span aria-hidden="true"> *</span> : null}
-    </>
-  );
+    </>);
+
 }
 
 function safePatternAttribute(pattern?: string) {
@@ -87,20 +88,20 @@ function renderField(field: FormField) {
   };
   const inputValidationAttributes = {
     ...validationAttributes,
-    inputMode: hasNumericRange ? ("decimal" as const) : undefined,
+    inputMode: hasNumericRange ? "decimal" as const : undefined,
     pattern: safePatternAttribute(validationRules.pattern),
     title: validationRules.pattern ? "Use the expected format." : undefined
   };
-  const wrapField = (children: ReactNode, forceHidden = false) => (
-    <div
-      data-form-field-id={field.id}
-      data-form-field-page={field.pageNumber}
-      hidden={forceHidden}
-      key={field.id}
-    >
+  const wrapField = (children: ReactNode, forceHidden = false) =>
+  <div
+    data-form-field-id={field.id}
+    data-form-field-page={field.pageNumber}
+    hidden={forceHidden}
+    key={field.id}>
+    
       {children}
-    </div>
-  );
+    </div>;
+
   const commonProps = {
     id: field.id,
     name,
@@ -118,11 +119,11 @@ function renderField(field: FormField) {
       <div className="ui-field">
         <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
         <textarea {...commonProps} {...validationAttributes} placeholder={field.placeholder} />
-        {field.helpText ? (
-          <small className="ui-zero" id={helpId}>
+        {field.helpText ?
+        <small className="ui-zero" id={helpId}>
             {field.helpText}
-          </small>
-        ) : null}
+          </small> :
+        null}
       </div>
     );
   }
@@ -135,17 +136,17 @@ function renderField(field: FormField) {
           <option value="" disabled>
             Select one
           </option>
-          {options.map((option) => (
-            <option key={option} value={option}>
+          {options.map((option) =>
+          <option key={option} value={option}>
               {option}
             </option>
-          ))}
+          )}
         </select>
-        {field.helpText ? (
-          <small className="ui-zero" id={helpId}>
+        {field.helpText ?
+        <small className="ui-zero" id={helpId}>
             {field.helpText}
-          </small>
-        ) : null}
+          </small> :
+        null}
       </div>
     );
   }
@@ -157,18 +158,18 @@ function renderField(field: FormField) {
           {labelText(field.label, field.isRequired)}
         </legend>
         <div className="ui-zero">
-          {options.map((option) => (
-            <label className="ui-zero" key={option}>
+          {options.map((option) =>
+          <label className="ui-zero" key={option}>
               <input name={name} required={field.isRequired} type="radio" value={option} />
               {option}
             </label>
-          ))}
+          )}
         </div>
-        {field.helpText ? (
-          <small className="ui-zero" id={helpId}>
+        {field.helpText ?
+        <small className="ui-zero" id={helpId}>
             {field.helpText}
-          </small>
-        ) : null}
+          </small> :
+        null}
       </fieldset>
     );
   }
@@ -182,15 +183,15 @@ function renderField(field: FormField) {
             required={field.isRequired}
             aria-required={field.isRequired || undefined}
             aria-describedby={helpId}
-            type="checkbox"
-          />
+            type="checkbox" />
+          
           {labelText(field.label, field.isRequired)}
         </label>
-        {field.helpText ? (
-          <small className="ui-zero" id={helpId}>
+        {field.helpText ?
+        <small className="ui-zero" id={helpId}>
             {field.helpText}
-          </small>
-        ) : null}
+          </small> :
+        null}
       </div>
     );
   }
@@ -202,11 +203,11 @@ function renderField(field: FormField) {
       <div className="ui-field">
         <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
         <input {...commonProps} accept={uploadRules.allowedMimeTypes.join(",")} type="file" />
-        {field.helpText ? (
-          <small className="ui-zero" id={helpId}>
+        {field.helpText ?
+        <small className="ui-zero" id={helpId}>
             {field.helpText}
-          </small>
-        ) : null}
+          </small> :
+        null}
       </div>
     );
   }
@@ -220,23 +221,23 @@ function renderField(field: FormField) {
         label={field.label}
         name={name}
         placeholder={field.placeholder}
-        validationRules={field.validationRules}
-      />
+        validationRules={field.validationRules} />
+
     );
   }
 
   const inputType =
-    field.type === FormFieldType.EMAIL ? "email" : field.type === FormFieldType.PHONE ? "tel" : field.type === FormFieldType.DATE ? "date" : "text";
+  field.type === FormFieldType.EMAIL ? "email" : field.type === FormFieldType.PHONE ? "tel" : field.type === FormFieldType.DATE ? "date" : "text";
 
   return wrapField(
     <div className="ui-field">
       <label htmlFor={field.id}>{labelText(field.label, field.isRequired)}</label>
       <input {...commonProps} {...inputValidationAttributes} placeholder={field.placeholder} type={inputType} />
-      {field.helpText ? (
-        <small className="ui-zero" id={helpId}>
+      {field.helpText ?
+      <small className="ui-zero" id={helpId}>
           {field.helpText}
-        </small>
-      ) : null}
+        </small> :
+      null}
     </div>
   );
 }
@@ -261,17 +262,17 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
 
   if (!settings.enabledModuleIds.includes("forms")) notFound();
   if (!form) notFound();
-  const attachment = attachmentTarget
-    ? await prisma.formAttachment.findFirst({
-        where: {
-          formId: form.id,
-          siteId: settings.siteId,
-          targetId: attachmentTarget.targetId,
-          targetType: attachmentTarget.targetType
-        },
-        select: { id: true, isRequired: true, targetId: true, targetType: true }
-      })
-    : null;
+  const attachment = attachmentTarget ?
+  await prisma.formAttachment.findFirst({
+    where: {
+      formId: form.id,
+      siteId: settings.siteId,
+      targetId: attachmentTarget.targetId,
+      targetType: attachmentTarget.targetType
+    },
+    select: { id: true, isRequired: true, targetId: true, targetType: true }
+  }) :
+  null;
   if (attachmentTarget && !attachment) notFound();
   const testimonialsEnabled = settings.enabledModuleIds.includes("testimonials");
   if (!query.submitted) {
@@ -299,28 +300,28 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
       <JsonLd
         data={buildBreadcrumbJsonLd(
           [
-            { name: "Home", path: "/" },
-            { name: form.name, path: `/forms/${form.slug}` }
-          ],
+          { name: "Home", path: "/" },
+          { name: form.name, path: `/forms/${form.slug}` }],
+
           baseUrl
-        )}
-      />
+        )} />
+      
       <nav className="site-nav">
         <Link href="/" className="brand">
           <span className="brand-mark" />
           <span>{settings.businessName}</span>
         </Link>
         <div className="site-nav-links">
-          <Link href="/book" className="ui-button ui-button-secondary">
+          <ButtonLink href="/book" variant="secondary">
             <CalendarDays size={18} />
             Book
-          </Link>
-          {testimonialsEnabled ? (
-            <Link href="/testimonials" className="ui-button ui-button-secondary">
+          </ButtonLink>
+          {testimonialsEnabled ?
+          <ButtonLink href="/testimonials" variant="secondary">
               <MessageSquare size={18} />
               Reviews
-            </Link>
-          ) : null}
+            </ButtonLink> :
+          null}
         </div>
       </nav>
 
@@ -329,40 +330,40 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
           <p className="eyebrow">Form</p>
           <h1>{form.name}</h1>
           {form.description ? <p className="lead">{form.description}</p> : null}
-          {attachment ? (
-            <p className={attachment.isRequired ? "ui-badge ui-badge-success" : "ui-badge"}>
+          {attachment ?
+          <p className={attachment.isRequired ? "ui-badge ui-badge-success" : "ui-badge"}>
               {attachment.isRequired ? "Required" : "Optional"} attached form
-            </p>
-          ) : null}
+            </p> :
+          null}
         </div>
 
-        {query.submitted ? (
-          <div className="success-message" role="status" aria-live="polite">
+        {query.submitted ?
+        <div className="success-message" role="status" aria-live="polite">
             {form.successMessage}
-          </div>
-        ) : null}
-        {query.error ? (
-          <div className="error" role="alert">
+          </div> :
+        null}
+        {query.error ?
+        <div className="error" role="alert">
             {decodeURIComponent(query.error)}
-          </div>
-        ) : null}
+          </div> :
+        null}
 
-        <form action={createPublicFormSubmissionAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid" encType="multipart/form-data">
+        <Card action={createPublicFormSubmissionAction} encType="multipart/form-data" as="form" minHeight="none" bodyClassName="form-grid">
           <input type="hidden" name="formId" value={form.id} />
-          {attachment ? (
-            <>
+          {attachment ?
+          <>
               <input type="hidden" name="attachmentTargetType" value={attachment.targetType} />
               <input type="hidden" name="attachmentTargetId" value={attachment.targetId} />
-            </>
-          ) : null}
+            </> :
+          null}
           <input className="ui-zero"
-            aria-hidden="true"
-            autoComplete="off"
-            name="companyWebsite"
-           
-            tabIndex={-1}
-            type="text"
-          />
+          aria-hidden="true"
+          autoComplete="off"
+          name="companyWebsite"
+
+          tabIndex={-1}
+          type="text" />
+          
           {form.fields.map(renderField)}
           {!form.fields.length ? <p className="empty-state">This form does not have fields yet.</p> : null}
           <PublicFormBehavior
@@ -379,10 +380,10 @@ export default async function PublicFormPage({ params, searchParams }: PublicFor
               type: field.type,
               validationRules: field.validationRules
             }))}
-            submitButtonLabel={form.submitButtonLabel}
-          />
-        </form>
+            submitButtonLabel={form.submitButtonLabel} />
+          
+        </Card>
       </section>
-    </main>
-  );
+    </main>);
+
 }

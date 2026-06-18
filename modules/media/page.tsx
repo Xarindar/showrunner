@@ -11,22 +11,22 @@ import {
   restoreMediaAssetAction,
   setHeroImageAction,
   updateMediaAssetAction,
-  uploadMediaAction
-} from "./actions";
+  uploadMediaAction } from "./actions";
+import { Button, ButtonAnchor, Card, EqualGrid, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 const repoAssets = [
-  {
-    filename: "hero.svg",
-    url: "/hero.svg",
-    alt: "Neutral admin template hero"
-  }
-];
+{
+  filename: "hero.svg",
+  url: "/hero.svg",
+  alt: "Neutral admin template hero"
+}];
+
 const pageSize = 24;
 
 type MediaPageProps = {
-  searchParams: Promise<{ saved?: string; error?: string; page?: string }>;
+  searchParams: Promise<{saved?: string;error?: string;page?: string;}>;
 };
 
 function fileSizeLabel(bytes: number) {
@@ -49,28 +49,28 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
   const activeMediaWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: null });
   const archivedMediaWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: { not: null } });
   const [mediaAssets, assetCount, archivedAssets, archivedCount, folderGroups] = await Promise.all([
-    prisma.mediaAsset.findMany({
-      where: activeMediaWhere,
-      include: { variants: { orderBy: { type: "asc" } } },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize
-    }),
-    prisma.mediaAsset.count({ where: activeMediaWhere }),
-    prisma.mediaAsset.findMany({
-      where: archivedMediaWhere,
-      orderBy: { deletedAt: "desc" },
-      take: 8
-    }),
-    prisma.mediaAsset.count({ where: archivedMediaWhere }),
-    prisma.mediaAsset.groupBy({
-      by: ["folder"],
-      where: activeMediaWhere,
-      _count: { _all: true },
-      orderBy: { folder: "asc" },
-      take: 8
-    })
-  ]);
+  prisma.mediaAsset.findMany({
+    where: activeMediaWhere,
+    include: { variants: { orderBy: { type: "asc" } } },
+    orderBy: { createdAt: "desc" },
+    skip: (page - 1) * pageSize,
+    take: pageSize
+  }),
+  prisma.mediaAsset.count({ where: activeMediaWhere }),
+  prisma.mediaAsset.findMany({
+    where: archivedMediaWhere,
+    orderBy: { deletedAt: "desc" },
+    take: 8
+  }),
+  prisma.mediaAsset.count({ where: archivedMediaWhere }),
+  prisma.mediaAsset.groupBy({
+    by: ["folder"],
+    where: activeMediaWhere,
+    _count: { _all: true },
+    orderBy: { folder: "asc" },
+    take: 8
+  })]
+  );
   const pageCount = Math.max(1, Math.ceil(assetCount / pageSize));
   const errorMessage = params.error === "missing-file" ? "Choose a file before uploading." : params.error;
 
@@ -89,8 +89,8 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       {params.saved ? <div className="success-message">Media changes saved.</div> : null}
       {errorMessage ? <div className="error">{decodeURIComponent(errorMessage)}</div> : null}
 
-      <section className="grid-2">
-        <form action={uploadMediaAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      <EqualGrid as="section">
+        <Card action={uploadMediaAction} as="form" minHeight="none" bodyClassName="form-grid">
           <h2 className="section-title">Upload to R2</h2>
           <p className="lead lead-compact">
             Current media mode: <strong>{settings.mediaDriver}</strong>. Uploads require the matching storage env vars in `.env`.
@@ -107,7 +107,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
             <input name="isDecorative" type="checkbox" disabled={!canUpload} />
             Decorative image
           </label>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="folder">Folder</label>
               <input id="folder" name="folder" placeholder="portraits/spring" disabled={!canUpload} />
@@ -116,7 +116,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
               <label htmlFor="tags">Tags</label>
               <input id="tags" name="tags" placeholder="hero, portrait, proofing" disabled={!canUpload} />
             </div>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="caption">Caption</label>
             <input id="caption" name="caption" disabled={!canUpload} />
@@ -129,7 +129,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
             <label htmlFor="usageContext">Usage context</label>
             <input id="usageContext" name="usageContext" placeholder="homepage, proofing, product" disabled={!canUpload} />
           </div>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="focalPointX">Focal X</label>
               <input id="focalPointX" name="focalPointX" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
@@ -138,45 +138,45 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
               <label htmlFor="focalPointY">Focal Y</label>
               <input id="focalPointY" name="focalPointY" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
             </div>
-          </div>
+          </EqualGrid>
           <label className="ui-zero">
             <input name="isPrivate" type="checkbox" disabled={!canUpload} />
             Private delivery asset
           </label>
-          <button className="ui-button" type="submit" disabled={!canUpload}>
+          <Button type="submit" disabled={!canUpload}>
             <ImagePlus size={18} />
             Upload image
-          </button>
-          {!canUpload ? (
-            <p className="lead lead-compact">
+          </Button>
+          {!canUpload ?
+          <p className="lead lead-compact">
               Switch media mode to R2 or Cloudflare Images in Settings and add credentials to enable uploads.
-            </p>
-          ) : null}
-        </form>
+            </p> :
+          null}
+        </Card>
 
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        <Card>
           <h2 className="section-title">Repo assets</h2>
           <div className="stack">
-            {repoAssets.map((asset) => (
-              <div key={asset.url} className="asset-tile">
+            {repoAssets.map((asset) =>
+            <div key={asset.url} className="asset-tile">
                 <NextImage src={asset.url} alt={asset.alt} width={500} height={375} unoptimized />
                 <div className="page-header ui-zero">
                   <span>{asset.filename}</span>
                   <form action={setHeroImageAction}>
                     <input type="hidden" name="url" value={asset.url} />
-                    <button className="ui-button ui-button-secondary" type="submit">
+                    <Button type="submit" variant="secondary">
                       <Star size={16} />
                       Use hero
-                    </button>
+                    </Button>
                   </form>
                 </div>
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      </section>
+        </Card>
+      </EqualGrid>
 
-      <section className="ui-card ui-card-density-normal ui-card-min-md">
+      <Card as="section">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Uploaded assets</h2>
@@ -185,70 +185,70 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
             </p>
           </div>
         </div>
-        {folderGroups.length ? (
-          <div className="ui-zero">
-            {folderGroups.map((folder) => (
-              <span className="ui-badge" key={folder.folder || "root"}>
+        {folderGroups.length ?
+        <div className="ui-zero">
+            {folderGroups.map((folder) =>
+          <span className="ui-badge" key={folder.folder || "root"}>
                 <Folder size={14} />
                 {folder.folder || "root"} ({folder._count._all})
               </span>
-            ))}
-          </div>
-        ) : null}
-        <div className="grid-3">
-          {mediaAssets.map((asset) => (
-            <div key={asset.id} className="asset-tile">
+          )}
+          </div> :
+        null}
+        <EqualGrid min="220px">
+          {mediaAssets.map((asset) =>
+          <div key={asset.id} className="asset-tile">
               <NextImage
-                src={mediaAssetDisplayUrl(asset, MediaVariantType.CARD)}
-                alt={asset.isDecorative ? "" : asset.alt || asset.filename}
-                width={500}
-                height={375}
-                unoptimized
-              />
+              src={mediaAssetDisplayUrl(asset, MediaVariantType.CARD)}
+              alt={asset.isDecorative ? "" : asset.alt || asset.filename}
+              width={500}
+              height={375}
+              unoptimized />
+            
               <div className="ui-zero">
                 <strong>{asset.filename}</strong>
                 <span className="muted-text">
                   {asset.mimeType || "image"} - {fileSizeLabel(asset.sizeBytes)} - {asset.driver}
                 </span>
                 <div className="ui-zero">
-                  {asset.folder ? (
-                    <span className="ui-badge">
+                  {asset.folder ?
+                <span className="ui-badge">
                       <Folder size={14} />
                       {asset.folder}
-                    </span>
-                  ) : null}
+                    </span> :
+                null}
                   {asset.isPrivate ? <span className="ui-badge ui-badge-danger">private</span> : null}
                   {asset.isDecorative ? <span className="ui-badge">decorative</span> : null}
                   {asset.usageContext ? <span className="ui-badge">{asset.usageContext}</span> : null}
-                  {nonEmptyStringArrayFromUnknown(asset.tags).map((tag) => (
-                    <span className="ui-badge" key={tag}>
+                  {nonEmptyStringArrayFromUnknown(asset.tags).map((tag) =>
+                <span className="ui-badge" key={tag}>
                       <Tag size={14} />
                       {tag}
                     </span>
-                  ))}
+                )}
                 </div>
-                {asset.caption || asset.credit ? (
-                  <p className="ui-zero">
+                {asset.caption || asset.credit ?
+              <p className="ui-zero">
                     {asset.caption}
                     {asset.caption && asset.credit ? " - " : ""}
                     {asset.credit}
-                  </p>
-                ) : null}
+                  </p> :
+              null}
                 <span className="muted-text">
                   Focal point {asset.focalPointX.toFixed(2)}, {asset.focalPointY.toFixed(2)} - {asset.variants.length} variants
                 </span>
               </div>
-              {!asset.isPrivate ? (
-                <div className="page-header ui-zero">
+              {!asset.isPrivate ?
+            <div className="page-header ui-zero">
                 <form action={setHeroImageAction}>
                   <input type="hidden" name="url" value={mediaAssetDisplayUrl(asset, MediaVariantType.HERO)} />
-                  <button className="ui-button ui-button-secondary" type="submit">
+                  <Button type="submit" variant="secondary">
                     <Star size={16} />
                     Use hero
-                  </button>
+                  </Button>
                 </form>
-                </div>
-              ) : null}
+                </div> :
+            null}
               <details className="subpanel">
                 <summary>Edit metadata</summary>
                 <form action={updateMediaAssetAction} className="form-grid ui-zero">
@@ -257,7 +257,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                     <label htmlFor={`asset-${asset.id}-alt`}>Alt text</label>
                     <input id={`asset-${asset.id}-alt`} name="alt" defaultValue={asset.alt || ""} />
                   </div>
-                  <div className="grid-2">
+                  <EqualGrid>
                     <div className="ui-field">
                       <label htmlFor={`asset-${asset.id}-folder`}>Folder</label>
                       <input id={`asset-${asset.id}-folder`} name="folder" defaultValue={asset.folder} />
@@ -266,7 +266,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                       <label htmlFor={`asset-${asset.id}-tags`}>Tags</label>
                       <input id={`asset-${asset.id}-tags`} name="tags" defaultValue={stringArrayCsv(asset.tags)} />
                     </div>
-                  </div>
+                  </EqualGrid>
                   <div className="ui-field">
                     <label htmlFor={`asset-${asset.id}-caption`}>Caption</label>
                     <input id={`asset-${asset.id}-caption`} name="caption" defaultValue={asset.caption} />
@@ -279,7 +279,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                     <label htmlFor={`asset-${asset.id}-usageContext`}>Usage context</label>
                     <input id={`asset-${asset.id}-usageContext`} name="usageContext" defaultValue={asset.usageContext} />
                   </div>
-                  <div className="grid-2">
+                  <EqualGrid>
                     <div className="ui-field">
                       <label htmlFor={`asset-${asset.id}-focalPointX`}>Focal X</label>
                       <input id={`asset-${asset.id}-focalPointX`} name="focalPointX" defaultValue={asset.focalPointX} inputMode="decimal" />
@@ -288,8 +288,8 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                       <label htmlFor={`asset-${asset.id}-focalPointY`}>Focal Y</label>
                       <input id={`asset-${asset.id}-focalPointY`} name="focalPointY" defaultValue={asset.focalPointY} inputMode="decimal" />
                     </div>
-                  </div>
-                  <div className="grid-2">
+                  </EqualGrid>
+                  <EqualGrid>
                     <label className="ui-zero">
                       <input name="isDecorative" type="checkbox" defaultChecked={asset.isDecorative} />
                       Decorative
@@ -298,10 +298,10 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                       <input name="isPrivate" type="checkbox" defaultChecked={asset.isPrivate} />
                       Private
                     </label>
-                  </div>
-                  <button className="ui-button ui-button-secondary" type="submit">
+                  </EqualGrid>
+                  <Button type="submit" variant="secondary">
                     Save metadata
-                  </button>
+                  </Button>
                 </form>
                 <form action={archiveMediaAssetAction} className="form-grid ui-zero">
                   <input type="hidden" name="id" value={asset.id} />
@@ -309,33 +309,33 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                     <input name="confirmArchive" type="checkbox" required />
                     Archive this asset.
                   </label>
-                  <button className="ui-button ui-button-danger" type="submit">
+                  <Button type="submit" variant="danger">
                     <Archive size={16} />
                     Archive asset
-                  </button>
+                  </Button>
                 </form>
               </details>
             </div>
-          ))}
+          )}
           {!mediaAssets.length ? <p>No uploaded media yet.</p> : null}
-        </div>
+        </EqualGrid>
         <div className="ui-zero">
-          <a className="ui-button ui-button-secondary" href={`/admin/modules/media?page=${Math.max(1, page - 1)}`} aria-disabled={page <= 1}>
+          <ButtonAnchor href={`/admin/modules/media?page=${Math.max(1, page - 1)}`} aria-disabled={page <= 1} variant="secondary">
             Previous
-          </a>
+          </ButtonAnchor>
           <span className="ui-badge">
             Page {Math.min(page, pageCount)} of {pageCount}
           </span>
-          <a className="ui-button ui-button-secondary" href={`/admin/modules/media?page=${Math.min(pageCount, page + 1)}`} aria-disabled={page >= pageCount}>
+          <ButtonAnchor href={`/admin/modules/media?page=${Math.min(pageCount, page + 1)}`} aria-disabled={page >= pageCount} variant="secondary">
             Next
-          </a>
+          </ButtonAnchor>
         </div>
-      </section>
+      </Card>
 
-      {archivedAssets.length ? (
-        <section className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+      {archivedAssets.length ?
+      <Card as="section" bodyClassName="ui-stack">
           <h2 className="section-title">Archived assets</h2>
-          <table className="ui-table">
+          <Table>
             <thead>
               <tr>
                 <th>Asset</th>
@@ -344,8 +344,8 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
               </tr>
             </thead>
             <tbody>
-              {archivedAssets.map((asset) => (
-                <tr key={asset.id}>
+              {archivedAssets.map((asset) =>
+            <tr key={asset.id}>
                   <td>
                     <strong>{asset.filename}</strong>
                     <br />
@@ -355,18 +355,18 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                   <td>
                     <form action={restoreMediaAssetAction}>
                       <input type="hidden" name="id" value={asset.id} />
-                      <button className="ui-button ui-button-secondary" type="submit">
+                      <Button type="submit" variant="secondary">
                         <RotateCcw size={16} />
                         Restore
-                      </button>
+                      </Button>
                     </form>
                   </td>
                 </tr>
-              ))}
+            )}
             </tbody>
-          </table>
-        </section>
-      ) : null}
-    </div>
-  );
+          </Table>
+        </Card> :
+      null}
+    </div>);
+
 }

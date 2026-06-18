@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPlatformStatus, platformFoundationItems, type PlatformWarningSeverity } from "@/lib/platform-status";
 import { getSiteSettings } from "@/lib/site";
 import { moduleIcons } from "@/shell/modules";
+import { ButtonLink, Card, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -12,37 +13,37 @@ function warningPillClassName(severity: PlatformWarningSeverity) {
 }
 
 const commonWorkflows = [
-  {
-    label: "Add or edit bookable time",
-    href: "/admin/modules/scheduling",
-    detail: "Update services, availability, or blockouts."
-  },
-  {
-    label: "Manage a new booking",
-    href: "/admin/modules/appointments",
-    detail: "Open the customer, then confirm, cancel, complete, or add internal notes."
-  },
-  {
-    label: "Review a returning client",
-    href: "/admin/modules/clients",
-    detail: "Open the client record, then review notes and appointment history."
-  },
-  {
-    label: "Change homepage copy",
-    href: "/admin/modules/content",
-    detail: "Edit homepage text and hero image fields, then check the public homepage."
-  },
-  {
-    label: "Create a client gallery",
-    href: "/admin/modules/portfolio",
-    detail: "Create and publish the gallery, add media-backed items, issue access links, then open the public gallery or token route."
-  },
-  {
-    label: "Review conversion activity",
-    href: "/admin/modules/analytics",
-    detail: "Review automatic and manual events, attribution, goals, CSV export, adapter IDs, and retention policy."
-  }
-];
+{
+  label: "Add or edit bookable time",
+  href: "/admin/modules/scheduling",
+  detail: "Update services, availability, or blockouts."
+},
+{
+  label: "Manage a new booking",
+  href: "/admin/modules/appointments",
+  detail: "Open the customer, then confirm, cancel, complete, or add internal notes."
+},
+{
+  label: "Review a returning client",
+  href: "/admin/modules/clients",
+  detail: "Open the client record, then review notes and appointment history."
+},
+{
+  label: "Change homepage copy",
+  href: "/admin/modules/content",
+  detail: "Edit homepage text and hero image fields, then check the public homepage."
+},
+{
+  label: "Create a client gallery",
+  href: "/admin/modules/portfolio",
+  detail: "Create and publish the gallery, add media-backed items, issue access links, then open the public gallery or token route."
+},
+{
+  label: "Review conversion activity",
+  href: "/admin/modules/analytics",
+  detail: "Review automatic and manual events, attribution, goals, CSV export, adapter IDs, and retention policy."
+}];
+
 
 export default async function HelpPage() {
   const settings = await getSiteSettings();
@@ -59,9 +60,9 @@ export default async function HelpPage() {
           <h1>Admin user guide</h1>
           <p>Operating notes, setup status, and readiness context for the modules currently enabled in this admin.</p>
         </div>
-        <Link className="ui-button ui-button-secondary" href="/admin/modules/settings">
+        <ButtonLink href="/admin/modules/settings" variant="secondary">
           Settings
-        </Link>
+        </ButtonLink>
       </header>
 
       <section className="dashboard-stat-grid" aria-label="Help readiness snapshot">
@@ -87,15 +88,15 @@ export default async function HelpPage() {
         </Link>
       </section>
 
-      <section className="ui-card ui-card-density-normal ui-card-min-md">
+      <Card as="section">
         <div className="page-header">
           <div>
             <h2 className="section-title">Current setup notes</h2>
             <p>Warnings combine manifest readiness with live configuration and data checks.</p>
           </div>
         </div>
-        {warnings.length ? (
-          <table className="ui-table">
+        {warnings.length ?
+        <Table>
             <thead>
               <tr>
                 <th>Severity</th>
@@ -104,21 +105,21 @@ export default async function HelpPage() {
               </tr>
             </thead>
             <tbody>
-              {warnings.map((item) => (
-                <tr key={`${item.moduleId || "platform"}-${item.title}`}>
+              {warnings.map((item) =>
+            <tr key={`${item.moduleId || "platform"}-${item.title}`}>
                   <td>
                     <span className={warningPillClassName(item.severity)}>{item.severity}</span>
                   </td>
                   <td>{item.title}</td>
                   <td>{item.href ? <Link href={item.href}>{item.detail}</Link> : item.detail}</td>
                 </tr>
-              ))}
+            )}
             </tbody>
-          </table>
-        ) : (
-          <p className="empty-state">No setup warnings are active.</p>
-        )}
-      </section>
+          </Table> :
+
+        <p className="empty-state">No setup warnings are active.</p>
+        }
+      </Card>
 
       <section className="stack" aria-label="Enabled module guide">
         <div className="page-header">
@@ -143,33 +144,33 @@ export default async function HelpPage() {
                 <span className="module-readiness-meta">
                   {item.module.readiness.primaryGap || (item.hasPublicRoute ? "Public route declared." : "Admin-only surface.")}
                 </span>
-              </Link>
-            );
+              </Link>);
+
           })}
         </div>
       </section>
 
-      <section className="ui-card ui-card-density-normal ui-card-min-md">
+      <Card as="section">
         <h2 className="section-title">Common workflows</h2>
-        <table className="ui-table">
+        <Table>
           <tbody>
-            {commonWorkflows.map((workflow) => (
-              <tr key={workflow.label}>
+            {commonWorkflows.map((workflow) =>
+            <tr key={workflow.label}>
                 <td>{workflow.label}</td>
                 <td>
                   Go to <Link href={workflow.href}>{workflow.href.replace("/admin/modules/", "")}</Link>. {workflow.detail}
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
-        </table>
-      </section>
+        </Table>
+      </Card>
 
-      <section className="ui-card ui-card-density-normal ui-card-min-md">
+      <Card as="section">
         <h2 className="section-title">Security and compliance foundations</h2>
         <div className="foundation-list">
-          {platformFoundationItems.map((item) => (
-            <div className="foundation-row" key={item.key}>
+          {platformFoundationItems.map((item) =>
+          <div className="foundation-row" key={item.key}>
               <span className={item.status === "schema-ready" ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{item.status.replaceAll("-", " ")}</span>
               <span>
                 <strong>{item.title}</strong>
@@ -177,17 +178,17 @@ export default async function HelpPage() {
                 <small>Models: {item.models.join(", ")}</small>
               </span>
             </div>
-          ))}
+          )}
         </div>
-      </section>
+      </Card>
 
-      <section className="ui-card ui-card-density-normal ui-card-min-md">
+      <Card as="section">
         <h2 className="section-title">If a time is missing from booking</h2>
         <p className="lead lead-compact">
           Check that the service is active, weekly availability exists, there is no blockout, minimum notice has passed,
           the selected date is inside the advance booking window, and no appointment or buffer is already using that time.
         </p>
-      </section>
-    </div>
-  );
+      </Card>
+    </div>);
+
 }

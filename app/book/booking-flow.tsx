@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { CalendarCheck, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, FileText, MapPin } from "lucide-react";
 import { slugify } from "@/lib/slug";
 import { createPublicBookingAction, joinPublicWaitlistAction, type BookingFormState, type WaitlistFormState } from "./actions";
+import { Button, ButtonAnchor } from "@/components/ui";
 
 type BookableService = {
   id: string;
@@ -50,12 +51,12 @@ type TransitionDirection = "forward" | "back";
 
 const initialState: BookingFormState = {};
 const initialWaitlistState: WaitlistFormState = {};
-const steps: Array<{ id: Step; label: string }> = [
-  { id: "service", label: "Service" },
-  { id: "time", label: "Time" },
-  { id: "details", label: "Details" },
-  { id: "review", label: "Review" }
-];
+const steps: Array<{id: Step;label: string;}> = [
+{ id: "service", label: "Service" },
+{ id: "time", label: "Time" },
+{ id: "details", label: "Details" },
+{ id: "review", label: "Review" }];
+
 
 function slotKey(slot: Slot) {
   return `${slot.startsAt}|${slot.staffId || ""}|${slot.resourceIds.join(",")}`;
@@ -63,7 +64,7 @@ function slotKey(slot: Slot) {
 
 export function BookingFlow({ services, defaultDate, initialServiceSlug }: BookingFlowProps) {
   const initialService =
-    services.find((service) => service.slug === initialServiceSlug) || services.find((service) => service.id === initialServiceSlug) || services[0];
+  services.find((service) => service.slug === initialServiceSlug) || services.find((service) => service.id === initialServiceSlug) || services[0];
   const [state, action, pending] = useActionState(createPublicBookingAction, initialState);
   const [waitlistState, waitlistAction, waitlistPending] = useActionState(joinPublicWaitlistAction, initialWaitlistState);
   const [step, setStep] = useState<Step>("service");
@@ -102,19 +103,19 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
     const params = new URLSearchParams({ serviceId, date });
     if (staffFilterId) params.set("staffId", staffFilterId);
 
-    fetch(`/api/availability?${params.toString()}`)
-      .then((response) => response.json())
-      .then((data: { slots: Slot[] }) => {
-        if (!active) return;
-        setSlots(data.slots);
-        setSelectedSlot(data.slots[0] ? slotKey(data.slots[0]) : "");
-      })
-      .catch(() => {
-        if (active) setSlots([]);
-      })
-      .finally(() => {
-        if (active) setLoadingSlots(false);
-      });
+    fetch(`/api/availability?${params.toString()}`).
+    then((response) => response.json()).
+    then((data: {slots: Slot[];}) => {
+      if (!active) return;
+      setSlots(data.slots);
+      setSelectedSlot(data.slots[0] ? slotKey(data.slots[0]) : "");
+    }).
+    catch(() => {
+      if (active) setSlots([]);
+    }).
+    finally(() => {
+      if (active) setLoadingSlots(false);
+    });
 
     return () => {
       active = false;
@@ -136,38 +137,38 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
         <p className="eyebrow">{isWaitlist ? "Waitlisted" : isRequest ? "Requested" : "Booked"}</p>
         <h1>{isWaitlist ? "You're on the waitlist." : isRequest ? "Your appointment request is in." : "Your appointment is booked."}</h1>
         <p className="lead">
-          {isWaitlist
-            ? "The business will follow up if a time opens for your selected date."
-            : isRequest
-              ? "Check your email for request details. The business will approve or follow up if anything needs to change."
-              : "Check your email for confirmation details. The business will follow up if anything needs to change."}
+          {isWaitlist ?
+          "The business will follow up if a time opens for your selected date." :
+          isRequest ?
+          "Check your email for request details. The business will approve or follow up if anything needs to change." :
+          "Check your email for confirmation details. The business will follow up if anything needs to change."}
         </p>
-        {!isWaitlist && state.calendarUrl ? (
-          <a className="ui-button ui-button-secondary" href={state.calendarUrl}>
+        {!isWaitlist && state.calendarUrl ?
+        <ButtonAnchor href={state.calendarUrl} variant="secondary">
             <CalendarDays size={18} />
             Add to calendar
-          </a>
-        ) : null}
-        {!isWaitlist && state.manageUrl ? (
-          <a className="ui-button" href={state.manageUrl}>
+          </ButtonAnchor> :
+        null}
+        {!isWaitlist && state.manageUrl ?
+        <ButtonAnchor href={state.manageUrl}>
             <CalendarCheck size={18} />
             Manage appointment
-          </a>
-        ) : null}
-        {state.formLinks?.length ? (
-          <div className="subpanel form-grid ui-zero">
+          </ButtonAnchor> :
+        null}
+        {state.formLinks?.length ?
+        <div className="subpanel form-grid ui-zero">
             <h2 className="ui-zero">Appointment forms</h2>
-            {state.formLinks.map((formLink) => (
-              <a className={formLink.isRequired ? "ui-button" : "ui-button ui-button-secondary"} href={formLink.href} key={formLink.href}>
+            {state.formLinks.map((formLink) =>
+          <a className={formLink.isRequired ? "ui-button" : "ui-button ui-button-secondary"} href={formLink.href} key={formLink.href}>
                 <FileText size={18} />
                 {formLink.isRequired ? "Required: " : ""}
                 {formLink.name}
               </a>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    );
+          )}
+          </div> :
+        null}
+      </div>);
+
   }
 
   function goToStep(nextStep: Step) {
@@ -205,158 +206,158 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
     <div className="booking-flow">
       <section className="booking-main">
         <div className="booking-progress" aria-label="Booking progress">
-          {steps.map((item, index) => (
-            <button
-              className={index <= stepIndex ? "booking-progress-step active" : "booking-progress-step"}
-              disabled={index > stepIndex}
-              key={item.id}
-              onClick={() => goToStep(item.id)}
-              type="button"
-            >
+          {steps.map((item, index) =>
+          <button
+            className={index <= stepIndex ? "booking-progress-step active" : "booking-progress-step"}
+            disabled={index > stepIndex}
+            key={item.id}
+            onClick={() => goToStep(item.id)}
+            type="button">
+            
               <span>{index + 1}</span>
               {item.label}
             </button>
-          ))}
+          )}
         </div>
 
         {state.error || waitlistState.error ? <div className="error">{state.error || waitlistState.error}</div> : null}
 
-        {step === "service" ? (
-          <div className={panelClass}>
+        {step === "service" ?
+        <div className={panelClass}>
             <p className="eyebrow">Step 1</p>
             <h2>What would you like to book?</h2>
             <div className="service-choice-grid">
-              {services.map((service) => (
-                <button
-                  className={service.id === serviceId ? "service-choice selected" : "service-choice"}
-                  key={service.id}
-                  onClick={() => selectService(service)}
-                  type="button"
-                >
+              {services.map((service) =>
+            <button
+              className={service.id === serviceId ? "service-choice selected" : "service-choice"}
+              key={service.id}
+              onClick={() => selectService(service)}
+              type="button">
+              
                   <span className="service-choice-name">{service.name}</span>
                   <span>{service.description || "Book a focused appointment."}</span>
                   <span className="service-choice-meta">
                     <Clock size={16} />
                     {service.durationMinutes} min
-                    {service.location ? (
-                      <>
+                    {service.location ?
+                <>
                         <MapPin size={16} />
                         {service.location}
-                      </>
-                    ) : null}
+                      </> :
+                null}
                   </span>
-                  {service.requestOnly || service.waitlistEnabled ? (
-                    <span className="service-choice-meta">
+                  {service.requestOnly || service.waitlistEnabled ?
+              <span className="service-choice-meta">
                       {service.requestOnly ? "Approval required" : ""}
                       {service.requestOnly && service.waitlistEnabled ? " | " : ""}
                       {service.waitlistEnabled ? "Waitlist available" : ""}
-                    </span>
-                  ) : null}
+                    </span> :
+              null}
                 </button>
-              ))}
+            )}
             </div>
             <div className="booking-actions">
-              <button className="ui-button" onClick={goNext} type="button">
+              <Button onClick={goNext} type="button">
                 Continue
                 <ChevronRight size={18} />
-              </button>
+              </Button>
             </div>
-          </div>
-        ) : null}
+          </div> :
+        null}
 
-        {step === "time" ? (
-          <div className={panelClass}>
+        {step === "time" ?
+        <div className={panelClass}>
             <p className="eyebrow">Step 2</p>
             <h2>Choose a day and time.</h2>
             <div className="date-picker-row">
               <label htmlFor="bookingDate">Date</label>
               <input
-                id="bookingDate"
-                type="date"
-                value={date}
-                onChange={(event) => {
-                  setLoadingSlots(true);
-                  setSelectedSlot("");
-                  setDate(event.target.value);
-                }}
-              />
+              id="bookingDate"
+              type="date"
+              value={date}
+              onChange={(event) => {
+                setLoadingSlots(true);
+                setSelectedSlot("");
+                setDate(event.target.value);
+              }} />
+            
             </div>
-            {selectedService?.staff.length ? (
-              <div className="date-picker-row">
+            {selectedService?.staff.length ?
+          <div className="date-picker-row">
                 <label htmlFor="staffFilterId">Staff</label>
                 <select
-                  id="staffFilterId"
-                  value={staffFilterId}
-                  onChange={(event) => {
-                    setLoadingSlots(true);
-                    setSelectedSlot("");
-                    setStaffFilterId(event.target.value);
-                  }}
-                >
+              id="staffFilterId"
+              value={staffFilterId}
+              onChange={(event) => {
+                setLoadingSlots(true);
+                setSelectedSlot("");
+                setStaffFilterId(event.target.value);
+              }}>
+              
                   <option value="">Any available staff</option>
-                  {selectedService.staff.map((member) => (
-                    <option key={member.id} value={member.id}>
+                  {selectedService.staff.map((member) =>
+              <option key={member.id} value={member.id}>
                       {member.name}
                       {member.title ? `, ${member.title}` : ""}
                     </option>
-                  ))}
+              )}
                 </select>
-              </div>
-            ) : null}
+              </div> :
+          null}
 
             <div className="slot-panel" aria-busy={loadingSlots}>
-              {loadingSlots ? (
-                <div className="skeleton-stack" aria-label="Loading available times">
-                  {Array.from({ length: 5 }, (_, index) => (
-                    <div className="skeleton-row" key={index}>
+              {loadingSlots ?
+            <div className="skeleton-stack" aria-label="Loading available times">
+                  {Array.from({ length: 5 }, (_, index) =>
+              <div className="skeleton-row" key={index}>
                       <span className="skeleton-dot" />
                       <span className="skeleton-line long" />
                       <span className="skeleton-line medium" />
                     </div>
-                  ))}
-                </div>
-              ) : null}
-              {!loadingSlots && !slots.length ? (
-                <div className="empty-state">
+              )}
+                </div> :
+            null}
+              {!loadingSlots && !slots.length ?
+            <div className="empty-state">
                   <CalendarDays size={24} />
                   <p>
-                    {selectedService?.waitlistEnabled
-                      ? "No times are available for this date. Continue to join the waitlist."
-                      : "No times are available for this date. Try another day."}
+                    {selectedService?.waitlistEnabled ?
+                "No times are available for this date. Continue to join the waitlist." :
+                "No times are available for this date. Try another day."}
                   </p>
-                </div>
-              ) : null}
-              {!loadingSlots && slots.length ? (
-                <div className="time-slot-grid">
-                  {slots.map((slot) => (
-                    <button
-                      className={slotKey(slot) === selectedSlot ? "time-slot selected" : "time-slot"}
-                      key={slotKey(slot)}
-                      onClick={() => setSelectedSlot(slotKey(slot))}
-                      type="button"
-                    >
+                </div> :
+            null}
+              {!loadingSlots && slots.length ?
+            <div className="time-slot-grid">
+                  {slots.map((slot) =>
+              <button
+                className={slotKey(slot) === selectedSlot ? "time-slot selected" : "time-slot"}
+                key={slotKey(slot)}
+                onClick={() => setSelectedSlot(slotKey(slot))}
+                type="button">
+                
                       {slot.label}
                     </button>
-                  ))}
-                </div>
-              ) : null}
+              )}
+                </div> :
+            null}
             </div>
 
             <div className="booking-actions">
-              <button className="ui-button ui-button-secondary" onClick={goBack} type="button">
+              <Button onClick={goBack} type="button" variant="secondary">
                 <ChevronLeft size={18} />
                 Back
-              </button>
-              <button className="ui-button" disabled={!selectedSlot && !canJoinWaitlist} onClick={goNext} type="button">
+              </Button>
+              <Button disabled={!selectedSlot && !canJoinWaitlist} onClick={goNext} type="button">
                 {canJoinWaitlist && !selectedSlot ? "Join waitlist" : "Continue"}
                 <ChevronRight size={18} />
-              </button>
+              </Button>
             </div>
-          </div>
-        ) : null}
+          </div> :
+        null}
 
-        {step === "details" ? (
-          <div className={panelClass}>
+        {step === "details" ?
+        <div className={panelClass}>
             <p className="eyebrow">Step 3</p>
             <h2>Tell us who is coming.</h2>
             <div className="booking-detail-fields">
@@ -367,11 +368,11 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
               <div className="ui-field">
                 <label htmlFor="customerEmail">Email</label>
                 <input
-                  id="customerEmail"
-                  type="email"
-                  value={customerEmail}
-                  onChange={(event) => setCustomerEmail(event.target.value)}
-                />
+                id="customerEmail"
+                type="email"
+                value={customerEmail}
+                onChange={(event) => setCustomerEmail(event.target.value)} />
+              
               </div>
               <div className="ui-field">
                 <label htmlFor="customerPhone">Phone</label>
@@ -381,40 +382,40 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
                 <label htmlFor="notes">Anything else?</label>
                 <textarea id="notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
               </div>
-              {selectedService?.intakePrompt ? (
-                <div className="ui-field">
+              {selectedService?.intakePrompt ?
+            <div className="ui-field">
                   <label htmlFor="intakeResponse">{selectedService.intakePrompt}</label>
                   <textarea
-                    id="intakeResponse"
-                    value={intakeResponse}
-                    onChange={(event) => setIntakeResponse(event.target.value)}
-                  />
-                </div>
-              ) : null}
+                id="intakeResponse"
+                value={intakeResponse}
+                onChange={(event) => setIntakeResponse(event.target.value)} />
+              
+                </div> :
+            null}
             </div>
             <div className="booking-actions">
-              <button className="ui-button ui-button-secondary" onClick={goBack} type="button">
+              <Button onClick={goBack} type="button" variant="secondary">
                 <ChevronLeft size={18} />
                 Back
-              </button>
-              <button className="ui-button" disabled={!detailsReady} onClick={goNext} type="button">
+              </Button>
+              <Button disabled={!detailsReady} onClick={goNext} type="button">
                 Review
                 <ChevronRight size={18} />
-              </button>
+              </Button>
             </div>
-          </div>
-        ) : null}
+          </div> :
+        null}
 
-        {step === "review" ? (
-          <form action={selectedSlotDetails ? action : waitlistAction} className={panelClass}>
+        {step === "review" ?
+        <form action={selectedSlotDetails ? action : waitlistAction} className={panelClass}>
             <input className="ui-zero"
-              aria-hidden="true"
-              autoComplete="off"
-              name="companyWebsite"
-             
-              tabIndex={-1}
-              type="text"
-            />
+          aria-hidden="true"
+          autoComplete="off"
+          name="companyWebsite"
+
+          tabIndex={-1}
+          type="text" />
+          
             <input name="serviceId" type="hidden" value={selectedService?.id || ""} />
             <input name="staffId" type="hidden" value={selectedSlotDetails?.staffId || (!selectedSlotDetails ? staffFilterId : "")} />
             <input name="resourceIds" type="hidden" value={selectedSlotDetails?.resourceIds.join(",") || ""} />
@@ -437,18 +438,18 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
                 <span>{selectedSlotDetails ? "Time" : "Waitlist date"}</span>
                 <strong>{selectedSlotDetails ? `${date} at ${selectedSlotDetails.label}` : date}</strong>
               </div>
-              {selectedSlotDetails?.staffName ? (
-                <div>
+              {selectedSlotDetails?.staffName ?
+            <div>
                   <span>Staff</span>
                   <strong>{selectedSlotDetails.staffName}</strong>
-                </div>
-              ) : null}
-              {selectedSlotDetails?.resourceNames.length ? (
-                <div>
+                </div> :
+            null}
+              {selectedSlotDetails?.resourceNames.length ?
+            <div>
                   <span>Resources</span>
                   <strong>{selectedSlotDetails.resourceNames.join(", ")}</strong>
-                </div>
-              ) : null}
+                </div> :
+            null}
               <div>
                 <span>Name</span>
                 <strong>{customerName}</strong>
@@ -459,40 +460,40 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
               </div>
             </div>
 
-            {selectedService?.policyText ? (
-              <label className="policy-check">
+            {selectedService?.policyText ?
+          <label className="policy-check">
                 <input
-                  checked={policyAccepted}
-                  name="policyAccepted"
-                  onChange={(event) => setPolicyAccepted(event.target.checked)}
-                  required={selectedService.requirePolicy}
-                  type="checkbox"
-                />
+              checked={policyAccepted}
+              name="policyAccepted"
+              onChange={(event) => setPolicyAccepted(event.target.checked)}
+              required={selectedService.requirePolicy}
+              type="checkbox" />
+            
                 <span>{selectedService.policyText}</span>
-              </label>
-            ) : null}
+              </label> :
+          null}
 
             <div className="booking-actions">
-              <button className="ui-button ui-button-secondary" onClick={goBack} type="button">
+              <Button onClick={goBack} type="button" variant="secondary">
                 <ChevronLeft size={18} />
                 Back
-              </button>
-              <button
-                className="ui-button"
-                aria-busy={submitting}
-                disabled={submitting || !reviewReady || (requiresPolicyAcceptance && !policyAccepted)}
-                type="submit"
-              >
+              </Button>
+              <Button
+
+              aria-busy={submitting}
+              disabled={submitting || !reviewReady || requiresPolicyAcceptance && !policyAccepted}
+              type="submit">
+              
                 <CalendarCheck size={18} />
-                {selectedSlotDetails
-                  ? selectedService?.requestOnly
-                    ? "Request appointment"
-                    : "Book appointment"
-                  : "Join waitlist"}
-              </button>
+                {selectedSlotDetails ?
+              selectedService?.requestOnly ?
+              "Request appointment" :
+              "Book appointment" :
+              "Join waitlist"}
+              </Button>
             </div>
-          </form>
-        ) : null}
+          </form> :
+        null}
       </section>
 
       <footer className="booking-footer-summary">
@@ -522,11 +523,11 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
           <div>
             <dt>Resources</dt>
             <dd className="summary-value" key={selectedSlotDetails?.resourceIds.join("-") || "resources-empty"}>
-              {selectedSlotDetails?.resourceNames.length
-                ? selectedSlotDetails.resourceNames.join(", ")
-                : selectedService?.resources.length
-                  ? selectedService.resources.map((resource) => resource.name).join(", ")
-                  : "No dedicated resource"}
+              {selectedSlotDetails?.resourceNames.length ?
+              selectedSlotDetails.resourceNames.join(", ") :
+              selectedService?.resources.length ?
+              selectedService.resources.map((resource) => resource.name).join(", ") :
+              "No dedicated resource"}
             </dd>
           </div>
           <div>
@@ -543,6 +544,6 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
           </div>
         </dl>
       </footer>
-    </div>
-  );
+    </div>);
+
 }

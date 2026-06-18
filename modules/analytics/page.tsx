@@ -11,7 +11,7 @@ import { createAnalyticsGoalAction, recordAnalyticsEventAction, updateAnalyticsG
 export const dynamic = "force-dynamic";
 
 type AnalyticsPageProps = {
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  searchParams: Promise<{saved?: string;error?: string;}>;
 };
 
 function eventDisplayName(eventType: AnalyticsEventType, eventName: string) {
@@ -26,12 +26,12 @@ function countBy<T>(items: T[], getKey: (item: T) => string) {
     counts.set(key, (counts.get(key) || 0) + 1);
   }
 
-  return [...counts.entries()]
-    .map(([label, count]) => ({ label, count }))
-    .sort((left, right) => right.count - left.count);
+  return [...counts.entries()].
+  map(([label, count]) => ({ label, count })).
+  sort((left, right) => right.count - left.count);
 }
 
-function goalWhere(goal: { eventType: AnalyticsEventType; eventName: string }, siteId: string): Prisma.AnalyticsEventWhereInput {
+function goalWhere(goal: {eventType: AnalyticsEventType;eventName: string;}, siteId: string): Prisma.AnalyticsEventWhereInput {
   return {
     siteId,
     eventType: goal.eventType,
@@ -44,41 +44,41 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   await enforceAnalyticsRetention(settings.siteId, settings.analyticsRetentionDays);
   const [
-    recentEvents,
-    goals,
-    eventCount,
-    bookingCount,
-    completedBookingCount,
-    leadSubmissionCount,
-    publishedGalleryCount,
-    galleryViewCount,
-    favoriteCount,
-    paidOrders,
-    paidRevenue
-  ] = await Promise.all([
-    prisma.analyticsEvent.findMany({
-      where: { siteId: settings.siteId },
-      orderBy: { occurredAt: "desc" },
-      take: 250
-    }),
-    prisma.analyticsGoal.findMany({
-      where: { siteId: settings.siteId },
-      orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
-      take: 30
-    }),
-    prisma.analyticsEvent.count({ where: { siteId: settings.siteId } }),
-    prisma.booking.count({ where: { siteId: settings.siteId } }),
-    prisma.booking.count({ where: { siteId: settings.siteId, status: BookingStatus.COMPLETED } }),
-    prisma.formSubmission.count({ where: { form: { siteId: settings.siteId } } }),
-    prisma.portfolioGallery.count({ where: { siteId: settings.siteId, status: PortfolioGalleryStatus.PUBLISHED } }),
-    prisma.analyticsEvent.count({ where: { siteId: settings.siteId, eventType: AnalyticsEventType.GALLERY_VIEWED } }),
-    prisma.portfolioGalleryFavorite.count({ where: { gallery: { siteId: settings.siteId } } }),
-    prisma.order.count({ where: { siteId: settings.siteId, status: OrderStatus.PAID } }),
-    prisma.order.aggregate({
-      where: { siteId: settings.siteId, status: OrderStatus.PAID },
-      _sum: { totalCents: true }
-    })
-  ]);
+  recentEvents,
+  goals,
+  eventCount,
+  bookingCount,
+  completedBookingCount,
+  leadSubmissionCount,
+  publishedGalleryCount,
+  galleryViewCount,
+  favoriteCount,
+  paidOrders,
+  paidRevenue] =
+  await Promise.all([
+  prisma.analyticsEvent.findMany({
+    where: { siteId: settings.siteId },
+    orderBy: { occurredAt: "desc" },
+    take: 250
+  }),
+  prisma.analyticsGoal.findMany({
+    where: { siteId: settings.siteId },
+    orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
+    take: 30
+  }),
+  prisma.analyticsEvent.count({ where: { siteId: settings.siteId } }),
+  prisma.booking.count({ where: { siteId: settings.siteId } }),
+  prisma.booking.count({ where: { siteId: settings.siteId, status: BookingStatus.COMPLETED } }),
+  prisma.formSubmission.count({ where: { form: { siteId: settings.siteId } } }),
+  prisma.portfolioGallery.count({ where: { siteId: settings.siteId, status: PortfolioGalleryStatus.PUBLISHED } }),
+  prisma.analyticsEvent.count({ where: { siteId: settings.siteId, eventType: AnalyticsEventType.GALLERY_VIEWED } }),
+  prisma.portfolioGalleryFavorite.count({ where: { gallery: { siteId: settings.siteId } } }),
+  prisma.order.count({ where: { siteId: settings.siteId, status: OrderStatus.PAID } }),
+  prisma.order.aggregate({
+    where: { siteId: settings.siteId, status: OrderStatus.PAID },
+    _sum: { totalCents: true }
+  })]
+  );
 
   const goalProgress = await Promise.all(
     goals.map(async (goal) => {
@@ -127,50 +127,50 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         <StatTile label="Gallery engagement" value={`${galleryViewCount} / ${favoriteCount}`} detail="Tracked gallery views and proofing favorites." />
       </EqualGrid>
 
-      <section className="grid-2">
+      <EqualGrid as="section">
         <Card as="section" minHeight="none">
         <form action={recordAnalyticsEventAction} className="form-grid">
           <h2 className="section-title">Record manual event</h2>
-          <div className="grid-2">
+          <EqualGrid>
             <Field label="Event type" htmlFor="event-type">
               <Select id="event-type" name="eventType" defaultValue={AnalyticsEventType.CUSTOM}>
-                {Object.values(AnalyticsEventType).map((type) => (
+                {Object.values(AnalyticsEventType).map((type) =>
                   <option key={type} value={type}>
                     {enumLabel(type)}
                   </option>
-                ))}
+                  )}
               </Select>
             </Field>
             <Field label="Event name" htmlFor="event-name">
               <Input id="event-name" name="eventName" placeholder="custom_event_name" />
             </Field>
-          </div>
-          <div className="grid-3">
+          </EqualGrid>
+          <EqualGrid min="220px">
             <Field label="Source" htmlFor="event-source"><Input id="event-source" name="source" placeholder="google" /></Field>
             <Field label="Medium" htmlFor="event-medium"><Input id="event-medium" name="medium" placeholder="organic" /></Field>
             <Field label="Campaign" htmlFor="event-campaign"><Input id="event-campaign" name="campaign" /></Field>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <Field label="Pathname" htmlFor="event-pathname"><Input id="event-pathname" name="pathname" placeholder="/book" /></Field>
             <Field label="Landing page" htmlFor="event-landing"><Input id="event-landing" name="landingPage" placeholder="/" /></Field>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <Field label="Client email" htmlFor="event-client-email"><Input id="event-client-email" name="clientEmail" type="email" /></Field>
             <Field label="Referrer" htmlFor="event-referrer"><Input id="event-referrer" name="referrer" /></Field>
-          </div>
-          <div className="grid-3">
+          </EqualGrid>
+          <EqualGrid min="220px">
             <Field label="Value" htmlFor="event-value"><Input id="event-value" name="value" inputMode="decimal" placeholder="125.00" /></Field>
             <Field label="Currency" htmlFor="event-currency"><Input id="event-currency" name="currency" defaultValue="USD" maxLength={3} /></Field>
             <Field label="Occurred at" htmlFor="event-occurred"><Input id="event-occurred" name="occurredAt" type="datetime-local" /></Field>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <Field label="Related type" htmlFor="event-related-type"><Input id="event-related-type" name="relatedType" placeholder="booking" /></Field>
             <Field label="Related id" htmlFor="event-related-id"><Input id="event-related-id" name="relatedId" /></Field>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <Field label="Metadata key" htmlFor="event-metadata-key"><Input id="event-metadata-key" name="metadataKey" placeholder="service" /></Field>
             <Field label="Metadata value" htmlFor="event-metadata-value"><Input id="event-metadata-value" name="metadataValue" /></Field>
-          </div>
+          </EqualGrid>
           <Button type="submit">
             <Plus size={18} />
             Record manual event
@@ -181,27 +181,27 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         <Card as="section" minHeight="none">
         <form action={createAnalyticsGoalAction} className="form-grid">
           <h2 className="section-title">Create conversion goal</h2>
-          <div className="grid-2">
+          <EqualGrid>
             <Field label="Name" htmlFor="goal-name"><Input id="goal-name" name="name" required /></Field>
             <Field label="Key" htmlFor="goal-key"><Input id="goal-key" name="key" placeholder="bookings-completed" /></Field>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <Field label="Event type" htmlFor="goal-event-type">
               <Select id="goal-event-type" name="eventType" defaultValue={AnalyticsEventType.BOOKING_COMPLETED}>
-                {Object.values(AnalyticsEventType).map((type) => (
+                {Object.values(AnalyticsEventType).map((type) =>
                   <option key={type} value={type}>
                     {enumLabel(type)}
                   </option>
-                ))}
+                  )}
               </Select>
             </Field>
             <Field label="Event name" htmlFor="goal-event-name"><Input id="goal-event-name" name="eventName" placeholder="booking completed" /></Field>
-          </div>
-          <div className="grid-3">
+          </EqualGrid>
+          <EqualGrid min="220px">
             <Field label="Target count" htmlFor="goal-target-count"><Input id="goal-target-count" name="targetCount" type="number" min="1" defaultValue="10" required /></Field>
             <Field label="Target value" htmlFor="goal-target-value"><Input id="goal-target-value" name="targetValue" inputMode="decimal" /></Field>
             <Field label="Currency" htmlFor="goal-currency"><Input id="goal-currency" name="currency" defaultValue="USD" maxLength={3} /></Field>
-          </div>
+          </EqualGrid>
           <label className="ui-check-row">
             <input name="isActive" type="checkbox" defaultChecked />
             Active
@@ -211,9 +211,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           </Button>
         </form>
         </Card>
-      </section>
+      </EqualGrid>
 
-      <section className="grid-2">
+      <EqualGrid as="section">
         <Card as="section" minHeight="none">
         <Stack>
           <h2 className="section-title">Conversion goals</h2>
@@ -228,11 +228,11 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
             </thead>
             <tbody>
               {goals.map((goal) => {
-                const progress = progressByGoal.get(goal.id) || { count: 0, valueCents: 0 };
-                const progressPercent = Math.min(100, Math.round((progress.count / Math.max(1, goal.targetCount)) * 100));
+                  const progress = progressByGoal.get(goal.id) || { count: 0, valueCents: 0 };
+                  const progressPercent = Math.min(100, Math.round(progress.count / Math.max(1, goal.targetCount) * 100));
 
-                return (
-                  <tr key={goal.id}>
+                  return (
+                    <tr key={goal.id}>
                     <td>
                       <strong>{goal.name}</strong>
                       <br />
@@ -257,14 +257,14 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                         </Button>
                       </form>
                     </td>
-                  </tr>
-                );
-              })}
-              {!goals.length ? (
+                  </tr>);
+
+                })}
+              {!goals.length ?
                 <tr>
                   <td colSpan={4}>No conversion goals yet.</td>
-                </tr>
-              ) : null}
+                </tr> :
+                null}
             </tbody>
           </Table>
         </Stack>
@@ -281,24 +281,24 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
               </tr>
             </thead>
             <tbody>
-              {topEvents.map((event) => (
+              {topEvents.map((event) =>
                 <tr key={event.label}>
                   <td>{event.label}</td>
                   <td>{event.count}</td>
                 </tr>
-              ))}
-              {!topEvents.length ? (
+                )}
+              {!topEvents.length ?
                 <tr>
                   <td colSpan={2}>No events recorded yet.</td>
-                </tr>
-              ) : null}
+                </tr> :
+                null}
             </tbody>
           </Table>
         </Stack>
         </Card>
-      </section>
+      </EqualGrid>
 
-      <section className="grid-2">
+      <EqualGrid as="section">
         <Card as="section" minHeight="none">
         <Stack>
           <h2 className="section-title">Source attribution</h2>
@@ -310,17 +310,17 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
               </tr>
             </thead>
             <tbody>
-              {topSources.map((source) => (
+              {topSources.map((source) =>
                 <tr key={source.label}>
                   <td>{source.label}</td>
                   <td>{source.count}</td>
                 </tr>
-              ))}
-              {!topSources.length ? (
+                )}
+              {!topSources.length ?
                 <tr>
                   <td colSpan={2}>No source data yet.</td>
-                </tr>
-              ) : null}
+                </tr> :
+                null}
             </tbody>
           </Table>
         </Stack>
@@ -339,7 +339,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
               </tr>
             </thead>
             <tbody>
-              {visibleEvents.map((event) => (
+              {visibleEvents.map((event) =>
                 <tr key={event.id}>
                   <td>
                     <strong>{eventDisplayName(event.eventType, event.eventName)}</strong>
@@ -350,17 +350,17 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                   <td>{event.valueCents ? formatMoney(event.valueCents, event.currency) : "-"}</td>
                   <td>{formatDateTime(event.occurredAt, settings.timezone)}</td>
                 </tr>
-              ))}
-              {!visibleEvents.length ? (
+                )}
+              {!visibleEvents.length ?
                 <tr>
                   <td colSpan={4}>No recent events yet.</td>
-                </tr>
-              ) : null}
+                </tr> :
+                null}
             </tbody>
           </Table>
         </Stack>
         </Card>
-      </section>
-    </div>
-  );
+      </EqualGrid>
+    </div>);
+
 }

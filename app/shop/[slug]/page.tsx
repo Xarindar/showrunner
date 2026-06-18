@@ -14,11 +14,12 @@ import { prisma } from "@/lib/prisma";
 import { buildBreadcrumbJsonLd, buildImageObjectJsonLd, buildPageMetadata, buildProductJsonLd, getCanonicalBaseUrl } from "@/lib/seo";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
+import { Button, ButtonLink, Card, EqualGrid } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type ProductPageProps = {
-  params: Promise<{ slug: string }>;
+  params: Promise<{slug: string;}>;
 };
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
@@ -40,7 +41,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   });
 }
 
-function variantLabel(variant: { name: string; optionName: string; optionValue: string; isDefault: boolean }) {
+function variantLabel(variant: {name: string;optionName: string;optionValue: string;isDefault: boolean;}) {
   if (variant.isDefault) return variant.name;
   if (variant.optionName || variant.optionValue) return `${variant.optionName || "Option"}: ${variant.optionValue || variant.name}`;
   return variant.name;
@@ -96,35 +97,35 @@ export default async function ProductPage({ params }: ProductPageProps) {
     <main className="site-shell" style={themeToCssVars(settings)}>
       <JsonLd
         data={[
-          buildProductJsonLd({
-            baseUrl,
-            categories,
-            currency: product.currency,
-            description: product.summary || product.description,
-            imageUrl: product.imageUrl,
-            name: product.name,
-            path: `/shop/${product.slug}`,
-            priceCents: defaultPriceCents,
-            sku: defaultVariant?.sku || product.sku
-          }),
-          product.imageUrl
-            ? buildImageObjectJsonLd({
-                baseUrl,
-                description: product.summary || product.description,
-                name: product.name,
-                url: product.imageUrl
-              })
-            : {},
-          buildBreadcrumbJsonLd(
-            [
-              { name: "Home", path: "/" },
-              { name: "Shop", path: "/shop" },
-              { name: product.name, path: `/shop/${product.slug}` }
-            ],
-            baseUrl
-          )
-        ].filter((item) => Object.keys(item).length)}
-      />
+        buildProductJsonLd({
+          baseUrl,
+          categories,
+          currency: product.currency,
+          description: product.summary || product.description,
+          imageUrl: product.imageUrl,
+          name: product.name,
+          path: `/shop/${product.slug}`,
+          priceCents: defaultPriceCents,
+          sku: defaultVariant?.sku || product.sku
+        }),
+        product.imageUrl ?
+        buildImageObjectJsonLd({
+          baseUrl,
+          description: product.summary || product.description,
+          name: product.name,
+          url: product.imageUrl
+        }) :
+        {},
+        buildBreadcrumbJsonLd(
+          [
+          { name: "Home", path: "/" },
+          { name: "Shop", path: "/shop" },
+          { name: product.name, path: `/shop/${product.slug}` }],
+
+          baseUrl
+        )].
+        filter((item) => Object.keys(item).length)} />
+      
       <TrackAnalyticsEvent event={viewItemEvent} onceKey={`view-item:${product.id}:${defaultVariant?.id || "default"}`} />
       <nav className="site-nav">
         <Link href="/" className="brand">
@@ -132,35 +133,35 @@ export default async function ProductPage({ params }: ProductPageProps) {
           <span>{settings.businessName}</span>
         </Link>
         <div className="site-nav-links">
-          <Link href="/shop" className="ui-button ui-button-secondary">
+          <ButtonLink href="/shop" variant="secondary">
             Shop
-          </Link>
-          <Link href="/cart" className="ui-button">
+          </ButtonLink>
+          <ButtonLink href="/cart">
             <ShoppingCart size={18} />
             Cart
-          </Link>
+          </ButtonLink>
         </div>
       </nav>
 
       <section className="section ui-zero">
-        <div className="grid-2 ui-zero">
-          <div className="ui-card ui-card-density-normal ui-card-min-md">
-            {product.imageUrl ? (
-              <NextImage className="ui-zero"
-                alt={product.name}
-                src={product.imageUrl}
-                width={1000}
-                height={720}
-                priority
-                unoptimized
-               
-              />
-            ) : (
-              <div className="empty-state">No product image</div>
-            )}
-          </div>
+        <EqualGrid className="ui-zero">
+          <Card>
+            {product.imageUrl ?
+            <NextImage className="ui-zero"
+            alt={product.name}
+            src={product.imageUrl}
+            width={1000}
+            height={720}
+            priority
+            unoptimized /> :
 
-          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+
+
+            <div className="empty-state">No product image</div>
+            }
+          </Card>
+
+          <Card bodyClassName="ui-stack">
             <div>
               <p className="eyebrow">Product</p>
               <h1>{product.name}</h1>
@@ -169,58 +170,58 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
             <strong className="ui-zero">{formatMoney(defaultPriceCents, product.currency)}</strong>
 
-            {product.collectionProducts.length ? (
-              <div className="ui-zero">
-                {product.collectionProducts.map(({ collection }) => (
-                  <span className="ui-badge" key={collection.id}>
+            {product.collectionProducts.length ?
+            <div className="ui-zero">
+                {product.collectionProducts.map(({ collection }) =>
+              <span className="ui-badge" key={collection.id}>
                     {collection.name}
                   </span>
-                ))}
-              </div>
-            ) : null}
+              )}
+              </div> :
+            null}
 
-            {defaultVariant ? (
-              <TrackedAnalyticsForm
-                action={addToCartAction}
-                analyticsData={JSON.stringify({
-                  categories,
-                  currency: product.currency,
-                  productId: product.id,
-                  productName: product.name,
-                  variants: product.variants.map((variant) => ({
-                    id: variant.id,
-                    name: variantLabel(variant),
-                    priceCents: variant.priceCents ?? product.basePriceCents
-                  }))
-                })}
-                className="form-grid"
-                mode="add_to_cart"
-              >
+            {defaultVariant ?
+            <TrackedAnalyticsForm
+              action={addToCartAction}
+              analyticsData={JSON.stringify({
+                categories,
+                currency: product.currency,
+                productId: product.id,
+                productName: product.name,
+                variants: product.variants.map((variant) => ({
+                  id: variant.id,
+                  name: variantLabel(variant),
+                  priceCents: variant.priceCents ?? product.basePriceCents
+                }))
+              })}
+              className="form-grid"
+              mode="add_to_cart">
+              
                 <input type="hidden" name="productId" value={product.id} />
-                <div className="grid-2">
+                <EqualGrid>
                   <div className="ui-field">
                     <label htmlFor="variantId">Option</label>
                     <select id="variantId" name="variantId" defaultValue={defaultVariant.id}>
-                      {product.variants.map((variant) => (
-                        <option key={variant.id} value={variant.id}>
+                      {product.variants.map((variant) =>
+                    <option key={variant.id} value={variant.id}>
                           {variantLabel(variant)} - {formatMoney(variant.priceCents ?? product.basePriceCents, product.currency)}
                         </option>
-                      ))}
+                    )}
                     </select>
                   </div>
-                  {isGiftCard ? (
-                    <input type="hidden" name="quantity" value="1" />
-                  ) : (
-                    <div className="ui-field">
+                  {isGiftCard ?
+                <input type="hidden" name="quantity" value="1" /> :
+
+                <div className="ui-field">
                       <label htmlFor="quantity">Quantity</label>
                       <input id="quantity" name="quantity" type="number" min="1" max="999" defaultValue="1" required />
                     </div>
-                  )}
-                </div>
-                {isGiftCard ? (
-                  <div className="subpanel form-grid">
+                }
+                </EqualGrid>
+                {isGiftCard ?
+              <div className="subpanel form-grid">
                     <h2 className="ui-zero">Gift recipient</h2>
-                    <div className="grid-2">
+                    <EqualGrid>
                       <div className="ui-field">
                         <label htmlFor="giftCardRecipientName">Recipient name</label>
                         <input id="giftCardRecipientName" name="giftCardRecipientName" />
@@ -229,31 +230,31 @@ export default async function ProductPage({ params }: ProductPageProps) {
                         <label htmlFor="giftCardRecipientEmail">Recipient email</label>
                         <input id="giftCardRecipientEmail" name="giftCardRecipientEmail" type="email" required />
                       </div>
-                    </div>
+                    </EqualGrid>
                     <div className="ui-field">
                       <label htmlFor="giftCardMessage">Message</label>
                       <textarea id="giftCardMessage" name="giftCardMessage" />
                     </div>
-                  </div>
-                ) : null}
-                <button className="ui-button" type="submit" aria-label={`Add ${product.name} to cart`}>
+                  </div> :
+              null}
+                <Button type="submit" aria-label={`Add ${product.name} to cart`}>
                   <ShoppingCart size={18} />
                   Add to cart
-                </button>
-              </TrackedAnalyticsForm>
-            ) : (
-              <span className="ui-badge">No active variants</span>
-            )}
+                </Button>
+              </TrackedAnalyticsForm> :
 
-            {product.description && product.description !== product.summary ? (
-              <div className="subpanel">
+            <span className="ui-badge">No active variants</span>
+            }
+
+            {product.description && product.description !== product.summary ?
+            <div className="subpanel">
                 <h2 className="compact-title">Details</h2>
                 <p>{product.description}</p>
-              </div>
-            ) : null}
-          </div>
-        </div>
+              </div> :
+            null}
+          </Card>
+        </EqualGrid>
       </section>
-    </main>
-  );
+    </main>);
+
 }

@@ -13,8 +13,8 @@ import {
   deleteClientSegmentAction,
   importClientsCsvAction,
   mergeClientsAction,
-  reissueClientPortalLinkAction
-} from "./actions";
+  reissueClientPortalLinkAction } from "./actions";
+import { Button, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -94,46 +94,46 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
   const selectedSegment = segments.find((segment) => segment.key === params.segment);
   const where: Prisma.ClientWhereInput = await getAccessibleClientWhere(user, settings.siteId, {
     AND: [
-      selectedSegment ? segmentWhere(selectedSegment.criteria) : {},
-      query
-        ? {
-            OR: [
-              { name: { contains: query, mode: "insensitive" } },
-              { email: { contains: query, mode: "insensitive" } },
-              { phone: { contains: query, mode: "insensitive" } },
-              { companyName: { contains: query, mode: "insensitive" } },
-              { familyName: { contains: query, mode: "insensitive" } },
-              { tags: { some: { label: { contains: query.toLowerCase(), mode: "insensitive" } } } }
-            ]
-          }
-        : {}
-    ]
+    selectedSegment ? segmentWhere(selectedSegment.criteria) : {},
+    query ?
+    {
+      OR: [
+      { name: { contains: query, mode: "insensitive" } },
+      { email: { contains: query, mode: "insensitive" } },
+      { phone: { contains: query, mode: "insensitive" } },
+      { companyName: { contains: query, mode: "insensitive" } },
+      { familyName: { contains: query, mode: "insensitive" } },
+      { tags: { some: { label: { contains: query.toLowerCase(), mode: "insensitive" } } } }]
+
+    } :
+    {}]
+
   });
   const [clients, clientCount, pipelineCounts, mergeCandidates] = await Promise.all([
-    prisma.client.findMany({
-      where,
-      include: {
-        _count: { select: { billingDocuments: true, bookings: true, formSubmissions: true, notes: true, orders: true } },
-        tags: { orderBy: { label: "asc" }, take: 6 },
-        bookings: { orderBy: { startsAt: "desc" }, take: 1 }
-      },
-      orderBy: { updatedAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize
-    }),
-    prisma.client.count({ where }),
-    prisma.client.groupBy({
-      by: ["pipelineStage"],
-      where,
-      _count: { _all: true }
-    }),
-    prisma.client.findMany({
-      where: where,
-      select: { id: true, name: true, email: true },
-      orderBy: { updatedAt: "desc" },
-      take: 100
-    })
-  ]);
+  prisma.client.findMany({
+    where,
+    include: {
+      _count: { select: { billingDocuments: true, bookings: true, formSubmissions: true, notes: true, orders: true } },
+      tags: { orderBy: { label: "asc" }, take: 6 },
+      bookings: { orderBy: { startsAt: "desc" }, take: 1 }
+    },
+    orderBy: { updatedAt: "desc" },
+    skip: (page - 1) * pageSize,
+    take: pageSize
+  }),
+  prisma.client.count({ where }),
+  prisma.client.groupBy({
+    by: ["pipelineStage"],
+    where,
+    _count: { _all: true }
+  }),
+  prisma.client.findMany({
+    where: where,
+    select: { id: true, name: true, email: true },
+    orderBy: { updatedAt: "desc" },
+    take: 100
+  })]
+  );
   const pageCount = Math.max(1, Math.ceil(clientCount / pageSize));
   const message = savedMessage(params);
 
@@ -150,27 +150,27 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
       {message ? <div className="success-message">{message}</div> : null}
       {params.error ? <div className="error">{params.error}</div> : null}
 
-      <section className="grid-2">
-        <form action={createClientAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      <EqualGrid as="section">
+        <Card action={createClientAction} as="form" minHeight="none" bodyClassName="form-grid">
           <h2 className="section-title">Add client</h2>
           {[
-            "alternateEmails",
-            "alternatePhones",
-            "addressLine1",
-            "addressLine2",
-            "city",
-            "region",
-            "postalCode",
-            "country",
-            "timezone",
-            "pronouns",
-            "birthday",
-            "anniversary",
-            "preferences"
-          ].map((name) => (
-            <input key={name} name={name} type="hidden" value="" />
-          ))}
-          <div className="grid-2">
+          "alternateEmails",
+          "alternatePhones",
+          "addressLine1",
+          "addressLine2",
+          "city",
+          "region",
+          "postalCode",
+          "country",
+          "timezone",
+          "pronouns",
+          "birthday",
+          "anniversary",
+          "preferences"].
+          map((name) =>
+          <input key={name} name={name} type="hidden" value="" />
+          )}
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="name">Name</label>
               <input id="name" name="name" required />
@@ -179,12 +179,12 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
               <label htmlFor="email">Email</label>
               <input id="email" name="email" type="email" required />
             </div>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="phone">Phone</label>
             <input id="phone" name="phone" />
           </div>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="status">Status</label>
               <select id="status" name="status" defaultValue="lead">
@@ -197,15 +197,15 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
             <div className="ui-field">
               <label htmlFor="pipelineStage">Pipeline</label>
               <select id="pipelineStage" name="pipelineStage" defaultValue={ClientPipelineStage.INQUIRY}>
-                {Object.values(ClientPipelineStage).map((stage) => (
-                  <option key={stage} value={stage}>
+                {Object.values(ClientPipelineStage).map((stage) =>
+                <option key={stage} value={stage}>
                     {enumLabel(stage)}
                   </option>
-                ))}
+                )}
               </select>
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="companyName">Company or household</label>
               <input id="companyName" name="companyName" />
@@ -214,18 +214,18 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
               <label htmlFor="tags">Tags</label>
               <input id="tags" name="tags" placeholder="vip, wedding, retainer" />
             </div>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="privateNotes">Private notes</label>
             <textarea id="privateNotes" name="privateNotes" />
           </div>
-          <button className="ui-button" type="submit">
+          <Button type="submit">
             <Plus size={18} />
             Add client
-          </button>
-        </form>
+          </Button>
+        </Card>
 
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        <Card>
           <Users size={22} />
           <h2 className="section-title">{clientCount} clients</h2>
           <p className="lead lead-compact">
@@ -237,15 +237,15 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
               return (
                 <span className="ui-badge" key={stage}>
                   {enumLabel(stage)}: {count}
-                </span>
-              );
+                </span>);
+
             })}
           </div>
-        </div>
-      </section>
+        </Card>
+      </EqualGrid>
 
-      <section className="grid-2">
-        <div className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      <EqualGrid as="section">
+        <Card minHeight="none" bodyClassName="form-grid">
           <h2 className="section-title">CSV tools</h2>
           <p className="lead lead-compact">
             Import new client records from a mapped header row, or export the full client book for backup and analysis.
@@ -255,87 +255,87 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
               <label htmlFor="client-csv">CSV file</label>
               <input id="client-csv" name="file" type="file" accept=".csv,text/csv" required />
             </div>
-            <button className="ui-button ui-button-secondary" type="submit">
+            <Button type="submit" variant="secondary">
               <Upload size={16} />
               Import CSV
-            </button>
+            </Button>
           </form>
-          <Link className="ui-button" href="/admin/modules/clients/export">
+          <ButtonLink href="/admin/modules/clients/export">
             <Download size={16} />
             Export all clients
-          </Link>
-        </div>
+          </ButtonLink>
+        </Card>
 
-        <form action={mergeClientsAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+        <Card action={mergeClientsAction} as="form" minHeight="none" bodyClassName="form-grid">
           <h2 className="section-title">Merge duplicates</h2>
           <div className="ui-field">
             <label htmlFor="survivorId">Keep this record</label>
             <select id="survivorId" name="survivorId" required>
               <option value="">Choose survivor</option>
-              {mergeCandidates.map((client) => (
-                <option key={client.id} value={client.id}>
+              {mergeCandidates.map((client) =>
+              <option key={client.id} value={client.id}>
                   {client.name} - {client.email}
                 </option>
-              ))}
+              )}
             </select>
           </div>
           <div className="ui-field">
             <label htmlFor="duplicateId">Merge and remove this duplicate</label>
             <select id="duplicateId" name="duplicateId" required>
               <option value="">Choose duplicate</option>
-              {mergeCandidates.map((client) => (
-                <option key={client.id} value={client.id}>
+              {mergeCandidates.map((client) =>
+              <option key={client.id} value={client.id}>
                   {client.name} - {client.email}
                 </option>
-              ))}
+              )}
             </select>
           </div>
           <label className="ui-zero">
             <input name="confirmMerge" type="checkbox" />
             Confirm duplicate merge
           </label>
-          <button className="ui-button ui-button-secondary" type="submit">
+          <Button type="submit" variant="secondary">
             <GitMerge size={16} />
             Merge records
-          </button>
-        </form>
-      </section>
+          </Button>
+        </Card>
+      </EqualGrid>
 
-      <section className="grid-2">
-        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+      <EqualGrid as="section">
+        <Card bodyClassName="ui-stack">
           <h2 className="section-title">Saved segments</h2>
           <div className="ui-zero">
             <Link className={!selectedSegment ? "ui-button" : "ui-button ui-button-secondary"} href="/admin/modules/clients">
               All clients
             </Link>
-            {segments.map((segment) => (
-              <Link
-                className={selectedSegment?.id === segment.id ? "ui-button" : "ui-button ui-button-secondary"}
-                href={`/admin/modules/clients?segment=${encodeURIComponent(segment.key)}`}
-                key={segment.id}
-              >
+            {segments.map((segment) =>
+            <Link
+              className={selectedSegment?.id === segment.id ? "ui-button" : "ui-button ui-button-secondary"}
+              href={`/admin/modules/clients?segment=${encodeURIComponent(segment.key)}`}
+              key={segment.id}>
+              
                 {segment.name}
               </Link>
-            ))}
+            )}
           </div>
-          {selectedSegment ? (
-            <form action={deleteClientSegmentAction} className="form-grid">
+          {selectedSegment ?
+          <form action={deleteClientSegmentAction} className="form-grid">
               <input type="hidden" name="id" value={selectedSegment.id} />
               <label className="ui-zero">
                 <input name="confirmDelete" type="checkbox" />
                 Confirm segment delete
               </label>
-              <button className="ui-button ui-button-secondary" type="submit">
+              <Button type="submit" variant="secondary">
                 <Trash2 size={16} />
                 Delete selected segment
-              </button>
-            </form>
-          ) : null}
-        </div>
+              </Button>
+            </form> :
+          null}
+        </Card>
 
-        <form action={createClientSegmentAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+        <Card action={createClientSegmentAction} as="form" minHeight="none" bodyClassName="form-grid">
           <h2 className="section-title">Save segment</h2>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="segment-name">Name</label>
               <input id="segment-name" name="name" required />
@@ -344,8 +344,8 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
               <label htmlFor="segment-tag">Tag</label>
               <input id="segment-tag" name="tag" />
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="segment-status">Status</label>
               <select id="segment-status" name="status" defaultValue="">
@@ -360,15 +360,15 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
               <label htmlFor="segment-stage">Pipeline</label>
               <select id="segment-stage" name="pipelineStage" defaultValue="">
                 <option value="">Any stage</option>
-                {Object.values(ClientPipelineStage).map((stage) => (
-                  <option key={stage} value={stage}>
+                {Object.values(ClientPipelineStage).map((stage) =>
+                <option key={stage} value={stage}>
                     {enumLabel(stage)}
                   </option>
-                ))}
+                )}
               </select>
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <label className="ui-zero">
               <input name="pastDue" type="checkbox" />
               Past due
@@ -377,8 +377,8 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
               <input name="upcomingAppointment" type="checkbox" />
               Upcoming appointment
             </label>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="segment-recent">Recent purchase days</label>
               <input id="segment-recent" name="recentPurchaseDays" type="number" min="1" />
@@ -387,15 +387,15 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
               <label htmlFor="segment-stale">No activity days</label>
               <input id="segment-stale" name="noRecentActivityDays" type="number" min="1" />
             </div>
-          </div>
-          <button className="ui-button ui-button-secondary" type="submit">
+          </EqualGrid>
+          <Button type="submit" variant="secondary">
             <Save size={16} />
             Save segment
-          </button>
-        </form>
-      </section>
+          </Button>
+        </Card>
+      </EqualGrid>
 
-      <section className="ui-card ui-card-density-normal ui-card-min-md">
+      <Card as="section">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Client list</h2>
@@ -404,12 +404,12 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
           <form className="ui-zero" action="/admin/modules/clients">
             {selectedSegment ? <input type="hidden" name="segment" value={selectedSegment.key} /> : null}
             <input aria-label="Search clients" name="q" placeholder="Search clients" defaultValue={query} />
-            <button className="ui-button ui-button-secondary" type="submit">
+            <Button type="submit" variant="secondary">
               Search
-            </button>
+            </Button>
           </form>
         </div>
-        <table className="ui-table">
+        <Table>
           <thead>
             <tr>
               <th>Client</th>
@@ -419,8 +419,8 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
             </tr>
           </thead>
           <tbody>
-            {clients.map((client) => (
-              <tr key={client.id}>
+            {clients.map((client) =>
+            <tr key={client.id}>
                 <td>
                   <Link href={`/admin/clients/${client.id}`}>
                     <strong>{client.name}</strong>
@@ -429,26 +429,26 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                   <span className="muted-text">{client.companyName || client.familyName || client.email}</span>
                   <br />
                   <Link className="ui-zero"
-                    href={clientPortalPath({
-                      clientId: client.id,
-                      email: client.email,
-                      portalAccessVersion: client.portalAccessVersion,
-                      siteId: settings.siteId
-                    })}>
+                href={clientPortalPath({
+                  clientId: client.id,
+                  email: client.email,
+                  portalAccessVersion: client.portalAccessVersion,
+                  siteId: settings.siteId
+                })}>
                     Client portal
                   </Link>
                   <form className="ui-zero" action={reissueClientPortalLinkAction}>
                     <input name="clientId" type="hidden" value={client.id} />
-                    <button className="ui-button ui-button-secondary" type="submit">
+                    <Button type="submit" variant="secondary">
                       Reissue portal link
-                    </button>
+                    </Button>
                   </form>
                   <br />
-                  {client.tags.map((tag) => (
-                    <span className="ui-badge ui-zero" key={tag.id}>
+                  {client.tags.map((tag) =>
+                <span className="ui-badge ui-zero" key={tag.id}>
                       {tag.label}
                     </span>
-                  ))}
+                )}
                 </td>
                 <td>
                   {client._count.bookings} appointments, {client._count.orders} orders, {client._count.billingDocuments} billing docs
@@ -464,34 +464,34 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                   <span className="ui-badge">{enumLabel(client.pipelineStage)}</span>
                 </td>
               </tr>
-            ))}
-            {!clients.length ? (
-              <tr>
+            )}
+            {!clients.length ?
+            <tr>
                 <td colSpan={4}>No clients yet.</td>
-              </tr>
-            ) : null}
+              </tr> :
+            null}
           </tbody>
-        </table>
+        </Table>
         <div className="ui-zero">
-          <Link
+          <ButtonLink
             aria-disabled={page <= 1}
-            className="ui-button ui-button-secondary"
-            href={`/admin/modules/clients?q=${encodeURIComponent(query)}&segment=${encodeURIComponent(params.segment || "")}&page=${Math.max(1, page - 1)}`}
-          >
+
+            href={`/admin/modules/clients?q=${encodeURIComponent(query)}&segment=${encodeURIComponent(params.segment || "")}&page=${Math.max(1, page - 1)}`} variant="secondary">
+            
             Previous
-          </Link>
+          </ButtonLink>
           <span className="ui-badge">
             Page {Math.min(page, pageCount)} of {pageCount}
           </span>
-          <Link
+          <ButtonLink
             aria-disabled={page >= pageCount}
-            className="ui-button ui-button-secondary"
-            href={`/admin/modules/clients?q=${encodeURIComponent(query)}&segment=${encodeURIComponent(params.segment || "")}&page=${Math.min(pageCount, page + 1)}`}
-          >
+
+            href={`/admin/modules/clients?q=${encodeURIComponent(query)}&segment=${encodeURIComponent(params.segment || "")}&page=${Math.min(pageCount, page + 1)}`} variant="secondary">
+            
             Next
-          </Link>
+          </ButtonLink>
         </div>
-      </section>
-    </div>
-  );
+      </Card>
+    </div>);
+
 }

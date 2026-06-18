@@ -6,8 +6,8 @@ import {
   type EmailBuilderBlock,
   type EmailBuilderDocument,
   emailBuilderDocumentFromText,
-  normalizeEmailBuilderDocument
-} from "@/lib/email-builder/document";
+  normalizeEmailBuilderDocument } from "@/lib/email-builder/document";
+import { Button, EqualGrid } from "@/components/ui";
 
 type EmailTemplateBuilderProps = {
   availableTokens: string[];
@@ -63,14 +63,14 @@ function blockIcon(type: BlockType) {
 }
 
 function textBodyFromDocument(document: EmailBuilderDocument) {
-  return document.blocks
-    .map((block) => {
-      if (block.type === "heading" || block.type === "text" || block.type === "button") return block.props.text;
-      if (block.type === "image") return block.props.alt;
-      return "";
-    })
-    .filter(Boolean)
-    .join("\n\n");
+  return document.blocks.
+  map((block) => {
+    if (block.type === "heading" || block.type === "text" || block.type === "button") return block.props.text;
+    if (block.type === "image") return block.props.alt;
+    return "";
+  }).
+  filter(Boolean).
+  join("\n\n");
 }
 
 function withAlign(block: EmailBuilderBlock, align: "left" | "center" | "right"): EmailBuilderBlock {
@@ -99,7 +99,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
   function updateBlock(blockId: string, next: EmailBuilderBlock) {
     setDocument((current) => ({
       ...current,
-      blocks: current.blocks.map((block) => (block.id === blockId ? next : block))
+      blocks: current.blocks.map((block) => block.id === blockId ? next : block)
     }));
   }
 
@@ -130,7 +130,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
   return (
     <div className="form-grid">
       <input name="builderJson" type="hidden" value={serializedDocument} readOnly />
-      <div className="grid-2">
+      <EqualGrid>
         <div className="ui-field">
           <label htmlFor={`${props.idPrefix}-subject`}>Subject</label>
           <input id={`${props.idPrefix}-subject`} name="subject" value={subject} onChange={(event) => setSubject(event.target.value)} required />
@@ -139,9 +139,9 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
           <label htmlFor={`${props.idPrefix}-preview`}>Preview text</label>
           <input id={`${props.idPrefix}-preview`} name="previewText" value={previewText} onChange={(event) => setPreviewText(event.target.value)} />
         </div>
-      </div>
+      </EqualGrid>
 
-      <div className="grid-2">
+      <EqualGrid>
         <div className="ui-field">
           <label htmlFor={`${props.idPrefix}-background`}>Background</label>
           <input
@@ -149,9 +149,9 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
             type="color"
             value={document.body.backgroundColor}
             onChange={(event) =>
-              setDocument((current) => ({ ...current, body: { ...current.body, backgroundColor: event.target.value } }))
-            }
-          />
+            setDocument((current) => ({ ...current, body: { ...current.body, backgroundColor: event.target.value } }))
+            } />
+          
         </div>
         <div className="ui-field">
           <label htmlFor={`${props.idPrefix}-text-color`}>Text color</label>
@@ -159,47 +159,47 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
             id={`${props.idPrefix}-text-color`}
             type="color"
             value={document.body.textColor}
-            onChange={(event) => setDocument((current) => ({ ...current, body: { ...current.body, textColor: event.target.value } }))}
-          />
+            onChange={(event) => setDocument((current) => ({ ...current, body: { ...current.body, textColor: event.target.value } }))} />
+          
         </div>
-      </div>
+      </EqualGrid>
 
       <div className="subpanel form-grid">
         <div className="ui-zero">
-          {(["heading", "text", "button", "image", "divider", "spacer"] as BlockType[]).map((type) => (
-            <button className="ui-button ui-button-secondary" key={type} type="button" onClick={() => addBlock(type)}>
+          {(["heading", "text", "button", "image", "divider", "spacer"] as BlockType[]).map((type) =>
+          <Button key={type} type="button" onClick={() => addBlock(type)} variant="secondary">
               {blockIcon(type)}
               {type}
-            </button>
-          ))}
+            </Button>
+          )}
         </div>
 
-        {document.blocks.map((block) => (
-          <div className="subpanel form-grid" key={block.id}>
+        {document.blocks.map((block) =>
+        <div className="subpanel form-grid" key={block.id}>
             <div className="page-header ui-zero">
               <strong>{blockLabel(block)}</strong>
               <div className="ui-zero">
-                <button className="ui-button ui-button-secondary" type="button" onClick={() => moveBlock(block.id, -1)} aria-label="Move up">
+                <Button type="button" onClick={() => moveBlock(block.id, -1)} aria-label="Move up" variant="secondary">
                   <ArrowUp size={16} />
-                </button>
-                <button className="ui-button ui-button-secondary" type="button" onClick={() => moveBlock(block.id, 1)} aria-label="Move down">
+                </Button>
+                <Button type="button" onClick={() => moveBlock(block.id, 1)} aria-label="Move down" variant="secondary">
                   <ArrowDown size={16} />
-                </button>
-                <button className="ui-button ui-button-danger" type="button" onClick={() => removeBlock(block.id)} aria-label="Delete block">
+                </Button>
+                <Button type="button" onClick={() => removeBlock(block.id)} aria-label="Delete block" variant="danger">
                   <Trash2 size={16} />
-                </button>
+                </Button>
               </div>
             </div>
 
-            {block.type === "heading" && (
-              <>
+            {block.type === "heading" &&
+          <>
                 <div className="ui-field">
                   <label htmlFor={`${block.id}-level`}>Level</label>
                   <select
-                    id={`${block.id}-level`}
-                    value={block.props.level}
-                    onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, level: event.target.value as "h1" | "h2" | "h3" } })}
-                  >
+                id={`${block.id}-level`}
+                value={block.props.level}
+                onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, level: event.target.value as "h1" | "h2" | "h3" } })}>
+                
                     <option value="h1">h1</option>
                     <option value="h2">h2</option>
                     <option value="h3">h3</option>
@@ -208,122 +208,122 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
                 <div className="ui-field">
                   <label htmlFor={`${block.id}-text`}>Text</label>
                   <textarea
-                    id={`${block.id}-text`}
-                    value={block.props.text}
-                    onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, text: event.target.value } })}
-                  />
+                id={`${block.id}-text`}
+                value={block.props.text}
+                onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, text: event.target.value } })} />
+              
                 </div>
               </>
-            )}
+          }
 
-            {block.type === "text" && (
-              <div className="ui-field">
+            {block.type === "text" &&
+          <div className="ui-field">
                 <label htmlFor={`${block.id}-text`}>Text</label>
                 <textarea
-                  id={`${block.id}-text`}
-                  value={block.props.text}
-                  onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, text: event.target.value } })}
-                />
+              id={`${block.id}-text`}
+              value={block.props.text}
+              onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, text: event.target.value } })} />
+            
               </div>
-            )}
+          }
 
-            {block.type === "button" && (
-              <div className="grid-2">
+            {block.type === "button" &&
+          <EqualGrid>
                 <div className="ui-field">
                   <label htmlFor={`${block.id}-button-text`}>Button text</label>
                   <input
-                    id={`${block.id}-button-text`}
-                    value={block.props.text}
-                    onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, text: event.target.value } })}
-                  />
+                id={`${block.id}-button-text`}
+                value={block.props.text}
+                onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, text: event.target.value } })} />
+              
                 </div>
                 <div className="ui-field">
                   <label htmlFor={`${block.id}-button-url`}>Button URL</label>
                   <input
-                    id={`${block.id}-button-url`}
-                    value={block.props.url}
-                    onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, url: event.target.value } })}
-                  />
+                id={`${block.id}-button-url`}
+                value={block.props.url}
+                onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, url: event.target.value } })} />
+              
                 </div>
-              </div>
-            )}
+              </EqualGrid>
+          }
 
-            {block.type === "image" && (
-              <div className="grid-2">
+            {block.type === "image" &&
+          <EqualGrid>
                 <div className="ui-field">
                   <label htmlFor={`${block.id}-image-src`}>Image URL</label>
                   <input
-                    id={`${block.id}-image-src`}
-                    value={block.props.src}
-                    onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, src: event.target.value } })}
-                  />
+                id={`${block.id}-image-src`}
+                value={block.props.src}
+                onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, src: event.target.value } })} />
+              
                 </div>
                 <div className="ui-field">
                   <label htmlFor={`${block.id}-image-alt`}>Alt text</label>
                   <input
-                    id={`${block.id}-image-alt`}
-                    value={block.props.alt}
-                    onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, alt: event.target.value } })}
-                  />
+                id={`${block.id}-image-alt`}
+                value={block.props.alt}
+                onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, alt: event.target.value } })} />
+              
                 </div>
-              </div>
-            )}
+              </EqualGrid>
+          }
 
-            {block.type === "divider" && (
-              <div className="ui-field">
+            {block.type === "divider" &&
+          <div className="ui-field">
                 <label htmlFor={`${block.id}-divider-color`}>Divider color</label>
                 <input
-                  id={`${block.id}-divider-color`}
-                  type="color"
-                  value={block.props.color}
-                  onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, color: event.target.value } })}
-                />
+              id={`${block.id}-divider-color`}
+              type="color"
+              value={block.props.color}
+              onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, color: event.target.value } })} />
+            
               </div>
-            )}
+          }
 
-            {block.type === "spacer" && (
-              <div className="ui-field">
+            {block.type === "spacer" &&
+          <div className="ui-field">
                 <label htmlFor={`${block.id}-spacer-height`}>Height</label>
                 <input
-                  id={`${block.id}-spacer-height`}
-                  type="number"
-                  min="8"
-                  max="80"
-                  value={block.props.height}
-                  onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, height: Number(event.target.value) } })}
-                />
+              id={`${block.id}-spacer-height`}
+              type="number"
+              min="8"
+              max="80"
+              value={block.props.height}
+              onChange={(event) => updateBlock(block.id, { ...block, props: { ...block.props, height: Number(event.target.value) } })} />
+            
               </div>
-            )}
+          }
 
-            {"align" in block.props ? (
-              <div className="ui-field">
+            {"align" in block.props ?
+          <div className="ui-field">
                 <label htmlFor={`${block.id}-align`}>Align</label>
                 <select
-                  id={`${block.id}-align`}
-                  value={block.props.align}
-                  onChange={(event) => updateBlock(block.id, withAlign(block, event.target.value as "left" | "center" | "right"))}
-                >
+              id={`${block.id}-align`}
+              value={block.props.align}
+              onChange={(event) => updateBlock(block.id, withAlign(block, event.target.value as "left" | "center" | "right"))}>
+              
                   <option value="left">left</option>
                   <option value="center">center</option>
                   <option value="right">right</option>
                 </select>
-              </div>
-            ) : null}
+              </div> :
+          null}
           </div>
-        ))}
+        )}
       </div>
 
       <div className="ui-field">
         <label htmlFor={`${props.idPrefix}-text-fallback`}>Text fallback</label>
         <textarea id={`${props.idPrefix}-text-fallback`} name="textBody" value={textBody} onChange={(event) => setTextBody(event.target.value)} required />
       </div>
-      <button className="ui-button ui-button-secondary" type="button" onClick={syncTextFallback}>
+      <Button type="button" onClick={syncTextFallback} variant="secondary">
         <Type size={16} />
         Sync text fallback
-      </button>
+      </Button>
       <small className="muted-text">
         Required tokens: {props.requiredTokens.join(", ") || "none"}. Available tokens: {props.availableTokens.join(", ") || "none"}.
       </small>
-    </div>
-  );
+    </div>);
+
 }

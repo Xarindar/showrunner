@@ -7,12 +7,13 @@ import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
+import { Card, EqualGrid, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type ClientPortalPageProps = {
-  params: Promise<{ clientId: string }>;
-  searchParams: Promise<{ token?: string }>;
+  params: Promise<{clientId: string;}>;
+  searchParams: Promise<{token?: string;}>;
 };
 
 function statusClass(status: string) {
@@ -21,13 +22,13 @@ function statusClass(status: string) {
   return "ui-badge";
 }
 
-function paidCents(payments: Array<{ amountCents: number; refundedCents?: number; status: PaymentStatus }>) {
-  return payments
-    .filter((payment) => payment.status === PaymentStatus.PAID || payment.status === PaymentStatus.AUTHORIZED)
-    .reduce((sum, payment) => sum + Math.max(0, payment.amountCents - (payment.refundedCents || 0)), 0);
+function paidCents(payments: Array<{amountCents: number;refundedCents?: number;status: PaymentStatus;}>) {
+  return payments.
+  filter((payment) => payment.status === PaymentStatus.PAID || payment.status === PaymentStatus.AUTHORIZED).
+  reduce((sum, payment) => sum + Math.max(0, payment.amountCents - (payment.refundedCents || 0)), 0);
 }
 
-function remainingCents(totalCents: number, payments: Array<{ amountCents: number; refundedCents?: number; status: PaymentStatus }>) {
+function remainingCents(totalCents: number, payments: Array<{amountCents: number;refundedCents?: number;status: PaymentStatus;}>) {
   return Math.max(0, totalCents - paidCents(payments));
 }
 
@@ -99,15 +100,15 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
   });
 
   if (
-    !client ||
-    !verifyClientPortalToken({
-      clientId: client.id,
-      email: client.email,
-      portalAccessVersion: client.portalAccessVersion,
-      siteId: settings.siteId,
-      token
-    })
-  ) {
+  !client ||
+  !verifyClientPortalToken({
+    clientId: client.id,
+    email: client.email,
+    portalAccessVersion: client.portalAccessVersion,
+    siteId: settings.siteId,
+    token
+  }))
+  {
     notFound();
   }
 
@@ -135,42 +136,42 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
             <span className="ui-badge">{settings.businessName}</span>
           </header>
 
-          <section className="grid-3">
-            <div className="ui-card ui-card-density-normal ui-card-min-md">
+          <EqualGrid as="section" min="220px">
+            <Card>
               <CalendarCheck size={22} />
               <h2 className="ui-zero">Upcoming</h2>
               <p>{upcomingBookings.length} appointments</p>
-            </div>
-            <div className="ui-card ui-card-density-normal ui-card-min-md">
+            </Card>
+            <Card>
               <Package size={22} />
               <h2 className="ui-zero">Orders</h2>
               <p>{client.orders.length} orders</p>
-            </div>
-            <div className="ui-card ui-card-density-normal ui-card-min-md">
+            </Card>
+            <Card>
               <Receipt size={22} />
               <h2 className="ui-zero">Open billing</h2>
               <p>{openBillingDocuments.length} documents</p>
-            </div>
-            <div className="ui-card ui-card-density-normal ui-card-min-md">
+            </Card>
+            <Card>
               <PenLine size={22} />
               <h2 className="ui-zero">Signed forms</h2>
               <p>{client.formSubmissions.length} records</p>
-            </div>
-            <div className="ui-card ui-card-density-normal ui-card-min-md">
+            </Card>
+            <Card>
               <Images size={22} />
               <h2 className="ui-zero">Galleries</h2>
               <p>{client.portfolioGalleryAccesses.length} galleries</p>
-            </div>
-          </section>
+            </Card>
+          </EqualGrid>
 
-          <section className="ui-card ui-card-density-normal ui-card-min-md">
+          <Card as="section">
             <div className="page-header compact-header">
               <div>
                 <CalendarCheck size={22} />
                 <h2 className="section-title">Appointments</h2>
               </div>
             </div>
-            <table className="ui-table">
+            <Table>
               <thead>
                 <tr>
                   <th>Service</th>
@@ -180,24 +181,24 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                 </tr>
               </thead>
               <tbody>
-                {[...upcomingBookings, ...pastBookings].map((booking) => (
-                  <tr key={booking.id}>
+                {[...upcomingBookings, ...pastBookings].map((booking) =>
+                <tr key={booking.id}>
                     <td>
                       <strong>{booking.service.name}</strong>
-                      {booking.service.location ? (
-                        <>
+                      {booking.service.location ?
+                    <>
                           <br />
                           <span className="muted-text">{booking.service.location}</span>
-                        </>
-                      ) : null}
-                      {booking.resources.length ? (
-                        <>
+                        </> :
+                    null}
+                      {booking.resources.length ?
+                    <>
                           <br />
                           <span className="muted-text">
                             {booking.resources.map((bookingResource) => bookingResource.resource.name).join(", ")}
                           </span>
-                        </>
-                      ) : null}
+                        </> :
+                    null}
                     </td>
                     <td>
                       {formatDateTime(booking.startsAt, settings.timezone)}
@@ -209,24 +210,24 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                       <span className={statusClass(booking.status)}>{enumLabel(booking.status)}</span>
                     </td>
                   </tr>
-                ))}
-                {!client.bookings.length ? (
-                  <tr>
+                )}
+                {!client.bookings.length ?
+                <tr>
                     <td colSpan={4}>No appointment history yet.</td>
-                  </tr>
-                ) : null}
+                  </tr> :
+                null}
               </tbody>
-            </table>
-          </section>
+            </Table>
+          </Card>
 
-          <section className="ui-card ui-card-density-normal ui-card-min-md">
+          <Card as="section">
             <div className="page-header compact-header">
               <div>
                 <PenLine size={22} />
                 <h2 className="section-title">Signed forms and documents</h2>
               </div>
             </div>
-            <table className="ui-table">
+            <Table>
               <thead>
                 <tr>
                   <th>Document</th>
@@ -236,8 +237,8 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                 </tr>
               </thead>
               <tbody>
-                {client.formSubmissions.map((submission) => (
-                  <tr key={submission.id}>
+                {client.formSubmissions.map((submission) =>
+                <tr key={submission.id}>
                     <td>
                       <strong>{submission.form.name}</strong>
                       <br />
@@ -252,40 +253,40 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                       <span className="muted-text">{submission.submitterEmail || submission.signatures[0]?.signerEmail || client.email}</span>
                     </td>
                     <td>
-                      {submission.signatures.map((signature) => (
-                        <div className="ui-zero" key={signature.id}>
+                      {submission.signatures.map((signature) =>
+                    <div className="ui-zero" key={signature.id}>
                           <strong>{signature.formField.label}</strong>
                           <br />
-                          {signature.captureType === FormSignatureCaptureType.TYPED ? (
-                            <span>{signature.capturedSignature}</span>
-                          ) : (
-                            <span>Drawn signature on file</span>
-                          )}
+                          {signature.captureType === FormSignatureCaptureType.TYPED ?
+                      <span>{signature.capturedSignature}</span> :
+
+                      <span>Drawn signature on file</span>
+                      }
                           <br />
                           <span className="muted-text">{signature.consentStatement}</span>
                         </div>
-                      ))}
+                    )}
                     </td>
                     <td>{formatDateTime(submission.signatures[0]?.signedAt || submission.createdAt, settings.timezone)}</td>
                   </tr>
-                ))}
-                {!client.formSubmissions.length ? (
-                  <tr>
+                )}
+                {!client.formSubmissions.length ?
+                <tr>
                     <td colSpan={4}>No signed forms yet.</td>
-                  </tr>
-                ) : null}
+                  </tr> :
+                null}
               </tbody>
-            </table>
-          </section>
+            </Table>
+          </Card>
 
-          <section className="ui-card ui-card-density-normal ui-card-min-md">
+          <Card as="section">
             <div className="page-header compact-header">
               <div>
                 <Images size={22} />
                 <h2 className="section-title">Galleries</h2>
               </div>
             </div>
-            <table className="ui-table">
+            <Table>
               <thead>
                 <tr>
                   <th>Gallery</th>
@@ -295,18 +296,18 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                 </tr>
               </thead>
               <tbody>
-                {client.portfolioGalleryAccesses.map((access) => (
-                  <tr key={access.id}>
+                {client.portfolioGalleryAccesses.map((access) =>
+                <tr key={access.id}>
                     <td>
                       <Link href={`/galleries/access/${access.accessToken}`}>
                         <strong>{access.gallery.title}</strong>
                       </Link>
-                      {access.gallery.description ? (
-                        <>
+                      {access.gallery.description ?
+                    <>
                           <br />
                           <span className="muted-text">{access.gallery.description}</span>
-                        </>
-                      ) : null}
+                        </> :
+                    null}
                     </td>
                     <td>
                       <span className={statusClass(access.status)}>{enumLabel(access.status)}</span>
@@ -322,24 +323,24 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                     </td>
                     <td>{access.lastViewedAt ? formatDateTime(access.lastViewedAt, settings.timezone) : "Not viewed yet"}</td>
                   </tr>
-                ))}
-                {!client.portfolioGalleryAccesses.length ? (
-                  <tr>
+                )}
+                {!client.portfolioGalleryAccesses.length ?
+                <tr>
                     <td colSpan={4}>No galleries shared yet.</td>
-                  </tr>
-                ) : null}
+                  </tr> :
+                null}
               </tbody>
-            </table>
-          </section>
+            </Table>
+          </Card>
 
-          <section className="ui-card ui-card-density-normal ui-card-min-md">
+          <Card as="section">
             <div className="page-header compact-header">
               <div>
                 <Package size={22} />
                 <h2 className="section-title">Orders</h2>
               </div>
             </div>
-            <table className="ui-table">
+            <Table>
               <thead>
                 <tr>
                   <th>Order</th>
@@ -349,20 +350,20 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                 </tr>
               </thead>
               <tbody>
-                {client.orders.map((order) => (
-                  <tr key={order.id}>
+                {client.orders.map((order) =>
+                <tr key={order.id}>
                     <td>
                       <strong>{order.orderNumber}</strong>
                       <br />
                       <span className="muted-text">{formatDateTime(order.placedAt || order.createdAt, settings.timezone)}</span>
                     </td>
                     <td>
-                      {order.items.slice(0, 3).map((item) => (
-                        <span key={item.id}>
+                      {order.items.slice(0, 3).map((item) =>
+                    <span key={item.id}>
                           {item.quantity} x {item.name}
                           <br />
                         </span>
-                      ))}
+                    )}
                       {order.items.length > 3 ? <span className="muted-text">+{order.items.length - 3} more</span> : null}
                     </td>
                     <td>
@@ -374,24 +375,24 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                       <span className={statusClass(order.status)}>{enumLabel(order.status)}</span>
                     </td>
                   </tr>
-                ))}
-                {!client.orders.length ? (
-                  <tr>
+                )}
+                {!client.orders.length ?
+                <tr>
                     <td colSpan={4}>No orders yet.</td>
-                  </tr>
-                ) : null}
+                  </tr> :
+                null}
               </tbody>
-            </table>
-          </section>
+            </Table>
+          </Card>
 
-          <section className="ui-card ui-card-density-normal ui-card-min-md">
+          <Card as="section">
             <div className="page-header compact-header">
               <div>
                 <FileText size={22} />
                 <h2 className="section-title">Invoices and documents</h2>
               </div>
             </div>
-            <table className="ui-table">
+            <Table>
               <thead>
                 <tr>
                   <th>Document</th>
@@ -417,19 +418,19 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
                       <td>
                         <span className={statusClass(document.status)}>{enumLabel(document.status)}</span>
                       </td>
-                    </tr>
-                  );
-                })}
-                {!client.billingDocuments.length ? (
-                  <tr>
-                    <td colSpan={4}>No billing documents yet.</td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </section>
+                    </tr>);
 
-          <section className="ui-card ui-card-density-normal ui-card-min-md">
+                })}
+                {!client.billingDocuments.length ?
+                <tr>
+                    <td colSpan={4}>No billing documents yet.</td>
+                  </tr> :
+                null}
+              </tbody>
+            </Table>
+          </Card>
+
+          <Card as="section">
             <User size={22} />
             <h2 className="section-title">Profile</h2>
             <p>
@@ -437,9 +438,9 @@ export default async function ClientPortalPage({ params, searchParams }: ClientP
               <br />
               <span className="muted-text">{client.phone || client.email}</span>
             </p>
-          </section>
+          </Card>
         </div>
       </section>
-    </main>
-  );
+    </main>);
+
 }

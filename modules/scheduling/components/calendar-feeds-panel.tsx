@@ -1,6 +1,7 @@
 import { CalendarClock } from "lucide-react";
 import { SchedulingCalendarConnectionStatus, SchedulingCalendarOwnerType, type SchedulingCalendarConnection, type StaffMember } from "@prisma/client";
 import { googleCalendarConnectPath, googleCalendarConnectionLabel } from "@/lib/scheduling/google-calendar";
+import { ButtonAnchor, Card, EqualGrid, Table } from "@/components/ui";
 
 type CalendarFeedsPanelProps = {
   googleConnections: Array<{
@@ -16,10 +17,10 @@ type CalendarFeedsPanelProps = {
 };
 
 function connectionFor(
-  connections: CalendarFeedsPanelProps["googleConnections"],
-  ownerType: SchedulingCalendarOwnerType,
-  ownerId = ""
-) {
+connections: CalendarFeedsPanelProps["googleConnections"],
+ownerType: SchedulingCalendarOwnerType,
+ownerId = "")
+{
   return connections.find((item) => item.connection.ownerType === ownerType && item.connection.ownerId === ownerId);
 }
 
@@ -41,7 +42,7 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
   const siteGoogleConnection = connectionFor(googleConnections, SchedulingCalendarOwnerType.SITE);
 
   return (
-    <section className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+    <Card as="section" minHeight="none" bodyClassName="form-grid">
       <div>
         <h2 className="section-title">Calendars</h2>
         <p className="ui-zero">
@@ -50,7 +51,7 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
       </div>
 
       <div className="subpanel form-grid">
-        <div className="grid-2">
+        <EqualGrid>
           <div>
             <h3>Google free/busy</h3>
             <p className="ui-zero">
@@ -59,16 +60,16 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
           </div>
           <div className="ui-zero">
             {connectionStatus(siteGoogleConnection?.connection)}
-            <a className="ui-button ui-button-secondary" href={googleCalendarConnectPath({ ownerType: SchedulingCalendarOwnerType.SITE })}>
+            <ButtonAnchor href={googleCalendarConnectPath({ ownerType: SchedulingCalendarOwnerType.SITE })} variant="secondary">
               <CalendarClock size={18} />
               {siteGoogleConnection ? "Reconnect business calendar" : "Connect business calendar"}
-            </a>
+            </ButtonAnchor>
           </div>
-        </div>
+        </EqualGrid>
         <p className="ui-zero">{connectionDetail(siteGoogleConnection)}</p>
 
-        {staff.length ? (
-          <table className="ui-table">
+        {staff.length ?
+        <Table>
             <thead>
               <tr>
                 <th>Staff</th>
@@ -78,26 +79,26 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
             </thead>
             <tbody>
               {staff.map((member) => {
-                const item = connectionFor(googleConnections, SchedulingCalendarOwnerType.STAFF, member.id);
-                return (
-                  <tr key={member.id}>
+              const item = connectionFor(googleConnections, SchedulingCalendarOwnerType.STAFF, member.id);
+              return (
+                <tr key={member.id}>
                     <td>
                       <strong>{member.name}</strong>
                       {member.title ? <span className="muted-text"> {member.title}</span> : null}
                     </td>
                     <td>{connectionStatus(item?.connection)}</td>
                     <td>
-                      <a className="ui-button ui-button-secondary" href={googleCalendarConnectPath({ ownerId: member.id, ownerType: SchedulingCalendarOwnerType.STAFF })}>
+                      <ButtonAnchor href={googleCalendarConnectPath({ ownerId: member.id, ownerType: SchedulingCalendarOwnerType.STAFF })} variant="secondary">
                         <CalendarClock size={18} />
                         {item ? "Reconnect" : "Connect"}
-                      </a>
+                      </ButtonAnchor>
                     </td>
-                  </tr>
-                );
-              })}
+                  </tr>);
+
+            })}
             </tbody>
-          </table>
-        ) : null}
+          </Table> :
+        null}
       </div>
 
       <div>
@@ -110,8 +111,8 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
         <input id="site-calendar-feed" readOnly value={siteFeedUrl} />
       </div>
 
-      {staffFeedUrls.length ? (
-        <table className="ui-table">
+      {staffFeedUrls.length ?
+      <Table>
           <thead>
             <tr>
               <th>Staff</th>
@@ -119,8 +120,8 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
             </tr>
           </thead>
           <tbody>
-            {staffFeedUrls.map(({ staff, url }) => (
-              <tr key={staff.id}>
+            {staffFeedUrls.map(({ staff, url }) =>
+          <tr key={staff.id}>
                 <td>
                   <strong>{staff.name}</strong>
                   {staff.title ? <span className="muted-text"> {staff.title}</span> : null}
@@ -129,12 +130,12 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
                   <input aria-label={`${staff.name} calendar feed`} readOnly value={url} />
                 </td>
               </tr>
-            ))}
+          )}
           </tbody>
-        </table>
-      ) : (
-        <p className="empty-state">Add staff to create staff-specific calendar feeds.</p>
-      )}
-    </section>
-  );
+        </Table> :
+
+      <p className="empty-state">Add staff to create staff-specific calendar feeds.</p>
+      }
+    </Card>);
+
 }

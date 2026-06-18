@@ -2,9 +2,10 @@ import type { Booking, BookingResource, Resource, Service, StaffMember } from "@
 import Link from "next/link";
 import { formatDateTime } from "@/lib/format";
 import { updateBookingStatusAction } from "../actions";
+import { Table } from "@/components/ui";
 
 type BookingWithService = Booking & {
-  resources: Array<BookingResource & { resource: Resource }>;
+  resources: Array<BookingResource & {resource: Resource;}>;
   service: Service;
   staff: StaffMember | null;
 };
@@ -17,7 +18,7 @@ type AppointmentsTableProps = {
 export function AppointmentsTable({ bookings, timezone }: AppointmentsTableProps) {
   return (
     <div>
-      <table className="ui-table">
+      <Table>
         <thead>
           <tr>
             <th>Customer</th>
@@ -28,8 +29,8 @@ export function AppointmentsTable({ bookings, timezone }: AppointmentsTableProps
           </tr>
         </thead>
         <tbody>
-          {bookings.map((booking) => (
-            <tr key={booking.id}>
+          {bookings.map((booking) =>
+          <tr key={booking.id}>
               <td>
                 <Link href={`/admin/appointments/${booking.id}`}>
                   <strong>{booking.customerName}</strong>
@@ -41,12 +42,12 @@ export function AppointmentsTable({ bookings, timezone }: AppointmentsTableProps
                 {booking.service.name}
                 <br />
                 <span className="muted-text">{booking.staff?.name || "Any staff"}</span>
-                {booking.resources.length ? (
-                  <>
+                {booking.resources.length ?
+              <>
                     <br />
                     <span className="muted-text">{booking.resources.map((assignment) => assignment.resource.name).join(", ")}</span>
-                  </>
-                ) : null}
+                  </> :
+              null}
               </td>
               <td>{formatDateTime(booking.startsAt, timezone)}</td>
               <td>
@@ -54,26 +55,26 @@ export function AppointmentsTable({ bookings, timezone }: AppointmentsTableProps
               </td>
               <td>
                 <div className="ui-zero">
-                  {(["CONFIRMED", "CANCELED", "COMPLETED"] as const).map((status) => (
-                    <form key={status} action={updateBookingStatusAction}>
+                  {(["CONFIRMED", "CANCELED", "COMPLETED"] as const).map((status) =>
+                <form key={status} action={updateBookingStatusAction}>
                       <input type="hidden" name="id" value={booking.id} />
                       <input type="hidden" name="status" value={status} />
                       <button className={status === "CANCELED" ? "ui-button ui-button-danger" : "ui-button ui-button-secondary"} type="submit">
                         {status.toLowerCase()}
                       </button>
                     </form>
-                  ))}
+                )}
                 </div>
               </td>
             </tr>
-          ))}
-          {!bookings.length ? (
-            <tr>
+          )}
+          {!bookings.length ?
+          <tr>
               <td colSpan={5}>No appointments yet.</td>
-            </tr>
-          ) : null}
+            </tr> :
+          null}
         </tbody>
-      </table>
-    </div>
-  );
+      </Table>
+    </div>);
+
 }

@@ -6,14 +6,15 @@ import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import { themeToCssVars } from "@/lib/theme/tokens";
 import { addDaysToDateKey, getTodayDateKey, getZonedWeekday, parseZonedDateKey } from "@/lib/timezone";
 import { BookingFlow } from "./booking-flow";
+import { ButtonLink } from "@/components/ui";
 
 type BookingPageShellProps = {
   initialServiceSlug?: string;
 };
 
 type ActiveServiceWithStaff = Service & {
-  resourceAssignments: Array<ServiceResource & { resource: Resource }>;
-  staffAssignments: Array<ServiceStaff & { staff: StaffMember }>;
+  resourceAssignments: Array<ServiceResource & {resource: Resource;}>;
+  staffAssignments: Array<ServiceStaff & {staff: StaffMember;}>;
 };
 
 function getDefaultDate(timeZone: string, availableWeekdays: number[]) {
@@ -35,9 +36,9 @@ function getDefaultDate(timeZone: string, availableWeekdays: number[]) {
 export async function BookingPageShell({ initialServiceSlug }: BookingPageShellProps) {
   const settings = await getSiteSettings();
   const [services, availability] = await Promise.all([
-    nativeSchedulingAdapter.listActiveServices() as Promise<ActiveServiceWithStaff[]>,
-    prisma.availabilityRule.findMany({ where: { siteId: settings.siteId }, select: { weekday: true } })
-  ]);
+  nativeSchedulingAdapter.listActiveServices() as Promise<ActiveServiceWithStaff[]>,
+  prisma.availabilityRule.findMany({ where: { siteId: settings.siteId }, select: { weekday: true } })]
+  );
 
   return (
     <main className="site-shell" style={themeToCssVars(settings)}>
@@ -46,9 +47,9 @@ export async function BookingPageShell({ initialServiceSlug }: BookingPageShellP
           <span className="brand-mark" />
           <span>{settings.businessName}</span>
         </Link>
-        <Link href="/admin" className="ui-button ui-button-secondary">
+        <ButtonLink href="/admin" variant="secondary">
           Admin
-        </Link>
+        </ButtonLink>
       </nav>
 
       <section className="booking-page">
@@ -76,23 +77,23 @@ export async function BookingPageShell({ initialServiceSlug }: BookingPageShellP
             requirePolicy: service.requirePolicy,
             requestOnly: service.requestOnly,
             waitlistEnabled: service.waitlistEnabled,
-            resources: service.resourceAssignments
-              ? service.resourceAssignments.map((assignment) => ({
-                  id: assignment.resource.id,
-                  name: assignment.resource.name,
-                  type: assignment.resource.type
-                }))
-              : [],
-            staff: service.staffAssignments
-              ? service.staffAssignments.map((assignment) => ({
-                  id: assignment.staff.id,
-                  name: assignment.staff.name,
-                  title: assignment.staff.title
-                }))
-              : []
-          }))}
-        />
+            resources: service.resourceAssignments ?
+            service.resourceAssignments.map((assignment) => ({
+              id: assignment.resource.id,
+              name: assignment.resource.name,
+              type: assignment.resource.type
+            })) :
+            [],
+            staff: service.staffAssignments ?
+            service.staffAssignments.map((assignment) => ({
+              id: assignment.staff.id,
+              name: assignment.staff.name,
+              title: assignment.staff.title
+            })) :
+            []
+          }))} />
+        
       </section>
-    </main>
-  );
+    </main>);
+
 }

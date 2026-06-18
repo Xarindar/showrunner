@@ -2,19 +2,20 @@ import type { BlockedTime, Resource } from "@prisma/client";
 import { Plus, Trash2 } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import { createBlockoutAction, deleteBlockoutAction } from "../actions";
+import { Button, Card, EqualGrid, Table } from "@/components/ui";
 
 type BlockoutsPanelProps = {
-  blockouts: Array<BlockedTime & { resource: Resource | null }>;
+  blockouts: Array<BlockedTime & {resource: Resource | null;}>;
   resources: Resource[];
   timezone: string;
 };
 
 export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPanelProps) {
   return (
-    <section className="grid-2">
-      <form action={createBlockoutAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+    <EqualGrid as="section">
+      <Card action={createBlockoutAction} as="form" minHeight="none" bodyClassName="form-grid">
         <h2 className="section-title">Manual blockout</h2>
-        <div className="grid-2">
+        <EqualGrid>
           <div className="ui-field">
             <label htmlFor="startsAt">Starts</label>
             <input id="startsAt" name="startsAt" type="datetime-local" required />
@@ -23,7 +24,7 @@ export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPane
             <label htmlFor="endsAt">Ends</label>
             <input id="endsAt" name="endsAt" type="datetime-local" required />
           </div>
-        </div>
+        </EqualGrid>
         <div className="ui-field">
           <label htmlFor="reason">Reason</label>
           <input id="reason" name="reason" placeholder="Vacation, private event, closed" />
@@ -32,25 +33,25 @@ export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPane
           <label htmlFor="blockout-resource">Resource</label>
           <select id="blockout-resource" name="resourceId" defaultValue="">
             <option value="">All booking</option>
-            {resources.map((resource) => (
-              <option key={resource.id} value={resource.id}>
+            {resources.map((resource) =>
+            <option key={resource.id} value={resource.id}>
                 {resource.name}
               </option>
-            ))}
+            )}
           </select>
         </div>
-        <button className="ui-button" type="submit">
+        <Button type="submit">
           <Plus size={18} />
           Add blockout
-        </button>
-      </form>
+        </Button>
+      </Card>
 
-      <div className="ui-card ui-card-density-normal ui-card-min-md">
+      <Card>
         <h2 className="section-title">Upcoming blockouts</h2>
-        <table className="ui-table">
+        <Table>
           <tbody>
-            {blockouts.map((block) => (
-              <tr key={block.id}>
+            {blockouts.map((block) =>
+            <tr key={block.id}>
                 <td>
                   {formatDateTime(block.startsAt, timezone)}
                   <br />
@@ -62,21 +63,21 @@ export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPane
                 <td>
                   <form action={deleteBlockoutAction}>
                     <input type="hidden" name="id" value={block.id} />
-                    <button className="ui-button ui-button-secondary" type="submit" title="Delete blockout">
+                    <Button type="submit" title="Delete blockout" variant="secondary">
                       <Trash2 size={16} />
-                    </button>
+                    </Button>
                   </form>
                 </td>
               </tr>
-            ))}
-            {!blockouts.length ? (
-              <tr>
+            )}
+            {!blockouts.length ?
+            <tr>
                 <td>No blockouts yet.</td>
-              </tr>
-            ) : null}
+              </tr> :
+            null}
           </tbody>
-        </table>
-      </div>
-    </section>
-  );
+        </Table>
+      </Card>
+    </EqualGrid>);
+
 }

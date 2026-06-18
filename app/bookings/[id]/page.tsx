@@ -8,12 +8,13 @@ import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
 import { getZonedDateKey } from "@/lib/timezone";
 import { SelfServicePanel } from "./self-service-panel";
+import { Badge, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type BookingSelfServicePageProps = {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; saved?: string; token?: string }>;
+  params: Promise<{id: string;}>;
+  searchParams: Promise<{error?: string;saved?: string;token?: string;}>;
 };
 
 function statusLabel(value: string) {
@@ -36,14 +37,14 @@ export default async function BookingSelfServicePage({ params, searchParams }: B
   });
 
   if (
-    !booking ||
-    !verifyBookingSelfServiceToken({
-      bookingId: booking.id,
-      customerEmail: booking.customerEmail,
-      siteId: booking.siteId,
-      token
-    })
-  ) {
+  !booking ||
+  !verifyBookingSelfServiceToken({
+    bookingId: booking.id,
+    customerEmail: booking.customerEmail,
+    siteId: booking.siteId,
+    token
+  }))
+  {
     notFound();
   }
 
@@ -51,10 +52,10 @@ export default async function BookingSelfServicePage({ params, searchParams }: B
     where: {
       siteId: settings.siteId,
       OR: [
-        ...(booking.clientId ? [{ clientId: booking.clientId }] : []),
-        { customerEmail: booking.customerEmail },
-        { customerEmail: booking.customerEmail.toLowerCase() }
-      ]
+      ...(booking.clientId ? [{ clientId: booking.clientId }] : []),
+      { customerEmail: booking.customerEmail },
+      { customerEmail: booking.customerEmail.toLowerCase() }]
+
     },
     include: {
       resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
@@ -73,9 +74,9 @@ export default async function BookingSelfServicePage({ params, searchParams }: B
           <span className="brand-mark" />
           <span>{settings.businessName}</span>
         </Link>
-        <Link href="/book" className="button secondary">
+        <ButtonLink href="/book" variant="secondary">
           Book
-        </Link>
+        </ButtonLink>
       </nav>
 
       <section className="booking-page">
@@ -89,15 +90,15 @@ export default async function BookingSelfServicePage({ params, searchParams }: B
         {saved === "cancel" ? <div className="success-message">Appointment canceled.</div> : null}
         {error ? <div className="error">{error}</div> : null}
 
-        <section className="grid-2">
-          <div className="card">
+        <EqualGrid as="section">
+          <Card>
             <h2 className="section-title">Current appointment</h2>
-            <table className="table">
+            <Table>
               <tbody>
                 <tr>
                   <td>Status</td>
                   <td>
-                    <span className="pill">{statusLabel(booking.status)}</span>
+                    <Badge>{statusLabel(booking.status)}</Badge>
                   </td>
                 </tr>
                 <tr>
@@ -139,20 +140,20 @@ export default async function BookingSelfServicePage({ params, searchParams }: B
                   </td>
                 </tr>
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
 
           <SelfServicePanel
             bookingId={booking.id}
             canManage={canManage}
             defaultDate={getZonedDateKey(booking.startsAt, settings.timezone)}
-            token={token}
-          />
-        </section>
+            token={token} />
+          
+        </EqualGrid>
 
-        <section className="card">
+        <Card as="section">
           <h2 className="section-title">Appointment history</h2>
-          <table className="table">
+          <Table>
             <thead>
               <tr>
                 <th>Service</th>
@@ -162,20 +163,20 @@ export default async function BookingSelfServicePage({ params, searchParams }: B
               </tr>
             </thead>
             <tbody>
-              {history.map((item) => (
-                <tr key={item.id}>
+              {history.map((item) =>
+              <tr key={item.id}>
                   <td>{item.service.name}</td>
                   <td>{formatDateTime(item.startsAt, settings.timezone)}</td>
                   <td>
-                    <span className="pill">{statusLabel(item.status)}</span>
+                    <Badge>{statusLabel(item.status)}</Badge>
                   </td>
                   <td>{item.staff?.name || "Any staff"}</td>
                 </tr>
-              ))}
+              )}
             </tbody>
-          </table>
-        </section>
+          </Table>
+        </Card>
       </section>
-    </main>
-  );
+    </main>);
+
 }

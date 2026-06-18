@@ -9,8 +9,7 @@ import {
   PortfolioGalleryVisibility,
   PortfolioProofApprovalStatus,
   PortfolioProofItemStatus,
-  PortfolioProofRoundStatus
-} from "@prisma/client";
+  PortfolioProofRoundStatus } from "@prisma/client";
 import { cssBackgroundImage } from "@/lib/css";
 import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
 import { enumLabel, formatDateTime } from "@/lib/format";
@@ -24,8 +23,8 @@ import {
   commentOnGalleryItemAction,
   favoriteGalleryItemAction,
   saveGalleryItemDecisionAction,
-  submitGalleryApprovalAction
-} from "@/modules/portfolio/public-actions";
+  submitGalleryApprovalAction } from "@/modules/portfolio/public-actions";
+import { Badge, Button, ButtonAnchor, ButtonLink, Card, EqualGrid } from "@/components/ui";
 
 type GallerySearchParams = Record<string, string | string[] | undefined>;
 
@@ -40,7 +39,7 @@ function firstParam(searchParams: GallerySearchParams | undefined, key: string) 
   return Array.isArray(value) ? value[0] || "" : value || "";
 }
 
-function safeAlt(item: { altText: string; title: string; caption: string }) {
+function safeAlt(item: {altText: string;title: string;caption: string;}) {
   return item.altText || item.title || item.caption || "Gallery image";
 }
 
@@ -92,11 +91,11 @@ function galleryLayoutClass(layout: PortfolioGalleryLayout) {
 }
 
 function galleryDownloadHref(
-  item: GalleryMediaItem,
-  slug: string,
-  accessToken: string,
-  visibility: PortfolioGalleryVisibility
-) {
+item: GalleryMediaItem,
+slug: string,
+accessToken: string,
+visibility: PortfolioGalleryVisibility)
+{
   if (item.mediaAssetId) return galleryMediaPath(slug, item.id, accessToken, MediaVariantType.DOWNLOAD, true);
   if (visibility === PortfolioGalleryVisibility.PUBLIC) return item.imageUrl;
 
@@ -112,20 +111,20 @@ function lockedGallery(settings: Awaited<ReturnType<typeof getSiteSettings>>) {
           <span>{settings.businessName}</span>
         </Link>
         <div className="site-nav-links">
-          <Link href="/" className="button secondary">
+          <ButtonLink href="/" variant="secondary">
             Home
-          </Link>
+          </ButtonLink>
         </div>
       </nav>
-      <section className="section" style={{ maxWidth: 760 }}>
-        <div className="card" style={{ minHeight: 260 }}>
+      <section className="section ui-max-readable">
+        <Card minHeight="lg">
           <LockKeyhole size={28} />
           <h1>Private gallery</h1>
           <p className="lead">Use an active gallery access link to view this collection.</p>
-        </div>
+        </Card>
       </section>
-    </main>
-  );
+    </main>);
+
 }
 
 export async function PublicGalleryView({ accessToken = "", searchParams, slug }: PublicGalleryViewProps) {
@@ -135,20 +134,20 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
   const queryAccessToken = accessToken || firstParam(searchParams, "access") || firstParam(searchParams, "token");
   const access = queryAccessToken ? await findActiveGalleryAccess(queryAccessToken, undefined, settings.siteId) : null;
   const gallerySlug = slug || access?.gallery.slug || "";
-  const gallery = gallerySlug
-    ? await prisma.portfolioGallery.findFirst({
-        where: {
-          siteId: settings.siteId,
-          slug: gallerySlug,
-          status: PortfolioGalleryStatus.PUBLISHED
-        },
-        include: {
-          items: {
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
-          }
-        }
-      })
-    : null;
+  const gallery = gallerySlug ?
+  await prisma.portfolioGallery.findFirst({
+    where: {
+      siteId: settings.siteId,
+      slug: gallerySlug,
+      status: PortfolioGalleryStatus.PUBLISHED
+    },
+    include: {
+      items: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+      }
+    }
+  }) :
+  null;
 
   if (!gallery) return lockedGallery(settings);
   if (gallery.visibility !== PortfolioGalleryVisibility.PUBLIC && access?.galleryId !== gallery.id) return lockedGallery(settings);
@@ -158,12 +157,12 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
   }
 
   const mediaIds = gallery.items.map((item) => item.mediaAssetId).filter((id): id is string => Boolean(id));
-  const mediaAssets = mediaIds.length
-    ? await prisma.mediaAsset.findMany({
-        where: { siteId: settings.siteId, id: { in: mediaIds } },
-        select: { deletedAt: true, id: true, isPrivate: true }
-      })
-    : [];
+  const mediaAssets = mediaIds.length ?
+  await prisma.mediaAsset.findMany({
+    where: { siteId: settings.siteId, id: { in: mediaIds } },
+    select: { deletedAt: true, id: true, isPrivate: true }
+  }) :
+  [];
   const mediaById = new Map(mediaAssets.map((asset) => [asset.id, asset]));
   const visibleItems = gallery.items.filter((item) => {
     if (!item.mediaAssetId) return gallery.visibility === PortfolioGalleryVisibility.PUBLIC;
@@ -174,38 +173,38 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
     return true;
   });
   const favoriteViewerEmail = access?.recipientEmail || "";
-  const favoriteItemIds = favoriteViewerEmail
-    ? new Set(
-        (
-          await prisma.portfolioGalleryFavorite.findMany({
-            where: {
-              galleryId: gallery.id,
-              viewerEmail: favoriteViewerEmail
-            },
-            select: { itemId: true }
-          })
-        ).map((favorite) => favorite.itemId)
-      )
-    : new Set<string>();
-  const latestProofRound = gallery.proofingEnabled
-    ? await prisma.portfolioProofRound.findFirst({
-        where: {
-          galleryId: gallery.id,
-          siteId: settings.siteId
-        },
-        include: {
-          approvals: { orderBy: { createdAt: "desc" }, take: 10 },
-          comments: { orderBy: { createdAt: "desc" }, take: 50 },
-          decisions: { orderBy: { updatedAt: "desc" }, take: 100 }
-        },
-        orderBy: { roundNumber: "desc" }
-      })
-    : null;
+  const favoriteItemIds = favoriteViewerEmail ?
+  new Set(
+    (
+    await prisma.portfolioGalleryFavorite.findMany({
+      where: {
+        galleryId: gallery.id,
+        viewerEmail: favoriteViewerEmail
+      },
+      select: { itemId: true }
+    })).
+    map((favorite) => favorite.itemId)
+  ) :
+  new Set<string>();
+  const latestProofRound = gallery.proofingEnabled ?
+  await prisma.portfolioProofRound.findFirst({
+    where: {
+      galleryId: gallery.id,
+      siteId: settings.siteId
+    },
+    include: {
+      approvals: { orderBy: { createdAt: "desc" }, take: 10 },
+      comments: { orderBy: { createdAt: "desc" }, take: 50 },
+      decisions: { orderBy: { updatedAt: "desc" }, take: 100 }
+    },
+    orderBy: { roundNumber: "desc" }
+  }) :
+  null;
   const activeProofRound = latestProofRound?.status === PortfolioProofRoundStatus.OPEN ? latestProofRound : null;
   const canSubmitProofing = Boolean(access);
-  const viewerDecisions = access
-    ? new Map(latestProofRound?.decisions.filter((decision) => decision.accessId === access.id).map((decision) => [decision.itemId, decision]) || [])
-    : new Map<string, NonNullable<typeof latestProofRound>["decisions"][number]>();
+  const viewerDecisions = access ?
+  new Map(latestProofRound?.decisions.filter((decision) => decision.accessId === access.id).map((decision) => [decision.itemId, decision]) || []) :
+  new Map<string, NonNullable<typeof latestProofRound>["decisions"][number]>();
   const commentsByItem = new Map<string, NonNullable<typeof latestProofRound>["comments"]>();
   const roundComments: NonNullable<typeof latestProofRound>["comments"] = [];
   for (const comment of latestProofRound?.comments || []) {
@@ -236,9 +235,9 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
 
   const firstVisibleImage = visibleItems[0] ? galleryItemSource(visibleItems[0], gallery.slug, queryAccessToken) : "";
   const coverImage =
-    gallery.visibility === PortfolioGalleryVisibility.PUBLIC
-      ? gallery.coverImageUrl || firstVisibleImage || "/hero.svg"
-      : firstVisibleImage || "/hero.svg";
+  gallery.visibility === PortfolioGalleryVisibility.PUBLIC ?
+  gallery.coverImageUrl || firstVisibleImage || "/hero.svg" :
+  firstVisibleImage || "/hero.svg";
   const featuredItems = visibleItems.slice(0, 6);
   const downloadableBundleCount = visibleItems.filter((item) => item.isDownloadable && item.mediaAssetId).length;
   const bundleHref = galleryBundlePath(gallery.slug, queryAccessToken);
@@ -261,9 +260,9 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
           <span>{settings.businessName}</span>
         </Link>
         <div className="site-nav-links">
-          <Link href="/" className="button secondary">
+          <ButtonLink href="/" variant="secondary">
             Home
-          </Link>
+          </ButtonLink>
         </div>
       </nav>
 
@@ -272,23 +271,23 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
           <p className="eyebrow">{gallery.category || "Gallery"}</p>
           <h1>{gallery.title}</h1>
           {gallery.description ? <p className="lead">{gallery.description}</p> : null}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 20 }}>
-            {gallery.proofingEnabled ? <span className="pill success">proofing open</span> : null}
-            {gallery.downloadEnabled ? <span className="pill">downloads enabled</span> : null}
-            {access ? <span className="pill">private access</span> : null}
-            {latestProofRound ? <span className="pill">proof round {latestProofRound.roundNumber}</span> : null}
+          <div className="inline-controls ui-offset-4">
+            {gallery.proofingEnabled ? <Badge tone="success">proofing open</Badge> : null}
+            {gallery.downloadEnabled ? <Badge>downloads enabled</Badge> : null}
+            {access ? <Badge>private access</Badge> : null}
+            {latestProofRound ? <Badge>proof round {latestProofRound.roundNumber}</Badge> : null}
           </div>
-          {gallery.downloadEnabled && downloadableBundleCount ? (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 16 }}>
-              <a className="button" href={bundleHref}>
+          {gallery.downloadEnabled && downloadableBundleCount ?
+          <div className="inline-controls ui-offset-3">
+              <ButtonAnchor href={bundleHref}>
                 <Download size={16} />
                 Download bundle
-              </a>
-              <span style={{ alignSelf: "center", color: "rgba(255, 255, 255, 0.84)" }}>
+              </ButtonAnchor>
+              <span className="ui-on-dark-muted">
                 {downloadableBundleCount} file{downloadableBundleCount === 1 ? "" : "s"}
               </span>
-            </div>
-          ) : null}
+            </div> :
+          null}
         </div>
       </section>
 
@@ -298,75 +297,75 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
         {decision ? <div className="success-message">Image decision saved.</div> : null}
         {approved ? <div className="success-message">Proofing response submitted.</div> : null}
         {error ? <div className="error">{decodeURIComponent(error)}</div> : null}
-        {galleryFormAttachments.length ? (
-          <div className="subpanel" style={{ marginBottom: 18 }}>
-            <div className="page-header" style={{ marginBottom: 12 }}>
+        {galleryFormAttachments.length ?
+        <div className="subpanel ui-muted-gap">
+            <div className="page-header compact-header">
               <div>
                 <p className="eyebrow">Gallery forms</p>
-                <h2 style={{ fontSize: "1.4rem" }}>Forms for this gallery</h2>
+                <h2 className="section-title">Forms for this gallery</h2>
               </div>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              {galleryFormAttachments.map((attachment) => (
-                <Link
-                  className={attachment.isRequired ? "button" : "button secondary"}
-                  href={publicFormAttachmentHref({
-                    formSlug: attachment.form.slug,
-                    targetId: attachment.targetId,
-                    targetType: attachment.targetType
-                  })}
-                  key={attachment.id}
-                >
+            <div className="inline-controls">
+              {galleryFormAttachments.map((attachment) =>
+            <Link
+              className={attachment.isRequired ? "button" : "button secondary"}
+              href={publicFormAttachmentHref({
+                formSlug: attachment.form.slug,
+                targetId: attachment.targetId,
+                targetType: attachment.targetType
+              })}
+              key={attachment.id}>
+              
                   {attachment.isRequired ? "Required: " : ""}
                   {attachment.form.name}
                 </Link>
-              ))}
+            )}
             </div>
-          </div>
-        ) : null}
+          </div> :
+        null}
 
-        {latestProofRound ? (
-          <div className="subpanel" style={{ marginBottom: 18 }}>
-            <div className="page-header" style={{ marginBottom: 12 }}>
+        {latestProofRound ?
+        <div className="subpanel ui-muted-gap">
+            <div className="page-header compact-header">
               <div>
                 <p className="eyebrow">Proofing round {latestProofRound.roundNumber}</p>
-                <h2 style={{ fontSize: "1.4rem" }}>{latestProofRound.title || `Round ${latestProofRound.roundNumber}`}</h2>
+                <h2 className="section-title">{latestProofRound.title || `Round ${latestProofRound.roundNumber}`}</h2>
                 {latestProofRound.instructions ? <p>{latestProofRound.instructions}</p> : null}
-                {latestProofRound.dueAt ? (
-                  <p style={{ color: "var(--muted)", marginTop: 6 }}>
+                {latestProofRound.dueAt ?
+              <p className="ui-muted-compact">
                     Due {formatDateTime(latestProofRound.dueAt, settings.timezone)}
-                  </p>
-                ) : null}
+                  </p> :
+              null}
               </div>
               <span className={latestProofRound.status === PortfolioProofRoundStatus.OPEN ? "pill success" : "pill"}>
                 {enumLabel(latestProofRound.status)}
               </span>
             </div>
 
-            {activeProofRound && canSubmitProofing ? (
-              <form action={submitGalleryApprovalAction} className="form-grid">
+            {activeProofRound && canSubmitProofing ?
+          <form action={submitGalleryApprovalAction} className="form-grid">
                 <input type="hidden" name="galleryId" value={gallery.id} />
                 <input type="hidden" name="roundId" value={activeProofRound.id} />
                 <input type="hidden" name="slug" value={gallery.slug} />
                 <input type="hidden" name="accessToken" value={queryAccessToken} />
                 <input type="hidden" name="pathname" value={canonicalPathname} />
                 <input
-                  aria-hidden="true"
-                  autoComplete="off"
-                  name="companyWebsite"
-                  style={{ display: "none" }}
-                  tabIndex={-1}
-                  type="text"
-                />
-                <div className="grid-3">
-                  {favoriteViewerEmail ? (
-                    <input type="hidden" name="viewerEmail" value={favoriteViewerEmail} />
-                  ) : (
-                    <div className="field">
+              aria-hidden="true"
+              autoComplete="off"
+              name="companyWebsite"
+              className="ui-hidden"
+              tabIndex={-1}
+              type="text" />
+            
+                <EqualGrid min="220px">
+                  {favoriteViewerEmail ?
+              <input type="hidden" name="viewerEmail" value={favoriteViewerEmail} /> :
+
+              <div className="field">
                       <label htmlFor="proof-email">Email</label>
                       <input id="proof-email" name="viewerEmail" type="email" required />
                     </div>
-                  )}
+              }
                   <div className="field">
                     <label htmlFor="proof-name">Name</label>
                     <input id="proof-name" name="approverName" />
@@ -374,67 +373,67 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
                   <div className="field">
                     <label htmlFor="proof-status">Response</label>
                     <select id="proof-status" name="status" defaultValue={PortfolioProofApprovalStatus.APPROVED}>
-                      {Object.values(PortfolioProofApprovalStatus).map((status) => (
-                        <option key={status} value={status}>
+                      {Object.values(PortfolioProofApprovalStatus).map((status) =>
+                  <option key={status} value={status}>
                           {enumLabel(status)}
                         </option>
-                      ))}
+                  )}
                     </select>
                   </div>
-                </div>
+                </EqualGrid>
                 <div className="field">
                   <label htmlFor="proof-notes">Round notes</label>
                   <textarea id="proof-notes" name="notes" />
                 </div>
-                <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
+                <label className="inline-controls">
                   <input name="approvalConfirmed" type="checkbox" />
                   I approve this gallery for delivery or production.
                 </label>
-                <button className="button" type="submit">
+                <Button type="submit">
                   <CheckCircle2 size={16} />
                   Submit response
-                </button>
-              </form>
-            ) : activeProofRound ? (
-              <p style={{ color: "var(--muted)" }}>Use an active gallery access link to submit proofing responses.</p>
-            ) : (
-              <p style={{ color: "var(--muted)" }}>This proofing round is closed.</p>
-            )}
+                </Button>
+              </form> :
+          activeProofRound ?
+          <p className="ui-muted-flush">Use an active gallery access link to submit proofing responses.</p> :
 
-            {roundComments.length || latestProofRound.approvals.length ? (
-              <div className="grid-2" style={{ marginTop: 16 }}>
+          <p className="ui-muted-flush">This proofing round is closed.</p>
+          }
+
+            {roundComments.length || latestProofRound.approvals.length ?
+          <EqualGrid className="ui-offset-3">
                 <div>
                   <h3>Round comments</h3>
-                  {roundComments.slice(0, 4).map((comment) => (
-                    <p key={comment.id} style={{ margin: "8px 0" }}>
+                  {roundComments.slice(0, 4).map((comment) =>
+              <p className="ui-comment-line" key={comment.id}>
                       <strong>{comment.authorName || comment.viewerEmail || "Viewer"}:</strong> {comment.body}
                     </p>
-                  ))}
+              )}
                 </div>
                 <div>
                   <h3>Responses</h3>
-                  {latestProofRound.approvals.map((approval) => (
-                    <p key={approval.id} style={{ margin: "8px 0" }}>
+                  {latestProofRound.approvals.map((approval) =>
+              <p className="ui-comment-line" key={approval.id}>
                       <strong>{approval.approverName || approval.viewerEmail || "Viewer"}:</strong> {enumLabel(approval.status)}
                     </p>
-                  ))}
+              )}
                 </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+              </EqualGrid> :
+          null}
+          </div> :
+        null}
 
-        {featuredItems.length ? (
-          <div className="public-gallery-widgets" aria-label="Gallery widgets">
+        {featuredItems.length ?
+        <div className="public-gallery-widgets" aria-label="Gallery widgets">
             <div className="public-gallery-widget public-gallery-widget-feature">
               <NextImage
-                alt={safeAlt(featuredItems[0])}
-                height={720}
-                src={galleryItemHeroSource(featuredItems[0], gallery.slug, queryAccessToken)}
-                sizes="(max-width: 860px) 100vw, 52vw"
-                unoptimized
-                width={1080}
-              />
+              alt={safeAlt(featuredItems[0])}
+              height={720}
+              src={galleryItemHeroSource(featuredItems[0], gallery.slug, queryAccessToken)}
+              sizes="(max-width: 860px) 100vw, 52vw"
+              unoptimized
+              width={1080} />
+            
               <div>
                 <p className="eyebrow">{gallery.category || "Featured"}</p>
                 <h2>{featuredItems[0].title || gallery.title}</h2>
@@ -442,21 +441,21 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
               </div>
             </div>
             <div className="public-gallery-widget public-gallery-widget-strip" aria-label="Featured gallery strip">
-              {featuredItems.map((item) => (
-                <a href={`#lightbox-${item.id}`} key={item.id}>
+              {featuredItems.map((item) =>
+            <a href={`#lightbox-${item.id}`} key={item.id}>
                   <NextImage
-                    alt={safeAlt(item)}
-                    height={180}
-                    src={galleryItemSource(item, gallery.slug, queryAccessToken)}
-                    sizes="150px"
-                    unoptimized
-                    width={240}
-                  />
+                alt={safeAlt(item)}
+                height={180}
+                src={galleryItemSource(item, gallery.slug, queryAccessToken)}
+                sizes="150px"
+                unoptimized
+                width={240} />
+              
                 </a>
-              ))}
+            )}
             </div>
-          </div>
-        ) : null}
+          </div> :
+        null}
 
         <div className={galleryLayoutClass(gallery.layout)} id="gallery-grid" aria-label={`${enumLabel(gallery.layout)} gallery layout`}>
           {visibleItems.map((item, index) => {
@@ -482,8 +481,8 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
                   previousItemId={previousItem.id}
                   thumbnailSrc={galleryItemSource(item, gallery.slug, queryAccessToken)}
                   title={item.title || gallery.title}
-                  width={1800}
-                />
+                  width={1800} />
+                
                 <div className="public-gallery-item-body">
                   <div>
                     {item.title ? <h2>{item.title}</h2> : null}
@@ -491,14 +490,14 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
                     {item.licenseNotes ? <small>{item.licenseNotes}</small> : null}
                   </div>
                   <div className="public-gallery-actions">
-                    {gallery.downloadEnabled && item.isDownloadable && downloadHref ? (
-                      <a className="button secondary" href={downloadHref} download>
+                    {gallery.downloadEnabled && item.isDownloadable && downloadHref ?
+                    <ButtonAnchor href={downloadHref} download variant="secondary">
                         <Download size={16} />
                         Download
-                      </a>
-                    ) : null}
-                    {gallery.proofingEnabled ? (
-                      <details>
+                      </ButtonAnchor> :
+                    null}
+                    {gallery.proofingEnabled ?
+                    <details>
                         <summary className={isFavorited ? "button" : "button secondary"}>
                           <Heart size={16} />
                           {isFavorited ? "Favorited" : "Favorite"}
@@ -510,35 +509,35 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
                           <input type="hidden" name="accessToken" value={queryAccessToken} />
                           <input type="hidden" name="pathname" value={canonicalPathname} />
                           <input
-                            aria-hidden="true"
-                            autoComplete="off"
-                            name="companyWebsite"
-                            style={{ display: "none" }}
-                            tabIndex={-1}
-                            type="text"
-                          />
-                          {favoriteViewerEmail ? (
-                            <input type="hidden" name="viewerEmail" value={favoriteViewerEmail} />
-                          ) : (
-                            <div className="field">
+                          aria-hidden="true"
+                          autoComplete="off"
+                          name="companyWebsite"
+                          className="ui-hidden"
+                          tabIndex={-1}
+                          type="text" />
+                        
+                          {favoriteViewerEmail ?
+                        <input type="hidden" name="viewerEmail" value={favoriteViewerEmail} /> :
+
+                        <div className="field">
                               <label htmlFor={`favorite-${item.id}-email`}>Email</label>
                               <input id={`favorite-${item.id}-email`} name="viewerEmail" type="email" required />
                             </div>
-                          )}
+                        }
                           <div className="field">
                             <label htmlFor={`favorite-${item.id}-notes`}>Notes</label>
                             <textarea id={`favorite-${item.id}-notes`} name="notes" />
                           </div>
-                          <button className="button" type="submit">
+                          <Button type="submit">
                             <Heart size={16} />
                             Save favorite
-                          </button>
+                          </Button>
                         </form>
-                      </details>
-                    ) : null}
-                    {activeProofRound && canSubmitProofing ? (
-                      <details>
-                        <summary className="button secondary">
+                      </details> :
+                    null}
+                    {activeProofRound && canSubmitProofing ?
+                    <details>
+                        <summary>
                           <MessageSquare size={16} />
                           Proof
                         </summary>
@@ -551,42 +550,42 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
                             <input type="hidden" name="accessToken" value={queryAccessToken} />
                             <input type="hidden" name="pathname" value={canonicalPathname} />
                             <input
-                              aria-hidden="true"
-                              autoComplete="off"
-                              name="companyWebsite"
-                              style={{ display: "none" }}
-                              tabIndex={-1}
-                              type="text"
-                            />
-                            {favoriteViewerEmail ? (
-                              <input type="hidden" name="viewerEmail" value={favoriteViewerEmail} />
-                            ) : (
-                              <div className="field">
+                            aria-hidden="true"
+                            autoComplete="off"
+                            name="companyWebsite"
+                            className="ui-hidden"
+                            tabIndex={-1}
+                            type="text" />
+                          
+                            {favoriteViewerEmail ?
+                          <input type="hidden" name="viewerEmail" value={favoriteViewerEmail} /> :
+
+                          <div className="field">
                                 <label htmlFor={`decision-${item.id}-email`}>Email</label>
                                 <input id={`decision-${item.id}-email`} name="viewerEmail" type="email" required />
                               </div>
-                            )}
+                          }
                             <div className="field">
                               <label htmlFor={`decision-${item.id}-status`}>Decision</label>
                               <select
-                                id={`decision-${item.id}-status`}
-                                name="status"
-                                defaultValue={itemDecision?.status || PortfolioProofItemStatus.APPROVED}
-                              >
-                                {Object.values(PortfolioProofItemStatus).map((status) => (
-                                  <option key={status} value={status}>
+                              id={`decision-${item.id}-status`}
+                              name="status"
+                              defaultValue={itemDecision?.status || PortfolioProofItemStatus.APPROVED}>
+                              
+                                {Object.values(PortfolioProofItemStatus).map((status) =>
+                              <option key={status} value={status}>
                                     {enumLabel(status)}
                                   </option>
-                                ))}
+                              )}
                               </select>
                             </div>
                             <div className="field">
                               <label htmlFor={`decision-${item.id}-notes`}>Decision notes</label>
                               <textarea id={`decision-${item.id}-notes`} name="notes" defaultValue={itemDecision?.notes || ""} />
                             </div>
-                            <button className="button secondary" type="submit">
+                            <Button type="submit" variant="secondary">
                               Save decision
-                            </button>
+                            </Button>
                           </form>
 
                           <form action={commentOnGalleryItemAction} className="form-grid">
@@ -597,21 +596,21 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
                             <input type="hidden" name="accessToken" value={queryAccessToken} />
                             <input type="hidden" name="pathname" value={canonicalPathname} />
                             <input
-                              aria-hidden="true"
-                              autoComplete="off"
-                              name="companyWebsite"
-                              style={{ display: "none" }}
-                              tabIndex={-1}
-                              type="text"
-                            />
-                            {favoriteViewerEmail ? (
-                              <input type="hidden" name="viewerEmail" value={favoriteViewerEmail} />
-                            ) : (
-                              <div className="field">
+                            aria-hidden="true"
+                            autoComplete="off"
+                            name="companyWebsite"
+                            className="ui-hidden"
+                            tabIndex={-1}
+                            type="text" />
+                          
+                            {favoriteViewerEmail ?
+                          <input type="hidden" name="viewerEmail" value={favoriteViewerEmail} /> :
+
+                          <div className="field">
                                 <label htmlFor={`comment-${item.id}-email`}>Email</label>
                                 <input id={`comment-${item.id}-email`} name="viewerEmail" type="email" required />
                               </div>
-                            )}
+                          }
                             <div className="field">
                               <label htmlFor={`comment-${item.id}-name`}>Name</label>
                               <input id={`comment-${item.id}-name`} name="authorName" />
@@ -620,39 +619,39 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
                               <label htmlFor={`comment-${item.id}-body`}>Comment</label>
                               <textarea id={`comment-${item.id}-body`} name="body" required />
                             </div>
-                            <button className="button secondary" type="submit">
+                            <Button type="submit" variant="secondary">
                               Save comment
-                            </button>
+                            </Button>
                           </form>
 
-                          {itemComments.length ? (
-                            <div>
-                              {itemComments.slice(0, 3).map((comment) => (
-                                <p key={comment.id} style={{ margin: "8px 0" }}>
+                          {itemComments.length ?
+                        <div>
+                              {itemComments.slice(0, 3).map((comment) =>
+                          <p className="ui-comment-line" key={comment.id}>
                                   <strong>{comment.authorName || comment.viewerEmail || "Viewer"}:</strong> {comment.body}
                                 </p>
-                              ))}
-                            </div>
-                          ) : null}
+                          )}
+                            </div> :
+                        null}
                         </div>
-                      </details>
-                    ) : activeProofRound ? (
-                      <p style={{ color: "var(--muted)", fontSize: "0.95rem" }}>Use an access link to proof this image.</p>
-                    ) : null}
+                      </details> :
+                    activeProofRound ?
+                    <p className="ui-muted-compact">Use an access link to proof this image.</p> :
+                    null}
                   </div>
                 </div>
-              </article>
-            );
+              </article>);
+
           })}
         </div>
 
         {!visibleItems.length ? <p className="empty-state">No gallery images are available.</p> : null}
-        {gallery.rightsNotes ? (
-          <div className="subpanel" style={{ marginTop: 18 }}>
+        {gallery.rightsNotes ?
+        <div className="subpanel ui-offset-4">
             <p>{gallery.rightsNotes}</p>
-          </div>
-        ) : null}
+          </div> :
+        null}
       </section>
-    </main>
-  );
+    </main>);
+
 }

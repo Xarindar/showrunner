@@ -8,12 +8,13 @@ import { formatDateTime } from "@/lib/format";
 import { publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { getSiteSettings } from "@/lib/site";
 import { rescheduleBookingAction, updateBookingDetailAction, updateBookingStatusAction } from "../actions";
+import { Button, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type AppointmentDetailPageProps = {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  params: Promise<{id: string;}>;
+  searchParams: Promise<{saved?: string;error?: string;}>;
 };
 
 function formatDateTimeLocalInput(value: Date, timeZone: string) {
@@ -69,18 +70,18 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
             {booking.service.name} - {formatDateTime(booking.startsAt, settings.timezone)}
           </p>
         </div>
-        <Link className="ui-button ui-button-secondary" href="/admin/modules/appointments">
+        <ButtonLink href="/admin/modules/appointments" variant="secondary">
           Back to appointments
-        </Link>
+        </ButtonLink>
       </header>
 
       {saved ? <div className="success-message">Appointment updated.</div> : null}
       {error ? <div className="error">{error}</div> : null}
 
-      <section className="grid-2">
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+      <EqualGrid as="section">
+        <Card>
           <h2 className="section-title">Appointment details</h2>
-          <table className="ui-table">
+          <Table>
             <tbody>
               <tr>
                 <td>Status</td>
@@ -91,11 +92,11 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
               <tr>
                 <td>Customer</td>
                 <td>
-                  {booking.client ? (
-                    <Link href={`/admin/clients/${booking.client.id}`}>{booking.client.name}</Link>
-                  ) : (
-                    booking.customerName
-                  )}
+                  {booking.client ?
+                  <Link href={`/admin/clients/${booking.client.id}`}>{booking.client.name}</Link> :
+
+                  booking.customerName
+                  }
                   <br />
                   <span className="muted-text">{booking.customerEmail}</span>
                 </td>
@@ -136,29 +137,29 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
                 <td>{booking.policyAccepted ? "Yes" : "No"}</td>
               </tr>
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Card>
 
-        <div className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+        <Card minHeight="none" bodyClassName="form-grid">
           <h2 className="section-title">Status actions</h2>
           <div className="ui-zero">
-            {(["CONFIRMED", "CANCELED", "COMPLETED"] as const).map((status) => (
-              <form key={status} action={updateBookingStatusAction}>
+            {(["CONFIRMED", "CANCELED", "COMPLETED"] as const).map((status) =>
+            <form key={status} action={updateBookingStatusAction}>
                 <input type="hidden" name="id" value={booking.id} />
                 <input type="hidden" name="status" value={status} />
                 <button className={status === "CANCELED" ? "ui-button ui-button-danger" : "ui-button ui-button-secondary"} type="submit">
                   {status.toLowerCase()}
                 </button>
               </form>
-            ))}
+            )}
           </div>
-        </div>
-      </section>
+        </Card>
+      </EqualGrid>
 
-      {formAttachments.length ? (
-        <section className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+      {formAttachments.length ?
+      <Card as="section" bodyClassName="ui-stack">
           <h2 className="section-title">Attached forms</h2>
-          <table className="ui-table">
+          <Table>
             <thead>
               <tr>
                 <th>Form</th>
@@ -168,8 +169,8 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
               </tr>
             </thead>
             <tbody>
-              {formAttachments.map((attachment) => (
-                <tr key={attachment.id}>
+              {formAttachments.map((attachment) =>
+            <tr key={attachment.id}>
                   <td>
                     <strong>{attachment.form.name}</strong>
                     <br />
@@ -181,26 +182,26 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
                   <td>{attachment._count.submissions}</td>
                   <td>
                     <Link
-                      href={publicFormAttachmentHref({
-                        formSlug: attachment.form.slug,
-                        targetId: attachment.targetId,
-                        targetType: attachment.targetType
-                      })}
-                    >
+                  href={publicFormAttachmentHref({
+                    formSlug: attachment.form.slug,
+                    targetId: attachment.targetId,
+                    targetType: attachment.targetType
+                  })}>
+                  
                       Open public form
                     </Link>
                   </td>
                 </tr>
-              ))}
+            )}
             </tbody>
-          </table>
-        </section>
-      ) : null}
+          </Table>
+        </Card> :
+      null}
 
-      <form action={rescheduleBookingAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      <Card action={rescheduleBookingAction} as="form" minHeight="none" bodyClassName="form-grid">
         <input type="hidden" name="id" value={booking.id} />
         <h2 className="section-title">Reschedule</h2>
-        <div className="grid-2">
+        <EqualGrid>
           <div className="ui-field">
             <label htmlFor="startsAt">New start time</label>
             <input
@@ -208,21 +209,21 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
               name="startsAt"
               type="datetime-local"
               defaultValue={formatDateTimeLocalInput(booking.startsAt, settings.timezone)}
-              required
-            />
+              required />
+            
           </div>
           <div className="ui-field">
             <label>Validation</label>
             <span className="ui-badge">availability, buffers, blockouts, conflicts</span>
           </div>
-        </div>
-        <button className="ui-button ui-button-secondary" type="submit">
+        </EqualGrid>
+        <Button type="submit" variant="secondary">
           <CalendarClock size={18} />
           Reschedule appointment
-        </button>
-      </form>
+        </Button>
+      </Card>
 
-      <form action={updateBookingDetailAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      <Card action={updateBookingDetailAction} as="form" minHeight="none" bodyClassName="form-grid">
         <input type="hidden" name="id" value={booking.id} />
         <h2 className="section-title">Internal appointment notes</h2>
         <div className="ui-field">
@@ -233,11 +234,11 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
           <label htmlFor="cancellationReason">Cancellation reason</label>
           <input id="cancellationReason" name="cancellationReason" defaultValue={booking.cancellationReason || ""} />
         </div>
-        <button className="ui-button" type="submit">
+        <Button type="submit">
           <Save size={18} />
           Save appointment notes
-        </button>
-      </form>
-    </div>
-  );
+        </Button>
+      </Card>
+    </div>);
+
 }

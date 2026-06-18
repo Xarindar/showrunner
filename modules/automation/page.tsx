@@ -4,8 +4,7 @@ import {
   AutomationStatus,
   AutomationTrigger,
   MessageChannel,
-  WebhookDeliveryStatus
-} from "@prisma/client";
+  WebhookDeliveryStatus } from "@prisma/client";
 import { Play, Plus, Webhook, Workflow } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { moduleEventNames } from "@/lib/events/catalog";
@@ -22,13 +21,13 @@ import {
   replayAutomationRunAction,
   updateAutomationAction,
   updateWebhookEndpointAction,
-  updateAutomationStatusAction
-} from "./actions";
+  updateAutomationStatusAction } from "./actions";
+import { Button, Card, EqualGrid, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type AutomationPageProps = {
-  searchParams: Promise<{ saved?: string; error?: string; automation?: string }>;
+  searchParams: Promise<{saved?: string;error?: string;automation?: string;}>;
 };
 
 function automationStatusClass(status: AutomationStatus) {
@@ -61,48 +60,48 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
   await requireAdmin("automation:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const [automations, endpoints, recentDeliveries, messageTemplates, recentTasks, activeCount, runCount, deadLetterCount] = await Promise.all([
-    prisma.automation.findMany({
-      where: { siteId: settings.siteId },
-      include: { _count: { select: { runs: true } } },
-      orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
-      take: 30
-    }),
-    prisma.webhookEndpoint.findMany({
-      where: { siteId: settings.siteId },
-      include: { _count: { select: { deliveries: true } } },
-      orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
-      take: 20
-    }),
-    prisma.webhookDelivery.findMany({
-      where: {
-        OR: [{ automation: { siteId: settings.siteId } }, { webhookEndpoint: { siteId: settings.siteId } }]
-      },
-      include: { automation: true, webhookEndpoint: true },
-      orderBy: { createdAt: "desc" },
-      take: 10
-    }),
-    prisma.messageTemplate.findMany({
-      where: { siteId: settings.siteId, channel: MessageChannel.EMAIL, isActive: true, key: { not: null } },
-      orderBy: [{ purpose: "asc" }, { name: "asc" }],
-      take: 100
-    }),
-    prisma.automationTask.findMany({
-      where: { siteId: settings.siteId },
-      orderBy: { createdAt: "desc" },
-      take: 10
-    }),
-    prisma.automation.count({ where: { siteId: settings.siteId, status: AutomationStatus.ACTIVE } }),
-    prisma.automationRun.count({ where: { automation: { siteId: settings.siteId } } }),
-    prisma.automationRun.count({ where: { automation: { siteId: settings.siteId }, status: AutomationRunStatus.DEAD_LETTER } })
-  ]);
+  prisma.automation.findMany({
+    where: { siteId: settings.siteId },
+    include: { _count: { select: { runs: true } } },
+    orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
+    take: 30
+  }),
+  prisma.webhookEndpoint.findMany({
+    where: { siteId: settings.siteId },
+    include: { _count: { select: { deliveries: true } } },
+    orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
+    take: 20
+  }),
+  prisma.webhookDelivery.findMany({
+    where: {
+      OR: [{ automation: { siteId: settings.siteId } }, { webhookEndpoint: { siteId: settings.siteId } }]
+    },
+    include: { automation: true, webhookEndpoint: true },
+    orderBy: { createdAt: "desc" },
+    take: 10
+  }),
+  prisma.messageTemplate.findMany({
+    where: { siteId: settings.siteId, channel: MessageChannel.EMAIL, isActive: true, key: { not: null } },
+    orderBy: [{ purpose: "asc" }, { name: "asc" }],
+    take: 100
+  }),
+  prisma.automationTask.findMany({
+    where: { siteId: settings.siteId },
+    orderBy: { createdAt: "desc" },
+    take: 10
+  }),
+  prisma.automation.count({ where: { siteId: settings.siteId, status: AutomationStatus.ACTIVE } }),
+  prisma.automationRun.count({ where: { automation: { siteId: settings.siteId } } }),
+  prisma.automationRun.count({ where: { automation: { siteId: settings.siteId }, status: AutomationRunStatus.DEAD_LETTER } })]
+  );
 
   const selectedAutomationId = params.automation || automations[0]?.id;
-  const selectedAutomation = selectedAutomationId
-    ? await prisma.automation.findFirst({
-        where: { id: selectedAutomationId, siteId: settings.siteId },
-        include: { runs: { orderBy: { createdAt: "desc" }, take: 10 } }
-      })
-    : null;
+  const selectedAutomation = selectedAutomationId ?
+  await prisma.automation.findFirst({
+    where: { id: selectedAutomationId, siteId: settings.siteId },
+    include: { runs: { orderBy: { createdAt: "desc" }, take: 10 } }
+  }) :
+  null;
   const savedMessage = params.saved ? "Automation changes saved." : null;
   const errorMessage = params.error || null;
 
@@ -119,34 +118,34 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
       {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
       {errorMessage ? <div className="error">{errorMessage}</div> : null}
 
-      <section className="grid-3">
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+      <EqualGrid as="section" min="220px">
+        <Card>
           <Workflow size={22} />
           <h3>{activeCount} active rules</h3>
           <p className="lead lead-compact">
             Trigger-action rules that can be wired into booking, forms, commerce, billing, and gallery events.
           </p>
-        </div>
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        </Card>
+        <Card>
           <Play size={22} />
           <h3>{runCount} run records</h3>
           <p className="lead lead-compact">
             Live event matches, queued executors, and {deadLetterCount} dead-lettered runs.
           </p>
-        </div>
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        </Card>
+        <Card>
           <Webhook size={22} />
           <h3>{endpoints.length} webhook endpoints</h3>
           <p className="lead lead-compact">
             Destinations ready for signed outbound event delivery.
           </p>
-        </div>
-      </section>
+        </Card>
+      </EqualGrid>
 
-      <section className="grid-2">
-        <form action={createAutomationAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      <EqualGrid as="section">
+        <Card action={createAutomationAction} as="form" minHeight="none" bodyClassName="form-grid">
           <h2 className="section-title">Create automation</h2>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="automation-name">Name</label>
               <input id="automation-name" name="name" required />
@@ -154,37 +153,37 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
             <div className="ui-field">
               <label htmlFor="automation-status">Status</label>
               <select id="automation-status" name="status" defaultValue={AutomationStatus.DRAFT}>
-                {Object.values(AutomationStatus).map((status) => (
-                  <option key={status} value={status}>
+                {Object.values(AutomationStatus).map((status) =>
+                <option key={status} value={status}>
                     {enumLabel(status)}
                   </option>
-                ))}
+                )}
               </select>
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="automation-trigger">Trigger</label>
               <select id="automation-trigger" name="trigger" defaultValue={AutomationTrigger.FORM_SUBMITTED}>
-                {Object.values(AutomationTrigger).map((trigger) => (
-                  <option key={trigger} value={trigger}>
+                {Object.values(AutomationTrigger).map((trigger) =>
+                <option key={trigger} value={trigger}>
                     {enumLabel(trigger)}
                   </option>
-                ))}
+                )}
               </select>
             </div>
             <div className="ui-field">
               <label htmlFor="automation-action">Action</label>
               <select id="automation-action" name="action" defaultValue={AutomationAction.NOTIFY_ADMIN}>
-                {Object.values(AutomationAction).map((action) => (
-                  <option key={action} value={action}>
+                {Object.values(AutomationAction).map((action) =>
+                <option key={action} value={action}>
                     {enumLabel(action)}
                   </option>
-                ))}
+                )}
               </select>
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="automation-email">Target email</label>
               <input id="automation-email" name="targetEmail" type="email" />
@@ -193,16 +192,16 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
               <label htmlFor="automation-url">Webhook URL</label>
               <input id="automation-url" name="webhookUrl" placeholder="https://example.com/webhook" />
             </div>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="automation-template">Email template</label>
             <select id="automation-template" name="messageTemplateId" defaultValue="">
               <option value="">No template</option>
-              {messageTemplates.map((template) => (
-                <option key={template.id} value={template.id}>
+              {messageTemplates.map((template) =>
+              <option key={template.id} value={template.id}>
                   {template.name} ({template.key})
                 </option>
-              ))}
+              )}
             </select>
           </div>
           <div className="ui-field">
@@ -218,10 +217,10 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
             <textarea
               id="automation-config"
               name="actionConfig"
-              placeholder={'{"targetStatus":"CONFIRMED","tag":"vip","title":"Follow up with {{actorEmail}}","dueInDays":2}'}
-            />
+              placeholder={'{"targetStatus":"CONFIRMED","tag":"vip","title":"Follow up with {{actorEmail}}","dueInDays":2}'} />
+            
           </div>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="condition-key">Condition key</label>
               <input id="condition-key" name="conditionKey" placeholder="formSlug" />
@@ -230,16 +229,16 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
               <label htmlFor="condition-value">Condition value</label>
               <input id="condition-value" name="conditionValue" placeholder="contact-inquiry" />
             </div>
-          </div>
-          <button className="ui-button" type="submit">
+          </EqualGrid>
+          <Button type="submit">
             <Plus size={18} />
             Create automation
-          </button>
-        </form>
+          </Button>
+        </Card>
 
-        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+        <Card bodyClassName="ui-stack">
           <h2 className="section-title">Automation rules</h2>
-          <table className="ui-table">
+          <Table>
             <thead>
               <tr>
                 <th>Rule</th>
@@ -249,8 +248,8 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
               </tr>
             </thead>
             <tbody>
-              {automations.map((automation) => (
-                <tr key={automation.id}>
+              {automations.map((automation) =>
+              <tr key={automation.id}>
                   <td>
                     <a href={`/admin/modules/automation?automation=${automation.id}`}>{automation.name}</a>
                     <br />
@@ -262,27 +261,27 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                     <span className={automationStatusClass(automation.status)}>{enumLabel(automation.status)}</span>
                   </td>
                 </tr>
-              ))}
-              {!automations.length ? (
-                <tr>
+              )}
+              {!automations.length ?
+              <tr>
                   <td colSpan={4}>No automations yet.</td>
-                </tr>
-              ) : null}
+                </tr> :
+              null}
             </tbody>
-          </table>
-        </div>
-      </section>
+          </Table>
+        </Card>
+      </EqualGrid>
 
-      {selectedAutomation ? (
-        <section className="grid-2">
-          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+      {selectedAutomation ?
+      <EqualGrid as="section">
+          <Card bodyClassName="ui-stack">
             {(() => {
-              const condition = conditionEntry(selectedAutomation.conditions);
-              return (
-                <form action={updateAutomationAction} className="subpanel form-grid">
+            const condition = conditionEntry(selectedAutomation.conditions);
+            return (
+              <form action={updateAutomationAction} className="subpanel form-grid">
                   <input type="hidden" name="id" value={selectedAutomation.id} />
                   <h3 className="subsection-title">Edit automation</h3>
-                  <div className="grid-2">
+                  <EqualGrid>
                     <div className="ui-field">
                       <label htmlFor={`automation-${selectedAutomation.id}-name`}>Name</label>
                       <input id={`automation-${selectedAutomation.id}-name`} name="name" defaultValue={selectedAutomation.name} required />
@@ -290,69 +289,69 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                     <div className="ui-field">
                       <label htmlFor={`automation-${selectedAutomation.id}-status`}>Status</label>
                       <select id={`automation-${selectedAutomation.id}-status`} name="status" defaultValue={selectedAutomation.status}>
-                        {Object.values(AutomationStatus).map((status) => (
-                          <option key={status} value={status}>
+                        {Object.values(AutomationStatus).map((status) =>
+                      <option key={status} value={status}>
                             {enumLabel(status)}
                           </option>
-                        ))}
+                      )}
                       </select>
                     </div>
-                  </div>
-                  <div className="grid-2">
+                  </EqualGrid>
+                  <EqualGrid>
                     <div className="ui-field">
                       <label htmlFor={`automation-${selectedAutomation.id}-trigger`}>Trigger</label>
                       <select id={`automation-${selectedAutomation.id}-trigger`} name="trigger" defaultValue={selectedAutomation.trigger}>
-                        {Object.values(AutomationTrigger).map((trigger) => (
-                          <option key={trigger} value={trigger}>
+                        {Object.values(AutomationTrigger).map((trigger) =>
+                      <option key={trigger} value={trigger}>
                             {enumLabel(trigger)}
                           </option>
-                        ))}
+                      )}
                       </select>
                     </div>
                     <div className="ui-field">
                       <label htmlFor={`automation-${selectedAutomation.id}-action`}>Action</label>
                       <select id={`automation-${selectedAutomation.id}-action`} name="action" defaultValue={selectedAutomation.action}>
-                        {Object.values(AutomationAction).map((action) => (
-                          <option key={action} value={action}>
+                        {Object.values(AutomationAction).map((action) =>
+                      <option key={action} value={action}>
                             {enumLabel(action)}
                           </option>
-                        ))}
+                      )}
                       </select>
                     </div>
-                  </div>
-                  <div className="grid-2">
+                  </EqualGrid>
+                  <EqualGrid>
                     <div className="ui-field">
                       <label htmlFor={`automation-${selectedAutomation.id}-email`}>Target email</label>
                       <input
-                        id={`automation-${selectedAutomation.id}-email`}
-                        name="targetEmail"
-                        type="email"
-                        defaultValue={selectedAutomation.targetEmail || ""}
-                      />
+                      id={`automation-${selectedAutomation.id}-email`}
+                      name="targetEmail"
+                      type="email"
+                      defaultValue={selectedAutomation.targetEmail || ""} />
+                    
                     </div>
                     <div className="ui-field">
                       <label htmlFor={`automation-${selectedAutomation.id}-url`}>Webhook URL</label>
                       <input
-                        id={`automation-${selectedAutomation.id}-url`}
-                        name="webhookUrl"
-                        defaultValue={selectedAutomation.webhookUrl || ""}
-                        placeholder="https://example.com/webhook"
-                      />
+                      id={`automation-${selectedAutomation.id}-url`}
+                      name="webhookUrl"
+                      defaultValue={selectedAutomation.webhookUrl || ""}
+                      placeholder="https://example.com/webhook" />
+                    
                     </div>
-                  </div>
+                  </EqualGrid>
                   <div className="ui-field">
                     <label htmlFor={`automation-${selectedAutomation.id}-template`}>Email template</label>
                     <select
-                      id={`automation-${selectedAutomation.id}-template`}
-                      name="messageTemplateId"
-                      defaultValue={selectedAutomation.messageTemplateId || ""}
-                    >
+                    id={`automation-${selectedAutomation.id}-template`}
+                    name="messageTemplateId"
+                    defaultValue={selectedAutomation.messageTemplateId || ""}>
+                    
                       <option value="">No template</option>
-                      {messageTemplates.map((template) => (
-                        <option key={template.id} value={template.id}>
+                      {messageTemplates.map((template) =>
+                    <option key={template.id} value={template.id}>
                           {template.name} ({template.key})
                         </option>
-                      ))}
+                    )}
                     </select>
                   </div>
                   <div className="ui-field">
@@ -366,12 +365,12 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                   <div className="ui-field">
                     <label htmlFor={`automation-${selectedAutomation.id}-config`}>Action config JSON</label>
                     <textarea
-                      id={`automation-${selectedAutomation.id}-config`}
-                      name="actionConfig"
-                      defaultValue={configTextareaValue(selectedAutomation.actionConfig)}
-                    />
+                    id={`automation-${selectedAutomation.id}-config`}
+                    name="actionConfig"
+                    defaultValue={configTextareaValue(selectedAutomation.actionConfig)} />
+                  
                   </div>
-                  <div className="grid-2">
+                  <EqualGrid>
                     <div className="ui-field">
                       <label htmlFor={`automation-${selectedAutomation.id}-condition-key`}>Simple condition key</label>
                       <input id={`automation-${selectedAutomation.id}-condition-key`} name="conditionKey" defaultValue={condition.key} />
@@ -380,13 +379,13 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                       <label htmlFor={`automation-${selectedAutomation.id}-condition-value`}>Simple condition value</label>
                       <input id={`automation-${selectedAutomation.id}-condition-value`} name="conditionValue" defaultValue={condition.value} />
                     </div>
-                  </div>
-                  <button className="ui-button ui-button-secondary" type="submit">
+                  </EqualGrid>
+                  <Button type="submit" variant="secondary">
                     Save automation
-                  </button>
-                </form>
-              );
-            })()}
+                  </Button>
+                </form>);
+
+          })()}
             <div className="page-header compact-header">
               <div>
                 <h2 className="section-title">{selectedAutomation.name}</h2>
@@ -397,36 +396,36 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
               <span className={automationStatusClass(selectedAutomation.status)}>{enumLabel(selectedAutomation.status)}</span>
             </div>
             <div className="ui-zero">
-              {[AutomationStatus.ACTIVE, AutomationStatus.PAUSED, AutomationStatus.DRAFT].map((status) => (
-                <form action={updateAutomationStatusAction} key={status}>
+              {[AutomationStatus.ACTIVE, AutomationStatus.PAUSED, AutomationStatus.DRAFT].map((status) =>
+            <form action={updateAutomationStatusAction} key={status}>
                   <input type="hidden" name="id" value={selectedAutomation.id} />
                   <input type="hidden" name="status" value={status} />
-                  <button className="ui-button ui-button-secondary" type="submit">
+                  <Button type="submit" variant="secondary">
                     Mark {enumLabel(status)}
-                  </button>
+                  </Button>
                 </form>
-              ))}
+            )}
             </div>
             <form action={recordAutomationRunAction} className="subpanel form-grid">
               <input type="hidden" name="automationId" value={selectedAutomation.id} />
               <h3 className="subsection-title">Record manual run</h3>
-              <div className="grid-2">
+              <EqualGrid>
                 <div className="ui-field">
                   <label htmlFor="run-status">Status</label>
                   <select id="run-status" name="status" defaultValue={AutomationRunStatus.SUCCEEDED}>
-                    {Object.values(AutomationRunStatus).map((status) => (
-                      <option key={status} value={status}>
+                    {Object.values(AutomationRunStatus).map((status) =>
+                  <option key={status} value={status}>
                         {enumLabel(status)}
                       </option>
-                    ))}
+                  )}
                   </select>
                 </div>
                 <div className="ui-field">
                   <label htmlFor="run-key">Trigger key</label>
                   <input id="run-key" name="triggerKey" placeholder="manual-test" />
                 </div>
-              </div>
-              <div className="grid-2">
+              </EqualGrid>
+              <EqualGrid>
                 <div className="ui-field">
                   <label htmlFor="run-related-type">Related type</label>
                   <input id="run-related-type" name="relatedType" placeholder="form_submission" />
@@ -435,14 +434,14 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                   <label htmlFor="run-related-id">Related id</label>
                   <input id="run-related-id" name="relatedId" />
                 </div>
-              </div>
+              </EqualGrid>
               <div className="ui-field">
                 <label htmlFor="run-summary">Summary</label>
                 <input id="run-summary" name="summary" placeholder="Matched rule and queued admin notification." />
               </div>
-              <button className="ui-button ui-button-secondary" type="submit">
+              <Button type="submit" variant="secondary">
                 Record manual run
-              </button>
+              </Button>
             </form>
             <form action={deleteAutomationAction} className="subpanel form-grid">
               <input type="hidden" name="id" value={selectedAutomation.id} />
@@ -450,15 +449,15 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                 <input name="confirmDelete" type="checkbox" required />
                 Delete this automation and its run records.
               </label>
-              <button className="ui-button ui-button-danger" type="submit">
+              <Button type="submit" variant="danger">
                 Delete automation
-              </button>
+              </Button>
             </form>
-          </div>
+          </Card>
 
-          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+          <Card bodyClassName="ui-stack">
             <h2 className="section-title">Run history</h2>
-            <table className="ui-table">
+            <Table>
               <thead>
                 <tr>
                   <th>Status</th>
@@ -467,18 +466,18 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                 </tr>
               </thead>
               <tbody>
-                {selectedAutomation.runs.map((run) => (
-                  <tr key={run.id}>
+                {selectedAutomation.runs.map((run) =>
+              <tr key={run.id}>
                     <td>
                       <span className={runStatusClass(run.status)}>{enumLabel(run.status)}</span>
-                      {run.status === AutomationRunStatus.DEAD_LETTER ? (
-                        <form className="ui-zero" action={replayAutomationRunAction}>
+                      {run.status === AutomationRunStatus.DEAD_LETTER ?
+                  <form className="ui-zero" action={replayAutomationRunAction}>
                           <input type="hidden" name="id" value={run.id} />
-                          <button className="ui-button ui-button-secondary" type="submit">
+                          <Button type="submit" variant="secondary">
                             Replay
-                          </button>
-                        </form>
-                      ) : null}
+                          </Button>
+                        </form> :
+                  null}
                     </td>
                     <td>
                       {run.summary || run.triggerKey || "No summary"}
@@ -487,22 +486,22 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                     </td>
                     <td>{formatDateTime(run.createdAt, settings.timezone)}</td>
                   </tr>
-                ))}
-                {!selectedAutomation.runs.length ? (
-                  <tr>
+              )}
+                {!selectedAutomation.runs.length ?
+              <tr>
                     <td colSpan={3}>No runs recorded yet.</td>
-                  </tr>
-                ) : null}
+                  </tr> :
+              null}
               </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
+            </Table>
+          </Card>
+        </EqualGrid> :
+      null}
 
-      <section className="grid-2">
-        <form action={createWebhookEndpointAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      <EqualGrid as="section">
+        <Card action={createWebhookEndpointAction} as="form" minHeight="none" bodyClassName="form-grid">
           <h2 className="section-title">Create webhook endpoint</h2>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="webhook-name">Name</label>
               <input id="webhook-name" name="name" required />
@@ -510,19 +509,19 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
             <div className="ui-field">
               <label htmlFor="webhook-status">Status</label>
               <select id="webhook-status" name="status" defaultValue={AutomationStatus.DRAFT}>
-                {Object.values(AutomationStatus).map((status) => (
-                  <option key={status} value={status}>
+                {Object.values(AutomationStatus).map((status) =>
+                <option key={status} value={status}>
                     {enumLabel(status)}
                   </option>
-                ))}
+                )}
               </select>
             </div>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="webhook-url">URL</label>
             <input id="webhook-url" name="url" placeholder="https://example.com/showrunner" required />
           </div>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="webhook-secret">Signing secret</label>
               <input id="webhook-secret" name="signingSecret" placeholder="Generated if left blank" type="password" />
@@ -531,15 +530,15 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
               <label htmlFor="webhook-events">Events</label>
               <input id="webhook-events" name="events" placeholder={moduleEventNames.join(", ")} />
             </div>
-          </div>
-          <button className="ui-button ui-button-secondary" type="submit">
+          </EqualGrid>
+          <Button type="submit" variant="secondary">
             Add endpoint
-          </button>
-        </form>
+          </Button>
+        </Card>
 
-        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+        <Card bodyClassName="ui-stack">
           <h2 className="section-title">Webhook endpoints</h2>
-          <table className="ui-table">
+          <Table>
             <thead>
               <tr>
                 <th>Target</th>
@@ -549,8 +548,8 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
               </tr>
             </thead>
             <tbody>
-              {endpoints.map((endpoint) => (
-                <tr key={endpoint.id}>
+              {endpoints.map((endpoint) =>
+              <tr key={endpoint.id}>
                   <td>
                     <strong>{endpoint.name}</strong>
                     <br />
@@ -573,29 +572,29 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                           <label htmlFor={`webhook-${endpoint.id}-url`}>URL</label>
                           <input id={`webhook-${endpoint.id}-url`} name="url" defaultValue={endpoint.url} required />
                         </div>
-                        <div className="grid-2">
+                        <EqualGrid>
                           <div className="ui-field">
                             <label htmlFor={`webhook-${endpoint.id}-status`}>Status</label>
                             <select id={`webhook-${endpoint.id}-status`} name="status" defaultValue={endpoint.status}>
-                              {Object.values(AutomationStatus).map((status) => (
-                                <option key={status} value={status}>
+                              {Object.values(AutomationStatus).map((status) =>
+                            <option key={status} value={status}>
                                   {enumLabel(status)}
                                 </option>
-                              ))}
+                            )}
                             </select>
                           </div>
                           <div className="ui-field">
                             <label htmlFor={`webhook-${endpoint.id}-secret`}>Rotate secret</label>
                             <input id={`webhook-${endpoint.id}-secret`} name="signingSecret" placeholder="Leave blank to keep current" type="password" />
                           </div>
-                        </div>
+                        </EqualGrid>
                         <div className="ui-field">
                           <label htmlFor={`webhook-${endpoint.id}-events`}>Events</label>
                           <input id={`webhook-${endpoint.id}-events`} name="events" defaultValue={stringArrayCsv(endpoint.events)} />
                         </div>
-                        <button className="ui-button ui-button-secondary" type="submit">
+                        <Button type="submit" variant="secondary">
                           Save endpoint
-                        </button>
+                        </Button>
                       </form>
                       <form action={deleteWebhookEndpointAction} className="form-grid ui-zero">
                         <input type="hidden" name="id" value={endpoint.id} />
@@ -603,28 +602,28 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                           <input name="confirmDelete" type="checkbox" required />
                           Delete this endpoint and delivery records.
                         </label>
-                        <button className="ui-button ui-button-danger" type="submit">
+                        <Button type="submit" variant="danger">
                           Delete endpoint
-                        </button>
+                        </Button>
                       </form>
                     </details>
                   </td>
                 </tr>
-              ))}
-              {!endpoints.length ? (
-                <tr>
+              )}
+              {!endpoints.length ?
+              <tr>
                   <td colSpan={4}>No webhook endpoints yet.</td>
-                </tr>
-              ) : null}
+                </tr> :
+              null}
             </tbody>
-          </table>
-        </div>
-      </section>
+          </Table>
+        </Card>
+      </EqualGrid>
 
-      <section className="grid-2">
-        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+      <EqualGrid as="section">
+        <Card bodyClassName="ui-stack">
           <h2 className="section-title">Automation tasks</h2>
-          <table className="ui-table">
+          <Table>
             <thead>
               <tr>
                 <th>Task</th>
@@ -633,8 +632,8 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
               </tr>
             </thead>
             <tbody>
-              {recentTasks.map((task) => (
-                <tr key={task.id}>
+              {recentTasks.map((task) =>
+              <tr key={task.id}>
                   <td>
                     <strong>{task.title}</strong>
                     <br />
@@ -649,68 +648,68 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                     <span className={runStatusClass(task.status)}>{enumLabel(task.status)}</span>
                   </td>
                 </tr>
-              ))}
-              {!recentTasks.length ? (
-                <tr>
+              )}
+              {!recentTasks.length ?
+              <tr>
                   <td colSpan={3}>No automation tasks yet.</td>
-                </tr>
-              ) : null}
+                </tr> :
+              null}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Card>
 
-        <form action={recordWebhookDeliveryAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+        <Card action={recordWebhookDeliveryAction} as="form" minHeight="none" bodyClassName="form-grid">
           <h2 className="section-title">Record manual webhook delivery</h2>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="delivery-endpoint">Endpoint</label>
               <select id="delivery-endpoint" name="webhookEndpointId">
-                {endpoints.map((endpoint) => (
-                  <option key={endpoint.id} value={endpoint.id}>
+                {endpoints.map((endpoint) =>
+                <option key={endpoint.id} value={endpoint.id}>
                     {endpoint.name}
                   </option>
-                ))}
+                )}
               </select>
             </div>
             <div className="ui-field">
               <label htmlFor="delivery-status">Status</label>
               <select id="delivery-status" name="status" defaultValue={WebhookDeliveryStatus.DELIVERED}>
-                {[WebhookDeliveryStatus.DELIVERED, WebhookDeliveryStatus.FAILED].map((status) => (
-                  <option key={status} value={status}>
+                {[WebhookDeliveryStatus.DELIVERED, WebhookDeliveryStatus.FAILED].map((status) =>
+                <option key={status} value={status}>
                     {enumLabel(status)}
                   </option>
-                ))}
+                )}
               </select>
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="delivery-event">Event</label>
               <select id="delivery-event" name="event" defaultValue="form.submitted">
-                {moduleEventNames.map((event) => (
-                  <option key={event} value={event}>
+                {moduleEventNames.map((event) =>
+                <option key={event} value={event}>
                     {event}
                   </option>
-                ))}
+                )}
               </select>
             </div>
             <div className="ui-field">
               <label htmlFor="delivery-code">Status code</label>
               <input id="delivery-code" name="statusCode" type="number" min="100" max="599" />
             </div>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="delivery-error">Error</label>
             <input id="delivery-error" name="errorMessage" />
           </div>
-          <button className="ui-button ui-button-secondary" type="submit" disabled={!endpoints.length}>
+          <Button type="submit" disabled={!endpoints.length} variant="secondary">
             Record manual delivery
-          </button>
-        </form>
+          </Button>
+        </Card>
 
-        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+        <Card bodyClassName="ui-stack">
           <h2 className="section-title">Webhook delivery records</h2>
-          <table className="ui-table">
+          <Table>
             <thead>
               <tr>
                 <th>Target</th>
@@ -720,8 +719,8 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
               </tr>
             </thead>
             <tbody>
-              {recentDeliveries.map((delivery) => (
-                <tr key={delivery.id}>
+              {recentDeliveries.map((delivery) =>
+              <tr key={delivery.id}>
                   <td>
                     {delivery.webhookEndpoint?.name || delivery.automation?.name || "Manual delivery"}
                     <br />
@@ -735,16 +734,16 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                   </td>
                   <td>{formatDateTime(delivery.createdAt, settings.timezone)}</td>
                 </tr>
-              ))}
-              {!recentDeliveries.length ? (
-                <tr>
+              )}
+              {!recentDeliveries.length ?
+              <tr>
                   <td colSpan={4}>No webhook deliveries recorded yet.</td>
-                </tr>
-              ) : null}
+                </tr> :
+              null}
             </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
+          </Table>
+        </Card>
+      </EqualGrid>
+    </div>);
+
 }

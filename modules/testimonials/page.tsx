@@ -6,6 +6,7 @@ import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { createTestimonialAction, deleteTestimonialAction, updateTestimonialModerationAction } from "./actions";
+import { Button, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ const pageSize = 25;
 const statusFilters = ["all", ...Object.values(TestimonialStatus).map((status) => status.toLowerCase())] as const;
 
 type TestimonialsPageProps = {
-  searchParams: Promise<{ saved?: string; error?: string; page?: string; status?: string }>;
+  searchParams: Promise<{saved?: string;error?: string;page?: string;status?: string;}>;
 };
 
 function normalizeStatusFilter(value?: string) {
@@ -35,20 +36,20 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
   const testimonialWhere = await getAccessibleTestimonialWhere(user, settings.siteId, statusExtra);
 
   const [testimonials, testimonialCount, approvedCount, pendingCount, featuredCount] = await Promise.all([
-    prisma.testimonial.findMany({
-      where: testimonialWhere,
-      include: { client: true },
-      orderBy: [{ status: "asc" }, { submittedAt: "desc" }],
-      skip: (page - 1) * pageSize,
-      take: pageSize
-    }),
-    prisma.testimonial.count({ where: testimonialWhere }),
-    prisma.testimonial.count({ where: await getAccessibleTestimonialWhere(user, settings.siteId, { status: TestimonialStatus.APPROVED }) }),
-    prisma.testimonial.count({ where: await getAccessibleTestimonialWhere(user, settings.siteId, { status: TestimonialStatus.PENDING }) }),
-    prisma.testimonial.count({
-      where: await getAccessibleTestimonialWhere(user, settings.siteId, { status: TestimonialStatus.APPROVED, featured: true })
-    })
-  ]);
+  prisma.testimonial.findMany({
+    where: testimonialWhere,
+    include: { client: true },
+    orderBy: [{ status: "asc" }, { submittedAt: "desc" }],
+    skip: (page - 1) * pageSize,
+    take: pageSize
+  }),
+  prisma.testimonial.count({ where: testimonialWhere }),
+  prisma.testimonial.count({ where: await getAccessibleTestimonialWhere(user, settings.siteId, { status: TestimonialStatus.APPROVED }) }),
+  prisma.testimonial.count({ where: await getAccessibleTestimonialWhere(user, settings.siteId, { status: TestimonialStatus.PENDING }) }),
+  prisma.testimonial.count({
+    where: await getAccessibleTestimonialWhere(user, settings.siteId, { status: TestimonialStatus.APPROVED, featured: true })
+  })]
+  );
   const pageCount = Math.max(1, Math.ceil(testimonialCount / pageSize));
   const savedMessage = params.saved ? "Testimonial changes saved." : null;
   const errorMessage = params.error || null;
@@ -61,43 +62,43 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
           <h1>Reviews and social proof</h1>
           <p>Collect first-party quotes, moderate submissions, and feature approved testimonials on the public site.</p>
         </div>
-        <Link className="ui-button ui-button-secondary" href="/testimonials">
+        <ButtonLink href="/testimonials" variant="secondary">
           <MessageSquare size={18} />
           Public page
-        </Link>
+        </ButtonLink>
       </header>
 
       {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
       {errorMessage ? <div className="error">{errorMessage}</div> : null}
 
-      <section className="grid-3">
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+      <EqualGrid as="section" min="220px">
+        <Card>
           <ShieldCheck size={22} />
           <h3>{approvedCount} approved</h3>
           <p className="lead lead-compact">
             Quotes cleared for public display.
           </p>
-        </div>
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        </Card>
+        <Card>
           <MessageSquare size={22} />
           <h3>{pendingCount} pending</h3>
           <p className="lead lead-compact">
             New submissions waiting for moderation.
           </p>
-        </div>
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        </Card>
+        <Card>
           <Star size={22} />
           <h3>{featuredCount} featured</h3>
           <p className="lead lead-compact">
             Approved quotes shown in the homepage proof block.
           </p>
-        </div>
-      </section>
+        </Card>
+      </EqualGrid>
 
-      <section className="grid-2">
-        <form action={createTestimonialAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      <EqualGrid as="section">
+        <Card action={createTestimonialAction} as="form" minHeight="none" bodyClassName="form-grid">
           <h2 className="section-title">Add testimonial</h2>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="authorName">Author name</label>
               <input id="authorName" name="authorName" required />
@@ -106,8 +107,8 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
               <label htmlFor="authorEmail">Author email</label>
               <input id="authorEmail" name="authorEmail" type="email" />
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="authorRole">Role or context</label>
               <input id="authorRole" name="authorRole" placeholder="Client, buyer, parent, venue owner" />
@@ -116,12 +117,12 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
               <label htmlFor="serviceName">Service or product</label>
               <input id="serviceName" name="serviceName" />
             </div>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="quote">Quote</label>
             <textarea id="quote" name="quote" required />
           </div>
-          <div className="grid-3">
+          <EqualGrid min="220px">
             <div className="ui-field">
               <label htmlFor="rating">Rating</label>
               <input id="rating" name="rating" type="number" min="1" max="5" defaultValue="5" />
@@ -133,15 +134,15 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
             <div className="ui-field">
               <label htmlFor="status">Status</label>
               <select id="status" name="status" defaultValue={TestimonialStatus.PENDING}>
-                {Object.values(TestimonialStatus).map((status) => (
-                  <option key={status} value={status}>
+                {Object.values(TestimonialStatus).map((status) =>
+                <option key={status} value={status}>
                     {enumLabel(status)}
                   </option>
-                ))}
+                )}
               </select>
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="sourceUrl">Source URL</label>
               <input id="sourceUrl" name="sourceUrl" />
@@ -150,7 +151,7 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
               <label htmlFor="productName">Product</label>
               <input id="productName" name="productName" />
             </div>
-          </div>
+          </EqualGrid>
           <div className="ui-zero">
             <label className="ui-zero">
               <input name="permissionGranted" type="checkbox" />
@@ -161,31 +162,31 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
               Featured
             </label>
           </div>
-          <button className="ui-button" type="submit">
+          <Button type="submit">
             <Plus size={18} />
             Add testimonial
-          </button>
-        </form>
+          </Button>
+        </Card>
 
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        <Card>
           <div className="page-header compact-header">
             <div>
               <h2 className="section-title">Moderation queue</h2>
               <p>{testimonialCount} matching testimonials</p>
             </div>
             <div className="ui-zero">
-              {statusFilters.map((filter) => (
-                <Link
-                  className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"}
-                  href={`/admin/modules/testimonials?status=${filter}`}
-                  key={filter}
-                >
+              {statusFilters.map((filter) =>
+              <Link
+                className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"}
+                href={`/admin/modules/testimonials?status=${filter}`}
+                key={filter}>
+                
                   {filter}
                 </Link>
-              ))}
+              )}
             </div>
           </div>
-          <table className="ui-table">
+          <Table>
             <thead>
               <tr>
                 <th>Author</th>
@@ -195,8 +196,8 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
               </tr>
             </thead>
             <tbody>
-              {testimonials.map((testimonial) => (
-                <tr key={testimonial.id}>
+              {testimonials.map((testimonial) =>
+              <tr key={testimonial.id}>
                   <td>
                     <strong>{testimonial.authorName}</strong>
                     <br />
@@ -206,18 +207,18 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
                     <br />
                     <span className="muted-text">
                       Consent:{" "}
-                      {testimonial.permissionGrantedAt
-                        ? formatDateTime(testimonial.permissionGrantedAt, settings.timezone)
-                        : testimonial.permissionGranted
-                          ? "recorded before snapshots"
-                          : "missing"}
+                      {testimonial.permissionGrantedAt ?
+                    formatDateTime(testimonial.permissionGrantedAt, settings.timezone) :
+                    testimonial.permissionGranted ?
+                    "recorded before snapshots" :
+                    "missing"}
                     </span>
-                    {testimonial.client ? (
-                      <>
+                    {testimonial.client ?
+                  <>
                         <br />
                         <Link href={`/admin/clients/${testimonial.client.id}`}>Client record</Link>
-                      </>
-                    ) : null}
+                      </> :
+                  null}
                   </td>
                   <td>
                     {testimonial.quote}
@@ -227,46 +228,46 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
                   <td>
                     <span className={statusClass(testimonial.status)}>{enumLabel(testimonial.status)}</span>{" "}
                     {testimonial.featured ? <span className="ui-badge ui-badge-success">featured</span> : null}
-                    {!testimonial.permissionGranted ? (
-                      <>
+                    {!testimonial.permissionGranted ?
+                  <>
                         {" "}
                         <span className="ui-badge ui-badge-danger">needs permission</span>
-                      </>
-                    ) : null}
+                      </> :
+                  null}
                   </td>
                   <td>
                     <div className="ui-zero">
                       <form action={updateTestimonialModerationAction}>
                         <input type="hidden" name="id" value={testimonial.id} />
                         <input type="hidden" name="status" value={TestimonialStatus.APPROVED} />
-                        <button className="ui-button ui-button-secondary" disabled={!testimonial.permissionGranted} type="submit">
+                        <Button disabled={!testimonial.permissionGranted} type="submit" variant="secondary">
                           Approve
-                        </button>
+                        </Button>
                       </form>
                       <form action={updateTestimonialModerationAction}>
                         <input type="hidden" name="id" value={testimonial.id} />
                         <input type="hidden" name="status" value={TestimonialStatus.REJECTED} />
-                        <button className="ui-button ui-button-secondary" type="submit">
+                        <Button type="submit" variant="secondary">
                           Reject
-                        </button>
+                        </Button>
                       </form>
                       <form action={updateTestimonialModerationAction}>
                         <input type="hidden" name="id" value={testimonial.id} />
                         <input type="hidden" name="featured" value={testimonial.featured ? "false" : "true"} />
-                        <button
-                          className="ui-button ui-button-secondary"
-                          disabled={!testimonial.featured && (!testimonial.permissionGranted || testimonial.status !== TestimonialStatus.APPROVED)}
-                          type="submit"
-                        >
+                        <Button
+
+                        disabled={!testimonial.featured && (!testimonial.permissionGranted || testimonial.status !== TestimonialStatus.APPROVED)}
+                        type="submit" variant="secondary">
+                        
                           {testimonial.featured ? "Unfeature" : "Feature"}
-                        </button>
+                        </Button>
                       </form>
                       <form action={updateTestimonialModerationAction}>
                         <input type="hidden" name="id" value={testimonial.id} />
                         <input type="hidden" name="status" value={TestimonialStatus.ARCHIVED} />
-                        <button className="ui-button ui-button-secondary" type="submit">
+                        <Button type="submit" variant="secondary">
                           Archive
-                        </button>
+                        </Button>
                       </form>
                       <form action={deleteTestimonialAction} className="form-grid">
                         <input type="hidden" name="id" value={testimonial.id} />
@@ -274,42 +275,42 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
                           <input name="confirmDelete" type="checkbox" required />
                           Delete
                         </label>
-                        <button className="ui-button ui-button-danger" type="submit">
+                        <Button type="submit" variant="danger">
                           Delete
-                        </button>
+                        </Button>
                       </form>
                     </div>
                   </td>
                 </tr>
-              ))}
-              {!testimonials.length ? (
-                <tr>
+              )}
+              {!testimonials.length ?
+              <tr>
                   <td colSpan={4}>No testimonials yet.</td>
-                </tr>
-              ) : null}
+                </tr> :
+              null}
             </tbody>
-          </table>
+          </Table>
           <div className="ui-zero">
-            <Link
-              className="ui-button ui-button-secondary"
+            <ButtonLink
+
               href={`/admin/modules/testimonials?status=${statusFilter}&page=${Math.max(1, page - 1)}`}
-              aria-disabled={page <= 1}
-            >
+              aria-disabled={page <= 1} variant="secondary">
+              
               Previous
-            </Link>
+            </ButtonLink>
             <span className="ui-badge">
               Page {Math.min(page, pageCount)} of {pageCount}
             </span>
-            <Link
-              className="ui-button ui-button-secondary"
+            <ButtonLink
+
               href={`/admin/modules/testimonials?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
-              aria-disabled={page >= pageCount}
-            >
+              aria-disabled={page >= pageCount} variant="secondary">
+              
               Next
-            </Link>
+            </ButtonLink>
           </div>
-        </div>
-      </section>
-    </div>
-  );
+        </Card>
+      </EqualGrid>
+    </div>);
+
 }

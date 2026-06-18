@@ -4,6 +4,7 @@ import NextImage from "next/image";
 import { Search, X } from "lucide-react";
 import type { KeyboardEvent, MouseEvent } from "react";
 import { useCallback, useEffect, useId, useRef } from "react";
+import { Button } from "@/components/ui";
 
 const openLightboxEvent = "public-gallery:open-lightbox";
 
@@ -65,7 +66,7 @@ export function PublicGalleryLightbox({
 
   useEffect(() => {
     function handleOpen(event: Event) {
-      const detail = (event as CustomEvent<{ itemId?: string }>).detail;
+      const detail = (event as CustomEvent<{itemId?: string;}>).detail;
       if (detail?.itemId === itemId) openDialog();
     }
 
@@ -112,16 +113,16 @@ export function PublicGalleryLightbox({
         aria-haspopup="dialog"
         className="public-gallery-image-link"
         onClick={openDialog}
-        type="button"
-      >
+        type="button">
+        
         <NextImage
           src={thumbnailSrc}
           alt={alt}
           width={1200}
           height={900}
           sizes="(max-width: 860px) 100vw, 33vw"
-          unoptimized
-        />
+          unoptimized />
+        
         <span>
           <Search size={16} />
           Open
@@ -136,31 +137,31 @@ export function PublicGalleryLightbox({
         id={`lightbox-${itemId}`}
         onClick={handleDialogClick}
         onKeyDown={handleDialogKeyDown}
-        ref={dialogRef}
-      >
+        ref={dialogRef}>
+        
         <div className="public-gallery-lightbox-panel">
           <div className="public-gallery-lightbox-toolbar">
             <div>
               <strong id={titleId}>{title}</strong>
               {caption ? <p id={descriptionId}>{caption}</p> : null}
             </div>
-            <button className="button secondary" onClick={closeDialog} ref={closeButtonRef} type="button">
+            <Button onClick={closeDialog} ref={closeButtonRef} type="button" variant="secondary">
               <X size={16} />
               Close
-            </button>
+            </Button>
           </div>
           <NextImage src={fullImageSrc} alt={alt} width={width} height={height} sizes="100vw" unoptimized />
           <div className="public-gallery-lightbox-nav">
-            <button className="button secondary" onClick={() => openAdjacentLightbox(previousItemId)} type="button">
+            <Button onClick={() => openAdjacentLightbox(previousItemId)} type="button" variant="secondary">
               Previous
-            </button>
+            </Button>
             <span>{positionLabel}</span>
-            <button className="button secondary" onClick={() => openAdjacentLightbox(nextItemId)} type="button">
+            <Button onClick={() => openAdjacentLightbox(nextItemId)} type="button" variant="secondary">
               Next
-            </button>
+            </Button>
           </div>
         </div>
       </dialog>
-    </>
-  );
+    </>);
+
 }

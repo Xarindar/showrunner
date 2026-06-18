@@ -12,14 +12,14 @@ import {
   addClientNoteAction,
   deleteClientFileAction,
   deleteClientNoteAction,
-  updateClientAction
-} from "../actions";
+  updateClientAction } from "../actions";
+import { Button, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type ClientDetailPageProps = {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  params: Promise<{id: string;}>;
+  searchParams: Promise<{saved?: string;error?: string;}>;
 };
 
 type TimelineItem = {
@@ -43,7 +43,7 @@ function preferencesNotes(value: unknown) {
   return isRecord(value) && typeof value.notes === "string" ? value.notes : "";
 }
 
-function clientEmailSet(client: { alternateEmails: unknown; email: string }) {
+function clientEmailSet(client: {alternateEmails: unknown;email: string;}) {
   return [...new Set([client.email, ...stringArrayFromUnknown(client.alternateEmails)].map((email) => email.trim().toLowerCase()).filter(Boolean))];
 }
 
@@ -78,16 +78,16 @@ function relatedRecordLabel(type: string, id: string) {
 function summarizeSubmission(value: unknown) {
   if (!isRecord(value)) return "No response data";
 
-  const entries = Object.entries(value)
-    .map(([key, item]) => {
-      if (isRecord(item) && "value" in item) {
-        return [String(item.label || key), item.value] as const;
-      }
+  const entries = Object.entries(value).
+  map(([key, item]) => {
+    if (isRecord(item) && "value" in item) {
+      return [String(item.label || key), item.value] as const;
+    }
 
-      return [key, item] as const;
-    })
-    .filter(([, item]) => String(item || "").trim())
-    .slice(0, 3);
+    return [key, item] as const;
+  }).
+  filter(([, item]) => String(item || "").trim()).
+  slice(0, 3);
 
   return entries.length ? truncate(entries.map(([key, item]) => `${key}: ${String(item)}`).join(" | ")) : "No response data";
 }
@@ -140,7 +140,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
   const orderIds = client.orders.map((order) => order.id);
   const billingDocumentIds = client.billingDocuments.map((document) => document.id);
   const formSubmissionIds = client.formSubmissions.map((submission) => submission.id);
-  const relatedOutboxFilters: Array<{ relatedType: string; relatedId: { in: string[] } }> = [];
+  const relatedOutboxFilters: Array<{relatedType: string;relatedId: {in: string[];};}> = [];
   if (bookingIds.length) relatedOutboxFilters.push({ relatedType: "booking", relatedId: { in: bookingIds } });
   if (orderIds.length) relatedOutboxFilters.push({ relatedType: "order", relatedId: { in: orderIds } });
   if (billingDocumentIds.length) relatedOutboxFilters.push({ relatedType: "billingDocument", relatedId: { in: billingDocumentIds } });
@@ -150,170 +150,170 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
   }
 
   const [galleryAccesses, galleryFavorites, proofApprovals, proofDecisions, emailOutboxRows] = await Promise.all([
-    prisma.portfolioGalleryAccess.findMany({
-      where: { siteId: settings.siteId, clientId: client.id },
-      include: { gallery: { select: { slug: true, title: true } } },
-      orderBy: { updatedAt: "desc" },
-      take: 20
-    }),
-    prisma.portfolioGalleryFavorite.findMany({
-      where: { clientId: client.id },
-      include: {
-        gallery: { select: { slug: true, title: true } },
-        item: { select: { title: true, imageUrl: true } }
-      },
-      orderBy: { createdAt: "desc" },
-      take: 30
-    }),
-    prisma.portfolioProofApproval.findMany({
-      where: { siteId: settings.siteId, clientId: client.id },
-      include: { gallery: { select: { slug: true, title: true } }, round: { select: { roundNumber: true } } },
-      orderBy: { createdAt: "desc" },
-      take: 20
-    }),
-    prisma.portfolioProofItemDecision.findMany({
-      where: { siteId: settings.siteId, clientId: client.id },
-      include: {
-        gallery: { select: { slug: true, title: true } },
-        item: { select: { title: true, imageUrl: true } },
-        round: { select: { roundNumber: true } }
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 30
-    }),
-    prisma.emailOutbox.findMany({
-      where: {
-        siteId: settings.siteId,
-        OR: [{ recipientEmail: { in: clientEmails } }, ...relatedOutboxFilters]
-      },
-      include: { template: { select: { name: true, key: true, purpose: true } } },
-      orderBy: { createdAt: "desc" },
-      take: 80
-    })
-  ]);
+  prisma.portfolioGalleryAccess.findMany({
+    where: { siteId: settings.siteId, clientId: client.id },
+    include: { gallery: { select: { slug: true, title: true } } },
+    orderBy: { updatedAt: "desc" },
+    take: 20
+  }),
+  prisma.portfolioGalleryFavorite.findMany({
+    where: { clientId: client.id },
+    include: {
+      gallery: { select: { slug: true, title: true } },
+      item: { select: { title: true, imageUrl: true } }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 30
+  }),
+  prisma.portfolioProofApproval.findMany({
+    where: { siteId: settings.siteId, clientId: client.id },
+    include: { gallery: { select: { slug: true, title: true } }, round: { select: { roundNumber: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 20
+  }),
+  prisma.portfolioProofItemDecision.findMany({
+    where: { siteId: settings.siteId, clientId: client.id },
+    include: {
+      gallery: { select: { slug: true, title: true } },
+      item: { select: { title: true, imageUrl: true } },
+      round: { select: { roundNumber: true } }
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 30
+  }),
+  prisma.emailOutbox.findMany({
+    where: {
+      siteId: settings.siteId,
+      OR: [{ recipientEmail: { in: clientEmails } }, ...relatedOutboxFilters]
+    },
+    include: { template: { select: { name: true, key: true, purpose: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 80
+  })]
+  );
 
   const timelineItems: TimelineItem[] = [
-    {
-      id: `profile-${client.id}`,
-      at: client.updatedAt,
-      badge: "profile",
-      title: "Profile status",
-      detail: `${client.status} | ${enumLabel(client.pipelineStage)}`
-    },
-    ...client.bookings.map((booking) => ({
-      id: `booking-${booking.id}`,
-      at: booking.startsAt,
-      badge: "appointment",
-      title: booking.service.name,
-      detail: `${enumLabel(booking.status)} | ${formatDateTime(booking.startsAt, settings.timezone)}`,
-      href: `/admin/appointments/${booking.id}`
-    })),
-    ...client.notes.map((note) => ({
-      id: `note-${note.id}`,
-      at: note.createdAt,
-      badge: "note",
-      title: "Internal note",
-      detail: truncate(note.content)
-    })),
-    ...client.formSubmissions.map((submission) => ({
-      id: `form-${submission.id}`,
-      at: submission.createdAt,
-      badge: "form",
-      title: submission.form.name,
-      detail: `${enumLabel(submission.form.destination)} | ${summarizeSubmission(submission.data)}`,
-      href: `/admin/modules/forms?form=${submission.formId}`
-    })),
-    ...client.testimonials.map((testimonial) => ({
-      id: `testimonial-${testimonial.id}`,
-      at: testimonial.submittedAt,
-      badge: "testimonial",
-      title: testimonial.serviceName || "Testimonial",
-      detail: `${enumLabel(testimonial.status)} | ${testimonial.rating}/5 | ${truncate(testimonial.quote)}`,
-      href: `/admin/modules/testimonials?status=${testimonial.status.toLowerCase()}`
-    })),
-    ...client.billingDocuments.map((document) => ({
-      id: `billing-${document.id}`,
-      at: document.updatedAt,
-      badge: enumLabel(document.type),
-      title: document.documentNumber,
-      detail: `${enumLabel(document.status)} | ${formatMoney(document.totalCents, document.currency)}`,
-      href: `/admin/modules/billing?document=${document.id}`
-    })),
-    ...client.orders.map((order) => ({
-      id: `order-${order.id}`,
-      at: order.placedAt || order.updatedAt,
-      badge: "order",
-      title: order.orderNumber,
-      detail: `${enumLabel(order.status)} | ${formatMoney(order.totalCents, order.currency)}`,
-      href: `/admin/modules/products?order=${order.id}`
-    })),
-    ...client.orders.flatMap((order) =>
-      order.payments.map((payment) => ({
-        id: `payment-${payment.id}`,
-        at: payment.createdAt,
-        badge: "payment",
-        title: `${enumLabel(payment.status)} payment`,
-        detail: `${formatMoney(payment.amountCents, payment.currency)} | ${enumLabel(payment.provider)}`,
-        href: `/admin/modules/products?order=${order.id}`
-      }))
-    ),
-    ...client.messageLogs.map((message) => ({
-      id: `message-${message.id}`,
-      at: message.sentAt || message.createdAt,
-      badge: message.channel.toLowerCase(),
-      title: message.subject || message.template?.name || message.purpose,
-      detail: `${enumLabel(message.status)} | ${truncate(message.bodyPreview || message.recipientEmail || "No preview")}`
-    })),
-    ...emailOutboxRows.map((message) => ({
-      id: `email-outbox-${message.id}`,
-      at: message.sentAt || message.updatedAt,
-      badge: "email",
-      title: message.subject || message.template?.name || message.templateKey,
-      detail: `${enumLabel(message.status)} | ${message.recipientEmail}`
-    })),
-    ...client.files.map((file) => ({
-      id: `file-${file.id}`,
-      at: file.uploadedAt,
-      badge: "upload",
-      title: file.title,
-      detail: `${file.category || "file"} | ${truncate(file.notes || file.url)}`,
-      href: file.url
-    })),
-    ...galleryAccesses.map((access) => ({
-      id: `gallery-access-${access.id}`,
-      at: access.lastViewedAt || access.createdAt,
-      badge: "gallery access",
-      title: access.gallery.title,
-      detail: `${enumLabel(access.status)} | ${access.recipientEmail}`,
-      href: `/galleries/access/${access.accessToken}`
-    })),
-    ...galleryFavorites.map((favorite) => ({
-      id: `gallery-favorite-${favorite.id}`,
-      at: favorite.createdAt,
-      badge: "favorite",
-      title: favorite.gallery.title,
-      detail: `${favorite.item.title || favorite.item.imageUrl} | ${truncate(favorite.notes || "No notes")}`,
-      href: `/galleries/${favorite.gallery.slug}`
-    })),
-    ...proofApprovals.map((approval) => ({
-      id: `proof-approval-${approval.id}`,
-      at: approval.createdAt,
-      badge: "proof response",
-      title: approval.gallery.title,
-      detail: `Round ${approval.round.roundNumber} | ${enumLabel(approval.status)} | ${truncate(approval.notes || "No notes")}`,
-      href: `/galleries/${approval.gallery.slug}`
-    })),
-    ...proofDecisions.map((decision) => ({
-      id: `proof-decision-${decision.id}`,
-      at: decision.updatedAt,
-      badge: "proof image",
-      title: decision.gallery.title,
-      detail: `Round ${decision.round.roundNumber} | ${enumLabel(decision.status)} | ${decision.item.title || decision.item.imageUrl}`,
-      href: `/galleries/${decision.gallery.slug}`
-    }))
-  ]
-    .sort((first, second) => second.at.getTime() - first.at.getTime())
-    .slice(0, 80);
+  {
+    id: `profile-${client.id}`,
+    at: client.updatedAt,
+    badge: "profile",
+    title: "Profile status",
+    detail: `${client.status} | ${enumLabel(client.pipelineStage)}`
+  },
+  ...client.bookings.map((booking) => ({
+    id: `booking-${booking.id}`,
+    at: booking.startsAt,
+    badge: "appointment",
+    title: booking.service.name,
+    detail: `${enumLabel(booking.status)} | ${formatDateTime(booking.startsAt, settings.timezone)}`,
+    href: `/admin/appointments/${booking.id}`
+  })),
+  ...client.notes.map((note) => ({
+    id: `note-${note.id}`,
+    at: note.createdAt,
+    badge: "note",
+    title: "Internal note",
+    detail: truncate(note.content)
+  })),
+  ...client.formSubmissions.map((submission) => ({
+    id: `form-${submission.id}`,
+    at: submission.createdAt,
+    badge: "form",
+    title: submission.form.name,
+    detail: `${enumLabel(submission.form.destination)} | ${summarizeSubmission(submission.data)}`,
+    href: `/admin/modules/forms?form=${submission.formId}`
+  })),
+  ...client.testimonials.map((testimonial) => ({
+    id: `testimonial-${testimonial.id}`,
+    at: testimonial.submittedAt,
+    badge: "testimonial",
+    title: testimonial.serviceName || "Testimonial",
+    detail: `${enumLabel(testimonial.status)} | ${testimonial.rating}/5 | ${truncate(testimonial.quote)}`,
+    href: `/admin/modules/testimonials?status=${testimonial.status.toLowerCase()}`
+  })),
+  ...client.billingDocuments.map((document) => ({
+    id: `billing-${document.id}`,
+    at: document.updatedAt,
+    badge: enumLabel(document.type),
+    title: document.documentNumber,
+    detail: `${enumLabel(document.status)} | ${formatMoney(document.totalCents, document.currency)}`,
+    href: `/admin/modules/billing?document=${document.id}`
+  })),
+  ...client.orders.map((order) => ({
+    id: `order-${order.id}`,
+    at: order.placedAt || order.updatedAt,
+    badge: "order",
+    title: order.orderNumber,
+    detail: `${enumLabel(order.status)} | ${formatMoney(order.totalCents, order.currency)}`,
+    href: `/admin/modules/products?order=${order.id}`
+  })),
+  ...client.orders.flatMap((order) =>
+  order.payments.map((payment) => ({
+    id: `payment-${payment.id}`,
+    at: payment.createdAt,
+    badge: "payment",
+    title: `${enumLabel(payment.status)} payment`,
+    detail: `${formatMoney(payment.amountCents, payment.currency)} | ${enumLabel(payment.provider)}`,
+    href: `/admin/modules/products?order=${order.id}`
+  }))
+  ),
+  ...client.messageLogs.map((message) => ({
+    id: `message-${message.id}`,
+    at: message.sentAt || message.createdAt,
+    badge: message.channel.toLowerCase(),
+    title: message.subject || message.template?.name || message.purpose,
+    detail: `${enumLabel(message.status)} | ${truncate(message.bodyPreview || message.recipientEmail || "No preview")}`
+  })),
+  ...emailOutboxRows.map((message) => ({
+    id: `email-outbox-${message.id}`,
+    at: message.sentAt || message.updatedAt,
+    badge: "email",
+    title: message.subject || message.template?.name || message.templateKey,
+    detail: `${enumLabel(message.status)} | ${message.recipientEmail}`
+  })),
+  ...client.files.map((file) => ({
+    id: `file-${file.id}`,
+    at: file.uploadedAt,
+    badge: "upload",
+    title: file.title,
+    detail: `${file.category || "file"} | ${truncate(file.notes || file.url)}`,
+    href: file.url
+  })),
+  ...galleryAccesses.map((access) => ({
+    id: `gallery-access-${access.id}`,
+    at: access.lastViewedAt || access.createdAt,
+    badge: "gallery access",
+    title: access.gallery.title,
+    detail: `${enumLabel(access.status)} | ${access.recipientEmail}`,
+    href: `/galleries/access/${access.accessToken}`
+  })),
+  ...galleryFavorites.map((favorite) => ({
+    id: `gallery-favorite-${favorite.id}`,
+    at: favorite.createdAt,
+    badge: "favorite",
+    title: favorite.gallery.title,
+    detail: `${favorite.item.title || favorite.item.imageUrl} | ${truncate(favorite.notes || "No notes")}`,
+    href: `/galleries/${favorite.gallery.slug}`
+  })),
+  ...proofApprovals.map((approval) => ({
+    id: `proof-approval-${approval.id}`,
+    at: approval.createdAt,
+    badge: "proof response",
+    title: approval.gallery.title,
+    detail: `Round ${approval.round.roundNumber} | ${enumLabel(approval.status)} | ${truncate(approval.notes || "No notes")}`,
+    href: `/galleries/${approval.gallery.slug}`
+  })),
+  ...proofDecisions.map((decision) => ({
+    id: `proof-decision-${decision.id}`,
+    at: decision.updatedAt,
+    badge: "proof image",
+    title: decision.gallery.title,
+    detail: `Round ${decision.round.roundNumber} | ${enumLabel(decision.status)} | ${decision.item.title || decision.item.imageUrl}`,
+    href: `/galleries/${decision.gallery.slug}`
+  }))].
+
+  sort((first, second) => second.at.getTime() - first.at.getTime()).
+  slice(0, 80);
 
   return (
     <div className="stack">
@@ -323,19 +323,19 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           <h1>{client.name}</h1>
           <p>{client.email}</p>
         </div>
-        <Link className="ui-button ui-button-secondary" href="/admin/modules/clients">
+        <ButtonLink href="/admin/modules/clients" variant="secondary">
           Back to clients
-        </Link>
+        </ButtonLink>
       </header>
 
       {saved ? <div className="success-message">Client record updated.</div> : null}
       {error ? <div className="error">{error}</div> : null}
 
-      <section className="grid-2">
-        <form action={updateClientAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      <EqualGrid as="section">
+        <Card action={updateClientAction} as="form" minHeight="none" bodyClassName="form-grid">
           <input type="hidden" name="id" value={client.id} />
           <h2 className="section-title">Profile</h2>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="name">Name</label>
               <input id="name" name="name" defaultValue={client.name} required />
@@ -344,8 +344,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               <label htmlFor="email">Email</label>
               <input id="email" name="email" type="email" defaultValue={client.email} required />
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="companyName">Company</label>
               <input id="companyName" name="companyName" defaultValue={client.companyName} />
@@ -354,8 +354,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               <label htmlFor="familyName">Family or household</label>
               <input id="familyName" name="familyName" defaultValue={client.familyName} />
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="phone">Phone</label>
               <input id="phone" name="phone" defaultValue={client.phone || ""} />
@@ -369,24 +369,24 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                 <option value="inactive">Inactive</option>
               </select>
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="pipelineStage">Pipeline</label>
               <select id="pipelineStage" name="pipelineStage" defaultValue={client.pipelineStage}>
-                {Object.values(ClientPipelineStage).map((stage) => (
-                  <option key={stage} value={stage}>
+                {Object.values(ClientPipelineStage).map((stage) =>
+                <option key={stage} value={stage}>
                     {enumLabel(stage)}
                   </option>
-                ))}
+                )}
               </select>
             </div>
             <div className="ui-field">
               <label htmlFor="tags">Tags</label>
               <input id="tags" name="tags" defaultValue={client.tags.map((tag) => tag.label).join(", ")} />
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="alternateEmails">Alternate emails</label>
               <input id="alternateEmails" name="alternateEmails" defaultValue={stringArrayCsv(client.alternateEmails)} />
@@ -395,8 +395,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               <label htmlFor="alternatePhones">Alternate phones</label>
               <input id="alternatePhones" name="alternatePhones" defaultValue={stringArrayCsv(client.alternatePhones)} />
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="addressLine1">Address</label>
               <input id="addressLine1" name="addressLine1" defaultValue={client.addressLine1} />
@@ -405,8 +405,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               <label htmlFor="addressLine2">Address 2</label>
               <input id="addressLine2" name="addressLine2" defaultValue={client.addressLine2} />
             </div>
-          </div>
-          <div className="grid-3">
+          </EqualGrid>
+          <EqualGrid min="220px">
             <div className="ui-field">
               <label htmlFor="city">City</label>
               <input id="city" name="city" defaultValue={client.city} />
@@ -419,8 +419,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               <label htmlFor="postalCode">Postal code</label>
               <input id="postalCode" name="postalCode" defaultValue={client.postalCode} />
             </div>
-          </div>
-          <div className="grid-3">
+          </EqualGrid>
+          <EqualGrid min="220px">
             <div className="ui-field">
               <label htmlFor="country">Country</label>
               <input id="country" name="country" defaultValue={client.country} />
@@ -433,8 +433,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               <label htmlFor="pronouns">Pronouns</label>
               <input id="pronouns" name="pronouns" defaultValue={client.pronouns} />
             </div>
-          </div>
-          <div className="grid-2">
+          </EqualGrid>
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="birthday">Birthday</label>
               <input id="birthday" name="birthday" type="date" defaultValue={dateInputValue(client.birthday)} />
@@ -443,12 +443,12 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               <label htmlFor="anniversary">Anniversary</label>
               <input id="anniversary" name="anniversary" type="date" defaultValue={dateInputValue(client.anniversary)} />
             </div>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="preferences">Preferences</label>
             <textarea id="preferences" name="preferences" defaultValue={preferencesNotes(client.preferences)} />
           </div>
-          <div className="grid-3">
+          <EqualGrid min="220px">
             <label className="ui-zero">
               <input name="emailOptIn" type="checkbox" defaultChecked={client.emailOptIn} />
               Email opt-in
@@ -461,8 +461,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               <input name="photoUsageRelease" type="checkbox" defaultChecked={client.photoUsageRelease} />
               Photo release
             </label>
-          </div>
-          <div className="grid-3">
+          </EqualGrid>
+          <EqualGrid min="220px">
             <label className="ui-zero">
               <input name="policyAccepted" type="checkbox" />
               Record policy acceptance
@@ -475,36 +475,36 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               <input name="dataDeletionRequested" type="checkbox" defaultChecked={Boolean(client.dataDeletionRequestedAt)} />
               Deletion requested
             </label>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="privateNotes">Private summary</label>
             <textarea id="privateNotes" name="privateNotes" defaultValue={client.privateNotes || ""} />
           </div>
-          <button className="ui-button" type="submit">
+          <Button type="submit">
             <Save size={18} />
             Save profile
-          </button>
-        </form>
+          </Button>
+        </Card>
 
-        <form action={addClientNoteAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+        <Card action={addClientNoteAction} as="form" minHeight="none" bodyClassName="form-grid">
           <input type="hidden" name="clientId" value={client.id} />
           <h2 className="section-title">Add note</h2>
           <div className="ui-field">
             <label htmlFor="content">Note</label>
             <textarea id="content" name="content" required />
           </div>
-          <button className="ui-button" type="submit">
+          <Button type="submit">
             <Save size={18} />
             Save note
-          </button>
-        </form>
-      </section>
+          </Button>
+        </Card>
+      </EqualGrid>
 
-      <section className="grid-2">
-        <form action={addClientFileAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      <EqualGrid as="section">
+        <Card action={addClientFileAction} as="form" minHeight="none" bodyClassName="form-grid">
           <input type="hidden" name="clientId" value={client.id} />
           <h2 className="section-title">Attach file</h2>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="file-title">Title</label>
               <input id="file-title" name="title" required />
@@ -513,7 +513,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               <label htmlFor="file-category">Category</label>
               <input id="file-category" name="category" placeholder="contract, gallery, upload" />
             </div>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="file-url">URL or site path</label>
             <input id="file-url" name="url" placeholder="/uploads/file.pdf" required />
@@ -522,13 +522,13 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             <label htmlFor="file-notes">Notes</label>
             <textarea id="file-notes" name="notes" />
           </div>
-          <button className="ui-button ui-button-secondary" type="submit">
+          <Button type="submit" variant="secondary">
             <Save size={18} />
             Attach file
-          </button>
-        </form>
+          </Button>
+        </Card>
 
-        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+        <Card bodyClassName="ui-stack">
           <h2 className="section-title">CRM snapshot</h2>
           <div className="ui-zero">
             <span className="ui-badge">{client.status}</span>
@@ -541,17 +541,17 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           </div>
           <div>
             <h3>Tags</h3>
-            {client.tags.map((tag) => (
-              <span className="ui-badge ui-zero" key={tag.id}>
+            {client.tags.map((tag) =>
+            <span className="ui-badge ui-zero" key={tag.id}>
                 {tag.label}
               </span>
-            ))}
+            )}
             {!client.tags.length ? <p className="empty-state">No tags yet.</p> : null}
           </div>
           <div>
             <h3>Files</h3>
-            {client.files.slice(0, 5).map((file) => (
-              <div className="subpanel" key={file.id}>
+            {client.files.slice(0, 5).map((file) =>
+            <div className="subpanel" key={file.id}>
                 <p className="ui-zero">
                   <a href={file.url}>{file.title}</a>
                   <br />
@@ -566,18 +566,18 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                     <input name="confirmDelete" type="checkbox" />
                     Confirm file delete
                   </label>
-                  <button className="ui-button ui-button-secondary" type="submit">
+                  <Button type="submit" variant="secondary">
                     Delete file
-                  </button>
+                  </Button>
                 </form>
               </div>
-            ))}
+            )}
             {!client.files.length ? <p className="empty-state">No files attached.</p> : null}
           </div>
-        </div>
-      </section>
+        </Card>
+      </EqualGrid>
 
-      <section className="ui-card ui-card-density-normal ui-card-min-md">
+      <Card as="section">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Unified timeline</h2>
@@ -587,8 +587,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           </div>
         </div>
         <div className="stack">
-          {timelineItems.map((item) => (
-            <div className="subpanel" key={item.id}>
+          {timelineItems.map((item) =>
+          <div className="subpanel" key={item.id}>
               <div className="ui-zero">
                 <div>
                   <span className="ui-badge">{item.badge}</span>
@@ -600,12 +600,12 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                 <span className="ui-badge">{formatDateTime(item.at, settings.timezone)}</span>
               </div>
             </div>
-          ))}
+          )}
           {!timelineItems.length ? <p>No timeline activity yet.</p> : null}
         </div>
-      </section>
+      </Card>
 
-      <section className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+      <Card as="section" bodyClassName="ui-stack">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Email delivery history</h2>
@@ -614,7 +614,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             </p>
           </div>
         </div>
-        <table className="ui-table">
+        <Table>
           <thead>
             <tr>
               <th>Recipient</th>
@@ -642,19 +642,19 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                   </td>
                   <td>{relatedHref ? <Link href={relatedHref}>{relatedLabel}</Link> : relatedLabel}</td>
                   <td>{formatDateTime(row.sentAt || row.updatedAt, settings.timezone)}</td>
-                </tr>
-              );
+                </tr>);
+
             })}
-            {!emailOutboxRows.length ? (
-              <tr>
+            {!emailOutboxRows.length ?
+            <tr>
                 <td colSpan={5}>No outbox delivery records for this client yet.</td>
-              </tr>
-            ) : null}
+              </tr> :
+            null}
           </tbody>
-        </table>
+        </Table>
         <div className="subpanel">
           <h3 className="subsection-title">Manual message notes</h3>
-          <table className="ui-table">
+          <Table>
             <thead>
               <tr>
                 <th>Recipient</th>
@@ -682,26 +682,26 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                     </td>
                     <td>{relatedHref ? <Link href={relatedHref}>{relatedLabel}</Link> : relatedLabel}</td>
                     <td>{formatDateTime(log.sentAt || log.createdAt, settings.timezone)}</td>
-                  </tr>
-                );
-              })}
-              {!client.messageLogs.length ? (
-                <tr>
-                  <td colSpan={5}>No manual message notes for this client yet.</td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                  </tr>);
 
-      <section className="grid-2">
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+              })}
+              {!client.messageLogs.length ?
+              <tr>
+                  <td colSpan={5}>No manual message notes for this client yet.</td>
+                </tr> :
+              null}
+            </tbody>
+          </Table>
+        </div>
+      </Card>
+
+      <EqualGrid as="section">
+        <Card>
           <h2 className="section-title">Appointment history</h2>
-          <table className="ui-table">
+          <Table>
             <tbody>
-              {client.bookings.map((booking) => (
-                <tr key={booking.id}>
+              {client.bookings.map((booking) =>
+              <tr key={booking.id}>
                   <td>
                     <Link href={`/admin/appointments/${booking.id}`}>
                       <strong>{booking.service.name}</strong>
@@ -713,21 +713,21 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                     <span className="ui-badge">{booking.status.toLowerCase()}</span>
                   </td>
                 </tr>
-              ))}
-              {!client.bookings.length ? (
-                <tr>
+              )}
+              {!client.bookings.length ?
+              <tr>
                   <td>No appointment history yet.</td>
-                </tr>
-              ) : null}
+                </tr> :
+              null}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Card>
 
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        <Card>
           <h2 className="section-title">Notes</h2>
           <div className="stack">
-            {client.notes.map((note) => (
-              <div className="subpanel" key={note.id}>
+            {client.notes.map((note) =>
+            <div className="subpanel" key={note.id}>
                 <p>{note.content}</p>
                 <span className="ui-badge">{formatDateTime(note.createdAt, settings.timezone)}</span>
                 <form action={deleteClientNoteAction} className="form-grid ui-zero">
@@ -737,24 +737,24 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                     <input name="confirmDelete" type="checkbox" />
                     Confirm note delete
                   </label>
-                  <button className="ui-button ui-button-secondary" type="submit">
+                  <Button type="submit" variant="secondary">
                     Delete note
-                  </button>
+                  </Button>
                 </form>
               </div>
-            ))}
+            )}
             {!client.notes.length ? <p>No client notes yet.</p> : null}
           </div>
-        </div>
-      </section>
+        </Card>
+      </EqualGrid>
 
-      <section className="ui-card ui-card-density-normal ui-card-min-md">
+      <Card as="section">
         <CalendarCheck size={22} />
         <h2 className="section-title">Service history</h2>
         <p className="lead lead-compact">
           This history is generated from appointments. Future product modules can attach purchases and packages here too.
         </p>
-      </section>
-    </div>
-  );
+      </Card>
+    </div>);
+
 }

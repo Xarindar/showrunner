@@ -10,7 +10,7 @@ import { addDaysToDateKey, getTodayDateKey, parseZonedDateKey } from "@/lib/time
 import { promoteWaitlistEntryAction, updateWaitlistEntryStatusAction } from "./actions";
 import { AppointmentCalendar, type AppointmentCalendarBooking, type AppointmentCalendarDay } from "./components/appointment-calendar";
 import { AppointmentsTable } from "./components/appointments-table";
-import { TabLink, Tabs } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid, Table, TabLink, Tabs } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,7 @@ function normalizeStatusFilter(value?: string) {
 }
 
 function normalizeCalendarView(value?: string): (typeof calendarViews)[number] {
-  return calendarViews.includes(value as (typeof calendarViews)[number]) ? (value as (typeof calendarViews)[number]) : "week";
+  return calendarViews.includes(value as (typeof calendarViews)[number]) ? value as (typeof calendarViews)[number] : "week";
 }
 
 function validDateKey(value: string | undefined, fallback: string) {
@@ -110,7 +110,7 @@ function calendarWindow(view: (typeof calendarViews)[number], dateKey: string) {
   };
 }
 
-function dayList(input: { activeMonth: number; endKey: string; startKey: string; todayKey: string; timeZone: string }) {
+function dayList(input: {activeMonth: number;endKey: string;startKey: string;todayKey: string;timeZone: string;}) {
   const days: AppointmentCalendarDay[] = [];
   for (let dateKey = input.startKey; dateKey < input.endKey; dateKey = addDaysToDateKey(dateKey, 1)) {
     const day = parseZonedDateKey(dateKey, input.timeZone) || dateKeyToUtcDate(dateKey);
@@ -136,9 +136,9 @@ function localBookingParts(date: Date, timeZone: string) {
       month: "2-digit",
       timeZone,
       year: "numeric"
-    })
-      .formatToParts(date)
-      .map((part) => [part.type, part.value])
+    }).
+    formatToParts(date).
+    map((part) => [part.type, part.value])
   );
 
   return {
@@ -199,11 +199,11 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
   const rangeStart = parseZonedDateKey(calendarRange.startKey, settings.timezone) || now;
   const rangeEnd = parseZonedDateKey(calendarRange.endKey, settings.timezone) || now;
   const statusWhere: Prisma.BookingWhereInput =
-    statusFilter === "upcoming"
-      ? { status: { not: BookingStatus.CANCELED }, startsAt: { gte: now } }
-      : statusFilter === "all"
-        ? {}
-        : { status: statusFilter.toUpperCase() as BookingStatus };
+  statusFilter === "upcoming" ?
+  { status: { not: BookingStatus.CANCELED }, startsAt: { gte: now } } :
+  statusFilter === "all" ?
+  {} :
+  { status: statusFilter.toUpperCase() as BookingStatus };
   const assignmentWhere: Prisma.BookingWhereInput = {
     ...(selectedStaffId ? { staffId: selectedStaffId } : {}),
     ...(selectedResourceId ? { resources: { some: { resourceId: selectedResourceId } } } : {})
@@ -225,56 +225,56 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
   });
 
   const [bookings, bookingCount, pendingCount, upcomingCount, waitlistEntries, waitlistCount, calendarBookings, staff, resources] = await Promise.all([
-    prisma.booking.findMany({
-      where: bookingWhere,
-      include: {
-        resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
-        service: { include: { resourceAssignments: { select: { resourceId: true } } } },
-        staff: true
-      },
-      orderBy: { startsAt: statusFilter === "upcoming" ? "asc" : "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize
-    }),
-    prisma.booking.count({ where: bookingWhere }),
-    prisma.booking.count({ where: await getAccessibleBookingWhere(user, settings.siteId, { status: "PENDING" }) }),
-    prisma.booking.count({
-      where: await getAccessibleBookingWhere(user, settings.siteId, {
-        status: { not: "CANCELED" },
-        startsAt: { gte: now }
-      })
-    }),
-    prisma.bookingWaitlistEntry.findMany({
-      where: waitlistWhere,
-      include: {
-        service: {
-          include: {
-            staffAssignments: {
-              where: { staff: { isActive: true } },
-              include: { staff: true },
-              orderBy: { staff: { name: "asc" } }
-            }
+  prisma.booking.findMany({
+    where: bookingWhere,
+    include: {
+      resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
+      service: { include: { resourceAssignments: { select: { resourceId: true } } } },
+      staff: true
+    },
+    orderBy: { startsAt: statusFilter === "upcoming" ? "asc" : "desc" },
+    skip: (page - 1) * pageSize,
+    take: pageSize
+  }),
+  prisma.booking.count({ where: bookingWhere }),
+  prisma.booking.count({ where: await getAccessibleBookingWhere(user, settings.siteId, { status: "PENDING" }) }),
+  prisma.booking.count({
+    where: await getAccessibleBookingWhere(user, settings.siteId, {
+      status: { not: "CANCELED" },
+      startsAt: { gte: now }
+    })
+  }),
+  prisma.bookingWaitlistEntry.findMany({
+    where: waitlistWhere,
+    include: {
+      service: {
+        include: {
+          staffAssignments: {
+            where: { staff: { isActive: true } },
+            include: { staff: true },
+            orderBy: { staff: { name: "asc" } }
           }
-        },
-        staff: true
+        }
       },
-      orderBy: { createdAt: "asc" },
-      take: 50
-    }),
-    prisma.bookingWaitlistEntry.count({ where: waitlistWhere }),
-    prisma.booking.findMany({
-      where: calendarWhere,
-      include: {
-        resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
-        service: { include: { resourceAssignments: { select: { resourceId: true } } } },
-        staff: true
-      },
-      orderBy: { startsAt: "asc" },
-      take: 500
-    }),
-    prisma.staffMember.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
-    prisma.resource.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] })
-  ]);
+      staff: true
+    },
+    orderBy: { createdAt: "asc" },
+    take: 50
+  }),
+  prisma.bookingWaitlistEntry.count({ where: waitlistWhere }),
+  prisma.booking.findMany({
+    where: calendarWhere,
+    include: {
+      resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
+      service: { include: { resourceAssignments: { select: { resourceId: true } } } },
+      staff: true
+    },
+    orderBy: { startsAt: "asc" },
+    take: 500
+  }),
+  prisma.staffMember.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
+  prisma.resource.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] })]
+  );
   const pageCount = Math.max(1, Math.ceil(bookingCount / pageSize));
   const warningsByBookingId = new Map<string, string[]>();
   for (const warning of bookingConflictWarnings(calendarBookings)) {
@@ -311,16 +311,16 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
   });
   const calendarHours = Array.from(
     new Set([
-      ...Array.from({ length: 13 }, (_, index) => index + 7),
-      ...calendarItems.map((booking) => booking.hour)
-    ])
+    ...Array.from({ length: 13 }, (_, index) => index + 7),
+    ...calendarItems.map((booking) => booking.hour)]
+    )
   ).sort((left, right) => left - right);
   const selectedRangeLabel =
-    view === "day"
-      ? days[0]?.label || selectedDateKey
-      : `${days[0]?.shortLabel || calendarRange.startKey} - ${
-          days[days.length - 1]?.shortLabel || addDaysToDateKey(calendarRange.endKey, -1)
-        }`;
+  view === "day" ?
+  days[0]?.label || selectedDateKey :
+  `${days[0]?.shortLabel || calendarRange.startKey} - ${
+  days[days.length - 1]?.shortLabel || addDaysToDateKey(calendarRange.endKey, -1)}`;
+
 
   return (
     <div className="stack">
@@ -330,40 +330,40 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
           <h1>Active appointment desk</h1>
           <p>Review upcoming bookings, confirm requests, cancel conflicts, and mark completed work.</p>
         </div>
-        <Link className="ui-button ui-button-secondary" href="/admin/modules/scheduling">
+        <ButtonLink href="/admin/modules/scheduling" variant="secondary">
           <CalendarDays size={18} />
           Scheduling setup
-        </Link>
+        </ButtonLink>
       </header>
 
       {params.saved ? <div className="success-message">Appointment desk updated.</div> : null}
       {params.error ? <div className="error">{params.error}</div> : null}
 
-      <section className="grid-3">
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+      <EqualGrid as="section" min="220px">
+        <Card>
           <Clock size={22} />
           <h3>{upcomingCount} upcoming</h3>
           <p className="lead lead-compact">
             Non-canceled appointments from today forward.
           </p>
-        </div>
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        </Card>
+        <Card>
           <ListChecks size={22} />
           <h3>{pendingCount} pending</h3>
           <p className="lead lead-compact">
             Requests that may need confirmation.
           </p>
-        </div>
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        </Card>
+        <Card>
           <CalendarDays size={22} />
           <h3>{waitlistCount} waitlisted</h3>
           <p className="lead lead-compact">
             Clients waiting for a full service/date.
           </p>
-        </div>
-      </section>
+        </Card>
+      </EqualGrid>
 
-      <section className="ui-card ui-card-density-normal ui-card-min-md appointment-calendar-card">
+      <Card className="appointment-calendar-card" as="section">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Calendar</h2>
@@ -372,38 +372,38 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
             </p>
           </div>
           <div className="appointment-calendar-toolbar">
-            <Link
-              className="ui-button ui-button-secondary"
+            <ButtonLink
+
               href={calendarHref({
                 dateKey: calendarRange.previousDateKey,
                 resourceId: selectedResourceId,
                 staffId: selectedStaffId,
                 statusFilter,
                 view
-              })}
-            >
+              })} variant="secondary">
+              
               <ChevronLeft size={18} />
               Previous
-            </Link>
-            <Link
-              className="ui-button ui-button-secondary"
-              href={calendarHref({ dateKey: todayKey, resourceId: selectedResourceId, staffId: selectedStaffId, statusFilter, view })}
-            >
+            </ButtonLink>
+            <ButtonLink
+
+              href={calendarHref({ dateKey: todayKey, resourceId: selectedResourceId, staffId: selectedStaffId, statusFilter, view })} variant="secondary">
+              
               Today
-            </Link>
-            <Link
-              className="ui-button ui-button-secondary"
+            </ButtonLink>
+            <ButtonLink
+
               href={calendarHref({
                 dateKey: calendarRange.nextDateKey,
                 resourceId: selectedResourceId,
                 staffId: selectedStaffId,
                 statusFilter,
                 view
-              })}
-            >
+              })} variant="secondary">
+              
               Next
               <ChevronRight size={18} />
-            </Link>
+            </ButtonLink>
           </div>
         </div>
 
@@ -412,11 +412,11 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
           <label>
             View
             <select name="view" defaultValue={view}>
-              {calendarViews.map((item) => (
-                <option key={item} value={item}>
+              {calendarViews.map((item) =>
+              <option key={item} value={item}>
                   {item}
                 </option>
-              ))}
+              )}
             </select>
           </label>
           <label>
@@ -427,52 +427,52 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
             Staff
             <select name="staffId" defaultValue={selectedStaffId}>
               <option value="">All staff</option>
-              {staff.map((member) => (
-                <option key={member.id} value={member.id}>
+              {staff.map((member) =>
+              <option key={member.id} value={member.id}>
                   {member.name}
                 </option>
-              ))}
+              )}
             </select>
           </label>
           <label>
             Resource
             <select name="resourceId" defaultValue={selectedResourceId}>
               <option value="">All resources</option>
-              {resources.map((resource) => (
-                <option key={resource.id} value={resource.id}>
+              {resources.map((resource) =>
+              <option key={resource.id} value={resource.id}>
                   {resource.name}
                 </option>
-              ))}
+              )}
             </select>
           </label>
-          <button className="ui-button ui-button-secondary" type="submit">
+          <Button type="submit" variant="secondary">
             <Filter size={18} />
             Apply
-          </button>
+          </Button>
         </form>
 
         <Tabs className="appointment-calendar-view-tabs" aria-label="Calendar view">
-          {calendarViews.map((item) => (
-            <TabLink
-              aria-selected={item === view}
-              href={calendarHref({
-                dateKey: selectedDateKey,
-                resourceId: selectedResourceId,
-                staffId: selectedStaffId,
-                statusFilter,
-                view: item
-              })}
-              key={item}
-            >
+          {calendarViews.map((item) =>
+          <TabLink
+            aria-selected={item === view}
+            href={calendarHref({
+              dateKey: selectedDateKey,
+              resourceId: selectedResourceId,
+              staffId: selectedStaffId,
+              statusFilter,
+              view: item
+            })}
+            key={item}>
+            
               {item}
             </TabLink>
-          ))}
+          )}
         </Tabs>
 
         <AppointmentCalendar bookings={calendarItems} days={days} hours={calendarHours} view={view} />
-      </section>
+      </Card>
 
-      <section className="ui-card ui-card-density-normal ui-card-min-md">
+      <Card as="section">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Waitlist</h2>
@@ -481,7 +481,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
             </p>
           </div>
         </div>
-        <table className="ui-table">
+        <Table>
           <thead>
             <tr>
               <th>Client</th>
@@ -492,29 +492,29 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
             </tr>
           </thead>
           <tbody>
-            {waitlistEntries.map((entry) => (
-              <tr key={entry.id}>
+            {waitlistEntries.map((entry) =>
+            <tr key={entry.id}>
                 <td>
                   <strong>{entry.customerName}</strong>
                   <br />
                   <span className="muted-text">{entry.customerEmail}</span>
-                  {entry.customerPhone ? (
-                    <>
+                  {entry.customerPhone ?
+                <>
                       <br />
                       <span className="muted-text">{entry.customerPhone}</span>
-                    </>
-                  ) : null}
+                    </> :
+                null}
                 </td>
                 <td>
                   {entry.service.name}
                   <br />
                   <span className="muted-text">{entry.staff?.name || "Any staff"}</span>
-                  {entry.notes ? (
-                    <>
+                  {entry.notes ?
+                <>
                       <br />
                       <span className="muted-text">{entry.notes}</span>
-                    </>
-                  ) : null}
+                    </> :
+                null}
                 </td>
                 <td>{formatDateTime(entry.startsAt, settings.timezone)}</td>
                 <td>
@@ -523,80 +523,80 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
                     <div className="ui-field">
                       <label htmlFor={`waitlist-${entry.id}-startsAt`}>Start time</label>
                       <input
-                        id={`waitlist-${entry.id}-startsAt`}
-                        name="startsAt"
-                        type="datetime-local"
-                        defaultValue={formatDateTimeLocalInput(entry.startsAt, settings.timezone)}
-                        required
-                      />
+                      id={`waitlist-${entry.id}-startsAt`}
+                      name="startsAt"
+                      type="datetime-local"
+                      defaultValue={formatDateTimeLocalInput(entry.startsAt, settings.timezone)}
+                      required />
+                    
                     </div>
-                    {entry.service.staffAssignments.length ? (
-                      <div className="ui-field">
+                    {entry.service.staffAssignments.length ?
+                  <div className="ui-field">
                         <label htmlFor={`waitlist-${entry.id}-staffId`}>Staff</label>
                         <select id={`waitlist-${entry.id}-staffId`} name="staffId" defaultValue={entry.staffId || ""} required>
                           <option value="">Choose staff</option>
-                          {entry.service.staffAssignments.map((assignment) => (
-                            <option key={assignment.staffId} value={assignment.staffId}>
+                          {entry.service.staffAssignments.map((assignment) =>
+                      <option key={assignment.staffId} value={assignment.staffId}>
                               {assignment.staff.name}
                             </option>
-                          ))}
+                      )}
                         </select>
-                      </div>
-                    ) : null}
-                    <button className="ui-button ui-button-secondary" type="submit">
+                      </div> :
+                  null}
+                    <Button type="submit" variant="secondary">
                       Promote
-                    </button>
+                    </Button>
                   </form>
                 </td>
                 <td>
                   <form action={updateWaitlistEntryStatusAction}>
                     <input type="hidden" name="id" value={entry.id} />
                     <input type="hidden" name="status" value={BookingWaitlistStatus.DECLINED} />
-                    <button className="ui-button ui-button-danger" type="submit">
+                    <Button type="submit" variant="danger">
                       decline
-                    </button>
+                    </Button>
                   </form>
                 </td>
               </tr>
-            ))}
-            {!waitlistEntries.length ? (
-              <tr>
+            )}
+            {!waitlistEntries.length ?
+            <tr>
                 <td colSpan={5}>No waitlist entries match these filters.</td>
-              </tr>
-            ) : null}
+              </tr> :
+            null}
           </tbody>
-        </table>
-      </section>
+        </Table>
+      </Card>
 
-      <section className="ui-card ui-card-density-normal ui-card-min-md">
+      <Card as="section">
         <div className="page-header compact-header">
           <div>
             <h2 className="section-title">Appointment list</h2>
             <p className="ui-zero">{bookingCount} matching appointments</p>
           </div>
           <div className="ui-zero">
-            {statusFilters.map((filter) => (
-              <Link
-                className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"}
-                href={calendarHref({
-                  dateKey: selectedDateKey,
-                  resourceId: selectedResourceId,
-                  staffId: selectedStaffId,
-                  statusFilter: filter,
-                  view
-                })}
-                key={filter}
-              >
+            {statusFilters.map((filter) =>
+            <Link
+              className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"}
+              href={calendarHref({
+                dateKey: selectedDateKey,
+                resourceId: selectedResourceId,
+                staffId: selectedStaffId,
+                statusFilter: filter,
+                view
+              })}
+              key={filter}>
+              
                 {filter}
               </Link>
-            ))}
+            )}
           </div>
         </div>
         <AppointmentsTable bookings={bookings} timezone={settings.timezone} />
         <div className="ui-zero">
-          <Link
+          <ButtonLink
             aria-disabled={page <= 1}
-            className="ui-button ui-button-secondary"
+
             href={calendarHref({
               dateKey: selectedDateKey,
               page: Math.max(1, page - 1),
@@ -604,16 +604,16 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
               staffId: selectedStaffId,
               statusFilter,
               view
-            })}
-          >
+            })} variant="secondary">
+            
             Previous
-          </Link>
+          </ButtonLink>
           <span className="ui-badge">
             Page {Math.min(page, pageCount)} of {pageCount}
           </span>
-          <Link
+          <ButtonLink
             aria-disabled={page >= pageCount}
-            className="ui-button ui-button-secondary"
+
             href={calendarHref({
               dateKey: selectedDateKey,
               page: Math.min(pageCount, page + 1),
@@ -621,12 +621,12 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
               staffId: selectedStaffId,
               statusFilter,
               view
-            })}
-          >
+            })} variant="secondary">
+            
             Next
-          </Link>
+          </ButtonLink>
         </div>
-      </section>
-    </div>
-  );
+      </Card>
+    </div>);
+
 }

@@ -1,6 +1,7 @@
 import type { Resource, Service, StaffMember } from "@prisma/client";
 import { Search } from "lucide-react";
 import type { SlotDiagnostics } from "@/lib/scheduling/types";
+import { Button, Card, EqualGrid, Table } from "@/components/ui";
 
 type SlotDiagnosticsPanelProps = {
   services: Service[];
@@ -32,7 +33,7 @@ export function SlotDiagnosticsPanel({
   const hiddenSlotCount = Math.max(0, (diagnostics?.slots.length || 0) - shownSlots.length);
 
   return (
-    <section className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+    <Card as="section" bodyClassName="ui-stack">
       <div className="page-header flush-header">
         <div>
           <h2 className="section-title">Slot diagnostics</h2>
@@ -41,52 +42,52 @@ export function SlotDiagnosticsPanel({
       </div>
 
       <form action="/admin/modules/scheduling" className="subpanel form-grid">
-        <div className="grid-3">
+        <EqualGrid min="220px">
           <div className="ui-field">
             <label htmlFor="diagnosticServiceId">Service</label>
             <select id="diagnosticServiceId" name="diagnosticServiceId" defaultValue={selectedServiceId}>
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
+              {services.map((service) =>
+              <option key={service.id} value={service.id}>
                   {service.name}
                 </option>
-              ))}
+              )}
             </select>
           </div>
           <div className="ui-field">
             <label htmlFor="diagnosticStaffId">Staff</label>
             <select id="diagnosticStaffId" name="diagnosticStaffId" defaultValue={selectedStaffId}>
               <option value="">Any assigned staff</option>
-              {staff.map((member) => (
-                <option key={member.id} value={member.id} disabled={!member.isActive}>
+              {staff.map((member) =>
+              <option key={member.id} value={member.id} disabled={!member.isActive}>
                   {member.name}
                 </option>
-              ))}
+              )}
             </select>
           </div>
           <div className="ui-field">
             <label htmlFor="diagnosticResourceId">Resource</label>
             <select id="diagnosticResourceId" name="diagnosticResourceId" defaultValue={selectedResourceId}>
               <option value="">Required resources</option>
-              {resources.map((resource) => (
-                <option key={resource.id} value={resource.id} disabled={!resource.isActive}>
+              {resources.map((resource) =>
+              <option key={resource.id} value={resource.id} disabled={!resource.isActive}>
                   {resource.name}
                 </option>
-              ))}
+              )}
             </select>
           </div>
           <div className="ui-field">
             <label htmlFor="diagnosticDate">Date</label>
             <input id="diagnosticDate" name="diagnosticDate" type="date" defaultValue={selectedDate} required />
           </div>
-        </div>
-        <button className="ui-button ui-button-secondary" type="submit">
+        </EqualGrid>
+        <Button type="submit" variant="secondary">
           <Search size={18} />
           Diagnose slots
-        </button>
+        </Button>
       </form>
 
-      {diagnostics ? (
-        <div className="subpanel">
+      {diagnostics ?
+      <div className="subpanel">
           <div className="ui-zero">
             <span className="ui-badge">{diagnostics.serviceName}</span>
             {diagnostics.staffName ? <span className="ui-badge">{diagnostics.staffName}</span> : null}
@@ -96,12 +97,12 @@ export function SlotDiagnosticsPanel({
             <span className="ui-badge">{diagnostics.slotCount} generated</span>
             <span className="ui-badge">{diagnostics.timezone}</span>
           </div>
-          {diagnostics.messages.length ? (
-            <div className="error ui-zero">
+          {diagnostics.messages.length ?
+        <div className="error ui-zero">
               {diagnostics.messages.join(" ")}
-            </div>
-          ) : null}
-          <table className="ui-table">
+            </div> :
+        null}
+          <Table>
             <thead>
               <tr>
                 <th>Time</th>
@@ -112,8 +113,8 @@ export function SlotDiagnosticsPanel({
               </tr>
             </thead>
             <tbody>
-              {shownSlots.map((slot) => (
-                <tr key={`${slot.startsAt.toISOString()}-${slot.staffId || "global"}`}>
+              {shownSlots.map((slot) =>
+            <tr key={`${slot.startsAt.toISOString()}-${slot.staffId || "global"}`}>
                   <td>{slot.label}</td>
                   <td>{slot.staffName || "Business-wide"}</td>
                   <td>{slot.resourceNames.length ? slot.resourceNames.join(", ") : "None"}</td>
@@ -124,21 +125,21 @@ export function SlotDiagnosticsPanel({
                   </td>
                   <td>{reasonSummary(slot)}</td>
                 </tr>
-              ))}
-              {!shownSlots.length ? (
-                <tr>
+            )}
+              {!shownSlots.length ?
+            <tr>
                   <td colSpan={5}>No slots were generated for this date.</td>
-                </tr>
-              ) : null}
+                </tr> :
+            null}
             </tbody>
-          </table>
-          {hiddenSlotCount ? (
-            <p className="ui-zero">{hiddenSlotCount} additional slots hidden.</p>
-          ) : null}
-        </div>
-      ) : (
-        <p className="empty-state">Choose a service and date to diagnose generated slots.</p>
-      )}
-    </section>
-  );
+          </Table>
+          {hiddenSlotCount ?
+        <p className="ui-zero">{hiddenSlotCount} additional slots hidden.</p> :
+        null}
+        </div> :
+
+      <p className="empty-state">Choose a service and date to diagnose generated slots.</p>
+      }
+    </Card>);
+
 }

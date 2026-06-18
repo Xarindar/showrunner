@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import { normalizeValidationRules } from "@/modules/forms/validation-rules";
+import { Button } from "@/components/ui";
 
 type SignatureFieldProps = {
   fieldId: string;
@@ -15,9 +16,9 @@ type SignatureFieldProps = {
 };
 
 const consentStatement =
-  "I agree that this electronic signature is the legal equivalent of my handwritten signature and that the information submitted with this form is accurate.";
+"I agree that this electronic signature is the legal equivalent of my handwritten signature and that the information submitted with this form is accurate.";
 
-function signaturePayload(input: { drawnDataUrl: string; mode: "TYPED" | "DRAWN"; typedName: string }) {
+function signaturePayload(input: {drawnDataUrl: string;mode: "TYPED" | "DRAWN";typedName: string;}) {
   return JSON.stringify({
     consentStatement,
     capturedSignature: input.mode === "DRAWN" ? input.drawnDataUrl : input.typedName.trim(),
@@ -121,35 +122,35 @@ export function SignatureField({ fieldId, helpText, isRequired, label, name, pla
         }}
         placeholder={placeholder || "Type your full legal name"}
         required={isRequired}
-        value={typedName}
-      />
-      {mode === "DRAWN" ? (
-        <div className="form-grid">
+        value={typedName} />
+      
+      {mode === "DRAWN" ?
+      <div className="form-grid">
           <canvas className="ui-zero"
-            aria-label={`${label} drawing area`}
-            onPointerDown={beginDrawing}
-            onPointerMove={draw}
-            onPointerUp={endDrawing}
-            onPointerCancel={endDrawing}
-            ref={canvasRef}
-           
-          />
-          <button className="ui-button ui-button-secondary" onClick={clearDrawing} type="button">
+        aria-label={`${label} drawing area`}
+        onPointerDown={beginDrawing}
+        onPointerMove={draw}
+        onPointerUp={endDrawing}
+        onPointerCancel={endDrawing}
+        ref={canvasRef} />
+
+        
+          <Button onClick={clearDrawing} type="button" variant="secondary">
             Clear signature
-          </button>
-        </div>
-      ) : null}
-      {helpText ? (
-        <small className="ui-zero" id={helpId}>
+          </Button>
+        </div> :
+      null}
+      {helpText ?
+      <small className="ui-zero" id={helpId}>
           {helpText}
-        </small>
-      ) : null}
+        </small> :
+      null}
       <label className="ui-zero" htmlFor={consentId}>
         <input id={consentId} name={`${name}-consent`} required={isRequired || Boolean(typedName || drawnDataUrl)} type="checkbox" />
         <span>{consentStatement}</span>
       </label>
-    </div>
-  );
+    </div>);
+
 }
 
 export { consentStatement as signatureConsentStatement };

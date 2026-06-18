@@ -7,9 +7,7 @@ import {
   PortfolioItemType,
   PortfolioProofItemStatus,
   PortfolioProofRoundStatus,
-  type Prisma
-} from "@prisma/client";
-import { cssBackgroundImage } from "@/lib/css";
+  type Prisma } from "@prisma/client";
 import { getAccessibleClientWhere, getAccessibleGalleryWhere, getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -22,13 +20,13 @@ import {
   updatePortfolioAccessStatusAction,
   updatePortfolioGalleryLayoutAction,
   updatePortfolioGalleryStatusAction,
-  updatePortfolioProofRoundStatusAction
-} from "./actions";
+  updatePortfolioProofRoundStatusAction } from "./actions";
+import { Button, ButtonAnchor, Card, EqualGrid, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type PortfolioPageProps = {
-  searchParams: Promise<{ saved?: string; error?: string; gallery?: string }>;
+  searchParams: Promise<{saved?: string;error?: string;gallery?: string;}>;
 };
 
 function galleryStatusClass(status: PortfolioGalleryStatus) {
@@ -50,81 +48,81 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
   const activeMediaWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: null });
   const clientWhere: Prisma.ClientWhereInput = await getAccessibleClientWhere(user, settings.siteId);
   const [galleries, mediaAssets, clients, publishedCount, privateCount, itemCount, favoriteCount] = await Promise.all([
-    prisma.portfolioGallery.findMany({
-      where: galleryWhere,
-      include: { _count: { select: { items: true, accesses: true, favorites: true } } },
-      orderBy: [{ status: "asc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
-      take: 30
-    }),
-    prisma.mediaAsset.findMany({
-      where: activeMediaWhere,
-      orderBy: { createdAt: "desc" },
-      take: 60
-    }),
-    prisma.client.findMany({
-      where: clientWhere,
-      orderBy: { updatedAt: "desc" },
-      take: 50
-    }),
-    prisma.portfolioGallery.count({ where: await getAccessibleGalleryWhere(user, settings.siteId, { status: PortfolioGalleryStatus.PUBLISHED }) }),
-    prisma.portfolioGallery.count({
-      where: await getAccessibleGalleryWhere(user, settings.siteId, {
-        visibility: { in: [PortfolioGalleryVisibility.PRIVATE, PortfolioGalleryVisibility.PASSWORD] }
-      })
-    }),
-    prisma.portfolioGalleryItem.count({ where: { gallery: galleryWhere } }),
-    prisma.portfolioGalleryFavorite.count({ where: { gallery: galleryWhere } })
-  ]);
+  prisma.portfolioGallery.findMany({
+    where: galleryWhere,
+    include: { _count: { select: { items: true, accesses: true, favorites: true } } },
+    orderBy: [{ status: "asc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
+    take: 30
+  }),
+  prisma.mediaAsset.findMany({
+    where: activeMediaWhere,
+    orderBy: { createdAt: "desc" },
+    take: 60
+  }),
+  prisma.client.findMany({
+    where: clientWhere,
+    orderBy: { updatedAt: "desc" },
+    take: 50
+  }),
+  prisma.portfolioGallery.count({ where: await getAccessibleGalleryWhere(user, settings.siteId, { status: PortfolioGalleryStatus.PUBLISHED }) }),
+  prisma.portfolioGallery.count({
+    where: await getAccessibleGalleryWhere(user, settings.siteId, {
+      visibility: { in: [PortfolioGalleryVisibility.PRIVATE, PortfolioGalleryVisibility.PASSWORD] }
+    })
+  }),
+  prisma.portfolioGalleryItem.count({ where: { gallery: galleryWhere } }),
+  prisma.portfolioGalleryFavorite.count({ where: { gallery: galleryWhere } })]
+  );
 
   const selectedGalleryId = params.gallery || galleries[0]?.id;
-  const selectedGallery = selectedGalleryId
-    ? await prisma.portfolioGallery.findFirst({
-        where: await getAccessibleGalleryWhere(user, settings.siteId, { id: selectedGalleryId }),
+  const selectedGallery = selectedGalleryId ?
+  await prisma.portfolioGallery.findFirst({
+    where: await getAccessibleGalleryWhere(user, settings.siteId, { id: selectedGalleryId }),
+    include: {
+      items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+      accesses: { orderBy: { createdAt: "desc" }, take: 20 },
+      favorites: {
+        include: { item: { select: { id: true, imageUrl: true, title: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 20
+      },
+      proofRounds: {
         include: {
-          items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
-          accesses: { orderBy: { createdAt: "desc" }, take: 20 },
-          favorites: {
+          approvals: { orderBy: { createdAt: "desc" }, take: 20 },
+          comments: {
             include: { item: { select: { id: true, imageUrl: true, title: true } } },
             orderBy: { createdAt: "desc" },
-            take: 20
+            take: 50
           },
-          proofRounds: {
-            include: {
-              approvals: { orderBy: { createdAt: "desc" }, take: 20 },
-              comments: {
-                include: { item: { select: { id: true, imageUrl: true, title: true } } },
-                orderBy: { createdAt: "desc" },
-                take: 50
-              },
-              decisions: {
-                include: { item: { select: { id: true, imageUrl: true, title: true } } },
-                orderBy: { updatedAt: "desc" },
-                take: 100
-              }
-            },
-            orderBy: { roundNumber: "desc" },
-            take: 5
+          decisions: {
+            include: { item: { select: { id: true, imageUrl: true, title: true } } },
+            orderBy: { updatedAt: "desc" },
+            take: 100
           }
-        }
-      })
-    : null;
+        },
+        orderBy: { roundNumber: "desc" },
+        take: 5
+      }
+    }
+  }) :
+  null;
   const latestProofRound = selectedGallery?.proofRounds[0] || null;
-  const selectedImageExport = selectedGallery
-    ? [
-        ...selectedGallery.favorites.map((favorite) => ({
-          item: favorite.item?.title || favorite.item?.imageUrl || favorite.itemId,
-          source: "favorite",
-          viewer: favorite.viewerEmail || favorite.clientId || "anonymous"
-        })),
-        ...(latestProofRound?.decisions || [])
-          .filter((decision) => decision.status === PortfolioProofItemStatus.APPROVED)
-          .map((decision) => ({
-            item: decision.item?.title || decision.item?.imageUrl || decision.itemId,
-            source: "approved",
-            viewer: decision.viewerEmail || decision.clientId || "anonymous"
-          }))
-      ]
-    : [];
+  const selectedImageExport = selectedGallery ?
+  [
+  ...selectedGallery.favorites.map((favorite) => ({
+    item: favorite.item?.title || favorite.item?.imageUrl || favorite.itemId,
+    source: "favorite",
+    viewer: favorite.viewerEmail || favorite.clientId || "anonymous"
+  })),
+  ...(latestProofRound?.decisions || []).
+  filter((decision) => decision.status === PortfolioProofItemStatus.APPROVED).
+  map((decision) => ({
+    item: decision.item?.title || decision.item?.imageUrl || decision.itemId,
+    source: "approved",
+    viewer: decision.viewerEmail || decision.clientId || "anonymous"
+  }))] :
+
+  [];
   const selectedDownloadableCount = selectedGallery?.items.filter((item) => item.isDownloadable && item.mediaAssetId).length || 0;
   const savedMessage = params.saved ? "Portfolio changes saved." : null;
   const errorMessage = params.error || null;
@@ -142,34 +140,34 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
       {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
       {errorMessage ? <div className="error">{errorMessage}</div> : null}
 
-      <section className="grid-3">
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+      <EqualGrid as="section" min="220px">
+        <Card>
           <Camera size={22} />
           <h3>{publishedCount} published galleries</h3>
           <p className="lead lead-compact">
             Portfolio collections ready for public gallery and campaign surfaces.
           </p>
-        </div>
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        </Card>
+        <Card>
           <KeyRound size={22} />
           <h3>{privateCount} private galleries</h3>
           <p className="lead lead-compact">
             Password or private-link collections for proofing and client delivery.
           </p>
-        </div>
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        </Card>
+        <Card>
           <Star size={22} />
           <h3>{favoriteCount} favorites</h3>
           <p className="lead lead-compact">
             Client selections captured for approval, delivery, and future print workflows.
           </p>
-        </div>
-      </section>
+        </Card>
+      </EqualGrid>
 
-      <section className="grid-2">
-        <form action={createPortfolioGalleryAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      <EqualGrid as="section">
+        <Card action={createPortfolioGalleryAction} as="form" minHeight="none" bodyClassName="form-grid">
           <h2 className="section-title">Create gallery</h2>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="gallery-title">Title</label>
               <input id="gallery-title" name="title" required />
@@ -178,44 +176,44 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               <label htmlFor="gallery-slug">Slug</label>
               <input id="gallery-slug" name="slug" placeholder="spring-portraits" />
             </div>
-          </div>
-          <div className="grid-3">
+          </EqualGrid>
+          <EqualGrid min="220px">
             <div className="ui-field">
               <label htmlFor="gallery-status">Status</label>
               <select id="gallery-status" name="status" defaultValue={PortfolioGalleryStatus.DRAFT}>
-                {Object.values(PortfolioGalleryStatus).map((status) => (
-                  <option key={status} value={status}>
+                {Object.values(PortfolioGalleryStatus).map((status) =>
+                <option key={status} value={status}>
                     {enumLabel(status)}
                   </option>
-                ))}
+                )}
               </select>
             </div>
             <div className="ui-field">
               <label htmlFor="gallery-visibility">Visibility</label>
               <select id="gallery-visibility" name="visibility" defaultValue={PortfolioGalleryVisibility.PUBLIC}>
-                {Object.values(PortfolioGalleryVisibility).map((visibility) => (
-                  <option key={visibility} value={visibility}>
+                {Object.values(PortfolioGalleryVisibility).map((visibility) =>
+                <option key={visibility} value={visibility}>
                     {enumLabel(visibility)}
                   </option>
-                ))}
+                )}
               </select>
             </div>
             <div className="ui-field">
               <label htmlFor="gallery-sort">Sort order</label>
               <input id="gallery-sort" name="sortOrder" type="number" defaultValue="0" />
             </div>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="gallery-layout">Layout</label>
             <select id="gallery-layout" name="layout" defaultValue={PortfolioGalleryLayout.GRID}>
-              {Object.values(PortfolioGalleryLayout).map((layout) => (
-                <option key={layout} value={layout}>
+              {Object.values(PortfolioGalleryLayout).map((layout) =>
+              <option key={layout} value={layout}>
                   {enumLabel(layout)}
                 </option>
-              ))}
+              )}
             </select>
           </div>
-          <div className="grid-3">
+          <EqualGrid min="220px">
             <div className="ui-field">
               <label htmlFor="gallery-category">Category</label>
               <input id="gallery-category" name="category" placeholder="Portraits" />
@@ -228,7 +226,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               <label htmlFor="gallery-shot-at">Shoot date</label>
               <input id="gallery-shot-at" name="shotAt" type="date" />
             </div>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="gallery-description">Description</label>
             <textarea id="gallery-description" name="description" />
@@ -237,7 +235,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             <label htmlFor="gallery-cover">Cover image URL</label>
             <input id="gallery-cover" name="coverImageUrl" placeholder="/hero.svg" />
           </div>
-          <div className="grid-2">
+          <EqualGrid>
             <label className="ui-zero">
               <input name="proofingEnabled" type="checkbox" defaultChecked />
               Proofing enabled
@@ -246,7 +244,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               <input name="downloadEnabled" type="checkbox" />
               Downloads enabled
             </label>
-          </div>
+          </EqualGrid>
           <div className="ui-field">
             <label htmlFor="gallery-access-code">Password access code</label>
             <input id="gallery-access-code" name="accessCode" type="password" />
@@ -255,7 +253,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             <label htmlFor="gallery-rights">Rights notes</label>
             <textarea id="gallery-rights" name="rightsNotes" />
           </div>
-          <div className="grid-2">
+          <EqualGrid>
             <div className="ui-field">
               <label htmlFor="gallery-seo-title">SEO title</label>
               <input id="gallery-seo-title" name="seoTitle" />
@@ -264,16 +262,16 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               <label htmlFor="gallery-seo-description">SEO description</label>
               <input id="gallery-seo-description" name="seoDescription" />
             </div>
-          </div>
-          <button className="ui-button" type="submit">
+          </EqualGrid>
+          <Button type="submit">
             <ImageIcon size={18} />
             Create gallery
-          </button>
-        </form>
+          </Button>
+        </Card>
 
-        <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+        <Card bodyClassName="ui-stack">
           <h2 className="section-title">Gallery queue</h2>
-          <table className="ui-table">
+          <Table>
             <thead>
               <tr>
                 <th>Gallery</th>
@@ -282,8 +280,8 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               </tr>
             </thead>
             <tbody>
-              {galleries.map((gallery) => (
-                <tr key={gallery.id}>
+              {galleries.map((gallery) =>
+              <tr key={gallery.id}>
                   <td>
                     <a href={`/admin/modules/portfolio?gallery=${gallery.id}`}>{gallery.title}</a>
                     <br />
@@ -300,20 +298,20 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                     <span className={galleryStatusClass(gallery.status)}>{enumLabel(gallery.status)}</span>
                   </td>
                 </tr>
-              ))}
-              {!galleries.length ? (
-                <tr>
+              )}
+              {!galleries.length ?
+              <tr>
                   <td colSpan={3}>No galleries yet.</td>
-                </tr>
-              ) : null}
+                </tr> :
+              null}
             </tbody>
-          </table>
-        </div>
-      </section>
+          </Table>
+        </Card>
+      </EqualGrid>
 
-      {selectedGallery ? (
-        <section className="grid-2">
-          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+      {selectedGallery ?
+      <EqualGrid as="section">
+          <Card bodyClassName="ui-stack">
             <div className="page-header compact-header">
               <div>
                 <h2 className="section-title">{selectedGallery.title}</h2>
@@ -324,24 +322,24 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               <span className={galleryStatusClass(selectedGallery.status)}>{enumLabel(selectedGallery.status)}</span>
             </div>
             <div className="ui-zero"
-              aria-label={selectedGallery.title}
-              role="img"
-             
-            />
-            <table className="ui-table">
+          aria-label={selectedGallery.title}
+          role="img" />
+
+          
+            <Table>
               <tbody>
                 <tr>
                   <td>Slug</td>
                   <td>
                     {selectedGallery.slug}
-                    {selectedGallery.status === PortfolioGalleryStatus.PUBLISHED ? (
-                      <>
+                    {selectedGallery.status === PortfolioGalleryStatus.PUBLISHED ?
+                  <>
                         <br />
                         <a className="ui-zero" href={`/galleries/${selectedGallery.slug}`}>
                           Open public gallery
                         </a>
-                      </>
-                    ) : null}
+                      </> :
+                  null}
                   </td>
                 </tr>
                 <tr>
@@ -352,14 +350,14 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                   <td>Proofing</td>
                   <td>
                     {selectedGallery.proofingEnabled ? "Enabled" : "Disabled"}
-                    {latestProofRound ? (
-                      <>
+                    {latestProofRound ?
+                  <>
                         <br />
                         <span className="muted-text">
                           Round {latestProofRound.roundNumber} - {enumLabel(latestProofRound.status)}
                         </span>
-                      </>
-                    ) : null}
+                      </> :
+                  null}
                   </td>
                 </tr>
                 <tr>
@@ -375,73 +373,73 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                   <td>{formatDateTime(selectedGallery.updatedAt, settings.timezone)}</td>
                 </tr>
               </tbody>
-            </table>
+            </Table>
             <form action={updatePortfolioGalleryLayoutAction} className="form-grid">
               <input type="hidden" name="id" value={selectedGallery.id} />
               <div className="ui-field">
                 <label htmlFor={`gallery-${selectedGallery.id}-layout`}>Gallery layout</label>
                 <select id={`gallery-${selectedGallery.id}-layout`} name="layout" defaultValue={selectedGallery.layout}>
-                  {Object.values(PortfolioGalleryLayout).map((layout) => (
-                    <option key={layout} value={layout}>
+                  {Object.values(PortfolioGalleryLayout).map((layout) =>
+                <option key={layout} value={layout}>
                       {enumLabel(layout)}
                     </option>
-                  ))}
+                )}
                 </select>
               </div>
-              <button className="ui-button ui-button-secondary" type="submit">
+              <Button type="submit" variant="secondary">
                 Save layout
-              </button>
+              </Button>
             </form>
             <div className="ui-zero">
-              {[PortfolioGalleryStatus.PUBLISHED, PortfolioGalleryStatus.DRAFT, PortfolioGalleryStatus.ARCHIVED].map((status) => (
-                <form action={updatePortfolioGalleryStatusAction} className="stack ui-zero" key={status}>
+              {[PortfolioGalleryStatus.PUBLISHED, PortfolioGalleryStatus.DRAFT, PortfolioGalleryStatus.ARCHIVED].map((status) =>
+            <form action={updatePortfolioGalleryStatusAction} className="stack ui-zero" key={status}>
                   <input type="hidden" name="id" value={selectedGallery.id} />
                   <input type="hidden" name="status" value={status} />
-                  {status === PortfolioGalleryStatus.ARCHIVED ? (
-                    <label className="ui-zero">
+                  {status === PortfolioGalleryStatus.ARCHIVED ?
+              <label className="ui-zero">
                       <input name="confirmArchive" type="checkbox" />
                       Confirm archive
-                    </label>
-                  ) : null}
-                  <button className="ui-button ui-button-secondary" type="submit">
+                    </label> :
+              null}
+                  <Button type="submit" variant="secondary">
                     Mark {enumLabel(status)}
-                  </button>
+                  </Button>
                 </form>
-              ))}
+            )}
             </div>
-          </div>
+          </Card>
 
-          <form action={addPortfolioGalleryItemAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+          <Card action={addPortfolioGalleryItemAction} as="form" minHeight="none" bodyClassName="form-grid">
             <input type="hidden" name="galleryId" value={selectedGallery.id} />
             <h2 className="section-title">Add image or delivery item</h2>
-            <div className="grid-2">
+            <EqualGrid>
               <div className="ui-field">
                 <label htmlFor="item-media">Uploaded media</label>
                 <select id="item-media" name="mediaAssetId" defaultValue="">
                   <option value="">Use a URL instead</option>
-                  {mediaAssets.map((asset) => (
-                    <option key={asset.id} value={asset.id}>
+                  {mediaAssets.map((asset) =>
+                <option key={asset.id} value={asset.id}>
                       {asset.filename}
                     </option>
-                  ))}
+                )}
                 </select>
               </div>
               <div className="ui-field">
                 <label htmlFor="item-type">Type</label>
                 <select id="item-type" name="type" defaultValue={PortfolioItemType.IMAGE}>
-                  {Object.values(PortfolioItemType).map((type) => (
-                    <option key={type} value={type}>
+                  {Object.values(PortfolioItemType).map((type) =>
+                <option key={type} value={type}>
                       {enumLabel(type)}
                     </option>
-                  ))}
+                )}
                 </select>
               </div>
-            </div>
+            </EqualGrid>
             <div className="ui-field">
               <label htmlFor="item-url">Image or file URL</label>
               <input id="item-url" name="imageUrl" placeholder="/hero.svg" />
             </div>
-            <div className="grid-2">
+            <EqualGrid>
               <div className="ui-field">
                 <label htmlFor="item-title">Title</label>
                 <input id="item-title" name="title" />
@@ -450,7 +448,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 <label htmlFor="item-sort">Sort order</label>
                 <input id="item-sort" name="sortOrder" type="number" defaultValue={selectedGallery.items.length * 10 + 10} />
               </div>
-            </div>
+            </EqualGrid>
             <div className="ui-field">
               <label htmlFor="item-alt">Alt text</label>
               <input id="item-alt" name="altText" />
@@ -459,7 +457,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               <label htmlFor="item-caption">Caption</label>
               <textarea id="item-caption" name="caption" />
             </div>
-            <div className="grid-3">
+            <EqualGrid min="220px">
               <label className="ui-zero">
                 <input name="isCover" type="checkbox" />
                 Use as cover
@@ -472,24 +470,24 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 <input name="isWatermarked" type="checkbox" defaultChecked />
                 Watermarked
               </label>
-            </div>
+            </EqualGrid>
             <div className="ui-field">
               <label htmlFor="item-license">License notes</label>
               <input id="item-license" name="licenseNotes" />
             </div>
-            <button className="ui-button ui-button-secondary" type="submit">
+            <Button type="submit" variant="secondary">
               Add item
-            </button>
-          </form>
-        </section>
-      ) : null}
+            </Button>
+          </Card>
+        </EqualGrid> :
+      null}
 
-      {selectedGallery ? (
-        <section className="grid-2">
-          <form action={createPortfolioProofRoundAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      {selectedGallery ?
+      <EqualGrid as="section">
+          <Card action={createPortfolioProofRoundAction} as="form" minHeight="none" bodyClassName="form-grid">
             <input type="hidden" name="galleryId" value={selectedGallery.id} />
             <h2 className="section-title">Start revision round</h2>
-            <div className="grid-2">
+            <EqualGrid>
               <div className="ui-field">
                 <label htmlFor="round-title">Title</label>
                 <input id="round-title" name="title" placeholder={`Round ${(latestProofRound?.roundNumber || 0) + 1}`} />
@@ -498,20 +496,20 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 <label htmlFor="round-due">Due date</label>
                 <input id="round-due" name="dueAt" type="date" />
               </div>
-            </div>
+            </EqualGrid>
             <div className="ui-field">
               <label htmlFor="round-instructions">Instructions</label>
               <textarea id="round-instructions" name="instructions" />
             </div>
-            <button className="ui-button ui-button-secondary" type="submit">
+            <Button type="submit" variant="secondary">
               <RotateCcw size={16} />
               Start round
-            </button>
-          </form>
+            </Button>
+          </Card>
 
-          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+          <Card bodyClassName="ui-stack">
             <h2 className="section-title">Proofing rounds</h2>
-            <table className="ui-table">
+            <Table>
               <thead>
                 <tr>
                   <th>Round</th>
@@ -521,8 +519,8 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 </tr>
               </thead>
               <tbody>
-                {selectedGallery.proofRounds.map((round) => (
-                  <tr key={round.id}>
+                {selectedGallery.proofRounds.map((round) =>
+              <tr key={round.id}>
                     <td>
                       <strong>{round.title || `Round ${round.roundNumber}`}</strong>
                       <br />
@@ -545,47 +543,47 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                     <td>
                       <div className="ui-zero">
                         {[PortfolioProofRoundStatus.LOCKED, PortfolioProofRoundStatus.CHANGES_REQUESTED, PortfolioProofRoundStatus.APPROVED].map(
-                          (status) => (
-                            <form action={updatePortfolioProofRoundStatusAction} className="stack ui-zero" key={status}>
+                      (status) =>
+                      <form action={updatePortfolioProofRoundStatusAction} className="stack ui-zero" key={status}>
                               <input type="hidden" name="id" value={round.id} />
                               <input type="hidden" name="status" value={status} />
                               <label className="ui-zero">
                                 <input name="confirmTransition" type="checkbox" />
                                 Confirm {enumLabel(status).toLowerCase()}
                               </label>
-                              <button className="ui-button ui-button-secondary" type="submit">
+                              <Button type="submit" variant="secondary">
                                 Mark {enumLabel(status)}
-                              </button>
+                              </Button>
                             </form>
-                          )
-                        )}
+
+                    )}
                       </div>
                     </td>
                   </tr>
-                ))}
-                {!selectedGallery.proofRounds.length ? (
-                  <tr>
+              )}
+                {!selectedGallery.proofRounds.length ?
+              <tr>
                     <td colSpan={4}>No proofing rounds yet.</td>
-                  </tr>
-                ) : null}
+                  </tr> :
+              null}
               </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
+            </Table>
+          </Card>
+        </EqualGrid> :
+      null}
 
-      {selectedGallery ? (
-        <section className="grid-2">
-          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+      {selectedGallery ?
+      <EqualGrid as="section">
+          <Card bodyClassName="ui-stack">
             <h2 className="section-title">Gallery items</h2>
-            <div className="grid-3">
-              {selectedGallery.items.map((item) => (
-                <div className="asset-tile" key={item.id}>
+            <EqualGrid min="220px">
+              {selectedGallery.items.map((item) =>
+            <div className="asset-tile" key={item.id}>
                   <div className="ui-zero"
-                    aria-label={item.altText || item.title || "Portfolio item"}
-                    role="img"
-                   
-                  />
+              aria-label={item.altText || item.title || "Portfolio item"}
+              role="img" />
+
+              
                   <div>
                     <strong>{item.title || item.imageUrl}</strong>
                     <p className="ui-zero">
@@ -594,14 +592,14 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                     </p>
                   </div>
                 </div>
-              ))}
+            )}
               {!selectedGallery.items.length ? <p className="empty-state">No gallery items yet.</p> : null}
-            </div>
-          </div>
+            </EqualGrid>
+          </Card>
 
-          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+          <Card bodyClassName="ui-stack">
             <h2 className="section-title">Recent favorites</h2>
-            <table className="ui-table">
+            <Table>
               <thead>
                 <tr>
                   <th>Viewer</th>
@@ -610,31 +608,31 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 </tr>
               </thead>
               <tbody>
-                {selectedGallery.favorites.map((favorite) => (
-                  <tr key={favorite.id}>
+                {selectedGallery.favorites.map((favorite) =>
+              <tr key={favorite.id}>
                     <td>{favorite.viewerEmail || favorite.clientId || "Anonymous"}</td>
                     <td>{favorite.notes || favorite.itemId}</td>
                     <td>{formatDateTime(favorite.createdAt, settings.timezone)}</td>
                   </tr>
-                ))}
-                {!selectedGallery.favorites.length ? (
-                  <tr>
+              )}
+                {!selectedGallery.favorites.length ?
+              <tr>
                     <td colSpan={3}>No favorites yet.</td>
-                  </tr>
-                ) : null}
+                  </tr> :
+              null}
               </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
+            </Table>
+          </Card>
+        </EqualGrid> :
+      null}
 
-      {selectedGallery ? (
-        <section className="grid-2">
-          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+      {selectedGallery ?
+      <EqualGrid as="section">
+          <Card bodyClassName="ui-stack">
             <h2 className="section-title">Proof decisions and comments</h2>
             {!latestProofRound ? <p className="empty-state">No proofing round selected.</p> : null}
-            {latestProofRound ? (
-              <table className="ui-table">
+            {latestProofRound ?
+          <Table>
                 <thead>
                   <tr>
                     <th>Image</th>
@@ -644,112 +642,112 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                   </tr>
                 </thead>
                 <tbody>
-                  {latestProofRound.decisions.map((decision) => (
-                    <tr key={decision.id}>
+                  {latestProofRound.decisions.map((decision) =>
+              <tr key={decision.id}>
                       <td>{decision.item?.title || decision.item?.imageUrl || decision.itemId}</td>
                       <td>{decision.viewerEmail || decision.clientId || "Anonymous"}</td>
                       <td>{enumLabel(decision.status)}</td>
                       <td>{decision.notes || "-"}</td>
                     </tr>
-                  ))}
-                  {!latestProofRound.decisions.length ? (
-                    <tr>
+              )}
+                  {!latestProofRound.decisions.length ?
+              <tr>
                       <td colSpan={4}>No image decisions yet.</td>
-                    </tr>
-                  ) : null}
+                    </tr> :
+              null}
                 </tbody>
-              </table>
-            ) : null}
-            {latestProofRound?.comments.length ? (
-              <div className="stack">
+              </Table> :
+          null}
+            {latestProofRound?.comments.length ?
+          <div className="stack">
                 <h3>Recent proof comments</h3>
-                {latestProofRound.comments.slice(0, 8).map((comment) => (
-                  <div className="subpanel" key={comment.id}>
+                {latestProofRound.comments.slice(0, 8).map((comment) =>
+            <div className="subpanel" key={comment.id}>
                     <strong>{comment.item?.title || comment.item?.imageUrl || "Round comment"}</strong>
                     <p className="ui-zero">{comment.body}</p>
                     <small className="muted-text">
                       {comment.authorName || comment.viewerEmail || "Viewer"} - {formatDateTime(comment.createdAt, settings.timezone)}
                     </small>
                   </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
+            )}
+              </div> :
+          null}
+          </Card>
 
-          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+          <Card bodyClassName="ui-stack">
             <h2 className="section-title">Selected image export</h2>
             <textarea
-              readOnly
-              rows={Math.max(6, Math.min(14, selectedImageExport.length + 1))}
-              value={selectedImageExport.map((entry) => `${entry.source},${entry.viewer},${entry.item}`).join("\n")}
-            />
+            readOnly
+            rows={Math.max(6, Math.min(14, selectedImageExport.length + 1))}
+            value={selectedImageExport.map((entry) => `${entry.source},${entry.viewer},${entry.item}`).join("\n")} />
+          
             <div className="subpanel stack">
               <h3>Delivery bundle</h3>
               <p className="ui-zero">
                 {selectedDownloadableCount} media-backed downloadable item{selectedDownloadableCount === 1 ? "" : "s"} ready for a ZIP delivery bundle.
               </p>
-              {selectedGallery.downloadEnabled && selectedDownloadableCount ? (
-                <div className="ui-zero">
-                  {selectedGallery.visibility === PortfolioGalleryVisibility.PUBLIC ? (
-                    <a className="ui-button ui-button-secondary" href={`/galleries/${selectedGallery.slug}/bundle`}>
+              {selectedGallery.downloadEnabled && selectedDownloadableCount ?
+            <div className="ui-zero">
+                  {selectedGallery.visibility === PortfolioGalleryVisibility.PUBLIC ?
+              <ButtonAnchor href={`/galleries/${selectedGallery.slug}/bundle`} variant="secondary">
                       <Download size={16} />
                       Public bundle
-                    </a>
-                  ) : null}
-                  {selectedGallery.accesses
-                    .filter((access) => access.status === PortfolioAccessStatus.ACTIVE)
-                    .slice(0, 4)
-                    .map((access) => (
-                      <a className="ui-button ui-button-secondary" href={`/galleries/${selectedGallery.slug}/bundle?access=${access.accessToken}`} key={access.id}>
+                    </ButtonAnchor> :
+              null}
+                  {selectedGallery.accesses.
+              filter((access) => access.status === PortfolioAccessStatus.ACTIVE).
+              slice(0, 4).
+              map((access) =>
+              <ButtonAnchor href={`/galleries/${selectedGallery.slug}/bundle?access=${access.accessToken}`} key={access.id} variant="secondary">
                         <Download size={16} />
                         {access.recipientEmail}
-                      </a>
-                    ))}
-                </div>
-              ) : (
-                <p className="ui-zero">Enable gallery downloads and mark media-backed items downloadable to create a bundle.</p>
+                      </ButtonAnchor>
               )}
+                </div> :
+
+            <p className="ui-zero">Enable gallery downloads and mark media-backed items downloadable to create a bundle.</p>
+            }
             </div>
             <div className="stack">
               <h3>Round responses</h3>
-              {latestProofRound?.approvals.map((approval) => (
-                <div className="subpanel" key={approval.id}>
+              {latestProofRound?.approvals.map((approval) =>
+            <div className="subpanel" key={approval.id}>
                   <strong>{enumLabel(approval.status)}</strong>
                   <p className="ui-zero">{approval.notes || "-"}</p>
                   <small className="muted-text">
                     {approval.approverName || approval.viewerEmail || "Viewer"} - {formatDateTime(approval.createdAt, settings.timezone)}
                   </small>
                 </div>
-              ))}
+            )}
               {!latestProofRound?.approvals.length ? <p className="empty-state">No round responses yet.</p> : null}
             </div>
-          </div>
-        </section>
-      ) : null}
+          </Card>
+        </EqualGrid> :
+      null}
 
-      {selectedGallery ? (
-        <section className="grid-2">
-          <form action={createPortfolioAccessAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+      {selectedGallery ?
+      <EqualGrid as="section">
+          <Card action={createPortfolioAccessAction} as="form" minHeight="none" bodyClassName="form-grid">
             <input type="hidden" name="galleryId" value={selectedGallery.id} />
             <h2 className="section-title">Create private access</h2>
-            <div className="grid-2">
+            <EqualGrid>
               <div className="ui-field">
                 <label htmlFor="access-client">Client</label>
                 <select id="access-client" name="clientId" defaultValue="">
                   <option value="">No linked client</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
+                  {clients.map((client) =>
+                <option key={client.id} value={client.id}>
                       {client.name} ({client.email})
                     </option>
-                  ))}
+                )}
                 </select>
               </div>
               <div className="ui-field">
                 <label htmlFor="access-email">Recipient email</label>
                 <input id="access-email" name="recipientEmail" type="email" required />
               </div>
-            </div>
-            <div className="grid-2">
+            </EqualGrid>
+            <EqualGrid>
               <div className="ui-field">
                 <label htmlFor="access-token">Access token</label>
                 <input id="access-token" name="accessToken" placeholder="Generated if blank" />
@@ -758,15 +756,15 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 <label htmlFor="access-expires">Expires</label>
                 <input id="access-expires" name="expiresAt" type="date" />
               </div>
-            </div>
-            <button className="ui-button ui-button-secondary" type="submit">
+            </EqualGrid>
+            <Button type="submit" variant="secondary">
               Create access
-            </button>
-          </form>
+            </Button>
+          </Card>
 
-          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+          <Card bodyClassName="ui-stack">
             <h2 className="section-title">Access links</h2>
-            <table className="ui-table">
+            <Table>
               <thead>
                 <tr>
                   <th>Recipient</th>
@@ -776,8 +774,8 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 </tr>
               </thead>
               <tbody>
-                {selectedGallery.accesses.map((access) => (
-                  <tr key={access.id}>
+                {selectedGallery.accesses.map((access) =>
+              <tr key={access.id}>
                     <td>
                       {access.recipientEmail}
                       <br />
@@ -799,27 +797,27 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                       <form action={updatePortfolioAccessStatusAction}>
                         <input type="hidden" name="id" value={access.id} />
                         <input
-                          type="hidden"
-                          name="status"
-                          value={access.status === PortfolioAccessStatus.ACTIVE ? PortfolioAccessStatus.REVOKED : PortfolioAccessStatus.ACTIVE}
-                        />
-                        <button className="ui-button ui-button-secondary" type="submit">
+                      type="hidden"
+                      name="status"
+                      value={access.status === PortfolioAccessStatus.ACTIVE ? PortfolioAccessStatus.REVOKED : PortfolioAccessStatus.ACTIVE} />
+                    
+                        <Button type="submit" variant="secondary">
                           {access.status === PortfolioAccessStatus.ACTIVE ? "Revoke" : "Reactivate"}
-                        </button>
+                        </Button>
                       </form>
                     </td>
                   </tr>
-                ))}
-                {!selectedGallery.accesses.length ? (
-                  <tr>
+              )}
+                {!selectedGallery.accesses.length ?
+              <tr>
                     <td colSpan={4}>No private access links yet.</td>
-                  </tr>
-                ) : null}
+                  </tr> :
+              null}
               </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
-    </div>
-  );
+            </Table>
+          </Card>
+        </EqualGrid> :
+      null}
+    </div>);
+
 }

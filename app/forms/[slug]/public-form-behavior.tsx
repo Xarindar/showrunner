@@ -5,6 +5,7 @@ import { recordPublicFormStartAction } from "@/modules/forms/actions";
 import { computeVisibleFieldIds } from "@/modules/forms/conditional-logic";
 import { validateUploadedFile } from "@/modules/forms/upload-fields";
 import { normalizeValidationRules, validateFormFieldValue } from "@/modules/forms/validation-rules";
+import { Button } from "@/components/ui";
 
 type PublicFormFieldBehavior = {
   conditionalLogic: unknown;
@@ -28,7 +29,7 @@ type PublicFormBehaviorProps = {
 function fieldControlValue(form: HTMLFormElement, field: PublicFormFieldBehavior) {
   const controls = Array.from(form.elements).filter(
     (control): control is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
-      control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement
+    control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement
   );
   const namedControls = controls.filter((control) => control.name === field.inputName);
 
@@ -66,8 +67,8 @@ function setFieldEnabled(wrapper: HTMLElement, enabled: boolean, forceHidden: bo
 function namedFieldControls(form: HTMLFormElement, field: PublicFormFieldBehavior) {
   return Array.from(form.elements).filter(
     (control): control is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
-      (control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement) &&
-      control.name === field.inputName
+    (control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement) &&
+    control.name === field.inputName
   );
 }
 
@@ -180,11 +181,11 @@ export function PublicFormBehavior({ enableSteps, fields, formId, formPath, subm
   if (!hasSteps) {
     return (
       <div ref={containerRef}>
-        <button className="ui-button" type="submit">
+        <Button type="submit">
           {submitButtonLabel}
-        </button>
-      </div>
-    );
+        </Button>
+      </div>);
+
   }
 
   return (
@@ -194,25 +195,25 @@ export function PublicFormBehavior({ enableSteps, fields, formId, formPath, subm
           Step {currentPageIndex + 1} of {pages.length}
         </span>
         <div className="ui-zero">
-          <button
-            className="ui-button ui-button-secondary"
+          <Button
+
             disabled={currentPageIndex <= 0}
             onClick={() => setCurrentPage(pages[Math.max(0, currentPageIndex - 1)] || activePage)}
-            type="button"
-          >
+            type="button" variant="secondary">
+            
             Previous
-          </button>
-          {currentPageIndex < pages.length - 1 ? (
-            <button className="ui-button" onClick={goToNextPage} type="button">
+          </Button>
+          {currentPageIndex < pages.length - 1 ?
+          <Button onClick={goToNextPage} type="button">
               Next
-            </button>
-          ) : (
-            <button className="ui-button" type="submit">
+            </Button> :
+
+          <Button type="submit">
               {submitButtonLabel}
-            </button>
-          )}
+            </Button>
+          }
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }

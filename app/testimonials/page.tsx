@@ -9,6 +9,7 @@ import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
 import { prisma } from "@/lib/prisma";
 import { createPublicTestimonialAction } from "@/modules/testimonials/actions";
+import { Button, ButtonLink, Card, EqualGrid } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 type TestimonialsPublicPageProps = {
-  searchParams: Promise<{ submitted?: string; error?: string }>;
+  searchParams: Promise<{submitted?: string;error?: string;}>;
 };
 
 export default async function TestimonialsPublicPage({ searchParams }: TestimonialsPublicPageProps) {
@@ -48,25 +49,25 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
       <JsonLd
         data={buildBreadcrumbJsonLd(
           [
-            { name: "Home", path: "/" },
-            { name: "Testimonials", path: "/testimonials" }
-          ],
+          { name: "Home", path: "/" },
+          { name: "Testimonials", path: "/testimonials" }],
+
           baseUrl
-        )}
-      />
+        )} />
+      
       <nav className="site-nav">
         <Link href="/" className="brand">
           <span className="brand-mark" />
           <span>{settings.businessName}</span>
         </Link>
         <div className="site-nav-links">
-          <Link href="/book" className="button secondary">
+          <ButtonLink href="/book" variant="secondary">
             <CalendarDays size={18} />
             Book
-          </Link>
-          <Link href="/admin" className="button secondary">
+          </ButtonLink>
+          <ButtonLink href="/admin" variant="secondary">
             Admin
-          </Link>
+          </ButtonLink>
         </div>
       </nav>
 
@@ -77,48 +78,48 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
           <p className="lead">Approved first-party quotes and a collection form for new reviews.</p>
         </div>
 
-        <div className="grid-2" style={{ alignItems: "start" }}>
+        <EqualGrid className="ui-align-start">
           <div className="stack">
-            {testimonials.map((testimonial) => (
-              <article className="card" key={testimonial.id}>
+            {testimonials.map((testimonial) =>
+            <Card key={testimonial.id} as="article">
                 <Star size={20} />
-                <p style={{ fontSize: "1.08rem", lineHeight: 1.7 }}>&quot;{testimonial.quote}&quot;</p>
+                <p className="testimonial-quote">&quot;{testimonial.quote}&quot;</p>
                 <strong>{testimonial.authorName}</strong>
                 <span className="muted-text">
                   {testimonial.authorRole || testimonial.serviceName || testimonial.source} · {testimonial.rating}/5
                 </span>
-              </article>
-            ))}
+              </Card>
+            )}
             {!testimonials.length ? <p className="empty-state">No approved testimonials yet.</p> : null}
           </div>
 
-          <form action={createPublicTestimonialAction} className="card form-grid">
+          <Card action={createPublicTestimonialAction} as="form" bodyClassName="form-grid">
             <input
               aria-hidden="true"
               autoComplete="off"
               name="companyWebsite"
-              style={{ display: "none" }}
+              className="ui-hidden"
               tabIndex={-1}
-              type="text"
-            />
+              type="text" />
+            
             <div>
               <MessageSquare size={22} />
-              <h2 style={{ fontSize: "1.35rem", marginTop: 12 }}>Share a testimonial</h2>
+              <h2 className="section-title ui-title-tight">Share a testimonial</h2>
               <p className="lead lead-compact">
                 New submissions go to the admin queue before public display.
               </p>
             </div>
-            {query.submitted ? (
-              <div className="success-message" role="status" aria-live="polite">
+            {query.submitted ?
+            <div className="success-message" role="status" aria-live="polite">
                 Thanks. Your testimonial is waiting for review.
-              </div>
-            ) : null}
-            {query.error ? (
-              <div className="error" role="alert">
+              </div> :
+            null}
+            {query.error ?
+            <div className="error" role="alert">
                 {decodeURIComponent(query.error)}
-              </div>
-            ) : null}
-            <div className="grid-2">
+              </div> :
+            null}
+            <EqualGrid>
               <div className="field">
                 <label htmlFor="authorName">
                   Name <span aria-hidden="true">*</span>
@@ -129,8 +130,8 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
                 <label htmlFor="authorEmail">Email</label>
                 <input id="authorEmail" name="authorEmail" type="email" />
               </div>
-            </div>
-            <div className="grid-2">
+            </EqualGrid>
+            <EqualGrid>
               <div className="field">
                 <label htmlFor="authorRole">Context</label>
                 <input id="authorRole" name="authorRole" placeholder="Client, buyer, parent" />
@@ -139,7 +140,7 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
                 <label htmlFor="serviceName">Service or product</label>
                 <input id="serviceName" name="serviceName" />
               </div>
-            </div>
+            </EqualGrid>
             <div className="field">
               <label htmlFor="quote">
                 Testimonial <span aria-hidden="true">*</span>
@@ -150,18 +151,18 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
               <label htmlFor="rating">Rating</label>
               <input id="rating" name="rating" type="number" min="1" max="5" defaultValue="5" />
             </div>
-            <label style={{ alignItems: "flex-start", display: "flex", gap: 10, lineHeight: 1.5 }}>
+            <label className="ui-check-row">
               <input name="permissionGranted" required aria-required="true" type="checkbox" />
               <span>
                 I give permission to display this testimonial publicly after review. <span aria-hidden="true">*</span>
               </span>
             </label>
-            <button className="button" type="submit">
+            <Button type="submit">
               Submit testimonial
-            </button>
-          </form>
-        </div>
+            </Button>
+          </Card>
+        </EqualGrid>
       </section>
-    </main>
-  );
+    </main>);
+
 }

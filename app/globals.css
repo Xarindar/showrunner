@@ -467,10 +467,24 @@ button.button:disabled,
 .ui-min-300 { min-width: 300px; }
 .ui-max-84 { max-width: 84px; }
 .ui-max-180 { max-width: 180px; }
+.ui-max-readable { max-width: 760px; }
 .ui-title-sm { font-size: var(--type-h3); }
 .ui-title-md { font-size: var(--type-h2); }
 .ui-title-lg { font-size: var(--type-h1); }
 .ui-title-tight { margin: var(--space-2) 0 var(--space-1); }
+.ui-check-row {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--space-2);
+  line-height: var(--leading-normal);
+}
+.ui-comment-line {
+  margin: var(--space-2) 0;
+}
+.ui-on-dark-muted {
+  align-self: center;
+  color: rgba(255, 255, 255, 0.84);
+}
 .ui-media-wide,
 .ui-media-standard {
   border-radius: var(--radius-card);

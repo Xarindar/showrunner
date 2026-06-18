@@ -1,4 +1,4 @@
-import type { CSSProperties, HTMLAttributes } from "react";
+import type { CSSProperties, ElementType, HTMLAttributes } from "react";
 import { cx } from "./utils";
 
 type StackProps = HTMLAttributes<HTMLDivElement> & {
@@ -19,11 +19,12 @@ export function Cluster({ align = "center", className, gap = "3", ...props }: Cl
 }
 
 type EqualGridProps = HTMLAttributes<HTMLDivElement> & {
+  as?: ElementType;
   min?: string;
 };
 
-export function EqualGrid({ className, min = "240px", style, ...props }: EqualGridProps) {
-  return <div className={cx("ui-equal-grid", className)} style={{ "--ui-grid-min": min, ...style } as CSSProperties} {...props} />;
+export function EqualGrid({ as: Component = "div", className, min = "240px", style, ...props }: EqualGridProps) {
+  return <Component className={cx("ui-equal-grid", className)} style={{ "--ui-grid-min": min, ...style } as CSSProperties} {...props} />;
 }
 
 type ReservedSlotProps = HTMLAttributes<HTMLDivElement> & {

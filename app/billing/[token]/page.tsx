@@ -7,12 +7,13 @@ import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
+import { Button, ButtonAnchor, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type BillingDocumentPageProps = {
-  params: Promise<{ token: string }>;
-  searchParams: Promise<{ accepted?: string; checkout?: string; error?: string }>;
+  params: Promise<{token: string;}>;
+  searchParams: Promise<{accepted?: string;checkout?: string;error?: string;}>;
 };
 
 function statusClass(status: BillingDocumentStatus) {
@@ -50,9 +51,9 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
 
   const payable = canPay(document.type, document.status);
   const acceptable = canAccept(document.type, document.status);
-  const paidCents = document.payments
-    .filter((payment) => payment.status === "PAID" || payment.status === "AUTHORIZED")
-    .reduce((sum, payment) => sum + payment.amountCents, 0);
+  const paidCents = document.payments.
+  filter((payment) => payment.status === "PAID" || payment.status === "AUTHORIZED").
+  reduce((sum, payment) => sum + payment.amountCents, 0);
   const remainingCents = Math.max(0, document.totalCents - paidCents);
 
   return (
@@ -63,14 +64,14 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
           <span>{settings.businessName}</span>
         </Link>
         <div className="site-nav-links">
-          <Link href={`/billing/${token}/print`} className="ui-button ui-button-secondary">
+          <ButtonLink href={`/billing/${token}/print`} variant="secondary">
             <Printer size={18} />
             Print
-          </Link>
-          <Link href={`/billing/${token}/pdf`} className="ui-button ui-button-secondary">
+          </ButtonLink>
+          <ButtonLink href={`/billing/${token}/pdf`} variant="secondary">
             <FileText size={18} />
             PDF
-          </Link>
+          </ButtonLink>
         </div>
       </nav>
 
@@ -81,7 +82,7 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
           {query.checkout === "cancel" ? <div className="error">Payment was canceled before completion.</div> : null}
           {query.error ? <div className="error">{query.error}</div> : null}
 
-          <div className="ui-card ui-card-density-normal ui-card-min-md ui-stack">
+          <Card bodyClassName="ui-stack">
             <div className="page-header flush-header">
               <div>
                 <p className="eyebrow">{enumLabel(document.type)}</p>
@@ -93,7 +94,7 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
               <span className={statusClass(document.status)}>{enumLabel(document.status)}</span>
             </div>
 
-            <div className="grid-3">
+            <EqualGrid min="220px">
               <div className="subpanel">
                 <FileText size={20} />
                 <h3>Total</h3>
@@ -109,11 +110,11 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
                 <h3>Balance</h3>
                 <p>{formatMoney(remainingCents, document.currency)} remaining</p>
               </div>
-            </div>
+            </EqualGrid>
 
             {document.publicMemo ? <p className="lead">{document.publicMemo}</p> : null}
 
-            <table className="ui-table">
+            <Table>
               <thead>
                 <tr>
                   <th>Description</th>
@@ -123,21 +124,21 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
                 </tr>
               </thead>
               <tbody>
-                {document.lineItems.map((item) => (
-                  <tr key={item.id}>
+                {document.lineItems.map((item) =>
+                <tr key={item.id}>
                     <td>{item.description}</td>
                     <td>{item.quantity}</td>
                     <td>{formatMoney(item.unitPriceCents, document.currency)}</td>
                     <td>{formatMoney(item.lineTotalCents, document.currency)}</td>
                   </tr>
-                ))}
+                )}
               </tbody>
-            </table>
+            </Table>
 
-            <div className="grid-2">
+            <EqualGrid>
               <div className="subpanel">
                 <h3>Summary</h3>
-                <table className="ui-table ui-zero">
+                <Table tableClassName="ui-zero">
                   <tbody>
                     <tr>
                       <td>Subtotal</td>
@@ -168,90 +169,90 @@ export default async function BillingDocumentPage({ params, searchParams }: Bill
                       </td>
                     </tr>
                   </tbody>
-                </table>
+                </Table>
               </div>
 
               <div className="subpanel form-grid">
                 <h3>Actions</h3>
-                {acceptable ? (
-                  <form action={acceptPublicBillingDocumentAction}>
+                {acceptable ?
+                <form action={acceptPublicBillingDocumentAction}>
                     <input type="hidden" name="token" value={token} />
-                    <button className="ui-button" type="submit">
+                    <Button type="submit">
                       <CheckCircle size={18} />
                       Accept document
-                    </button>
-                  </form>
-                ) : null}
-                {payable && remainingCents > 0 ? (
-                  <form action={createPublicBillingCheckoutAction} className="form-grid">
+                    </Button>
+                  </form> :
+                null}
+                {payable && remainingCents > 0 ?
+                <form action={createPublicBillingCheckoutAction} className="form-grid">
                     <input type="hidden" name="token" value={token} />
                     <div className="ui-field">
                       <label htmlFor="billing-payment-amount">Payment amount</label>
                       <input
-                        id="billing-payment-amount"
-                        name="amount"
-                        inputMode="decimal"
-                        defaultValue={paymentAmountInput(remainingCents)}
-                        required
-                      />
+                      id="billing-payment-amount"
+                      name="amount"
+                      inputMode="decimal"
+                      defaultValue={paymentAmountInput(remainingCents)}
+                      required />
+                    
                     </div>
-                    <button className="ui-button" type="submit">
+                    <Button type="submit">
                       <CreditCard size={18} />
                       Pay with Stripe Checkout
-                    </button>
-                  </form>
-                ) : null}
-                {payable && document.checkoutUrl && remainingCents > 0 ? (
-                  <a className="ui-button ui-button-secondary" href={document.checkoutUrl}>
+                    </Button>
+                  </form> :
+                null}
+                {payable && document.checkoutUrl && remainingCents > 0 ?
+                <ButtonAnchor href={document.checkoutUrl} variant="secondary">
                     <CreditCard size={18} />
                     Resume latest checkout
-                  </a>
-                ) : null}
+                  </ButtonAnchor> :
+                null}
                 {payable && remainingCents <= 0 ? <span className="ui-badge ui-badge-success">Paid in full</span> : null}
                 {!acceptable && !payable ? <span className="ui-badge">No action needed</span> : null}
-                <Link className="ui-button ui-button-secondary" href={`/billing/${token}/print`}>
+                <ButtonLink href={`/billing/${token}/print`} variant="secondary">
                   <Printer size={18} />
                   Print or save PDF
-                </Link>
-                <Link className="ui-button ui-button-secondary" href={`/billing/${token}/pdf`}>
+                </ButtonLink>
+                <ButtonLink href={`/billing/${token}/pdf`} variant="secondary">
                   <FileText size={18} />
                   Download PDF
-                </Link>
+                </ButtonLink>
               </div>
-            </div>
+            </EqualGrid>
 
-            {document.payments.length ? (
-              <div className="subpanel">
+            {document.payments.length ?
+            <div className="subpanel">
                 <h3>Payment history</h3>
-                <table className="ui-table ui-zero">
+                <Table tableClassName="ui-zero">
                   <tbody>
-                    {document.payments.map((payment) => (
-                      <tr key={payment.id}>
+                    {document.payments.map((payment) =>
+                  <tr key={payment.id}>
                         <td>{enumLabel(payment.status)}</td>
                         <td>{formatMoney(payment.amountCents, payment.currency)}</td>
                         <td>{formatDateTime(payment.createdAt, settings.timezone)}</td>
                       </tr>
-                    ))}
+                  )}
                   </tbody>
-                </table>
-              </div>
-            ) : null}
+                </Table>
+              </div> :
+            null}
 
-            {document.attachments.length ? (
-              <div className="subpanel">
+            {document.attachments.length ?
+            <div className="subpanel">
                 <h3>Attachments</h3>
                 <div className="stack">
-                  {document.attachments.map((attachment) => (
-                    <a href={attachment.url} key={attachment.id} target="_blank" rel="noreferrer">
+                  {document.attachments.map((attachment) =>
+                <a href={attachment.url} key={attachment.id} target="_blank" rel="noreferrer">
                       {attachment.title}
                     </a>
-                  ))}
+                )}
                 </div>
-              </div>
-            ) : null}
-          </div>
+              </div> :
+            null}
+          </Card>
         </div>
       </section>
-    </main>
-  );
+    </main>);
+
 }

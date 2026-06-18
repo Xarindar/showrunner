@@ -1,4 +1,5 @@
-import type { ButtonHTMLAttributes, ComponentPropsWithoutRef } from "react";
+import { forwardRef } from "react";
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ComponentPropsWithoutRef } from "react";
 import Link from "next/link";
 import { cx } from "./utils";
 
@@ -22,9 +23,9 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
 };
 
-export function Button({ className, size, variant, ...props }: ButtonProps) {
-  return <button className={buttonClassName({ className, size, variant })} {...props} />;
-}
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({ className, size, variant, ...props }, ref) {
+  return <button className={buttonClassName({ className, size, variant })} ref={ref} {...props} />;
+});
 
 type ButtonLinkProps = ComponentPropsWithoutRef<typeof Link> & {
   size?: ButtonSize;
@@ -33,4 +34,13 @@ type ButtonLinkProps = ComponentPropsWithoutRef<typeof Link> & {
 
 export function ButtonLink({ className, size, variant, ...props }: ButtonLinkProps) {
   return <Link className={buttonClassName({ className, size, variant })} {...props} />;
+}
+
+type ButtonAnchorProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+  size?: ButtonSize;
+  variant?: ButtonVariant;
+};
+
+export function ButtonAnchor({ className, size, variant, ...props }: ButtonAnchorProps) {
+  return <a className={buttonClassName({ className, size, variant })} {...props} />;
 }

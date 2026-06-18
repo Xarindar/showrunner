@@ -1,5 +1,6 @@
 import { Bell, Save } from "lucide-react";
 import { updateReminderSettingsAction } from "../actions";
+import { Button, Card } from "@/components/ui";
 
 type RemindersPanelProps = {
   enabled: boolean;
@@ -10,7 +11,7 @@ export function RemindersPanel({ enabled, leadMinutes }: RemindersPanelProps) {
   const leadHours = Math.max(1, Math.round(leadMinutes / 60));
 
   return (
-    <section className="ui-card ui-card-density-normal ui-card-min-none form-grid">
+    <Card as="section" minHeight="none" bodyClassName="form-grid">
       <div>
         <p className="eyebrow">Notifications</p>
         <h2 className="section-title">Booking reminders</h2>
@@ -30,18 +31,18 @@ export function RemindersPanel({ enabled, leadMinutes }: RemindersPanelProps) {
             max="720"
             step="1"
             defaultValue={leadHours}
-            required
-          />
+            required />
+          
         </div>
-        <button className="ui-button" type="submit">
+        <Button type="submit">
           <Save size={18} />
           Save reminders
-        </button>
+        </Button>
         <div className="ui-badge ui-zero">
           <Bell size={14} />
           {enabled ? `${leadHours}h lead` : "off"}
         </div>
       </form>
-    </section>
-  );
+    </Card>);
+
 }

@@ -3,11 +3,12 @@ import { requireAdmin } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site";
 import { manifest } from "./module";
 import { updateContentAction } from "./actions";
+import { Button, Card, EqualGrid } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type ContentPageProps = {
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{saved?: string;}>;
 };
 
 export default async function ContentPage({ searchParams }: ContentPageProps) {
@@ -26,8 +27,8 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
 
       {saved ? <div className="success-message">Content saved.</div> : null}
 
-      <form action={updateContentAction} className="ui-card ui-card-density-normal ui-card-min-none form-grid">
-        <div className="grid-2">
+      <Card action={updateContentAction} as="form" minHeight="none" bodyClassName="form-grid">
+        <EqualGrid>
           <div className="ui-field">
             <label htmlFor="heroHeadline">Hero headline</label>
             <input id="heroHeadline" name="heroHeadline" defaultValue={settings.heroHeadline} required />
@@ -37,14 +38,14 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
             <label htmlFor="heroImageUrl">Hero image URL</label>
             <input id="heroImageUrl" name="heroImageUrl" defaultValue={settings.heroImageUrl} required />
           </div>
-        </div>
+        </EqualGrid>
 
         <div className="ui-field">
           <label htmlFor="heroSubheadline">Hero supporting copy</label>
           <textarea id="heroSubheadline" name="heroSubheadline" defaultValue={settings.heroSubheadline} />
         </div>
 
-        <div className="grid-2">
+        <EqualGrid>
           <div className="ui-field">
             <label htmlFor="introTitle">Intro section title</label>
             <input id="introTitle" name="introTitle" defaultValue={settings.introTitle} required />
@@ -53,26 +54,26 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
             <label htmlFor="introBody">Intro section body</label>
             <textarea id="introBody" name="introBody" defaultValue={settings.introBody} />
           </div>
-        </div>
+        </EqualGrid>
 
-        <button className="ui-button" type="submit">
+        <Button type="submit">
           <Save size={18} />
           Save content
-        </button>
-      </form>
+        </Button>
+      </Card>
 
-      <section className="grid-2" aria-label="Content readiness">
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+      <EqualGrid aria-label="Content readiness" as="section">
+        <Card>
           <span className="ui-badge ui-badge-warning">Partial</span>
           <h2 className="compact-title">Current content scope</h2>
           <p>{manifest.readiness.summary}</p>
-        </div>
-        <div className="ui-card ui-card-density-normal ui-card-min-md">
+        </Card>
+        <Card>
           <span className="ui-badge">Planned</span>
           <h2 className="compact-title">SEO foundation</h2>
           <p>{manifest.readiness.primaryGap}</p>
-        </div>
-      </section>
-    </div>
-  );
+        </Card>
+      </EqualGrid>
+    </div>);
+
 }
