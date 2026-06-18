@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  env: {
+    MODULE_INCL: process.env.MODULE_INCL ?? ""
+  },
   async headers() {
     return [
       {

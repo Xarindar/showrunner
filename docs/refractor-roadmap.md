@@ -555,7 +555,7 @@ adds (a) persistent install/enable state and (b) build-time module exclusion for
 > installation rows. Net: enablement is now persisted module state, but the app still works whether or not
 > the migration is applied.
 >
-> **Build-time selection.** `shell/modules.ts` filters the registry by `NEXT_PUBLIC_SHOWRUNNER_DISABLED_MODULES`
+> **Build-time selection.** `shell/modules.ts` filters the registry by `MODULE_INCL`
 > (comma-separated ids, inlined for client+server so they can't disagree). Excluded modules leave the
 > registry entirely — no sidebar entry, no route (`getModule` → undefined → 404), no enablement. Required
 > platform modules can never be excluded. Documented in `.env.example`.
