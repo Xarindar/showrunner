@@ -38,3 +38,15 @@ pnpm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local/internal documentation
+docs/
+Claude Audit*.md
+showrunner_refractor.md
+
+# Local tool state
+.claude/
+.tmp/
+
+# Local dev server captures
+*.out.log

@@ -38,7 +38,7 @@ The initial schema migration lives in `prisma/migrations/20260606190000_init/mig
 
 ## Module Shape
 
-Modules live in `modules/` and publish a `module.ts` manifest. The admin shell reads those manifests from `shell/modules.ts` to build sidebar navigation and settings controls. Use `docs/module-dev-guide.md` when building a module, and `docs/module-system.md` for the short architecture contract.
+Modules live in `modules/` and publish a `module.ts` manifest. The admin shell reads those manifests from `shell/modules.ts` to build sidebar navigation and settings controls.
 
 API endpoint behavior lives in each module's own `modules/<id>/api/` folder. Next.js route files under `app/**/route.ts` should stay thin and re-export handlers from there. Shared API helpers (CSV, request-body parsing, secret checks) live in `lib/api/`, and shared non-HTTP services and utilities live in `lib/`.
 
@@ -70,10 +70,10 @@ Future modules such as contracts and deeper client self-service surfaces can be 
 - Appointments: day-to-day queue, appointment details, statuses, intake answers, and internal appointment notes.
 - Analytics: module reporting, server event records, CSV export, client adapters, and retention controls.
 - Automation: rule matching, queued webhooks, non-webhook executors, replay, and dead-letter handling.
-- Billing: document admin with server-side totals. Public accept/pay, PDFs, and partial payments are implemented but still audit-gated until confirmed in `docs/roadmap.md`.
+- Billing: document admin with server-side totals, public accept/pay, PDFs, and partial payments.
 - Clients: long-term client book with profile data, private notes, timeline notes, saved segments, lead pipeline, consent/preferences, audit-logged CSV import/export, audit-logged duplicate merge, and appointment history.
 - Communications: transactional outbox, booking template settings, visual template builder, sender/recipient controls, and suppressions.
-- Scheduling: setup for services, assigned staff, bookable resources, per-staff/resource availability, blockouts, booking rules, intake prompts, and policies. Booking reminders are implemented but still pre-audit until confirmed in `docs/roadmap.md`.
+- Scheduling: setup for services, assigned staff, bookable resources, per-staff/resource availability, blockouts, booking rules, intake prompts, policies, and booking reminders.
 - Content: controlled public-site copy and hero image edits.
 - Media: repo assets by default, R2/Cloudflare Images uploads when configured, folders/tags/focal points, archive lifecycle, signed delivery, and signed Sharp/R2 image variants.
 - Portfolio: gallery admin, access-link delivery, proofing favorites/comments/approvals, public widgets/lightbox, signed image variants, and ZIP bundles.
@@ -86,23 +86,17 @@ Future modules such as contracts and deeper client self-service surfaces can be 
 
 ## Theme Tokens
 
-Theme presets and CSS variable generation live in `lib/theme/tokens.ts`. See `docs/theme-tokens.md` for the token structure, current presets, and how to add new client styles.
+Theme presets and CSS variable generation live in `lib/theme/tokens.ts`.
 
-## User Documentation
-
-End-user documentation lives in `docs/admin-user-guide.md` and is also summarized in the admin at `/admin/help`.
-
-Client handoff documentation lives in `docs/client-handoff-checklist.md`.
-
-Email platform planning lives in `docs/email-core.md`. Use it before changing booking notifications, form notifications, newsletter flows, sender configuration, or delivery logging.
+## Operations
 
 The email outbox is drained by `npm run email:process`. On Railway, create a separate cron service from this repo with that command and a schedule such as `*/5 * * * *`. Railway cron schedules are configured in the service settings, not in this single web-service `railway.json`.
 
 Analytics retention is drained by `npm run analytics:process`. Provision it as a separate scheduled worker as well; the internal HTTP route can use `ANALYTICS_WORKER_SECRET` when configured, otherwise it falls back to `EMAIL_WORKER_SECRET`.
 
-Booking reminders have a matching worker shape in code (`npm run booking-reminders:process`) but remain pre-audit until the roadmap confirms them. Treat that cron as not shipped for handoff purposes until then.
+Booking reminders are drained by `npm run booking-reminders:process`. Provision it as a separate scheduled worker as well.
 
-The payments platform is being generalized behind `lib/payments/` so gateways can connect per site. The confirmed Stripe path supports per-site Stripe Connect credentials plus owner-controlled payment-method toggles for card-backed Apple Pay and Google Pay, Cash App Pay, Klarna, and Affirm. Apple Pay domain registration currently depends on the platform URL; support for each client's custom domain is a hard dependency for reliable Apple Pay on owner domains. Square and PayPal remain roadmap work until confirmed.
+The payments platform is generalized behind `lib/payments/` so gateways can connect per site. The Stripe path supports per-site Stripe Connect credentials plus owner-controlled payment-method toggles for card-backed Apple Pay and Google Pay, Cash App Pay, Klarna, and Affirm. Apple Pay domain registration currently depends on the platform URL; each client's custom domain must be registered for reliable Apple Pay on owner domains.
 
 ## Scheduling
 
