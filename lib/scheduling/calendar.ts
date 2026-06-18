@@ -3,6 +3,7 @@ import "server-only";
 import crypto from "node:crypto";
 import { BookingStatus } from "@prisma/client";
 import { headers } from "next/headers";
+import { publicAppBaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import type { CalendarBookingScope, CalendarFeedScope, CalendarFileAdapter } from "@/lib/scheduling/types";
 
@@ -118,10 +119,6 @@ export function absoluteCalendarUrl(origin: string, path: string) {
   }
 }
 
-function normalizeOrigin(value: string) {
-  return value.replace(/\/+$/, "");
-}
-
 export async function requestBaseUrl() {
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") || headerStore.get("host") || "";
@@ -130,7 +127,7 @@ export async function requestBaseUrl() {
     return `${proto}://${host}`;
   }
 
-  return normalizeOrigin(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
+  return publicAppBaseUrl();
 }
 
 function icsDate(value: Date) {

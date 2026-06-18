@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
 import { getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
+import { publicAppBaseUrl } from "@/lib/env";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { createPayPalPartnerReferralUrl, paypalFetch } from "@/lib/payments/paypal-connect";
 import type { PaymentGateway, PaymentGatewayCheckoutInput } from "@/lib/payments/types";
@@ -95,17 +96,13 @@ type PayPalRefundResponse = {
 
 const payPalEventStaleProcessingMs = 5 * 60 * 1000;
 
-function appBaseUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
-}
-
 function publicOrderUrl(orderNumber: string, status: "success" | "cancel") {
   const params = new URLSearchParams({
     checkout: status,
     order: orderNumber
   });
 
-  return `${appBaseUrl()}/cart?${params.toString()}`;
+  return `${publicAppBaseUrl()}/cart?${params.toString()}`;
 }
 
 function publicBillingUrl(token: string, status: "success" | "cancel") {
@@ -113,7 +110,7 @@ function publicBillingUrl(token: string, status: "success" | "cancel") {
     checkout: status
   });
 
-  return `${appBaseUrl()}/billing/${encodeURIComponent(token)}?${params.toString()}`;
+  return `${publicAppBaseUrl()}/billing/${encodeURIComponent(token)}?${params.toString()}`;
 }
 
 function requirePayPalWebhookId() {

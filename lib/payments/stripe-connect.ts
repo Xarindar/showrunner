@@ -3,13 +3,10 @@ import "server-only";
 import crypto from "node:crypto";
 import { PaymentProvider, Prisma } from "@prisma/client";
 import Stripe from "stripe";
+import { publicAppBaseUrl } from "@/lib/env";
 import { upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
 
 const stateTtlSeconds = 10 * 60;
-
-function appBaseUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
-}
 
 function requireStripeConnectClientId() {
   const clientId = process.env.STRIPE_CONNECT_CLIENT_ID || "";
@@ -38,7 +35,7 @@ function connectStateSecret() {
 }
 
 function redirectUri() {
-  return process.env.STRIPE_CONNECT_REDIRECT_URI || `${appBaseUrl()}/api/payments/stripe/connect/callback`;
+  return process.env.STRIPE_CONNECT_REDIRECT_URI || `${publicAppBaseUrl()}/api/payments/stripe/connect/callback`;
 }
 
 function signPayload(payload: string) {

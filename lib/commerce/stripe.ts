@@ -12,6 +12,7 @@ import {
 import Stripe from "stripe";
 import { getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
+import { publicAppBaseUrl } from "@/lib/env";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { resolveStripeCheckoutPaymentMethods } from "@/lib/payments/methods";
 import { createStripeConnectAuthorizeUrl } from "@/lib/payments/stripe-connect";
@@ -64,10 +65,6 @@ async function getStripeConnectedAccountId(siteId?: string) {
 async function stripeRequestOptions(siteId?: string): Promise<Stripe.RequestOptions | undefined> {
   const stripeAccount = await getStripeConnectedAccountId(siteId);
   return stripeAccount ? { stripeAccount } : undefined;
-}
-
-function appBaseUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
 }
 
 function stripeMetadata(order: {
@@ -192,7 +189,7 @@ function publicOrderUrl(orderNumber: string, status: "success" | "cancel") {
     order: orderNumber
   });
 
-  return `${appBaseUrl()}/cart?${params.toString()}`;
+  return `${publicAppBaseUrl()}/cart?${params.toString()}`;
 }
 
 function publicBillingUrl(token: string, status: "success" | "cancel") {
@@ -200,7 +197,7 @@ function publicBillingUrl(token: string, status: "success" | "cancel") {
     checkout: status
   });
 
-  return `${appBaseUrl()}/billing/${encodeURIComponent(token)}?${params.toString()}`;
+  return `${publicAppBaseUrl()}/billing/${encodeURIComponent(token)}?${params.toString()}`;
 }
 
 export async function createStripeCheckoutSessionForOrder(orderId: string, siteId?: string) {

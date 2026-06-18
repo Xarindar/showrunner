@@ -2,6 +2,7 @@ import "server-only";
 
 import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
 import Stripe from "stripe";
+import { publicAppBaseUrl } from "@/lib/env";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { prisma } from "@/lib/prisma";
 
@@ -86,9 +87,8 @@ function getStripe() {
 }
 
 function appHostname() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
   try {
-    const hostname = new URL(appUrl).hostname.trim().toLowerCase();
+    const hostname = new URL(publicAppBaseUrl()).hostname.trim().toLowerCase();
     return hostname === "localhost" || hostname === "127.0.0.1" ? "" : hostname;
   } catch {
     return "";

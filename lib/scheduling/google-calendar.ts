@@ -2,6 +2,7 @@ import "server-only";
 
 import crypto from "node:crypto";
 import { Prisma, SchedulingCalendarConnectionStatus, SchedulingCalendarOwnerType, SchedulingCalendarProvider } from "@prisma/client";
+import { publicAppBaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
 const stateTtlSeconds = 10 * 60;
@@ -41,10 +42,6 @@ export type CalendarBusyWindow = {
 export type CalendarBusyResult = {
   busy: CalendarBusyWindow[];
 };
-
-function appBaseUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
-}
 
 function isWeakProductionSecret(value: string) {
   const normalized = value.trim().toLowerCase();
@@ -112,7 +109,7 @@ function requireGoogleClientSecret() {
 }
 
 function redirectUri() {
-  return process.env.GOOGLE_CALENDAR_REDIRECT_URI || `${appBaseUrl()}/api/scheduling/google-calendar/connect/callback`;
+  return process.env.GOOGLE_CALENDAR_REDIRECT_URI || `${publicAppBaseUrl()}/api/scheduling/google-calendar/connect/callback`;
 }
 
 function signPayload(payload: string) {

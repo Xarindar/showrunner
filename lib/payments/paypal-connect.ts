@@ -2,6 +2,7 @@ import "server-only";
 
 import crypto from "node:crypto";
 import { PaymentProvider, Prisma } from "@prisma/client";
+import { publicAppBaseUrl } from "@/lib/env";
 import { upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
 
 const stateTtlSeconds = 10 * 60;
@@ -45,10 +46,6 @@ export function paypalApiBaseUrl() {
   return paypalEnvironment() === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
 }
 
-function appBaseUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
-}
-
 function requirePayPalClientId() {
   const clientId = process.env.PAYPAL_CLIENT_ID || "";
   if (!clientId) throw new Error("PAYPAL_CLIENT_ID is required before PayPal onboarding can start.");
@@ -86,7 +83,7 @@ function connectStateSecret() {
 }
 
 function redirectUri() {
-  return process.env.PAYPAL_CONNECT_REDIRECT_URI || `${appBaseUrl()}/api/payments/paypal/connect/callback`;
+  return process.env.PAYPAL_CONNECT_REDIRECT_URI || `${publicAppBaseUrl()}/api/payments/paypal/connect/callback`;
 }
 
 function signPayload(payload: string) {

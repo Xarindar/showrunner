@@ -2,6 +2,7 @@ import "server-only";
 
 import crypto from "node:crypto";
 import { PaymentProvider, Prisma } from "@prisma/client";
+import { publicAppBaseUrl } from "@/lib/env";
 import { decryptGatewaySecret, upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { prisma } from "@/lib/prisma";
 
@@ -34,10 +35,6 @@ function squareAuthorizeBaseUrl() {
   return squareEnvironment() === "sandbox" ? "https://connect.squareupsandbox.com/oauth2/authorize" : "https://connect.squareup.com/oauth2/authorize";
 }
 
-function appBaseUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
-}
-
 function requireSquareApplicationId() {
   const applicationId = process.env.SQUARE_APPLICATION_ID || "";
   if (!applicationId) throw new Error("SQUARE_APPLICATION_ID is required before Square Connect onboarding can start.");
@@ -65,7 +62,7 @@ function connectStateSecret() {
 }
 
 function redirectUri() {
-  return process.env.SQUARE_CONNECT_REDIRECT_URI || `${appBaseUrl()}/api/payments/square/connect/callback`;
+  return process.env.SQUARE_CONNECT_REDIRECT_URI || `${publicAppBaseUrl()}/api/payments/square/connect/callback`;
 }
 
 function signPayload(payload: string) {

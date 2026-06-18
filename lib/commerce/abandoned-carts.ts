@@ -1,4 +1,5 @@
 import { CartStatus, EmailCategory, EmailSubscriberStatus } from "@prisma/client";
+import { publicAppBaseUrl } from "@/lib/env";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettingsForSite } from "@/lib/site";
@@ -34,10 +35,6 @@ export type AbandonedCartSweepResult = {
   skipped: number;
   failed: number;
 };
-
-function appBaseUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
-}
 
 function positiveIntegerEnv(name: string, fallback: number) {
   const value = Number.parseInt(process.env[name] || "", 10);
@@ -112,8 +109,8 @@ async function queueRecoveryEmail(cart: AbandonedCart) {
 
   const settings = await getSiteSettingsForSite(cart.siteId);
   const token = createCartRecoveryToken({ cartId: cart.id, siteId: cart.siteId, expiresAt: cart.expiresAt });
-  const cartUrl = `${appBaseUrl()}/cart/recover?token=${encodeURIComponent(token)}`;
-  const unsubscribeUrl = `${appBaseUrl()}/unsubscribe/${encodeURIComponent(subscriber.unsubscribeToken)}`;
+  const cartUrl = `${publicAppBaseUrl()}/cart/recover?token=${encodeURIComponent(token)}`;
+  const unsubscribeUrl = `${publicAppBaseUrl()}/unsubscribe/${encodeURIComponent(subscriber.unsubscribeToken)}`;
 
   await queueEmail({
     siteId: cart.siteId,
