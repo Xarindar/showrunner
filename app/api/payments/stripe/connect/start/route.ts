@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { PaymentProvider } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { publicAppBaseUrl } from "@/lib/env";
+import { paymentOnboardingUnavailableMessage } from "@/lib/payments/onboarding-status";
 import { createStripeConnectAuthorizeUrl } from "@/lib/payments/stripe-connect";
 import { getCurrentSiteId } from "@/lib/site";
 
@@ -17,7 +19,7 @@ export async function GET() {
   try {
     return NextResponse.redirect(createStripeConnectAuthorizeUrl(siteId));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Stripe Connect could not start.";
-    return settingsRedirect("error", message);
+    console.error("[payments:stripe-connect-start-failed]", error);
+    return settingsRedirect("error", paymentOnboardingUnavailableMessage(PaymentProvider.STRIPE));
   }
 }

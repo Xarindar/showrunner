@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PaymentProvider } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { publicAppBaseUrl } from "@/lib/env";
+import { sanitizePaymentOnboardingError } from "@/lib/payments/onboarding-status";
 import { completePayPalConnectOnboarding } from "@/lib/payments/paypal-connect";
 import { getCurrentSiteId } from "@/lib/site";
 
@@ -32,7 +34,7 @@ export async function GET(request: NextRequest) {
     });
     return settingsRedirect("saved", "payments");
   } catch (connectError) {
-    const message = connectError instanceof Error ? connectError.message : "PayPal Connect could not be completed.";
+    const message = sanitizePaymentOnboardingError(connectError, PaymentProvider.PAYPAL, "PayPal Connect could not be completed.");
     return settingsRedirect("error", message);
   }
 }

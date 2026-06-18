@@ -6,6 +6,7 @@ import { EMBED_SCOPES } from "@/lib/embed/scopes";
 import { enumLabel } from "@/lib/format";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { getStripePaymentMethodSettings } from "@/lib/payments/methods";
+import { getPaymentOnboardingStatus, sanitizePaymentOnboardingError } from "@/lib/payments/onboarding-status";
 import { isRequiredModule } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
 import { getPlatformStatus, platformFoundationItems } from "@/lib/platform-status";
@@ -42,6 +43,30 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   const stripeConnected = stripePaymentMethods.connected;
   const squareConnected = squareCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(squareCredential.merchantId);
   const paypalConnected = paypalCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(paypalCredential.merchantId);
+  const errorMessage = error ? sanitizePaymentOnboardingError(error) : "";
+  const paymentConnectionRows = [
+    {
+      connected: stripeConnected,
+      href: "/api/payments/stripe/connect/start",
+      onboarding: getPaymentOnboardingStatus(PaymentProvider.STRIPE),
+      reconnectLabel: "Reconnect Stripe",
+      variant: undefined
+    },
+    {
+      connected: squareConnected,
+      href: "/api/payments/square/connect/start",
+      onboarding: getPaymentOnboardingStatus(PaymentProvider.SQUARE),
+      reconnectLabel: "Reconnect Square",
+      variant: "secondary" as const
+    },
+    {
+      connected: paypalConnected,
+      href: "/api/payments/paypal/connect/start",
+      onboarding: getPaymentOnboardingStatus(PaymentProvider.PAYPAL),
+      reconnectLabel: "Reconnect PayPal",
+      variant: "secondary" as const
+    }
+  ];
   const selectedProviderDisconnected =
   settings.checkoutProvider === PaymentProvider.SQUARE && !squareConnected ||
   settings.checkoutProvider === PaymentProvider.PAYPAL && !paypalConnected;
@@ -59,7 +84,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       </header>
 
       {saved ? <div className="success-message">Settings saved.</div> : null}
-      {error ? <div className="error">{error}</div> : null}
+      {errorMessage ? <div className="error">{errorMessage}</div> : null}
 
       <EqualGrid aria-label="Settings structure" as="section" min="220px">
         <Card>
@@ -80,26 +105,41 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <EqualGrid>
           <div>
             <h2 className="compact-title">Payments</h2>
-            <p>Connected payment accounts, hosted checkout routing, and refunds.</p>
-          </div>
-          <div className="ui-zero">
-            <span className={stripeConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{stripeConnected ? "Connected" : "Not connected"}</span>
-            <ButtonAnchor href="/api/payments/stripe/connect/start">
-              <CreditCard size={18} />
-              {stripeConnected ? "Reconnect Stripe" : "Connect Stripe"}
-            </ButtonAnchor>
-            <span className={squareConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{squareConnected ? "Connected" : "Not connected"}</span>
-            <ButtonAnchor href="/api/payments/square/connect/start" variant="secondary">
-              <CreditCard size={18} />
-              {squareConnected ? "Reconnect Square" : "Connect Square"}
-            </ButtonAnchor>
-            <span className={paypalConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{paypalConnected ? "Connected" : "Not connected"}</span>
-            <ButtonAnchor href="/api/payments/paypal/connect/start" variant="secondary">
-              <CreditCard size={18} />
-              {paypalConnected ? "Reconnect PayPal" : "Connect PayPal"}
-            </ButtonAnchor>
+            <p>Connected accounts use provider-hosted onboarding, checkout, and refund flows.</p>
           </div>
         </EqualGrid>
+        <div className="module-toggle-grid">
+          {paymentConnectionRows.map((row) => {
+            const connectLabel = row.connected ? row.reconnectLabel : `Connect ${row.onboarding.label}`;
+
+            return (
+              <div className="module-toggle-row" key={row.onboarding.provider}>
+                <CreditCard aria-hidden="true" size={18} />
+                <span className="module-toggle-main">
+                  <span>
+                    <strong>{row.onboarding.label}</strong>
+                    <span className={row.connected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>
+                      {row.connected ? "Connected" : "Not connected"}
+                    </span>
+                    <span className={row.onboarding.ready ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>
+                      {row.onboarding.statusLabel}
+                    </span>
+                  </span>
+                  <small>{row.onboarding.description}</small>
+                </span>
+                {row.onboarding.ready ?
+                <ButtonAnchor href={row.href} variant={row.variant}>
+                    <CreditCard size={18} />
+                    {connectLabel}
+                  </ButtonAnchor> :
+                <Button disabled type="button" variant={row.variant}>
+                    <CreditCard size={18} />
+                    Setup pending
+                  </Button>}
+              </div>);
+
+          })}
+        </div>
         <form action={updateCheckoutProviderAction} className="subpanel form-grid">
           <div>
             <h3>Checkout provider</h3>
