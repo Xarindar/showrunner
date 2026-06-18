@@ -1,4 +1,4 @@
-import type { SiteSettings } from "@prisma/client";
+import { Prisma, type SiteSettings } from "@prisma/client";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { resolveEnabledModuleIds } from "@/lib/modules/installation";
@@ -97,14 +97,27 @@ export async function getCurrentSiteId() {
 
 export async function getSiteSettingsForSite(siteId: string): Promise<SiteSettingsWithModules> {
   if (siteId === DEFAULT_SITE_ID) await ensureDefaultSite();
-  const settings = await prisma.siteSettings.upsert({
-    where: { siteId },
-    update: {},
-    create: {
-      siteId,
-      enabledModules: defaultEnabledModules
+  let settings: SiteSettings;
+  try {
+    settings = await prisma.siteSettings.upsert({
+      where: { siteId },
+      update: {},
+      create: {
+        siteId,
+        enabledModules: defaultEnabledModules
+      }
+    });
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+      throw error;
     }
-  });
+
+    const existingSettings = await prisma.siteSettings.findUnique({
+      where: { siteId }
+    });
+    if (!existingSettings) throw error;
+    settings = existingSettings;
+  }
 
   // Enablement now comes from ModuleInstallation records, seeded from (and falling back to) the legacy
   // SiteSettings.enabledModules JSON so the app keeps working whether or not the install table exists.
