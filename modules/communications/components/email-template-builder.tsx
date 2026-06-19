@@ -185,7 +185,8 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
 
       const editorJson = ref.getJSON();
       const email = await ref.getEmail();
-      const nextTextBody = options?.preserveTextFallback || textFallbackDirty ? textBody : email.text || textBody;
+      const shouldKeepTextFallback = options?.preserveTextFallback || textFallbackDirty || textBody.trim().length > 0;
+      const nextTextBody = shouldKeepTextFallback ? textBody : email.text;
       const nextBuilderJson = reactEmailBuilderJson(editorJson);
 
       if (!email.html.trim()) {

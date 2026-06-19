@@ -6,7 +6,7 @@ export const manifest = {
   href: "/admin",
   icon: "Gauge",
   order: 10,
-  description: "Overview, shortcuts, and upcoming work.",
+  description: "Setup checklist, business snapshot, and quick access to your modules.",
   layout: "standard",
   status: "active",
   enabledByDefault: true,
@@ -14,13 +14,14 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Live business counts with platform readiness and operational warnings.",
-    primaryGap: "Role-aware queues and incident history are still pending."
+    summary: "Guided setup checklist, live business counts, and quick access to every enabled module.",
+    primaryGap: "User-pinnable module cards and role-aware queues are still pending."
   },
   capabilities: [
+    { label: "Setup checklist", status: "live" },
     { label: "Business snapshot", status: "live" },
-    { label: "Module readiness", status: "live" },
-    { label: "Incidents and release notes", status: "planned" }
+    { label: "Quick module access", status: "live" },
+    { label: "Pinnable widget cards", status: "planned" }
   ],
   adminRoutes: ["/admin"],
   dependencies: ["settings"],

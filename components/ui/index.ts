@@ -4,6 +4,8 @@ export * from "./card";
 export * from "./dialog";
 export * from "./field";
 export * from "./layout";
+export * from "./modal";
+export * from "./onboarding-modal";
 export * from "./states";
 export * from "./table";
 export * from "./tabs";

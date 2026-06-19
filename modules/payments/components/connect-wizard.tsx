@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import {
   Check,
   CheckCircle2,
@@ -9,10 +9,9 @@ import {
   Copy,
   ExternalLink,
   Loader2,
-  ShieldCheck,
-  X
+  ShieldCheck
 } from "lucide-react";
-import { Button, Field, Input, Select } from "@/components/ui";
+import { Button, Field, Input, OnboardingModal, Select } from "@/components/ui";
 import {
   connectPayPalAction,
   connectStripeAction,
@@ -22,57 +21,8 @@ import {
 } from "../actions";
 
 // ---------------------------------------------------------------------------
-// Shared modal + small building blocks (also reused by the manage modals)
+// Shared small building blocks
 // ---------------------------------------------------------------------------
-
-export function Modal({
-  children,
-  onClose,
-  open,
-  title
-}: {
-  children: ReactNode;
-  onClose: () => void;
-  open: boolean;
-  title: string;
-}) {
-  const ref = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    const handleCancel = (event: Event) => {
-      event.preventDefault();
-      onClose();
-    };
-    dialog.addEventListener("cancel", handleCancel);
-    return () => dialog.removeEventListener("cancel", handleCancel);
-  }, [onClose]);
-
-  return (
-    <dialog
-      className="ui-dialog pay-dialog"
-      onClick={(event) => {
-        if (event.target === ref.current) onClose();
-      }}
-      ref={ref}>
-      <div className="pay-dialog-head">
-        <h2 className="ui-zero">{title}</h2>
-        <Button aria-label="Close" onClick={onClose} size="sm" type="button" variant="ghost">
-          <X size={16} />
-        </Button>
-      </div>
-      <div className="ui-dialog-body">{open ? children : null}</div>
-    </dialog>
-  );
-}
 
 export function LinkOutButton({ children, href }: { children: ReactNode; href: string }) {
   return (
@@ -434,7 +384,15 @@ function maskValue(value: string) {
   return `••••${trimmed.slice(-4)}`;
 }
 
-export function ConnectWizard({ config, onClose }: { config: WizardConfig; onClose: () => void }) {
+export function ConnectWizard({
+  config,
+  onClose,
+  open
+}: {
+  config: WizardConfig;
+  onClose: () => void;
+  open: boolean;
+}) {
   const [state, formAction, pending] = useActionState(config.action, initialPaymentActionState);
   const [stepIndex, setStepIndex] = useState(0);
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -448,6 +406,15 @@ export function ConnectWizard({ config, onClose }: { config: WizardConfig; onClo
   const stepCount = config.steps.length;
   const isLast = stepIndex === stepCount - 1;
   const connected = state.status === "success";
+  const hasStartStep = config.steps[0]?.kind === "intro";
+  const numberedStepCount = hasStartStep ? Math.max(stepCount - 1, 0) : stepCount;
+  const progressLabel =
+    hasStartStep && stepIndex === 0 ? "Start" : `Step ${hasStartStep ? stepIndex : stepIndex + 1} of ${numberedStepCount}`;
+  const modalSteps = config.steps.map((item, index) => ({
+    id: `${config.provider}-${index}`,
+    label: hasStartStep && index === 0 ? "START" : String(hasStartStep ? index : index + 1),
+    title: item.title
+  }));
 
   function setValue(name: string, value: string) {
     setValues((current) => ({ ...current, [name]: value }));
@@ -476,8 +443,14 @@ export function ConnectWizard({ config, onClose }: { config: WizardConfig; onClo
     setStepIndex((index) => Math.max(index - 1, 0));
   }
 
-  if (connected && isLast && step.kind === "review") {
-    return (
+  function goToStep(index: number) {
+    if (index > stepIndex) return;
+    setFieldError(null);
+    setStepIndex(index);
+  }
+
+  const body =
+    connected && isLast && step.kind === "review" ? (
       <div className="pay-wizard pay-wizard-success">
         <div className="pay-success-mark">
           <CheckCircle2 size={42} />
@@ -488,129 +461,129 @@ export function ConnectWizard({ config, onClose }: { config: WizardConfig; onClo
           Done
         </Button>
       </div>
-    );
-  }
+    ) : (
+      <div className="pay-wizard">
+        <p className="pay-progress-count">{progressLabel}</p>
 
-  return (
-    <div className="pay-wizard">
-      <ol className="pay-progress" aria-label={`Step ${stepIndex + 1} of ${stepCount}`}>
-        {config.steps.map((item, index) => (
-          <li
-            className={index < stepIndex ? "pay-progress-dot done" : index === stepIndex ? "pay-progress-dot current" : "pay-progress-dot"}
-            key={item.title}>
-            {index < stepIndex ? <Check size={12} /> : index + 1}
-          </li>
-        ))}
-      </ol>
-      <p className="pay-progress-count">
-        Step {stepIndex + 1} of {stepCount}
-      </p>
+        <div className="pay-step">
+          <h3 className="ui-zero">{step.title}</h3>
+          <p className="pay-step-lead">{step.lead}</p>
 
-      <div className="pay-step">
-        <h3 className="ui-zero">{step.title}</h3>
-        <p className="pay-step-lead">{step.lead}</p>
+          {step.kind === "intro" ? (
+            <>
+              <ul className="pay-checklist">
+                {step.points.map((point) => (
+                  <li key={point}>
+                    <Check size={15} />
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+              {step.link ? <LinkOutButton href={step.link.href}>{step.link.label}</LinkOutButton> : null}
+            </>
+          ) : null}
 
-        {step.kind === "intro" ? (
-          <>
-            <ul className="pay-checklist">
-              {step.points.map((point) => (
-                <li key={point}>
-                  <Check size={15} />
-                  <span>{point}</span>
-                </li>
-              ))}
-            </ul>
-            {step.link ? <LinkOutButton href={step.link.href}>{step.link.label}</LinkOutButton> : null}
-          </>
-        ) : null}
-
-        {step.kind === "field" ? (
-          <>
-            {step.link ? <LinkOutButton href={step.link.href}>{step.link.label}</LinkOutButton> : null}
-            {step.copy ? <CopyValue hint={step.copy.hint} label={step.copy.label} value={step.copy.value} /> : null}
-            {step.events ? (
-              <div className="pay-events">
-                <span className="pay-copy-label">Select these events</span>
-                <div className="pay-event-list">
-                  {step.events.map((event) => (
-                    <code key={event}>{event}</code>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            <Field hint={step.field.hint} label={step.field.label}>
-              {step.field.kind === "select" ? (
-                <Select
-                  name={step.field.name}
-                  onChange={(event) => setValue(step.field.name, event.target.value)}
-                  value={values[step.field.name] ?? ""}>
-                  {step.field.options?.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              ) : (
-                <Input
-                  autoComplete="off"
-                  name={step.field.name}
-                  onChange={(event) => setValue(step.field.name, event.target.value)}
-                  placeholder={step.field.placeholder}
-                  type={step.field.kind === "password" ? "password" : "text"}
-                  value={values[step.field.name] ?? ""} />
-              )}
-            </Field>
-            {fieldError ? <p className="error ui-zero">{fieldError}</p> : null}
-          </>
-        ) : null}
-
-        {step.kind === "review" ? (
-          <form action={formAction} className="pay-review">
-            <dl className="pay-review-list">
-              {fieldSteps(config.steps).map((field) => {
-                const raw = (values[field.name] ?? "").trim();
-                const display = field.secret
-                  ? maskValue(raw)
-                  : field.kind === "select"
-                    ? field.options?.find((option) => option.value === raw)?.label || raw
-                    : raw || (field.optional ? "Auto (first active location)" : "");
-                return (
-                  <div key={field.name}>
-                    <dt>{field.label}</dt>
-                    <dd>{display || "—"}</dd>
+          {step.kind === "field" ? (
+            <>
+              {step.link ? <LinkOutButton href={step.link.href}>{step.link.label}</LinkOutButton> : null}
+              {step.copy ? <CopyValue hint={step.copy.hint} label={step.copy.label} value={step.copy.value} /> : null}
+              {step.events ? (
+                <div className="pay-events">
+                  <span className="pay-copy-label">Select these events</span>
+                  <div className="pay-event-list">
+                    {step.events.map((event) => (
+                      <code key={event}>{event}</code>
+                    ))}
                   </div>
-                );
-              })}
-            </dl>
-            {fieldSteps(config.steps).map((field) => (
-              <input key={field.name} name={field.name} type="hidden" value={values[field.name] ?? ""} />
-            ))}
-            {state.status === "error" ? <p className="error ui-zero">{state.message}</p> : null}
-            <p className="pay-secure-note">
-              <ShieldCheck size={14} /> Verified live with {config.name}, then stored encrypted.
-            </p>
-            <Button aria-busy={pending} disabled={pending} type="submit">
-              {pending ? <Loader2 className="pay-spin" size={18} /> : <ShieldCheck size={18} />}
-              {pending ? `Verifying with ${config.name}…` : step.submitLabel}
-            </Button>
-          </form>
-        ) : null}
-      </div>
+                </div>
+              ) : null}
+              <Field hint={step.field.hint} label={step.field.label}>
+                {step.field.kind === "select" ? (
+                  <Select
+                    name={step.field.name}
+                    onChange={(event) => setValue(step.field.name, event.target.value)}
+                    value={values[step.field.name] ?? ""}>
+                    {step.field.options?.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <Input
+                    autoComplete="off"
+                    name={step.field.name}
+                    onChange={(event) => setValue(step.field.name, event.target.value)}
+                    placeholder={step.field.placeholder}
+                    type={step.field.kind === "password" ? "password" : "text"}
+                    value={values[step.field.name] ?? ""} />
+                )}
+              </Field>
+              {fieldError ? <p className="error ui-zero">{fieldError}</p> : null}
+            </>
+          ) : null}
 
-      {step.kind !== "review" || !connected ? (
-        <div className="pay-step-actions">
-          <Button disabled={stepIndex === 0} onClick={goBack} type="button" variant="secondary">
-            <ChevronLeft size={16} />
-            Back
-          </Button>
-          {step.kind !== "review" ? (
-            <Button onClick={goNext} type="button">
-              Continue
-              <ChevronRight size={16} />
-            </Button>
+          {step.kind === "review" ? (
+            <form action={formAction} className="pay-review">
+              <dl className="pay-review-list">
+                {fieldSteps(config.steps).map((field) => {
+                  const raw = (values[field.name] ?? "").trim();
+                  const display = field.secret
+                    ? maskValue(raw)
+                    : field.kind === "select"
+                      ? field.options?.find((option) => option.value === raw)?.label || raw
+                      : raw || (field.optional ? "Auto (first active location)" : "");
+                  return (
+                    <div key={field.name}>
+                      <dt>{field.label}</dt>
+                      <dd>{display || "—"}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+              {fieldSteps(config.steps).map((field) => (
+                <input key={field.name} name={field.name} type="hidden" value={values[field.name] ?? ""} />
+              ))}
+              {state.status === "error" ? <p className="error ui-zero">{state.message}</p> : null}
+              <p className="pay-secure-note">
+                <ShieldCheck size={14} /> Verified live with {config.name}, then stored encrypted.
+              </p>
+              <Button aria-busy={pending} disabled={pending} type="submit">
+                {pending ? <Loader2 className="pay-spin" size={18} /> : <ShieldCheck size={18} />}
+                {pending ? `Verifying with ${config.name}…` : step.submitLabel}
+              </Button>
+            </form>
           ) : null}
         </div>
-      ) : null}
-    </div>
+
+        {step.kind !== "review" || !connected ? (
+          <div className="pay-step-actions">
+            <Button disabled={stepIndex === 0} onClick={goBack} type="button" variant="secondary">
+              <ChevronLeft size={16} />
+              Back
+            </Button>
+            {step.kind !== "review" ? (
+              <Button onClick={goNext} type="button">
+                Continue
+                <ChevronRight size={16} />
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+
+  return (
+    <OnboardingModal
+      activeStepIndex={connected && isLast ? null : stepIndex}
+      completedStepIndex={connected && isLast ? stepCount - 1 : stepIndex - 1}
+      maxNavigableStepIndex={stepIndex}
+      onClose={onClose}
+      onStepSelect={connected ? undefined : goToStep}
+      open={open}
+      steps={modalSteps}
+      title={`Connect ${config.name}`}>
+      {body}
+    </OnboardingModal>
   );
 }

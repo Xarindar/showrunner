@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, CreditCard, Lock, Settings2, Wallet } from "lucide-react";
-import { Button } from "@/components/ui";
-import { buildConnectWizards, ConnectWizard, Modal, type WebhookUrls } from "./connect-wizard";
+import { Button, Modal } from "@/components/ui";
+import { buildConnectWizards, ConnectWizard, type WebhookUrls } from "./connect-wizard";
 import { CheckoutModal, ManageProviderModal, MethodsModal, type MethodOption } from "./manage-modals";
 
 type ProviderKey = "STRIPE" | "SQUARE" | "PAYPAL";
@@ -65,6 +65,7 @@ export function PaymentsWorkspace({ checkout, featuredConnected, methods, provid
 
   const manageProvider = active?.kind === "manage" ? providers.find((p) => p.provider === active.provider) : undefined;
   const connectConfig = active?.kind === "connect" ? wizards[active.provider] : undefined;
+  const simpleModalOpen = active !== null && active.kind !== "connect";
 
   const modalTitle =
     active?.kind === "connect"
@@ -253,10 +254,11 @@ export function PaymentsWorkspace({ checkout, featuredConnected, methods, provid
         ) : null}
       </section>
 
-      <Modal onClose={close} open={active !== null} title={modalTitle}>
-        {active?.kind === "connect" && connectConfig ? (
-          <ConnectWizard config={connectConfig} key={`connect-${active.provider}`} onClose={close} />
-        ) : null}
+      {active?.kind === "connect" && connectConfig ? (
+        <ConnectWizard config={connectConfig} key={`connect-${active.provider}`} onClose={close} open={true} />
+      ) : null}
+
+      <Modal className="pay-dialog" onClose={close} open={simpleModalOpen} title={modalTitle}>
         {active?.kind === "manage" && manageProvider ? (
           <ManageProviderModal
             detail={manageProvider.manageDetail}
