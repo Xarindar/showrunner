@@ -376,6 +376,9 @@ function rotateHue(hex: string, degrees: number) {
 
 export function themeToCssVars(input: { themePreset?: string | null; themePrimary?: string | null }): CSSProperties {
   const preset = withBrandOverride(themePresets[normalizeThemePreset(input.themePreset)], input.themePrimary);
+  const accentContrast = contrastRatio("#ffffff", preset.colors.accent) >= 4.5
+    ? "#ffffff"
+    : ensureContrast(preset.colors.text, preset.colors.accent, 4.5);
 
   return {
     "--color-page": preset.colors.page,
@@ -391,6 +394,9 @@ export function themeToCssVars(input: { themePreset?: string | null; themePrimar
     "--color-brand-border": `color-mix(in srgb, ${preset.colors.brand} 22%, transparent)`,
     "--color-admin-sidebar": `color-mix(in srgb, ${preset.colors.brandDark} 82%, ${preset.colors.text})`,
     "--color-accent": preset.colors.accent,
+    "--color-accent-soft": `color-mix(in srgb, ${preset.colors.accent} 18%, ${preset.colors.surface})`,
+    "--color-accent-border": `color-mix(in srgb, ${preset.colors.accent} 42%, ${preset.colors.border})`,
+    "--color-accent-contrast": accentContrast,
     "--color-danger": preset.colors.danger,
     "--color-success": preset.colors.success,
     "--color-hover": `color-mix(in srgb, ${preset.colors.surface} 86%, ${preset.colors.brand} 14%)`,

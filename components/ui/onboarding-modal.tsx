@@ -85,7 +85,7 @@ export function OnboardingModal({
                     aria-current={current ? "step" : undefined}
                     aria-label={`${step.title || step.label}${current ? ", current step" : complete ? ", completed" : ""}`}
                     className={cx(
-                      "ui-onboarding-step-button",
+                      "ui-onboarding-step-control",
                       current && "is-current",
                       complete && "is-complete",
                       !current && !complete && "is-pending"

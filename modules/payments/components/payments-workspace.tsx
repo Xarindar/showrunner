@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, CreditCard, Lock, Settings2, Wallet } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CreditCard, Lock, Settings2 } from "lucide-react";
 import { Button, Modal } from "@/components/ui";
+import { MethodMark, ProviderMark } from "./brand-marks";
 import { buildConnectWizards, ConnectWizard, type WebhookUrls } from "./connect-wizard";
 import { CheckoutModal, ManageProviderModal, MethodsModal, type MethodOption } from "./manage-modals";
 
@@ -37,12 +38,6 @@ type ActiveModal =
   | { kind: "methods" }
   | { kind: "checkout" }
   | null;
-
-function StatusBadge({ connected, needsAttention }: { connected: boolean; needsAttention: boolean }) {
-  if (connected && needsAttention) return <span className="ui-badge ui-badge-warning">Needs attention</span>;
-  if (connected) return <span className="ui-badge ui-badge-success">Connected</span>;
-  return <span className="ui-badge">Not set up</span>;
-}
 
 export function PaymentsWorkspace({ checkout, featuredConnected, methods, providers, webhooks }: PaymentsWorkspaceProps) {
   const [active, setActive] = useState<ActiveModal>(null);
@@ -107,10 +102,10 @@ export function PaymentsWorkspace({ checkout, featuredConnected, methods, provid
             </p>
             <div className="pay-chips">
               <span className={featuredConnected ? "pay-chip pay-chip-on" : "pay-chip pay-chip-locked"}>
-                {featuredConnected ? null : <Lock size={12} />} Cash App Pay
+                {featuredConnected ? <MethodMark methodKey="CASH_APP_PAY" size={14} /> : <Lock size={12} />} Cash App Pay
               </span>
               <span className={featuredConnected ? "pay-chip pay-chip-on" : "pay-chip pay-chip-locked"}>
-                {featuredConnected ? null : <Lock size={12} />} Affirm
+                {featuredConnected ? <MethodMark methodKey="AFFIRM" size={14} /> : <Lock size={12} />} Affirm
               </span>
             </div>
           </div>
@@ -126,48 +121,54 @@ export function PaymentsWorkspace({ checkout, featuredConnected, methods, provid
         )}
       </section>
 
-      {/* Provider cards ---------------------------------------------------- */}
+      {/* Payment providers ------------------------------------------------- */}
       <section className="form-grid">
-        <h2 className="compact-title">
-          <Wallet size={18} /> Payment accounts
-        </h2>
-        <div className="pay-grid">
+        <div className="module-toggle-main">
+          <span>
+            <strong>Payment Providers</strong>
+          </span>
+          <small>Pick a provider to set up — the whole tile is the button. You can connect more than one and choose which runs checkout below.</small>
+        </div>
+        <div className="pay-provider-row">
           {providers.map((provider) => (
-            <article className="pay-card" key={provider.provider}>
-              <div className="pay-card-head">
-                <span className="pay-card-icon">
-                  <CreditCard size={18} />
-                </span>
-                <div className="module-toggle-main">
-                  <span>
-                    <strong>{provider.name}</strong>
-                    {provider.recommended ? <span className="ui-badge">Recommended</span> : null}
-                    <StatusBadge connected={provider.connected} needsAttention={provider.needsAttention} />
-                  </span>
-                  <small>{provider.headline}</small>
-                </div>
-              </div>
-              <div className="pay-card-actions">
+            <button
+              className={[
+                "pay-provider-tile",
+                provider.connected ? "is-connected" : "",
+                provider.connected && provider.needsAttention ? "needs-attention" : ""
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              key={provider.provider}
+              onClick={() =>
+                setActive(
+                  provider.connected
+                    ? { kind: "manage", provider: provider.provider }
+                    : { kind: "connect", provider: provider.provider }
+                )
+              }
+              type="button">
+              {provider.recommended ? <span className="pay-provider-rec">Recommended</span> : null}
+              <span className="pay-provider-logo">
+                <ProviderMark provider={provider.provider} size={38} />
+              </span>
+              <span className="pay-provider-name">{provider.name}</span>
+              <span className="pay-provider-status">
                 {provider.connected ? (
-                  <>
-                    <Button onClick={() => setActive({ kind: "manage", provider: provider.provider })} type="button" variant="secondary">
-                      <Settings2 size={16} />
-                      Manage
-                    </Button>
-                    <Button onClick={() => setActive({ kind: "connect", provider: provider.provider })} type="button" variant="ghost">
-                      Replace credentials
-                    </Button>
-                  </>
+                  provider.needsAttention ? (
+                    <>
+                      <AlertTriangle size={13} /> Needs attention
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={13} /> Connected · Manage
+                    </>
+                  )
                 ) : (
-                  <Button
-                    onClick={() => setActive({ kind: "connect", provider: provider.provider })}
-                    type="button"
-                    variant={provider.recommended ? "primary" : "secondary"}>
-                    Set up {provider.name}
-                  </Button>
+                  "Click to set up"
                 )}
-              </div>
-            </article>
+              </span>
+            </button>
           ))}
         </div>
       </section>
@@ -192,6 +193,7 @@ export function PaymentsWorkspace({ checkout, featuredConnected, methods, provid
                 <span
                   className={methods.enabledKeys.includes(option.key) ? "pay-chip pay-chip-on" : "pay-chip"}
                   key={option.key}>
+                  <MethodMark methodKey={option.key} size={14} />
                   {option.label}
                 </span>
               ))}
@@ -265,6 +267,7 @@ export function PaymentsWorkspace({ checkout, featuredConnected, methods, provid
             key={`manage-${active.provider}`}
             name={manageProvider.name}
             onClose={close}
+            onReplace={() => setActive({ kind: "connect", provider: manageProvider.provider })}
             provider={manageProvider.provider} />
         ) : null}
         {active?.kind === "methods" ? (

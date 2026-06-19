@@ -1304,63 +1304,71 @@ button.button:disabled,
 }
 
 .ui-onboarding-rail {
-  background: color-mix(in srgb, var(--color-surface-sunken) 58%, var(--color-surface));
+  background: var(--color-surface-sunken);
   border-right: 1px solid var(--color-border);
   min-width: 0;
-  padding: clamp(18px, 2.4vw, 28px);
 }
 
 .ui-onboarding-steps {
   display: grid;
-  gap: var(--space-2);
+  grid-auto-rows: minmax(0, 1fr);
+  height: 100%;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
 .ui-onboarding-step-item {
+  border-bottom: 1px solid var(--color-border);
   min-width: 0;
 }
 
-.ui-onboarding-step-button {
+.ui-onboarding-step-item:last-child {
+  border-bottom: 0;
+}
+
+.ui-onboarding-step-control {
   align-items: center;
-  background: color-mix(in srgb, var(--color-surface) 78%, var(--color-surface-sunken));
-  border: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
-  border-radius: var(--radius-control);
+  background: transparent;
+  border: 0;
   color: var(--color-muted);
   cursor: pointer;
   display: flex;
   font-size: var(--type-small);
   font-weight: 720;
+  height: 100%;
   justify-content: center;
-  min-height: 42px;
-  padding: 0 var(--space-3);
+  min-height: 0;
+  padding: var(--space-3);
   transition:
     background-color var(--motion-fast) ease,
-    border-color var(--motion-fast) ease,
     color var(--motion-fast) ease;
   width: 100%;
 }
 
-.ui-onboarding-step-button:disabled {
+.ui-onboarding-step-control:disabled {
   cursor: not-allowed;
   opacity: 1;
 }
 
-.ui-onboarding-step-button.is-current {
-  background: color-mix(in srgb, var(--color-accent) 18%, var(--color-surface));
-  border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
-  color: color-mix(in srgb, var(--color-accent) 82%, var(--color-text));
+.ui-onboarding-step-control.is-current {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
 }
 
-.ui-onboarding-step-button.is-complete {
+.ui-onboarding-step-control.is-complete {
   background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: white;
+  color: var(--color-accent-contrast);
 }
 
-.ui-onboarding-step-button:not(:disabled):hover {
-  border-color: color-mix(in srgb, var(--color-accent) 62%, var(--color-border));
+.ui-onboarding-step-control:not(:disabled):hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.ui-onboarding-step-control.is-complete:not(:disabled):hover {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 
 .ui-onboarding-content {
@@ -1409,7 +1417,7 @@ button.button:disabled,
 }
 
 .ui-onboarding-close:hover {
-  background: color-mix(in srgb, var(--color-border) 42%, transparent);
+  background: var(--color-hover);
   color: var(--color-text);
 }
 
@@ -1433,25 +1441,29 @@ button.button:disabled,
   .ui-onboarding-rail {
     border-bottom: 1px solid var(--color-border);
     border-right: 0;
-    padding: var(--space-3);
   }
 
   .ui-onboarding-steps {
     display: flex;
-    gap: var(--space-2);
+    height: 64px;
     overflow-x: auto;
     scrollbar-gutter: stable;
   }
 
   .ui-onboarding-step-item {
-    flex: 0 0 auto;
+    border-bottom: 0;
+    border-right: 1px solid var(--color-border);
+    flex: 1 0 56px;
   }
 
-  .ui-onboarding-step-button {
-    min-height: 38px;
-    min-width: 50px;
+  .ui-onboarding-step-item:last-child {
+    border-right: 0;
+  }
+
+  .ui-onboarding-step-control {
+    min-height: 64px;
+    min-width: 0;
     padding: 0 var(--space-3);
-    width: auto;
   }
 
   .ui-onboarding-content {
@@ -4151,29 +4163,93 @@ button.button:disabled,
   vertical-align: -3px;
 }
 
-.pay-grid {
+.pay-provider-row {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
 }
 
-.pay-card {
+.pay-provider-tile {
+  align-items: center;
   background: color-mix(in srgb, var(--panel) 70%, var(--bg));
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
+  color: var(--ink);
+  cursor: pointer;
   display: grid;
-  gap: 14px;
-  padding: 14px;
+  gap: 8px;
+  justify-items: center;
+  min-height: 138px;
+  padding: 22px 16px;
+  position: relative;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.06s ease;
 }
 
-.pay-card-head {
-  align-items: flex-start;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: 32px minmax(0, 1fr);
+.pay-provider-tile:hover {
+  background: color-mix(in srgb, var(--panel) 88%, var(--bg));
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
 }
 
-.pay-card-icon,
+.pay-provider-tile:active {
+  transform: translateY(1px);
+}
+
+.pay-provider-tile:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, var(--line));
+  outline-offset: 2px;
+}
+
+.pay-provider-tile.is-connected {
+  border-color: color-mix(in srgb, var(--color-success) 40%, var(--line));
+}
+
+.pay-provider-tile.needs-attention {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--line));
+}
+
+.pay-provider-logo {
+  align-items: center;
+  color: var(--ink);
+  display: flex;
+  height: 44px;
+}
+
+.pay-provider-name {
+  font-size: 1.02rem;
+  font-weight: 650;
+}
+
+.pay-provider-status {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 560;
+  gap: 5px;
+}
+
+.pay-provider-tile.is-connected .pay-provider-status {
+  color: var(--color-success);
+}
+
+.pay-provider-tile.needs-attention .pay-provider-status {
+  color: color-mix(in srgb, var(--color-accent) 76%, black);
+}
+
+.pay-provider-rec {
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-radius: var(--radius-pill);
+  color: color-mix(in srgb, var(--accent) 80%, var(--ink));
+  font-size: 0.7rem;
+  font-weight: 650;
+  left: 8px;
+  padding: 2px 8px;
+  position: absolute;
+  top: 8px;
+}
+
 .pay-feature-icon {
   align-items: center;
   background: color-mix(in srgb, var(--panel) 60%, var(--bg));
@@ -4186,10 +4262,8 @@ button.button:disabled,
   width: 32px;
 }
 
-.pay-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.pay-chip svg {
+  flex: none;
 }
 
 /* Cash App Pay + Affirm gating banner */
@@ -4270,42 +4344,6 @@ button.button:disabled,
 .pay-wizard {
   display: grid;
   gap: 16px;
-}
-
-.pay-progress {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.pay-progress-dot {
-  align-items: center;
-  background: color-mix(in srgb, var(--panel) 70%, var(--bg));
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-  display: flex;
-  font-size: 0.78rem;
-  font-weight: 700;
-  height: 26px;
-  justify-content: center;
-  width: 26px;
-}
-
-.pay-progress-dot.current {
-  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
-  color: color-mix(in srgb, var(--accent) 80%, var(--ink));
-}
-
-.pay-progress-dot.done {
-  background: color-mix(in srgb, var(--color-success) 16%, var(--panel));
-  border-color: color-mix(in srgb, var(--color-success) 45%, var(--line));
-  color: var(--color-success);
 }
 
 .pay-progress-count {

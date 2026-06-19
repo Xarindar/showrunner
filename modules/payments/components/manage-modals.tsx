@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
-import { CreditCard, Loader2, RefreshCw, Unplug } from "lucide-react";
+import { CreditCard, KeyRound, Loader2, RefreshCw, Unplug } from "lucide-react";
 import { Button } from "@/components/ui";
+import { MethodMark } from "./brand-marks";
 import {
   disconnectProviderAction,
   initialPaymentActionState,
@@ -54,6 +55,7 @@ export function MethodsModal({
               <input defaultChecked={checked} name="stripePaymentMethods" type="checkbox" value={option.key} />
               <span className="module-toggle-main">
                 <span>
+                  <MethodMark methodKey={option.key} size={15} />
                   <strong>{option.label}</strong>
                   <span className="ui-badge">{option.type}</span>
                   {featuredMethodKeys.has(option.key) ? <span className="ui-badge ui-badge-success">Included</span> : null}
@@ -146,11 +148,13 @@ export function ManageProviderModal({
   detail,
   name,
   onClose,
+  onReplace,
   provider
 }: {
   detail: string;
   name: string;
   onClose: () => void;
+  onReplace?: () => void;
   provider: string;
 }) {
   const [recheckState, recheckAction, recheckPending] = useActionState(reverifyProviderAction, initialPaymentActionState);
@@ -174,6 +178,12 @@ export function ManageProviderModal({
       {disconnectState.status === "error" ? <p className="error ui-zero">{disconnectState.message}</p> : null}
 
       <div className="pay-step-actions">
+        {onReplace ? (
+          <Button onClick={onReplace} type="button" variant="secondary">
+            <KeyRound size={16} />
+            Replace credentials
+          </Button>
+        ) : null}
         <form action={recheckAction}>
           <input name="provider" type="hidden" value={provider} />
           <Button aria-busy={recheckPending} disabled={recheckPending} type="submit" variant="secondary">
