@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Star,
   Users,
+  Wallet,
   Workflow,
   type LucideIcon
 } from "lucide-react";
@@ -33,6 +34,7 @@ export const moduleIcons = {
   ShoppingBag,
   Star,
   Users,
+  Wallet,
   Workflow
 } satisfies Record<string, LucideIcon>;
 

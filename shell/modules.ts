@@ -11,6 +11,7 @@ import { manifest as dashboardModule } from "@/modules/dashboard/module";
 import { manifest as formsModule } from "@/modules/forms/module";
 import { manifest as helpModule } from "@/modules/help/module";
 import { manifest as mediaModule } from "@/modules/media/module";
+import { manifest as paymentsModule } from "@/modules/payments/module";
 import { manifest as portfolioModule } from "@/modules/portfolio/module";
 import { manifest as productsModule } from "@/modules/products/module";
 import { manifest as schedulingModule } from "@/modules/scheduling/module";
@@ -34,6 +35,7 @@ const registeredModules = [
   usersModule,
   helpModule,
   productsModule,
+  paymentsModule,
   communicationsModule,
   billingModule,
   automationModule,

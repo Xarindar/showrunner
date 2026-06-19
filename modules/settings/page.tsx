@@ -1,13 +1,9 @@
+import Link from "next/link";
 import { Save } from "lucide-react";
-import { PaymentGatewayConnectionStatus, PaymentProvider } from "@prisma/client";
 import { dataScopePresets, parseDataScopeConfig, requireAdmin, scopableModules } from "@/lib/auth";
 import { listSiteApiKeys } from "@/lib/embed/keys";
 import { EMBED_SCOPES } from "@/lib/embed/scopes";
-import { publicAppBaseUrl } from "@/lib/env";
 import { enumLabel } from "@/lib/format";
-import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
-import { getStripePaymentMethodSettings } from "@/lib/payments/methods";
-import { sanitizePaymentOnboardingError } from "@/lib/payments/onboarding-status";
 import { isRequiredModule } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
 import { getPlatformStatus, platformFoundationItems } from "@/lib/platform-status";
@@ -18,8 +14,7 @@ import {
   revokeSiteApiKeyAction,
   updateSettingsAction,
   updateSiteApiKeyOriginsAction } from "./actions";
-import { PaymentOnboarding } from "./components/payment-onboarding";
-import { Button, Card, EqualGrid } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -30,36 +25,10 @@ type SettingsPageProps = {
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   await requireAdmin("settings:update");
   const [{ saved, error }, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [platformStatus, stripePaymentMethods, squareCredential, paypalCredential, apiKeys] = await Promise.all([
-  getPlatformStatus(settings),
-  getStripePaymentMethodSettings(settings.siteId),
-  getConnectedGatewayCredential(settings.siteId, PaymentProvider.SQUARE),
-  getConnectedGatewayCredential(settings.siteId, PaymentProvider.PAYPAL),
-  listSiteApiKeys(settings.siteId)]
-  );
+  const [platformStatus, apiKeys] = await Promise.all([getPlatformStatus(settings), listSiteApiKeys(settings.siteId)]);
   const dataScopeConfig = parseDataScopeConfig(settings.dataScopeConfig);
   const dataScopeModules = scopableModules();
-  const stripeCredential = stripePaymentMethods.credential;
-  const stripeConnected = stripePaymentMethods.connected;
-  const squareConnected =
-    squareCredential?.status === PaymentGatewayConnectionStatus.CONNECTED &&
-    Boolean(squareCredential.merchantId || squareCredential.encryptedAccessToken);
-  const paypalConnected =
-    paypalCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(paypalCredential.externalAccountId);
-  const errorMessage = error ? sanitizePaymentOnboardingError(error) : "";
-  const selectedProviderDisconnected =
-    (settings.checkoutProvider === PaymentProvider.STRIPE && !stripeConnected) ||
-    (settings.checkoutProvider === PaymentProvider.SQUARE && !squareConnected) ||
-    (settings.checkoutProvider === PaymentProvider.PAYPAL && !paypalConnected);
-  const activeCheckoutProvider = selectedProviderDisconnected
-    ? stripeConnected
-      ? PaymentProvider.STRIPE
-      : squareConnected
-        ? PaymentProvider.SQUARE
-        : paypalConnected
-          ? PaymentProvider.PAYPAL
-          : undefined
-    : settings.checkoutProvider;
+  const errorMessage = error || "";
 
   return (
     <div className="stack">
@@ -89,21 +58,18 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </Card>
       </EqualGrid>
 
-      <PaymentOnboarding
-        checkout={{
-          activeProvider: activeCheckoutProvider,
-          selectedProviderDisconnected
-        }}
-        paypalCredential={paypalCredential}
-        publicBaseUrl={publicAppBaseUrl().replace(/\/$/, "")}
-        squareCredential={squareCredential}
-        stripeCredential={stripeCredential}
-        stripeMethods={{
-          applePayStatus: stripePaymentMethods.applePayDomain.status,
-          enabledKeys: stripePaymentMethods.enabledKeys,
-          options: stripePaymentMethods.options
-        }} />
-
+      <Card aria-label="Payments" as="section" minHeight="none" bodyClassName="form-grid">
+        <div>
+          <h2 className="compact-title">Payments</h2>
+          <p>
+            Connecting payment accounts and choosing how customers pay now lives in the dedicated{" "}
+            <Link href="/admin/modules/payments">Payments</Link> module, with a guided step-by-step setup.
+          </p>
+        </div>
+        <div>
+          <ButtonLink href="/admin/modules/payments">Open Payments</ButtonLink>
+        </div>
+      </Card>
 
       <Card action={updateSettingsAction} as="form" minHeight="none" bodyClassName="form-grid">
         <section className="subpanel form-grid">
