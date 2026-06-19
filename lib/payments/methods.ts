@@ -29,7 +29,7 @@ export const stripePaymentMethodOptions = [
     type: "wallet"
   },
   {
-    defaultEnabled: false,
+    defaultEnabled: true,
     key: "CASH_APP_PAY",
     label: "Cash App Pay",
     stripePaymentMethod: "cashapp",
@@ -43,7 +43,7 @@ export const stripePaymentMethodOptions = [
     type: "bnpl"
   },
   {
-    defaultEnabled: false,
+    defaultEnabled: true,
     key: "AFFIRM",
     label: "Affirm",
     stripePaymentMethod: "affirm",

@@ -1,4 +1,4 @@
-import { CreditCard, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { PaymentGatewayConnectionStatus, PaymentProvider } from "@prisma/client";
 import { dataScopePresets, parseDataScopeConfig, requireAdmin, scopableModules } from "@/lib/auth";
 import { listSiteApiKeys } from "@/lib/embed/keys";
@@ -15,11 +15,10 @@ import { normalizeThemePreset, themePresetOptions } from "@/lib/theme/tokens";
 import {
   createSiteApiKeyAction,
   revokeSiteApiKeyAction,
-  updateCheckoutProviderAction,
   updateSettingsAction,
-  updateSiteApiKeyOriginsAction,
-  updateStripePaymentMethodsAction } from "./actions";
-import { Button, ButtonAnchor, Card, EqualGrid } from "@/components/ui";
+  updateSiteApiKeyOriginsAction } from "./actions";
+import { PaymentOnboarding } from "./components/payment-onboarding";
+import { Button, Card, EqualGrid } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -47,29 +46,6 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   const stripeOnboarding = getPaymentOnboardingStatus(PaymentProvider.STRIPE);
   const squareOnboarding = getPaymentOnboardingStatus(PaymentProvider.SQUARE);
   const paypalOnboarding = getPaymentOnboardingStatus(PaymentProvider.PAYPAL);
-  const paymentConnectionRows = [
-    {
-      connected: stripeConnected,
-      href: "/api/payments/stripe/connect/start",
-      onboarding: stripeOnboarding,
-      reconnectLabel: "Reconnect Stripe",
-      variant: undefined
-    },
-    {
-      connected: squareConnected,
-      href: "/api/payments/square/connect/start",
-      onboarding: squareOnboarding,
-      reconnectLabel: "Reconnect Square",
-      variant: "secondary" as const
-    },
-    {
-      connected: paypalConnected,
-      href: "/api/payments/paypal/connect/start",
-      onboarding: paypalOnboarding,
-      reconnectLabel: "Reconnect PayPal",
-      variant: "secondary" as const
-    }
-  ];
   const selectedProviderDisconnected =
   settings.checkoutProvider === PaymentProvider.STRIPE && !stripeConnected ||
   settings.checkoutProvider === PaymentProvider.SQUARE && !squareConnected ||
@@ -78,7 +54,16 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   selectedProviderDisconnected ?
   stripeConnected ? PaymentProvider.STRIPE : squareConnected ? PaymentProvider.SQUARE : paypalConnected ? PaymentProvider.PAYPAL : undefined :
   settings.checkoutProvider;
-  const checkoutProviderConnected = stripeConnected || squareConnected || paypalConnected;
+  const squareAccountSummary = squareConnected
+    ? `Merchant ${squareCredential?.merchantId}${squareCredential?.displayName ? `, ${squareCredential.displayName}` : ""}`
+    : undefined;
+  const paypalAccountSummary = paypalConnected
+    ? `Merchant ${paypalCredential?.merchantId || paypalCredential?.displayName}`
+    : undefined;
+  const stripeAccountSummary =
+    stripeConnected && stripeCredential
+      ? `${stripeCredential.displayName || stripeCredential.externalAccountId} · ${stripeCredential.externalAccountId}`
+      : undefined;
 
   return (
     <div className="stack">
@@ -108,180 +93,33 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </Card>
       </EqualGrid>
 
-      <Card as="section" minHeight="none" bodyClassName="form-grid">
-        <EqualGrid>
-          <div>
-            <h2 className="compact-title">Payments</h2>
-            <p>Connect the client&apos;s payment account through a secure provider-hosted flow. No API keys are entered on this screen.</p>
-          </div>
-        </EqualGrid>
-        <div className="module-toggle-grid">
-          {paymentConnectionRows.map((row) => {
-            const connectLabel = row.connected ? row.reconnectLabel : `Connect ${row.onboarding.label}`;
+      <PaymentOnboarding
+        stripe={{
+          connected: stripeConnected,
+          ready: stripeOnboarding.ready,
+          statusLabel: stripeOnboarding.statusLabel,
+          accountSummary: stripeAccountSummary,
+          options: stripePaymentMethods.options,
+          enabledKeys: stripePaymentMethods.enabledKeys,
+          applePayStatus: stripePaymentMethods.applePayDomain.status
+        }}
+        square={{
+          connected: squareConnected,
+          ready: squareOnboarding.ready,
+          statusLabel: squareOnboarding.statusLabel,
+          accountSummary: squareAccountSummary
+        }}
+        paypal={{
+          connected: paypalConnected,
+          ready: paypalOnboarding.ready,
+          statusLabel: paypalOnboarding.statusLabel,
+          accountSummary: paypalAccountSummary
+        }}
+        checkout={{
+          activeProvider: activeCheckoutProvider,
+          selectedProviderDisconnected
+        }} />
 
-            return (
-              <div className="module-toggle-row" key={row.onboarding.provider}>
-                <CreditCard aria-hidden="true" size={18} />
-                <span className="module-toggle-main">
-                  <span>
-                    <strong>{row.onboarding.label}</strong>
-                    <span className={row.connected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>
-                      {row.connected ? "Connected" : "Not connected"}
-                    </span>
-                    <span className={row.onboarding.ready ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>
-                      {row.onboarding.statusLabel}
-                    </span>
-                  </span>
-                  <small>{row.onboarding.description}</small>
-                </span>
-                {row.onboarding.ready ?
-                <ButtonAnchor href={row.href} variant={row.variant}>
-                    <CreditCard size={18} />
-                    {connectLabel}
-                  </ButtonAnchor> :
-                <Button disabled type="button" variant={row.variant}>
-                    <CreditCard size={18} />
-                    Not enabled
-                  </Button>}
-              </div>);
-
-          })}
-        </div>
-        <form action={updateCheckoutProviderAction} className="subpanel form-grid">
-          <div>
-            <h3>Checkout provider</h3>
-            <p className="ui-zero">Choose which connected provider creates new public checkout sessions.</p>
-            {selectedProviderDisconnected ?
-            <p className="error ui-zero">
-                Connect a payment provider before using hosted public checkout.
-              </p> :
-            null}
-          </div>
-          <div className="module-toggle-grid">
-            <label className="module-toggle-row">
-              <input
-                disabled={!stripeConnected}
-                name="checkoutProvider"
-                type="radio"
-                value={PaymentProvider.STRIPE}
-                defaultChecked={activeCheckoutProvider === PaymentProvider.STRIPE} />
-              
-              <span className="module-toggle-main">
-                <span>
-                  <strong>Stripe</strong>
-                  <span className={stripeConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>
-                    {stripeConnected ? "Connected account" : stripeOnboarding.ready ? "Connect first" : "Not enabled"}
-                  </span>
-                </span>
-                <small>
-                  {stripeConnected ?
-                  "Hosted Stripe Checkout with connected-account settlement." :
-                  stripeOnboarding.ready ?
-                  "Connect Stripe above before using it for public checkout." :
-                  "Stripe is not enabled for this workspace yet."}
-                </small>
-              </span>
-            </label>
-            <label className="module-toggle-row">
-              <input
-                disabled={!squareConnected}
-                name="checkoutProvider"
-                type="radio"
-                value={PaymentProvider.SQUARE}
-                defaultChecked={activeCheckoutProvider === PaymentProvider.SQUARE} />
-              
-              <span className="module-toggle-main">
-                <span>
-                  <strong>Square</strong>
-                  <span className={squareConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>
-                    {squareConnected ? "Connected account" : squareOnboarding.ready ? "Connect first" : "Not enabled"}
-                  </span>
-                </span>
-                <small>
-                  {squareConnected ?
-                  `Merchant ${squareCredential?.merchantId}, location ${squareCredential?.displayName || "connected"}.` :
-                  squareOnboarding.ready ?
-                  "Connect Square before using it for public checkout." :
-                  "Square is not enabled for this workspace yet."}
-                </small>
-              </span>
-            </label>
-            <label className="module-toggle-row">
-              <input
-                disabled={!paypalConnected}
-                name="checkoutProvider"
-                type="radio"
-                value={PaymentProvider.PAYPAL}
-                defaultChecked={activeCheckoutProvider === PaymentProvider.PAYPAL} />
-              
-              <span className="module-toggle-main">
-                <span>
-                  <strong>PayPal</strong>
-                  <span className={paypalConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>
-                    {paypalConnected ? "Connected account" : paypalOnboarding.ready ? "Connect first" : "Not enabled"}
-                  </span>
-                </span>
-                <small>
-                  {paypalConnected ?
-                  `Merchant ${paypalCredential?.merchantId || paypalCredential?.displayName}.` :
-                  paypalOnboarding.ready ?
-                  "Connect PayPal before using it for public checkout." :
-                  "PayPal is not enabled for this workspace yet."}
-                </small>
-              </span>
-            </label>
-          </div>
-          <Button disabled={!checkoutProviderConnected} type="submit" variant="secondary">
-            <CreditCard size={18} />
-            Save checkout provider
-          </Button>
-        </form>
-        {stripeConnected ?
-        <>
-            <div className="subpanel">
-              <strong>{stripeCredential?.displayName || stripeCredential?.externalAccountId}</strong>
-              <small>Stripe account: {stripeCredential?.externalAccountId}</small>
-            </div>
-            <form action={updateStripePaymentMethodsAction} className="subpanel form-grid">
-              <div>
-                <h3>Checkout methods</h3>
-                <p className="ui-zero">Choose which Stripe-backed options can appear at checkout.</p>
-              </div>
-              <div className="module-toggle-grid">
-                {stripePaymentMethods.options.map((option) => {
-                const checked = stripePaymentMethods.enabledKeys.includes(option.key);
-                const applePayStatus =
-                option.key === "APPLE_PAY" && stripePaymentMethods.applePayDomain.status ?
-                stripePaymentMethods.applePayDomain.status :
-                "";
-
-                return (
-                  <label className="module-toggle-row" key={option.key}>
-                      <input name="stripePaymentMethods" type="checkbox" value={option.key} defaultChecked={checked} />
-                      <span className="module-toggle-main">
-                        <span>
-                          <strong>{option.label}</strong>
-                          <span className="ui-badge">{option.type}</span>
-                          {applePayStatus ? <span className={applePayStatus === "verified" ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{applePayStatus}</span> : null}
-                        </span>
-                        <small>
-                          {option.stripePaymentMethod === "card" ?
-                        "Card-backed Stripe Checkout method." :
-                        `Stripe Checkout payment_method_types: ${option.stripePaymentMethod}.`}
-                        </small>
-                      </span>
-                    </label>);
-
-              })}
-              </div>
-              <Button type="submit" variant="secondary">
-                <CreditCard size={18} />
-                Save payment methods
-              </Button>
-            </form>
-          </> :
-        null}
-      </Card>
 
       <Card action={updateSettingsAction} as="form" minHeight="none" bodyClassName="form-grid">
         <section className="subpanel form-grid">

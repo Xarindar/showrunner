@@ -44,6 +44,55 @@ function getStripe() {
   return stripeClient;
 }
 
+// Optional methods that can be enabled in onboarding but require the connected account to be eligible
+// (Stripe activates Cash App Pay, Affirm, and Klarna per account/region). Cards always stay available.
+const optionalStripeMethodTypes = ["cashapp", "affirm", "klarna"];
+
+function isStripePaymentMethodActivationError(error: unknown): boolean {
+  if (!(error instanceof Stripe.errors.StripeError)) return false;
+  if (error.type !== "StripeInvalidRequestError") return false;
+  const param = (error.param || "").toLowerCase();
+  const message = (error.message || "").toLowerCase();
+  return param.includes("payment_method_types") || message.includes("payment method type") || message.includes("payment_method_types");
+}
+
+// Drop any optional method the connected account cannot use yet, keeping card so checkout still works.
+// If the error names specific methods, drop only those; otherwise drop every optional method as a safe floor.
+function methodsWithoutUnavailable(methodTypes: string[] | undefined, errorMessage: string): string[] {
+  const requested = methodTypes && methodTypes.length ? methodTypes : ["card"];
+  const message = errorMessage.toLowerCase();
+  const named = requested.filter((type) => type === "card" || !message.includes(type));
+  const retained = named.length !== requested.length ? named : requested.filter((type) => !optionalStripeMethodTypes.includes(type));
+  return retained.length ? retained : ["card"];
+}
+
+// Create a hosted Checkout session, but never let an optional payment method the seller has not finished
+// activating (Affirm, Cash App Pay, Klarna) block the sale. Retry once with the usable methods.
+async function createResilientCheckoutSession(
+  params: Stripe.Checkout.SessionCreateParams,
+  requestOptions: Stripe.RequestOptions | undefined
+) {
+  try {
+    return await getStripe().checkout.sessions.create(params, requestOptions);
+  } catch (error) {
+    if (!isStripePaymentMethodActivationError(error)) throw error;
+
+    const requested = params.payment_method_types || [];
+    const fallback = methodsWithoutUnavailable(requested, error instanceof Error ? error.message : "");
+    if (fallback.length === requested.length) throw error;
+
+    console.warn("[payments:stripe-checkout-method-fallback]", {
+      fallback,
+      requested
+    });
+
+    return getStripe().checkout.sessions.create(
+      { ...params, payment_method_types: fallback as Stripe.Checkout.SessionCreateParams.PaymentMethodType[] },
+      requestOptions
+    );
+  }
+}
+
 function configuredStripeWallets(): PaymentWallet[] {
   return ["APPLE_PAY", "GOOGLE_PAY", "CASH_APP_PAY"];
 }
@@ -242,7 +291,7 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
   const metadata = stripeMetadata(orderForMetadata);
   const requestOptions = await stripeRequestOptions(order.siteId);
   const methodSelection = await resolveStripeCheckoutPaymentMethods(order.siteId);
-  const session = await getStripe().checkout.sessions.create({
+  const session = await createResilientCheckoutSession({
     client_reference_id: order.id,
     customer_email: order.customerEmail,
     line_items: stripeLineItems(order),
@@ -368,7 +417,7 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
   });
   const requestOptions = await stripeRequestOptions(result.document.siteId);
   const methodSelection = await resolveStripeCheckoutPaymentMethods(result.document.siteId);
-  const session = await getStripe().checkout.sessions.create({
+  const session = await createResilientCheckoutSession({
     client_reference_id: result.document.id,
     customer_email: result.document.customerEmail,
     line_items: stripeBillingLineItems({
