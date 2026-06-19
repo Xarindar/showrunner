@@ -13,8 +13,8 @@ import {
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
 import { getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
 import { publicAppBaseUrl } from "@/lib/env";
-import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
-import { createSquareConnectAuthorizeUrl, getSquareAccessToken, squareApiBaseUrl } from "@/lib/payments/square-connect";
+import { getConnectedGatewayCredential, getConnectedSquareWebhookSignatureKeys, getSquareAccessToken } from "@/lib/payments/credentials";
+import { squareApiBaseUrl } from "@/lib/payments/provider-onboarding";
 import type { PaymentGateway, PaymentGatewayCheckoutInput, PaymentWallet } from "@/lib/payments/types";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
@@ -87,12 +87,6 @@ function squareWebhookNotificationUrl() {
   return process.env.SQUARE_WEBHOOK_NOTIFICATION_URL || `${publicAppBaseUrl()}/api/webhooks/square`;
 }
 
-function requireSquareWebhookSignatureKey() {
-  const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY || "";
-  if (!signatureKey) throw new Error("SQUARE_WEBHOOK_SIGNATURE_KEY is required to verify Square webhooks.");
-  return signatureKey;
-}
-
 function assertSquareCurrency(currency: string) {
   const safeCurrency = currency.trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(safeCurrency)) throw new Error("Currency is not supported by Square.");
@@ -111,14 +105,14 @@ function squareLocationId(credential: { metadata: Prisma.JsonValue }) {
 }
 
 async function squareFetch<T>(siteId: string, path: string, init: RequestInit = {}) {
-  const { accessToken } = await getSquareAccessToken(siteId);
+  const { accessToken, environment } = await getSquareAccessToken(siteId);
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   headers.set("Content-Type", "application/json");
   headers.set("Square-Version", process.env.SQUARE_API_VERSION || "2026-05-20");
   headers.set("Authorization", `Bearer ${accessToken}`);
 
-  const response = await fetch(`${squareApiBaseUrl()}${path}`, {
+  const response = await fetch(`${squareApiBaseUrl(environment)}${path}`, {
     ...init,
     headers
   });
@@ -423,15 +417,22 @@ export async function createSquareCheckoutSessionForBillingDocument(input: {
   };
 }
 
-export function constructSquareWebhookEvent(rawBody: string, signature: string | null) {
-  if (!signature) throw new Error("Missing x-square-hmacsha256-signature header.");
+function signatureMatches(signatureKey: string, rawBody: string, signature: string) {
   const expected = crypto
-    .createHmac("sha256", requireSquareWebhookSignatureKey())
+    .createHmac("sha256", signatureKey)
     .update(`${squareWebhookNotificationUrl()}${rawBody}`)
     .digest("base64");
   const expectedBuffer = Buffer.from(expected);
   const actualBuffer = Buffer.from(signature);
-  if (expectedBuffer.length !== actualBuffer.length || !crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
+  return expectedBuffer.length === actualBuffer.length && crypto.timingSafeEqual(expectedBuffer, actualBuffer);
+}
+
+export async function constructSquareWebhookEvent(rawBody: string, signature: string | null) {
+  if (!signature) throw new Error("Missing x-square-hmacsha256-signature header.");
+
+  const signatureKeys = [...(await getConnectedSquareWebhookSignatureKeys()), process.env.SQUARE_WEBHOOK_SIGNATURE_KEY || ""].filter(Boolean);
+  if (!signatureKeys.length) throw new Error("No Square webhook signature key is configured. Add it in Settings → Payments.");
+  if (!signatureKeys.some((key) => signatureMatches(key, rawBody, signature))) {
     throw new Error("Square webhook signature is invalid.");
   }
 
@@ -819,11 +820,6 @@ async function refundSquareGatewayPayment(input: { amountCents?: number; payment
 export const squarePaymentGateway: PaymentGateway = {
   provider: PaymentProvider.SQUARE,
   createCheckoutSession: createSquareGatewayCheckoutSession,
-  createOnboardingSession: async (siteId: string) => ({
-    provider: PaymentProvider.SQUARE,
-    status: "pending",
-    url: createSquareConnectAuthorizeUrl(siteId)
-  }),
   handleWebhookEvent: async (event: unknown) => handleSquareWebhookEvent(event as SquareWebhookEvent),
   refund: async (input) => refundSquareGatewayPayment(input),
   supportedWallets: async () => ["APPLE_PAY", "GOOGLE_PAY", "CASH_APP_PAY"] satisfies PaymentWallet[],

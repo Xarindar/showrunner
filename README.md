@@ -9,7 +9,7 @@ Showrunner is a reusable per-client website/admin template for service businesse
 - Native service appointment scheduling with multi-staff support
 - SMTP email outbox with worker processing and dev console fallback
 - Repo media by default, Cloudflare R2 uploads when configured
-- Stripe Checkout for hosted commerce payments, including per-site Stripe Connect and owner-controlled Stripe payment methods when configured
+- Hosted commerce payments on the owner's own Stripe / Square / PayPal accounts (bring-your-own-credentials, pasted in Settings → Payments), including owner-controlled Stripe payment methods
 - Request-resolved site boundary for tenant-owned data
 - Theme tokens with client-safe style presets
 
@@ -96,7 +96,7 @@ Analytics retention is drained by `npm run analytics:process`. Provision it as a
 
 Booking reminders are drained by `npm run booking-reminders:process`. Provision it as a separate scheduled worker as well.
 
-The payments platform is generalized behind `lib/payments/` so gateways can connect per site. The Stripe path supports per-site Stripe Connect credentials plus owner-controlled payment-method toggles for card-backed Apple Pay and Google Pay, Cash App Pay, Klarna, and Affirm. Apple Pay domain registration currently depends on the platform URL; each client's custom domain must be registered for reliable Apple Pay on owner domains.
+The payments platform is generalized behind `lib/payments/` so gateways can connect per site. Each deployment owner pastes their **own** Stripe / Square / PayPal credentials (and webhook secrets) in Settings → Payments; they are verified live, stored encrypted via `PAYMENT_CREDENTIAL_ENCRYPTION_KEY`, and used for direct charges on the owner's own account — there is no shared platform secret or OAuth Connect. Stripe adds owner-controlled payment-method toggles for card-backed Apple Pay and Google Pay, Cash App Pay, Klarna, and Affirm. See `docs/PAYMENTS_SETUP.md`. Apple Pay domain registration uses the deployment's public URL; each client's custom domain must be registered for reliable Apple Pay on owner domains.
 
 ## Scheduling
 

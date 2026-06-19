@@ -1,12 +1,12 @@
 import "server-only";
 
-import { OrderStatus, ProductStatus } from "@prisma/client";
+import { OrderStatus, PaymentGatewayConnectionStatus, ProductStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { warning, type ModuleHealthCheck } from "@/lib/platform-health";
 
 export const getHealth: ModuleHealthCheck = async ({ settings }) => {
   const warnings = [];
-  const [activeProductCount, pendingCheckoutCount] = await Promise.all([
+  const [activeProductCount, pendingCheckoutCount, connectedProviderCount] = await Promise.all([
     prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.ACTIVE } }),
     prisma.order.count({
       where: {
@@ -14,21 +14,22 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
         status: OrderStatus.PENDING,
         OR: [{ checkoutUrl: null }, { checkoutUrl: "" }]
       }
+    }),
+    prisma.paymentGatewayCredential.count({
+      where: { siteId: settings.siteId, status: PaymentGatewayConnectionStatus.CONNECTED }
     })
   ]);
 
-  if (activeProductCount > 0) {
-    if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
-      warnings.push(
-        warning(
-          "Stripe Checkout not configured",
-          "Storefront checkout needs STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET before live payment collection.",
-          "critical",
-          "products",
-          "/admin/modules/settings"
-        )
-      );
-    }
+  if (activeProductCount > 0 && connectedProviderCount === 0) {
+    warnings.push(
+      warning(
+        "No payment provider connected",
+        "Storefront checkout needs a connected payment account. Add your own Stripe (or Square/PayPal) credentials in Settings → Payments before live payment collection.",
+        "critical",
+        "products",
+        "/admin/modules/settings"
+      )
+    );
   }
 
   if (pendingCheckoutCount > 0) {

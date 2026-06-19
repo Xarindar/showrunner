@@ -11,6 +11,15 @@ import { createSiteApiKey, parseOriginsInput, revokeSiteApiKey, updateSiteApiKey
 import { normalizeScopes } from "@/lib/embed/scopes";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { updateStripePaymentMethodSettings } from "@/lib/payments/methods";
+import {
+  disconnectPaymentProvider,
+  reverifyPaymentProvider,
+  savePayPalCredentials,
+  saveSquareCredentials,
+  saveStripeCredentials,
+  type PayPalEnvironment,
+  type SquareEnvironment
+} from "@/lib/payments/provider-onboarding";
 import { normalizeModules } from "@/shell/modules";
 import { prisma } from "@/lib/prisma";
 import { resolveCurrentSite } from "@/lib/site";
@@ -273,4 +282,143 @@ export async function updateCheckoutProviderAction(formData: FormData) {
 
   revalidatePath("/", "layout");
   redirect("/admin/modules/settings?saved=payments");
+}
+
+function paymentProviderError(message: string): never {
+  redirect(`/admin/modules/settings?error=${encodeURIComponent(message)}`);
+}
+
+function paymentProviderSaved(): never {
+  revalidatePath("/", "layout");
+  redirect("/admin/modules/settings?saved=payments");
+}
+
+function parseConnectablePaymentProvider(value: FormDataEntryValue | null) {
+  const provider = String(value || "").trim().toUpperCase();
+  if (provider === PaymentProvider.STRIPE || provider === PaymentProvider.SQUARE || provider === PaymentProvider.PAYPAL) {
+    return provider as PaymentProvider;
+  }
+  throw new Error("Choose a supported payment provider.");
+}
+
+// Audit logging never records the pasted secret values themselves — only that a provider was connected.
+async function auditPaymentProvider(
+  user: Awaited<ReturnType<typeof requireAdmin>>,
+  siteId: string,
+  siteName: string,
+  action: string,
+  provider: PaymentProvider,
+  metadata: Record<string, unknown> = {}
+) {
+  await recordAuditLog({
+    action,
+    actor: user,
+    metadata: { provider, ...metadata },
+    siteId,
+    targetId: siteId,
+    targetLabel: siteName,
+    targetType: "payment_gateway"
+  });
+}
+
+export async function saveStripeCredentialsAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+
+  try {
+    const result = await saveStripeCredentials({
+      apiKey: String(formData.get("stripeApiKey") || ""),
+      siteId: site.id,
+      webhookSecret: String(formData.get("stripeWebhookSecret") || "")
+    });
+    await auditPaymentProvider(user, site.id, site.name, "settings.payment_provider.connected", PaymentProvider.STRIPE, {
+      keyMode: result.livemode ? "live" : "test"
+    });
+  } catch (error) {
+    paymentProviderError(error instanceof Error ? error.message : "Could not save Stripe credentials.");
+  }
+
+  paymentProviderSaved();
+}
+
+export async function saveSquareCredentialsAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+  const environment = (String(formData.get("squareEnvironment") || "production").toLowerCase() === "sandbox"
+    ? "sandbox"
+    : "production") as SquareEnvironment;
+
+  try {
+    await saveSquareCredentials({
+      accessToken: String(formData.get("squareAccessToken") || ""),
+      environment,
+      locationId: String(formData.get("squareLocationId") || ""),
+      siteId: site.id,
+      webhookSignatureKey: String(formData.get("squareWebhookSignatureKey") || "")
+    });
+    await auditPaymentProvider(user, site.id, site.name, "settings.payment_provider.connected", PaymentProvider.SQUARE, {
+      environment
+    });
+  } catch (error) {
+    paymentProviderError(error instanceof Error ? error.message : "Could not save Square credentials.");
+  }
+
+  paymentProviderSaved();
+}
+
+export async function savePayPalCredentialsAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+  const environment = (String(formData.get("paypalEnvironment") || "live").toLowerCase() === "sandbox"
+    ? "sandbox"
+    : "live") as PayPalEnvironment;
+
+  try {
+    await savePayPalCredentials({
+      clientId: String(formData.get("paypalClientId") || ""),
+      clientSecret: String(formData.get("paypalClientSecret") || ""),
+      environment,
+      siteId: site.id,
+      webhookId: String(formData.get("paypalWebhookId") || "")
+    });
+    await auditPaymentProvider(user, site.id, site.name, "settings.payment_provider.connected", PaymentProvider.PAYPAL, {
+      environment
+    });
+  } catch (error) {
+    paymentProviderError(error instanceof Error ? error.message : "Could not save PayPal credentials.");
+  }
+
+  paymentProviderSaved();
+}
+
+export async function disconnectPaymentProviderAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+
+  let provider: PaymentProvider;
+  try {
+    provider = parseConnectablePaymentProvider(formData.get("provider"));
+    await disconnectPaymentProvider({ provider, siteId: site.id });
+  } catch (error) {
+    paymentProviderError(error instanceof Error ? error.message : "Could not disconnect that provider.");
+  }
+
+  await auditPaymentProvider(user, site.id, site.name, "settings.payment_provider.disconnected", provider);
+  paymentProviderSaved();
+}
+
+export async function reverifyPaymentProviderAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+
+  let provider: PaymentProvider;
+  try {
+    provider = parseConnectablePaymentProvider(formData.get("provider"));
+    await reverifyPaymentProvider({ provider, siteId: site.id });
+  } catch (error) {
+    paymentProviderError(error instanceof Error ? error.message : "Could not re-check that provider.");
+  }
+
+  await auditPaymentProvider(user, site.id, site.name, "settings.payment_provider.reverified", provider);
+  paymentProviderSaved();
 }

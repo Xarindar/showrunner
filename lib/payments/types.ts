@@ -2,12 +2,6 @@ import type { PaymentProvider } from "@prisma/client";
 
 export type PaymentWallet = "APPLE_PAY" | "GOOGLE_PAY" | "CASH_APP_PAY";
 
-export type PaymentGatewayOnboardingResult = {
-  provider: PaymentProvider;
-  status: "unsupported" | "pending" | "connected";
-  url?: string;
-};
-
 export type PaymentGatewayCheckoutInput =
   | {
       kind: "order";
@@ -44,7 +38,6 @@ export type PaymentGatewayRefundInput = {
 export type PaymentGateway = {
   provider: PaymentProvider;
   createCheckoutSession(input: PaymentGatewayCheckoutInput): Promise<PaymentGatewayCheckoutSession>;
-  createOnboardingSession(siteId: string): Promise<PaymentGatewayOnboardingResult>;
   handleWebhookEvent(event: unknown): Promise<unknown>;
   refund(input: PaymentGatewayRefundInput): Promise<unknown>;
   supportedWallets(siteId?: string): Promise<PaymentWallet[]>;

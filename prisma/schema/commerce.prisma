@@ -394,6 +394,7 @@ model PaymentGatewayCredential {
   encryptedAccessToken  String                         @default("")
   encryptedRefreshToken String                         @default("")
   encryptedSecretKey    String                         @default("")
+  encryptedWebhookSecret String                        @default("")
   webhookSecretHint     String                         @default("")
   supportedWallets      Json                           @default("[]")
   metadata              Json                           @default("{}")

@@ -3,10 +3,11 @@ import { PaymentGatewayConnectionStatus, PaymentProvider } from "@prisma/client"
 import { dataScopePresets, parseDataScopeConfig, requireAdmin, scopableModules } from "@/lib/auth";
 import { listSiteApiKeys } from "@/lib/embed/keys";
 import { EMBED_SCOPES } from "@/lib/embed/scopes";
+import { publicAppBaseUrl } from "@/lib/env";
 import { enumLabel } from "@/lib/format";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { getStripePaymentMethodSettings } from "@/lib/payments/methods";
-import { getPaymentOnboardingStatus, sanitizePaymentOnboardingError } from "@/lib/payments/onboarding-status";
+import { sanitizePaymentOnboardingError } from "@/lib/payments/onboarding-status";
 import { isRequiredModule } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
 import { getPlatformStatus, platformFoundationItems } from "@/lib/platform-status";
@@ -40,30 +41,25 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   const dataScopeModules = scopableModules();
   const stripeCredential = stripePaymentMethods.credential;
   const stripeConnected = stripePaymentMethods.connected;
-  const squareConnected = squareCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(squareCredential.merchantId);
-  const paypalConnected = paypalCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(paypalCredential.merchantId);
+  const squareConnected =
+    squareCredential?.status === PaymentGatewayConnectionStatus.CONNECTED &&
+    Boolean(squareCredential.merchantId || squareCredential.encryptedAccessToken);
+  const paypalConnected =
+    paypalCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(paypalCredential.externalAccountId);
   const errorMessage = error ? sanitizePaymentOnboardingError(error) : "";
-  const stripeOnboarding = getPaymentOnboardingStatus(PaymentProvider.STRIPE);
-  const squareOnboarding = getPaymentOnboardingStatus(PaymentProvider.SQUARE);
-  const paypalOnboarding = getPaymentOnboardingStatus(PaymentProvider.PAYPAL);
   const selectedProviderDisconnected =
-  settings.checkoutProvider === PaymentProvider.STRIPE && !stripeConnected ||
-  settings.checkoutProvider === PaymentProvider.SQUARE && !squareConnected ||
-  settings.checkoutProvider === PaymentProvider.PAYPAL && !paypalConnected;
-  const activeCheckoutProvider =
-  selectedProviderDisconnected ?
-  stripeConnected ? PaymentProvider.STRIPE : squareConnected ? PaymentProvider.SQUARE : paypalConnected ? PaymentProvider.PAYPAL : undefined :
-  settings.checkoutProvider;
-  const squareAccountSummary = squareConnected
-    ? `Merchant ${squareCredential?.merchantId}${squareCredential?.displayName ? `, ${squareCredential.displayName}` : ""}`
-    : undefined;
-  const paypalAccountSummary = paypalConnected
-    ? `Merchant ${paypalCredential?.merchantId || paypalCredential?.displayName}`
-    : undefined;
-  const stripeAccountSummary =
-    stripeConnected && stripeCredential
-      ? `${stripeCredential.displayName || stripeCredential.externalAccountId} · ${stripeCredential.externalAccountId}`
-      : undefined;
+    (settings.checkoutProvider === PaymentProvider.STRIPE && !stripeConnected) ||
+    (settings.checkoutProvider === PaymentProvider.SQUARE && !squareConnected) ||
+    (settings.checkoutProvider === PaymentProvider.PAYPAL && !paypalConnected);
+  const activeCheckoutProvider = selectedProviderDisconnected
+    ? stripeConnected
+      ? PaymentProvider.STRIPE
+      : squareConnected
+        ? PaymentProvider.SQUARE
+        : paypalConnected
+          ? PaymentProvider.PAYPAL
+          : undefined
+    : settings.checkoutProvider;
 
   return (
     <div className="stack">
@@ -94,30 +90,18 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       </EqualGrid>
 
       <PaymentOnboarding
-        stripe={{
-          connected: stripeConnected,
-          ready: stripeOnboarding.ready,
-          statusLabel: stripeOnboarding.statusLabel,
-          accountSummary: stripeAccountSummary,
-          options: stripePaymentMethods.options,
-          enabledKeys: stripePaymentMethods.enabledKeys,
-          applePayStatus: stripePaymentMethods.applePayDomain.status
-        }}
-        square={{
-          connected: squareConnected,
-          ready: squareOnboarding.ready,
-          statusLabel: squareOnboarding.statusLabel,
-          accountSummary: squareAccountSummary
-        }}
-        paypal={{
-          connected: paypalConnected,
-          ready: paypalOnboarding.ready,
-          statusLabel: paypalOnboarding.statusLabel,
-          accountSummary: paypalAccountSummary
-        }}
         checkout={{
           activeProvider: activeCheckoutProvider,
           selectedProviderDisconnected
+        }}
+        paypalCredential={paypalCredential}
+        publicBaseUrl={publicAppBaseUrl().replace(/\/$/, "")}
+        squareCredential={squareCredential}
+        stripeCredential={stripeCredential}
+        stripeMethods={{
+          applePayStatus: stripePaymentMethods.applePayDomain.status,
+          enabledKeys: stripePaymentMethods.enabledKeys,
+          options: stripePaymentMethods.options
         }} />
 
 

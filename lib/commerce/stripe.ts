@@ -13,35 +13,31 @@ import Stripe from "stripe";
 import { getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
 import { publicAppBaseUrl } from "@/lib/env";
-import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
+import { getConnectedGatewayCredential, getConnectedStripeWebhookSecrets, getStripeApiKeyForSite } from "@/lib/payments/credentials";
 import { resolveStripeCheckoutPaymentMethods } from "@/lib/payments/methods";
-import { createStripeConnectAuthorizeUrl } from "@/lib/payments/stripe-connect";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
 import type { PaymentGateway, PaymentGatewayCheckoutInput, PaymentWallet } from "@/lib/payments/types";
 import { updateOrderStatus } from "./orders";
 
-let stripeClient: Stripe | null = null;
 const STRIPE_EVENT_STALE_PROCESSING_MS = 5 * 60 * 1000;
 
-function requireStripeSecretKey() {
-  const secretKey = process.env.STRIPE_SECRET_KEY || "";
-  if (!secretKey) throw new Error("STRIPE_SECRET_KEY is required to create Stripe Checkout sessions.");
-  return secretKey;
-}
-
-function requireStripeWebhookSecret() {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
-  if (!webhookSecret) throw new Error("STRIPE_WEBHOOK_SECRET is required to verify Stripe webhooks.");
-  return webhookSecret;
-}
-
-function getStripe() {
-  if (!stripeClient) {
-    stripeClient = new Stripe(requireStripeSecretKey());
+// Build a Stripe client from the merchant's own pasted secret key for this site (direct-charge model:
+// no Connect, no stripeAccount). Falls back to a STRIPE_SECRET_KEY env var for Cosmic-hosted demos,
+// and throws a clear setup message if neither is configured.
+async function getStripeForSite(siteId?: string) {
+  const apiKey = (siteId ? await getStripeApiKeyForSite(siteId) : "") || process.env.STRIPE_SECRET_KEY || "";
+  if (!apiKey) {
+    throw new Error("Connect Stripe in Settings → Payments before creating Stripe Checkout.");
   }
 
-  return stripeClient;
+  return new Stripe(apiKey);
+}
+
+// Webhook signature verification needs the signing secret only, not a live API key, so a placeholder
+// client is fine here — constructEvent is pure crypto over the raw body.
+function stripeWebhookClient() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY || "sk_webhook_verify_placeholder");
 }
 
 // Optional methods that can be enabled in onboarding but require the connected account to be eligible
@@ -68,12 +64,9 @@ function methodsWithoutUnavailable(methodTypes: string[] | undefined, errorMessa
 
 // Create a hosted Checkout session, but never let an optional payment method the seller has not finished
 // activating (Affirm, Cash App Pay, Klarna) block the sale. Retry once with the usable methods.
-async function createResilientCheckoutSession(
-  params: Stripe.Checkout.SessionCreateParams,
-  requestOptions: Stripe.RequestOptions | undefined
-) {
+async function createResilientCheckoutSession(stripe: Stripe, params: Stripe.Checkout.SessionCreateParams) {
   try {
-    return await getStripe().checkout.sessions.create(params, requestOptions);
+    return await stripe.checkout.sessions.create(params);
   } catch (error) {
     if (!isStripePaymentMethodActivationError(error)) throw error;
 
@@ -86,10 +79,10 @@ async function createResilientCheckoutSession(
       requested
     });
 
-    return getStripe().checkout.sessions.create(
-      { ...params, payment_method_types: fallback as Stripe.Checkout.SessionCreateParams.PaymentMethodType[] },
-      requestOptions
-    );
+    return stripe.checkout.sessions.create({
+      ...params,
+      payment_method_types: fallback as Stripe.Checkout.SessionCreateParams.PaymentMethodType[]
+    });
   }
 }
 
@@ -102,18 +95,6 @@ function parseConnectedWallets(value: Prisma.JsonValue): PaymentWallet[] {
   const supported = new Set(configuredStripeWallets());
   const wallets = value.filter((item): item is PaymentWallet => typeof item === "string" && supported.has(item as PaymentWallet));
   return wallets.length ? wallets : configuredStripeWallets();
-}
-
-async function getStripeConnectedAccountId(siteId?: string) {
-  if (!siteId) return "";
-  const credential = await getConnectedGatewayCredential(siteId, PaymentProvider.STRIPE);
-  if (credential?.status !== PaymentGatewayConnectionStatus.CONNECTED) return "";
-  return credential.externalAccountId.trim();
-}
-
-async function stripeRequestOptions(siteId?: string): Promise<Stripe.RequestOptions | undefined> {
-  const stripeAccount = await getStripeConnectedAccountId(siteId);
-  return stripeAccount ? { stripeAccount } : undefined;
 }
 
 function stripeMetadata(order: {
@@ -289,9 +270,9 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
     payments: [payment]
   };
   const metadata = stripeMetadata(orderForMetadata);
-  const requestOptions = await stripeRequestOptions(order.siteId);
+  const stripe = await getStripeForSite(order.siteId);
   const methodSelection = await resolveStripeCheckoutPaymentMethods(order.siteId);
-  const session = await createResilientCheckoutSession({
+  const session = await createResilientCheckoutSession(stripe, {
     client_reference_id: order.id,
     customer_email: order.customerEmail,
     line_items: stripeLineItems(order),
@@ -303,7 +284,7 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
     },
     success_url: publicOrderUrl(order.orderNumber, "success"),
     cancel_url: publicOrderUrl(order.orderNumber, "cancel")
-  }, requestOptions);
+  });
 
   if (!session.url) throw new Error("Stripe did not return a hosted Checkout URL.");
 
@@ -311,7 +292,6 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
     strategy: "stripe_checkout",
     checkoutSession: {
       amountTotal: session.amount_total,
-      connectedAccount: requestOptions?.stripeAccount || "",
       currency: session.currency,
       id: session.id,
       livemode: session.livemode,
@@ -415,9 +395,9 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
     documentNumber: result.document.documentNumber,
     siteId: result.document.siteId
   });
-  const requestOptions = await stripeRequestOptions(result.document.siteId);
+  const stripe = await getStripeForSite(result.document.siteId);
   const methodSelection = await resolveStripeCheckoutPaymentMethods(result.document.siteId);
-  const session = await createResilientCheckoutSession({
+  const session = await createResilientCheckoutSession(stripe, {
     client_reference_id: result.document.id,
     customer_email: result.document.customerEmail,
     line_items: stripeBillingLineItems({
@@ -433,7 +413,7 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
     },
     success_url: publicBillingUrl(result.document.publicAccessToken, "success"),
     cancel_url: publicBillingUrl(result.document.publicAccessToken, "cancel")
-  }, requestOptions);
+  });
 
   if (!session.url) throw new Error("Stripe did not return a hosted Checkout URL.");
 
@@ -441,7 +421,6 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
     strategy: "stripe_checkout_billing_document",
     checkoutSession: {
       amountTotal: session.amount_total,
-      connectedAccount: requestOptions?.stripeAccount || "",
       currency: session.currency,
       id: session.id,
       livemode: session.livemode,
@@ -479,9 +458,23 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
   };
 }
 
-export function constructStripeWebhookEvent(rawBody: string, signature: string | null) {
+export async function constructStripeWebhookEvent(rawBody: string, signature: string | null) {
   if (!signature) throw new Error("Missing Stripe-Signature header.");
-  return getStripe().webhooks.constructEvent(rawBody, signature, requireStripeWebhookSecret());
+
+  const secrets = [...(await getConnectedStripeWebhookSecrets()), process.env.STRIPE_WEBHOOK_SECRET || ""].filter(Boolean);
+  if (!secrets.length) throw new Error("No Stripe webhook signing secret is configured. Add it in Settings → Payments.");
+
+  const client = stripeWebhookClient();
+  let lastError: unknown;
+  for (const secret of secrets) {
+    try {
+      return client.webhooks.constructEvent(rawBody, signature, secret);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Stripe webhook signature is invalid.");
 }
 
 function stripeEventSummary(event: Stripe.Event): Prisma.InputJsonObject {
@@ -969,13 +962,11 @@ async function refundStripeGatewayPayment(input: { amountCents?: number; payment
 
   if (payment) {
     if (!payment.externalPaymentId) throw new Error("Stripe payment intent is missing for this order payment.");
-    const refund = await getStripe().refunds.create(
-      {
-        amount: input.amountCents,
-        payment_intent: payment.externalPaymentId
-      },
-      await stripeRequestOptions(payment.order.siteId)
-    );
+    const stripe = await getStripeForSite(payment.order.siteId);
+    const refund = await stripe.refunds.create({
+      amount: input.amountCents,
+      payment_intent: payment.externalPaymentId
+    });
     const isFullRefund = !input.amountCents || input.amountCents >= payment.amountCents;
 
     await prisma.payment.update({
@@ -1019,13 +1010,11 @@ async function refundStripeGatewayPayment(input: { amountCents?: number; payment
   if (!billingPayment) throw new Error("Stripe payment record not found for refund.");
   if (!billingPayment.externalPaymentId) throw new Error("Stripe payment intent is missing for this billing payment.");
 
-  const refund = await getStripe().refunds.create(
-    {
-      amount: input.amountCents,
-      payment_intent: billingPayment.externalPaymentId
-    },
-    await stripeRequestOptions(billingPayment.billingDocument.siteId)
-  );
+  const stripe = await getStripeForSite(billingPayment.billingDocument.siteId);
+  const refund = await stripe.refunds.create({
+    amount: input.amountCents,
+    payment_intent: billingPayment.externalPaymentId
+  });
   const isFullRefund = !input.amountCents || input.amountCents >= billingPayment.amountCents;
 
   await prisma.billingPayment.update({
@@ -1050,11 +1039,6 @@ async function refundStripeGatewayPayment(input: { amountCents?: number; payment
 export const stripePaymentGateway: PaymentGateway = {
   provider: PaymentProvider.STRIPE,
   createCheckoutSession: createStripeGatewayCheckoutSession,
-  createOnboardingSession: async (siteId: string) => ({
-    provider: PaymentProvider.STRIPE,
-    status: "pending",
-    url: await createStripeConnectAuthorizeUrl(siteId)
-  }),
   handleWebhookEvent: async (event: unknown) => handleStripeWebhookEvent(event as Stripe.Event),
   refund: async (input) => {
     return refundStripeGatewayPayment(input);

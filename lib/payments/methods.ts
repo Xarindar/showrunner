@@ -3,7 +3,7 @@ import "server-only";
 import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
 import Stripe from "stripe";
 import { publicAppBaseUrl } from "@/lib/env";
-import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
+import { getConnectedGatewayCredential, getStripeApiKeyForSite } from "@/lib/payments/credentials";
 import { prisma } from "@/lib/prisma";
 
 export const stripePaymentMethodOptions = [
@@ -76,14 +76,10 @@ type PaymentCredentialMetadata = Prisma.JsonObject & {
   paymentMethods?: StripePaymentMethodsMetadata;
 };
 
-function requireStripeSecretKey() {
-  const secretKey = process.env.STRIPE_SECRET_KEY || "";
-  if (!secretKey) throw new Error("STRIPE_SECRET_KEY is required to verify Stripe payment methods.");
-  return secretKey;
-}
-
-function getStripe() {
-  return new Stripe(requireStripeSecretKey());
+async function getStripeForSite(siteId: string) {
+  const apiKey = (await getStripeApiKeyForSite(siteId)) || process.env.STRIPE_SECRET_KEY || "";
+  if (!apiKey) throw new Error("Connect Stripe before verifying Stripe payment methods.");
+  return new Stripe(apiKey);
 }
 
 function appHostname() {
@@ -177,7 +173,8 @@ export async function verifyStripeApplePayDomain(siteId: string) {
   }
 
   try {
-    await getStripe().applePayDomains.create({ domain_name: domain }, { stripeAccount: credential.externalAccountId });
+    const stripe = await getStripeForSite(siteId);
+    await stripe.applePayDomains.create({ domain_name: domain });
     await saveApplePayDomainStatus({
       credentialId: credential.id,
       metadata,
