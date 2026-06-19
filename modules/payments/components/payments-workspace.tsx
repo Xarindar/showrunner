@@ -122,7 +122,7 @@ export function PaymentsWorkspace({ checkout, featuredConnected, methods, provid
       </section>
 
       {/* Payment providers ------------------------------------------------- */}
-      <section className="form-grid">
+      <section className="subpanel form-grid pay-provider-panel">
         <div className="module-toggle-main">
           <span>
             <strong>Payment Providers</strong>
