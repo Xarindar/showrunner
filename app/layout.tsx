@@ -6,6 +6,7 @@ import { PublicAnalyticsBootstrap } from "@/components/analytics/tracker";
 import { getPublicAnalyticsConfig } from "@/lib/analytics/config";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
+import "@react-email/editor/themes/default.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

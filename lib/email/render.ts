@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { isReactEmailBuilderDocument } from "@/lib/email-builder/document";
 import { renderEmailBuilderHtml } from "@/lib/email-builder/render";
 import { stringArrayFromUnknown } from "@/lib/format";
 import { sanitizeEmailHtml } from "./sanitize";
@@ -11,6 +12,7 @@ type StoredTemplate = {
   htmlBody: string;
   textBody: string;
   builderJson?: Prisma.JsonValue;
+  builderRenderer?: string;
   requiredTokens: Prisma.JsonValue;
 };
 
@@ -72,7 +74,9 @@ export async function renderEmailTemplate(template: StoredTemplate, tokens: Emai
 
   const textSource = template.textBody || template.body;
   const htmlSource = hasBuilderJson(template.builderJson)
-    ? await renderEmailBuilderHtml(template.builderJson)
+    ? isReactEmailBuilderDocument(template.builderJson)
+      ? template.htmlBody || textToHtml(textSource)
+      : await renderEmailBuilderHtml(template.builderJson)
     : template.htmlBody || textToHtml(textSource);
 
   return {

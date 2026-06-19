@@ -14,10 +14,20 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { csvList, optionalEmailStored, optionalStoredText, parseForm, requiredText } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
-import { extractEmailBuilderTokens, normalizeEmailBuilderDocument } from "@/lib/email-builder/document";
+import {
+  REACT_EMAIL_BUILDER_RENDERER,
+  type EmailBuilderDocument,
+  type ReactEmailBuilderDocument,
+  extractEmailBuilderTokens,
+  extractReactEmailBuilderTokens,
+  isReactEmailBuilderDocument,
+  normalizeEmailBuilderDocument,
+  normalizeReactEmailBuilderDocument
+} from "@/lib/email-builder/document";
 import { renderEmailBuilderHtml } from "@/lib/email-builder/render";
 import { queueTemplateTestEmail } from "@/lib/email";
 import { extractEmailTemplateTokens, hasBuilderJson } from "@/lib/email/render";
+import { sanitizeEmailHtml } from "@/lib/email/sanitize";
 import { stringArrayFromUnknown } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -53,6 +63,7 @@ const builderTemplateSettingsSchema = z.object({
   subject: requiredText,
   previewText: optionalStoredText,
   textBody: requiredText,
+  htmlBody: requiredText,
   builderJson: requiredText,
   senderIdentityId: optionalStoredText
 });
@@ -343,24 +354,36 @@ export async function updateMessageTemplateBuilderAction(formData: FormData) {
 
   await requireVerifiedSender(input.senderIdentityId, settings.siteId);
 
-  let builderDocument;
+  let builderDocument: EmailBuilderDocument | ReactEmailBuilderDocument;
+  let builderRenderer = "first_party_v1";
+  let renderedBuilderHtml = "";
   try {
-    builderDocument = normalizeEmailBuilderDocument(input.builderJson);
+    const parsedBuilderJson = JSON.parse(input.builderJson);
+    if (isReactEmailBuilderDocument(parsedBuilderJson)) {
+      builderDocument = normalizeReactEmailBuilderDocument(parsedBuilderJson);
+      builderRenderer = REACT_EMAIL_BUILDER_RENDERER;
+      renderedBuilderHtml = sanitizeEmailHtml(input.htmlBody);
+    } else {
+      builderDocument = normalizeEmailBuilderDocument(parsedBuilderJson);
+      renderedBuilderHtml = await renderEmailBuilderHtml(builderDocument);
+    }
   } catch {
     communicationsError("Builder JSON is invalid.");
   }
 
-  const renderedBuilderHtml = await renderEmailBuilderHtml(builderDocument);
   if (!renderedBuilderHtml) {
     communicationsError("The visual builder must contain at least one renderable block.");
   }
 
   const { allowedTokens, requiredTokens } = templateAllowedTokens(template);
+  const builderTokens = isReactEmailBuilderDocument(builderDocument)
+    ? [...extractReactEmailBuilderTokens(builderDocument), ...extractEmailTemplateTokens(renderedBuilderHtml)]
+    : extractEmailBuilderTokens(builderDocument);
   const usedTokens = new Set([
     ...extractEmailTemplateTokens(input.subject),
     ...extractEmailTemplateTokens(input.previewText),
     ...extractEmailTemplateTokens(input.textBody),
-    ...extractEmailBuilderTokens(builderDocument)
+    ...builderTokens
   ]);
   assertTemplateTokens({ allowedTokens, requiredTokens, usedTokens });
 
@@ -373,8 +396,8 @@ export async function updateMessageTemplateBuilderAction(formData: FormData) {
       previewText: input.previewText,
       textBody: input.textBody,
       htmlBody: renderedBuilderHtml,
-      builderJson: builderDocument,
-      builderRenderer: "first_party_v1",
+      builderJson: JSON.parse(JSON.stringify(builderDocument)) as Prisma.InputJsonValue,
+      builderRenderer,
       senderIdentityId: input.senderIdentityId || null,
       version: { increment: 1 }
     }
@@ -495,8 +518,17 @@ export async function restoreMessageTemplateVersionAction(formData: FormData) {
     ...extractEmailTemplateTokens(version.textBody)
   ]);
   if (hasBuilderJson(version.builderJson)) {
-    for (const token of extractEmailBuilderTokens(normalizeEmailBuilderDocument(version.builderJson))) {
-      restoredUsedTokens.add(token);
+    if (isReactEmailBuilderDocument(version.builderJson)) {
+      for (const token of extractReactEmailBuilderTokens(normalizeReactEmailBuilderDocument(version.builderJson))) {
+        restoredUsedTokens.add(token);
+      }
+      for (const token of extractEmailTemplateTokens(version.htmlBody)) {
+        restoredUsedTokens.add(token);
+      }
+    } else {
+      for (const token of extractEmailBuilderTokens(normalizeEmailBuilderDocument(version.builderJson))) {
+        restoredUsedTokens.add(token);
+      }
     }
   } else {
     for (const token of extractEmailTemplateTokens(version.htmlBody)) {

@@ -5,7 +5,7 @@ import {
   MessageChannel,
   MessageLogStatus,
   MessageTemplatePurpose } from "@prisma/client";
-import { Copy, Mail, MessageSquareText, Plus, RotateCcw, Save, ShieldOff } from "lucide-react";
+import { Copy, Mail, MessageSquareText, Plus, RotateCcw, ShieldOff } from "lucide-react";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { hasBuilderJson, renderEmailTemplate } from "@/lib/email/render";
@@ -274,60 +274,44 @@ export default async function CommunicationsPage({ searchParams }: Communication
         </Card>
       </EqualGrid>
 
-      <EqualGrid as="section">
-        <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Visual email builder</h2>
-          <p>
-            The single editor for every email — booking, order, invoice, form, and admin notifications. Build the HTML from structured blocks
-            while keeping a required text fallback, with version history per template.
-          </p>
-          {emailTemplates.map((template, index) => {
+      <section className="email-builder-launchpad" aria-labelledby="email-builder-heading">
+        <div className="email-builder-launchpad-header">
+          <div>
+            <h2 className="section-title" id="email-builder-heading">Visual email playground</h2>
+            <p>
+              Open any email in a full-screen builder with blocks, text tools, token insertion, preview, and text fallback.
+            </p>
+          </div>
+          <span className="ui-badge">{emailTemplates.length} email templates</span>
+        </div>
+        <div className="email-template-launcher-list">
+          {emailTemplates.map((template) => {
             const requiredTokens = stringArrayFromUnknown(template.requiredTokens);
             const availableTokens = [
             ...new Set([...requiredTokens, ...stringArrayFromUnknown(template.optionalTokens), ...stringArrayFromUnknown(template.tokens)])];
 
 
             return (
-              <details className="subpanel" key={template.id} open={index === 0}>
-                <summary className="ui-zero">
-                  <span>
-                    <strong>{template.name}</strong>
-                    <br />
-                    <small className="muted-text">{template.key || enumLabel(template.purpose)}</small>
-                  </span>
-                  <span className={hasBuilderJson(template.builderJson) ? "ui-badge ui-badge-success" : "ui-badge"}>
-                    {hasBuilderJson(template.builderJson) ? "builder" : "text"}
-                  </span>
-                </summary>
-                <form action={updateMessageTemplateBuilderAction} className="form-grid ui-zero">
-                  <input type="hidden" name="id" value={template.id} />
-                  <div className="ui-field">
-                    <label htmlFor={`builder-template-sender-${template.id}`}>Sender</label>
-                    <select id={`builder-template-sender-${template.id}`} name="senderIdentityId" defaultValue={template.senderIdentityId || ""}>
-                      <option value="">Default sender</option>
-                      {verifiedSenderIdentities.map((sender) =>
-                      <option key={sender.id} value={sender.id}>
-                          {sender.name} &lt;{sender.fromEmail}&gt;
-                        </option>
-                      )}
-                    </select>
-                  </div>
+              <div className="email-template-launcher-item" key={template.id}>
                   <EmailTemplateBuilder
                     availableTokens={availableTokens}
                     builderJson={template.builderJson}
+                    htmlBody={template.htmlBody}
+                    id={template.id}
                     idPrefix={`builder-${template.id}`}
+                    isBuilderTemplate={hasBuilderJson(template.builderJson)}
                     previewText={template.previewText}
+                    purposeLabel={enumLabel(template.purpose)}
                     requiredTokens={requiredTokens}
+                    selectedSenderIdentityId={template.senderIdentityId}
+                    senderIdentities={verifiedSenderIdentities}
                     subject={template.subject}
-                    textBody={template.textBody || template.body} />
-                  
-                  <Button type="submit">
-                    <Save size={18} />
-                    Save visual template
-                  </Button>
-                </form>
-                <div className="subpanel stack ui-zero">
-                  <h3 className="subsection-title">Version history</h3>
+                    templateKey={template.key || ""}
+                    templateName={template.name}
+                    textBody={template.textBody || template.body}
+                    updateAction={updateMessageTemplateBuilderAction} />
+                <details className="email-version-drawer">
+                  <summary>Version history</summary>
                   {(versionsByTemplateId.get(template.id) || []).slice(0, 5).map((version) =>
                   <form action={restoreMessageTemplateVersionAction} className="grid-2" key={version.id}>
                       <input type="hidden" name="templateId" value={template.id} />
@@ -354,13 +338,15 @@ export default async function CommunicationsPage({ searchParams }: Communication
                   {!(versionsByTemplateId.get(template.id) || []).length ?
                   <small className="muted-text">Versions appear after the first save.</small> :
                   null}
-                </div>
-              </details>);
+                </details>
+              </div>);
 
           })}
-          {!emailTemplates.length ? <div className="subpanel">No email templates found.</div> : null}
-        </Card>
+          {!emailTemplates.length ? <div className="empty-state">No email templates found.</div> : null}
+        </div>
+      </section>
 
+      <EqualGrid as="section">
         <Card action={createMessageTemplateAction} as="form" minHeight="none" bodyClassName="form-grid">
           <h2 className="section-title">Create manual template</h2>
           <EqualGrid>

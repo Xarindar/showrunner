@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const tokenPattern = /{{\s*([A-Za-z0-9_.-]+)\s*}}/g;
+export const REACT_EMAIL_BUILDER_RENDERER = "react_email_editor_v1";
 
 const alignSchema = z.enum(["left", "center", "right"]);
 const colorSchema = z
@@ -109,8 +110,20 @@ export const emailBuilderDocumentSchema = z.object({
   blocks: z.array(emailBuilderBlockSchema).max(40).catch([])
 });
 
+export const reactEmailBuilderDocumentSchema = z.object({
+  version: z.literal(2),
+  renderer: z.literal(REACT_EMAIL_BUILDER_RENDERER),
+  editorJson: z
+    .object({
+      type: z.string().optional(),
+      content: z.unknown().optional()
+    })
+    .passthrough()
+});
+
 export type EmailBuilderBlock = z.infer<typeof emailBuilderBlockSchema>;
 export type EmailBuilderDocument = z.infer<typeof emailBuilderDocumentSchema>;
+export type ReactEmailBuilderDocument = z.infer<typeof reactEmailBuilderDocumentSchema>;
 
 export function defaultEmailBuilderDocument(): EmailBuilderDocument {
   return {
@@ -152,6 +165,16 @@ export function normalizeEmailBuilderDocument(value: unknown): EmailBuilderDocum
   return emailBuilderDocumentSchema.parse(parsed);
 }
 
+export function normalizeReactEmailBuilderDocument(value: unknown): ReactEmailBuilderDocument {
+  const parsed = typeof value === "string" ? JSON.parse(value) : value;
+  return reactEmailBuilderDocumentSchema.parse(parsed);
+}
+
+export function isReactEmailBuilderDocument(value: unknown): value is ReactEmailBuilderDocument {
+  const parsed = typeof value === "string" ? safeParseJson(value) : value;
+  return reactEmailBuilderDocumentSchema.safeParse(parsed).success;
+}
+
 export function emailBuilderDocumentFromText(textBody: string): EmailBuilderDocument {
   const document = defaultEmailBuilderDocument();
   const paragraphs = textBody
@@ -189,4 +212,44 @@ export function extractEmailBuilderTokens(document: EmailBuilderDocument) {
   }
 
   return Array.from(tokens);
+}
+
+export function extractTokensFromUnknown(value: unknown) {
+  const tokens = new Set<string>();
+  const scan = (text: string) => {
+    for (const match of text.matchAll(tokenPattern)) {
+      tokens.add(match[1]);
+    }
+  };
+
+  const visit = (input: unknown) => {
+    if (typeof input === "string") {
+      scan(input);
+      return;
+    }
+
+    if (Array.isArray(input)) {
+      for (const item of input) visit(item);
+      return;
+    }
+
+    if (input && typeof input === "object") {
+      for (const item of Object.values(input)) visit(item);
+    }
+  };
+
+  visit(value);
+  return Array.from(tokens);
+}
+
+export function extractReactEmailBuilderTokens(document: ReactEmailBuilderDocument) {
+  return extractTokensFromUnknown(document.editorJson);
+}
+
+function safeParseJson(value: string) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
 }
