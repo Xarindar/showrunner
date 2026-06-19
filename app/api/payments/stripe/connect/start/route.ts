@@ -17,7 +17,7 @@ export async function GET() {
   const siteId = await getCurrentSiteId();
 
   try {
-    return NextResponse.redirect(createStripeConnectAuthorizeUrl(siteId));
+    return NextResponse.redirect(await createStripeConnectAuthorizeUrl(siteId));
   } catch (error) {
     console.error("[payments:stripe-connect-start-failed]", error);
     return settingsRedirect("error", paymentOnboardingUnavailableMessage(PaymentProvider.STRIPE));

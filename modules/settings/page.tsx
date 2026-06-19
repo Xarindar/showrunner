@@ -44,34 +44,41 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   const squareConnected = squareCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(squareCredential.merchantId);
   const paypalConnected = paypalCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(paypalCredential.merchantId);
   const errorMessage = error ? sanitizePaymentOnboardingError(error) : "";
+  const stripeOnboarding = getPaymentOnboardingStatus(PaymentProvider.STRIPE);
+  const squareOnboarding = getPaymentOnboardingStatus(PaymentProvider.SQUARE);
+  const paypalOnboarding = getPaymentOnboardingStatus(PaymentProvider.PAYPAL);
   const paymentConnectionRows = [
     {
       connected: stripeConnected,
       href: "/api/payments/stripe/connect/start",
-      onboarding: getPaymentOnboardingStatus(PaymentProvider.STRIPE),
+      onboarding: stripeOnboarding,
       reconnectLabel: "Reconnect Stripe",
       variant: undefined
     },
     {
       connected: squareConnected,
       href: "/api/payments/square/connect/start",
-      onboarding: getPaymentOnboardingStatus(PaymentProvider.SQUARE),
+      onboarding: squareOnboarding,
       reconnectLabel: "Reconnect Square",
       variant: "secondary" as const
     },
     {
       connected: paypalConnected,
       href: "/api/payments/paypal/connect/start",
-      onboarding: getPaymentOnboardingStatus(PaymentProvider.PAYPAL),
+      onboarding: paypalOnboarding,
       reconnectLabel: "Reconnect PayPal",
       variant: "secondary" as const
     }
   ];
   const selectedProviderDisconnected =
+  settings.checkoutProvider === PaymentProvider.STRIPE && !stripeConnected ||
   settings.checkoutProvider === PaymentProvider.SQUARE && !squareConnected ||
   settings.checkoutProvider === PaymentProvider.PAYPAL && !paypalConnected;
   const activeCheckoutProvider =
-  selectedProviderDisconnected ? PaymentProvider.STRIPE : settings.checkoutProvider;
+  selectedProviderDisconnected ?
+  stripeConnected ? PaymentProvider.STRIPE : squareConnected ? PaymentProvider.SQUARE : paypalConnected ? PaymentProvider.PAYPAL : undefined :
+  settings.checkoutProvider;
+  const checkoutProviderConnected = stripeConnected || squareConnected || paypalConnected;
 
   return (
     <div className="stack">
@@ -105,7 +112,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <EqualGrid>
           <div>
             <h2 className="compact-title">Payments</h2>
-            <p>Connected accounts use provider-hosted onboarding, checkout, and refund flows.</p>
+            <p>Connect the client&apos;s payment account through a secure provider-hosted flow. No API keys are entered on this screen.</p>
           </div>
         </EqualGrid>
         <div className="module-toggle-grid">
@@ -134,7 +141,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                   </ButtonAnchor> :
                 <Button disabled type="button" variant={row.variant}>
                     <CreditCard size={18} />
-                    Setup pending
+                    Not enabled
                   </Button>}
               </div>);
 
@@ -146,13 +153,14 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
             <p className="ui-zero">Choose which connected provider creates new public checkout sessions.</p>
             {selectedProviderDisconnected ?
             <p className="error ui-zero">
-                {settings.checkoutProvider === PaymentProvider.SQUARE ? "Square" : "PayPal"} is disconnected, so new checkout sessions are using Stripe until it is connected again.
+                Connect a payment provider before using hosted public checkout.
               </p> :
             null}
           </div>
           <div className="module-toggle-grid">
             <label className="module-toggle-row">
               <input
+                disabled={!stripeConnected}
                 name="checkoutProvider"
                 type="radio"
                 value={PaymentProvider.STRIPE}
@@ -161,9 +169,17 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               <span className="module-toggle-main">
                 <span>
                   <strong>Stripe</strong>
-                  <span className={stripeConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{stripeConnected ? "Connected account" : "Platform fallback"}</span>
+                  <span className={stripeConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>
+                    {stripeConnected ? "Connected account" : stripeOnboarding.ready ? "Connect first" : "Not enabled"}
+                  </span>
                 </span>
-                <small>Hosted Stripe Checkout with connected-account settlement when Stripe is connected.</small>
+                <small>
+                  {stripeConnected ?
+                  "Hosted Stripe Checkout with connected-account settlement." :
+                  stripeOnboarding.ready ?
+                  "Connect Stripe above before using it for public checkout." :
+                  "Stripe is not enabled for this workspace yet."}
+                </small>
               </span>
             </label>
             <label className="module-toggle-row">
@@ -177,12 +193,16 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               <span className="module-toggle-main">
                 <span>
                   <strong>Square</strong>
-                  <span className={squareConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{squareConnected ? "Connected account" : "Connect first"}</span>
+                  <span className={squareConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>
+                    {squareConnected ? "Connected account" : squareOnboarding.ready ? "Connect first" : "Not enabled"}
+                  </span>
                 </span>
                 <small>
                   {squareConnected ?
                   `Merchant ${squareCredential?.merchantId}, location ${squareCredential?.displayName || "connected"}.` :
-                  "Connect Square before using it for public checkout."}
+                  squareOnboarding.ready ?
+                  "Connect Square before using it for public checkout." :
+                  "Square is not enabled for this workspace yet."}
                 </small>
               </span>
             </label>
@@ -197,17 +217,21 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               <span className="module-toggle-main">
                 <span>
                   <strong>PayPal</strong>
-                  <span className={paypalConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>{paypalConnected ? "Connected account" : "Connect first"}</span>
+                  <span className={paypalConnected ? "ui-badge ui-badge-success" : "ui-badge ui-badge-warning"}>
+                    {paypalConnected ? "Connected account" : paypalOnboarding.ready ? "Connect first" : "Not enabled"}
+                  </span>
                 </span>
                 <small>
                   {paypalConnected ?
                   `Merchant ${paypalCredential?.merchantId || paypalCredential?.displayName}.` :
-                  "Connect PayPal before using it for public checkout."}
+                  paypalOnboarding.ready ?
+                  "Connect PayPal before using it for public checkout." :
+                  "PayPal is not enabled for this workspace yet."}
                 </small>
               </span>
             </label>
           </div>
-          <Button type="submit" variant="secondary">
+          <Button disabled={!checkoutProviderConnected} type="submit" variant="secondary">
             <CreditCard size={18} />
             Save checkout provider
           </Button>

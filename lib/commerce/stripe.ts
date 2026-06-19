@@ -1004,7 +1004,7 @@ export const stripePaymentGateway: PaymentGateway = {
   createOnboardingSession: async (siteId: string) => ({
     provider: PaymentProvider.STRIPE,
     status: "pending",
-    url: createStripeConnectAuthorizeUrl(siteId)
+    url: await createStripeConnectAuthorizeUrl(siteId)
   }),
   handleWebhookEvent: async (event: unknown) => handleStripeWebhookEvent(event as Stripe.Event),
   refund: async (input) => {

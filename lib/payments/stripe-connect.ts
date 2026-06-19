@@ -1,22 +1,16 @@
 import "server-only";
 
 import crypto from "node:crypto";
-import { PaymentProvider, Prisma } from "@prisma/client";
+import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
 import Stripe from "stripe";
 import { publicAppBaseUrl } from "@/lib/env";
-import { upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
+import { prisma } from "@/lib/prisma";
 
 const stateTtlSeconds = 10 * 60;
 
-function requireStripeConnectClientId() {
-  const clientId = process.env.STRIPE_CONNECT_CLIENT_ID || "";
-  if (!clientId) throw new Error("STRIPE_CONNECT_CLIENT_ID is required before Stripe Connect onboarding can start.");
-  return clientId;
-}
-
 function requireStripeSecretKey() {
   const secretKey = process.env.STRIPE_SECRET_KEY || "";
-  if (!secretKey) throw new Error("STRIPE_SECRET_KEY is required before Stripe Connect onboarding can complete.");
+  if (!secretKey) throw new Error("STRIPE_SECRET_KEY is required before Stripe onboarding can start.");
   return secretKey;
 }
 
@@ -36,6 +30,10 @@ function connectStateSecret() {
 
 function redirectUri() {
   return process.env.STRIPE_CONNECT_REDIRECT_URI || `${publicAppBaseUrl()}/api/payments/stripe/connect/callback`;
+}
+
+function refreshUri() {
+  return `${publicAppBaseUrl()}/api/payments/stripe/connect/start`;
 }
 
 function signPayload(payload: string) {
@@ -76,44 +74,147 @@ export function verifyStripeConnectState(state: string) {
   return decoded.siteId;
 }
 
-export function createStripeConnectAuthorizeUrl(siteId: string) {
-  const url = new URL("https://connect.stripe.com/oauth/authorize");
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", requireStripeConnectClientId());
-  url.searchParams.set("scope", "read_write");
-  url.searchParams.set("redirect_uri", redirectUri());
-  url.searchParams.set("state", createStripeConnectState(siteId));
+function getStripe() {
+  return new Stripe(requireStripeSecretKey());
+}
+
+function stripeReturnUri(state: string) {
+  const url = new URL(redirectUri());
+  url.searchParams.set("state", state);
   return url.toString();
 }
 
-export async function completeStripeConnectOnboarding(input: { code: string; expectedSiteId?: string; state: string }) {
+function stripeDisplayName(account: Stripe.Account) {
+  return account.business_profile?.name || account.settings?.dashboard?.display_name || account.email || account.id;
+}
+
+async function getOrCreateStripeAccount(stripe: Stripe, siteId: string) {
+  const credential = await prisma.paymentGatewayCredential.findUnique({
+    where: {
+      siteId_provider: {
+        provider: PaymentProvider.STRIPE,
+        siteId
+      }
+    }
+  });
+
+  if (credential?.externalAccountId) return credential.externalAccountId;
+
+  const account = await stripe.accounts.create({
+    metadata: {
+      siteId,
+      source: "showrunner_payment_settings"
+    },
+    type: "standard"
+  });
+
+  await prisma.paymentGatewayCredential.upsert({
+    where: {
+      siteId_provider: {
+        provider: PaymentProvider.STRIPE,
+        siteId
+      }
+    },
+    update: {
+      displayName: account.id,
+      externalAccountId: account.id,
+      lastVerifiedAt: new Date(),
+      metadata: {
+        accountType: account.type || "standard",
+        onboarding: "stripe_account_link"
+      } satisfies Prisma.InputJsonObject,
+      status: PaymentGatewayConnectionStatus.PENDING,
+      supportedWallets: ["APPLE_PAY", "GOOGLE_PAY", "CASH_APP_PAY"]
+    },
+    create: {
+      displayName: account.id,
+      externalAccountId: account.id,
+      lastVerifiedAt: new Date(),
+      metadata: {
+        accountType: account.type || "standard",
+        onboarding: "stripe_account_link"
+      } satisfies Prisma.InputJsonObject,
+      provider: PaymentProvider.STRIPE,
+      siteId,
+      status: PaymentGatewayConnectionStatus.PENDING,
+      supportedWallets: ["APPLE_PAY", "GOOGLE_PAY", "CASH_APP_PAY"]
+    }
+  });
+
+  return account.id;
+}
+
+export async function createStripeConnectAuthorizeUrl(siteId: string) {
+  const stripe = getStripe();
+  const state = createStripeConnectState(siteId);
+  const accountId = await getOrCreateStripeAccount(stripe, siteId);
+  const accountLink = await stripe.accountLinks.create({
+    account: accountId,
+    refresh_url: refreshUri(),
+    return_url: stripeReturnUri(state),
+    type: "account_onboarding"
+  });
+
+  if (!accountLink.url) throw new Error("Stripe did not return an onboarding URL.");
+  return accountLink.url;
+}
+
+export async function completeStripeConnectOnboarding(input: { expectedSiteId?: string; state: string }) {
   const siteId = verifyStripeConnectState(input.state);
   if (input.expectedSiteId && input.expectedSiteId !== siteId) {
     throw new Error("Stripe Connect state does not match the current site.");
   }
 
-  const stripe = new Stripe(requireStripeSecretKey());
-  const response = await stripe.oauth.token({
-    grant_type: "authorization_code",
-    code: input.code
+  const credential = await prisma.paymentGatewayCredential.findUnique({
+    where: {
+      siteId_provider: {
+        provider: PaymentProvider.STRIPE,
+        siteId
+      }
+    }
   });
+  if (!credential?.externalAccountId) throw new Error("Stripe onboarding could not find a connected account.");
 
-  const stripeUserId = response.stripe_user_id || "";
-  if (!stripeUserId) throw new Error("Stripe Connect did not return a connected account id.");
+  const stripe = getStripe();
+  const account = await stripe.accounts.retrieve(credential.externalAccountId);
+  if ("deleted" in account && account.deleted) {
+    throw new Error("Stripe account was removed. Start Stripe connection again.");
+  }
 
-  await upsertConnectedGatewayCredential({
-    accessToken: response.access_token || "",
-    displayName: stripeUserId,
-    encryptedMetadata: {
-      livemode: response.livemode,
-      scope: response.scope || "",
-      tokenType: response.token_type || ""
-    } satisfies Prisma.InputJsonObject,
-    externalAccountId: stripeUserId,
-    provider: PaymentProvider.STRIPE,
-    refreshToken: response.refresh_token || "",
-    siteId,
-    supportedWallets: ["APPLE_PAY", "GOOGLE_PAY", "CASH_APP_PAY"]
+  const metadata = {
+    accountType: account.type || "standard",
+    chargesEnabled: account.charges_enabled,
+    detailsSubmitted: account.details_submitted,
+    onboarding: "stripe_account_link",
+    payoutsEnabled: account.payouts_enabled,
+    requirementsCurrentlyDue: account.requirements?.currently_due || [],
+    requirementsDisabledReason: account.requirements?.disabled_reason || "",
+    requirementsPastDue: account.requirements?.past_due || ""
+  } satisfies Prisma.InputJsonObject;
+
+  if (!account.details_submitted || !account.charges_enabled) {
+    await prisma.paymentGatewayCredential.update({
+      where: { id: credential.id },
+      data: {
+        displayName: stripeDisplayName(account),
+        lastVerifiedAt: new Date(),
+        metadata,
+        status: PaymentGatewayConnectionStatus.PENDING
+      }
+    });
+    throw new Error("Stripe still needs a little more information. Select Connect Stripe again to continue onboarding.");
+  }
+
+  await prisma.paymentGatewayCredential.update({
+    where: { id: credential.id },
+    data: {
+      connectedAt: new Date(),
+      displayName: stripeDisplayName(account),
+      lastVerifiedAt: new Date(),
+      metadata,
+      status: PaymentGatewayConnectionStatus.CONNECTED,
+      supportedWallets: ["APPLE_PAY", "GOOGLE_PAY", "CASH_APP_PAY"]
+    },
   });
 
   return siteId;

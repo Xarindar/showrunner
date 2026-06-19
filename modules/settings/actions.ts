@@ -233,10 +233,15 @@ export async function updateCheckoutProviderAction(formData: FormData) {
   let provider: PaymentProvider;
   try {
     provider = parseCheckoutProvider(formData.get("checkoutProvider"));
-    if (provider === PaymentProvider.SQUARE || provider === PaymentProvider.PAYPAL) {
+    if (provider === PaymentProvider.STRIPE || provider === PaymentProvider.SQUARE || provider === PaymentProvider.PAYPAL) {
       const credential = await getConnectedGatewayCredential(site.id, provider);
-      if (credential?.status !== PaymentGatewayConnectionStatus.CONNECTED || !credential.merchantId.trim()) {
-        throw new Error(`Connect ${provider === PaymentProvider.SQUARE ? "Square" : "PayPal"} before making it the checkout provider.`);
+      const connected =
+        credential?.status === PaymentGatewayConnectionStatus.CONNECTED &&
+        (provider === PaymentProvider.STRIPE ? Boolean(credential.externalAccountId.trim()) : Boolean(credential.merchantId.trim()));
+      if (!connected) {
+        const label =
+          provider === PaymentProvider.STRIPE ? "Stripe" : provider === PaymentProvider.SQUARE ? "Square" : "PayPal";
+        throw new Error(`Connect ${label} before making it the checkout provider.`);
       }
     }
 

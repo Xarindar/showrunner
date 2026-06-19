@@ -27,7 +27,7 @@ const providerLabels: Record<ConnectablePaymentProvider, string> = {
 const providerRequirements: Record<ConnectablePaymentProvider, ProviderRequirement> = {
   [PaymentProvider.STRIPE]: {
     completionEnv: ["STRIPE_SECRET_KEY"],
-    startEnv: ["STRIPE_CONNECT_CLIENT_ID"]
+    startEnv: []
   },
   [PaymentProvider.SQUARE]: {
     completionEnv: ["SQUARE_APPLICATION_SECRET"],
@@ -78,12 +78,12 @@ export function getPaymentOnboardingStatus(provider: ConnectablePaymentProvider)
 
   return {
     description: ready
-      ? `${label} opens a provider-hosted connection flow. Account owners sign in with the provider and grant access; no keys are entered here.`
-      : `${label} onboarding is not available on this deployment yet. The platform connector needs one-time setup before account owners can connect.`,
+      ? `Open a secure ${label}-hosted onboarding window. The client signs in with ${label} and does not paste API keys here.`
+      : `${label} is not enabled for this workspace yet. There is nothing for the client to configure here.`,
     label,
     provider,
     ready,
-    statusLabel: ready ? "OAuth ready" : "Setup pending"
+    statusLabel: ready ? "Ready to connect" : "Not enabled"
   };
 }
 
@@ -110,7 +110,7 @@ function isPlatformConfigurationError(message: string) {
 
 export function paymentOnboardingUnavailableMessage(provider?: ConnectablePaymentProvider) {
   const label = provider ? paymentProviderLabel(provider) : "Payment provider";
-  return `${label} onboarding is not available yet. The Showrunner platform connector needs one-time setup before account owners can connect through the provider-hosted flow. No client keys are required.`;
+  return `${label} is not enabled for this workspace yet. There is nothing for the client to configure here.`;
 }
 
 export function sanitizePaymentOnboardingError(

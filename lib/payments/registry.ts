@@ -20,7 +20,9 @@ export async function resolvePaymentProviderForSite(siteId: string, provider?: P
   });
   const selectedProvider = provider || settings?.checkoutProvider || PaymentProvider.STRIPE;
 
-  if (selectedProvider !== PaymentProvider.SQUARE && selectedProvider !== PaymentProvider.PAYPAL) return selectedProvider;
+  if (selectedProvider !== PaymentProvider.STRIPE && selectedProvider !== PaymentProvider.SQUARE && selectedProvider !== PaymentProvider.PAYPAL) {
+    return selectedProvider;
+  }
 
   const credential = await prisma.paymentGatewayCredential.findUnique({
     where: {
@@ -30,14 +32,31 @@ export async function resolvePaymentProviderForSite(siteId: string, provider?: P
       }
     },
     select: {
+      externalAccountId: true,
       merchantId: true,
       status: true
     }
   });
-  const connected = credential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(credential.merchantId.trim());
+  const connected =
+    credential?.status === PaymentGatewayConnectionStatus.CONNECTED &&
+    (selectedProvider === PaymentProvider.STRIPE ? Boolean(credential.externalAccountId.trim()) : Boolean(credential.merchantId.trim()));
 
   if (connected) return selectedProvider;
   if (provider) throw new Error(`${selectedProvider} checkout is not connected for this site.`);
 
-  return PaymentProvider.STRIPE;
+  const connectedFallback = await prisma.paymentGatewayCredential.findFirst({
+    where: {
+      siteId,
+      status: PaymentGatewayConnectionStatus.CONNECTED,
+      OR: [
+        { provider: PaymentProvider.STRIPE, externalAccountId: { not: "" } },
+        { provider: { in: [PaymentProvider.SQUARE, PaymentProvider.PAYPAL] }, merchantId: { not: "" } }
+      ]
+    },
+    orderBy: { connectedAt: "desc" },
+    select: { provider: true }
+  });
+
+  if (connectedFallback) return connectedFallback.provider;
+  throw new Error("Connect a payment provider before creating hosted checkout.");
 }

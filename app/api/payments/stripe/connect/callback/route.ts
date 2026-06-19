@@ -20,15 +20,14 @@ export async function GET(request: NextRequest) {
     return settingsRedirect("error", description);
   }
 
-  const code = request.nextUrl.searchParams.get("code") || "";
   const state = request.nextUrl.searchParams.get("state") || "";
-  if (!code || !state) {
+  if (!state) {
     return settingsRedirect("error", "Stripe Connect returned an incomplete response.");
   }
 
   try {
     const siteId = await getCurrentSiteId();
-    await completeStripeConnectOnboarding({ code, expectedSiteId: siteId, state });
+    await completeStripeConnectOnboarding({ expectedSiteId: siteId, state });
     return settingsRedirect("saved", "payments");
   } catch (connectError) {
     const message = sanitizePaymentOnboardingError(connectError, PaymentProvider.STRIPE, "Stripe Connect could not be completed.");
