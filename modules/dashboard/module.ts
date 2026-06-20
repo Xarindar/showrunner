@@ -12,20 +12,20 @@ export const manifest = {
   enabledByDefault: true,
   required: true,
   readiness: {
-    level: "partial",
-    mode: "mixed",
-    summary: "Guided setup checklist, live business counts, and quick access to every enabled module.",
-    primaryGap: "User-pinnable module cards and role-aware queues are still pending."
+    level: "live",
+    mode: "live",
+    summary: "Guided setup checklist plus user-configurable module cards with saved sizing.",
+    primaryGap: "Role-aware queue summaries can be expanded as module ownership rules mature."
   },
   capabilities: [
     { label: "Setup checklist", status: "live" },
-    { label: "Business snapshot", status: "live" },
-    { label: "Quick module access", status: "live" },
-    { label: "Pinnable widget cards", status: "planned" }
+    { label: "Module card catalog", status: "live" },
+    { label: "Per-user dashboard layout", status: "live" },
+    { label: "Resizable widget cards", status: "live" }
   ],
   adminRoutes: ["/admin"],
   dependencies: ["settings"],
-  dataModels: ["SiteSettings", "Booking", "Client", "Service"],
+  dataModels: ["SiteSettings", "ModuleInstallation", "ModuleSetting", "Booking", "Client", "Service"],
   settingsSections: ["Modules", "Operations"],
   healthChecks: ["module-readiness", "email-outbox", "booking-setup"]
 } satisfies ShellModule;

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BookingStatus, BookingWaitlistStatus, Prisma } from "@prisma/client";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, Filter, ListChecks } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, Filter, ListChecks, Plus } from "lucide-react";
 import { getAccessibleBookingWaitlistWhere, getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import { bookingConflictWarnings } from "@/lib/bookings/conflicts";
 import { formatDateTime } from "@/lib/format";
@@ -11,6 +11,7 @@ import { promoteWaitlistEntryAction, updateWaitlistEntryStatusAction } from "./a
 import { AppointmentCalendar, type AppointmentCalendarBooking, type AppointmentCalendarDay } from "./components/appointment-calendar";
 import { AppointmentsTable } from "./components/appointments-table";
 import { Button, ButtonLink, Card, EqualGrid, Table, TabLink, Tabs } from "@/components/ui";
+import { addDashboardCardAction } from "@/modules/dashboard/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -320,6 +321,15 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
   days[0]?.label || selectedDateKey :
   `${days[0]?.shortLabel || calendarRange.startKey} - ${
   days[days.length - 1]?.shortLabel || addDaysToDateKey(calendarRange.endKey, -1)}`;
+  const currentAppointmentsHref = calendarHref({
+    dateKey: selectedDateKey,
+    page,
+    resourceId: selectedResourceId,
+    staffId: selectedStaffId,
+    statusFilter,
+    view
+  });
+  const savedMessage = params.saved?.startsWith("dashboard-card") ? "Dashboard card updated." : "Appointment desk updated.";
 
 
   return (
@@ -330,13 +340,24 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
           <h1>Active appointment desk</h1>
           <p>Review upcoming bookings, confirm requests, cancel conflicts, and mark completed work.</p>
         </div>
-        <ButtonLink href="/admin/modules/scheduling" variant="secondary">
-          <CalendarDays size={18} />
-          Scheduling setup
-        </ButtonLink>
+        <div className="dashboard-header-actions">
+          <form action={addDashboardCardAction}>
+            <input name="cardId" type="hidden" value="appointments.today" />
+            <input name="returnTo" type="hidden" value={currentAppointmentsHref} />
+            <input name="size" type="hidden" value="lg" />
+            <Button type="submit" variant="secondary">
+              <Plus size={18} />
+              Add today card
+            </Button>
+          </form>
+          <ButtonLink href="/admin/modules/scheduling" variant="secondary">
+            <CalendarDays size={18} />
+            Scheduling setup
+          </ButtonLink>
+        </div>
       </header>
 
-      {params.saved ? <div className="success-message">Appointment desk updated.</div> : null}
+      {params.saved ? <div className="success-message">{savedMessage}</div> : null}
       {params.error ? <div className="error">{params.error}</div> : null}
 
       <EqualGrid as="section" min="220px">
