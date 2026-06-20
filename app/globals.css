@@ -5237,6 +5237,78 @@ button.button:disabled,
 }
 
 /* ---------------------------------------------------------------------------
+   Module compact action modals
+--------------------------------------------------------------------------- */
+
+.module-action-toolbar,
+.module-action-row,
+.module-card-header-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.module-action-toolbar .ui-button,
+.module-action-row .ui-button,
+.module-card-header-actions .ui-button {
+  min-width: 0;
+}
+
+.module-action-modal {
+  max-width: min(780px, calc(100vw - var(--space-6)));
+}
+
+.module-action-modal:not([open]) {
+  display: none;
+}
+
+.module-action-modal-body {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.module-modal-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.module-check-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 860px) {
+  .module-action-toolbar,
+  .module-card-header-actions {
+    justify-content: flex-start;
+  }
+
+  .module-check-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .module-action-toolbar .ui-button,
+  .module-modal-actions .ui-button {
+    flex: 1 1 100%;
+  }
+
+  .module-modal-actions {
+    align-items: stretch;
+    display: grid;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Clients module - compact list workspace
 --------------------------------------------------------------------------- */
 

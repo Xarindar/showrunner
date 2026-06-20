@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { createTestimonialAction, deleteTestimonialAction, updateTestimonialModerationAction } from "./actions";
 import { Button, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
+import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,80 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
   const pageCount = Math.max(1, Math.ceil(testimonialCount / pageSize));
   const savedMessage = params.saved ? "Testimonial changes saved." : null;
   const errorMessage = params.error || null;
+  const addTestimonialForm = (
+    <form action={createTestimonialAction} className="form-grid">
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="testimonial-authorName">Author name</label>
+          <input id="testimonial-authorName" name="authorName" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="testimonial-authorEmail">Author email</label>
+          <input id="testimonial-authorEmail" name="authorEmail" type="email" />
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="testimonial-authorRole">Role or context</label>
+          <input id="testimonial-authorRole" name="authorRole" placeholder="Client, buyer, parent, venue owner" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="testimonial-serviceName">Service or product</label>
+          <input id="testimonial-serviceName" name="serviceName" />
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="testimonial-quote">Quote</label>
+        <textarea id="testimonial-quote" name="quote" required />
+      </div>
+      <EqualGrid min="220px">
+        <div className="ui-field">
+          <label htmlFor="testimonial-rating">Rating</label>
+          <input id="testimonial-rating" name="rating" type="number" min="1" max="5" defaultValue="5" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="testimonial-source">Source</label>
+          <input id="testimonial-source" name="source" defaultValue="first-party" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="testimonial-status">Status</label>
+          <select id="testimonial-status" name="status" defaultValue={TestimonialStatus.PENDING}>
+            {Object.values(TestimonialStatus).map((status) => (
+              <option key={status} value={status}>
+                {enumLabel(status)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="testimonial-sourceUrl">Source URL</label>
+          <input id="testimonial-sourceUrl" name="sourceUrl" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="testimonial-productName">Product</label>
+          <input id="testimonial-productName" name="productName" />
+        </div>
+      </EqualGrid>
+      <div className="module-check-grid">
+        <label className="ui-check-row">
+          <input name="permissionGranted" type="checkbox" />
+          Permission granted
+        </label>
+        <label className="ui-check-row">
+          <input name="featured" type="checkbox" />
+          Featured
+        </label>
+      </div>
+      <div className="module-modal-actions">
+        <Button type="submit">
+          <Plus size={18} />
+          Add testimonial
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="stack">
@@ -62,10 +137,6 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
           <h1>Reviews and social proof</h1>
           <p>Collect first-party quotes, moderate submissions, and feature approved testimonials on the public site.</p>
         </div>
-        <ButtonLink href="/testimonials" variant="secondary">
-          <MessageSquare size={18} />
-          Public page
-        </ButtonLink>
       </header>
 
       {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
@@ -95,84 +166,30 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
         </Card>
       </EqualGrid>
 
-      <EqualGrid as="section">
-        <Card action={createTestimonialAction} as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Add testimonial</h2>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="authorName">Author name</label>
-              <input id="authorName" name="authorName" required />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="authorEmail">Author email</label>
-              <input id="authorEmail" name="authorEmail" type="email" />
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="authorRole">Role or context</label>
-              <input id="authorRole" name="authorRole" placeholder="Client, buyer, parent, venue owner" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="serviceName">Service or product</label>
-              <input id="serviceName" name="serviceName" />
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="quote">Quote</label>
-            <textarea id="quote" name="quote" required />
-          </div>
-          <EqualGrid min="220px">
-            <div className="ui-field">
-              <label htmlFor="rating">Rating</label>
-              <input id="rating" name="rating" type="number" min="1" max="5" defaultValue="5" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="source">Source</label>
-              <input id="source" name="source" defaultValue="first-party" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="status">Status</label>
-              <select id="status" name="status" defaultValue={TestimonialStatus.PENDING}>
-                {Object.values(TestimonialStatus).map((status) =>
-                <option key={status} value={status}>
-                    {enumLabel(status)}
-                  </option>
-                )}
-              </select>
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="sourceUrl">Source URL</label>
-              <input id="sourceUrl" name="sourceUrl" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="productName">Product</label>
-              <input id="productName" name="productName" />
-            </div>
-          </EqualGrid>
-          <div className="ui-zero">
-            <label className="ui-zero">
-              <input name="permissionGranted" type="checkbox" />
-              Permission granted
-            </label>
-            <label className="ui-zero">
-              <input name="featured" type="checkbox" />
-              Featured
-            </label>
-          </div>
-          <Button type="submit">
-            <Plus size={18} />
-            Add testimonial
-          </Button>
-        </Card>
-
-        <Card>
+      <Card as="section">
           <div className="page-header compact-header">
             <div>
               <h2 className="section-title">Moderation queue</h2>
               <p>{testimonialCount} matching testimonials</p>
+            </div>
+            <div className="module-card-header-actions">
+              <ModuleActionModals
+                items={[
+                  {
+                    content: addTestimonialForm,
+                    icon: "plus",
+                    id: "add",
+                    label: "Add",
+                    title: "Add testimonial",
+                    variant: "primary"
+                  }
+                ]}
+                toolbarLabel="Testimonial tools"
+              />
+              <ButtonLink href="/testimonials" size="sm" variant="secondary">
+                <MessageSquare size={15} />
+                Public page
+              </ButtonLink>
             </div>
             <div className="ui-zero">
               {statusFilters.map((filter) =>
@@ -310,7 +327,6 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
             </ButtonLink>
           </div>
         </Card>
-      </EqualGrid>
     </div>);
 
 }

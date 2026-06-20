@@ -5,6 +5,7 @@ import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { Badge, Button, Card, EqualGrid, Feedback, Field, Input, Select, StatTile, Table } from "@/components/ui";
+import { ModuleActionModals } from "@/components/ui/module-action-modals";
 import { createAdminUserAction, deleteAdminUserAction, updateAdminUserRoleAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,33 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
     })
   ]);
   const ownerCount = users.filter((user) => user.role === AdminRole.OWNER).length;
+  const inviteAdminForm = (
+    <form action={createAdminUserAction} className="form-grid">
+      <EqualGrid>
+        <Field label="Email" htmlFor="admin-email">
+          <Input id="admin-email" name="email" type="email" required />
+        </Field>
+        <Field label="Temporary password" htmlFor="admin-password">
+          <Input id="admin-password" name="password" type="password" minLength={12} required />
+        </Field>
+      </EqualGrid>
+      <Field label="Role" htmlFor="admin-role">
+        <Select id="admin-role" name="role" defaultValue={AdminRole.STAFF}>
+          {Object.values(AdminRole).map((role) => (
+            <option key={role} value={role}>
+              {enumLabel(role)}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <div className="module-modal-actions">
+        <Button type="submit">
+          <UserPlus size={16} />
+          Create admin
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="stack">
@@ -51,41 +79,23 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       </EqualGrid>
 
       <Card as="section" minHeight="none">
-        <div>
-          <p className="eyebrow">Create admin</p>
-          <h2 className="section-title">Invite with a temporary password</h2>
-        </div>
-        <form action={createAdminUserAction} className="grid-3">
-          <Field label="Email" htmlFor="email">
-            <Input id="email" name="email" type="email" required />
-          </Field>
-          <Field label="Temporary password" htmlFor="password">
-            <Input id="password" name="password" type="password" minLength={12} required />
-          </Field>
-          <Field label="Role" htmlFor="role">
-            <Select id="role" name="role" defaultValue={AdminRole.STAFF}>
-              {Object.values(AdminRole).map((role) => (
-                <option key={role} value={role}>
-                  {enumLabel(role)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <div className="ui-submit-slot">
-            <Button type="submit">
-              <UserPlus size={16} />
-              Create admin
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      <Card as="section" minHeight="none">
         <div className="page-header compact-header">
           <div>
             <p className="eyebrow">Role assignments</p>
             <h2 className="section-title">Admin users</h2>
           </div>
+          <ModuleActionModals
+            items={[
+              {
+                content: inviteAdminForm,
+                icon: "user",
+                id: "invite",
+                label: "Invite",
+                title: "Invite admin"
+              }
+            ]}
+            toolbarLabel="Admin user tools"
+          />
         </div>
 
           <Table>

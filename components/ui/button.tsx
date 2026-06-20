@@ -18,7 +18,7 @@ function buttonClassName({
   return cx("ui-button", variant !== "primary" && `ui-button-${variant}`, size !== "md" && `ui-button-${size}`, className);
 }
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   size?: ButtonSize;
   variant?: ButtonVariant;
 };
