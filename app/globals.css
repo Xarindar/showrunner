@@ -1814,40 +1814,32 @@ button.button:disabled,
 }
 
 .admin-root {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--line) 22%, transparent) 1px, transparent 1px),
-    linear-gradient(180deg, color-mix(in srgb, var(--line) 18%, transparent) 1px, transparent 1px),
-    color-mix(in srgb, var(--color-surface-sunken) 72%, var(--bg));
-  background-size: 34px 34px;
+  background: color-mix(in srgb, var(--color-surface-sunken) 42%, var(--color-page));
   display: grid;
-  gap: var(--space-3);
   grid-template-columns: var(--layout-admin-sidebar) minmax(0, 1fr);
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
-  padding: var(--space-3);
 }
 
 .admin-sidebar {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-admin-sidebar) 94%, var(--primary) 6%), var(--color-admin-sidebar));
-  border: 1px solid color-mix(in srgb, var(--color-admin-sidebar) 76%, white);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-raised);
-  color: rgba(255, 255, 255, 0.9);
+  background: color-mix(in srgb, var(--color-text) 92%, #000000);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.92);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  height: calc(100vh - (var(--space-3) * 2));
+  gap: var(--space-5);
+  height: 100vh;
   overflow: auto;
-  padding: var(--space-5) 14px;
+  padding: var(--space-5) var(--space-3);
   scrollbar-gutter: stable;
 }
 
 .admin-sidebar .brand {
   color: white;
+  font-size: 0.94rem;
   min-height: 44px;
-  padding: 0 8px;
+  padding: 0 var(--space-2);
 }
 
 .admin-mobile-bar,
@@ -1871,12 +1863,13 @@ button.button:disabled,
 .admin-nav .disabled-link {
   align-items: center;
   border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  color: rgba(255, 255, 255, 0.72);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.84);
   display: flex;
-  font-weight: 540;
+  font-size: var(--type-small);
+  font-weight: 520;
   gap: 10px;
-  min-height: 38px;
+  min-height: 36px;
   min-width: 0;
   padding: 0 10px;
   transition:
@@ -1887,24 +1880,23 @@ button.button:disabled,
 
 .admin-nav a svg,
 .admin-nav .disabled-link svg {
-  color: rgba(255, 255, 255, 0.58);
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .admin-nav a:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.075);
+  border-color: transparent;
   color: white;
 }
 
 .admin-nav a.active {
-  background: color-mix(in srgb, var(--color-surface) 94%, var(--color-brand-soft));
-  border-color: rgba(255, 255, 255, 0.34);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  color: var(--primary-dark);
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: white;
 }
 
 .admin-nav a.active svg {
-  color: var(--primary);
+  color: white;
 }
 
 .admin-menu-toggle,
@@ -1926,31 +1918,31 @@ button.button:disabled,
 }
 
 .disabled-link {
-  opacity: 0.52;
+  opacity: 0.5;
 }
 
 .admin-sidebar-actions {
   margin-top: auto;
+  padding-top: var(--space-3);
 }
 
 .admin-sidebar .button.ghost,
 .admin-sidebar .ui-button-ghost {
-  color: rgba(255, 255, 255, 0.76);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.82);
   justify-content: flex-start;
+  min-width: 0;
   width: 100%;
 }
 
 .admin-sidebar .ui-button-ghost:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.075);
   color: white;
 }
 
 .admin-main {
   background: color-mix(in srgb, var(--color-surface-sunken) 42%, var(--color-page));
-  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-panel);
-  height: calc(100vh - (var(--space-3) * 2));
+  height: 100vh;
   min-width: 0;
   overflow: auto;
   padding: var(--space-7);
