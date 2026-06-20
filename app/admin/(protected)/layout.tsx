@@ -15,7 +15,7 @@ export default async function AdminLayout({
 
   return (
     <div className="admin-root" style={themeToCssVars(settings)}>
-      <AdminSidebar businessName={settings.businessName} enabledModules={settings.enabledModuleIds} userRole={user.role} />
+      <AdminSidebar businessName={settings.businessName} enabledModules={settings.enabledModuleIds} userEmail={user.email} userRole={user.role} />
       <main className="admin-main">{children}</main>
     </div>
   );
