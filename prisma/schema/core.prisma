@@ -41,6 +41,7 @@ model Site {
   updatedAt                DateTime                     @updatedAt
   domains                  SiteDomain[]
   settings                 SiteSettings?
+  heroPresentation         HeroPresentation?
   schedulingSettings       SchedulingSettings?
   moduleInstallations      ModuleInstallation[]
   publicRateLimits         PublicRateLimit[]

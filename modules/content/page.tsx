@@ -1,9 +1,10 @@
-import { Save } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site";
 import { manifest } from "./module";
 import { updateContentAction } from "./actions";
-import { Button, Card, EqualGrid } from "@/components/ui";
+import { HeroContentEditor } from "./hero-content-editor";
+import { getHeroPresentationForSite } from "./hero-presentation.server";
+import { Card, EqualGrid } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -14,53 +15,21 @@ type ContentPageProps = {
 export default async function ContentPage({ searchParams }: ContentPageProps) {
   await requireAdmin("content:manage");
   const [{ saved }, settings] = await Promise.all([searchParams, getSiteSettings()]);
+  const heroPresentation = await getHeroPresentationForSite(settings.siteId, settings);
 
   return (
     <div className="stack">
       <header className="page-header">
         <div>
           <p className="eyebrow">Content</p>
-          <h1>Editable public content</h1>
-          <p>Keep this intentionally simple so clients can change copy and imagery without changing layout.</p>
+          <h1>Homepage hero studio</h1>
+          <p>Compose the public hero, slideshow screens, calls to action, and intro copy in one workspace.</p>
         </div>
       </header>
 
       {saved ? <div className="success-message">Content saved.</div> : null}
 
-      <Card action={updateContentAction} as="form" minHeight="none" bodyClassName="form-grid">
-        <EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="heroHeadline">Hero headline</label>
-            <input id="heroHeadline" name="heroHeadline" defaultValue={settings.heroHeadline} required />
-          </div>
-
-          <div className="ui-field">
-            <label htmlFor="heroImageUrl">Hero image URL</label>
-            <input id="heroImageUrl" name="heroImageUrl" defaultValue={settings.heroImageUrl} required />
-          </div>
-        </EqualGrid>
-
-        <div className="ui-field">
-          <label htmlFor="heroSubheadline">Hero supporting copy</label>
-          <textarea id="heroSubheadline" name="heroSubheadline" defaultValue={settings.heroSubheadline} />
-        </div>
-
-        <EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="introTitle">Intro section title</label>
-            <input id="introTitle" name="introTitle" defaultValue={settings.introTitle} required />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="introBody">Intro section body</label>
-            <textarea id="introBody" name="introBody" defaultValue={settings.introBody} />
-          </div>
-        </EqualGrid>
-
-        <Button type="submit">
-          <Save size={18} />
-          Save content
-        </Button>
-      </Card>
+      <HeroContentEditor action={updateContentAction} initialPresentation={heroPresentation} settings={settings} />
 
       <EqualGrid aria-label="Content readiness" as="section">
         <Card>

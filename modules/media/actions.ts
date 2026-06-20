@@ -3,12 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { MediaDriver } from "@prisma/client";
+import { HeroPresentationMode, HeroSlideElementType, MediaDriver } from "@prisma/client";
 import { optionalStoredText, parseForm, requiredText } from "@/lib/admin-validation";
 import { getAccessibleMediaWhere, getOwnerStaffIds, requireAdmin, resolveDataScopeMode } from "@/lib/auth";
 import { ensureMediaAssetVariants, mediaTagsFromInput, normalizeMediaFolder, uploadMedia } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
-import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
+import { getCurrentSiteId, getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
+import { defaultHeroSlideFromSettings, heroElementsArray, type HeroElementType } from "@/modules/content/hero-presentation";
+
+const heroElementTypeMap: Record<HeroElementType, HeroSlideElementType> = {
+  IMAGE: HeroSlideElementType.IMAGE,
+  HEADLINE: HeroSlideElementType.HEADLINE,
+  CAPTION: HeroSlideElementType.CAPTION,
+  CTA: HeroSlideElementType.CTA
+};
 
 const focalPoint = optionalStoredText
   .refine((value) => value === "" || (!Number.isNaN(Number(value)) && Number(value) >= 0 && Number(value) <= 1), "Use a value from 0 to 1.")
@@ -175,12 +183,67 @@ export async function setHeroImageAction(formData: FormData) {
     }
   }
 
-  await prisma.siteSettings.update({
-    where: { siteId },
-    data: { heroImageUrl: url }
+  const settings = await getSiteSettingsForSite(siteId);
+  const fallbackSlide = {
+    ...defaultHeroSlideFromSettings(settings),
+    imageUrl: url
+  };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.siteSettings.update({
+      where: { siteId },
+      data: { heroImageUrl: url }
+    });
+
+    const presentation = await tx.heroPresentation.upsert({
+      where: { siteId },
+      update: {},
+      create: {
+        siteId,
+        mode: HeroPresentationMode.STATIC,
+        autoplayIntervalMs: 6500
+      }
+    });
+
+    const firstSlide = await tx.heroSlide.findFirst({
+      where: { presentationId: presentation.id },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true }
+    });
+
+    if (firstSlide) {
+      await tx.heroSlide.update({
+        where: { id: firstSlide.id },
+        data: { imageUrl: url }
+      });
+    } else {
+      await tx.heroSlide.create({
+        data: {
+          presentationId: presentation.id,
+          sortOrder: 0,
+          headline: fallbackSlide.headline,
+          caption: fallbackSlide.caption,
+          imageUrl: fallbackSlide.imageUrl,
+          ctaLabel: fallbackSlide.ctaLabel,
+          ctaHref: fallbackSlide.ctaHref,
+          elements: {
+            create: heroElementsArray(fallbackSlide.elements).map((element) => ({
+              type: heroElementTypeMap[element.type],
+              gridColumn: element.gridColumn,
+              gridRow: element.gridRow,
+              columnSpan: element.columnSpan,
+              rowSpan: element.rowSpan,
+              zIndex: element.zIndex,
+              isVisible: element.isVisible
+            }))
+          }
+        }
+      });
+    }
   });
 
   revalidatePath("/");
   revalidatePath("/admin/modules/content");
+  revalidatePath("/sitemap.xml");
   redirect("/admin/modules/media?saved=hero");
 }

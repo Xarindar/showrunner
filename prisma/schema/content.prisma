@@ -1,0 +1,59 @@
+// Public content module models and enums.
+
+enum HeroPresentationMode {
+  STATIC
+  SLIDESHOW
+}
+
+enum HeroSlideElementType {
+  IMAGE
+  HEADLINE
+  CAPTION
+  CTA
+}
+
+model HeroPresentation {
+  id                 String               @id @default(cuid())
+  siteId             String               @unique
+  site               Site                 @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  mode               HeroPresentationMode @default(STATIC)
+  autoplayIntervalMs Int                  @default(6500)
+  slides             HeroSlide[]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+}
+
+model HeroSlide {
+  id             String             @id @default(cuid())
+  presentationId String
+  presentation   HeroPresentation   @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+  sortOrder      Int                @default(0)
+  headline       String             @default("")
+  caption        String             @default("")
+  imageUrl       String             @default("/hero.svg")
+  ctaLabel       String             @default("Book an appointment")
+  ctaHref        String             @default("/book")
+  elements       HeroSlideElement[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([presentationId, sortOrder])
+}
+
+model HeroSlideElement {
+  id         String               @id @default(cuid())
+  slideId    String
+  slide      HeroSlide            @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  type       HeroSlideElementType
+  gridColumn Int                  @default(1)
+  gridRow    Int                  @default(1)
+  columnSpan Int                  @default(2)
+  rowSpan    Int                  @default(1)
+  zIndex     Int                  @default(1)
+  isVisible  Boolean              @default(true)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  @@unique([slideId, type])
+  @@index([slideId])
+}

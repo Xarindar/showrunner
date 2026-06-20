@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import NextImage from "next/image";
-import { CalendarDays, FileText, Image as ImageIcon, LockKeyhole, MessageSquare, ShoppingBag, Star } from "lucide-react";
+import { CalendarDays, FileText, Image as ImageIcon, MessageSquare, ShoppingBag, Star } from "lucide-react";
 import { FormStatus, PortfolioGalleryStatus, PortfolioGalleryVisibility, TestimonialStatus } from "@prisma/client";
 import { JsonLd } from "@/components/structured-data";
-import { ButtonLink, Card, Cluster, EmptyState, EqualGrid } from "@/components/ui";
+import { ButtonLink, Card, EmptyState, EqualGrid } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import { buildImageObjectJsonLd, buildLocalBusinessJsonLd, buildPageMetadata, buildWebSiteJsonLd, getCanonicalBaseUrl } from "@/lib/seo";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
+import { getHeroPresentationForSite } from "@/modules/content/hero-presentation.server";
+import { PublicHeroPresentation } from "@/modules/content/public-hero";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function HomePage() {
   const settings = await getSiteSettings();
+  const heroPresentation = await getHeroPresentationForSite(settings.siteId, settings);
+  const primaryHeroSlide = heroPresentation.slides[0];
   const baseUrl = await getCanonicalBaseUrl(settings.siteId);
   const formsEnabled = settings.enabledModuleIds.includes("forms");
   const portfolioEnabled = settings.enabledModuleIds.includes("portfolio");
@@ -70,9 +73,9 @@ export default async function HomePage() {
         buildWebSiteJsonLd(settings, baseUrl),
         buildImageObjectJsonLd({
           baseUrl,
-          description: settings.heroSubheadline,
+          description: primaryHeroSlide.caption,
           name: `${settings.businessName} hero image`,
-          url: settings.heroImageUrl
+          url: primaryHeroSlide.imageUrl
         })]
         } />
       
@@ -98,38 +101,7 @@ export default async function HomePage() {
         </div>
       </nav>
 
-      <section className="hero">
-        <div className="hero-copy">
-          <p className="eyebrow">Showrunner</p>
-          <h1>{settings.heroHeadline}</h1>
-          <p className="lead">{settings.heroSubheadline}</p>
-          <Cluster className="hero-actions" gap="3">
-            <ButtonLink href="/book">
-              <CalendarDays size={18} />
-              Book an appointment
-            </ButtonLink>
-            <ButtonLink href="/admin/login" variant="secondary">
-              <LockKeyhole size={18} />
-              Admin login
-            </ButtonLink>
-            {testimonialsEnabled ?
-            <ButtonLink href="/testimonials" variant="secondary">
-                <MessageSquare size={18} />
-                Reviews
-              </ButtonLink> :
-            null}
-            {productsEnabled ?
-            <ButtonLink href="/shop" variant="secondary">
-                <ShoppingBag size={18} />
-                Shop
-              </ButtonLink> :
-            null}
-          </Cluster>
-        </div>
-        <div className="hero-media">
-          <NextImage src={settings.heroImageUrl} alt="" width={900} height={1000} priority unoptimized />
-        </div>
-      </section>
+      <PublicHeroPresentation presentation={heroPresentation} />
 
       <section className="section">
         <EqualGrid className="align-start">
