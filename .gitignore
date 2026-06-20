@@ -43,6 +43,7 @@ Thumbs.db
 docs/
 Claude Audit*.md
 showrunner_refractor.md
+codex-bug-notes.md
 
 # Local tool state
 .claude/
