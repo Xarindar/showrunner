@@ -23,6 +23,7 @@ import {
   updateWebhookEndpointAction,
   updateAutomationStatusAction } from "./actions";
 import { Button, Card, EqualGrid, Table } from "@/components/ui";
+import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +105,190 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
   null;
   const savedMessage = params.saved ? "Automation changes saved." : null;
   const errorMessage = params.error || null;
+  const createAutomationForm = (
+    <form action={createAutomationAction} className="form-grid">
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="automation-name">Name</label>
+          <input id="automation-name" name="name" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="automation-status">Status</label>
+          <select id="automation-status" name="status" defaultValue={AutomationStatus.DRAFT}>
+            {Object.values(AutomationStatus).map((status) =>
+            <option key={status} value={status}>
+                {enumLabel(status)}
+              </option>
+            )}
+          </select>
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="automation-trigger">Trigger</label>
+          <select id="automation-trigger" name="trigger" defaultValue={AutomationTrigger.FORM_SUBMITTED}>
+            {Object.values(AutomationTrigger).map((trigger) =>
+            <option key={trigger} value={trigger}>
+                {enumLabel(trigger)}
+              </option>
+            )}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="automation-action">Action</label>
+          <select id="automation-action" name="action" defaultValue={AutomationAction.NOTIFY_ADMIN}>
+            {Object.values(AutomationAction).map((action) =>
+            <option key={action} value={action}>
+                {enumLabel(action)}
+              </option>
+            )}
+          </select>
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="automation-email">Target email</label>
+          <input id="automation-email" name="targetEmail" type="email" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="automation-url">Webhook URL</label>
+          <input id="automation-url" name="webhookUrl" placeholder="https://example.com/webhook" />
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="automation-template">Email template</label>
+        <select id="automation-template" name="messageTemplateId" defaultValue="">
+          <option value="">No template</option>
+          {messageTemplates.map((template) =>
+          <option key={template.id} value={template.id}>
+              {template.name} ({template.key})
+            </option>
+          )}
+        </select>
+      </div>
+      <div className="ui-field">
+        <label htmlFor="automation-subject">Subject template</label>
+        <input id="automation-subject" name="subjectTemplate" placeholder="New {{trigger}} event" />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="automation-body">Body template</label>
+        <textarea id="automation-body" name="bodyTemplate" />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="automation-config">Action config JSON</label>
+        <textarea
+          id="automation-config"
+          name="actionConfig"
+          placeholder={'{"targetStatus":"CONFIRMED","tag":"vip","title":"Follow up with {{actorEmail}}","dueInDays":2}'} />
+      </div>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="condition-key">Condition key</label>
+          <input id="condition-key" name="conditionKey" placeholder="formSlug" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="condition-value">Condition value</label>
+          <input id="condition-value" name="conditionValue" placeholder="contact-inquiry" />
+        </div>
+      </EqualGrid>
+      <div className="module-modal-actions">
+        <Button type="submit">
+          <Plus size={18} />
+          Create automation
+        </Button>
+      </div>
+    </form>
+  );
+  const createWebhookEndpointForm = (
+    <form action={createWebhookEndpointAction} className="form-grid">
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="webhook-name">Name</label>
+          <input id="webhook-name" name="name" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="webhook-status">Status</label>
+          <select id="webhook-status" name="status" defaultValue={AutomationStatus.DRAFT}>
+            {Object.values(AutomationStatus).map((status) =>
+            <option key={status} value={status}>
+                {enumLabel(status)}
+              </option>
+            )}
+          </select>
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="webhook-url">URL</label>
+        <input id="webhook-url" name="url" placeholder="https://example.com/showrunner" required />
+      </div>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="webhook-secret">Signing secret</label>
+          <input id="webhook-secret" name="signingSecret" placeholder="Generated if left blank" type="password" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="webhook-events">Events</label>
+          <input id="webhook-events" name="events" placeholder={moduleEventNames.join(", ")} />
+        </div>
+      </EqualGrid>
+      <div className="module-modal-actions">
+        <Button type="submit" variant="secondary">
+          Add endpoint
+        </Button>
+      </div>
+    </form>
+  );
+  const recordWebhookDeliveryForm = (
+    <form action={recordWebhookDeliveryAction} className="form-grid">
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="delivery-endpoint">Endpoint</label>
+          <select id="delivery-endpoint" name="webhookEndpointId">
+            {endpoints.map((endpoint) =>
+            <option key={endpoint.id} value={endpoint.id}>
+                {endpoint.name}
+              </option>
+            )}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="delivery-status">Status</label>
+          <select id="delivery-status" name="status" defaultValue={WebhookDeliveryStatus.DELIVERED}>
+            {[WebhookDeliveryStatus.DELIVERED, WebhookDeliveryStatus.FAILED].map((status) =>
+            <option key={status} value={status}>
+                {enumLabel(status)}
+              </option>
+            )}
+          </select>
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="delivery-event">Event</label>
+          <select id="delivery-event" name="event" defaultValue="form.submitted">
+            {moduleEventNames.map((event) =>
+            <option key={event} value={event}>
+                {event}
+              </option>
+            )}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="delivery-code">Status code</label>
+          <input id="delivery-code" name="statusCode" type="number" min="100" max="599" />
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="delivery-error">Error</label>
+        <input id="delivery-error" name="errorMessage" />
+      </div>
+      <div className="module-modal-actions">
+        <Button type="submit" disabled={!endpoints.length} variant="secondary">
+          Record manual delivery
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="stack">
@@ -143,101 +328,25 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
       </EqualGrid>
 
       <EqualGrid as="section">
-        <Card action={createAutomationAction} as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Create automation</h2>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="automation-name">Name</label>
-              <input id="automation-name" name="name" required />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="automation-status">Status</label>
-              <select id="automation-status" name="status" defaultValue={AutomationStatus.DRAFT}>
-                {Object.values(AutomationStatus).map((status) =>
-                <option key={status} value={status}>
-                    {enumLabel(status)}
-                  </option>
-                )}
-              </select>
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="automation-trigger">Trigger</label>
-              <select id="automation-trigger" name="trigger" defaultValue={AutomationTrigger.FORM_SUBMITTED}>
-                {Object.values(AutomationTrigger).map((trigger) =>
-                <option key={trigger} value={trigger}>
-                    {enumLabel(trigger)}
-                  </option>
-                )}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="automation-action">Action</label>
-              <select id="automation-action" name="action" defaultValue={AutomationAction.NOTIFY_ADMIN}>
-                {Object.values(AutomationAction).map((action) =>
-                <option key={action} value={action}>
-                    {enumLabel(action)}
-                  </option>
-                )}
-              </select>
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="automation-email">Target email</label>
-              <input id="automation-email" name="targetEmail" type="email" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="automation-url">Webhook URL</label>
-              <input id="automation-url" name="webhookUrl" placeholder="https://example.com/webhook" />
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="automation-template">Email template</label>
-            <select id="automation-template" name="messageTemplateId" defaultValue="">
-              <option value="">No template</option>
-              {messageTemplates.map((template) =>
-              <option key={template.id} value={template.id}>
-                  {template.name} ({template.key})
-                </option>
-              )}
-            </select>
-          </div>
-          <div className="ui-field">
-            <label htmlFor="automation-subject">Subject template</label>
-            <input id="automation-subject" name="subjectTemplate" placeholder="New {{trigger}} event" />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="automation-body">Body template</label>
-            <textarea id="automation-body" name="bodyTemplate" />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="automation-config">Action config JSON</label>
-            <textarea
-              id="automation-config"
-              name="actionConfig"
-              placeholder={'{"targetStatus":"CONFIRMED","tag":"vip","title":"Follow up with {{actorEmail}}","dueInDays":2}'} />
-            
-          </div>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="condition-key">Condition key</label>
-              <input id="condition-key" name="conditionKey" placeholder="formSlug" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="condition-value">Condition value</label>
-              <input id="condition-value" name="conditionValue" placeholder="contact-inquiry" />
-            </div>
-          </EqualGrid>
-          <Button type="submit">
-            <Plus size={18} />
-            Create automation
-          </Button>
-        </Card>
-
         <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Automation rules</h2>
+          <div className="page-header compact-header">
+            <div>
+              <h2 className="section-title">Automation rules</h2>
+              <p>{automations.length} recent rules</p>
+            </div>
+            <ModuleActionModals
+              items={[
+                {
+                  content: createAutomationForm,
+                  icon: "wand",
+                  id: "automation",
+                  label: "Rule",
+                  title: "Create automation"
+                }
+              ]}
+              toolbarLabel="Automation rule tools"
+            />
+          </div>
           <Table>
             <thead>
               <tr>
@@ -499,45 +608,25 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
       null}
 
       <EqualGrid as="section">
-        <Card action={createWebhookEndpointAction} as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Create webhook endpoint</h2>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="webhook-name">Name</label>
-              <input id="webhook-name" name="name" required />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="webhook-status">Status</label>
-              <select id="webhook-status" name="status" defaultValue={AutomationStatus.DRAFT}>
-                {Object.values(AutomationStatus).map((status) =>
-                <option key={status} value={status}>
-                    {enumLabel(status)}
-                  </option>
-                )}
-              </select>
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="webhook-url">URL</label>
-            <input id="webhook-url" name="url" placeholder="https://example.com/showrunner" required />
-          </div>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="webhook-secret">Signing secret</label>
-              <input id="webhook-secret" name="signingSecret" placeholder="Generated if left blank" type="password" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="webhook-events">Events</label>
-              <input id="webhook-events" name="events" placeholder={moduleEventNames.join(", ")} />
-            </div>
-          </EqualGrid>
-          <Button type="submit" variant="secondary">
-            Add endpoint
-          </Button>
-        </Card>
-
         <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Webhook endpoints</h2>
+          <div className="page-header compact-header">
+            <div>
+              <h2 className="section-title">Webhook endpoints</h2>
+              <p>{endpoints.length} configured endpoints</p>
+            </div>
+            <ModuleActionModals
+              items={[
+                {
+                  content: createWebhookEndpointForm,
+                  icon: "link",
+                  id: "endpoint",
+                  label: "Endpoint",
+                  title: "Create webhook endpoint"
+                }
+              ]}
+              toolbarLabel="Webhook endpoint tools"
+            />
+          </div>
           <Table>
             <thead>
               <tr>
@@ -658,57 +747,25 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
           </Table>
         </Card>
 
-        <Card action={recordWebhookDeliveryAction} as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Record manual webhook delivery</h2>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="delivery-endpoint">Endpoint</label>
-              <select id="delivery-endpoint" name="webhookEndpointId">
-                {endpoints.map((endpoint) =>
-                <option key={endpoint.id} value={endpoint.id}>
-                    {endpoint.name}
-                  </option>
-                )}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="delivery-status">Status</label>
-              <select id="delivery-status" name="status" defaultValue={WebhookDeliveryStatus.DELIVERED}>
-                {[WebhookDeliveryStatus.DELIVERED, WebhookDeliveryStatus.FAILED].map((status) =>
-                <option key={status} value={status}>
-                    {enumLabel(status)}
-                  </option>
-                )}
-              </select>
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="delivery-event">Event</label>
-              <select id="delivery-event" name="event" defaultValue="form.submitted">
-                {moduleEventNames.map((event) =>
-                <option key={event} value={event}>
-                    {event}
-                  </option>
-                )}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="delivery-code">Status code</label>
-              <input id="delivery-code" name="statusCode" type="number" min="100" max="599" />
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="delivery-error">Error</label>
-            <input id="delivery-error" name="errorMessage" />
-          </div>
-          <Button type="submit" disabled={!endpoints.length} variant="secondary">
-            Record manual delivery
-          </Button>
-        </Card>
-
         <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Webhook delivery records</h2>
+          <div className="page-header compact-header">
+            <div>
+              <h2 className="section-title">Webhook delivery records</h2>
+              <p>{recentDeliveries.length} latest deliveries</p>
+            </div>
+            <ModuleActionModals
+              items={[
+                {
+                  content: recordWebhookDeliveryForm,
+                  icon: "send",
+                  id: "delivery",
+                  label: "Delivery",
+                  title: "Record manual webhook delivery"
+                }
+              ]}
+              toolbarLabel="Webhook delivery tools"
+            />
+          </div>
           <Table>
             <thead>
               <tr>

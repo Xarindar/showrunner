@@ -23,6 +23,7 @@ import {
   updateProductAction,
   updateProductStatusAction } from "./actions";
 import { Button, ButtonAnchor, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
+import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
 
@@ -140,6 +141,162 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   );
   const savedMessage = params.saved ? "Commerce changes saved." : null;
   const errorMessage = params.error || null;
+  const checkoutTotalsForm = (
+    <form action={updateCommerceCheckoutSettingsAction} className="form-grid">
+      <p className="lead lead-compact">
+        Configure the per-site tax rule and standard shipping option used by cart, orders, and hosted checkout.
+      </p>
+      <EqualGrid>
+        <div className="subpanel form-grid">
+          <h3 className="subsection-title">Tax</h3>
+          <label className="ui-zero">
+            <input name="commerceTaxEnabled" type="checkbox" defaultChecked={settings.commerceTaxEnabled} />
+            Enable tax
+          </label>
+          <EqualGrid>
+            <div className="ui-field">
+              <label htmlFor="commerceTaxLabel">Tax label</label>
+              <input id="commerceTaxLabel" name="commerceTaxLabel" defaultValue={settings.commerceTaxLabel} required />
+            </div>
+            <div className="ui-field">
+              <label htmlFor="commerceTaxRate">Tax rate %</label>
+              <input id="commerceTaxRate" name="commerceTaxRate" inputMode="decimal" defaultValue={percentInput(settings.commerceTaxRateBps)} />
+            </div>
+          </EqualGrid>
+          <label className="ui-zero">
+            <input name="commerceTaxAppliesToShipping" type="checkbox" defaultChecked={settings.commerceTaxAppliesToShipping} />
+            Tax shipping
+          </label>
+        </div>
+
+        <div className="subpanel form-grid">
+          <h3 className="subsection-title">Shipping</h3>
+          <label className="ui-zero">
+            <input name="commerceShippingEnabled" type="checkbox" defaultChecked={settings.commerceShippingEnabled} />
+            Enable standard shipping
+          </label>
+          <EqualGrid>
+            <div className="ui-field">
+              <label htmlFor="commerceShippingLabel">Shipping label</label>
+              <input id="commerceShippingLabel" name="commerceShippingLabel" defaultValue={settings.commerceShippingLabel} required />
+            </div>
+            <div className="ui-field">
+              <label htmlFor="commerceShippingFlat">Flat amount</label>
+              <input
+                id="commerceShippingFlat"
+                name="commerceShippingFlat"
+                inputMode="decimal"
+                defaultValue={moneyInput(settings.commerceShippingFlatCents)} />
+            </div>
+          </EqualGrid>
+          <div className="ui-field">
+            <label htmlFor="commerceFreeShippingThreshold">Free shipping threshold</label>
+            <input
+              id="commerceFreeShippingThreshold"
+              name="commerceFreeShippingThreshold"
+              inputMode="decimal"
+              defaultValue={moneyInput(settings.commerceFreeShippingThresholdCents)} />
+          </div>
+        </div>
+      </EqualGrid>
+      <div className="module-modal-actions">
+        <Button type="submit">
+          Save checkout totals
+        </Button>
+      </div>
+    </form>
+  );
+  const addProductForm = (
+    <form action={createProductAction} className="form-grid">
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="name">Name</label>
+          <input id="name" name="name" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="slug">Shop URL slug</label>
+          <input id="slug" name="slug" placeholder="starter-package" />
+        </div>
+      </EqualGrid>
+      <EqualGrid min="220px">
+        <div className="ui-field">
+          <label htmlFor="type">Type</label>
+          <select id="type" name="type" defaultValue={ProductType.PHYSICAL}>
+            {Object.values(ProductType).map((type) =>
+            <option key={type} value={type}>
+                {enumLabel(type)}
+              </option>
+            )}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="status">Status</label>
+          <select id="status" name="status" defaultValue={ProductStatus.DRAFT}>
+            {Object.values(ProductStatus).map((status) =>
+            <option key={status} value={status}>
+                {status.toLowerCase()}
+              </option>
+            )}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="currency">Currency</label>
+          <input id="currency" name="currency" defaultValue="USD" maxLength={3} required />
+        </div>
+      </EqualGrid>
+      <EqualGrid min="220px">
+        <div className="ui-field">
+          <label htmlFor="basePrice">Price</label>
+          <input id="basePrice" name="basePrice" inputMode="decimal" placeholder="125.00" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="compareAtPrice">Compare-at price</label>
+          <input id="compareAtPrice" name="compareAtPrice" inputMode="decimal" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="sku">SKU</label>
+          <input id="sku" name="sku" />
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="summary">Summary</label>
+        <input id="summary" name="summary" />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="description">Description</label>
+        <textarea id="description" name="description" />
+      </div>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="imageUrl">Image URL</label>
+          <input id="imageUrl" name="imageUrl" placeholder="/hero.svg" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="tags">Tags</label>
+          <input id="tags" name="tags" placeholder="package, featured" />
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <label className="ui-zero">
+          <input name="trackInventory" type="checkbox" />
+          Track default variant inventory
+        </label>
+        <div className="ui-field">
+          <label htmlFor="inventoryQuantity">Inventory quantity</label>
+          <input id="inventoryQuantity" name="inventoryQuantity" min="0" type="number" />
+        </div>
+      </EqualGrid>
+      <p className="lead lead-compact">
+        Inventory is governed per variant. This product-level value seeds and mirrors the default variant.
+      </p>
+      <div className="module-modal-actions">
+        <Button type="submit">
+          <PackagePlus size={18} />
+          Add product
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="stack">
@@ -178,166 +335,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </Card>
       </EqualGrid>
 
-      <Card as="section" minHeight="none" bodyClassName="form-grid">
-        <div className="page-header flush-header">
-          <div>
-            <h2 className="section-title">Checkout totals</h2>
-            <p>Configure the per-site tax rule and standard shipping option used by cart, orders, and hosted checkout.</p>
-          </div>
-          <CreditCard size={22} />
-        </div>
-        <form action={updateCommerceCheckoutSettingsAction} className="form-grid">
-          <EqualGrid>
-            <div className="subpanel form-grid">
-              <h3 className="subsection-title">Tax</h3>
-              <label className="ui-zero">
-                <input name="commerceTaxEnabled" type="checkbox" defaultChecked={settings.commerceTaxEnabled} />
-                Enable tax
-              </label>
-              <EqualGrid>
-                <div className="ui-field">
-                  <label htmlFor="commerceTaxLabel">Tax label</label>
-                  <input id="commerceTaxLabel" name="commerceTaxLabel" defaultValue={settings.commerceTaxLabel} required />
-                </div>
-                <div className="ui-field">
-                  <label htmlFor="commerceTaxRate">Tax rate %</label>
-                  <input id="commerceTaxRate" name="commerceTaxRate" inputMode="decimal" defaultValue={percentInput(settings.commerceTaxRateBps)} />
-                </div>
-              </EqualGrid>
-              <label className="ui-zero">
-                <input name="commerceTaxAppliesToShipping" type="checkbox" defaultChecked={settings.commerceTaxAppliesToShipping} />
-                Tax shipping
-              </label>
-            </div>
-
-            <div className="subpanel form-grid">
-              <h3 className="subsection-title">Shipping</h3>
-              <label className="ui-zero">
-                <input name="commerceShippingEnabled" type="checkbox" defaultChecked={settings.commerceShippingEnabled} />
-                Enable standard shipping
-              </label>
-              <EqualGrid>
-                <div className="ui-field">
-                  <label htmlFor="commerceShippingLabel">Shipping label</label>
-                  <input id="commerceShippingLabel" name="commerceShippingLabel" defaultValue={settings.commerceShippingLabel} required />
-                </div>
-                <div className="ui-field">
-                  <label htmlFor="commerceShippingFlat">Flat amount</label>
-                  <input
-                    id="commerceShippingFlat"
-                    name="commerceShippingFlat"
-                    inputMode="decimal"
-                    defaultValue={moneyInput(settings.commerceShippingFlatCents)} />
-                  
-                </div>
-              </EqualGrid>
-              <div className="ui-field">
-                <label htmlFor="commerceFreeShippingThreshold">Free shipping threshold</label>
-                <input
-                  id="commerceFreeShippingThreshold"
-                  name="commerceFreeShippingThreshold"
-                  inputMode="decimal"
-                  defaultValue={moneyInput(settings.commerceFreeShippingThresholdCents)} />
-                
-              </div>
-            </div>
-          </EqualGrid>
-          <Button type="submit">
-            Save checkout totals
-          </Button>
-        </form>
-      </Card>
-
       <EqualGrid as="section">
-        <Card action={createProductAction} as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Add product</h2>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="name">Name</label>
-              <input id="name" name="name" required />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="slug">Shop URL slug</label>
-              <input id="slug" name="slug" placeholder="starter-package" />
-            </div>
-          </EqualGrid>
-          <EqualGrid min="220px">
-            <div className="ui-field">
-              <label htmlFor="type">Type</label>
-              <select id="type" name="type" defaultValue={ProductType.PHYSICAL}>
-                {Object.values(ProductType).map((type) =>
-                <option key={type} value={type}>
-                    {enumLabel(type)}
-                  </option>
-                )}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="status">Status</label>
-              <select id="status" name="status" defaultValue={ProductStatus.DRAFT}>
-                {Object.values(ProductStatus).map((status) =>
-                <option key={status} value={status}>
-                    {status.toLowerCase()}
-                  </option>
-                )}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="currency">Currency</label>
-              <input id="currency" name="currency" defaultValue="USD" maxLength={3} required />
-            </div>
-          </EqualGrid>
-          <EqualGrid min="220px">
-            <div className="ui-field">
-              <label htmlFor="basePrice">Price</label>
-              <input id="basePrice" name="basePrice" inputMode="decimal" placeholder="125.00" required />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="compareAtPrice">Compare-at price</label>
-              <input id="compareAtPrice" name="compareAtPrice" inputMode="decimal" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="sku">SKU</label>
-              <input id="sku" name="sku" />
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="summary">Summary</label>
-            <input id="summary" name="summary" />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="description">Description</label>
-            <textarea id="description" name="description" />
-          </div>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="imageUrl">Image URL</label>
-              <input id="imageUrl" name="imageUrl" placeholder="/hero.svg" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="tags">Tags</label>
-              <input id="tags" name="tags" placeholder="package, featured" />
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <label className="ui-zero">
-              <input name="trackInventory" type="checkbox" />
-              Track default variant inventory
-            </label>
-            <div className="ui-field">
-              <label htmlFor="inventoryQuantity">Inventory quantity</label>
-              <input id="inventoryQuantity" name="inventoryQuantity" min="0" type="number" />
-            </div>
-          </EqualGrid>
-          <p className="lead lead-compact">
-            Inventory is governed per variant. This product-level value seeds and mirrors the default variant.
-          </p>
-          <Button type="submit">
-            <PackagePlus size={18} />
-            Add product
-          </Button>
-        </Card>
-
         <Card>
           <div className="page-header compact-header">
             <div>
@@ -345,6 +343,25 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               <p>{productCount} matching products</p>
             </div>
             <div className="ui-zero">
+              <ModuleActionModals
+                items={[
+                  {
+                    content: addProductForm,
+                    icon: "package",
+                    id: "product",
+                    label: "Product",
+                    title: "Add product"
+                  },
+                  {
+                    content: checkoutTotalsForm,
+                    icon: "receipt",
+                    id: "checkout",
+                    label: "Checkout totals",
+                    title: "Checkout totals"
+                  }
+                ]}
+                toolbarLabel="Catalog tools"
+              />
               {statusFilters.map((filter) =>
               <a className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"} href={`/admin/modules/products?status=${filter}`} key={filter}>
                   {filter}

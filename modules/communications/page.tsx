@@ -25,6 +25,7 @@ import {
   updateMessageTemplateStatusAction } from "./actions";
 import { EmailTemplateBuilder } from "./components/email-template-builder";
 import { Button, Card, EqualGrid, Table } from "@/components/ui";
+import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
 
@@ -236,6 +237,206 @@ export default async function CommunicationsPage({ searchParams }: Communication
   for (const version of templateVersions) {
     versionsByTemplateId.set(version.templateId, [...(versionsByTemplateId.get(version.templateId) || []), version]);
   }
+  const createTemplateForm = (
+    <form action={createMessageTemplateAction} className="form-grid">
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="template-name">Name</label>
+          <input id="template-name" name="name" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="template-purpose">Purpose</label>
+          <select id="template-purpose" name="purpose" defaultValue={MessageTemplatePurpose.BOOKING_CONFIRMATION}>
+            {Object.values(MessageTemplatePurpose).map((purpose) => (
+              <option key={purpose} value={purpose}>
+                {enumLabel(purpose)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="template-channel">Channel</label>
+          <select id="template-channel" name="channel" defaultValue={MessageChannel.EMAIL}>
+            {Object.values(MessageChannel).map((channel) => (
+              <option key={channel} value={channel}>
+                {enumLabel(channel)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <label className="ui-check-row">
+          <input name="isActive" type="checkbox" defaultChecked />
+          Active
+        </label>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="template-subject">Subject</label>
+        <input id="template-subject" name="subject" placeholder="{{businessName}} appointment request" />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="template-body">Body</label>
+        <textarea id="template-body" name="body" required />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="template-tokens">Allowed tokens</label>
+        <input id="template-tokens" name="tokens" placeholder="businessName, customerName, appointmentTime" />
+      </div>
+      <div className="module-modal-actions">
+        <Button type="submit">
+          <Plus size={18} />
+          Add manual template
+        </Button>
+      </div>
+    </form>
+  );
+  const previewTemplateForm = (
+    <form action="/admin/modules/communications" method="get" className="form-grid">
+      <div className="ui-field">
+        <label htmlFor="preview-template">Template</label>
+        <select id="preview-template" name="previewTemplate" defaultValue={previewTemplate?.id || ""}>
+          {templates.map((template) => (
+            <option key={template.id} value={template.id}>
+              {template.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="ui-field">
+        <label htmlFor="preview-sample-event">Sample event data</label>
+        <select id="preview-sample-event" name="sampleEvent" defaultValue={selectedSampleEvent}>
+          {["booking", "order", "invoice", "form", "gallery", "general"].map((event) => (
+            <option key={event} value={event}>
+              {event}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="ui-field">
+        <label htmlFor="preview-tokens">Token JSON</label>
+        <textarea id="preview-tokens" name="tokensJson" defaultValue={previewTokensText} />
+      </div>
+      <div className="module-modal-actions">
+        <Button type="submit" variant="secondary">
+          Render preview
+        </Button>
+      </div>
+    </form>
+  );
+  const recordManualNoteForm = (
+    <form action={recordMessageLogAction} className="form-grid">
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="log-template">Template</label>
+          <select id="log-template" name="templateId" defaultValue="">
+            <option value="">No template</option>
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="log-status">Status</label>
+          <select id="log-status" name="status" defaultValue={MessageLogStatus.SENT}>
+            {Object.values(MessageLogStatus).map((status) => (
+              <option key={status} value={status}>
+                {enumLabel(status)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="log-channel">Channel</label>
+          <select id="log-channel" name="channel" defaultValue={MessageChannel.EMAIL}>
+            {Object.values(MessageChannel).map((channel) => (
+              <option key={channel} value={channel}>
+                {enumLabel(channel)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="log-purpose">Purpose</label>
+          <input id="log-purpose" name="purpose" placeholder="booking_confirmation" />
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="recipient-email">Recipient email</label>
+          <input id="recipient-email" name="recipientEmail" type="email" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="recipient-phone">Recipient phone</label>
+          <input id="recipient-phone" name="recipientPhone" />
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="log-subject">Subject</label>
+        <input id="log-subject" name="subject" />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="log-body">Body preview</label>
+        <textarea id="log-body" name="bodyPreview" />
+      </div>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="related-type">Related type</label>
+          <input id="related-type" name="relatedType" placeholder="booking" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="related-id">Related id</label>
+          <input id="related-id" name="relatedId" />
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="log-error">Error message</label>
+        <input id="log-error" name="errorMessage" />
+      </div>
+      <div className="module-modal-actions">
+        <Button type="submit" variant="secondary">
+          Record manual note
+        </Button>
+      </div>
+    </form>
+  );
+  const addSuppressionForm = (
+    <form action={createSuppressionEntryAction} className="form-grid">
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="suppression-email">Email</label>
+          <input id="suppression-email" name="email" type="email" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="suppression-source">Source</label>
+          <input id="suppression-source" name="source" placeholder="admin" />
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="suppression-scope">Scope</label>
+        <select id="suppression-scope" name="scope" defaultValue={EmailSuppressionScope.MARKETING}>
+          {Object.values(EmailSuppressionScope).map((scope) => (
+            <option key={scope} value={scope}>
+              {enumLabel(scope)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="ui-field">
+        <label htmlFor="suppression-reason">Reason</label>
+        <input id="suppression-reason" name="reason" placeholder="Unsubscribed from marketing" />
+      </div>
+      <div className="module-modal-actions">
+        <Button type="submit" variant="secondary">
+          Suppress email
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="stack">
@@ -346,61 +547,25 @@ export default async function CommunicationsPage({ searchParams }: Communication
         </div>
       </section>
 
-      <EqualGrid as="section">
-        <Card action={createMessageTemplateAction} as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Create manual template</h2>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="template-name">Name</label>
-              <input id="template-name" name="name" required />
+      <Card as="section" bodyClassName="ui-stack">
+          <div className="page-header compact-header">
+            <div>
+              <h2 className="section-title">Template library</h2>
             </div>
-            <div className="ui-field">
-              <label htmlFor="template-purpose">Purpose</label>
-              <select id="template-purpose" name="purpose" defaultValue={MessageTemplatePurpose.BOOKING_CONFIRMATION}>
-                {Object.values(MessageTemplatePurpose).map((purpose) =>
-                <option key={purpose} value={purpose}>
-                    {enumLabel(purpose)}
-                  </option>
-                )}
-              </select>
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="template-channel">Channel</label>
-              <select id="template-channel" name="channel" defaultValue={MessageChannel.EMAIL}>
-                {Object.values(MessageChannel).map((channel) =>
-                <option key={channel} value={channel}>
-                    {enumLabel(channel)}
-                  </option>
-                )}
-              </select>
-            </div>
-            <label className="ui-zero">
-              <input name="isActive" type="checkbox" defaultChecked />
-              Active
-            </label>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="template-subject">Subject</label>
-            <input id="template-subject" name="subject" placeholder="{{businessName}} appointment request" />
+            <ModuleActionModals
+              items={[
+                {
+                  content: createTemplateForm,
+                  icon: "mail",
+                  id: "create",
+                  label: "Create",
+                  title: "Create manual template",
+                  variant: "primary"
+                }
+              ]}
+              toolbarLabel="Template tools"
+            />
           </div>
-          <div className="ui-field">
-            <label htmlFor="template-body">Body</label>
-            <textarea id="template-body" name="body" required />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="template-tokens">Allowed tokens</label>
-            <input id="template-tokens" name="tokens" placeholder="businessName, customerName, appointmentTime" />
-          </div>
-          <Button type="submit">
-            <Plus size={18} />
-            Add manual template
-          </Button>
-        </Card>
-
-        <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Template library</h2>
           <Table>
             <thead>
               <tr>
@@ -461,42 +626,25 @@ export default async function CommunicationsPage({ searchParams }: Communication
             </tbody>
           </Table>
         </Card>
-      </EqualGrid>
 
-      <EqualGrid as="section">
-        <Card action="/admin/modules/communications" method="get" as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Preview template</h2>
-          <div className="ui-field">
-            <label htmlFor="preview-template">Template</label>
-            <select id="preview-template" name="previewTemplate" defaultValue={previewTemplate?.id || ""}>
-              {templates.map((template) =>
-              <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              )}
-            </select>
+      <Card as="section" bodyClassName="ui-stack">
+          <div className="page-header compact-header">
+            <div>
+              <h2 className="section-title">Rendered email</h2>
+            </div>
+            <ModuleActionModals
+              items={[
+                {
+                  content: previewTemplateForm,
+                  icon: "wand",
+                  id: "preview",
+                  label: "Preview",
+                  title: "Preview template"
+                }
+              ]}
+              toolbarLabel="Email preview tools"
+            />
           </div>
-          <div className="ui-field">
-            <label htmlFor="preview-sample-event">Sample event data</label>
-            <select id="preview-sample-event" name="sampleEvent" defaultValue={selectedSampleEvent}>
-              {["booking", "order", "invoice", "form", "gallery", "general"].map((event) =>
-              <option key={event} value={event}>
-                  {event}
-                </option>
-              )}
-            </select>
-          </div>
-          <div className="ui-field">
-            <label htmlFor="preview-tokens">Token JSON</label>
-            <textarea id="preview-tokens" name="tokensJson" defaultValue={previewTokensText} />
-          </div>
-          <Button type="submit" variant="secondary">
-            Render preview
-          </Button>
-        </Card>
-
-        <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Rendered email</h2>
           {preview?.error ? <div className="error">{preview.error}</div> : null}
           {preview?.rendered ?
           <div className="subpanel stack">
@@ -537,89 +685,25 @@ export default async function CommunicationsPage({ searchParams }: Communication
             </form> :
           null}
         </Card>
-      </EqualGrid>
 
-      <EqualGrid as="section">
-        <Card action={recordMessageLogAction} as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Record manual delivery note</h2>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="log-template">Template</label>
-              <select id="log-template" name="templateId" defaultValue="">
-                <option value="">No template</option>
-                {templates.map((template) =>
-                <option key={template.id} value={template.id}>
-                    {template.name}
-                  </option>
-                )}
-              </select>
+      <Card as="section" bodyClassName="ui-stack">
+          <div className="page-header compact-header">
+            <div>
+              <h2 className="section-title">Actual outbox delivery</h2>
             </div>
-            <div className="ui-field">
-              <label htmlFor="log-status">Status</label>
-              <select id="log-status" name="status" defaultValue={MessageLogStatus.SENT}>
-                {Object.values(MessageLogStatus).map((status) =>
-                <option key={status} value={status}>
-                    {enumLabel(status)}
-                  </option>
-                )}
-              </select>
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="log-channel">Channel</label>
-              <select id="log-channel" name="channel" defaultValue={MessageChannel.EMAIL}>
-                {Object.values(MessageChannel).map((channel) =>
-                <option key={channel} value={channel}>
-                    {enumLabel(channel)}
-                  </option>
-                )}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="log-purpose">Purpose</label>
-              <input id="log-purpose" name="purpose" placeholder="booking_confirmation" />
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="recipient-email">Recipient email</label>
-              <input id="recipient-email" name="recipientEmail" type="email" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="recipient-phone">Recipient phone</label>
-              <input id="recipient-phone" name="recipientPhone" />
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="log-subject">Subject</label>
-            <input id="log-subject" name="subject" />
+            <ModuleActionModals
+              items={[
+                {
+                  content: recordManualNoteForm,
+                  icon: "send",
+                  id: "note",
+                  label: "Manual note",
+                  title: "Record manual delivery note"
+                }
+              ]}
+              toolbarLabel="Outbox tools"
+            />
           </div>
-          <div className="ui-field">
-            <label htmlFor="log-body">Body preview</label>
-            <textarea id="log-body" name="bodyPreview" />
-          </div>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="related-type">Related type</label>
-              <input id="related-type" name="relatedType" placeholder="booking" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="related-id">Related id</label>
-              <input id="related-id" name="relatedId" />
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="log-error">Error message</label>
-            <input id="log-error" name="errorMessage" />
-          </div>
-          <Button type="submit" variant="secondary">
-            Record manual note
-          </Button>
-        </Card>
-
-        <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Actual outbox delivery</h2>
           <Table>
             <thead>
               <tr>
@@ -732,42 +816,25 @@ export default async function CommunicationsPage({ searchParams }: Communication
             </Table>
           </div>
         </Card>
-      </EqualGrid>
 
-      <EqualGrid as="section">
-        <Card action={createSuppressionEntryAction} as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Add suppression</h2>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="suppression-email">Email</label>
-              <input id="suppression-email" name="email" type="email" required />
+      <Card as="section" bodyClassName="ui-stack">
+          <div className="page-header compact-header">
+            <div>
+              <h2 className="section-title">Suppression list</h2>
             </div>
-            <div className="ui-field">
-              <label htmlFor="suppression-source">Source</label>
-              <input id="suppression-source" name="source" placeholder="admin" />
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="suppression-scope">Scope</label>
-            <select id="suppression-scope" name="scope" defaultValue={EmailSuppressionScope.MARKETING}>
-              {Object.values(EmailSuppressionScope).map((scope) =>
-              <option key={scope} value={scope}>
-                  {enumLabel(scope)}
-                </option>
-              )}
-            </select>
+            <ModuleActionModals
+              items={[
+                {
+                  content: addSuppressionForm,
+                  icon: "plus",
+                  id: "suppress",
+                  label: "Add",
+                  title: "Add suppression"
+                }
+              ]}
+              toolbarLabel="Suppression tools"
+            />
           </div>
-          <div className="ui-field">
-            <label htmlFor="suppression-reason">Reason</label>
-            <input id="suppression-reason" name="reason" placeholder="Unsubscribed from marketing" />
-          </div>
-          <Button type="submit" variant="secondary">
-            Suppress email
-          </Button>
-        </Card>
-
-        <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Suppression list</h2>
           <Table>
             <thead>
               <tr>
@@ -807,7 +874,6 @@ export default async function CommunicationsPage({ searchParams }: Communication
             </tbody>
           </Table>
         </Card>
-      </EqualGrid>
     </div>);
 
 }

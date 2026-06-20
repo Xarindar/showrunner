@@ -6,6 +6,7 @@ import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { Badge, Button, ButtonLink, Card, EqualGrid, Feedback, Field, Input, Select, Stack, StatTile, Table } from "@/components/ui";
+import { ModuleActionModals } from "@/components/ui/module-action-modals";
 import { createAnalyticsGoalAction, recordAnalyticsEventAction, updateAnalyticsGoalStatusAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -101,6 +102,90 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const topSources = countBy(recentEvents, (event) => [event.source, event.medium].filter(Boolean).join(" / ")).slice(0, 8);
   const savedMessage = params.saved ? "Analytics changes saved." : null;
   const errorMessage = params.error || null;
+  const recordEventForm = (
+    <form action={recordAnalyticsEventAction} className="form-grid">
+      <EqualGrid>
+        <Field label="Event type" htmlFor="event-type">
+          <Select id="event-type" name="eventType" defaultValue={AnalyticsEventType.CUSTOM}>
+            {Object.values(AnalyticsEventType).map((type) => (
+              <option key={type} value={type}>
+                {enumLabel(type)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Event name" htmlFor="event-name">
+          <Input id="event-name" name="eventName" placeholder="custom_event_name" />
+        </Field>
+      </EqualGrid>
+      <EqualGrid min="220px">
+        <Field label="Source" htmlFor="event-source"><Input id="event-source" name="source" placeholder="google" /></Field>
+        <Field label="Medium" htmlFor="event-medium"><Input id="event-medium" name="medium" placeholder="organic" /></Field>
+        <Field label="Campaign" htmlFor="event-campaign"><Input id="event-campaign" name="campaign" /></Field>
+      </EqualGrid>
+      <EqualGrid>
+        <Field label="Pathname" htmlFor="event-pathname"><Input id="event-pathname" name="pathname" placeholder="/book" /></Field>
+        <Field label="Landing page" htmlFor="event-landing"><Input id="event-landing" name="landingPage" placeholder="/" /></Field>
+      </EqualGrid>
+      <EqualGrid>
+        <Field label="Client email" htmlFor="event-client-email"><Input id="event-client-email" name="clientEmail" type="email" /></Field>
+        <Field label="Referrer" htmlFor="event-referrer"><Input id="event-referrer" name="referrer" /></Field>
+      </EqualGrid>
+      <EqualGrid min="220px">
+        <Field label="Value" htmlFor="event-value"><Input id="event-value" name="value" inputMode="decimal" placeholder="125.00" /></Field>
+        <Field label="Currency" htmlFor="event-currency"><Input id="event-currency" name="currency" defaultValue="USD" maxLength={3} /></Field>
+        <Field label="Occurred at" htmlFor="event-occurred"><Input id="event-occurred" name="occurredAt" type="datetime-local" /></Field>
+      </EqualGrid>
+      <EqualGrid>
+        <Field label="Related type" htmlFor="event-related-type"><Input id="event-related-type" name="relatedType" placeholder="booking" /></Field>
+        <Field label="Related id" htmlFor="event-related-id"><Input id="event-related-id" name="relatedId" /></Field>
+      </EqualGrid>
+      <EqualGrid>
+        <Field label="Metadata key" htmlFor="event-metadata-key"><Input id="event-metadata-key" name="metadataKey" placeholder="service" /></Field>
+        <Field label="Metadata value" htmlFor="event-metadata-value"><Input id="event-metadata-value" name="metadataValue" /></Field>
+      </EqualGrid>
+      <div className="module-modal-actions">
+        <Button type="submit">
+          <Plus size={18} />
+          Record manual event
+        </Button>
+      </div>
+    </form>
+  );
+  const createGoalForm = (
+    <form action={createAnalyticsGoalAction} className="form-grid">
+      <EqualGrid>
+        <Field label="Name" htmlFor="goal-name"><Input id="goal-name" name="name" required /></Field>
+        <Field label="Key" htmlFor="goal-key"><Input id="goal-key" name="key" placeholder="bookings-completed" /></Field>
+      </EqualGrid>
+      <EqualGrid>
+        <Field label="Event type" htmlFor="goal-event-type">
+          <Select id="goal-event-type" name="eventType" defaultValue={AnalyticsEventType.BOOKING_COMPLETED}>
+            {Object.values(AnalyticsEventType).map((type) => (
+              <option key={type} value={type}>
+                {enumLabel(type)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Event name" htmlFor="goal-event-name"><Input id="goal-event-name" name="eventName" placeholder="booking completed" /></Field>
+      </EqualGrid>
+      <EqualGrid min="220px">
+        <Field label="Target count" htmlFor="goal-target-count"><Input id="goal-target-count" name="targetCount" type="number" min="1" defaultValue="10" required /></Field>
+        <Field label="Target value" htmlFor="goal-target-value"><Input id="goal-target-value" name="targetValue" inputMode="decimal" /></Field>
+        <Field label="Currency" htmlFor="goal-currency"><Input id="goal-currency" name="currency" defaultValue="USD" maxLength={3} /></Field>
+      </EqualGrid>
+      <label className="ui-check-row">
+        <input name="isActive" type="checkbox" defaultChecked />
+        Active
+      </label>
+      <div className="module-modal-actions">
+        <Button variant="secondary" type="submit">
+          Add goal
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="stack">
@@ -129,94 +214,31 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
       <EqualGrid as="section">
         <Card as="section" minHeight="none">
-        <form action={recordAnalyticsEventAction} className="form-grid">
-          <h2 className="section-title">Record manual event</h2>
-          <EqualGrid>
-            <Field label="Event type" htmlFor="event-type">
-              <Select id="event-type" name="eventType" defaultValue={AnalyticsEventType.CUSTOM}>
-                {Object.values(AnalyticsEventType).map((type) =>
-                  <option key={type} value={type}>
-                    {enumLabel(type)}
-                  </option>
-                  )}
-              </Select>
-            </Field>
-            <Field label="Event name" htmlFor="event-name">
-              <Input id="event-name" name="eventName" placeholder="custom_event_name" />
-            </Field>
-          </EqualGrid>
-          <EqualGrid min="220px">
-            <Field label="Source" htmlFor="event-source"><Input id="event-source" name="source" placeholder="google" /></Field>
-            <Field label="Medium" htmlFor="event-medium"><Input id="event-medium" name="medium" placeholder="organic" /></Field>
-            <Field label="Campaign" htmlFor="event-campaign"><Input id="event-campaign" name="campaign" /></Field>
-          </EqualGrid>
-          <EqualGrid>
-            <Field label="Pathname" htmlFor="event-pathname"><Input id="event-pathname" name="pathname" placeholder="/book" /></Field>
-            <Field label="Landing page" htmlFor="event-landing"><Input id="event-landing" name="landingPage" placeholder="/" /></Field>
-          </EqualGrid>
-          <EqualGrid>
-            <Field label="Client email" htmlFor="event-client-email"><Input id="event-client-email" name="clientEmail" type="email" /></Field>
-            <Field label="Referrer" htmlFor="event-referrer"><Input id="event-referrer" name="referrer" /></Field>
-          </EqualGrid>
-          <EqualGrid min="220px">
-            <Field label="Value" htmlFor="event-value"><Input id="event-value" name="value" inputMode="decimal" placeholder="125.00" /></Field>
-            <Field label="Currency" htmlFor="event-currency"><Input id="event-currency" name="currency" defaultValue="USD" maxLength={3} /></Field>
-            <Field label="Occurred at" htmlFor="event-occurred"><Input id="event-occurred" name="occurredAt" type="datetime-local" /></Field>
-          </EqualGrid>
-          <EqualGrid>
-            <Field label="Related type" htmlFor="event-related-type"><Input id="event-related-type" name="relatedType" placeholder="booking" /></Field>
-            <Field label="Related id" htmlFor="event-related-id"><Input id="event-related-id" name="relatedId" /></Field>
-          </EqualGrid>
-          <EqualGrid>
-            <Field label="Metadata key" htmlFor="event-metadata-key"><Input id="event-metadata-key" name="metadataKey" placeholder="service" /></Field>
-            <Field label="Metadata value" htmlFor="event-metadata-value"><Input id="event-metadata-value" name="metadataValue" /></Field>
-          </EqualGrid>
-          <Button type="submit">
-            <Plus size={18} />
-            Record manual event
-          </Button>
-        </form>
-        </Card>
-
-        <Card as="section" minHeight="none">
-        <form action={createAnalyticsGoalAction} className="form-grid">
-          <h2 className="section-title">Create conversion goal</h2>
-          <EqualGrid>
-            <Field label="Name" htmlFor="goal-name"><Input id="goal-name" name="name" required /></Field>
-            <Field label="Key" htmlFor="goal-key"><Input id="goal-key" name="key" placeholder="bookings-completed" /></Field>
-          </EqualGrid>
-          <EqualGrid>
-            <Field label="Event type" htmlFor="goal-event-type">
-              <Select id="goal-event-type" name="eventType" defaultValue={AnalyticsEventType.BOOKING_COMPLETED}>
-                {Object.values(AnalyticsEventType).map((type) =>
-                  <option key={type} value={type}>
-                    {enumLabel(type)}
-                  </option>
-                  )}
-              </Select>
-            </Field>
-            <Field label="Event name" htmlFor="goal-event-name"><Input id="goal-event-name" name="eventName" placeholder="booking completed" /></Field>
-          </EqualGrid>
-          <EqualGrid min="220px">
-            <Field label="Target count" htmlFor="goal-target-count"><Input id="goal-target-count" name="targetCount" type="number" min="1" defaultValue="10" required /></Field>
-            <Field label="Target value" htmlFor="goal-target-value"><Input id="goal-target-value" name="targetValue" inputMode="decimal" /></Field>
-            <Field label="Currency" htmlFor="goal-currency"><Input id="goal-currency" name="currency" defaultValue="USD" maxLength={3} /></Field>
-          </EqualGrid>
-          <label className="ui-check-row">
-            <input name="isActive" type="checkbox" defaultChecked />
-            Active
-          </label>
-          <Button variant="secondary" type="submit">
-            Add goal
-          </Button>
-        </form>
-        </Card>
-      </EqualGrid>
-
-      <EqualGrid as="section">
-        <Card as="section" minHeight="none">
         <Stack>
-          <h2 className="section-title">Conversion goals</h2>
+          <div className="page-header compact-header">
+            <div>
+              <h2 className="section-title">Conversion goals</h2>
+            </div>
+            <ModuleActionModals
+              items={[
+                {
+                  content: recordEventForm,
+                  icon: "activity",
+                  id: "event",
+                  label: "Event",
+                  title: "Record manual event"
+                },
+                {
+                  content: createGoalForm,
+                  icon: "goal",
+                  id: "goal",
+                  label: "Goal",
+                  title: "Create conversion goal"
+                }
+              ]}
+              toolbarLabel="Analytics tools"
+            />
+          </div>
           <Table>
             <thead>
               <tr>

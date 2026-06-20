@@ -26,6 +26,7 @@ import {
   updateFormStatusAction } from "./actions";
 import { formTemplates } from "./templates";
 import { Button, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
+import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
 
@@ -450,6 +451,96 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
     group.targets.map((target) => [targetKey(group.targetType, target.id), `${group.label}: ${target.label}`] as const)
     )
   );
+  const templateStarterPanel = (
+    <div className="form-grid">
+      <p className="lead lead-compact">
+        Clone a starter into a draft form, then customize fields, copy, and status before publishing.
+      </p>
+      <EqualGrid min="220px">
+        {formTemplates.map((template) =>
+        <form action={createFormFromTemplateAction} className="subpanel form-grid" key={template.key}>
+            <input type="hidden" name="templateKey" value={template.key} />
+            <div>
+              <span className="ui-badge">{template.category}</span>
+              <h3 className="ui-zero">{template.name}</h3>
+              <p className="ui-zero">{template.description}</p>
+            </div>
+            <p className="ui-zero">
+              {template.fields.length} fields - {enumLabel(template.destination)}
+            </p>
+            <Button type="submit" variant="secondary">
+              <CopyPlus size={18} />
+              Use template
+            </Button>
+          </form>
+        )}
+      </EqualGrid>
+    </div>
+  );
+  const createFormPanel = (
+    <form action={createFormAction} className="form-grid">
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="form-name">Name</label>
+          <input id="form-name" name="name" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="form-slug">Public URL slug</label>
+          <input id="form-slug" name="slug" placeholder="contact-inquiry" />
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="form-status">Status</label>
+          <select id="form-status" name="status" defaultValue={FormStatus.DRAFT}>
+            {Object.values(FormStatus).map((status) =>
+            <option key={status} value={status}>
+                {enumLabel(status)}
+              </option>
+            )}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="form-destination">Destination</label>
+          <select id="form-destination" name="destination" defaultValue={FormDestination.INQUIRY}>
+            {supportedDestinations.map((destination) =>
+            <option key={destination} value={destination}>
+                {enumLabel(destination)}
+              </option>
+            )}
+          </select>
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="form-description">Description</label>
+        <textarea id="form-description" name="description" />
+      </div>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="submitButtonLabel">Submit button</label>
+          <input id="submitButtonLabel" name="submitButtonLabel" placeholder="Submit" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="notificationEmail">Notify email</label>
+          <input id="notificationEmail" name="notificationEmail" type="email" placeholder={settings.contactEmail} />
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="successMessage">Success message</label>
+        <input id="successMessage" name="successMessage" placeholder="Thanks. Your form was submitted." />
+      </div>
+      <label className="ui-zero">
+        <input name="enableSteps" type="checkbox" />
+        Use multi-step pages
+      </label>
+      <div className="module-modal-actions">
+        <Button type="submit">
+          <Plus size={18} />
+          Create form
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="stack">
@@ -494,97 +585,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
         </Card>
       </EqualGrid>
 
-      <Card as="section" bodyClassName="ui-stack">
-        <div className="page-header flush-header">
-          <div>
-            <h2 className="section-title">Start from template</h2>
-            <p>Clone a starter into a draft form, then customize fields, copy, and status before publishing.</p>
-          </div>
-        </div>
-        <EqualGrid min="220px">
-          {formTemplates.map((template) =>
-          <form action={createFormFromTemplateAction} className="subpanel form-grid" key={template.key}>
-              <input type="hidden" name="templateKey" value={template.key} />
-              <div>
-                <span className="ui-badge">{template.category}</span>
-                <h3 className="ui-zero">{template.name}</h3>
-                <p className="ui-zero">{template.description}</p>
-              </div>
-              <p className="ui-zero">
-                {template.fields.length} fields · {enumLabel(template.destination)}
-              </p>
-              <Button type="submit" variant="secondary">
-                <CopyPlus size={18} />
-                Use template
-              </Button>
-            </form>
-          )}
-        </EqualGrid>
-      </Card>
-
       <EqualGrid as="section">
-        <Card action={createFormAction} as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Create form</h2>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="form-name">Name</label>
-              <input id="form-name" name="name" required />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="form-slug">Public URL slug</label>
-              <input id="form-slug" name="slug" placeholder="contact-inquiry" />
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="form-status">Status</label>
-              <select id="form-status" name="status" defaultValue={FormStatus.DRAFT}>
-                {Object.values(FormStatus).map((status) =>
-                <option key={status} value={status}>
-                    {enumLabel(status)}
-                  </option>
-                )}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="form-destination">Destination</label>
-              <select id="form-destination" name="destination" defaultValue={FormDestination.INQUIRY}>
-                {supportedDestinations.map((destination) =>
-                <option key={destination} value={destination}>
-                    {enumLabel(destination)}
-                  </option>
-                )}
-              </select>
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="form-description">Description</label>
-            <textarea id="form-description" name="description" />
-          </div>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="submitButtonLabel">Submit button</label>
-              <input id="submitButtonLabel" name="submitButtonLabel" placeholder="Submit" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="notificationEmail">Notify email</label>
-              <input id="notificationEmail" name="notificationEmail" type="email" placeholder={settings.contactEmail} />
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="successMessage">Success message</label>
-            <input id="successMessage" name="successMessage" placeholder="Thanks. Your form was submitted." />
-          </div>
-          <label className="ui-zero">
-            <input name="enableSteps" type="checkbox" />
-            Use multi-step pages
-          </label>
-          <Button type="submit">
-            <Plus size={18} />
-            Create form
-          </Button>
-        </Card>
-
         <Card>
           <div className="page-header compact-header">
             <div>
@@ -592,6 +593,25 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               <p>{formCount} matching forms</p>
             </div>
             <div className="ui-zero">
+              <ModuleActionModals
+                items={[
+                  {
+                    content: createFormPanel,
+                    icon: "file",
+                    id: "create",
+                    label: "Form",
+                    title: "Create form"
+                  },
+                  {
+                    content: templateStarterPanel,
+                    icon: "copy",
+                    id: "template",
+                    label: "Template",
+                    title: "Start from template"
+                  }
+                ]}
+                toolbarLabel="Form library tools"
+              />
               {statusFilters.map((filter) =>
               <Link className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"} href={`/admin/modules/forms?status=${filter}`} key={filter}>
                   {filter}

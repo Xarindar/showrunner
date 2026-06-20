@@ -13,6 +13,7 @@ import {
   updateMediaAssetAction,
   uploadMediaAction } from "./actions";
 import { Button, ButtonAnchor, Card, EqualGrid, Table } from "@/components/ui";
+import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +76,93 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
   const errorMessage = params.error === "missing-file" ? "Choose a file before uploading." : params.error;
 
   const canUpload = canUploadWithDriver(settings.mediaDriver);
+  const uploadForm = (
+    <form action={uploadMediaAction} className="form-grid">
+      <p className="lead lead-compact">
+        Current media mode: <strong>{settings.mediaDriver}</strong>. Uploads require the matching storage env vars in `.env`.
+      </p>
+      <div className="ui-field">
+        <label htmlFor="media-file">Image file</label>
+        <input id="media-file" name="file" type="file" accept="image/*" disabled={!canUpload} />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="media-alt">Alt text</label>
+        <input id="media-alt" name="alt" disabled={!canUpload} />
+      </div>
+      <label className="ui-check-row">
+        <input name="isDecorative" type="checkbox" disabled={!canUpload} />
+        Decorative image
+      </label>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="media-folder">Folder</label>
+          <input id="media-folder" name="folder" placeholder="portraits/spring" disabled={!canUpload} />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="media-tags">Tags</label>
+          <input id="media-tags" name="tags" placeholder="hero, portrait, proofing" disabled={!canUpload} />
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="media-caption">Caption</label>
+          <input id="media-caption" name="caption" disabled={!canUpload} />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="media-credit">Credit</label>
+          <input id="media-credit" name="credit" disabled={!canUpload} />
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="media-usageContext">Usage context</label>
+        <input id="media-usageContext" name="usageContext" placeholder="homepage, proofing, product" disabled={!canUpload} />
+      </div>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="media-focalPointX">Focal X</label>
+          <input id="media-focalPointX" name="focalPointX" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="media-focalPointY">Focal Y</label>
+          <input id="media-focalPointY" name="focalPointY" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
+        </div>
+      </EqualGrid>
+      <label className="ui-check-row">
+        <input name="isPrivate" type="checkbox" disabled={!canUpload} />
+        Private delivery asset
+      </label>
+      <div className="module-modal-actions">
+        <Button type="submit" disabled={!canUpload}>
+          <ImagePlus size={18} />
+          Upload image
+        </Button>
+      </div>
+      {!canUpload ? (
+        <p className="lead lead-compact">
+          Switch media mode to R2 or Cloudflare Images in Settings and add credentials to enable uploads.
+        </p>
+      ) : null}
+    </form>
+  );
+  const repoAssetsPanel = (
+    <div className="stack">
+      {repoAssets.map((asset) => (
+        <div key={asset.url} className="asset-tile">
+          <NextImage src={asset.url} alt={asset.alt} width={500} height={375} unoptimized />
+          <div className="page-header ui-zero">
+            <span>{asset.filename}</span>
+            <form action={setHeroImageAction}>
+              <input type="hidden" name="url" value={asset.url} />
+              <Button type="submit" variant="secondary">
+                <Star size={16} />
+                Use hero
+              </Button>
+            </form>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="stack">
@@ -89,93 +177,6 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       {params.saved ? <div className="success-message">Media changes saved.</div> : null}
       {errorMessage ? <div className="error">{decodeURIComponent(errorMessage)}</div> : null}
 
-      <EqualGrid as="section">
-        <Card action={uploadMediaAction} as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Upload to R2</h2>
-          <p className="lead lead-compact">
-            Current media mode: <strong>{settings.mediaDriver}</strong>. Uploads require the matching storage env vars in `.env`.
-          </p>
-          <div className="ui-field">
-            <label htmlFor="file">Image file</label>
-            <input id="file" name="file" type="file" accept="image/*" disabled={!canUpload} />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="alt">Alt text</label>
-            <input id="alt" name="alt" disabled={!canUpload} />
-          </div>
-          <label className="ui-zero">
-            <input name="isDecorative" type="checkbox" disabled={!canUpload} />
-            Decorative image
-          </label>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="folder">Folder</label>
-              <input id="folder" name="folder" placeholder="portraits/spring" disabled={!canUpload} />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="tags">Tags</label>
-              <input id="tags" name="tags" placeholder="hero, portrait, proofing" disabled={!canUpload} />
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="caption">Caption</label>
-            <input id="caption" name="caption" disabled={!canUpload} />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="credit">Credit</label>
-            <input id="credit" name="credit" disabled={!canUpload} />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="usageContext">Usage context</label>
-            <input id="usageContext" name="usageContext" placeholder="homepage, proofing, product" disabled={!canUpload} />
-          </div>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="focalPointX">Focal X</label>
-              <input id="focalPointX" name="focalPointX" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="focalPointY">Focal Y</label>
-              <input id="focalPointY" name="focalPointY" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
-            </div>
-          </EqualGrid>
-          <label className="ui-zero">
-            <input name="isPrivate" type="checkbox" disabled={!canUpload} />
-            Private delivery asset
-          </label>
-          <Button type="submit" disabled={!canUpload}>
-            <ImagePlus size={18} />
-            Upload image
-          </Button>
-          {!canUpload ?
-          <p className="lead lead-compact">
-              Switch media mode to R2 or Cloudflare Images in Settings and add credentials to enable uploads.
-            </p> :
-          null}
-        </Card>
-
-        <Card>
-          <h2 className="section-title">Repo assets</h2>
-          <div className="stack">
-            {repoAssets.map((asset) =>
-            <div key={asset.url} className="asset-tile">
-                <NextImage src={asset.url} alt={asset.alt} width={500} height={375} unoptimized />
-                <div className="page-header ui-zero">
-                  <span>{asset.filename}</span>
-                  <form action={setHeroImageAction}>
-                    <input type="hidden" name="url" value={asset.url} />
-                    <Button type="submit" variant="secondary">
-                      <Star size={16} />
-                      Use hero
-                    </Button>
-                  </form>
-                </div>
-              </div>
-            )}
-          </div>
-        </Card>
-      </EqualGrid>
-
       <Card as="section">
         <div className="page-header compact-header">
           <div>
@@ -184,6 +185,26 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
               {assetCount} active assets {archivedCount ? `- ${archivedCount} archived` : ""}
             </p>
           </div>
+          <ModuleActionModals
+            items={[
+              {
+                content: uploadForm,
+                icon: "upload",
+                id: "upload",
+                label: "Upload",
+                title: "Upload image",
+                variant: "primary"
+              },
+              {
+                content: repoAssetsPanel,
+                icon: "image",
+                id: "repo",
+                label: "Repo assets",
+                title: "Repo assets"
+              }
+            ]}
+            toolbarLabel="Media tools"
+          />
         </div>
         {folderGroups.length ?
         <div className="ui-zero">

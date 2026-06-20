@@ -22,6 +22,7 @@ import {
   updatePortfolioGalleryStatusAction,
   updatePortfolioProofRoundStatusAction } from "./actions";
 import { Button, ButtonAnchor, Card, EqualGrid, Table } from "@/components/ui";
+import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +127,112 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
   const selectedDownloadableCount = selectedGallery?.items.filter((item) => item.isDownloadable && item.mediaAssetId).length || 0;
   const savedMessage = params.saved ? "Portfolio changes saved." : null;
   const errorMessage = params.error || null;
+  const createGalleryForm = (
+    <form action={createPortfolioGalleryAction} className="form-grid">
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="gallery-title">Title</label>
+          <input id="gallery-title" name="title" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="gallery-slug">Slug</label>
+          <input id="gallery-slug" name="slug" placeholder="spring-portraits" />
+        </div>
+      </EqualGrid>
+      <EqualGrid min="220px">
+        <div className="ui-field">
+          <label htmlFor="gallery-status">Status</label>
+          <select id="gallery-status" name="status" defaultValue={PortfolioGalleryStatus.DRAFT}>
+            {Object.values(PortfolioGalleryStatus).map((status) =>
+            <option key={status} value={status}>
+                {enumLabel(status)}
+              </option>
+            )}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="gallery-visibility">Visibility</label>
+          <select id="gallery-visibility" name="visibility" defaultValue={PortfolioGalleryVisibility.PUBLIC}>
+            {Object.values(PortfolioGalleryVisibility).map((visibility) =>
+            <option key={visibility} value={visibility}>
+                {enumLabel(visibility)}
+              </option>
+            )}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="gallery-sort">Sort order</label>
+          <input id="gallery-sort" name="sortOrder" type="number" defaultValue="0" />
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="gallery-layout">Layout</label>
+        <select id="gallery-layout" name="layout" defaultValue={PortfolioGalleryLayout.GRID}>
+          {Object.values(PortfolioGalleryLayout).map((layout) =>
+          <option key={layout} value={layout}>
+              {enumLabel(layout)}
+            </option>
+          )}
+        </select>
+      </div>
+      <EqualGrid min="220px">
+        <div className="ui-field">
+          <label htmlFor="gallery-category">Category</label>
+          <input id="gallery-category" name="category" placeholder="Portraits" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="gallery-location">Location</label>
+          <input id="gallery-location" name="location" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="gallery-shot-at">Shoot date</label>
+          <input id="gallery-shot-at" name="shotAt" type="date" />
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="gallery-description">Description</label>
+        <textarea id="gallery-description" name="description" />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="gallery-cover">Cover image URL</label>
+        <input id="gallery-cover" name="coverImageUrl" placeholder="/hero.svg" />
+      </div>
+      <EqualGrid>
+        <label className="ui-zero">
+          <input name="proofingEnabled" type="checkbox" defaultChecked />
+          Proofing enabled
+        </label>
+        <label className="ui-zero">
+          <input name="downloadEnabled" type="checkbox" />
+          Downloads enabled
+        </label>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="gallery-access-code">Password access code</label>
+        <input id="gallery-access-code" name="accessCode" type="password" />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="gallery-rights">Rights notes</label>
+        <textarea id="gallery-rights" name="rightsNotes" />
+      </div>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="gallery-seo-title">SEO title</label>
+          <input id="gallery-seo-title" name="seoTitle" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="gallery-seo-description">SEO description</label>
+          <input id="gallery-seo-description" name="seoDescription" />
+        </div>
+      </EqualGrid>
+      <div className="module-modal-actions">
+        <Button type="submit">
+          <ImageIcon size={18} />
+          Create gallery
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="stack">
@@ -165,112 +272,25 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
       </EqualGrid>
 
       <EqualGrid as="section">
-        <Card action={createPortfolioGalleryAction} as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Create gallery</h2>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="gallery-title">Title</label>
-              <input id="gallery-title" name="title" required />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="gallery-slug">Slug</label>
-              <input id="gallery-slug" name="slug" placeholder="spring-portraits" />
-            </div>
-          </EqualGrid>
-          <EqualGrid min="220px">
-            <div className="ui-field">
-              <label htmlFor="gallery-status">Status</label>
-              <select id="gallery-status" name="status" defaultValue={PortfolioGalleryStatus.DRAFT}>
-                {Object.values(PortfolioGalleryStatus).map((status) =>
-                <option key={status} value={status}>
-                    {enumLabel(status)}
-                  </option>
-                )}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="gallery-visibility">Visibility</label>
-              <select id="gallery-visibility" name="visibility" defaultValue={PortfolioGalleryVisibility.PUBLIC}>
-                {Object.values(PortfolioGalleryVisibility).map((visibility) =>
-                <option key={visibility} value={visibility}>
-                    {enumLabel(visibility)}
-                  </option>
-                )}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="gallery-sort">Sort order</label>
-              <input id="gallery-sort" name="sortOrder" type="number" defaultValue="0" />
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="gallery-layout">Layout</label>
-            <select id="gallery-layout" name="layout" defaultValue={PortfolioGalleryLayout.GRID}>
-              {Object.values(PortfolioGalleryLayout).map((layout) =>
-              <option key={layout} value={layout}>
-                  {enumLabel(layout)}
-                </option>
-              )}
-            </select>
-          </div>
-          <EqualGrid min="220px">
-            <div className="ui-field">
-              <label htmlFor="gallery-category">Category</label>
-              <input id="gallery-category" name="category" placeholder="Portraits" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="gallery-location">Location</label>
-              <input id="gallery-location" name="location" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="gallery-shot-at">Shoot date</label>
-              <input id="gallery-shot-at" name="shotAt" type="date" />
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="gallery-description">Description</label>
-            <textarea id="gallery-description" name="description" />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="gallery-cover">Cover image URL</label>
-            <input id="gallery-cover" name="coverImageUrl" placeholder="/hero.svg" />
-          </div>
-          <EqualGrid>
-            <label className="ui-zero">
-              <input name="proofingEnabled" type="checkbox" defaultChecked />
-              Proofing enabled
-            </label>
-            <label className="ui-zero">
-              <input name="downloadEnabled" type="checkbox" />
-              Downloads enabled
-            </label>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="gallery-access-code">Password access code</label>
-            <input id="gallery-access-code" name="accessCode" type="password" />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="gallery-rights">Rights notes</label>
-            <textarea id="gallery-rights" name="rightsNotes" />
-          </div>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="gallery-seo-title">SEO title</label>
-              <input id="gallery-seo-title" name="seoTitle" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="gallery-seo-description">SEO description</label>
-              <input id="gallery-seo-description" name="seoDescription" />
-            </div>
-          </EqualGrid>
-          <Button type="submit">
-            <ImageIcon size={18} />
-            Create gallery
-          </Button>
-        </Card>
-
         <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Gallery queue</h2>
+          <div className="page-header compact-header">
+            <div>
+              <h2 className="section-title">Gallery queue</h2>
+              <p>{galleries.length} visible galleries</p>
+            </div>
+            <ModuleActionModals
+              items={[
+                {
+                  content: createGalleryForm,
+                  icon: "image",
+                  id: "gallery",
+                  label: "Gallery",
+                  title: "Create gallery"
+                }
+              ]}
+              toolbarLabel="Gallery queue tools"
+            />
+          </div>
           <Table>
             <thead>
               <tr>

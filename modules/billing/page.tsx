@@ -19,6 +19,7 @@ import {
   updateBillingLineItemAction,
   updateBillingDocumentStatusAction } from "./actions";
 import { Button, ButtonAnchor, Card, EqualGrid, Table } from "@/components/ui";
+import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
 
@@ -182,6 +183,101 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   selectedDocument?.status === BillingDocumentStatus.PAID || selectedDocument?.status === BillingDocumentStatus.VOID;
   const selectedPaidCents = selectedDocument ? paidCents(selectedDocument.payments) : 0;
   const selectedRemainingCents = selectedDocument ? Math.max(0, selectedDocument.totalCents - selectedPaidCents) : 0;
+  const createDocumentForm = (
+    <form action={createBillingDocumentAction} className="form-grid">
+      <EqualGrid min="220px">
+        <div className="ui-field">
+          <label htmlFor="billing-type">Type</label>
+          <select id="billing-type" name="type" defaultValue={BillingDocumentType.INVOICE}>
+            {Object.values(BillingDocumentType).map((type) => (
+              <option key={type} value={type}>
+                {enumLabel(type)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="billing-status">Status</label>
+          <select id="billing-status" name="status" defaultValue={BillingDocumentStatus.DRAFT}>
+            {[BillingDocumentStatus.DRAFT, BillingDocumentStatus.SENT].map((status) => (
+              <option key={status} value={status}>
+                {enumLabel(status)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="billing-currency">Currency</label>
+          <input id="billing-currency" name="currency" defaultValue="USD" maxLength={3} required />
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="billing-client">Client</label>
+          <select id="billing-client" name="clientId" defaultValue="">
+            <option value="">No linked client</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name} ({client.email})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="billing-due">Due date</label>
+          <input id="billing-due" name="dueAt" type="date" />
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="billing-name">Customer name</label>
+          <input id="billing-name" name="customerName" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="billing-email">Customer email</label>
+          <input id="billing-email" name="customerEmail" type="email" required />
+        </div>
+      </EqualGrid>
+      <EqualGrid min="220px">
+        <div className="ui-field">
+          <label htmlFor="line-description">First line item</label>
+          <input id="line-description" name="lineDescription" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="line-quantity">Quantity</label>
+          <input id="line-quantity" name="quantity" type="number" min="1" defaultValue="1" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="line-price">Unit price</label>
+          <input id="line-price" name="unitPrice" inputMode="decimal" placeholder="250.00" required />
+        </div>
+      </EqualGrid>
+      <EqualGrid>
+        <div className="ui-field">
+          <label htmlFor="billing-discount">Discount</label>
+          <input id="billing-discount" name="discount" inputMode="decimal" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="billing-tax">Tax</label>
+          <input id="billing-tax" name="tax" inputMode="decimal" />
+        </div>
+      </EqualGrid>
+      <div className="ui-field">
+        <label htmlFor="billing-memo">Customer memo</label>
+        <textarea id="billing-memo" name="publicMemo" />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="billing-notes">Internal notes</label>
+        <textarea id="billing-notes" name="notes" />
+      </div>
+      <div className="module-modal-actions">
+        <Button type="submit">
+          <Plus size={18} />
+          Create document
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="stack">
@@ -220,102 +316,25 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         </Card>
       </EqualGrid>
 
-      <EqualGrid as="section">
-        <Card action={createBillingDocumentAction} as="form" minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Create billing document</h2>
-          <EqualGrid min="220px">
-            <div className="ui-field">
-              <label htmlFor="billing-type">Type</label>
-              <select id="billing-type" name="type" defaultValue={BillingDocumentType.INVOICE}>
-                {Object.values(BillingDocumentType).map((type) =>
-                <option key={type} value={type}>
-                    {enumLabel(type)}
-                  </option>
-                )}
-              </select>
+      <Card as="section" bodyClassName="ui-stack">
+          <div className="page-header compact-header">
+            <div>
+              <h2 className="section-title">Billing queue</h2>
             </div>
-            <div className="ui-field">
-              <label htmlFor="billing-status">Status</label>
-              <select id="billing-status" name="status" defaultValue={BillingDocumentStatus.DRAFT}>
-                {[BillingDocumentStatus.DRAFT, BillingDocumentStatus.SENT].map((status) =>
-                <option key={status} value={status}>
-                    {enumLabel(status)}
-                  </option>
-                )}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="billing-currency">Currency</label>
-              <input id="billing-currency" name="currency" defaultValue="USD" maxLength={3} required />
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="billing-client">Client</label>
-              <select id="billing-client" name="clientId" defaultValue="">
-                <option value="">No linked client</option>
-                {clients.map((client) =>
-                <option key={client.id} value={client.id}>
-                    {client.name} ({client.email})
-                  </option>
-                )}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="billing-due">Due date</label>
-              <input id="billing-due" name="dueAt" type="date" />
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="billing-name">Customer name</label>
-              <input id="billing-name" name="customerName" required />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="billing-email">Customer email</label>
-              <input id="billing-email" name="customerEmail" type="email" required />
-            </div>
-          </EqualGrid>
-          <EqualGrid min="220px">
-            <div className="ui-field">
-              <label htmlFor="line-description">First line item</label>
-              <input id="line-description" name="lineDescription" required />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="line-quantity">Quantity</label>
-              <input id="line-quantity" name="quantity" type="number" min="1" defaultValue="1" required />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="line-price">Unit price</label>
-              <input id="line-price" name="unitPrice" inputMode="decimal" placeholder="250.00" required />
-            </div>
-          </EqualGrid>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="billing-discount">Discount</label>
-              <input id="billing-discount" name="discount" inputMode="decimal" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="billing-tax">Tax</label>
-              <input id="billing-tax" name="tax" inputMode="decimal" />
-            </div>
-          </EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="billing-memo">Customer memo</label>
-            <textarea id="billing-memo" name="publicMemo" />
+            <ModuleActionModals
+              items={[
+                {
+                  content: createDocumentForm,
+                  icon: "receipt",
+                  id: "create",
+                  label: "Create",
+                  title: "Create billing document",
+                  variant: "primary"
+                }
+              ]}
+              toolbarLabel="Billing tools"
+            />
           </div>
-          <div className="ui-field">
-            <label htmlFor="billing-notes">Internal notes</label>
-            <textarea id="billing-notes" name="notes" />
-          </div>
-          <Button type="submit">
-            <Plus size={18} />
-            Create document
-          </Button>
-        </Card>
-
-        <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Billing queue</h2>
           <Table>
             <thead>
               <tr>
@@ -364,7 +383,6 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
             </tbody>
           </Table>
         </Card>
-      </EqualGrid>
 
       {selectedDocument ?
       <EqualGrid as="section">
