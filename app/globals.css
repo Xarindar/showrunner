@@ -5236,6 +5236,282 @@ button.button:disabled,
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Clients module - compact list workspace
+--------------------------------------------------------------------------- */
+
+.clients-module {
+  gap: var(--space-3);
+}
+
+.clients-list-card {
+  min-height: min(720px, calc(100dvh - 180px));
+}
+
+.clients-list-card > .ui-card-slot-header {
+  align-items: stretch;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
+  display: block;
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-3);
+}
+
+.clients-list-head {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  width: 100%;
+}
+
+.clients-list-titlebar,
+.clients-list-controls,
+.clients-card-actions,
+.clients-pipeline-summary,
+.clients-pagination,
+.clients-modal-actions,
+.clients-filter-pills,
+.clients-delete-filter,
+.clients-row-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.clients-list-titlebar,
+.clients-list-controls,
+.clients-pagination {
+  justify-content: space-between;
+}
+
+.clients-list-titlebar {
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.clients-list-titlebar h2 {
+  font-size: 1.18rem;
+  margin-bottom: 2px;
+}
+
+.clients-card-actions,
+.clients-pipeline-summary,
+.clients-modal-actions,
+.clients-row-actions {
+  justify-content: flex-end;
+}
+
+.clients-card-actions .ui-button,
+.clients-modal-actions .ui-button,
+.clients-row-actions .ui-button {
+  min-width: 0;
+}
+
+.clients-search-form {
+  align-items: center;
+  display: flex;
+  flex: 1 1 320px;
+  gap: var(--space-2);
+  max-width: 520px;
+  min-width: min(100%, 280px);
+}
+
+.clients-search-form input {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  flex: 1 1 auto;
+  min-height: 34px;
+  min-width: 0;
+  padding: 7px 10px;
+  width: 100%;
+}
+
+.clients-search-form input:focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-focus);
+  outline: 0;
+}
+
+.clients-list-body {
+  gap: 0;
+  overflow: auto;
+}
+
+.clients-table {
+  min-width: 880px;
+}
+
+.clients-table th,
+.clients-table td {
+  height: auto;
+  padding: 10px;
+  vertical-align: top;
+}
+
+.clients-col-client {
+  width: 23%;
+}
+
+.clients-col-contact {
+  width: 20%;
+}
+
+.clients-col-activity {
+  width: 18%;
+}
+
+.clients-col-date {
+  width: 16%;
+}
+
+.clients-col-status {
+  width: 11%;
+}
+
+.clients-col-actions {
+  width: 12%;
+}
+
+.clients-primary-cell,
+.clients-contact-cell,
+.clients-status-cell {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.clients-primary-cell a,
+.clients-primary-cell strong,
+.clients-contact-cell span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clients-tag-row,
+.clients-activity-cell {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 7px;
+  min-width: 0;
+}
+
+.clients-activity-cell {
+  color: var(--color-text);
+  font-size: var(--type-caption);
+}
+
+.clients-activity-cell .muted-text {
+  flex-basis: 100%;
+}
+
+.clients-row-actions {
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.clients-row-actions form {
+  display: flex;
+}
+
+.clients-icon-button {
+  min-width: 34px !important;
+  padding: 0 !important;
+  width: 34px;
+}
+
+.clients-modal {
+  max-width: min(760px, calc(100vw - var(--space-6)));
+}
+
+.clients-modal:not([open]) {
+  display: none;
+}
+
+.clients-modal-body,
+.clients-filter-layout,
+.clients-filter-form,
+.clients-modal-section {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.clients-modal-section {
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
+  padding-top: var(--space-4);
+}
+
+.clients-modal-section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.clients-modal-section h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.clients-delete-filter {
+  justify-content: space-between;
+}
+
+.clients-check-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 860px) {
+  .clients-list-titlebar,
+  .clients-list-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .clients-card-actions,
+  .clients-pipeline-summary,
+  .clients-row-actions {
+    justify-content: flex-start;
+  }
+
+  .clients-card-actions .ui-button {
+    flex: 1 1 calc(50% - var(--space-2));
+  }
+
+  .clients-search-form {
+    flex: 0 1 auto;
+    max-width: none;
+    width: 100%;
+  }
+
+  .clients-check-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .clients-card-actions .ui-button,
+  .clients-modal-actions .ui-button {
+    flex: 1 1 100%;
+  }
+
+  .clients-search-form,
+  .clients-modal-actions {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .clients-pagination {
+    justify-content: flex-start;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
