@@ -42,6 +42,9 @@ type HeroContentEditorProps = {
 type ActiveModal = "add" | "image" | null;
 
 type PointerInteraction = {
+  lastTime: number;
+  lastX: number;
+  lastY: number;
   moved: boolean;
   pointerId: number;
   startX: number;
@@ -49,7 +52,17 @@ type PointerInteraction = {
   type: HeroCanvasLayerElementType;
 };
 
+type DragMotion = {
+  speed: number;
+  velocityX: number;
+  velocityY: number;
+  x: number;
+  y: number;
+};
+
 const dragThresholdPx = 6;
+const dotGridColumns = 30;
+const dotGridRows = 18;
 
 const layerIcons: Record<HeroCanvasLayerElementType, typeof Type> = {
   HEADLINE: Type,
@@ -67,6 +80,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
   }));
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [dragMotion, setDragMotion] = useState<DragMotion | null>(null);
   const [draggingLayer, setDraggingLayer] = useState<HeroCanvasLayerElementType | null>(null);
   const [editingLayer, setEditingLayer] = useState<HeroCanvasLayerElementType | null>(null);
   const [pendingUploadName, setPendingUploadName] = useState("");
@@ -174,6 +188,9 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     setEditingLayer(null);
     pointerInteractionRef.current = {
       moved: false,
+      lastTime: event.timeStamp,
+      lastX: event.clientX,
+      lastY: event.clientY,
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
@@ -192,7 +209,10 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
       setDraggingLayer(interaction.type);
     }
 
-    if (interaction.moved) updateLayerFromPointer(interaction.type, event);
+    if (interaction.moved) {
+      updateLayerFromPointer(interaction.type, event);
+      updateDragMotion(interaction, event);
+    }
   }
 
   function handleStagePointerUp() {
@@ -209,7 +229,31 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     }
 
     pointerInteractionRef.current = null;
+    setDragMotion(null);
     setDraggingLayer(null);
+  }
+
+  function updateDragMotion(interaction: PointerInteraction, event: PointerEvent<HTMLDivElement>) {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const now = event.timeStamp;
+    const elapsed = Math.max(16, now - interaction.lastTime);
+    const velocityX = ((event.clientX - interaction.lastX) / elapsed) * 1000;
+    const velocityY = ((event.clientY - interaction.lastY) / elapsed) * 1000;
+    const rect = stage.getBoundingClientRect();
+
+    interaction.lastTime = now;
+    interaction.lastX = event.clientX;
+    interaction.lastY = event.clientY;
+
+    setDragMotion({
+      speed: Math.min(3200, Math.hypot(velocityX, velocityY)),
+      velocityX,
+      velocityY,
+      x: clampUnit((event.clientX - rect.left) / rect.width),
+      y: clampUnit((event.clientY - rect.top) / rect.height)
+    });
   }
 
   const editorToolbar = (
@@ -283,7 +327,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
             unoptimized
           />
           <div className="content-hero-stage-scrim" aria-hidden="true" />
-          {draggedLayout ? <HeroDotGrid activeLayout={draggedLayout} /> : null}
+          {draggedLayout && dragMotion ? <HeroDotGrid activeLayout={draggedLayout} motion={dragMotion} /> : null}
           {visibleLayers.map((layout) => (
             <HeroCanvasLayer
               editing={editingLayer === layout.type}
@@ -337,24 +381,67 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
   );
 }
 
-function HeroDotGrid({ activeLayout }: { activeLayout: HeroSlideEditor["elements"][HeroCanvasLayerElementType] }) {
-  return (
-    <div className="content-hero-dot-grid" aria-hidden="true">
-      {Array.from({ length: HERO_GRID_ROWS }).flatMap((_, rowIndex) =>
-        Array.from({ length: HERO_GRID_COLUMNS }).map((__, columnIndex) => {
-          const column = columnIndex + 1;
-          const row = rowIndex + 1;
-          const touched =
-            column >= activeLayout.gridColumn &&
-            column < activeLayout.gridColumn + activeLayout.columnSpan &&
-            row >= activeLayout.gridRow &&
-            row < activeLayout.gridRow + activeLayout.rowSpan;
+function HeroDotGrid({
+  activeLayout,
+  motion
+}: {
+  activeLayout: HeroSlideEditor["elements"][HeroCanvasLayerElementType];
+  motion: DragMotion;
+}) {
+  const activeBounds = {
+    bottom: (activeLayout.gridRow - 1 + activeLayout.rowSpan) / HERO_GRID_ROWS,
+    left: (activeLayout.gridColumn - 1) / HERO_GRID_COLUMNS,
+    right: (activeLayout.gridColumn - 1 + activeLayout.columnSpan) / HERO_GRID_COLUMNS,
+    top: (activeLayout.gridRow - 1) / HERO_GRID_ROWS
+  };
 
-          return <span className={touched ? "is-touched" : undefined} key={`${column}-${row}`} />;
+  return (
+    <div
+      className="content-hero-dot-grid"
+      style={{
+        gridTemplateColumns: `repeat(${dotGridColumns}, minmax(0, 1fr))`,
+        gridTemplateRows: `repeat(${dotGridRows}, minmax(0, 1fr))`
+      }}
+      aria-hidden="true"
+    >
+      {Array.from({ length: dotGridRows }).flatMap((_, rowIndex) =>
+        Array.from({ length: dotGridColumns }).map((__, columnIndex) => {
+          const x = (columnIndex + 0.5) / dotGridColumns;
+          const y = (rowIndex + 0.5) / dotGridRows;
+          const touched = x >= activeBounds.left && x <= activeBounds.right && y >= activeBounds.top && y <= activeBounds.bottom;
+          const distance = Math.hypot(x - motion.x, y - motion.y);
+          const proximity = Math.max(0, 1 - distance / 0.24);
+          const speedFactor = Math.min(1, motion.speed / 1400);
+          const pushX = ((x - motion.x) * 34 + motion.velocityX * 0.01) * proximity * (0.45 + speedFactor);
+          const pushY = ((y - motion.y) * 34 + motion.velocityY * 0.01) * proximity * (0.45 + speedFactor);
+          const glow = Math.min(1, proximity + (touched ? 0.36 : 0));
+          const scale = 0.86 + (touched ? 0.48 : 0) + proximity * 1.18 + speedFactor * proximity * 0.4;
+          const opacity = Math.min(0.96, 0.28 + proximity * 0.56 + (touched ? 0.24 : 0));
+          const red = Math.round(226 - glow * 58);
+          const green = Math.round(244 + glow * 11);
+          const blue = Math.round(238 - glow * 157);
+
+          return (
+            <span
+              className={[touched && "is-touched", proximity > 0.42 && "is-near"].filter(Boolean).join(" ")}
+              key={`${columnIndex}-${rowIndex}`}
+              style={{
+                animationDelay: `${(columnIndex * 17 + rowIndex * 23) % 520}ms`,
+                backgroundColor: `rgba(${red}, ${green}, ${blue}, ${opacity})`,
+                boxShadow: `0 0 ${Math.round(4 + glow * 18)}px rgba(168, 255, 81, ${0.08 + glow * 0.34})`,
+                opacity,
+                transform: `translate(${pushX.toFixed(1)}px, ${pushY.toFixed(1)}px) scale(${scale.toFixed(2)})`
+              }}
+            />
+          );
         })
       )}
     </div>
   );
+}
+
+function clampUnit(value: number) {
+  return Math.max(0, Math.min(1, value));
 }
 
 function HeroCanvasLayer({

@@ -3050,11 +3050,10 @@ button.button:disabled,
 }
 
 .content-hero-dot-grid {
+  animation: content-dot-grid-in 180ms ease-out both;
   display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-template-rows: repeat(4, minmax(0, 1fr));
-  inset: 12px;
+  gap: 4px;
+  inset: 14px;
   place-items: center;
   pointer-events: none;
   position: absolute;
@@ -3062,19 +3061,49 @@ button.button:disabled,
 }
 
 .content-hero-dot-grid span {
-  background: rgba(255, 255, 255, 0.38);
+  animation: content-dot-breathe 760ms ease-in-out infinite alternate;
+  background: rgba(226, 244, 238, 0.34);
   border-radius: 999px;
-  box-shadow: 0 0 0 1px rgba(8, 17, 15, 0.1);
-  height: 5px;
+  box-shadow: 0 0 0 1px rgba(8, 17, 15, 0.08);
+  height: 4px;
   transition:
-    background-color var(--motion-fast) ease,
-    transform var(--motion-fast) ease;
-  width: 5px;
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease,
+    transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  width: 4px;
+  will-change: background-color, opacity, transform;
+}
+
+.content-hero-dot-grid span.is-near {
+  animation-duration: 420ms;
 }
 
 .content-hero-dot-grid span.is-touched {
-  background: rgba(255, 255, 255, 0.9);
-  transform: scale(1.95);
+  outline: 1px solid rgba(168, 255, 81, 0.36);
+  outline-offset: 2px;
+}
+
+@keyframes content-dot-grid-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes content-dot-breathe {
+  from {
+    filter: brightness(0.92);
+  }
+
+  to {
+    filter: brightness(1.18);
+  }
 }
 
 .content-canvas-layer {
