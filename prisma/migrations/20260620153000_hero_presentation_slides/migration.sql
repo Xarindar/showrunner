@@ -139,10 +139,10 @@ SELECT
 FROM "HeroSlide" slide
 CROSS JOIN (
   VALUES
-    ('IMAGE', 4, 1, 3, 4, 1),
-    ('HEADLINE', 1, 1, 3, 1, 2),
-    ('CAPTION', 1, 2, 3, 1, 3),
-    ('CTA', 1, 3, 2, 1, 4)
+    ('IMAGE', 1, 1, 30, 18, 1),
+    ('HEADLINE', 1, 1, 18, 2, 2),
+    ('CAPTION', 1, 5, 15, 3, 3),
+    ('CTA', 1, 10, 5, 2, 4)
 ) AS element("type", "gridColumn", "gridRow", "columnSpan", "rowSpan", "zIndex")
 WHERE NOT EXISTS (
   SELECT 1

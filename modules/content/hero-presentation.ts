@@ -1,7 +1,7 @@
 import type { SiteSettingsWithModules } from "@/lib/site";
 
-export const HERO_GRID_COLUMNS = 6;
-export const HERO_GRID_ROWS = 4;
+export const HERO_GRID_COLUMNS = 30;
+export const HERO_GRID_ROWS = 18;
 export const HERO_AUTOPLAY_INTERVAL_MS = 6500;
 
 export const heroElementTypes = ["IMAGE", "HEADLINE", "CAPTION", "CTA"] as const;
@@ -123,14 +123,20 @@ type HeroPresentationRecordLike = {
   slides?: HeroSlideRecordLike[];
 } | null;
 
+const heroElementFootprints: Record<HeroElementType, Pick<HeroElementLayout, "columnSpan" | "rowSpan">> = {
+  IMAGE: { columnSpan: 30, rowSpan: 18 },
+  HEADLINE: { columnSpan: 18, rowSpan: 2 },
+  CAPTION: { columnSpan: 15, rowSpan: 3 },
+  CTA: { columnSpan: 5, rowSpan: 2 }
+};
+
 export function defaultHeroElementLayout(type: HeroElementType): HeroElementLayout {
   if (type === "IMAGE") {
     return {
       type,
       gridColumn: 1,
       gridRow: 1,
-      columnSpan: 6,
-      rowSpan: 4,
+      ...heroElementFootprints.IMAGE,
       zIndex: 1,
       isVisible: true
     };
@@ -140,9 +146,8 @@ export function defaultHeroElementLayout(type: HeroElementType): HeroElementLayo
     return {
       type,
       gridColumn: 1,
-      gridRow: 2,
-      columnSpan: 4,
-      rowSpan: 1,
+      gridRow: 1,
+      ...heroElementFootprints.HEADLINE,
       zIndex: 2,
       isVisible: true
     };
@@ -152,9 +157,8 @@ export function defaultHeroElementLayout(type: HeroElementType): HeroElementLayo
     return {
       type,
       gridColumn: 1,
-      gridRow: 3,
-      columnSpan: 3,
-      rowSpan: 1,
+      gridRow: 5,
+      ...heroElementFootprints.CAPTION,
       zIndex: 3,
       isVisible: true
     };
@@ -163,9 +167,8 @@ export function defaultHeroElementLayout(type: HeroElementType): HeroElementLayo
   return {
     type,
     gridColumn: 1,
-    gridRow: 4,
-    columnSpan: 2,
-    rowSpan: 1,
+    gridRow: 10,
+    ...heroElementFootprints.CTA,
     zIndex: 4,
     isVisible: true
   };
@@ -191,6 +194,13 @@ export function clampHeroElementLayout(input: HeroElementLayout): HeroElementLay
     zIndex: clampInteger(input.zIndex, 1, 20),
     isVisible: input.isVisible !== false
   };
+}
+
+export function fitHeroElementLayoutToContent(input: HeroElementLayout): HeroElementLayout {
+  return clampHeroElementLayout({
+    ...input,
+    ...heroElementFootprints[input.type]
+  });
 }
 
 export function defaultHeroSlideFromSettings(settings: Pick<SiteSettingsWithModules, "heroHeadline" | "heroImageUrl" | "heroSubheadline">): HeroSlideEditor {
@@ -315,7 +325,7 @@ export function toHeroCanvasConfig(slide: HeroSlideEditor, index = 0): HeroCanva
 }
 
 export function toHeroCanvasLayout(layout: HeroElementLayout): HeroCanvasLayout {
-  const safeLayout = clampHeroElementLayout(layout);
+  const safeLayout = fitHeroElementLayoutToContent(layout);
 
   return {
     colStart: safeLayout.gridColumn,
@@ -344,7 +354,7 @@ export function withUpdatedHeroElement(
     ...slide,
     elements: {
       ...slide.elements,
-      [type]: clampHeroElementLayout({
+      [type]: fitHeroElementLayoutToContent({
         ...current,
         ...input,
         type
@@ -402,7 +412,7 @@ function normalizeHeroElements(input: unknown, fallback: Record<HeroElementType,
   for (const value of records) {
     if (!isRecord(value) || !isHeroElementType(value.type)) continue;
 
-    normalized[value.type] = clampHeroElementLayout({
+    normalized[value.type] = fitHeroElementLayoutToContent({
       type: value.type,
       gridColumn: numberFromUnknown(value.gridColumn, normalized[value.type].gridColumn),
       gridRow: numberFromUnknown(value.gridRow, normalized[value.type].gridRow),
@@ -414,7 +424,7 @@ function normalizeHeroElements(input: unknown, fallback: Record<HeroElementType,
   }
 
   for (const type of heroElementTypes) {
-    normalized[type] = clampHeroElementLayout(normalized[type] || defaultHeroElementLayout(type));
+    normalized[type] = fitHeroElementLayoutToContent(normalized[type] || defaultHeroElementLayout(type));
   }
 
   return normalized;
