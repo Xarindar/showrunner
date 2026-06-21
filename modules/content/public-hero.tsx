@@ -1,81 +1,57 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import NextImage from "next/image";
 import { MousePointerClick } from "lucide-react";
 import { ButtonLink } from "@/components/ui";
-import { heroElementsArray, type HeroElementLayout, type HeroPresentationEditor } from "./hero-presentation";
+import { toHeroCanvasPayload, type HeroCanvasLayout, type HeroCanvasLayer, type HeroPresentationEditor } from "./hero-presentation";
 
 type PublicHeroPresentationProps = {
   presentation: HeroPresentationEditor;
 };
 
 export function PublicHeroPresentation({ presentation }: PublicHeroPresentationProps) {
-  const slides = presentation.mode === "SLIDESHOW" ? presentation.slides : presentation.slides.slice(0, 1);
+  const payload = useMemo(() => toHeroCanvasPayload(presentation), [presentation]);
+  const screens = payload.slideshow?.screens ?? [payload.hero];
   const [activeIndex, setActiveIndex] = useState(0);
-  const safeActiveIndex = Math.min(activeIndex, Math.max(0, slides.length - 1));
-  const activeSlide = slides[safeActiveIndex] || slides[0];
+  const safeActiveIndex = Math.min(activeIndex, Math.max(0, screens.length - 1));
+  const activeHero = screens[safeActiveIndex] || screens[0];
+  const background = activeHero?.backgrounds[0];
 
   useEffect(() => {
-    if (presentation.mode !== "SLIDESHOW" || slides.length < 2) return;
+    if (!payload.slideshow || screens.length < 2) return;
 
     const timer = window.setInterval(() => {
-      setActiveIndex((index) => (index + 1) % slides.length);
-    }, presentation.autoplayIntervalMs);
+      setActiveIndex((index) => (index + 1) % screens.length);
+    }, payload.slideshow.autoplayIntervalMs);
 
     return () => window.clearInterval(timer);
-  }, [presentation.autoplayIntervalMs, presentation.mode, slides.length]);
+  }, [payload.slideshow, screens.length]);
 
-  if (!activeSlide) return null;
+  if (!activeHero) return null;
 
   return (
     <section className="hero hero-presentation" aria-label="Homepage hero">
+      {background ? (
+        <div className="hero-presentation-background">
+          <NextImage src={background.url || "/hero.svg"} alt={background.altText} fill sizes="100vw" priority unoptimized />
+        </div>
+      ) : null}
+      <div className="hero-presentation-scrim" aria-hidden="true" />
+
       <div className="hero-presentation-stage">
-        {heroElementsArray(activeSlide.elements).map((element) => {
-          if (!element.isVisible) return null;
-
-          if (element.type === "IMAGE") {
-            return (
-              <div className="hero-presentation-element hero-presentation-image" key={element.type} style={heroPublicElementStyle(element)}>
-                <NextImage src={activeSlide.imageUrl || "/hero.svg"} alt="" fill sizes="(max-width: 900px) 100vw, 56vw" priority unoptimized />
-              </div>
-            );
-          }
-
-          if (element.type === "HEADLINE") {
-            return (
-              <h1 className="hero-presentation-element hero-presentation-title" key={element.type} style={heroPublicElementStyle(element)}>
-                {activeSlide.headline}
-              </h1>
-            );
-          }
-
-          if (element.type === "CAPTION") {
-            return (
-              <p className="hero-presentation-element hero-presentation-caption" key={element.type} style={heroPublicElementStyle(element)}>
-                {activeSlide.caption}
-              </p>
-            );
-          }
-
-          return (
-            <div className="hero-presentation-element hero-presentation-cta" key={element.type} style={heroPublicElementStyle(element)}>
-              <ButtonLink href={activeSlide.ctaHref || "/book"}>
-                <MousePointerClick size={18} aria-hidden="true" />
-                {activeSlide.ctaLabel || "Book an appointment"}
-              </ButtonLink>
-            </div>
-          );
-        })}
+        {activeHero.canvasLayers.map((layer) => (
+          <HeroCanvasLayer key={layer.id} layer={layer} />
+        ))}
       </div>
 
-      {presentation.mode === "SLIDESHOW" && slides.length > 1 ? (
+      {screens.length > 1 ? (
         <div className="hero-presentation-dots" aria-label="Hero screens">
-          {slides.map((slide, index) => (
+          {screens.map((screen, index) => (
             <button
               aria-label={`Show hero screen ${index + 1}`}
               aria-pressed={index === safeActiveIndex}
-              key={slide.clientId}
+              key={screen.sectionId}
               onClick={() => setActiveIndex(index)}
               type="button"
             />
@@ -86,10 +62,38 @@ export function PublicHeroPresentation({ presentation }: PublicHeroPresentationP
   );
 }
 
-function heroPublicElementStyle(layout: HeroElementLayout): CSSProperties {
+function HeroCanvasLayer({ layer }: { layer: HeroCanvasLayer }) {
+  if (!layer.content) return null;
+
+  if (layer.type === "button") {
+    return (
+      <div className="hero-presentation-element hero-presentation-cta" style={heroPublicElementStyle(layer.layout)}>
+        <ButtonLink href={layer.link || "/book"}>
+          <MousePointerClick size={18} aria-hidden="true" />
+          {layer.content}
+        </ButtonLink>
+      </div>
+    );
+  }
+
+  if (layer.role === "headline") {
+    return (
+      <h1 className="hero-presentation-element hero-presentation-title" style={heroPublicElementStyle(layer.layout)}>
+        {layer.content}
+      </h1>
+    );
+  }
+
+  return (
+    <p className="hero-presentation-element hero-presentation-caption" style={heroPublicElementStyle(layer.layout)}>
+      {layer.content}
+    </p>
+  );
+}
+
+function heroPublicElementStyle(layout: HeroCanvasLayout): CSSProperties {
   return {
-    gridColumn: `${layout.gridColumn} / span ${layout.columnSpan}`,
-    gridRow: `${layout.gridRow} / span ${layout.rowSpan}`,
-    zIndex: layout.zIndex
+    gridColumn: `${layout.colStart} / ${layout.colEnd}`,
+    gridRow: `${layout.rowStart} / ${layout.rowEnd}`
   };
 }

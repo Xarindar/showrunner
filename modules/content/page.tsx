@@ -1,48 +1,78 @@
-import { requireAdmin } from "@/lib/auth";
+import { MediaDriver, MediaVariantType, type Prisma } from "@prisma/client";
+import { getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
+import { isCloudflareImagesConfigured, isR2Configured, mediaAssetDisplayUrl } from "@/lib/media";
+import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { manifest } from "./module";
 import { updateContentAction } from "./actions";
 import { HeroContentEditor } from "./hero-content-editor";
 import { getHeroPresentationForSite } from "./hero-presentation.server";
-import { Card, EqualGrid } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type ContentPageProps = {
-  searchParams: Promise<{saved?: string;}>;
+  searchParams: Promise<{ saved?: string; error?: string }>;
 };
 
 export default async function ContentPage({ searchParams }: ContentPageProps) {
-  await requireAdmin("content:manage");
+  const user = await requireAdmin("content:manage");
   const [{ saved }, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const heroPresentation = await getHeroPresentationForSite(settings.siteId, settings);
+  const activeMediaWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, {
+    deletedAt: null,
+    isPrivate: false
+  });
+  const [heroPresentation, mediaAssets] = await Promise.all([
+    getHeroPresentationForSite(settings.siteId, settings),
+    prisma.mediaAsset.findMany({
+      where: activeMediaWhere,
+      orderBy: { createdAt: "desc" },
+      take: 24
+    })
+  ]);
+  const mediaAssetOptions = [
+    {
+      alt: "Neutral admin template hero",
+      filename: "hero.svg",
+      id: "repo-hero-svg",
+      thumbnailUrl: "/hero.svg",
+      url: "/hero.svg"
+    },
+    ...mediaAssets.map((asset) => ({
+      alt: asset.isDecorative ? "" : asset.alt || asset.filename,
+      filename: asset.filename,
+      id: asset.id,
+      thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
+      url: mediaAssetDisplayUrl(asset, MediaVariantType.HERO)
+    }))
+  ];
+  const canUploadHeroImage = canUploadWithDriver(settings.mediaDriver);
+  const params = await searchParams;
 
   return (
     <div className="stack">
       <header className="page-header">
         <div>
           <p className="eyebrow">Content</p>
-          <h1>Homepage hero studio</h1>
-          <p>Compose the public hero, slideshow screens, calls to action, and intro copy in one workspace.</p>
+          <h1>Homepage hero</h1>
+          <p>Edit the public header image, title, caption, call to action, and intro copy.</p>
         </div>
       </header>
 
       {saved ? <div className="success-message">Content saved.</div> : null}
+      {params.error ? <div className="error">{decodeURIComponent(params.error)}</div> : null}
 
-      <HeroContentEditor action={updateContentAction} initialPresentation={heroPresentation} settings={settings} />
-
-      <EqualGrid aria-label="Content readiness" as="section">
-        <Card>
-          <span className="ui-badge ui-badge-warning">Partial</span>
-          <h2 className="compact-title">Current content scope</h2>
-          <p>{manifest.readiness.summary}</p>
-        </Card>
-        <Card>
-          <span className="ui-badge">Planned</span>
-          <h2 className="compact-title">SEO foundation</h2>
-          <p>{manifest.readiness.primaryGap}</p>
-        </Card>
-      </EqualGrid>
+      <HeroContentEditor
+        action={updateContentAction}
+        canUploadHeroImage={canUploadHeroImage}
+        initialPresentation={heroPresentation}
+        mediaAssets={mediaAssetOptions}
+        settings={settings}
+      />
     </div>);
 
+}
+
+function canUploadWithDriver(driver: MediaDriver) {
+  if (driver === MediaDriver.R2) return isR2Configured();
+  if (driver === MediaDriver.CLOUDFLARE_IMAGES) return isCloudflareImagesConfigured();
+  return false;
 }

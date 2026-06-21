@@ -5,9 +5,11 @@ export const HERO_GRID_ROWS = 4;
 export const HERO_AUTOPLAY_INTERVAL_MS = 6500;
 
 export const heroElementTypes = ["IMAGE", "HEADLINE", "CAPTION", "CTA"] as const;
+export const heroCanvasLayerElementTypes = ["HEADLINE", "CAPTION", "CTA"] as const;
 export const heroPresentationModes = ["STATIC", "SLIDESHOW"] as const;
 
 export type HeroElementType = (typeof heroElementTypes)[number];
+export type HeroCanvasLayerElementType = (typeof heroCanvasLayerElementTypes)[number];
 export type HeroPresentationModeValue = (typeof heroPresentationModes)[number];
 
 export type HeroElementLayout = {
@@ -18,6 +20,10 @@ export type HeroElementLayout = {
   rowSpan: number;
   zIndex: number;
   isVisible: boolean;
+};
+
+export type HeroCanvasLayerElementLayout = HeroElementLayout & {
+  type: HeroCanvasLayerElementType;
 };
 
 export type HeroSlideEditor = {
@@ -36,6 +42,58 @@ export type HeroPresentationEditor = {
   mode: HeroPresentationModeValue;
   autoplayIntervalMs: number;
   slides: HeroSlideEditor[];
+};
+
+export type HeroCanvasLayout = {
+  colStart: number;
+  colEnd: number;
+  rowStart: number;
+  rowEnd: number;
+};
+
+export type HeroCanvasBackground = {
+  id: string;
+  type: "image";
+  url: string;
+  altText: string;
+};
+
+export type HeroCanvasLayer =
+  | {
+      id: string;
+      type: "text";
+      role: "headline" | "caption";
+      content: string;
+      style: {
+        color: string;
+        fontSize: string;
+      };
+      layout: HeroCanvasLayout;
+    }
+  | {
+      id: string;
+      type: "button";
+      role: "cta";
+      content: string;
+      link: string;
+      style: {
+        theme: "primary";
+      };
+      layout: HeroCanvasLayout;
+    };
+
+export type HeroCanvasConfig = {
+  sectionId: string;
+  backgrounds: HeroCanvasBackground[];
+  canvasLayers: HeroCanvasLayer[];
+};
+
+export type HeroCanvasPayload = {
+  hero: HeroCanvasConfig;
+  slideshow?: {
+    autoplayIntervalMs: number;
+    screens: HeroCanvasConfig[];
+  };
 };
 
 type HeroElementRecordLike = {
@@ -69,9 +127,9 @@ export function defaultHeroElementLayout(type: HeroElementType): HeroElementLayo
   if (type === "IMAGE") {
     return {
       type,
-      gridColumn: 4,
+      gridColumn: 1,
       gridRow: 1,
-      columnSpan: 3,
+      columnSpan: 6,
       rowSpan: 4,
       zIndex: 1,
       isVisible: true
@@ -82,8 +140,8 @@ export function defaultHeroElementLayout(type: HeroElementType): HeroElementLayo
     return {
       type,
       gridColumn: 1,
-      gridRow: 1,
-      columnSpan: 3,
+      gridRow: 2,
+      columnSpan: 4,
       rowSpan: 1,
       zIndex: 2,
       isVisible: true
@@ -94,7 +152,7 @@ export function defaultHeroElementLayout(type: HeroElementType): HeroElementLayo
     return {
       type,
       gridColumn: 1,
-      gridRow: 2,
+      gridRow: 3,
       columnSpan: 3,
       rowSpan: 1,
       zIndex: 3,
@@ -105,7 +163,7 @@ export function defaultHeroElementLayout(type: HeroElementType): HeroElementLayo
   return {
     type,
     gridColumn: 1,
-    gridRow: 3,
+    gridRow: 4,
     columnSpan: 2,
     rowSpan: 1,
     zIndex: 4,
@@ -160,7 +218,7 @@ export function normalizeHeroPresentation(
     .filter((slide) => slide.headline || slide.caption || slide.imageUrl || slide.ctaLabel);
 
   return {
-    mode: presentation?.mode === "SLIDESHOW" ? "SLIDESHOW" : "STATIC",
+    mode: presentation?.mode === "SLIDESHOW" && slides.length > 1 ? "SLIDESHOW" : "STATIC",
     autoplayIntervalMs: clampInteger(presentation?.autoplayIntervalMs ?? HERO_AUTOPLAY_INTERVAL_MS, 2500, 20000),
     slides: slides.length ? slides : [fallback]
   };
@@ -179,10 +237,12 @@ export function parseHeroPresentationPayload(raw: FormDataEntryValue | null, fal
       .map((slide, index) => normalizeHeroSlide(isRecord(slide) ? slide : {}, index, fallback.slides[0]))
       .filter((slide) => slide.headline || slide.caption || slide.imageUrl || slide.ctaLabel);
 
+    const normalizedSlides = slides.length ? slides : [fallback.slides[0]];
+
     return {
-      mode: parsed.mode === "SLIDESHOW" ? "SLIDESHOW" : "STATIC",
+      mode: parsed.mode === "SLIDESHOW" && normalizedSlides.length > 1 ? "SLIDESHOW" : "STATIC",
       autoplayIntervalMs: clampInteger(numberFromUnknown(parsed.autoplayIntervalMs, fallback.autoplayIntervalMs), 2500, 20000),
-      slides: slides.length ? slides : [fallback.slides[0]]
+      slides: normalizedSlides
     };
   } catch {
     return fallback;
@@ -193,8 +253,84 @@ export function serializeHeroPresentation(presentation: HeroPresentationEditor) 
   return JSON.stringify(presentation);
 }
 
+export function toHeroCanvasPayload(presentation: HeroPresentationEditor): HeroCanvasPayload {
+  const screens = presentation.slides.map((slide, index) => toHeroCanvasConfig(slide, index));
+  const hero = screens[0] || toHeroCanvasConfig(defaultHeroSlideFromSettings({ heroHeadline: "", heroImageUrl: "/hero.svg", heroSubheadline: "" }), 0);
+
+  if (presentation.mode === "SLIDESHOW" && screens.length > 1) {
+    return {
+      hero,
+      slideshow: {
+        autoplayIntervalMs: presentation.autoplayIntervalMs,
+        screens
+      }
+    };
+  }
+
+  return { hero };
+}
+
+export function toHeroCanvasConfig(slide: HeroSlideEditor, index = 0): HeroCanvasConfig {
+  const sectionId = `canvas-hero-${String(index + 1).padStart(2, "0")}`;
+  const canvasLayers: HeroCanvasLayer[] = [
+    {
+      id: "layer-headline",
+      type: "text",
+      role: "headline",
+      content: slide.headline,
+      style: { fontSize: "4rem", color: "#ffffff" },
+      layout: toHeroCanvasLayout(slide.elements.HEADLINE)
+    },
+    {
+      id: "layer-caption",
+      type: "text",
+      role: "caption",
+      content: slide.caption,
+      style: { fontSize: "1.1rem", color: "rgba(255,255,255,0.86)" },
+      layout: toHeroCanvasLayout(slide.elements.CAPTION)
+    },
+    {
+      id: "layer-cta",
+      type: "button",
+      role: "cta",
+      content: slide.ctaLabel || "Book an appointment",
+      link: slide.ctaHref || "/book",
+      style: { theme: "primary" },
+      layout: toHeroCanvasLayout(slide.elements.CTA)
+    }
+  ];
+
+  return {
+    sectionId,
+    backgrounds: [
+      {
+        id: `bg-${String(index + 1).padStart(2, "0")}`,
+        type: "image",
+        url: slide.imageUrl || "/hero.svg",
+        altText: heroBackgroundAltText(slide)
+      }
+    ],
+    canvasLayers: canvasLayers.filter((layer) => slide.elements[heroElementTypeFromLayerRole(layer.role)].isVisible)
+  };
+}
+
+export function toHeroCanvasLayout(layout: HeroElementLayout): HeroCanvasLayout {
+  const safeLayout = clampHeroElementLayout(layout);
+
+  return {
+    colStart: safeLayout.gridColumn,
+    colEnd: safeLayout.gridColumn + safeLayout.columnSpan,
+    rowStart: safeLayout.gridRow,
+    rowEnd: safeLayout.gridRow + safeLayout.rowSpan
+  };
+}
+
 export function heroElementsArray(elements: Record<HeroElementType, HeroElementLayout>) {
   return heroElementTypes.map((type) => elements[type]);
+}
+
+export function heroCanvasLayerElementsArray(elements: Record<HeroElementType, HeroElementLayout>): HeroCanvasLayerElementLayout[] {
+  return heroCanvasLayerElementTypes.map((type) => ({ ...elements[type], type }));
 }
 
 export function withUpdatedHeroElement(
@@ -329,4 +465,14 @@ function normalizeCtaHref(value: string) {
   }
 
   return `/${value.replace(/^\/+/, "")}`;
+}
+
+function heroElementTypeFromLayerRole(role: HeroCanvasLayer["role"]): HeroCanvasLayerElementType {
+  if (role === "headline") return "HEADLINE";
+  if (role === "caption") return "CAPTION";
+  return "CTA";
+}
+
+function heroBackgroundAltText(slide: Pick<HeroSlideEditor, "headline">) {
+  return slide.headline ? `${slide.headline} hero background` : "Homepage hero background";
 }

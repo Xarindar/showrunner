@@ -6,19 +6,19 @@ export const manifest = {
   href: "/admin/modules/content",
   icon: "LayoutTemplate",
   order: 20,
-  description: "Public-site copy, hero screens, and call-to-action presentation.",
+  description: "Public-site copy, canvas hero, and call-to-action presentation.",
   layout: "standard",
   status: "active",
   enabledByDefault: true,
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Homepage copy, hero layout, and hero slideshow screens are live.",
-    primaryGap: "Page models, SEO metadata, redirects, sitemap controls, and structured data are not installed yet."
+    summary: "Homepage copy, canvas hero layout, and JSON delivery are live.",
+    primaryGap: "Page models, redirects, sitemap controls, and deeper SEO controls are not installed yet."
   },
   capabilities: [
-    { label: "Homepage hero studio", status: "live" },
-    { label: "Hero slideshow screens", status: "live" },
+    { label: "Homepage hero canvas", status: "live" },
+    { label: "Hero JSON delivery", status: "live" },
     { label: "SEO/page management", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/content"],

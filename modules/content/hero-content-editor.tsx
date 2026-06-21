@@ -1,71 +1,96 @@
 "use client";
 
-import { useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type KeyboardEvent, type PointerEvent } from "react";
 import NextImage from "next/image";
-import {
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  Copy,
-  Image as ImageIcon,
-  Maximize2,
-  Minimize2,
-  MousePointerClick,
-  Move,
-  PanelTop,
-  Play,
-  Plus,
-  Save,
-  Square,
-  Trash2,
-  Type
-} from "lucide-react";
-import { Button, Card, Tab, Tabs } from "@/components/ui";
+import { Check, Image as ImageIcon, MousePointerClick, PanelTop, Plus, Save, Trash2, Type, Upload } from "lucide-react";
+import { Button, Card, Modal, Tab, Tabs } from "@/components/ui";
 import type { SiteSettingsWithModules } from "@/lib/site";
 import {
   HERO_GRID_COLUMNS,
   HERO_GRID_ROWS,
-  createBlankHeroSlide,
-  createHeroSlideCopy,
+  heroCanvasLayerElementTypes,
+  heroCanvasLayerElementsArray,
   heroElementLabel,
-  heroElementsArray,
   serializeHeroPresentation,
   withUpdatedHeroElement,
+  type HeroCanvasLayerElementLayout,
+  type HeroCanvasLayerElementType,
   type HeroElementType,
   type HeroPresentationEditor,
   type HeroSlideEditor
 } from "./hero-presentation";
 
 type ContentAction = (formData: FormData) => void | Promise<void>;
+type ContentSettingsDraft = Pick<SiteSettingsWithModules, "heroHeadline" | "heroSubheadline">;
 
-type ContentSettingsDraft = Pick<
-  SiteSettingsWithModules,
-  "heroHeadline" | "heroImageUrl" | "heroSubheadline" | "introTitle" | "introBody"
->;
+export type HeroMediaAssetOption = {
+  alt: string;
+  filename: string;
+  id: string;
+  thumbnailUrl: string;
+  url: string;
+};
 
 type HeroContentEditorProps = {
   action: ContentAction;
+  canUploadHeroImage: boolean;
   initialPresentation: HeroPresentationEditor;
+  mediaAssets: HeroMediaAssetOption[];
   settings: ContentSettingsDraft;
 };
 
-const elementIcons: Record<HeroElementType, typeof ImageIcon> = {
-  IMAGE: ImageIcon,
+type ActiveModal = "add" | "image" | null;
+
+type PointerInteraction = {
+  moved: boolean;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  type: HeroCanvasLayerElementType;
+};
+
+const dragThresholdPx = 6;
+
+const layerIcons: Record<HeroCanvasLayerElementType, typeof Type> = {
   HEADLINE: Type,
   CAPTION: PanelTop,
   CTA: MousePointerClick
 };
 
-export function HeroContentEditor({ action, initialPresentation, settings }: HeroContentEditorProps) {
+export function HeroContentEditor({ action, canUploadHeroImage, initialPresentation, mediaAssets, settings }: HeroContentEditorProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pointerInteractionRef = useRef<PointerInteraction | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  const [presentation, setPresentation] = useState(initialPresentation);
+  const [presentation, setPresentation] = useState(() => ({
+    ...initialPresentation,
+    mode: initialPresentation.slides.length > 1 ? initialPresentation.mode : "STATIC"
+  }));
   const [activeIndex, setActiveIndex] = useState(0);
-  const [selectedElement, setSelectedElement] = useState<HeroElementType>("HEADLINE");
-  const [draggingElement, setDraggingElement] = useState<HeroElementType | null>(null);
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [draggingLayer, setDraggingLayer] = useState<HeroCanvasLayerElementType | null>(null);
+  const [editingLayer, setEditingLayer] = useState<HeroCanvasLayerElementType | null>(null);
+  const [pendingUploadName, setPendingUploadName] = useState("");
+  const [previewImageUrl, setPreviewImageUrl] = useState("");
+  const [selectedLayer, setSelectedLayer] = useState<HeroCanvasLayerElementType>("HEADLINE");
 
   const activeSlide = presentation.slides[activeIndex] || presentation.slides[0];
-  const serializedPresentation = useMemo(() => serializeHeroPresentation(presentation), [presentation]);
+  const showScreenTabs = presentation.slides.length > 1;
+  const visibleLayers = heroCanvasLayerElementsArray(activeSlide.elements).filter((layout) => layout.isVisible);
+  const draggedLayout = draggingLayer ? activeSlide.elements[draggingLayer] : null;
+  const serializedPresentation = useMemo(
+    () =>
+      serializeHeroPresentation({
+        ...presentation,
+        mode: presentation.slides.length > 1 ? presentation.mode : "STATIC"
+      }),
+    [presentation]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (previewImageUrl) URL.revokeObjectURL(previewImageUrl);
+    };
+  }, [previewImageUrl]);
 
   function updateActiveSlide(updater: (slide: HeroSlideEditor) => HeroSlideEditor) {
     setPresentation((current) => ({
@@ -81,67 +106,49 @@ export function HeroContentEditor({ action, initialPresentation, settings }: Her
     }));
   }
 
-  function setMode(mode: HeroPresentationEditor["mode"]) {
-    setPresentation((current) => ({ ...current, mode }));
-    setActiveIndex((index) => Math.min(index, presentation.slides.length - 1));
-  }
-
-  function addSlide() {
-    setPresentation((current) => {
-      const slides = orderSlides([...current.slides, createBlankHeroSlide(current.slides.length, settings)]);
-      setActiveIndex(slides.length - 1);
-      return {
-        ...current,
-        mode: "SLIDESHOW",
-        slides
-      };
-    });
-  }
-
-  function duplicateSlide() {
-    setPresentation((current) => {
-      const source = current.slides[activeIndex] || current.slides[0];
-      const slides = orderSlides([...current.slides, createHeroSlideCopy(source, current.slides.length)]);
-      setActiveIndex(slides.length - 1);
-      return {
-        ...current,
-        mode: "SLIDESHOW",
-        slides
-      };
-    });
-  }
-
-  function removeSlide() {
-    if (presentation.slides.length < 2) return;
-
-    setPresentation((current) => {
-      const slides = orderSlides(current.slides.filter((_, index) => index !== activeIndex));
-      setActiveIndex(Math.max(0, Math.min(activeIndex, slides.length - 1)));
-      return { ...current, slides };
-    });
-  }
-
-  function nudgeElement(type: HeroElementType, deltaColumn: number, deltaRow: number) {
+  function addLayer(type: HeroCanvasLayerElementType) {
     updateActiveSlide((slide) => {
-      const layout = slide.elements[type];
-      return withUpdatedHeroElement(slide, type, {
-        gridColumn: layout.gridColumn + deltaColumn,
-        gridRow: layout.gridRow + deltaRow
-      });
+      const nextSlide = withUpdatedHeroElement(slide, type, { isVisible: true });
+      if (type === "HEADLINE" && !nextSlide.headline) return { ...nextSlide, headline: settings.heroHeadline || "Hero title" };
+      if (type === "CAPTION" && !nextSlide.caption) return { ...nextSlide, caption: settings.heroSubheadline || "Hero caption" };
+      if (type === "CTA" && !nextSlide.ctaLabel) return { ...nextSlide, ctaLabel: "Book an appointment", ctaHref: "/book" };
+      return nextSlide;
     });
+    setSelectedLayer(type);
+    setEditingLayer(null);
+    setActiveModal(null);
   }
 
-  function resizeElement(type: HeroElementType, deltaColumnSpan: number, deltaRowSpan: number) {
-    updateActiveSlide((slide) => {
-      const layout = slide.elements[type];
-      return withUpdatedHeroElement(slide, type, {
-        columnSpan: layout.columnSpan + deltaColumnSpan,
-        rowSpan: layout.rowSpan + deltaRowSpan
-      });
-    });
+  function hideLayer(type: HeroCanvasLayerElementType) {
+    updateActiveSlide((slide) => withUpdatedHeroElement(slide, type, { isVisible: false }));
+    setEditingLayer(null);
   }
 
-  function updateElementFromPointer(type: HeroElementType, event: PointerEvent) {
+  function selectExistingImage(asset: HeroMediaAssetOption) {
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setPendingUploadName("");
+    setPreviewImageUrl("");
+    updateActiveSlideField("imageUrl", asset.url);
+    setActiveModal(null);
+  }
+
+  function triggerUploadPicker() {
+    if (!canUploadHeroImage) return;
+    fileInputRef.current?.click();
+  }
+
+  function handleHeroImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewImageUrl(objectUrl);
+    setPendingUploadName(file.name);
+    updateActiveSlideField("imageUrl", objectUrl);
+    setActiveModal(null);
+  }
+
+  function updateLayerFromPointer(type: HeroCanvasLayerElementType, event: PointerEvent) {
     const stage = stageRef.current;
     const layout = activeSlide.elements[type];
     if (!stage || !layout) return;
@@ -158,221 +165,338 @@ export function HeroContentEditor({ action, initialPresentation, settings }: Her
     );
   }
 
-  function handleElementPointerDown(type: HeroElementType, event: PointerEvent<HTMLButtonElement>) {
+  function handleLayerPointerDown(type: HeroCanvasLayerElementType, event: PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest(".content-inline-editor")) return;
+
     event.preventDefault();
-    setSelectedElement(type);
-    setDraggingElement(type);
+    setSelectedLayer(type);
+    setEditingLayer(null);
+    pointerInteractionRef.current = {
+      moved: false,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      type
+    };
     stageRef.current?.setPointerCapture(event.pointerId);
-    updateElementFromPointer(type, event);
   }
 
   function handleStagePointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (!draggingElement) return;
-    updateElementFromPointer(draggingElement, event);
-  }
+    const interaction = pointerInteractionRef.current;
+    if (!interaction) return;
 
-  function handleStagePointerUp(event: PointerEvent<HTMLDivElement>) {
-    if (!draggingElement) return;
-    if (stageRef.current?.hasPointerCapture(event.pointerId)) {
-      stageRef.current.releasePointerCapture(event.pointerId);
+    const distance = Math.hypot(event.clientX - interaction.startX, event.clientY - interaction.startY);
+    if (!interaction.moved && distance > dragThresholdPx) {
+      interaction.moved = true;
+      setDraggingLayer(interaction.type);
     }
-    setDraggingElement(null);
+
+    if (interaction.moved) updateLayerFromPointer(interaction.type, event);
   }
 
-  const selectedLayout = activeSlide.elements[selectedElement];
+  function handleStagePointerUp() {
+    const interaction = pointerInteractionRef.current;
+    if (!interaction) return;
+
+    if (stageRef.current?.hasPointerCapture(interaction.pointerId)) {
+      stageRef.current.releasePointerCapture(interaction.pointerId);
+    }
+
+    if (!interaction.moved) {
+      setSelectedLayer(interaction.type);
+      setEditingLayer(interaction.type);
+    }
+
+    pointerInteractionRef.current = null;
+    setDraggingLayer(null);
+  }
+
+  const editorToolbar = (
+    <div className="content-hero-toolbar">
+      <div className="content-hero-toolbar-left">
+        {showScreenTabs ? (
+          <Tabs aria-label="Hero screens" className="content-slide-tabs">
+            {presentation.slides.map((slide, index) => (
+              <Tab aria-selected={index === activeIndex} key={slide.clientId} onClick={() => setActiveIndex(index)}>
+                {`Screen ${index + 1}`}
+              </Tab>
+            ))}
+          </Tabs>
+        ) : null}
+        {pendingUploadName ? <span className="ui-badge">{pendingUploadName}</span> : null}
+      </div>
+      <div className="content-hero-toolbar-actions">
+        <Button aria-label="Choose hero image" onClick={() => setActiveModal("image")} size="sm" type="button" variant="secondary">
+          <ImageIcon size={16} aria-hidden="true" />
+          Image
+        </Button>
+        <Button aria-label="Add hero asset" onClick={() => setActiveModal("add")} size="sm" type="button" variant="secondary">
+          <Plus size={16} aria-hidden="true" />
+          Add
+        </Button>
+        <Button size="sm" type="submit">
+          <Save size={16} aria-hidden="true" />
+          Save
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
-    <Card action={action} as="form" className="content-hero-editor-card" minHeight="none" bodyClassName="content-hero-editor">
+    <Card
+      action={action}
+      as="form"
+      bodyClassName="content-hero-editor"
+      className="content-hero-editor-card"
+      encType="multipart/form-data"
+      minHeight="none"
+      reservedHeader={editorToolbar}
+    >
       <input name="heroPresentation" type="hidden" value={serializedPresentation} readOnly />
+      <input name="activeHeroSlideIndex" type="hidden" value={activeIndex} readOnly />
+      <input
+        accept="image/*"
+        className="ui-hidden"
+        name="heroBackgroundUpload"
+        onChange={handleHeroImageUpload}
+        ref={fileInputRef}
+        type="file"
+      />
 
-      <div className="content-hero-editor-head">
-        <Tabs aria-label="Hero mode">
-          <Tab aria-selected={presentation.mode === "STATIC"} onClick={() => setMode("STATIC")}>
-            <Square size={16} aria-hidden="true" />
-            Static
-          </Tab>
-          <Tab aria-selected={presentation.mode === "SLIDESHOW"} onClick={() => setMode("SLIDESHOW")}>
-            <Play size={16} aria-hidden="true" />
-            Slideshow
-          </Tab>
-        </Tabs>
-
-        <div className="content-slide-actions">
-          <Button onClick={addSlide} size="sm" type="button" variant="secondary">
-            <Plus size={16} aria-hidden="true" />
-            Screen
-          </Button>
-          <Button onClick={duplicateSlide} size="sm" type="button" variant="ghost">
-            <Copy size={16} aria-hidden="true" />
-            Duplicate
-          </Button>
-          <Button disabled={presentation.slides.length < 2} onClick={removeSlide} size="sm" type="button" variant="ghost">
-            <Trash2 size={16} aria-hidden="true" />
-            Delete
-          </Button>
-        </div>
-      </div>
-
-      {presentation.mode === "SLIDESHOW" ? (
-        <Tabs aria-label="Hero screens" className="content-slide-tabs">
-          {presentation.slides.map((slide, index) => (
-            <Tab aria-selected={index === activeIndex} key={slide.clientId} onClick={() => setActiveIndex(index)}>
-              {`Screen ${index + 1}`}
-            </Tab>
+      <section className="content-hero-preview-panel" aria-label="Hero preview">
+        <div
+          className="content-hero-stage"
+          data-dragging={Boolean(draggingLayer)}
+          onPointerCancel={handleStagePointerUp}
+          onPointerMove={handleStagePointerMove}
+          onPointerUp={handleStagePointerUp}
+          ref={stageRef}
+        >
+          <NextImage
+            alt=""
+            className="content-hero-background"
+            fill
+            priority
+            sizes="(max-width: 900px) 100vw, 72vw"
+            src={activeSlide.imageUrl || "/hero.svg"}
+            unoptimized
+          />
+          <div className="content-hero-stage-scrim" aria-hidden="true" />
+          {draggedLayout ? <HeroDotGrid activeLayout={draggedLayout} /> : null}
+          {visibleLayers.map((layout) => (
+            <HeroCanvasLayer
+              editing={editingLayer === layout.type}
+              key={layout.type}
+              layout={layout}
+              onEdit={() => setEditingLayer(layout.type)}
+              onHide={() => hideLayer(layout.type)}
+              onPointerDown={(event) => handleLayerPointerDown(layout.type, event)}
+              onSelect={() => setSelectedLayer(layout.type)}
+              onStopEditing={() => setEditingLayer(null)}
+              selected={selectedLayer === layout.type}
+              slide={activeSlide}
+              updateActiveSlideField={updateActiveSlideField}
+            />
           ))}
-        </Tabs>
-      ) : null}
+        </div>
+      </section>
 
-      <div className="content-hero-workspace">
-        <section className="content-hero-preview-panel" aria-label="Hero preview">
-          <div
-            className="content-hero-stage"
-            onPointerCancel={handleStagePointerUp}
-            onPointerMove={handleStagePointerMove}
-            onPointerUp={handleStagePointerUp}
-            ref={stageRef}
-          >
-            {heroElementsArray(activeSlide.elements).map((layout) => {
-              const Icon = elementIcons[layout.type];
-              const selected = selectedElement === layout.type;
-              return (
-                <button
-                  aria-label={`${heroElementLabel(layout.type)} block`}
-                  aria-pressed={selected}
-                  className={`content-hero-block content-hero-block-${layout.type.toLowerCase()}`}
-                  key={layout.type}
-                  onClick={() => setSelectedElement(layout.type)}
-                  onPointerDown={(event) => handleElementPointerDown(layout.type, event)}
-                  style={heroElementStyle(layout)}
-                  type="button"
-                >
-                  <span className="content-hero-block-chip">
-                    <Move size={13} aria-hidden="true" />
-                  {heroElementLabel(layout.type)}
-                  </span>
-                  {layout.type === "IMAGE" ? (
-                    <NextImage alt="" fill sizes="(max-width: 900px) 100vw, 58vw" src={activeSlide.imageUrl || "/hero.svg"} unoptimized />
-                  ) : null}
-                  {layout.type === "HEADLINE" ? <strong>{activeSlide.headline || "Hero headline"}</strong> : null}
-                  {layout.type === "CAPTION" ? <span>{activeSlide.caption || "Hero caption"}</span> : null}
-                  {layout.type === "CTA" ? <em>{activeSlide.ctaLabel || "Book an appointment"}</em> : null}
-                  <Icon className="content-hero-block-icon" size={18} aria-hidden="true" />
-                </button>
-              );
-            })}
-          </div>
+      <Modal className="content-asset-modal" onClose={() => setActiveModal(null)} open={activeModal === "image"} title="Hero image">
+        <div className="content-modal-actions">
+          <Button disabled={!canUploadHeroImage} onClick={triggerUploadPicker} type="button">
+            <Upload size={18} aria-hidden="true" />
+            Upload image
+          </Button>
+          {!canUploadHeroImage ? <span className="muted-text">Uploads need R2 or Cloudflare Images.</span> : null}
+        </div>
+        <div className="content-asset-grid">
+          {mediaAssets.map((asset) => (
+            <button className="content-asset-option" key={asset.id} onClick={() => selectExistingImage(asset)} type="button">
+              <NextImage src={asset.thumbnailUrl} alt={asset.alt} width={320} height={220} unoptimized />
+              <span>{asset.filename}</span>
+            </button>
+          ))}
+        </div>
+      </Modal>
 
-          <div className="content-layout-toolbar" aria-label={`${heroElementLabel(selectedElement)} layout`}>
-            <Button aria-label="Move left" onClick={() => nudgeElement(selectedElement, -1, 0)} size="sm" type="button" variant="ghost">
-              <ArrowLeft size={16} aria-hidden="true" />
-            </Button>
-            <Button aria-label="Move up" onClick={() => nudgeElement(selectedElement, 0, -1)} size="sm" type="button" variant="ghost">
-              <ArrowUp size={16} aria-hidden="true" />
-            </Button>
-            <Button aria-label="Move down" onClick={() => nudgeElement(selectedElement, 0, 1)} size="sm" type="button" variant="ghost">
-              <ArrowDown size={16} aria-hidden="true" />
-            </Button>
-            <Button aria-label="Move right" onClick={() => nudgeElement(selectedElement, 1, 0)} size="sm" type="button" variant="ghost">
-              <ArrowRight size={16} aria-hidden="true" />
-            </Button>
-            <Button aria-label="Widen" onClick={() => resizeElement(selectedElement, 1, 0)} size="sm" type="button" variant="ghost">
-              <Maximize2 size={16} aria-hidden="true" />
-            </Button>
-            <Button aria-label="Narrow" onClick={() => resizeElement(selectedElement, -1, 0)} size="sm" type="button" variant="ghost">
-              <Minimize2 size={16} aria-hidden="true" />
-            </Button>
-            <span>{`${heroElementLabel(selectedElement)} ${selectedLayout.gridColumn}.${selectedLayout.gridRow}`}</span>
-          </div>
-        </section>
-
-        <section className="content-hero-fields" aria-label="Hero content fields">
-          <div className="content-field-section">
-            <h2>Hero</h2>
-            <div className="ui-field">
-              <label htmlFor="heroEditorHeadline">Title</label>
-              <input
-                id="heroEditorHeadline"
-                onChange={(event) => updateActiveSlideField("headline", event.target.value)}
-                required
-                value={activeSlide.headline}
-              />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="heroEditorCaption">Caption</label>
-              <textarea
-                id="heroEditorCaption"
-                onChange={(event) => updateActiveSlideField("caption", event.target.value)}
-                value={activeSlide.caption}
-              />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="heroEditorImageUrl">Image URL</label>
-              <input
-                id="heroEditorImageUrl"
-                onChange={(event) => updateActiveSlideField("imageUrl", event.target.value)}
-                required
-                value={activeSlide.imageUrl}
-              />
-            </div>
-          </div>
-
-          <div className="content-field-section">
-            <h2>CTA</h2>
-            <div className="content-cta-grid">
-              <div className="ui-field">
-                <label htmlFor="heroEditorCtaLabel">Label</label>
-                <input
-                  id="heroEditorCtaLabel"
-                  onChange={(event) => updateActiveSlideField("ctaLabel", event.target.value)}
-                  required
-                  value={activeSlide.ctaLabel}
-                />
-              </div>
-              <div className="ui-field">
-                <label htmlFor="heroEditorCtaHref">URL</label>
-                <input
-                  id="heroEditorCtaHref"
-                  onChange={(event) => updateActiveSlideField("ctaHref", event.target.value)}
-                  required
-                  value={activeSlide.ctaHref}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="content-field-section">
-            <h2>Intro</h2>
-            <div className="ui-field">
-              <label htmlFor="introTitle">Title</label>
-              <input id="introTitle" name="introTitle" required defaultValue={settings.introTitle} />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="introBody">Body</label>
-              <textarea id="introBody" name="introBody" defaultValue={settings.introBody} />
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <Button type="submit">
-        <Save size={18} aria-hidden="true" />
-        Save content
-      </Button>
+      <Modal className="content-layer-modal" onClose={() => setActiveModal(null)} open={activeModal === "add"} title="Add asset">
+        <div className="content-layer-options">
+          {heroCanvasLayerElementTypes.map((type) => {
+            const Icon = layerIcons[type];
+            return (
+              <button className="content-layer-option" key={type} onClick={() => addLayer(type)} type="button">
+                <Icon size={18} aria-hidden="true" />
+                <span>{heroElementLabel(type)}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Modal>
     </Card>
   );
 }
 
-function heroElementStyle(layout: { gridColumn: number; gridRow: number; columnSpan: number; rowSpan: number; zIndex: number }): CSSProperties {
+function HeroDotGrid({ activeLayout }: { activeLayout: HeroSlideEditor["elements"][HeroCanvasLayerElementType] }) {
+  return (
+    <div className="content-hero-dot-grid" aria-hidden="true">
+      {Array.from({ length: HERO_GRID_ROWS }).flatMap((_, rowIndex) =>
+        Array.from({ length: HERO_GRID_COLUMNS }).map((__, columnIndex) => {
+          const column = columnIndex + 1;
+          const row = rowIndex + 1;
+          const touched =
+            column >= activeLayout.gridColumn &&
+            column < activeLayout.gridColumn + activeLayout.columnSpan &&
+            row >= activeLayout.gridRow &&
+            row < activeLayout.gridRow + activeLayout.rowSpan;
+
+          return <span className={touched ? "is-touched" : undefined} key={`${column}-${row}`} />;
+        })
+      )}
+    </div>
+  );
+}
+
+function HeroCanvasLayer({
+  editing,
+  layout,
+  onEdit,
+  onHide,
+  onPointerDown,
+  onSelect,
+  onStopEditing,
+  selected,
+  slide,
+  updateActiveSlideField
+}: {
+  editing: boolean;
+  layout: HeroCanvasLayerElementLayout;
+  onEdit: () => void;
+  onHide: () => void;
+  onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
+  onSelect: () => void;
+  onStopEditing: () => void;
+  selected: boolean;
+  slide: HeroSlideEditor;
+  updateActiveSlideField: (field: "headline" | "caption" | "imageUrl" | "ctaLabel" | "ctaHref", value: string) => void;
+}) {
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if ((event.target as HTMLElement).closest(".content-inline-editor")) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelect();
+      onEdit();
+    }
+  }
+
+  return (
+    <div
+      aria-label={`${heroElementLabel(layout.type)} layer`}
+      aria-pressed={selected}
+      className={`content-canvas-layer content-canvas-layer-${layout.type.toLowerCase()}`}
+      onKeyDown={handleKeyDown}
+      onPointerDown={onPointerDown}
+      role="button"
+      style={heroElementStyle(layout)}
+      tabIndex={0}
+    >
+      {editing ? (
+        <InlineLayerEditor
+          layout={layout}
+          onHide={onHide}
+          onStopEditing={onStopEditing}
+          slide={slide}
+          updateActiveSlideField={updateActiveSlideField}
+        />
+      ) : (
+        <LayerDisplay layout={layout} slide={slide} />
+      )}
+    </div>
+  );
+}
+
+function LayerDisplay({ layout, slide }: { layout: HeroCanvasLayerElementLayout; slide: HeroSlideEditor }) {
+  if (layout.type === "HEADLINE") return <strong>{slide.headline || "Hero title"}</strong>;
+  if (layout.type === "CAPTION") return <span>{slide.caption || "Hero caption"}</span>;
+  return <em>{slide.ctaLabel || "Book an appointment"}</em>;
+}
+
+function InlineLayerEditor({
+  layout,
+  onHide,
+  onStopEditing,
+  slide,
+  updateActiveSlideField
+}: {
+  layout: HeroCanvasLayerElementLayout;
+  onHide: () => void;
+  onStopEditing: () => void;
+  slide: HeroSlideEditor;
+  updateActiveSlideField: (field: "headline" | "caption" | "imageUrl" | "ctaLabel" | "ctaHref", value: string) => void;
+}) {
+  return (
+    <div className="content-inline-editor" onPointerDown={(event) => event.stopPropagation()}>
+      <div className="content-inline-tools">
+        <button aria-label="Remove asset" onClick={onHide} type="button">
+          <Trash2 size={14} aria-hidden="true" />
+        </button>
+        <button aria-label="Done editing" onClick={onStopEditing} type="button">
+          <Check size={14} aria-hidden="true" />
+        </button>
+      </div>
+
+      {layout.type === "HEADLINE" ? (
+        <textarea
+          aria-label="Title text"
+          autoFocus
+          className="content-inline-text content-inline-title"
+          onChange={(event) => updateActiveSlideField("headline", event.target.value)}
+          value={slide.headline}
+        />
+      ) : null}
+
+      {layout.type === "CAPTION" ? (
+        <textarea
+          aria-label="Caption text"
+          autoFocus
+          className="content-inline-text content-inline-caption"
+          onChange={(event) => updateActiveSlideField("caption", event.target.value)}
+          value={slide.caption}
+        />
+      ) : null}
+
+      {layout.type === "CTA" ? (
+        <div className="content-inline-cta-editor">
+          <input
+            aria-label="Button label"
+            autoFocus
+            className="content-inline-cta-label"
+            onChange={(event) => updateActiveSlideField("ctaLabel", event.target.value)}
+            value={slide.ctaLabel}
+          />
+          <input
+            aria-label="Button link"
+            className="content-inline-cta-link"
+            onChange={(event) => updateActiveSlideField("ctaHref", event.target.value)}
+            value={slide.ctaHref}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function heroElementStyle(layout: {
+  type?: HeroElementType;
+  gridColumn: number;
+  gridRow: number;
+  columnSpan: number;
+  rowSpan: number;
+  zIndex: number;
+}): CSSProperties {
   return {
     gridColumn: `${layout.gridColumn} / span ${layout.columnSpan}`,
     gridRow: `${layout.gridRow} / span ${layout.rowSpan}`,
     zIndex: layout.zIndex
   };
-}
-
-function orderSlides(slides: HeroSlideEditor[]) {
-  return slides.map((slide, index) => ({
-    ...slide,
-    sortOrder: index
-  }));
 }

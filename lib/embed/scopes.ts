@@ -4,6 +4,7 @@
 export const EMBED_SCOPES = [
   "scheduling:read",
   "scheduling:write",
+  "content:read",
   "commerce:read",
   "commerce:write",
   "galleries:read",
