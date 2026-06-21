@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ClientPipelineStage, Prisma } from "@prisma/client";
-import { Download, ExternalLink, GitMerge, Plus, RefreshCw, Save, Search, Trash2, Upload } from "lucide-react";
+import { Download, ExternalLink, Plus, RefreshCw, Save, Search, Trash2, Upload } from "lucide-react";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
 import { clientPortalPath } from "@/lib/clients/portal-token";
 import { enumLabel, formatDateTime } from "@/lib/format";
@@ -13,7 +13,6 @@ import {
   createClientSegmentAction,
   deleteClientSegmentAction,
   importClientsCsvAction,
-  mergeClientsAction,
   reissueClientPortalLinkAction
 } from "./actions";
 import { ClientsActionModals } from "./clients-action-modals";
@@ -143,8 +142,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
     settings.siteId,
     listFilters.length ? { AND: listFilters } : {}
   );
-  const mergeWhere = await getAccessibleClientWhere(user, settings.siteId);
-  const [clients, clientCount, pipelineCounts, mergeCandidates] = await Promise.all([
+  const [clients, clientCount, pipelineCounts] = await Promise.all([
     prisma.client.findMany({
       where,
       include: {
@@ -161,12 +159,6 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
       by: ["pipelineStage"],
       where,
       _count: { _all: true }
-    }),
-    prisma.client.findMany({
-      where: mergeWhere,
-      select: { email: true, id: true, name: true },
-      orderBy: { updatedAt: "desc" },
-      take: 100
     })
   ]);
   const pageCount = Math.max(1, Math.ceil(clientCount / pageSize));
@@ -361,43 +353,6 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
     </div>
   );
 
-  const mergeModal = (
-    <form action={mergeClientsAction} className="form-grid">
-      <div className="ui-field">
-        <label htmlFor="client-merge-survivor">Keep this record</label>
-        <select id="client-merge-survivor" name="survivorId" required>
-          <option value="">Choose survivor</option>
-          {mergeCandidates.map((client) => (
-            <option key={client.id} value={client.id}>
-              {client.name} - {client.email}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="ui-field">
-        <label htmlFor="client-merge-duplicate">Merge and remove this duplicate</label>
-        <select id="client-merge-duplicate" name="duplicateId" required>
-          <option value="">Choose duplicate</option>
-          {mergeCandidates.map((client) => (
-            <option key={client.id} value={client.id}>
-              {client.name} - {client.email}
-            </option>
-          ))}
-        </select>
-      </div>
-      <label className="ui-check-row">
-        <input name="confirmMerge" type="checkbox" />
-        Confirm duplicate merge
-      </label>
-      <div className="clients-modal-actions">
-        <Button type="submit" variant="secondary">
-          <GitMerge size={16} />
-          Merge records
-        </Button>
-      </div>
-    </form>
-  );
-
   return (
     <div className="stack clients-module">
       <header className="page-header">
@@ -452,7 +407,6 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                 addClient={addClientForm}
                 dataTools={dataToolsModal}
                 filters={filtersModal}
-                mergeRecords={mergeModal}
               />
             </div>
 

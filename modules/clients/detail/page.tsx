@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ClientPipelineStage, EmailOutboxStatus, MessageLogStatus } from "@prisma/client";
-import { CalendarCheck, Save } from "lucide-react";
+import { ClientPipelineStage, EmailOutboxStatus, MessageLogStatus, type Prisma } from "@prisma/client";
+import { CalendarCheck, GitMerge, Save, Search } from "lucide-react";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { enumLabel, formatDateTime, formatMoney, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
@@ -12,14 +12,16 @@ import {
   addClientNoteAction,
   deleteClientFileAction,
   deleteClientNoteAction,
+  mergeClientsAction,
   updateClientAction } from "../actions";
 import { Button, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
+import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
 
 type ClientDetailPageProps = {
   params: Promise<{id: string;}>;
-  searchParams: Promise<{saved?: string;error?: string;}>;
+  searchParams: Promise<{saved?: string;error?: string;merge?: string;mergeSearch?: string;}>;
 };
 
 type TimelineItem = {
@@ -31,6 +33,34 @@ type TimelineItem = {
   href?: string;
 };
 
+type ClientMergeCandidate = {
+  _count: {
+    billingDocuments: number;
+    bookings: number;
+    formSubmissions: number;
+    notes: number;
+    orders: number;
+  };
+  companyName: string;
+  email: string;
+  familyName: string;
+  id: string;
+  name: string;
+  phone: string | null;
+  updatedAt: Date;
+};
+
+const mergeCandidateSelect = {
+  _count: { select: { billingDocuments: true, bookings: true, formSubmissions: true, notes: true, orders: true } },
+  companyName: true,
+  email: true,
+  familyName: true,
+  id: true,
+  name: true,
+  phone: true,
+  updatedAt: true
+} satisfies Prisma.ClientSelect;
+
 function truncate(value: string, length = 140) {
   return value.length > length ? `${value.slice(0, length - 1)}...` : value;
 }
@@ -41,6 +71,26 @@ function dateInputValue(value: Date | null | undefined) {
 
 function preferencesNotes(value: unknown) {
   return isRecord(value) && typeof value.notes === "string" ? value.notes : "";
+}
+
+function mergeCandidateSearchFilter(query: string): Prisma.ClientWhereInput {
+  const value = query.trim();
+  if (!value) return {};
+
+  return {
+    OR: [
+      { name: { contains: value, mode: "insensitive" } },
+      { email: { contains: value, mode: "insensitive" } },
+      { phone: { contains: value, mode: "insensitive" } },
+      { companyName: { contains: value, mode: "insensitive" } },
+      { familyName: { contains: value, mode: "insensitive" } },
+      { tags: { some: { label: { contains: value.toLowerCase(), mode: "insensitive" } } } }
+    ]
+  };
+}
+
+function candidateContext(candidate: ClientMergeCandidate) {
+  return candidate.companyName || candidate.familyName || candidate.phone || "Individual client";
 }
 
 function clientEmailSet(client: {alternateEmails: unknown;email: string;}) {
@@ -93,7 +143,10 @@ function summarizeSubmission(value: unknown) {
 }
 
 export default async function ClientDetailPage({ params, searchParams }: ClientDetailPageProps) {
-  const [{ id }, { saved, error }] = await Promise.all([params, searchParams]);
+  const [{ id }, queryParams] = await Promise.all([params, searchParams]);
+  const { saved, error } = queryParams;
+  const mergeSearch = String(queryParams.mergeSearch || "").trim();
+  const openMergeModal = queryParams.merge === "1" || Boolean(mergeSearch);
   const user = await requireAdmin("clients:manage");
   const settings = await getSiteSettings();
   const client = await prisma.client.findFirst({
@@ -149,7 +202,28 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
     relatedOutboxFilters.push({ relatedType: "form_submission", relatedId: { in: formSubmissionIds } });
   }
 
-  const [galleryAccesses, galleryFavorites, proofApprovals, proofDecisions, emailOutboxRows] = await Promise.all([
+  const [exactMergeWhere, searchedMergeWhere] = await Promise.all([
+    getAccessibleClientWhere(user, settings.siteId, {
+      id: { not: client.id },
+      name: { equals: client.name, mode: "insensitive" }
+    }),
+    mergeSearch
+      ? getAccessibleClientWhere(user, settings.siteId, {
+          id: { not: client.id },
+          ...mergeCandidateSearchFilter(mergeSearch)
+        })
+      : Promise.resolve(null)
+  ]);
+
+  const [
+    galleryAccesses,
+    galleryFavorites,
+    proofApprovals,
+    proofDecisions,
+    emailOutboxRows,
+    exactMergeCandidates,
+    searchedMergeCandidates
+  ] = await Promise.all([
   prisma.portfolioGalleryAccess.findMany({
     where: { siteId: settings.siteId, clientId: client.id },
     include: { gallery: { select: { slug: true, title: true } } },
@@ -189,8 +263,33 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
     include: { template: { select: { name: true, key: true, purpose: true } } },
     orderBy: { createdAt: "desc" },
     take: 80
-  })]
+  }),
+  prisma.client.findMany({
+    where: exactMergeWhere,
+    orderBy: { updatedAt: "desc" },
+    select: mergeCandidateSelect,
+    take: 20
+  }),
+  searchedMergeWhere
+    ? prisma.client.findMany({
+        where: searchedMergeWhere,
+        orderBy: { updatedAt: "desc" },
+        select: mergeCandidateSelect,
+        take: 50
+      })
+    : Promise.resolve([])]
   );
+
+  const mergeCandidateMap = new Map<string, ClientMergeCandidate & { matchLabel: string }>();
+  exactMergeCandidates.forEach((candidate) => {
+    mergeCandidateMap.set(candidate.id, { ...candidate, matchLabel: "Exact name match" });
+  });
+  searchedMergeCandidates.forEach((candidate) => {
+    if (!mergeCandidateMap.has(candidate.id)) {
+      mergeCandidateMap.set(candidate.id, { ...candidate, matchLabel: "Search result" });
+    }
+  });
+  const mergeCandidates = Array.from(mergeCandidateMap.values());
 
   const timelineItems: TimelineItem[] = [
   {
@@ -315,6 +414,95 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
   sort((first, second) => second.at.getTime() - first.at.getTime()).
   slice(0, 80);
 
+  const savedMessage = saved === "merged" ? "Client records merged." : saved ? "Client record updated." : "";
+  const mergeClientModal = (
+    <div className="form-grid">
+      <div className="subpanel">
+        <span className="ui-badge ui-badge-success">Keeping</span>
+        <h3 className="ui-title-tight">{client.name}</h3>
+        <p className="ui-zero">{client.email}</p>
+      </div>
+
+      <form action={`/admin/clients/${client.id}`} className="clients-search-form">
+        <input name="merge" type="hidden" value="1" />
+        <input
+          aria-label="Search client merge candidates"
+          id="client-merge-search"
+          name="mergeSearch"
+          placeholder="Search all clients"
+          defaultValue={mergeSearch}
+        />
+        <Button size="sm" type="submit" variant="secondary">
+          <Search size={15} />
+          Search
+        </Button>
+        {mergeSearch ? (
+          <ButtonLink href={`/admin/clients/${client.id}?merge=1`} size="sm" variant="ghost">
+            Clear
+          </ButtonLink>
+        ) : null}
+      </form>
+
+      <form action={mergeClientsAction} className="form-grid">
+        <input name="survivorId" type="hidden" value={client.id} />
+        <div className="ui-field">
+          <label>Duplicate to merge into this client</label>
+          <div className="stack">
+            {mergeCandidates.map((candidate) => (
+              <label className="subpanel ui-check-row" key={candidate.id}>
+                <input
+                  aria-label={`Merge ${candidate.name} into ${client.name}`}
+                  name="duplicateId"
+                  required
+                  type="radio"
+                  value={candidate.id}
+                />
+                <span className="ui-stack ui-gap-2 ui-min-0">
+                  <span className="ui-inline-actions">
+                    <strong>{candidate.name}</strong>
+                    <span className={candidate.matchLabel === "Exact name match" ? "ui-badge ui-badge-success" : "ui-badge"}>
+                      {candidate.matchLabel}
+                    </span>
+                  </span>
+                  <span className="muted-text">
+                    {candidate.email}
+                    {candidate.phone ? ` | ${candidate.phone}` : ""}
+                  </span>
+                  <span className="muted-text">
+                    {candidateContext(candidate)} | Updated {formatDateTime(candidate.updatedAt, settings.timezone)}
+                  </span>
+                  <span className="ui-inline-actions">
+                    <span className="ui-badge">{candidate._count.bookings} appts</span>
+                    <span className="ui-badge">{candidate._count.orders} orders</span>
+                    <span className="ui-badge">{candidate._count.billingDocuments} docs</span>
+                    <span className="ui-badge">
+                      {candidate._count.formSubmissions} forms, {candidate._count.notes} notes
+                    </span>
+                  </span>
+                </span>
+              </label>
+            ))}
+            {!mergeCandidates.length ? (
+              <div className="empty-state">
+                {mergeSearch ? "No clients matched that search." : "No exact name matches. Search all clients for another record."}
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <label className="ui-check-row">
+          <input name="confirmMerge" type="checkbox" />
+          Confirm duplicate merge
+        </label>
+        <div className="module-modal-actions">
+          <Button disabled={!mergeCandidates.length} type="submit" variant="secondary">
+            <GitMerge size={16} />
+            Merge records
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+
   return (
     <div className="stack">
       <header className="page-header">
@@ -323,12 +511,27 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           <h1>{client.name}</h1>
           <p>{client.email}</p>
         </div>
-        <ButtonLink href="/admin/modules/clients" variant="secondary">
-          Back to clients
-        </ButtonLink>
+        <div className="module-card-header-actions">
+          <ModuleActionModals
+            initialActiveId={openMergeModal ? "merge" : undefined}
+            items={[
+              {
+                content: mergeClientModal,
+                icon: "merge",
+                id: "merge",
+                label: "Merge",
+                title: "Merge client"
+              }
+            ]}
+            toolbarLabel="Client record tools"
+          />
+          <ButtonLink href="/admin/modules/clients" variant="secondary">
+            Back to clients
+          </ButtonLink>
+        </div>
       </header>
 
-      {saved ? <div className="success-message">Client record updated.</div> : null}
+      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
       {error ? <div className="error">{error}</div> : null}
 
       <EqualGrid as="section">

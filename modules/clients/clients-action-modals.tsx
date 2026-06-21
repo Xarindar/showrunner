@@ -1,26 +1,24 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Filter, GitMerge, Plus, Upload } from "lucide-react";
+import { Filter, Plus, Upload } from "lucide-react";
 import { Button, Modal } from "@/components/ui";
 
-type ActiveModal = "add" | "filters" | "data" | "merge" | null;
+type ActiveModal = "add" | "filters" | "data" | null;
 
 type ClientsActionModalsProps = {
   addClient: ReactNode;
   dataTools: ReactNode;
   filters: ReactNode;
-  mergeRecords: ReactNode;
 };
 
 const modalTitles: Record<Exclude<ActiveModal, null>, string> = {
   add: "Add client",
   data: "Import and export",
-  filters: "Client filters",
-  merge: "Merge duplicates"
+  filters: "Client filters"
 };
 
-export function ClientsActionModals({ addClient, dataTools, filters, mergeRecords }: ClientsActionModalsProps) {
+export function ClientsActionModals({ addClient, dataTools, filters }: ClientsActionModalsProps) {
   const [active, setActive] = useState<ActiveModal>(null);
   const close = () => setActive(null);
 
@@ -39,10 +37,6 @@ export function ClientsActionModals({ addClient, dataTools, filters, mergeRecord
           <Upload size={15} />
           CSV
         </Button>
-        <Button aria-haspopup="dialog" onClick={() => setActive("merge")} size="sm" type="button" variant="secondary">
-          <GitMerge size={15} />
-          Merge
-        </Button>
       </div>
 
       <Modal
@@ -54,7 +48,6 @@ export function ClientsActionModals({ addClient, dataTools, filters, mergeRecord
         {active === "add" ? addClient : null}
         {active === "filters" ? filters : null}
         {active === "data" ? dataTools : null}
-        {active === "merge" ? mergeRecords : null}
       </Modal>
     </>
   );

@@ -6,6 +6,7 @@ import {
   CopyPlus,
   FilePlus,
   Filter,
+  GitMerge,
   Goal,
   ImagePlus,
   KeyRound,
@@ -33,6 +34,7 @@ const icons = {
   key: KeyRound,
   link: Link2,
   mail: MailPlus,
+  merge: GitMerge,
   package: PackagePlus,
   plus: Plus,
   receipt: ReceiptText,
@@ -53,15 +55,22 @@ export type ModuleActionModalItem = {
 
 type ModuleActionModalsProps = {
   className?: string;
+  initialActiveId?: string;
   items: ModuleActionModalItem[];
   modalClassName?: string;
   toolbarLabel: string;
 };
 
-export function ModuleActionModals({ className, items, modalClassName, toolbarLabel }: ModuleActionModalsProps) {
-  const [activeId, setActiveId] = useState<string | null>(null);
+export function ModuleActionModals({ className, initialActiveId, items, modalClassName, toolbarLabel }: ModuleActionModalsProps) {
+  const validInitialActiveId = initialActiveId && items.some((item) => item.id === initialActiveId) ? initialActiveId : null;
+  const [manualActiveId, setManualActiveId] = useState<string | null>(null);
+  const [dismissedInitialId, setDismissedInitialId] = useState<string | null>(null);
+  const activeId = manualActiveId || (validInitialActiveId !== dismissedInitialId ? validInitialActiveId : null);
   const activeItem = items.find((item) => item.id === activeId);
-  const close = () => setActiveId(null);
+  const close = () => {
+    setManualActiveId(null);
+    setDismissedInitialId(validInitialActiveId);
+  };
 
   return (
     <>
@@ -73,7 +82,7 @@ export function ModuleActionModals({ className, items, modalClassName, toolbarLa
             <Button
               aria-haspopup="dialog"
               key={item.id}
-              onClick={() => setActiveId(item.id)}
+              onClick={() => setManualActiveId(item.id)}
               size="sm"
               type="button"
               variant={item.variant || "secondary"}>

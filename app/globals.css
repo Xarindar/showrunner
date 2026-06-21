@@ -3062,13 +3062,11 @@ button.button:disabled,
 
 .content-hero-dot-grid span {
   animation: content-dot-breathe 760ms ease-in-out infinite alternate;
-  background: rgba(226, 244, 238, 0.34);
+  background: color-mix(in srgb, var(--color-accent) 34%, rgba(255, 255, 255, 0.32));
   border-radius: 999px;
-  box-shadow: 0 0 0 1px rgba(8, 17, 15, 0.08);
   height: 4px;
   transition:
     background-color 120ms ease,
-    box-shadow 120ms ease,
     opacity 120ms ease,
     transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
   width: 4px;
@@ -3077,11 +3075,6 @@ button.button:disabled,
 
 .content-hero-dot-grid span.is-near {
   animation-duration: 420ms;
-}
-
-.content-hero-dot-grid span.is-touched {
-  outline: 1px solid rgba(168, 255, 81, 0.36);
-  outline-offset: 2px;
 }
 
 @keyframes content-dot-grid-in {

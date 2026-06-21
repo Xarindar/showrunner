@@ -8,6 +8,7 @@ import type { SiteSettingsWithModules } from "@/lib/site";
 import {
   HERO_GRID_COLUMNS,
   HERO_GRID_ROWS,
+  clampHeroElementLayout,
   heroCanvasLayerElementTypes,
   heroCanvasLayerElementsArray,
   heroElementLabel,
@@ -42,9 +43,9 @@ type HeroContentEditorProps = {
 type ActiveModal = "add" | "image" | null;
 
 type PointerInteraction = {
+  lastAssetX: number;
+  lastAssetY: number;
   lastTime: number;
-  lastX: number;
-  lastY: number;
   moved: boolean;
   pointerId: number;
   startX: number;
@@ -56,8 +57,6 @@ type DragMotion = {
   speed: number;
   velocityX: number;
   velocityY: number;
-  x: number;
-  y: number;
 };
 
 const dragThresholdPx = 6;
@@ -162,35 +161,43 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     setActiveModal(null);
   }
 
-  function updateLayerFromPointer(type: HeroCanvasLayerElementType, event: PointerEvent) {
+  function updateLayerFromPointer(type: HeroCanvasLayerElementType, event: PointerEvent<HTMLDivElement>) {
     const stage = stageRef.current;
     const layout = activeSlide.elements[type];
-    if (!stage || !layout) return;
+    if (!stage || !layout) return null;
 
     const rect = stage.getBoundingClientRect();
     const column = Math.floor(((event.clientX - rect.left) / rect.width) * HERO_GRID_COLUMNS) + 1;
     const row = Math.floor(((event.clientY - rect.top) / rect.height) * HERO_GRID_ROWS) + 1;
+    const nextLayout = clampHeroElementLayout({
+      ...layout,
+      gridColumn: column - Math.floor(layout.columnSpan / 2),
+      gridRow: row - Math.floor(layout.rowSpan / 2)
+    });
 
-    updateActiveSlide((slide) =>
-      withUpdatedHeroElement(slide, type, {
-        gridColumn: column - Math.floor(layout.columnSpan / 2),
-        gridRow: row - Math.floor(layout.rowSpan / 2)
-      })
-    );
+    updateActiveSlide((slide) => withUpdatedHeroElement(slide, type, nextLayout));
+    return nextLayout;
   }
 
   function handleLayerPointerDown(type: HeroCanvasLayerElementType, event: PointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest(".content-inline-editor")) return;
 
+    const stage = stageRef.current;
+    const layout = activeSlide.elements[type];
+    if (!stage || !layout) return;
+
+    const rect = stage.getBoundingClientRect();
+    const assetCenter = heroLayoutCenter(layout);
+
     event.preventDefault();
     setSelectedLayer(type);
     setEditingLayer(null);
     pointerInteractionRef.current = {
       moved: false,
+      lastAssetX: rect.left + assetCenter.x * rect.width,
+      lastAssetY: rect.top + assetCenter.y * rect.height,
       lastTime: event.timeStamp,
-      lastX: event.clientX,
-      lastY: event.clientY,
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
@@ -210,8 +217,8 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     }
 
     if (interaction.moved) {
-      updateLayerFromPointer(interaction.type, event);
-      updateDragMotion(interaction, event);
+      const nextLayout = updateLayerFromPointer(interaction.type, event);
+      if (nextLayout) updateDragMotion(interaction, event, nextLayout);
     }
   }
 
@@ -233,26 +240,31 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     setDraggingLayer(null);
   }
 
-  function updateDragMotion(interaction: PointerInteraction, event: PointerEvent<HTMLDivElement>) {
+  function updateDragMotion(
+    interaction: PointerInteraction,
+    event: PointerEvent<HTMLDivElement>,
+    layout: HeroSlideEditor["elements"][HeroCanvasLayerElementType]
+  ) {
     const stage = stageRef.current;
     if (!stage) return;
 
     const now = event.timeStamp;
     const elapsed = Math.max(16, now - interaction.lastTime);
-    const velocityX = ((event.clientX - interaction.lastX) / elapsed) * 1000;
-    const velocityY = ((event.clientY - interaction.lastY) / elapsed) * 1000;
     const rect = stage.getBoundingClientRect();
+    const assetCenter = heroLayoutCenter(layout);
+    const assetX = rect.left + assetCenter.x * rect.width;
+    const assetY = rect.top + assetCenter.y * rect.height;
+    const velocityX = ((assetX - interaction.lastAssetX) / elapsed) * 1000;
+    const velocityY = ((assetY - interaction.lastAssetY) / elapsed) * 1000;
 
     interaction.lastTime = now;
-    interaction.lastX = event.clientX;
-    interaction.lastY = event.clientY;
+    interaction.lastAssetX = assetX;
+    interaction.lastAssetY = assetY;
 
     setDragMotion({
       speed: Math.min(3200, Math.hypot(velocityX, velocityY)),
       velocityX,
-      velocityY,
-      x: clampUnit((event.clientX - rect.left) / rect.width),
-      y: clampUnit((event.clientY - rect.top) / rect.height)
+      velocityY
     });
   }
 
@@ -388,12 +400,8 @@ function HeroDotGrid({
   activeLayout: HeroSlideEditor["elements"][HeroCanvasLayerElementType];
   motion: DragMotion;
 }) {
-  const activeBounds = {
-    bottom: (activeLayout.gridRow - 1 + activeLayout.rowSpan) / HERO_GRID_ROWS,
-    left: (activeLayout.gridColumn - 1) / HERO_GRID_COLUMNS,
-    right: (activeLayout.gridColumn - 1 + activeLayout.columnSpan) / HERO_GRID_COLUMNS,
-    top: (activeLayout.gridRow - 1) / HERO_GRID_ROWS
-  };
+  const activeBounds = heroLayoutBounds(activeLayout);
+  const activeCenter = heroLayoutCenter(activeLayout);
 
   return (
     <div
@@ -409,17 +417,24 @@ function HeroDotGrid({
           const x = (columnIndex + 0.5) / dotGridColumns;
           const y = (rowIndex + 0.5) / dotGridRows;
           const touched = x >= activeBounds.left && x <= activeBounds.right && y >= activeBounds.top && y <= activeBounds.bottom;
-          const distance = Math.hypot(x - motion.x, y - motion.y);
-          const proximity = Math.max(0, 1 - distance / 0.24);
+          const nearestX = clampValue(x, activeBounds.left, activeBounds.right);
+          const nearestY = clampValue(y, activeBounds.top, activeBounds.bottom);
+          const distance = touched ? 0 : Math.hypot(x - nearestX, y - nearestY);
+          const proximity = Math.max(0, 1 - distance / 0.18);
           const speedFactor = Math.min(1, motion.speed / 1400);
-          const pushX = ((x - motion.x) * 34 + motion.velocityX * 0.01) * proximity * (0.45 + speedFactor);
-          const pushY = ((y - motion.y) * 34 + motion.velocityY * 0.01) * proximity * (0.45 + speedFactor);
-          const glow = Math.min(1, proximity + (touched ? 0.36 : 0));
-          const scale = 0.86 + (touched ? 0.48 : 0) + proximity * 1.18 + speedFactor * proximity * 0.4;
-          const opacity = Math.min(0.96, 0.28 + proximity * 0.56 + (touched ? 0.24 : 0));
-          const red = Math.round(226 - glow * 58);
-          const green = Math.round(244 + glow * 11);
-          const blue = Math.round(238 - glow * 157);
+          const directionX = touched ? x - activeCenter.x : x - nearestX;
+          const directionY = touched ? y - activeCenter.y : y - nearestY;
+          const directionLength = Math.hypot(directionX, directionY) || 1;
+          const normalizedX = directionX / directionLength;
+          const normalizedY = directionY / directionLength;
+          const pushStrength = (touched ? 8.5 : 4 + proximity * 8) * proximity * (0.55 + speedFactor * 0.45);
+          const pushX = normalizedX * pushStrength + motion.velocityX * 0.004 * proximity * speedFactor;
+          const pushY = normalizedY * pushStrength + motion.velocityY * 0.004 * proximity * speedFactor;
+          const glow = Math.min(1, proximity + (touched ? 0.26 : 0));
+          const scale = 0.86 + (touched ? 0.58 : 0) + proximity * 0.86 + speedFactor * proximity * 0.22;
+          const opacity = Math.min(0.95, 0.24 + proximity * 0.52 + (touched ? 0.18 : 0));
+          const accentMix = Math.round(34 + glow * 58);
+          const whiteAlpha = (0.16 + glow * 0.24).toFixed(2);
 
           return (
             <span
@@ -427,8 +442,7 @@ function HeroDotGrid({
               key={`${columnIndex}-${rowIndex}`}
               style={{
                 animationDelay: `${(columnIndex * 17 + rowIndex * 23) % 520}ms`,
-                backgroundColor: `rgba(${red}, ${green}, ${blue}, ${opacity})`,
-                boxShadow: `0 0 ${Math.round(4 + glow * 18)}px rgba(168, 255, 81, ${0.08 + glow * 0.34})`,
+                backgroundColor: `color-mix(in srgb, var(--color-accent) ${accentMix}%, rgba(255, 255, 255, ${whiteAlpha}))`,
                 opacity,
                 transform: `translate(${pushX.toFixed(1)}px, ${pushY.toFixed(1)}px) scale(${scale.toFixed(2)})`
               }}
@@ -440,8 +454,25 @@ function HeroDotGrid({
   );
 }
 
-function clampUnit(value: number) {
-  return Math.max(0, Math.min(1, value));
+function heroLayoutBounds(layout: { gridColumn: number; gridRow: number; columnSpan: number; rowSpan: number }) {
+  return {
+    bottom: (layout.gridRow - 1 + layout.rowSpan) / HERO_GRID_ROWS,
+    left: (layout.gridColumn - 1) / HERO_GRID_COLUMNS,
+    right: (layout.gridColumn - 1 + layout.columnSpan) / HERO_GRID_COLUMNS,
+    top: (layout.gridRow - 1) / HERO_GRID_ROWS
+  };
+}
+
+function heroLayoutCenter(layout: { gridColumn: number; gridRow: number; columnSpan: number; rowSpan: number }) {
+  const bounds = heroLayoutBounds(layout);
+  return {
+    x: (bounds.left + bounds.right) / 2,
+    y: (bounds.top + bounds.bottom) / 2
+  };
+}
+
+function clampValue(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function HeroCanvasLayer({
