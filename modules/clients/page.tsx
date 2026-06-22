@@ -1,13 +1,28 @@
 import Link from "next/link";
 import { ClientPipelineStage, Prisma } from "@prisma/client";
-import { Download, ExternalLink, Plus, RefreshCw, Save, Search, Trash2, Upload } from "lucide-react";
+import {
+  Activity,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  ExternalLink,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  Star,
+  Trash2,
+  Upload,
+  UserPlus,
+  UsersRound
+} from "lucide-react";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
 import { clientPortalPath } from "@/lib/clients/portal-token";
 import { enumLabel, formatDateTime } from "@/lib/format";
 import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Button, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, ButtonLink, EqualGrid, Table } from "@/components/ui";
 import {
   createClientAction,
   createClientSegmentAction,
@@ -46,6 +61,7 @@ type ClientsPageProps = {
     saved?: string;
     segment?: string;
     skipped?: string;
+    stage?: string;
   }>;
 };
 
@@ -100,10 +116,32 @@ function savedMessage(params: Awaited<NonNullable<ClientsPageProps["searchParams
   return "";
 }
 
-function clientsHref({ page, q, segment }: { page?: number; q?: string; segment?: string }) {
+function selectedPipelineStage(value?: string) {
+  return value && Object.values(ClientPipelineStage).includes(value as ClientPipelineStage)
+    ? (value as ClientPipelineStage)
+    : undefined;
+}
+
+function tableLabel(value: string) {
+  const label = enumLabel(value);
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
+}
+
+function clientsHref({
+  page,
+  q,
+  segment,
+  stage
+}: {
+  page?: number;
+  q?: string;
+  segment?: string;
+  stage?: ClientPipelineStage;
+}) {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (segment) params.set("segment", segment);
+  if (stage) params.set("stage", stage);
   if (page && page > 1) params.set("page", String(page));
 
   const query = params.toString();
@@ -116,16 +154,17 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
   const settings = await getSiteSettings();
   const page = Math.max(1, Number(params.page || 1) || 1);
   const query = String(params.q || "").trim();
+  const selectedStage = selectedPipelineStage(params.stage);
   const segments = await prisma.clientSegment.findMany({
     where: { siteId: settings.siteId },
     orderBy: { name: "asc" }
   });
   const selectedSegment = segments.find((segment) => segment.key === params.segment);
-  const listFilters: Prisma.ClientWhereInput[] = [];
+  const baseListFilters: Prisma.ClientWhereInput[] = [];
 
-  if (selectedSegment) listFilters.push(segmentWhere(selectedSegment.criteria));
+  if (selectedSegment) baseListFilters.push(segmentWhere(selectedSegment.criteria));
   if (query) {
-    listFilters.push({
+    baseListFilters.push({
       OR: [
         { name: { contains: query, mode: "insensitive" } },
         { email: { contains: query, mode: "insensitive" } },
@@ -137,12 +176,20 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
     });
   }
 
+  const listFilters = [...baseListFilters];
+  if (selectedStage) listFilters.push({ pipelineStage: selectedStage });
+
+  const baseWhere = await getAccessibleClientWhere(
+    user,
+    settings.siteId,
+    baseListFilters.length ? { AND: baseListFilters } : {}
+  );
   const where = await getAccessibleClientWhere(
     user,
     settings.siteId,
     listFilters.length ? { AND: listFilters } : {}
   );
-  const [clients, clientCount, pipelineCounts] = await Promise.all([
+  const [clients, clientCount, pipelineCounts, statusCounts] = await Promise.all([
     prisma.client.findMany({
       where,
       include: {
@@ -157,7 +204,12 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
     prisma.client.count({ where }),
     prisma.client.groupBy({
       by: ["pipelineStage"],
-      where,
+      where: baseWhere,
+      _count: { _all: true }
+    }),
+    prisma.client.groupBy({
+      by: ["status"],
+      where: baseWhere,
       _count: { _all: true }
     })
   ]);
@@ -165,6 +217,14 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
   const rangeStart = clientCount ? (page - 1) * pageSize + 1 : 0;
   const rangeEnd = Math.min(page * pageSize, clientCount);
   const message = savedMessage(params);
+  const pipelineCount = (stage: ClientPipelineStage) =>
+    pipelineCounts.find((item) => item.pipelineStage === stage)?._count._all || 0;
+  const baseClientCount = pipelineCounts.reduce((total, item) => total + item._count._all, 0);
+  const statusCount = (status: string) =>
+    statusCounts.find((item) => item.status.toLowerCase() === status)?._count._all || 0;
+  const selectedFilterLabel = [selectedSegment?.name, selectedStage ? tableLabel(selectedStage) : ""]
+    .filter(Boolean)
+    .join(" + ");
 
   const addClientForm = (
     <form action={createClientAction} className="form-grid">
@@ -236,7 +296,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         <div className="clients-filter-pills">
           <Link
             className={!selectedSegment ? "ui-button ui-button-sm" : "ui-button ui-button-secondary ui-button-sm"}
-            href={clientsHref({ q: query })}>
+            href={clientsHref({ q: query, stage: selectedStage })}>
             All clients
           </Link>
           {segments.map((segment) => (
@@ -246,7 +306,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                   ? "ui-button ui-button-sm"
                   : "ui-button ui-button-secondary ui-button-sm"
               }
-              href={clientsHref({ q: query, segment: segment.key })}
+              href={clientsHref({ q: query, segment: segment.key, stage: selectedStage })}
               key={segment.id}>
               {segment.name}
             </Link>
@@ -366,73 +426,53 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
       {message ? <div className="success-message">{message}</div> : null}
       {params.error ? <div className="error">{params.error}</div> : null}
 
-      <Card
-        as="section"
-        bodyClassName="clients-list-body"
-        className="clients-list-card"
-        density="compact"
-        minHeight="none"
-        reservedFooter={
-          <div className="clients-pagination">
-            <ButtonLink
-              aria-disabled={page <= 1}
-              href={clientsHref({ page: Math.max(1, page - 1), q: query, segment: selectedSegment?.key })}
-              size="sm"
-              variant="secondary">
-              Previous
-            </ButtonLink>
-            <span className="ui-badge">
-              Page {Math.min(page, pageCount)} of {pageCount}
-            </span>
-            <ButtonLink
-              aria-disabled={page >= pageCount}
-              href={clientsHref({ page: Math.min(pageCount, page + 1), q: query, segment: selectedSegment?.key })}
-              size="sm"
-              variant="secondary">
-              Next
-            </ButtonLink>
-          </div>
-        }
-        reservedHeader={
-          <div className="clients-list-head">
-            <div className="clients-list-titlebar">
-              <div>
-                <h2 className="section-title">Clients</h2>
-                <p className="ui-zero">
-                  {rangeStart}-{rangeEnd} of {clientCount}
-                  {selectedSegment ? ` filtered by ${selectedSegment.name}` : " matching clients"}
-                </p>
-              </div>
-              <ClientsActionModals
-                addClient={addClientForm}
-                dataTools={dataToolsModal}
-                filters={filtersModal}
-              />
+      <section aria-labelledby="clients-table-title" className="ui-data-table-shell clients-data-table">
+        <div className="ui-data-table-header">
+          <div className="ui-data-table-titlebar">
+            <div>
+              <h2 className="section-title" id="clients-table-title">
+                Clients
+              </h2>
+              <p className="ui-zero">
+                {rangeStart}-{rangeEnd} of {clientCount}
+                {selectedFilterLabel ? ` filtered by ${selectedFilterLabel}` : " matching clients"}
+              </p>
             </div>
+            <ClientsActionModals addClient={addClientForm} dataTools={dataToolsModal} filters={filtersModal} />
+          </div>
 
-            <div className="clients-list-controls">
-              <form action="/admin/modules/clients" className="clients-search-form">
-                {selectedSegment ? <input type="hidden" name="segment" value={selectedSegment.key} /> : null}
-                <input aria-label="Search clients" id="clients-search" name="q" placeholder="Search clients" defaultValue={query} />
-                <Button size="sm" type="submit" variant="secondary">
-                  <Search size={15} />
-                  Search
-                </Button>
-              </form>
-              <div className="clients-pipeline-summary" aria-label="Pipeline summary">
-                {Object.values(ClientPipelineStage).map((stage) => {
-                  const count = pipelineCounts.find((item) => item.pipelineStage === stage)?._count._all || 0;
-                  return (
-                    <span className="ui-badge" key={stage}>
-                      {enumLabel(stage)}: {count}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
+          <div className="ui-data-table-tabs" aria-label="Pipeline stages">
+            <Link
+              className={`ui-data-table-tab${!selectedStage ? " is-active" : ""}`}
+              href={clientsHref({ q: query, segment: selectedSegment?.key })}>
+              All
+              <span>{baseClientCount}</span>
+            </Link>
+            {Object.values(ClientPipelineStage).map((stage) => (
+              <Link
+                className={`ui-data-table-tab${selectedStage === stage ? " is-active" : ""}`}
+                href={clientsHref({ q: query, segment: selectedSegment?.key, stage })}
+                key={stage}>
+                {tableLabel(stage)}
+                <span>{pipelineCount(stage)}</span>
+              </Link>
+            ))}
           </div>
-        }>
-        <Table className="clients-table-wrap" tableClassName="clients-table">
+
+          <div className="ui-data-table-toolbar">
+            <form action="/admin/modules/clients" className="clients-search-form ui-data-table-search">
+              {selectedSegment ? <input type="hidden" name="segment" value={selectedSegment.key} /> : null}
+              {selectedStage ? <input type="hidden" name="stage" value={selectedStage} /> : null}
+              <input aria-label="Search clients" id="clients-search" name="q" placeholder="Search clients" defaultValue={query} />
+              <Button size="sm" type="submit" variant="secondary">
+                <Search size={15} />
+                Search
+              </Button>
+            </form>
+          </div>
+        </div>
+
+        <Table className="ui-data-table-scroll clients-table-wrap" tableClassName="ui-data-table clients-table">
           <colgroup>
             <col className="clients-col-client" />
             <col className="clients-col-contact" />
@@ -533,12 +573,71 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
             })}
             {!clients.length ? (
               <tr>
-                <td colSpan={6}>No clients yet.</td>
+                <td className="ui-data-table-empty" colSpan={6}>
+                  No clients yet.
+                </td>
               </tr>
             ) : null}
           </tbody>
         </Table>
-      </Card>
+
+        <div className="ui-data-table-footer">
+          <div className="clients-pagination">
+            <ButtonLink
+              aria-disabled={page <= 1}
+              href={clientsHref({
+                page: Math.max(1, page - 1),
+                q: query,
+                segment: selectedSegment?.key,
+                stage: selectedStage
+              })}
+              size="sm"
+              variant="secondary">
+              <ChevronLeft size={15} />
+              Previous
+            </ButtonLink>
+            <span className="ui-badge">
+              Page {Math.min(page, pageCount)} of {pageCount}
+            </span>
+            <ButtonLink
+              aria-disabled={page >= pageCount}
+              href={clientsHref({
+                page: Math.min(pageCount, page + 1),
+                q: query,
+                segment: selectedSegment?.key,
+                stage: selectedStage
+              })}
+              size="sm"
+              variant="secondary">
+              Next
+              <ChevronRight size={15} />
+            </ButtonLink>
+          </div>
+        </div>
+
+        <div className="ui-data-table-stats" aria-label="Client summary">
+          <div className="ui-data-table-stat-pill ui-data-table-stat-pill-primary">
+            <UsersRound size={16} />
+            <strong>{baseClientCount}</strong>
+            <span>Clients</span>
+          </div>
+          <div className="ui-data-table-stat-pill ui-data-table-stat-pill-success">
+            <Activity size={16} />
+            <strong>{statusCount("active")}</strong>
+            <span>Active</span>
+          </div>
+          <div className="ui-data-table-stat-pill ui-data-table-stat-pill-warning">
+            <Star size={16} />
+            <strong>{statusCount("vip")}</strong>
+            <span>VIP</span>
+          </div>
+          <div className="ui-data-table-stat-pill">
+            <UserPlus size={16} />
+            <strong>{statusCount("lead")}</strong>
+            <span>Leads</span>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

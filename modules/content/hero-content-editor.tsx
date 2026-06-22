@@ -54,11 +54,45 @@ type HeroContentEditorProps = {
 
 type ActiveModal = "add" | "image" | null;
 
+type Rect = {
+  bottom: number;
+  left: number;
+  right: number;
+  top: number;
+};
+
+type GridGeometry = {
+  cellHeight: number;
+  cellWidth: number;
+  columnGap: number;
+  gridHeight: number;
+  gridLeft: number;
+  gridTop: number;
+  gridWidth: number;
+  originX: number;
+  originY: number;
+  rowGap: number;
+};
+
+// Everything the drag/keyboard logic needs to resolve a move without touching
+// the DOM again mid-gesture: stage geometry, the moving asset's rendered size,
+// and the rendered boxes of the other visible assets it can collide with.
+type LayerCollisionContext = {
+  colSpan: number;
+  contentHeight: number;
+  contentWidth: number;
+  geometry: GridGeometry;
+  rowSpan: number;
+  siblings: Rect[];
+  type: HeroCanvasLayerElementType;
+};
+
 type PointerInteraction = {
+  committedColumn: number;
+  committedRow: number;
+  context: LayerCollisionContext;
   lastAssetX: number;
   lastAssetY: number;
-  lastGridColumn: number;
-  lastGridRow: number;
   lastTime: number;
   moved: boolean;
   pointerId: number;
@@ -75,7 +109,18 @@ type DragMotion = {
   velocityY: number;
 };
 
+type AlignmentGuide = {
+  emphasis: boolean;
+  end: number;
+  id: string;
+  offset: number;
+  orientation: "horizontal" | "vertical";
+  start: number;
+};
+
 const dragThresholdPx = 6;
+const coarseNudgeCells = 3;
+const alignmentTolerancePx = 4;
 const dotGridColumns = HERO_GRID_COLUMNS;
 const dotGridRows = HERO_GRID_ROWS;
 
@@ -93,6 +138,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     HEADLINE: null
   });
   const pointerInteractionRef = useRef<PointerInteraction | null>(null);
+  const blockedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [presentation, setPresentation] = useState(() => ({
     ...initialPresentation,
@@ -101,6 +147,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [dragMotion, setDragMotion] = useState<DragMotion | null>(null);
+  const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
   const [blockedLayer, setBlockedLayer] = useState<HeroCanvasLayerElementType | null>(null);
   const [draggingLayer, setDraggingLayer] = useState<HeroCanvasLayerElementType | null>(null);
   const [editingLayer, setEditingLayer] = useState<HeroCanvasLayerElementType | null>(null);
@@ -127,6 +174,12 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     };
   }, [previewImageUrl]);
 
+  useEffect(() => {
+    return () => {
+      if (blockedTimeoutRef.current) clearTimeout(blockedTimeoutRef.current);
+    };
+  }, []);
+
   function updateActiveSlide(updater: (slide: HeroSlideEditor) => HeroSlideEditor) {
     setPresentation((current) => ({
       ...current,
@@ -152,7 +205,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
       if (type === "CTA" && !positionedSlide.ctaLabel) return { ...positionedSlide, ctaLabel: "Book an appointment", ctaHref: "/book" };
       return positionedSlide;
     });
-    setBlockedLayer(null);
+    clearBlocked();
     setSelectedLayer(type);
     setEditingLayer(null);
     setActiveModal(null);
@@ -187,111 +240,44 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     setActiveModal(null);
   }
 
-  function nudgeLayer(type: HeroCanvasLayerElementType, deltaColumn: number, deltaRow: number) {
-    const layout = activeSlide.elements[type];
-    moveLayerToLayout(type, {
-      ...layout,
-      gridColumn: layout.gridColumn + deltaColumn,
-      gridRow: layout.gridRow + deltaRow
-    }, layout);
-  }
-
-  function moveLayerToLayout(type: HeroCanvasLayerElementType, layout: HeroElementLayout, fromLayout?: HeroElementLayout) {
-    const nextLayout = fitHeroElementLayoutToContent({
-      ...layout,
-      type
-    });
-
-    if (hasLayerCollision(type, nextLayout, fromLayout)) {
-      setBlockedLayer(type);
-      return null;
-    }
-
+  function clearBlocked() {
+    if (blockedTimeoutRef.current) clearTimeout(blockedTimeoutRef.current);
     setBlockedLayer(null);
-    updateActiveSlide((slide) => withUpdatedHeroElement(slide, type, nextLayout));
-    return nextLayout;
   }
 
-  function hasLayerCollision(type: HeroCanvasLayerElementType, layout: HeroElementLayout, fromLayout?: HeroElementLayout) {
-    const nextLayout = fitHeroElementLayoutToContent({
-      ...layout,
-      type
-    });
+  function flashBlocked(type: HeroCanvasLayerElementType) {
+    if (blockedTimeoutRef.current) clearTimeout(blockedTimeoutRef.current);
+    setBlockedLayer(type);
+    blockedTimeoutRef.current = setTimeout(() => setBlockedLayer(null), 220);
+  }
 
-    if (!fromLayout) return hasLayerCollisionAt(type, nextLayout);
+  function commitLayerPosition(type: HeroCanvasLayerElementType, gridColumn: number, gridRow: number) {
+    updateActiveSlide((slide) => withUpdatedHeroElement(slide, type, { gridColumn, gridRow }));
+  }
 
-    const currentLayout = fitHeroElementLayoutToContent({
-      ...fromLayout,
-      type
-    });
-    const columnDelta = nextLayout.gridColumn - currentLayout.gridColumn;
-    const rowDelta = nextLayout.gridRow - currentLayout.gridRow;
-    const steps = Math.max(Math.abs(columnDelta), Math.abs(rowDelta), 1);
-    const checkedSteps = new Set<string>();
+  // Keyboard nudges share the same geometry-aware resolver as dragging, so a
+  // single arrow press slides along an obstacle instead of dead-stopping.
+  function nudgeLayer(type: HeroCanvasLayerElementType, deltaColumn: number, deltaRow: number) {
+    const stage = stageRef.current;
+    const layout = activeSlide.elements[type];
+    const context = stage ? buildCollisionContext(stage, type, layout) : null;
 
-    for (let step = 1; step <= steps; step += 1) {
-      const gridColumn = currentLayout.gridColumn + Math.round((columnDelta * step) / steps);
-      const gridRow = currentLayout.gridRow + Math.round((rowDelta * step) / steps);
-      const stepKey = `${gridColumn}:${gridRow}`;
-      if (checkedSteps.has(stepKey)) continue;
-      checkedSteps.add(stepKey);
-
-      if (
-        hasLayerCollisionAt(type, {
-          ...nextLayout,
-          gridColumn,
-          gridRow
-        })
-      ) {
-        return true;
-      }
+    if (!context) {
+      commitLayerPosition(type, layout.gridColumn + deltaColumn, layout.gridRow + deltaRow);
+      return;
     }
 
-    return false;
-  }
+    const targetColumn = clampColumnToContent(context, layout.gridColumn + deltaColumn);
+    const targetRow = clampRowToContent(context, layout.gridRow + deltaRow);
+    const resolved = resolveSlide(context, layout.gridColumn, layout.gridRow, targetColumn, targetRow);
 
-  function hasLayerCollisionAt(type: HeroCanvasLayerElementType, layout: HeroElementLayout) {
-    return hasVisibleLayerCollision(type, layout);
-  }
+    if (resolved.gridColumn === layout.gridColumn && resolved.gridRow === layout.gridRow) {
+      flashBlocked(type);
+      return;
+    }
 
-  function hasVisibleLayerCollision(type: HeroCanvasLayerElementType, layout: HeroElementLayout) {
-    const stage = stageRef.current;
-    const movingElement = layerContentRefs.current[type];
-    if (!stage || !movingElement) return false;
-
-    const movingRect = getCandidateContentRect(stage, movingElement, layout);
-    if (!movingRect) return false;
-
-    return heroCanvasLayerElementTypes.some((otherType) => {
-      if (otherType === type) return false;
-
-      const otherLayout = activeSlide.elements[otherType];
-      const otherElement = layerContentRefs.current[otherType];
-      if (!otherLayout?.isVisible || !otherElement) return false;
-
-      return rectsOverlap(movingRect, otherElement.getBoundingClientRect());
-    });
-  }
-
-  function updateLayerFromPointer(interaction: PointerInteraction, event: PointerEvent<HTMLDivElement>) {
-    const stage = stageRef.current;
-    const layout = activeSlide.elements[interaction.type];
-    if (!stage || !layout) return null;
-
-    const rect = stage.getBoundingClientRect();
-    const columnDelta = Math.round(((event.clientX - interaction.startX) / rect.width) * HERO_GRID_COLUMNS);
-    const rowDelta = Math.round(((event.clientY - interaction.startY) / rect.height) * HERO_GRID_ROWS);
-    const nextLayout = {
-      ...layout,
-      gridColumn: interaction.startGridColumn + columnDelta,
-      gridRow: interaction.startGridRow + rowDelta
-    };
-
-    return moveLayerToLayout(interaction.type, nextLayout, {
-      ...layout,
-      gridColumn: interaction.lastGridColumn,
-      gridRow: interaction.lastGridRow
-    });
+    clearBlocked();
+    commitLayerPosition(type, resolved.gridColumn, resolved.gridRow);
   }
 
   function handleLayerPointerDown(type: HeroCanvasLayerElementType, event: PointerEvent<HTMLDivElement>) {
@@ -302,19 +288,24 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     const layout = activeSlide.elements[type];
     if (!stage || !layout) return;
 
-    const rect = stage.getBoundingClientRect();
+    const context = buildCollisionContext(stage, type, layout);
+    if (!context) return;
+
     const assetCenter = heroLayoutCenter(layout);
+    const stageRect = stage.getBoundingClientRect();
 
     event.preventDefault();
     setSelectedLayer(type);
     setEditingLayer(null);
+    clearBlocked();
     pointerInteractionRef.current = {
-      moved: false,
-      lastAssetX: rect.left + assetCenter.x * rect.width,
-      lastAssetY: rect.top + assetCenter.y * rect.height,
-      lastGridColumn: layout.gridColumn,
-      lastGridRow: layout.gridRow,
+      committedColumn: layout.gridColumn,
+      committedRow: layout.gridRow,
+      context,
+      lastAssetX: stageRect.left + assetCenter.x * stageRect.width,
+      lastAssetY: stageRect.top + assetCenter.y * stageRect.height,
       lastTime: event.timeStamp,
+      moved: false,
       pointerId: event.pointerId,
       startGridColumn: layout.gridColumn,
       startGridRow: layout.gridRow,
@@ -322,12 +313,12 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
       startY: event.clientY,
       type
     };
-    stageRef.current?.setPointerCapture(event.pointerId);
+    stage.setPointerCapture(event.pointerId);
   }
 
   function handleStagePointerMove(event: PointerEvent<HTMLDivElement>) {
     const interaction = pointerInteractionRef.current;
-    if (!interaction) return;
+    if (!interaction || event.pointerId !== interaction.pointerId) return;
 
     const distance = Math.hypot(event.clientX - interaction.startX, event.clientY - interaction.startY);
     if (!interaction.moved && distance > dragThresholdPx) {
@@ -335,14 +326,26 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
       setDraggingLayer(interaction.type);
     }
 
-    if (interaction.moved) {
-      const nextLayout = updateLayerFromPointer(interaction, event);
-      if (nextLayout) {
-        interaction.lastGridColumn = nextLayout.gridColumn;
-        interaction.lastGridRow = nextLayout.gridRow;
-        updateDragMotion(interaction, event, nextLayout);
-      }
+    if (!interaction.moved) return;
+
+    const { context } = interaction;
+    const columnStride = context.geometry.cellWidth + context.geometry.columnGap;
+    const rowStride = context.geometry.cellHeight + context.geometry.rowGap;
+    const columnDelta = columnStride > 0 ? Math.round((event.clientX - interaction.startX) / columnStride) : 0;
+    const rowDelta = rowStride > 0 ? Math.round((event.clientY - interaction.startY) / rowStride) : 0;
+
+    const desiredColumn = clampColumnToContent(context, interaction.startGridColumn + columnDelta);
+    const desiredRow = clampRowToContent(context, interaction.startGridRow + rowDelta);
+    const resolved = resolveSlide(context, interaction.committedColumn, interaction.committedRow, desiredColumn, desiredRow);
+
+    if (resolved.gridColumn !== interaction.committedColumn || resolved.gridRow !== interaction.committedRow) {
+      interaction.committedColumn = resolved.gridColumn;
+      interaction.committedRow = resolved.gridRow;
+      commitLayerPosition(context.type, resolved.gridColumn, resolved.gridRow);
+      updateDragMotion(interaction, event, { ...resolved, columnSpan: context.colSpan, rowSpan: context.rowSpan });
     }
+
+    setAlignmentGuides(computeAlignmentGuides(context, resolved.gridColumn, resolved.gridRow));
   }
 
   function handleStagePointerUp() {
@@ -361,13 +364,14 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     pointerInteractionRef.current = null;
     setDragMotion(null);
     setDraggingLayer(null);
-    setBlockedLayer(null);
+    setAlignmentGuides([]);
+    clearBlocked();
   }
 
   function updateDragMotion(
     interaction: PointerInteraction,
     event: PointerEvent<HTMLDivElement>,
-    layout: HeroSlideEditor["elements"][HeroCanvasLayerElementType]
+    layout: { columnSpan: number; gridColumn: number; gridRow: number; rowSpan: number }
   ) {
     const stage = stageRef.current;
     if (!stage) return;
@@ -390,6 +394,134 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
       velocityX,
       velocityY
     });
+  }
+
+  function buildCollisionContext(
+    stage: HTMLDivElement,
+    type: HeroCanvasLayerElementType,
+    layout: HeroElementLayout
+  ): LayerCollisionContext | null {
+    const movingElement = layerContentRefs.current[type];
+    if (!movingElement) return null;
+
+    const movingRect = movingElement.getBoundingClientRect();
+    if (!movingRect.width || !movingRect.height) return null;
+
+    const siblings = heroCanvasLayerElementTypes.flatMap((otherType) => {
+      if (otherType === type) return [];
+      const otherLayout = activeSlide.elements[otherType];
+      const otherElement = layerContentRefs.current[otherType];
+      if (!otherLayout?.isVisible || !otherElement) return [];
+
+      const rect = otherElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return [];
+      return [{ bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top }];
+    });
+
+    return {
+      colSpan: layout.columnSpan,
+      contentHeight: movingRect.height,
+      contentWidth: movingRect.width,
+      geometry: readGridGeometry(stage),
+      rowSpan: layout.rowSpan,
+      siblings,
+      type
+    };
+  }
+
+  // Slide toward the target one cell at a time on each axis, stopping at the
+  // first blocked cell. This lets an asset glide along an obstacle (and lets
+  // the user change direction mid-drag) instead of refusing the whole move.
+  function resolveSlide(context: LayerCollisionContext, fromColumn: number, fromRow: number, toColumn: number, toRow: number) {
+    let gridColumn = fromColumn;
+    let gridRow = fromRow;
+
+    const slideColumn = () => {
+      const step = Math.sign(toColumn - gridColumn);
+      while (step !== 0 && gridColumn !== toColumn) {
+        const next = gridColumn + step;
+        if (collidesAt(context, next, gridRow)) break;
+        gridColumn = next;
+      }
+    };
+    const slideRow = () => {
+      const step = Math.sign(toRow - gridRow);
+      while (step !== 0 && gridRow !== toRow) {
+        const next = gridRow + step;
+        if (collidesAt(context, gridColumn, next)) break;
+        gridRow = next;
+      }
+    };
+
+    if (Math.abs(toColumn - fromColumn) >= Math.abs(toRow - fromRow)) {
+      slideColumn();
+      slideRow();
+    } else {
+      slideRow();
+      slideColumn();
+    }
+
+    return { gridColumn, gridRow };
+  }
+
+  function collidesAt(context: LayerCollisionContext, gridColumn: number, gridRow: number) {
+    const moving = contentRectFromGeometry(context, gridColumn, gridRow);
+    return context.siblings.some((sibling) => rectsOverlap(moving, sibling));
+  }
+
+  function computeAlignmentGuides(context: LayerCollisionContext, gridColumn: number, gridRow: number): AlignmentGuide[] {
+    const { geometry } = context;
+    const moving = contentRectFromGeometry(context, gridColumn, gridRow);
+    const movingX = [moving.left, (moving.left + moving.right) / 2, moving.right];
+    const movingY = [moving.top, (moving.top + moving.bottom) / 2, moving.bottom];
+    const guides: AlignmentGuide[] = [];
+    const seen = new Set<string>();
+
+    const pushVertical = (x: number, top: number, bottom: number, emphasis: boolean) => {
+      const offset = x - geometry.originX;
+      const key = `v:${Math.round(offset)}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      guides.push({ emphasis, end: bottom - geometry.originY, id: key, offset, orientation: "vertical", start: top - geometry.originY });
+    };
+    const pushHorizontal = (y: number, left: number, right: number, emphasis: boolean) => {
+      const offset = y - geometry.originY;
+      const key = `h:${Math.round(offset)}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      guides.push({ emphasis, end: right - geometry.originX, id: key, offset, orientation: "horizontal", start: left - geometry.originX });
+    };
+
+    const stageCenterX = geometry.gridLeft + geometry.gridWidth / 2;
+    const stageCenterY = geometry.gridTop + geometry.gridHeight / 2;
+    if (Math.abs((moving.left + moving.right) / 2 - stageCenterX) <= alignmentTolerancePx) {
+      pushVertical(stageCenterX, geometry.gridTop, geometry.gridTop + geometry.gridHeight, true);
+    }
+    if (Math.abs((moving.top + moving.bottom) / 2 - stageCenterY) <= alignmentTolerancePx) {
+      pushHorizontal(stageCenterY, geometry.gridLeft, geometry.gridLeft + geometry.gridWidth, true);
+    }
+
+    for (const sibling of context.siblings) {
+      const siblingX = [sibling.left, (sibling.left + sibling.right) / 2, sibling.right];
+      const siblingY = [sibling.top, (sibling.top + sibling.bottom) / 2, sibling.bottom];
+
+      for (const a of movingX) {
+        for (const b of siblingX) {
+          if (Math.abs(a - b) <= alignmentTolerancePx) {
+            pushVertical(b, Math.min(moving.top, sibling.top), Math.max(moving.bottom, sibling.bottom), false);
+          }
+        }
+      }
+      for (const a of movingY) {
+        for (const b of siblingY) {
+          if (Math.abs(a - b) <= alignmentTolerancePx) {
+            pushHorizontal(b, Math.min(moving.left, sibling.left), Math.max(moving.right, sibling.right), false);
+          }
+        }
+      }
+    }
+
+    return guides;
   }
 
   const editorToolbar = (
@@ -464,6 +596,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
           />
           <div className="content-hero-stage-scrim" aria-hidden="true" />
           {draggedLayout && dragMotion ? <HeroDotGrid activeLayout={draggedLayout} motion={dragMotion} /> : null}
+          {draggingLayer && alignmentGuides.length ? <HeroAlignmentGuides guides={alignmentGuides} /> : null}
           {visibleLayers.map((layout) => (
             <HeroCanvasLayer
               editing={editingLayer === layout.type}
@@ -479,12 +612,17 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
               onSelect={() => setSelectedLayer(layout.type)}
               onStopEditing={() => setEditingLayer(null)}
               blocked={blockedLayer === layout.type}
+              dragging={draggingLayer === layout.type}
               selected={selectedLayer === layout.type}
               slide={activeSlide}
               updateActiveSlideField={updateActiveSlideField}
             />
           ))}
         </div>
+        <p className="content-hero-hint" aria-hidden="true">
+          Drag assets to position them. Use arrow keys to nudge, Shift + arrows for bigger steps. Guides snap to the center and to other
+          assets.
+        </p>
       </section>
 
       <Modal className="content-asset-modal" onClose={() => setActiveModal(null)} open={activeModal === "image"} title="Hero image">
@@ -519,6 +657,26 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
         </div>
       </Modal>
     </Card>
+  );
+}
+
+function HeroAlignmentGuides({ guides }: { guides: AlignmentGuide[] }) {
+  return (
+    <div className="content-hero-guides" aria-hidden="true">
+      {guides.map((guide) => (
+        <span
+          className="content-hero-guide"
+          data-emphasis={guide.emphasis}
+          data-orientation={guide.orientation}
+          key={guide.id}
+          style={
+            guide.orientation === "vertical"
+              ? { left: `${guide.offset}px`, top: `${guide.start}px`, height: `${Math.max(0, guide.end - guide.start)}px` }
+              : { top: `${guide.offset}px`, left: `${guide.start}px`, width: `${Math.max(0, guide.end - guide.start)}px` }
+          }
+        />
+      ))}
+    </div>
   );
 }
 
@@ -604,25 +762,10 @@ function clampValue(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function getCandidateContentRect(stage: HTMLDivElement, contentElement: HTMLElement, layout: HeroElementLayout) {
-  const gridRect = getCandidateGridRect(stage, layout);
-  const contentRect = contentElement.getBoundingClientRect();
-  if (!contentRect.width || !contentRect.height) return null;
-
-  const isAtRightEdge = layout.gridColumn + layout.columnSpan > HERO_GRID_COLUMNS;
-  const left = isAtRightEdge ? gridRect.right - contentRect.width : gridRect.left;
-  const top = layout.type === "HEADLINE" ? gridRect.bottom - contentRect.height : gridRect.top;
-
-  return {
-    bottom: top + contentRect.height,
-    left,
-    right: left + contentRect.width,
-    top
-  };
-}
-
-function getCandidateGridRect(stage: HTMLDivElement, layout: HeroElementLayout) {
-  const stageRect = stage.getBoundingClientRect();
+// Stage layout measured once per gesture. originX/originY map viewport
+// coordinates into stage-relative coordinates for drawing alignment guides.
+function readGridGeometry(stage: HTMLDivElement): GridGeometry {
+  const rect = stage.getBoundingClientRect();
   const styles = window.getComputedStyle(stage);
   const borderLeft = cssPixelValue(styles.borderLeftWidth);
   const borderTop = cssPixelValue(styles.borderTopWidth);
@@ -632,35 +775,90 @@ function getCandidateGridRect(stage: HTMLDivElement, layout: HeroElementLayout) 
   const paddingBottom = cssPixelValue(styles.paddingBottom);
   const columnGap = cssPixelValue(styles.columnGap);
   const rowGap = cssPixelValue(styles.rowGap);
-  const gridLeft = stageRect.left + borderLeft + paddingLeft;
-  const gridTop = stageRect.top + borderTop + paddingTop;
+  const gridLeft = rect.left + borderLeft + paddingLeft;
+  const gridTop = rect.top + borderTop + paddingTop;
   const gridWidth = stage.clientWidth - paddingLeft - paddingRight;
   const gridHeight = stage.clientHeight - paddingTop - paddingBottom;
-  const cellWidth = (gridWidth - (HERO_GRID_COLUMNS - 1) * columnGap) / HERO_GRID_COLUMNS;
-  const cellHeight = (gridHeight - (HERO_GRID_ROWS - 1) * rowGap) / HERO_GRID_ROWS;
-  const left = gridLeft + (layout.gridColumn - 1) * (cellWidth + columnGap);
-  const top = gridTop + (layout.gridRow - 1) * (cellHeight + rowGap);
-  const width = layout.columnSpan * cellWidth + (layout.columnSpan - 1) * columnGap;
-  const height = layout.rowSpan * cellHeight + (layout.rowSpan - 1) * rowGap;
 
   return {
-    bottom: top + height,
-    left,
-    right: left + width,
-    top
+    cellHeight: (gridHeight - (HERO_GRID_ROWS - 1) * rowGap) / HERO_GRID_ROWS,
+    cellWidth: (gridWidth - (HERO_GRID_COLUMNS - 1) * columnGap) / HERO_GRID_COLUMNS,
+    columnGap,
+    gridHeight,
+    gridLeft,
+    gridTop,
+    gridWidth,
+    originX: rect.left + borderLeft,
+    originY: rect.top + borderTop,
+    rowGap
   };
 }
 
-function rectsOverlap(
-  first: Pick<DOMRectReadOnly, "bottom" | "left" | "right" | "top">,
-  second: Pick<DOMRectReadOnly, "bottom" | "left" | "right" | "top">
-) {
+function footprintRectFromGeometry(geometry: GridGeometry, gridColumn: number, gridRow: number, colSpan: number, rowSpan: number): Rect {
+  const left = geometry.gridLeft + (gridColumn - 1) * (geometry.cellWidth + geometry.columnGap);
+  const top = geometry.gridTop + (gridRow - 1) * (geometry.cellHeight + geometry.rowGap);
+  const width = colSpan * geometry.cellWidth + (colSpan - 1) * geometry.columnGap;
+  const height = rowSpan * geometry.cellHeight + (rowSpan - 1) * geometry.rowGap;
+
+  return { bottom: top + height, left, right: left + width, top };
+}
+
+// The visible box, anchored inside its footprint the same way the CSS renders
+// it: left-aligned, headline pinned to the bottom and the rest to the top.
+function contentRectFromGeometry(context: LayerCollisionContext, gridColumn: number, gridRow: number): Rect {
+  const footprint = footprintRectFromGeometry(context.geometry, gridColumn, gridRow, context.colSpan, context.rowSpan);
+  const left = footprint.left;
+  const top = context.type === "HEADLINE" ? footprint.bottom - context.contentHeight : footprint.top;
+
+  return { bottom: top + context.contentHeight, left, right: left + context.contentWidth, top };
+}
+
+// Largest column whose visible box still fits inside the stage on the right.
+function clampColumnToContent(context: LayerCollisionContext, gridColumn: number) {
+  const { geometry } = context;
+  const stride = geometry.cellWidth + geometry.columnGap;
+  const footprintMax = HERO_GRID_COLUMNS - context.colSpan + 1;
+  if (stride <= 0) return clampInteger(gridColumn, 1, footprintMax);
+
+  const contentMax = Math.floor(1 + (geometry.gridWidth - context.contentWidth) / stride + 1e-3);
+  const maxColumn = Math.max(1, Math.min(footprintMax, contentMax));
+  return clampInteger(gridColumn, 1, maxColumn);
+}
+
+// Keeps the visible box inside the stage top/bottom. Headlines are bottom
+// anchored, so their content can be taller than the footprint and we clamp the
+// row so the top edge never leaves the stage.
+function clampRowToContent(context: LayerCollisionContext, gridRow: number) {
+  const { geometry } = context;
+  const stride = geometry.cellHeight + geometry.rowGap;
+  const footprintMax = HERO_GRID_ROWS - context.rowSpan + 1;
+  if (stride <= 0) return clampInteger(gridRow, 1, footprintMax);
+
+  if (context.type === "HEADLINE") {
+    const footprintHeight = context.rowSpan * geometry.cellHeight + (context.rowSpan - 1) * geometry.rowGap;
+    const minRow = Math.max(1, Math.ceil(1 + (context.contentHeight - footprintHeight) / stride - 1e-3));
+    const contentMax = Math.floor(1 + (geometry.gridHeight - footprintHeight) / stride + 1e-3);
+    const maxRow = Math.max(minRow, Math.min(footprintMax, contentMax));
+    return clampInteger(gridRow, minRow, maxRow);
+  }
+
+  const contentMax = Math.floor(1 + (geometry.gridHeight - context.contentHeight) / stride + 1e-3);
+  const maxRow = Math.max(1, Math.min(footprintMax, contentMax));
+  return clampInteger(gridRow, 1, maxRow);
+}
+
+function rectsOverlap(first: Rect, second: Rect) {
   return first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
 }
 
 function cssPixelValue(value: string) {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function clampInteger(value: number, min: number, max: number) {
+  if (max < min) return min;
+  return Math.max(min, Math.min(max, Math.round(value)));
 }
 
 function findOpenHeroLayout(slide: HeroSlideEditor, type: HeroCanvasLayerElementType, preferredLayout: HeroElementLayout) {
@@ -723,6 +921,7 @@ function heroLayoutsOverlap(
 
 function HeroCanvasLayer({
   blocked,
+  dragging,
   editing,
   layout,
   onEdit,
@@ -737,6 +936,7 @@ function HeroCanvasLayer({
   updateActiveSlideField
 }: {
   blocked: boolean;
+  dragging: boolean;
   editing: boolean;
   layout: HeroCanvasLayerElementLayout;
   onEdit: () => void;
@@ -750,18 +950,17 @@ function HeroCanvasLayer({
   slide: HeroSlideEditor;
   updateActiveSlideField: (field: "headline" | "caption" | "imageUrl" | "ctaLabel" | "ctaHref", value: string) => void;
 }) {
-  const isAtRightEdge = layout.gridColumn + layout.columnSpan > HERO_GRID_COLUMNS;
-
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if ((event.target as HTMLElement).closest(".content-inline-editor")) return;
     if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "ArrowUp" || event.key === "ArrowDown") {
       event.preventDefault();
       onSelect();
 
-      if (event.key === "ArrowLeft") onNudge(-1, 0);
-      if (event.key === "ArrowRight") onNudge(1, 0);
-      if (event.key === "ArrowUp") onNudge(0, -1);
-      if (event.key === "ArrowDown") onNudge(0, 1);
+      const step = event.shiftKey ? coarseNudgeCells : 1;
+      if (event.key === "ArrowLeft") onNudge(-step, 0);
+      if (event.key === "ArrowRight") onNudge(step, 0);
+      if (event.key === "ArrowUp") onNudge(0, -step);
+      if (event.key === "ArrowDown") onNudge(0, step);
       return;
     }
 
@@ -778,7 +977,7 @@ function HeroCanvasLayer({
       aria-pressed={selected}
       className={`content-canvas-layer content-canvas-layer-${layout.type.toLowerCase()}`}
       data-blocked={blocked}
-      data-edge-x={isAtRightEdge ? "right" : undefined}
+      data-dragging={dragging}
       onKeyDown={handleKeyDown}
       onPointerDown={onPointerDown}
       role="button"
@@ -824,6 +1023,9 @@ function LayerContentFrame({
     onRegisterContent(node);
   }
 
+  // Size the headline box to its longest natural line so the selection outline
+  // hugs the text, while max-width:100% (CSS) still forces wrapping before it
+  // can run past the stage edge.
   useLayoutEffect(() => {
     const content = contentRef.current;
     if (!content) return;
