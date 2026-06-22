@@ -74,10 +74,11 @@ type GridGeometry = {
   rowGap: number;
 };
 
-// Everything the drag/keyboard logic needs to resolve a move without touching
+// Everything the drag/keyboard logic needs to place a move without touching
 // the DOM again mid-gesture: stage geometry, the moving asset's rendered size,
-// and the rendered boxes of the other visible assets it can collide with.
-type LayerCollisionContext = {
+// and the rendered boxes of the other visible assets (used to draw alignment
+// guides — assets are free to overlap).
+type LayerDragContext = {
   colSpan: number;
   contentHeight: number;
   contentWidth: number;
@@ -90,7 +91,7 @@ type LayerCollisionContext = {
 type PointerInteraction = {
   committedColumn: number;
   committedRow: number;
-  context: LayerCollisionContext;
+  context: LayerDragContext;
   lastAssetX: number;
   lastAssetY: number;
   lastTime: number;
@@ -255,12 +256,12 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     updateActiveSlide((slide) => withUpdatedHeroElement(slide, type, { gridColumn, gridRow }));
   }
 
-  // Keyboard nudges share the same geometry-aware resolver as dragging, so a
-  // single arrow press slides along an obstacle instead of dead-stopping.
+  // Keyboard nudges move freely (assets may overlap); they only stop at the
+  // image edge, where we flash to signal there is nowhere further to go.
   function nudgeLayer(type: HeroCanvasLayerElementType, deltaColumn: number, deltaRow: number) {
     const stage = stageRef.current;
     const layout = activeSlide.elements[type];
-    const context = stage ? buildCollisionContext(stage, type, layout) : null;
+    const context = stage ? buildDragContext(stage, type, layout) : null;
 
     if (!context) {
       commitLayerPosition(type, layout.gridColumn + deltaColumn, layout.gridRow + deltaRow);
@@ -269,15 +270,14 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
 
     const targetColumn = clampColumnToContent(context, layout.gridColumn + deltaColumn);
     const targetRow = clampRowToContent(context, layout.gridRow + deltaRow);
-    const resolved = resolveSlide(context, layout.gridColumn, layout.gridRow, targetColumn, targetRow);
 
-    if (resolved.gridColumn === layout.gridColumn && resolved.gridRow === layout.gridRow) {
+    if (targetColumn === layout.gridColumn && targetRow === layout.gridRow) {
       flashBlocked(type);
       return;
     }
 
     clearBlocked();
-    commitLayerPosition(type, resolved.gridColumn, resolved.gridRow);
+    commitLayerPosition(type, targetColumn, targetRow);
   }
 
   function handleLayerPointerDown(type: HeroCanvasLayerElementType, event: PointerEvent<HTMLDivElement>) {
@@ -288,7 +288,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     const layout = activeSlide.elements[type];
     if (!stage || !layout) return;
 
-    const context = buildCollisionContext(stage, type, layout);
+    const context = buildDragContext(stage, type, layout);
     if (!context) return;
 
     const assetCenter = heroLayoutCenter(layout);
@@ -334,18 +334,19 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     const columnDelta = columnStride > 0 ? Math.round((event.clientX - interaction.startX) / columnStride) : 0;
     const rowDelta = rowStride > 0 ? Math.round((event.clientY - interaction.startY) / rowStride) : 0;
 
-    const desiredColumn = clampColumnToContent(context, interaction.startGridColumn + columnDelta);
-    const desiredRow = clampRowToContent(context, interaction.startGridRow + rowDelta);
-    const resolved = resolveSlide(context, interaction.committedColumn, interaction.committedRow, desiredColumn, desiredRow);
+    // Assets follow the cursor freely and may overlap each other; the only
+    // limit is the image edge, enforced by the content-aware clamps.
+    const nextColumn = clampColumnToContent(context, interaction.startGridColumn + columnDelta);
+    const nextRow = clampRowToContent(context, interaction.startGridRow + rowDelta);
 
-    if (resolved.gridColumn !== interaction.committedColumn || resolved.gridRow !== interaction.committedRow) {
-      interaction.committedColumn = resolved.gridColumn;
-      interaction.committedRow = resolved.gridRow;
-      commitLayerPosition(context.type, resolved.gridColumn, resolved.gridRow);
-      updateDragMotion(interaction, event, { ...resolved, columnSpan: context.colSpan, rowSpan: context.rowSpan });
+    if (nextColumn !== interaction.committedColumn || nextRow !== interaction.committedRow) {
+      interaction.committedColumn = nextColumn;
+      interaction.committedRow = nextRow;
+      commitLayerPosition(context.type, nextColumn, nextRow);
+      updateDragMotion(interaction, event, { columnSpan: context.colSpan, gridColumn: nextColumn, gridRow: nextRow, rowSpan: context.rowSpan });
     }
 
-    const nextGuides = computeAlignmentGuides(context, resolved.gridColumn, resolved.gridRow);
+    const nextGuides = computeAlignmentGuides(context, nextColumn, nextRow);
     setAlignmentGuides((previous) => (sameGuides(previous, nextGuides) ? previous : nextGuides));
   }
 
@@ -397,11 +398,11 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     });
   }
 
-  function buildCollisionContext(
+  function buildDragContext(
     stage: HTMLDivElement,
     type: HeroCanvasLayerElementType,
     layout: HeroElementLayout
-  ): LayerCollisionContext | null {
+  ): LayerDragContext | null {
     const movingElement = layerContentRefs.current[type];
     if (!movingElement) return null;
 
@@ -430,47 +431,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     };
   }
 
-  // Slide toward the target one cell at a time on each axis, stopping at the
-  // first blocked cell. This lets an asset glide along an obstacle (and lets
-  // the user change direction mid-drag) instead of refusing the whole move.
-  function resolveSlide(context: LayerCollisionContext, fromColumn: number, fromRow: number, toColumn: number, toRow: number) {
-    let gridColumn = fromColumn;
-    let gridRow = fromRow;
-
-    const slideColumn = () => {
-      const step = Math.sign(toColumn - gridColumn);
-      while (step !== 0 && gridColumn !== toColumn) {
-        const next = gridColumn + step;
-        if (collidesAt(context, next, gridRow)) break;
-        gridColumn = next;
-      }
-    };
-    const slideRow = () => {
-      const step = Math.sign(toRow - gridRow);
-      while (step !== 0 && gridRow !== toRow) {
-        const next = gridRow + step;
-        if (collidesAt(context, gridColumn, next)) break;
-        gridRow = next;
-      }
-    };
-
-    if (Math.abs(toColumn - fromColumn) >= Math.abs(toRow - fromRow)) {
-      slideColumn();
-      slideRow();
-    } else {
-      slideRow();
-      slideColumn();
-    }
-
-    return { gridColumn, gridRow };
-  }
-
-  function collidesAt(context: LayerCollisionContext, gridColumn: number, gridRow: number) {
-    const moving = contentRectFromGeometry(context, gridColumn, gridRow);
-    return context.siblings.some((sibling) => rectsOverlap(moving, sibling));
-  }
-
-  function computeAlignmentGuides(context: LayerCollisionContext, gridColumn: number, gridRow: number): AlignmentGuide[] {
+  function computeAlignmentGuides(context: LayerDragContext, gridColumn: number, gridRow: number): AlignmentGuide[] {
     const { geometry } = context;
     const moving = contentRectFromGeometry(context, gridColumn, gridRow);
     const movingX = [moving.left, (moving.left + moving.right) / 2, moving.right];
@@ -807,7 +768,7 @@ function footprintRectFromGeometry(geometry: GridGeometry, gridColumn: number, g
 // The visible box, anchored inside its footprint the same way the CSS renders
 // it: top-left of the footprint. The visible content can be taller/narrower
 // than the footprint, and the clamps below keep that box inside the stage.
-function contentRectFromGeometry(context: LayerCollisionContext, gridColumn: number, gridRow: number): Rect {
+function contentRectFromGeometry(context: LayerDragContext, gridColumn: number, gridRow: number): Rect {
   const footprint = footprintRectFromGeometry(context.geometry, gridColumn, gridRow, context.colSpan, context.rowSpan);
   const left = footprint.left;
   const top = footprint.top;
@@ -816,7 +777,7 @@ function contentRectFromGeometry(context: LayerCollisionContext, gridColumn: num
 }
 
 // Largest column whose visible box still fits inside the stage on the right.
-function clampColumnToContent(context: LayerCollisionContext, gridColumn: number) {
+function clampColumnToContent(context: LayerDragContext, gridColumn: number) {
   const { geometry } = context;
   const stride = geometry.cellWidth + geometry.columnGap;
   const footprintMax = HERO_GRID_COLUMNS - context.colSpan + 1;
@@ -830,7 +791,7 @@ function clampColumnToContent(context: LayerCollisionContext, gridColumn: number
 // Largest row whose visible box still fits inside the stage at the bottom.
 // Content is top-anchored, so row 1 always reaches the top and content taller
 // than its footprint simply grows downward until it hits the bottom edge.
-function clampRowToContent(context: LayerCollisionContext, gridRow: number) {
+function clampRowToContent(context: LayerDragContext, gridRow: number) {
   const { geometry } = context;
   const stride = geometry.cellHeight + geometry.rowGap;
   const footprintMax = HERO_GRID_ROWS - context.rowSpan + 1;
@@ -839,10 +800,6 @@ function clampRowToContent(context: LayerCollisionContext, gridRow: number) {
   const contentMax = Math.floor(1 + (geometry.gridHeight - context.contentHeight) / stride + 1e-3);
   const maxRow = Math.max(1, Math.min(footprintMax, contentMax));
   return clampInteger(gridRow, 1, maxRow);
-}
-
-function rectsOverlap(first: Rect, second: Rect) {
-  return first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
 }
 
 function sameGuides(first: AlignmentGuide[], second: AlignmentGuide[]) {
