@@ -345,7 +345,8 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
       updateDragMotion(interaction, event, { ...resolved, columnSpan: context.colSpan, rowSpan: context.rowSpan });
     }
 
-    setAlignmentGuides(computeAlignmentGuides(context, resolved.gridColumn, resolved.gridRow));
+    const nextGuides = computeAlignmentGuides(context, resolved.gridColumn, resolved.gridRow);
+    setAlignmentGuides((previous) => (sameGuides(previous, nextGuides) ? previous : nextGuides));
   }
 
   function handleStagePointerUp() {
@@ -849,6 +850,19 @@ function clampRowToContent(context: LayerCollisionContext, gridRow: number) {
 
 function rectsOverlap(first: Rect, second: Rect) {
   return first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
+}
+
+function sameGuides(first: AlignmentGuide[], second: AlignmentGuide[]) {
+  if (first.length !== second.length) return false;
+  return first.every((guide, index) => {
+    const other = second[index];
+    return (
+      guide.id === other.id &&
+      guide.emphasis === other.emphasis &&
+      Math.round(guide.start) === Math.round(other.start) &&
+      Math.round(guide.end) === Math.round(other.end)
+    );
+  });
 }
 
 function cssPixelValue(value: string) {
