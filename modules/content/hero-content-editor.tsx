@@ -805,11 +805,12 @@ function footprintRectFromGeometry(geometry: GridGeometry, gridColumn: number, g
 }
 
 // The visible box, anchored inside its footprint the same way the CSS renders
-// it: left-aligned, headline pinned to the bottom and the rest to the top.
+// it: top-left of the footprint. The visible content can be taller/narrower
+// than the footprint, and the clamps below keep that box inside the stage.
 function contentRectFromGeometry(context: LayerCollisionContext, gridColumn: number, gridRow: number): Rect {
   const footprint = footprintRectFromGeometry(context.geometry, gridColumn, gridRow, context.colSpan, context.rowSpan);
   const left = footprint.left;
-  const top = context.type === "HEADLINE" ? footprint.bottom - context.contentHeight : footprint.top;
+  const top = footprint.top;
 
   return { bottom: top + context.contentHeight, left, right: left + context.contentWidth, top };
 }
@@ -826,22 +827,14 @@ function clampColumnToContent(context: LayerCollisionContext, gridColumn: number
   return clampInteger(gridColumn, 1, maxColumn);
 }
 
-// Keeps the visible box inside the stage top/bottom. Headlines are bottom
-// anchored, so their content can be taller than the footprint and we clamp the
-// row so the top edge never leaves the stage.
+// Largest row whose visible box still fits inside the stage at the bottom.
+// Content is top-anchored, so row 1 always reaches the top and content taller
+// than its footprint simply grows downward until it hits the bottom edge.
 function clampRowToContent(context: LayerCollisionContext, gridRow: number) {
   const { geometry } = context;
   const stride = geometry.cellHeight + geometry.rowGap;
   const footprintMax = HERO_GRID_ROWS - context.rowSpan + 1;
   if (stride <= 0) return clampInteger(gridRow, 1, footprintMax);
-
-  if (context.type === "HEADLINE") {
-    const footprintHeight = context.rowSpan * geometry.cellHeight + (context.rowSpan - 1) * geometry.rowGap;
-    const minRow = Math.max(1, Math.ceil(1 + (context.contentHeight - footprintHeight) / stride - 1e-3));
-    const contentMax = Math.floor(1 + (geometry.gridHeight - footprintHeight) / stride + 1e-3);
-    const maxRow = Math.max(minRow, Math.min(footprintMax, contentMax));
-    return clampInteger(gridRow, minRow, maxRow);
-  }
 
   const contentMax = Math.floor(1 + (geometry.gridHeight - context.contentHeight) / stride + 1e-3);
   const maxRow = Math.max(1, Math.min(footprintMax, contentMax));

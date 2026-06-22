@@ -1879,7 +1879,7 @@ button.button:disabled,
 }
 
 .hero-presentation-title {
-  align-self: end;
+  align-self: start;
   color: white;
   font-size: 4.15rem;
   justify-self: start;
@@ -3445,7 +3445,7 @@ button.button:disabled,
 }
 
 .content-canvas-layer-headline {
-  align-items: end;
+  align-items: start;
   justify-items: start;
 }
 
