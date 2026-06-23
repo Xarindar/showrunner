@@ -436,51 +436,52 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     const moving = contentRectFromGeometry(context, gridColumn, gridRow);
     const movingX = [moving.left, (moving.left + moving.right) / 2, moving.right];
     const movingY = [moving.top, (moving.top + moving.bottom) / 2, moving.bottom];
-    const guides: AlignmentGuide[] = [];
-    const seen = new Set<string>();
-
-    const pushVertical = (x: number, top: number, bottom: number, emphasis: boolean) => {
-      const offset = x - geometry.originX;
-      const key = `v:${Math.round(offset)}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      guides.push({ emphasis, end: bottom - geometry.originY, id: key, offset, orientation: "vertical", start: top - geometry.originY });
-    };
-    const pushHorizontal = (y: number, left: number, right: number, emphasis: boolean) => {
-      const offset = y - geometry.originY;
-      const key = `h:${Math.round(offset)}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      guides.push({ emphasis, end: right - geometry.originX, id: key, offset, orientation: "horizontal", start: left - geometry.originX });
-    };
-
+    const movingCenterX = (moving.left + moving.right) / 2;
+    const movingCenterY = (moving.top + moving.bottom) / 2;
     const stageCenterX = geometry.gridLeft + geometry.gridWidth / 2;
     const stageCenterY = geometry.gridTop + geometry.gridHeight / 2;
-    if (Math.abs((moving.left + moving.right) / 2 - stageCenterX) <= alignmentTolerancePx) {
-      pushVertical(stageCenterX, geometry.gridTop, geometry.gridTop + geometry.gridHeight, true);
-    }
-    if (Math.abs((moving.top + moving.bottom) / 2 - stageCenterY) <= alignmentTolerancePx) {
-      pushHorizontal(stageCenterY, geometry.gridLeft, geometry.gridLeft + geometry.gridWidth, true);
-    }
 
-    for (const sibling of context.siblings) {
-      const siblingX = [sibling.left, (sibling.left + sibling.right) / 2, sibling.right];
-      const siblingY = [sibling.top, (sibling.top + sibling.bottom) / 2, sibling.bottom];
+    // Keep only the single nearest snap per axis and draw it as one full-length
+    // ruler line, instead of stacking a bar for every near match across the
+    // widest asset. The stage centerline (emphasized) only catches the moving
+    // center; each sibling edge/center can catch any moving edge or center.
+    const verticalSnap = pickNearestSnap([
+      snapCandidate(stageCenterX, true, [movingCenterX]),
+      ...context.siblings.flatMap((sibling) => [
+        snapCandidate(sibling.left, false, movingX),
+        snapCandidate((sibling.left + sibling.right) / 2, false, movingX),
+        snapCandidate(sibling.right, false, movingX)
+      ])
+    ]);
+    const horizontalSnap = pickNearestSnap([
+      snapCandidate(stageCenterY, true, [movingCenterY]),
+      ...context.siblings.flatMap((sibling) => [
+        snapCandidate(sibling.top, false, movingY),
+        snapCandidate((sibling.top + sibling.bottom) / 2, false, movingY),
+        snapCandidate(sibling.bottom, false, movingY)
+      ])
+    ]);
 
-      for (const a of movingX) {
-        for (const b of siblingX) {
-          if (Math.abs(a - b) <= alignmentTolerancePx) {
-            pushVertical(b, Math.min(moving.top, sibling.top), Math.max(moving.bottom, sibling.bottom), false);
-          }
-        }
-      }
-      for (const a of movingY) {
-        for (const b of siblingY) {
-          if (Math.abs(a - b) <= alignmentTolerancePx) {
-            pushHorizontal(b, Math.min(moving.left, sibling.left), Math.max(moving.right, sibling.right), false);
-          }
-        }
-      }
+    const guides: AlignmentGuide[] = [];
+    if (verticalSnap) {
+      guides.push({
+        emphasis: verticalSnap.emphasis,
+        end: geometry.gridTop + geometry.gridHeight - geometry.originY,
+        id: "v",
+        offset: verticalSnap.value - geometry.originX,
+        orientation: "vertical",
+        start: geometry.gridTop - geometry.originY
+      });
+    }
+    if (horizontalSnap) {
+      guides.push({
+        emphasis: horizontalSnap.emphasis,
+        end: geometry.gridLeft + geometry.gridWidth - geometry.originX,
+        id: "h",
+        offset: horizontalSnap.value - geometry.originY,
+        orientation: "horizontal",
+        start: geometry.gridLeft - geometry.originX
+      });
     }
 
     return guides;
@@ -802,6 +803,27 @@ function clampRowToContent(context: LayerDragContext, gridRow: number) {
   return clampInteger(gridRow, 1, maxRow);
 }
 
+type SnapCandidate = { delta: number; emphasis: boolean; value: number };
+
+// Distance from the nearest moving anchor to a candidate snap line.
+function snapCandidate(value: number, emphasis: boolean, movingAnchors: number[]): SnapCandidate {
+  let delta = Number.POSITIVE_INFINITY;
+  for (const anchor of movingAnchors) delta = Math.min(delta, Math.abs(anchor - value));
+  return { delta, emphasis, value };
+}
+
+// Closest in-tolerance snap, preferring the emphasized stage centerline on ties.
+function pickNearestSnap(candidates: SnapCandidate[]): SnapCandidate | null {
+  let best: SnapCandidate | null = null;
+  for (const candidate of candidates) {
+    if (candidate.delta > alignmentTolerancePx) continue;
+    if (!best || candidate.delta < best.delta || (candidate.delta === best.delta && candidate.emphasis && !best.emphasis)) {
+      best = candidate;
+    }
+  }
+  return best;
+}
+
 function sameGuides(first: AlignmentGuide[], second: AlignmentGuide[]) {
   if (first.length !== second.length) return false;
   return first.every((guide, index) => {
@@ -809,6 +831,7 @@ function sameGuides(first: AlignmentGuide[], second: AlignmentGuide[]) {
     return (
       guide.id === other.id &&
       guide.emphasis === other.emphasis &&
+      Math.round(guide.offset) === Math.round(other.offset) &&
       Math.round(guide.start) === Math.round(other.start) &&
       Math.round(guide.end) === Math.round(other.end)
     );
