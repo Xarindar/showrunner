@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CalendarDays, FileText, Image as ImageIcon, MessageSquare, ShoppingBag, Star } from "lucide-react";
 import { FormStatus, PortfolioGalleryStatus, PortfolioGalleryVisibility, TestimonialStatus } from "@prisma/client";
 import { JsonLd } from "@/components/structured-data";
+import { TestimonialAvatar } from "@/components/testimonial-avatar";
 import { ButtonLink, Card, EmptyState, EqualGrid } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import { buildImageObjectJsonLd, buildLocalBusinessJsonLd, buildPageMetadata, buildWebSiteJsonLd, getCanonicalBaseUrl } from "@/lib/seo";
@@ -185,10 +186,15 @@ export default async function HomePage() {
               <Card key={testimonial.id} as="article">
                       <Star size={22} />
                       <p className="testimonial-quote">&quot;{testimonial.quote}&quot;</p>
-                      <strong>{testimonial.authorName}</strong>
-                      <span className="muted-text">
-                        {testimonial.authorRole || testimonial.serviceName || testimonial.source} - {testimonial.rating}/5
-                      </span>
+                      <div className="testimonial-author-row">
+                        <TestimonialAvatar imageUrl={testimonial.imageUrl} name={testimonial.authorName} />
+                        <div className="testimonial-author-meta">
+                          <strong>{testimonial.authorName}</strong>
+                          <span className="muted-text">
+                            {testimonial.authorRole || testimonial.serviceName || testimonial.source} - {testimonial.rating}/5
+                          </span>
+                        </div>
+                      </div>
                     </Card>
               )}
                   {!testimonials.length ? <EmptyState title="No featured testimonials" description="Approved reviews will reserve the same card rhythm." /> : null}

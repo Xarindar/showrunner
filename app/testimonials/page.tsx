@@ -9,6 +9,7 @@ import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
 import { prisma } from "@/lib/prisma";
 import { createPublicTestimonialAction } from "@/modules/testimonials/actions";
+import { TestimonialAvatar } from "@/components/testimonial-avatar";
 import { Button, ButtonLink, Card, EqualGrid } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -84,10 +85,15 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
             <Card key={testimonial.id} as="article">
                 <Star size={20} />
                 <p className="testimonial-quote">&quot;{testimonial.quote}&quot;</p>
-                <strong>{testimonial.authorName}</strong>
-                <span className="muted-text">
-                  {testimonial.authorRole || testimonial.serviceName || testimonial.source} · {testimonial.rating}/5
-                </span>
+                <div className="testimonial-author-row">
+                  <TestimonialAvatar imageUrl={testimonial.imageUrl} name={testimonial.authorName} />
+                  <div className="testimonial-author-meta">
+                    <strong>{testimonial.authorName}</strong>
+                    <span className="muted-text">
+                      {testimonial.authorRole || testimonial.serviceName || testimonial.source} · {testimonial.rating}/5
+                    </span>
+                  </div>
+                </div>
               </Card>
             )}
             {!testimonials.length ? <p className="empty-state">No approved testimonials yet.</p> : null}

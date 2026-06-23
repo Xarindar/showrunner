@@ -16,6 +16,7 @@ model Testimonial {
   authorName          String
   authorEmail         String            @default("")
   authorRole          String            @default("")
+  imageUrl            String            @default("")
   quote               String
   rating              Int               @default(5)
   source              String            @default("first-party")

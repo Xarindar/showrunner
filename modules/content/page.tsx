@@ -6,6 +6,9 @@ import { getSiteSettings } from "@/lib/site";
 import { updateContentAction } from "./actions";
 import { HeroContentEditor } from "./hero-content-editor";
 import { getHeroPresentationForSite } from "./hero-presentation.server";
+import { createContentTestimonialAction, removeContentTestimonialAction } from "./testimonials-actions";
+import { getContentTestimonials } from "./testimonials-data";
+import { TestimonialsEditor } from "./testimonials-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -20,13 +23,14 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
     deletedAt: null,
     isPrivate: false
   });
-  const [heroPresentation, mediaAssets] = await Promise.all([
+  const [heroPresentation, mediaAssets, testimonials] = await Promise.all([
     getHeroPresentationForSite(settings.siteId, settings),
     prisma.mediaAsset.findMany({
       where: activeMediaWhere,
       orderBy: { createdAt: "desc" },
       take: 24
-    })
+    }),
+    getContentTestimonials(settings.siteId)
   ]);
   const mediaAssetOptions = [
     {
@@ -52,12 +56,12 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
       <header className="page-header">
         <div>
           <p className="eyebrow">Content</p>
-          <h1>Homepage hero</h1>
-          <p>Edit the public header image, title, caption, call to action, and intro copy.</p>
+          <h1>Homepage content</h1>
+          <p>Edit the public hero, then curate the testimonials that appear across your site.</p>
         </div>
       </header>
 
-      {saved ? <div className="success-message">Content saved.</div> : null}
+      {saved ? <div className="success-message">{savedContentMessage(saved)}</div> : null}
       {params.error ? <div className="error">{decodeURIComponent(params.error)}</div> : null}
 
       <HeroContentEditor
@@ -67,6 +71,14 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
         mediaAssets={mediaAssetOptions}
         settings={settings}
       />
+
+      <TestimonialsEditor
+        canUploadImage={canUploadHeroImage}
+        createAction={createContentTestimonialAction}
+        mediaAssets={mediaAssetOptions}
+        removeAction={removeContentTestimonialAction}
+        testimonials={testimonials}
+      />
     </div>);
 
 }
@@ -75,4 +87,10 @@ function canUploadWithDriver(driver: MediaDriver) {
   if (driver === MediaDriver.R2) return isR2Configured();
   if (driver === MediaDriver.CLOUDFLARE_IMAGES) return isCloudflareImagesConfigured();
   return false;
+}
+
+function savedContentMessage(saved: string) {
+  if (saved === "testimonial") return "Testimonial published.";
+  if (saved === "testimonial-removed") return "Testimonial removed.";
+  return "Content saved.";
 }
