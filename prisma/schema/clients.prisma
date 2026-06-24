@@ -17,7 +17,7 @@ model Client {
   name                    String
   email                   String
   phone                   String?
-  status                  String              @default("active")
+  status                  String              @default("active_order")
   pipelineStage           ClientPipelineStage @default(INQUIRY)
   companyName             String              @default("")
   familyName              String              @default("")

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { recordAuditLog } from "@/lib/audit";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
 import { csvDocument } from "@/lib/api/csv";
+import { clientStatusLabel } from "@/lib/clients/status";
 import { formatMoney, stringArrayCsv } from "@/lib/format";
 import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
@@ -122,7 +123,7 @@ export async function GET(request: Request) {
     client.name,
     client.email,
     client.phone || "",
-    client.status,
+    clientStatusLabel(client.status),
     client.pipelineStage,
     client.companyName,
     client.familyName,

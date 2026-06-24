@@ -17,6 +17,7 @@ import { z } from "zod";
 import { csvList, optionalEmail, optionalStoredText, parseForm, requiredText } from "@/lib/admin-validation";
 import { recordAuditLog } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth";
+import { defaultClientStatus } from "@/lib/clients/status";
 import { queueFormSubmittedEmail } from "@/lib/email";
 import { emitAnalyticsEvent, emitModuleEvent, requestAttribution } from "@/lib/events/emit";
 import { deleteMediaAsset, uploadMedia } from "@/lib/media";
@@ -1017,7 +1018,7 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
             siteId: settings.siteId,
             name: submitterName || submitterEmail,
             email: submitterEmail,
-            status: "lead"
+            status: defaultClientStatus
           }
         });
     clientId = client.id;

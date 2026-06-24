@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
+import { defaultClientStatus } from "@/lib/clients/status";
 
 type PublicClientInput = {
   siteId: string;
@@ -44,7 +45,8 @@ export async function upsertPublicClient(tx: Prisma.TransactionClient, input: Pu
       siteId: input.siteId,
       email,
       name: name || email,
-      phone: phone || undefined
+      phone: phone || undefined,
+      status: defaultClientStatus
     },
     select: { id: true }
   });

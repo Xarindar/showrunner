@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { formDataObject } from "@/lib/form-data";
 import { timeToMinutes } from "@/lib/format";
+import { clientStatusValues, defaultClientStatus } from "@/lib/clients/status";
 import { isSafeExternalHttpsUrl } from "@/lib/security/urls";
 
 export const maxIntCents = 2_147_483_647;
@@ -171,7 +172,7 @@ export const clientFormSchema = z.object({
   name: requiredText,
   email: z.email().transform((value) => value.trim().toLowerCase()),
   phone: optionalStoredText,
-  status: z.enum(["active", "lead", "vip", "inactive"]).catch("active"),
+  status: z.enum(clientStatusValues).catch(defaultClientStatus),
   pipelineStage: z.enum(ClientPipelineStage).catch(ClientPipelineStage.INQUIRY),
   companyName: optionalStoredText,
   familyName: optionalStoredText,

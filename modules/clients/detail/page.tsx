@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ClientPipelineStage, EmailOutboxStatus, MessageLogStatus, type Prisma } from "@prisma/client";
 import { GitMerge, Save, Search } from "lucide-react";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
+import { clientStatusLabel, clientStatusOptions, defaultClientStatus, normalizeClientStatus } from "@/lib/clients/status";
 import { prisma } from "@/lib/prisma";
 import { enumLabel, formatDateTime, formatMoney, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
 import { isRecord } from "@/lib/objects";
@@ -297,7 +298,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
     at: client.updatedAt,
     badge: "profile",
     title: "Profile status",
-    detail: `${client.status} | ${enumLabel(client.pipelineStage)}`
+    detail: `${clientStatusLabel(client.status)} | ${enumLabel(client.pipelineStage)}`
   },
   ...client.bookings.map((booking) => ({
     id: `booking-${booking.id}`,
@@ -565,11 +566,12 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             </div>
             <div className="ui-field">
               <label htmlFor="status">Status</label>
-              <select id="status" name="status" defaultValue={client.status}>
-                <option value="active">Active</option>
-                <option value="lead">Lead</option>
-                <option value="vip">VIP</option>
-                <option value="inactive">Inactive</option>
+              <select id="status" name="status" defaultValue={normalizeClientStatus(client.status) || defaultClientStatus}>
+                {clientStatusOptions.map((status) =>
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                )}
               </select>
             </div>
           </EqualGrid>
@@ -734,7 +736,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         <Card bodyClassName="ui-stack">
           <h2 className="section-title">CRM snapshot</h2>
           <div className="ui-zero">
-            <span className="ui-badge">{client.status}</span>
+            <span className="ui-badge">{clientStatusLabel(client.status)}</span>
             <span className="ui-badge">{enumLabel(client.pipelineStage)}</span>
             {client.emailOptIn ? <span className="ui-badge ui-badge-success">email opt-in</span> : null}
             {client.smsOptIn ? <span className="ui-badge ui-badge-success">sms opt-in</span> : null}

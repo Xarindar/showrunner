@@ -2,32 +2,32 @@ import Link from "next/link";
 import { ClientPipelineStage, Prisma } from "@prisma/client";
 import {
   Activity,
+  CalendarCheck,
+  Crown,
+  CreditCard,
   Download,
-  ExternalLink,
   Plus,
-  RefreshCw,
   Save,
   Search,
-  Star,
   Trash2,
   Upload,
-  UserPlus,
   UsersRound
 } from "lucide-react";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
-import { clientPortalPath } from "@/lib/clients/portal-token";
-import { enumLabel, formatDateTime } from "@/lib/format";
+import { clientStatusLabel, clientStatusOptions, defaultClientStatus, normalizeClientStatus } from "@/lib/clients/status";
+import { getClientVipSettings, getClientVipSummaries } from "@/lib/clients/vip";
+import { enumLabel, formatDateTime, stringArrayFromUnknown } from "@/lib/format";
 import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Button, ButtonLink, EqualGrid, Pagination, Table } from "@/components/ui";
+import { Button, ButtonLink, EqualGrid, Pagination, Table, Tooltip } from "@/components/ui";
 import {
   createClientAction,
   createClientSegmentAction,
   deleteClientSegmentAction,
-  importClientsCsvAction,
-  reissueClientPortalLinkAction
+  importClientsCsvAction
 } from "./actions";
+import { ClientRowActions } from "./client-row-actions";
 import { ClientsActionModals } from "./clients-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -35,10 +35,7 @@ export const dynamic = "force-dynamic";
 const pageSize = 25;
 const clientMetricOptions = [
   { heading: "Appts", id: "appointments", label: "Appointments" },
-  { heading: "Orders", id: "orders", label: "Orders" },
-  { heading: "Docs", id: "documents", label: "Documents" },
-  { heading: "Forms", id: "forms", label: "Forms" },
-  { heading: "Notes", id: "notes", label: "Notes" }
+  { heading: "Orders", id: "orders", label: "Orders" }
 ] as const;
 type ClientMetricId = (typeof clientMetricOptions)[number]["id"];
 const defaultClientMetricIds = clientMetricOptions.map((option) => option.id);
@@ -69,7 +66,7 @@ type ClientsPageProps = {
     saved?: string;
     segment?: string;
     skipped?: string;
-    stage?: string;
+    status?: string;
   }>;
 };
 
@@ -81,7 +78,7 @@ function segmentWhere(criteria: unknown, now = new Date()): Prisma.ClientWhereIn
   if (!isRecord(criteria)) return {};
 
   const where: Prisma.ClientWhereInput = {};
-  const status = typeof criteria.status === "string" ? criteria.status : "";
+  const status = typeof criteria.status === "string" ? normalizeClientStatus(criteria.status) : undefined;
   const pipelineStage = typeof criteria.pipelineStage === "string" ? criteria.pipelineStage : "";
   const tag = typeof criteria.tag === "string" ? criteria.tag : "";
   const recentPurchaseDays = numberCriteria(criteria.recentPurchaseDays);
@@ -124,17 +121,6 @@ function savedMessage(params: Awaited<NonNullable<ClientsPageProps["searchParams
   return "";
 }
 
-function selectedPipelineStage(value?: string) {
-  return value && Object.values(ClientPipelineStage).includes(value as ClientPipelineStage)
-    ? (value as ClientPipelineStage)
-    : undefined;
-}
-
-function tableLabel(value: string) {
-  const label = enumLabel(value);
-  return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
-}
-
 function normalizeMetricIds(value?: string | string[]): ClientMetricId[] {
   if (value === undefined) return [...defaultClientMetricIds];
   const rawValues = Array.isArray(value) ? value : value.split(",");
@@ -152,18 +138,18 @@ function clientsHref({
   page,
   q,
   segment,
-  stage
+  status
 }: {
   metrics?: ClientMetricId[];
   page?: number;
   q?: string;
   segment?: string;
-  stage?: ClientPipelineStage;
+  status?: string;
 }) {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (segment) params.set("segment", segment);
-  if (stage) params.set("stage", stage);
+  if (status) params.set("status", status);
   if (metrics && !usesDefaultMetrics(metrics)) {
     if (metrics.length) {
       metrics.forEach((metric) => params.append("metrics", metric));
@@ -183,14 +169,17 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
   const settings = await getSiteSettings();
   const page = Math.max(1, Number(params.page || 1) || 1);
   const query = String(params.q || "").trim();
-  const selectedStage = selectedPipelineStage(params.stage);
+  const selectedStatus = normalizeClientStatus(params.status);
   const selectedMetricIds = normalizeMetricIds(params.metrics);
   const activeMetricOptions = clientMetricOptions.filter((option) => selectedMetricIds.includes(option.id));
   const tableColumnCount = activeMetricOptions.length + 6;
-  const segments = await prisma.clientSegment.findMany({
-    where: { siteId: settings.siteId },
-    orderBy: { name: "asc" }
-  });
+  const [segments, vipSettings] = await Promise.all([
+    prisma.clientSegment.findMany({
+      where: { siteId: settings.siteId },
+      orderBy: { name: "asc" }
+    }),
+    getClientVipSettings(settings.siteId)
+  ]);
   const selectedSegment = segments.find((segment) => segment.key === params.segment);
   const baseListFilters: Prisma.ClientWhereInput[] = [];
 
@@ -209,7 +198,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
   }
 
   const listFilters = [...baseListFilters];
-  if (selectedStage) listFilters.push({ pipelineStage: selectedStage });
+  if (selectedStatus) listFilters.push({ status: selectedStatus });
 
   const baseWhere = await getAccessibleClientWhere(
     user,
@@ -221,11 +210,11 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
     settings.siteId,
     listFilters.length ? { AND: listFilters } : {}
   );
-  const [clients, clientCount, pipelineCounts, statusCounts] = await Promise.all([
+  const [clients, clientCount, statusCounts] = await Promise.all([
     prisma.client.findMany({
       where,
       include: {
-        _count: { select: { billingDocuments: true, bookings: true, formSubmissions: true, notes: true, orders: true } },
+        _count: { select: { bookings: true, orders: true } },
         bookings: { orderBy: { startsAt: "desc" }, take: 1 },
         tags: { orderBy: { label: "asc" }, take: 6 }
       },
@@ -235,26 +224,27 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
     }),
     prisma.client.count({ where }),
     prisma.client.groupBy({
-      by: ["pipelineStage"],
-      where: baseWhere,
-      _count: { _all: true }
-    }),
-    prisma.client.groupBy({
       by: ["status"],
       where: baseWhere,
       _count: { _all: true }
     })
   ]);
+  const vipSummaries = await getClientVipSummaries({
+    clients: clients.map((client) => ({ createdAt: client.createdAt, id: client.id })),
+    settings: vipSettings,
+    siteId: settings.siteId
+  });
   const pageCount = Math.max(1, Math.ceil(clientCount / pageSize));
   const rangeStart = clientCount ? (page - 1) * pageSize + 1 : 0;
   const rangeEnd = Math.min(page * pageSize, clientCount);
   const message = savedMessage(params);
-  const pipelineCount = (stage: ClientPipelineStage) =>
-    pipelineCounts.find((item) => item.pipelineStage === stage)?._count._all || 0;
-  const baseClientCount = pipelineCounts.reduce((total, item) => total + item._count._all, 0);
+  const baseClientCount = statusCounts.reduce((total, item) => total + item._count._all, 0);
   const statusCount = (status: string) =>
-    statusCounts.find((item) => item.status.toLowerCase() === status)?._count._all || 0;
-  const selectedFilterLabel = [selectedSegment?.name, selectedStage ? tableLabel(selectedStage) : ""]
+    statusCounts.reduce(
+      (total, item) => (normalizeClientStatus(item.status) === status ? total + item._count._all : total),
+      0
+    );
+  const selectedFilterLabel = [selectedSegment?.name, selectedStatus ? clientStatusLabel(selectedStatus) : ""]
     .filter(Boolean)
     .join(" + ");
 
@@ -286,11 +276,12 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
       <EqualGrid>
         <div className="ui-field">
           <label htmlFor="client-add-status">Status</label>
-          <select id="client-add-status" name="status" defaultValue="lead">
-            <option value="lead">Lead</option>
-            <option value="active">Active</option>
-            <option value="vip">VIP</option>
-            <option value="inactive">Inactive</option>
+          <select id="client-add-status" name="status" defaultValue={defaultClientStatus}>
+            {clientStatusOptions.map((status) => (
+              <option key={status.value} value={status.value}>
+                {status.label}
+              </option>
+            ))}
           </select>
         </div>
         <div className="ui-field">
@@ -328,7 +319,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         <div className="clients-filter-pills">
           <Link
             className={!selectedSegment ? "ui-button ui-button-sm" : "ui-button ui-button-secondary ui-button-sm"}
-            href={clientsHref({ metrics: selectedMetricIds, q: query, stage: selectedStage })}>
+            href={clientsHref({ metrics: selectedMetricIds, q: query, status: selectedStatus })}>
             All clients
           </Link>
           {segments.map((segment) => (
@@ -338,7 +329,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                   ? "ui-button ui-button-sm"
                   : "ui-button ui-button-secondary ui-button-sm"
               }
-              href={clientsHref({ metrics: selectedMetricIds, q: query, segment: segment.key, stage: selectedStage })}
+              href={clientsHref({ metrics: selectedMetricIds, q: query, segment: segment.key, status: selectedStatus })}
               key={segment.id}>
               {segment.name}
             </Link>
@@ -363,7 +354,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         <h3>Activity columns</h3>
         {query ? <input type="hidden" name="q" value={query} /> : null}
         {selectedSegment ? <input type="hidden" name="segment" value={selectedSegment.key} /> : null}
-        {selectedStage ? <input type="hidden" name="stage" value={selectedStage} /> : null}
+        {selectedStatus ? <input type="hidden" name="status" value={selectedStatus} /> : null}
         <input type="hidden" name="metrics" value="none" />
         <p className="ui-muted-flush">Choose which activity metrics appear as individual table columns.</p>
         <div className="clients-check-grid clients-metric-grid">
@@ -403,10 +394,11 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
             <label htmlFor="client-filter-status">Status</label>
             <select id="client-filter-status" name="status" defaultValue="">
               <option value="">Any status</option>
-              <option value="lead">Lead</option>
-              <option value="active">Active</option>
-              <option value="vip">VIP</option>
-              <option value="inactive">Inactive</option>
+              {clientStatusOptions.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
             </select>
           </div>
           <div className="ui-field">
@@ -500,34 +492,23 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
             <ClientsActionModals addClient={addClientForm} dataTools={dataToolsModal} filters={filtersModal} />
           </div>
 
-          <div className="ui-data-table-tabs" aria-label="Pipeline stages">
-            <Link
-              className={`ui-data-table-tab${!selectedStage ? " is-active" : ""}`}
-              href={clientsHref({ metrics: selectedMetricIds, q: query, segment: selectedSegment?.key })}>
-              All
-              <span>{baseClientCount}</span>
-            </Link>
-            {Object.values(ClientPipelineStage).map((stage) => (
-              <Link
-                className={`ui-data-table-tab${selectedStage === stage ? " is-active" : ""}`}
-                href={clientsHref({ metrics: selectedMetricIds, q: query, segment: selectedSegment?.key, stage })}
-                key={stage}>
-                {tableLabel(stage)}
-                <span>{pipelineCount(stage)}</span>
-              </Link>
-            ))}
-          </div>
-
           <div className="ui-data-table-toolbar">
             <form action="/admin/modules/clients" className="clients-search-form ui-data-table-search">
               {selectedSegment ? <input type="hidden" name="segment" value={selectedSegment.key} /> : null}
-              {selectedStage ? <input type="hidden" name="stage" value={selectedStage} /> : null}
               {!usesDefaultMetrics(selectedMetricIds)
                 ? selectedMetricIds.length
                   ? selectedMetricIds.map((metric) => <input key={metric} type="hidden" name="metrics" value={metric} />)
                   : <input type="hidden" name="metrics" value="none" />
                 : null}
               <input aria-label="Search clients" id="clients-search" name="q" placeholder="Search clients" defaultValue={query} />
+              <select aria-label="Filter clients by status" id="clients-status-filter" name="status" defaultValue={selectedStatus || ""}>
+                <option value="">All statuses</option>
+                {clientStatusOptions.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </select>
               <Button size="sm" type="submit" variant="secondary">
                 <Search size={15} />
                 Search
@@ -560,34 +541,34 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
               ))}
               <th>Last appointment</th>
               <th>Status</th>
-              <th>Actions</th>
+              <th className="clients-actions-heading">Actions</th>
             </tr>
           </thead>
           <tbody>
             {clients.map((client) => {
               const visibleTags = client.tags.slice(0, 3);
               const hiddenTagCount = Math.max(0, client.tags.length - visibleTags.length);
+              const vipSummary = vipSummaries.get(client.id);
               const metricCounts: Record<ClientMetricId, number> = {
                 appointments: client._count.bookings,
-                documents: client._count.billingDocuments,
-                forms: client._count.formSubmissions,
-                notes: client._count.notes,
                 orders: client._count.orders
               };
-              const portalHref = clientPortalPath({
-                clientId: client.id,
-                email: client.email,
-                portalAccessVersion: client.portalAccessVersion,
-                siteId: settings.siteId
-              });
+              const detailHref = `/admin/clients/${client.id}`;
 
               return (
-                <tr key={client.id}>
+                <tr className="clients-clickable-row" key={client.id}>
                   <td>
-                    <div className="clients-primary-cell">
-                      <Link href={`/admin/clients/${client.id}`}>
+                    <Link className="clients-row-link clients-primary-cell" href={detailHref}>
+                      <span className="clients-name-line">
                         <strong>{client.name}</strong>
-                      </Link>
+                        {vipSummary?.qualifies ? (
+                          <Tooltip content={vipSummary.tooltip} focusable={false}>
+                            <span aria-label="VIP qualified" className="clients-vip-crown">
+                              <Crown aria-hidden="true" size={14} />
+                            </span>
+                          </Tooltip>
+                        ) : null}
+                      </span>
                       <span className="muted-text">{client.companyName || client.familyName || "Individual client"}</span>
                       {visibleTags.length ? (
                         <span className="clients-tag-row">
@@ -599,48 +580,44 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                           {hiddenTagCount ? <span className="ui-badge">+{hiddenTagCount}</span> : null}
                         </span>
                       ) : null}
-                    </div>
+                    </Link>
                   </td>
                   <td className="clients-email-cell">
-                    <span>{client.email}</span>
+                    <Link className="clients-row-link" href={detailHref}>
+                      <span>{client.email}</span>
+                    </Link>
                   </td>
                   <td className="clients-phone-cell">
-                    <span className={client.phone ? undefined : "muted-text"}>{client.phone || "No phone"}</span>
+                    <Link className="clients-row-link" href={detailHref}>
+                      <span className={client.phone ? undefined : "muted-text"}>{client.phone || "No phone"}</span>
+                    </Link>
                   </td>
                   {activeMetricOptions.map((metric) => (
                     <td className="clients-metric-cell" key={metric.id}>
-                      <strong>{metricCounts[metric.id]}</strong>
+                      <Link className="clients-row-link" href={detailHref}>
+                        <strong>{metricCounts[metric.id]}</strong>
+                      </Link>
                     </td>
                   ))}
-                  <td>{client.bookings[0] ? formatDateTime(client.bookings[0].startsAt, settings.timezone) : "None yet"}</td>
                   <td>
-                    <div className="clients-status-cell">
-                      <span className="ui-badge">{client.status}</span>
-                      <span className="ui-badge">{enumLabel(client.pipelineStage)}</span>
-                    </div>
+                    <Link className="clients-row-link" href={detailHref}>
+                      {client.bookings[0] ? formatDateTime(client.bookings[0].startsAt, settings.timezone) : "None yet"}
+                    </Link>
                   </td>
                   <td>
-                    <div className="clients-row-actions">
-                      <ButtonLink href={`/admin/clients/${client.id}`} size="sm" variant="secondary">
-                        Open
-                      </ButtonLink>
-                      <ButtonLink href={portalHref} size="sm" variant="ghost">
-                        <ExternalLink size={15} />
-                        Portal
-                      </ButtonLink>
-                      <form action={reissueClientPortalLinkAction}>
-                        <input name="clientId" type="hidden" value={client.id} />
-                        <Button
-                          aria-label={`Reissue portal link for ${client.name}`}
-                          className="clients-icon-button"
-                          size="sm"
-                          title="Reissue portal link"
-                          type="submit"
-                          variant="ghost">
-                          <RefreshCw size={15} />
-                        </Button>
-                      </form>
-                    </div>
+                    <Link className="clients-row-link clients-status-cell" href={detailHref}>
+                      <span className="ui-badge">{clientStatusLabel(client.status)}</span>
+                    </Link>
+                  </td>
+                  <td>
+                    <ClientRowActions
+                      alternateEmails={stringArrayFromUnknown(client.alternateEmails)}
+                      alternatePhones={stringArrayFromUnknown(client.alternatePhones)}
+                      detailHref={detailHref}
+                      email={client.email}
+                      name={client.name}
+                      phone={client.phone || ""}
+                    />
                   </td>
                 </tr>
               );
@@ -664,7 +641,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
               metrics: selectedMetricIds,
               q: query,
               segment: selectedSegment?.key,
-              stage: selectedStage
+              status: selectedStatus
             })}
             page={page}
             pageCount={pageCount}
@@ -673,7 +650,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
               metrics: selectedMetricIds,
               q: query,
               segment: selectedSegment?.key,
-              stage: selectedStage
+              status: selectedStatus
             })}
           />
         </div>
@@ -686,18 +663,23 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
           </div>
           <div className="ui-data-table-stat-pill ui-data-table-stat-pill-success">
             <Activity size={16} />
-            <strong>{statusCount("active")}</strong>
-            <span>Active</span>
+            <strong>{statusCount("active_order")}</strong>
+            <span>Active Orders</span>
           </div>
           <div className="ui-data-table-stat-pill ui-data-table-stat-pill-warning">
-            <Star size={16} />
-            <strong>{statusCount("vip")}</strong>
-            <span>VIP</span>
+            <CreditCard size={16} />
+            <strong>{statusCount("order_paid")}</strong>
+            <span>Paid Orders</span>
           </div>
           <div className="ui-data-table-stat-pill">
-            <UserPlus size={16} />
-            <strong>{statusCount("lead")}</strong>
-            <span>Leads</span>
+            <CalendarCheck size={16} />
+            <strong>{statusCount("appointment_booked")}</strong>
+            <span>Booked Appts</span>
+          </div>
+          <div className="ui-data-table-stat-pill">
+            <CreditCard size={16} />
+            <strong>{statusCount("deposit_paid")}</strong>
+            <span>Deposits Paid</span>
           </div>
         </div>
       </section>

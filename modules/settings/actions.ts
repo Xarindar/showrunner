@@ -6,6 +6,8 @@ import { recordAuditLog } from "@/lib/audit";
 import { applyDataScopePreset, dataScopeConfigFromFormData, dataScopePresets, requireAdmin, type DataScopePreset } from "@/lib/auth";
 import { parseForm, settingsFormSchema } from "@/lib/admin-validation";
 import { setModuleEnablement } from "@/lib/modules/installation";
+import { clientVipSettingsFromFormData } from "@/lib/clients/vip-settings";
+import { saveClientVipSettings } from "@/lib/clients/vip";
 import { createSiteApiKey, parseOriginsInput, revokeSiteApiKey, updateSiteApiKeyOrigins } from "@/lib/embed/keys";
 import { normalizeScopes } from "@/lib/embed/scopes";
 import { normalizeModules } from "@/shell/modules";
@@ -90,6 +92,28 @@ export async function updateSettingsAction(formData: FormData) {
 
   revalidatePath("/", "layout");
   redirect("/admin/modules/settings?saved=1");
+}
+
+export async function updateClientVipSettingsAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+  const vipSettings = clientVipSettingsFromFormData(formData);
+
+  await saveClientVipSettings(site.id, vipSettings);
+
+  await recordAuditLog({
+    action: "settings.clients_vip.updated",
+    actor: user,
+    metadata: vipSettings,
+    siteId: site.id,
+    targetId: site.id,
+    targetLabel: "Clients VIP settings",
+    targetType: "module_setting"
+  });
+
+  revalidatePath("/admin/modules/settings/modules");
+  revalidatePath("/admin/modules/clients");
+  redirect("/admin/modules/settings/modules?saved=clients-vip");
 }
 
 export async function createSiteApiKeyAction(formData: FormData) {

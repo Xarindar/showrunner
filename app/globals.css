@@ -1159,6 +1159,58 @@ button.button:disabled,
   color: var(--color-danger);
 }
 
+.ui-tooltip {
+  align-items: center;
+  display: inline-flex;
+  position: relative;
+}
+
+.ui-tooltip-content {
+  background: color-mix(in srgb, var(--color-text) 94%, #000000);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-control);
+  bottom: calc(100% + 8px);
+  box-shadow: var(--shadow-panel);
+  color: white;
+  font-size: var(--type-caption);
+  font-weight: 590;
+  left: 50%;
+  line-height: 1.3;
+  max-width: 260px;
+  opacity: 0;
+  padding: 7px 9px;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity var(--motion-fast) ease,
+    transform var(--motion-fast) ease,
+    visibility var(--motion-fast) ease;
+  visibility: hidden;
+  white-space: normal;
+  width: max-content;
+  z-index: 20;
+}
+
+.ui-tooltip-content::after {
+  background: color-mix(in srgb, var(--color-text) 94%, #000000);
+  bottom: -4px;
+  content: "";
+  height: 8px;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%) rotate(45deg);
+  width: 8px;
+}
+
+.ui-tooltip:hover .ui-tooltip-content,
+.ui-tooltip:focus-visible .ui-tooltip-content,
+.ui-tooltip:focus-within .ui-tooltip-content {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  visibility: visible;
+}
+
 :root {
   --data-table-radius: 8px;
   --data-table-min-width: 840px;
@@ -4446,6 +4498,11 @@ button.button:disabled,
   overflow-anchor: none;
 }
 
+.ui-settings-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
 .ui-settings-toolbar {
   align-items: center;
   background: var(--color-surface);
@@ -4482,6 +4539,17 @@ button.button:disabled,
   font-size: var(--type-caption);
   font-weight: 650;
   white-space: nowrap;
+}
+
+.ui-settings-footer {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hairline);
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-3);
 }
 
 .ui-settings-category {
@@ -6985,23 +7053,32 @@ button.button:disabled,
   display: flex;
   flex: 1 1 320px;
   gap: var(--space-2);
-  max-width: 520px;
+  max-width: 720px;
   min-width: min(100%, 280px);
 }
 
-.clients-search-form input {
+.clients-search-form input,
+.clients-search-form select {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   color: var(--color-text);
-  flex: 1 1 auto;
   min-height: 34px;
   min-width: 0;
   padding: 7px 10px;
+}
+
+.clients-search-form input {
+  flex: 1 1 260px;
   width: 100%;
 }
 
-.clients-search-form input:focus {
+.clients-search-form select {
+  flex: 0 0 210px;
+}
+
+.clients-search-form input:focus,
+.clients-search-form select:focus {
   border-color: var(--color-brand);
   box-shadow: 0 0 0 3px var(--color-focus);
   outline: 0;
@@ -7013,7 +7090,7 @@ button.button:disabled,
 }
 
 .clients-table {
-  min-width: 1360px;
+  min-width: 1240px;
 }
 
 .clients-table th,
@@ -7048,11 +7125,11 @@ button.button:disabled,
 }
 
 .clients-col-status {
-  width: 132px;
+  width: 170px;
 }
 
 .clients-col-actions {
-  width: 170px;
+  width: 104px;
 }
 
 .clients-primary-cell,
@@ -7062,7 +7139,50 @@ button.button:disabled,
   min-width: 0;
 }
 
-.clients-primary-cell a,
+.clients-name-line {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+  min-width: 0;
+}
+
+.clients-vip-crown {
+  align-items: center;
+  background: color-mix(in srgb, #f5b301 15%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, #f5b301 38%, var(--color-border));
+  border-radius: var(--radius-pill);
+  color: color-mix(in srgb, #f5b301 72%, #5f4000);
+  display: inline-flex;
+  height: 23px;
+  justify-content: center;
+  width: 23px;
+}
+
+.clients-row-link {
+  color: inherit;
+  display: block;
+  margin: -10px;
+  min-height: calc(100% + 20px);
+  padding: 10px;
+}
+
+.clients-row-link:focus-visible {
+  border-radius: var(--radius-control);
+  box-shadow: 0 0 0 3px var(--color-focus);
+  outline: 0;
+}
+
+.clients-row-link:focus-visible .ui-tooltip-content {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  visibility: visible;
+}
+
+.clients-row-link.clients-primary-cell,
+.clients-row-link.clients-status-cell {
+  display: grid;
+}
+
 .clients-primary-cell strong,
 .clients-email-cell span,
 .clients-phone-cell span {
@@ -7070,6 +7190,10 @@ button.button:disabled,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.clients-name-line strong {
+  min-width: 0;
 }
 
 .clients-tag-row {
@@ -7090,19 +7214,60 @@ button.button:disabled,
   font-size: 0.98rem;
 }
 
+.clients-actions-heading {
+  text-align: center;
+}
+
 .clients-row-actions {
   align-items: flex-start;
   gap: 6px;
+  justify-content: center;
 }
 
-.clients-row-actions form {
-  display: flex;
-}
-
-.clients-icon-button {
-  min-width: 34px !important;
-  padding: 0 !important;
+.clients-row-actions .clients-action-icon {
+  min-width: 34px;
+  padding: 0;
   width: 34px;
+}
+
+.clients-contact-modal {
+  max-width: min(520px, calc(100vw - var(--space-6)));
+}
+
+.clients-contact-modal-body,
+.clients-contact-section,
+.clients-contact-list {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.clients-contact-section h3 {
+  font-size: 0.94rem;
+  margin: 0;
+}
+
+.clients-contact-link {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-border) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border-radius: var(--radius-control);
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.clients-contact-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clients-contact-link small {
+  color: var(--color-muted);
+  font-size: var(--type-caption);
 }
 
 .clients-modal {
@@ -7185,6 +7350,10 @@ button.button:disabled,
   .clients-modal-actions {
     align-items: stretch;
     display: grid;
+  }
+
+  .clients-search-form select {
+    width: 100%;
   }
 
 }

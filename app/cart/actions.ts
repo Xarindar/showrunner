@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { AnalyticsEventType, CartStatus, OrderStatus } from "@prisma/client";
 import { z } from "zod";
 import { buildAddToCartEvent, buildBeginCheckoutEvent } from "@/lib/analytics/ecommerce";
+import { defaultClientStatus } from "@/lib/clients/status";
 import {
   addCartItem,
   applyGiftCardToCart,
@@ -294,7 +295,7 @@ export async function saveCartForRecoveryAction(formData: FormData) {
         siteId: settings.siteId,
         email: parsed.data.customerEmail,
         name: parsed.data.customerName || parsed.data.customerEmail,
-        status: "lead"
+        status: defaultClientStatus
       },
       select: { id: true }
     });

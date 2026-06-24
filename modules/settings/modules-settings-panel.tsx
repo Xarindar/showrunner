@@ -2,7 +2,8 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Search } from "lucide-react";
-import { Input, Select, SettingControlGroup, SettingRow, SettingsCategory, SettingsGroup, SettingValueGroup, Switch } from "@/components/ui";
+import { Button, Input, Select, SettingControlGroup, SettingRow, SettingsCategory, SettingsGroup, SettingValueGroup, Switch } from "@/components/ui";
+import { centsToDollarsInput, type ClientVipSettings } from "@/lib/clients/vip-settings";
 
 type SettingItem = {
   description?: string;
@@ -57,18 +58,23 @@ function categoryMatches(category: SettingCategory, query: string) {
   return categorySelfMatches(category, query) || category.groups.some((group) => groupMatches(group, query));
 }
 
-export function ModulesSettingsPanel() {
+type ModulesSettingsPanelProps = {
+  initialVipSettings: ClientVipSettings;
+  updateVipSettingsAction: (formData: FormData) => void | Promise<void>;
+};
+
+export function ModulesSettingsPanel({ initialVipSettings, updateVipSettingsAction }: ModulesSettingsPanelProps) {
   const [query, setQuery] = useState("");
-  const [vipEnabled, setVipEnabled] = useState(true);
-  const [vipSpendEnabled, setVipSpendEnabled] = useState(true);
-  const [vipAppointmentsEnabled, setVipAppointmentsEnabled] = useState(true);
-  const [vipLoyaltyEnabled, setVipLoyaltyEnabled] = useState(false);
+  const [vipEnabled, setVipEnabled] = useState(initialVipSettings.enabled);
+  const [vipSpendEnabled, setVipSpendEnabled] = useState(initialVipSettings.spend.enabled);
+  const [vipAppointmentsEnabled, setVipAppointmentsEnabled] = useState(initialVipSettings.appointments.enabled);
+  const [vipLoyaltyEnabled, setVipLoyaltyEnabled] = useState(initialVipSettings.loyalty.enabled);
   const [portalAccessEnabled, setPortalAccessEnabled] = useState(true);
   const [vipPriorityBookingEnabled, setVipPriorityBookingEnabled] = useState(false);
   const [bookingApprovalEnabled, setBookingApprovalEnabled] = useState(false);
-  const [paidInvoicesEnabled, setPaidInvoicesEnabled] = useState(true);
+  const [paidInvoicesEnabled, setPaidInvoicesEnabled] = useState(initialVipSettings.paidRevenueEnabled);
   const [vipReminderEnabled, setVipReminderEnabled] = useState(true);
-  const [adminVipBadgeEnabled, setAdminVipBadgeEnabled] = useState(true);
+  const [adminVipBadgeEnabled, setAdminVipBadgeEnabled] = useState(initialVipSettings.badgesEnabled);
 
   const normalizedQuery = normalize(query);
   const categories = useMemo(
@@ -92,6 +98,7 @@ export function ModulesSettingsPanel() {
                         <Switch
                           aria-label="Enable VIP"
                           checked={vipEnabled}
+                          name="vipEnabled"
                           onChange={(event) => setVipEnabled(event.target.checked)}
                         />
                       </SettingRow>
@@ -106,14 +113,13 @@ export function ModulesSettingsPanel() {
                               <Switch
                                 aria-label="Use money spend for VIP criteria"
                                 checked={vipSpendEnabled}
-                                disabled={!vipEnabled}
+                                name="vipSpendEnabled"
                                 onChange={(event) => setVipSpendEnabled(event.target.checked)}
                               />
                               <SettingValueGroup>
                                 <Input
                                   aria-label="VIP money spend amount"
-                                  defaultValue="2500"
-                                  disabled={!vipEnabled || !vipSpendEnabled}
+                                  defaultValue={centsToDollarsInput(initialVipSettings.spend.thresholdCents)}
                                   min="0"
                                   name="vipSpendAmount"
                                   type="number"
@@ -126,14 +132,13 @@ export function ModulesSettingsPanel() {
                               <Switch
                                 aria-label="Use number of appointments for VIP criteria"
                                 checked={vipAppointmentsEnabled}
-                                disabled={!vipEnabled}
+                                name="vipAppointmentCountEnabled"
                                 onChange={(event) => setVipAppointmentsEnabled(event.target.checked)}
                               />
                               <SettingValueGroup>
                                 <Input
                                   aria-label="VIP appointment count"
-                                  defaultValue="8"
-                                  disabled={!vipEnabled || !vipAppointmentsEnabled}
+                                  defaultValue={initialVipSettings.appointments.threshold}
                                   min="0"
                                   name="vipAppointmentCount"
                                   type="number"
@@ -146,19 +151,18 @@ export function ModulesSettingsPanel() {
                               <Switch
                                 aria-label="Use loyalty length for VIP criteria"
                                 checked={vipLoyaltyEnabled}
-                                disabled={!vipEnabled}
+                                name="vipLoyaltyEnabled"
                                 onChange={(event) => setVipLoyaltyEnabled(event.target.checked)}
                               />
                               <SettingValueGroup columns={2}>
                                 <Input
                                   aria-label="VIP loyalty length"
-                                  defaultValue="12"
-                                  disabled={!vipEnabled || !vipLoyaltyEnabled}
+                                  defaultValue={initialVipSettings.loyalty.length}
                                   min="0"
                                   name="vipLoyaltyLength"
                                   type="number"
                                 />
-                                <Select aria-label="VIP loyalty length unit" defaultValue="months" disabled={!vipEnabled || !vipLoyaltyEnabled} name="vipLoyaltyUnit">
+                                <Select aria-label="VIP loyalty length unit" defaultValue={initialVipSettings.loyalty.unit} name="vipLoyaltyUnit">
                                   <option value="months">Months</option>
                                   <option value="years">Years</option>
                                 </Select>
@@ -180,6 +184,7 @@ export function ModulesSettingsPanel() {
                       <Switch
                         aria-label="Show VIP indicators"
                         checked={adminVipBadgeEnabled}
+                        name="vipBadgesEnabled"
                         onChange={(event) => setAdminVipBadgeEnabled(event.target.checked)}
                       />
                     </SettingRow>
@@ -296,6 +301,7 @@ export function ModulesSettingsPanel() {
                       <Switch
                         aria-label="Paid revenue counts toward VIP"
                         checked={paidInvoicesEnabled}
+                        name="vipPaidRevenueEnabled"
                         onChange={(event) => setPaidInvoicesEnabled(event.target.checked)}
                       />
                     </SettingRow>
@@ -308,7 +314,7 @@ export function ModulesSettingsPanel() {
                   keywords: ["vip", "spend", "criteria", "lifetime"],
                   render: (
                     <SettingRow description="Time window used when calculating client spend for threshold-based settings." title="Spend calculation window">
-                      <Select aria-label="Spend calculation window" defaultValue="lifetime" name="spendWindow">
+                      <Select aria-label="Spend calculation window" defaultValue={initialVipSettings.spend.window} name="vipSpendWindow">
                         <option value="lifetime">Lifetime</option>
                         <option value="12-months">Last 12 months</option>
                         <option value="24-months">Last 24 months</option>
@@ -374,6 +380,11 @@ export function ModulesSettingsPanel() {
     [
       adminVipBadgeEnabled,
       bookingApprovalEnabled,
+      initialVipSettings.appointments.threshold,
+      initialVipSettings.loyalty.length,
+      initialVipSettings.loyalty.unit,
+      initialVipSettings.spend.thresholdCents,
+      initialVipSettings.spend.window,
       paidInvoicesEnabled,
       portalAccessEnabled,
       vipAppointmentsEnabled,
@@ -385,21 +396,20 @@ export function ModulesSettingsPanel() {
     ]
   );
 
-  const visibleCategories = categories
-    .filter((category) => categoryMatches(category, normalizedQuery))
-    .map((category) => ({
-      ...category,
-      groups: category.groups
-        .filter((group) => groupMatches(group, normalizedQuery))
-        .map((group) => ({
-          ...group,
-          items:
-            normalizedQuery && !groupSelfMatches(group, normalizedQuery) && !categorySelfMatches(category, normalizedQuery)
-              ? group.items.filter((item) => itemMatches(item, normalizedQuery))
-              : group.items
-        }))
-    }));
-  const visibleSettingCount = visibleCategories.reduce((total, category) => total + category.groups.reduce((groupTotal, group) => groupTotal + group.items.length, 0), 0);
+  const visibleSettingCount = categories.reduce(
+    (total, category) =>
+      total +
+      category.groups.reduce(
+        (groupTotal, group) =>
+          groupTotal +
+          group.items.filter((item) => {
+            if (!normalizedQuery) return true;
+            return itemMatches(item, normalizedQuery) || groupSelfMatches(group, normalizedQuery) || categorySelfMatches(category, normalizedQuery);
+          }).length,
+        0
+      ),
+    0
+  );
 
   return (
     <div className="ui-settings-surface">
@@ -417,19 +427,36 @@ export function ModulesSettingsPanel() {
         <span className="ui-settings-count">{visibleSettingCount} settings</span>
       </div>
 
-      {visibleCategories.map((category) => (
-        <SettingsCategory description={category.description} key={category.id} title={category.title}>
-          {category.groups.map((group) => (
-            <SettingsGroup description={group.description} key={group.id} title={group.title}>
-              {group.items.map((item) => (
-                <div key={item.id}>{item.render}</div>
-              ))}
-            </SettingsGroup>
-          ))}
-        </SettingsCategory>
-      ))}
+      <form action={updateVipSettingsAction} className="ui-settings-form">
+        {categories.map((category) => {
+          const categoryVisible = categoryMatches(category, normalizedQuery);
 
-      {!visibleCategories.length ? <p className="ui-zero">No settings match that search.</p> : null}
+          return (
+            <SettingsCategory description={category.description} hidden={!categoryVisible} key={category.id} title={category.title}>
+              {category.groups.map((group) => {
+                const groupVisible = groupMatches(group, normalizedQuery);
+                const groupIsBroadMatch = !normalizedQuery || groupSelfMatches(group, normalizedQuery) || categorySelfMatches(category, normalizedQuery);
+
+                return (
+                  <SettingsGroup description={group.description} hidden={!groupVisible} key={group.id} title={group.title}>
+                    {group.items.map((item) => (
+                      <div hidden={!groupIsBroadMatch && !itemMatches(item, normalizedQuery)} key={item.id}>
+                        {item.render}
+                      </div>
+                    ))}
+                  </SettingsGroup>
+                );
+              })}
+            </SettingsCategory>
+          );
+        })}
+
+        {!visibleSettingCount ? <p className="ui-zero">No settings match that search.</p> : null}
+
+        <div className="ui-settings-footer">
+          <Button type="submit">Save module settings</Button>
+        </div>
+      </form>
     </div>
   );
 }

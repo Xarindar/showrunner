@@ -15,6 +15,7 @@ import {
 } from "@prisma/client";
 import { updateBillingDocumentStatus, createAutomationInvoice } from "@/lib/billing/status";
 import { updateBookingStatus } from "@/lib/bookings/status";
+import { clientStatusLabel, normalizeClientStatus } from "@/lib/clients/status";
 import { updateOrderStatus } from "@/lib/commerce/orders";
 import { queueAdminEmail, queueEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
@@ -330,14 +331,14 @@ async function executeUpdateStatus(automation: AutomationForRun, envelope: Autom
   }
 
   if (targetType === "client") {
-    const allowed = new Set(["active", "lead", "vip", "inactive"]);
-    if (!allowed.has(targetStatus)) throw new Error(`Unsupported client status: ${targetStatus}.`);
+    const nextStatus = normalizeClientStatus(targetStatus);
+    if (!nextStatus) throw new Error(`Unsupported client status: ${targetStatus}.`);
     const result = await prisma.client.updateMany({
       where: { id: targetId, siteId: automation.siteId },
-      data: { status: targetStatus }
+      data: { status: nextStatus }
     });
     if (!result.count) throw new Error("Client target not found.");
-    return { summary: `Updated client status to ${targetStatus}.` };
+    return { summary: `Updated client status to ${clientStatusLabel(nextStatus)}.` };
   }
 
   if (targetType === "form") {

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { recordAuditLog } from "@/lib/audit";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
+import { normalizeClientStatus, parseClientStatus } from "@/lib/clients/status";
 import {
   clientFileFormSchema,
   clientFileDeleteFormSchema,
@@ -145,11 +146,6 @@ function parsePipelineStage(value: string) {
   return Object.values(ClientPipelineStage).includes(normalized as ClientPipelineStage)
     ? (normalized as ClientPipelineStage)
     : ClientPipelineStage.INQUIRY;
-}
-
-function parseClientStatus(value: string) {
-  const normalized = value.trim().toLowerCase();
-  return ["active", "lead", "vip", "inactive"].includes(normalized) ? normalized : "lead";
 }
 
 function isImportEmail(value: string) {
@@ -530,7 +526,7 @@ export async function createClientSegmentAction(formData: FormData) {
   const input = await parseForm(clientSegmentFormSchema, formData);
   const siteId = await getCurrentSiteId();
   const criteria = compactCriteria({
-    status: input.status || undefined,
+    status: normalizeClientStatus(input.status) || undefined,
     pipelineStage: input.pipelineStage || undefined,
     tag: input.tag || undefined,
     pastDue: input.pastDue === "on" || undefined,

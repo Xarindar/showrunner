@@ -14,6 +14,7 @@ import {
 } from "@prisma/client";
 import { buildAnalyticsItem } from "@/lib/analytics/ecommerce";
 import { recordAuditLog } from "@/lib/audit";
+import { defaultClientStatus } from "@/lib/clients/status";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
 
@@ -595,7 +596,7 @@ async function findOrCreateOrderClient(
       siteId: input.siteId,
       name: input.customerName,
       email: input.customerEmail,
-      status: "active"
+      status: defaultClientStatus
     },
     select: { id: true }
   });

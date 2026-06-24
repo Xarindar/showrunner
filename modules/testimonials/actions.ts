@@ -7,6 +7,7 @@ import { z } from "zod";
 import { recordAuditLog } from "@/lib/audit";
 import { formObject, parseForm } from "@/lib/admin-validation";
 import { getAccessibleTestimonialWhere, requireAdmin } from "@/lib/auth";
+import { defaultClientStatus } from "@/lib/clients/status";
 import { prisma } from "@/lib/prisma";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
@@ -118,7 +119,8 @@ async function findOrCreateClient(authorName: string, authorEmail: string, updat
     create: {
       siteId,
       name: authorName || authorEmail,
-      email: authorEmail
+      email: authorEmail,
+      status: defaultClientStatus
     },
     select: { id: true }
   });

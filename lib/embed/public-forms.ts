@@ -4,6 +4,7 @@ import { AnalyticsEventType, FormAttachmentTargetType, FormDestination, FormFiel
 import { headers } from "next/headers";
 import { z } from "zod";
 import { recordAuditLog } from "@/lib/audit";
+import { defaultClientStatus } from "@/lib/clients/status";
 import { queueFormSubmittedEmail } from "@/lib/email";
 import { EmbedRequestError } from "@/lib/embed/gateway";
 import { emitAnalyticsEvent, emitModuleEvent, requestAttribution } from "@/lib/events/emit";
@@ -280,7 +281,7 @@ export async function createPublicFormSubmission(input: {
       const client =
         existingClient ||
         (await prisma.client.create({
-          data: { siteId: input.siteId, name: submitterName || submitterEmail, email: submitterEmail, status: "lead" }
+          data: { siteId: input.siteId, name: submitterName || submitterEmail, email: submitterEmail, status: defaultClientStatus }
         }));
       clientId = client.id;
     }
