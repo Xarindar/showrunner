@@ -25,7 +25,7 @@ import {
   updateFormFieldAction,
   updateFormStatusAction } from "./actions";
 import { formTemplates } from "./templates";
-import { Button, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid, Pagination, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -677,21 +677,13 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               null}
             </tbody>
           </Table>
-          <div className="ui-zero">
-            <ButtonLink href={`/admin/modules/forms?status=${statusFilter}&page=${Math.max(1, page - 1)}`} aria-disabled={page <= 1} variant="secondary">
-              Previous
-            </ButtonLink>
-            <span className="ui-badge">
-              Page {Math.min(page, pageCount)} of {pageCount}
-            </span>
-            <ButtonLink
-
-              href={`/admin/modules/forms?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
-              aria-disabled={page >= pageCount} variant="secondary">
-              
-              Next
-            </ButtonLink>
-          </div>
+          <Pagination
+            label="Form pages"
+            nextHref={`/admin/modules/forms?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
+            page={page}
+            pageCount={pageCount}
+            previousHref={`/admin/modules/forms?status=${statusFilter}&page=${Math.max(1, page - 1)}`}
+          />
         </Card>
       </EqualGrid>
 

@@ -6,7 +6,7 @@ import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { createTestimonialAction, deleteTestimonialAction, updateTestimonialModerationAction } from "./actions";
-import { Button, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid, Pagination, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -307,25 +307,13 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
               null}
             </tbody>
           </Table>
-          <div className="ui-zero">
-            <ButtonLink
-
-              href={`/admin/modules/testimonials?status=${statusFilter}&page=${Math.max(1, page - 1)}`}
-              aria-disabled={page <= 1} variant="secondary">
-              
-              Previous
-            </ButtonLink>
-            <span className="ui-badge">
-              Page {Math.min(page, pageCount)} of {pageCount}
-            </span>
-            <ButtonLink
-
-              href={`/admin/modules/testimonials?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
-              aria-disabled={page >= pageCount} variant="secondary">
-              
-              Next
-            </ButtonLink>
-          </div>
+          <Pagination
+            label="Testimonial pages"
+            nextHref={`/admin/modules/testimonials?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
+            page={page}
+            pageCount={pageCount}
+            previousHref={`/admin/modules/testimonials?status=${statusFilter}&page=${Math.max(1, page - 1)}`}
+          />
         </Card>
     </div>);
 

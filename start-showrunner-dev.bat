@@ -5,55 +5,69 @@ set "ROOT=%~dp0"
 cd /d "%ROOT%"
 
 set "PG_PORT=55432"
-set "PGDATA=%TEMP%\showrunner-embedded-pg"
-set "PG_CTL=%ROOT%node_modules\@embedded-postgres\windows-x64\native\bin\pg_ctl.exe"
-set "PG_LOG=%TEMP%\showrunner-embedded-pg.direct.err.log"
-set "DATABASE_URL=postgresql://postgres:postgres@localhost:%PG_PORT%/showrunner"
+set "PGDATA=%ROOT%.dev-postgres\data"
+set "PG_LOG=%ROOT%.dev-postgres\postgres.log"
+
+set "PG_CTL="
+if exist "%ROOT%node_modules\@embedded-postgres\windows-x64\native\bin\pg_ctl.exe" (
+  set "PG_CTL=%ROOT%node_modules\@embedded-postgres\windows-x64\native\bin\pg_ctl.exe"
+)
+if not defined PG_CTL if exist "C:\Program Files\PostgreSQL\17\bin\pg_ctl.exe" (
+  set "PG_CTL=C:\Program Files\PostgreSQL\17\bin\pg_ctl.exe"
+)
+if not defined PG_CTL if exist "C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe" (
+  set "PG_CTL=C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe"
+)
+if not defined PG_CTL for %%P in (pg_ctl.exe) do if not defined PG_CTL set "PG_CTL=%%~$PATH:P"
 
 echo.
 echo Showrunner dev starter
 echo Project: %CD%
 echo.
 
-if not exist "%PG_CTL%" (
-  echo Could not find the embedded Postgres command:
-  echo   %PG_CTL%
+if not defined PG_CTL (
+  echo Could not find a Postgres control command.
+  echo Checked:
+  echo   node_modules\@embedded-postgres\windows-x64\native\bin\pg_ctl.exe
+  echo   C:\Program Files\PostgreSQL\17\bin\pg_ctl.exe
+  echo   C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe
+  echo   pg_ctl.exe on PATH
   echo.
-  echo Run npm install first, then double-click this file again.
+  echo Install PostgreSQL 17 or run npm install, then double-click this file again.
   echo.
   pause
   exit /b 1
 )
 
 if not exist "%PGDATA%\PG_VERSION" (
-  echo Could not find the existing embedded Postgres data folder:
+  echo Could not find the existing local Postgres data folder:
   echo   %PGDATA%
   echo.
   echo The previous local database was stored there. Ask Codex to recreate
-  echo the embedded database, or restore that folder, before starting dev.
+  echo the local database, or restore that folder, before starting dev.
   echo.
   pause
   exit /b 1
 )
 
-echo Checking embedded Postgres on localhost:%PG_PORT%...
+echo Checking local Postgres on localhost:%PG_PORT%...
 "%PG_CTL%" status -D "%PGDATA%" >nul 2>&1
 if errorlevel 1 (
-  echo Starting embedded Postgres...
-  "%PG_CTL%" start -D "%PGDATA%" -o "-p %PG_PORT% -h localhost" -l "%PG_LOG%"
+  echo Starting local Postgres...
+  "%PG_CTL%" start -D "%PGDATA%" -o "-p %PG_PORT% -h 127.0.0.1" -l "%PG_LOG%"
   if errorlevel 1 (
     echo.
-    echo Failed to start embedded Postgres. Last log lines:
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path $env:TEMP\showrunner-embedded-pg.direct.err.log) { Get-Content $env:TEMP\showrunner-embedded-pg.direct.err.log -Tail 40 }"
+    echo Failed to start local Postgres. Last log lines:
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '%PG_LOG%') { Get-Content '%PG_LOG%' -Tail 40 }"
     echo.
     pause
     exit /b 1
   )
 ) else (
-  echo Embedded Postgres is already running.
+  echo Local Postgres is already running.
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue) { exit 0 } exit 1" >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$client = [Net.Sockets.TcpClient]::new(); try { $attempt = $client.BeginConnect('127.0.0.1', 3000, $null, $null); if ($attempt.AsyncWaitHandle.WaitOne(250)) { $client.EndConnect($attempt); exit 0 } exit 1 } catch { exit 1 } finally { $client.Close() }" >nul 2>&1
 if not errorlevel 1 (
   echo.
   echo Something is already serving on http://localhost:3000/

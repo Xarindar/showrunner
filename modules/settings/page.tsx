@@ -15,6 +15,7 @@ import {
   updateSettingsAction,
   updateSiteApiKeyOriginsAction } from "./actions";
 import { Button, ButtonLink, Card, EqualGrid } from "@/components/ui";
+import { SettingsNav } from "./settings-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +36,12 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       <header className="page-header">
         <div>
           <p className="eyebrow">Settings</p>
-          <h1>Client configuration</h1>
+          <h1>Settings dashboard</h1>
           <p>Business details, visual basics, media mode, module state, and platform foundations for multi-site, roles, audit, and policy controls.</p>
         </div>
       </header>
+
+      <SettingsNav active="dashboard" />
 
       {saved ? <div className="success-message">Settings saved.</div> : null}
       {errorMessage ? <div className="error">{errorMessage}</div> : null}
@@ -49,7 +52,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           <p>Identity, contact email, and timezone for public pages and notifications.</p>
         </Card>
         <Card>
-          <h2 className="compact-title">Modules</h2>
+          <h2 className="compact-title">Module enablement</h2>
           <p>{platformStatus.enabledCount} modules enabled, including required platform modules for the admin shell.</p>
         </Card>
         <Card>
@@ -164,7 +167,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
         <section className="subpanel form-grid">
           <div>
-            <h2 className="compact-title">Modules</h2>
+            <h2 className="compact-title">Module enablement</h2>
             <p>Enabled modules appear in the sidebar. Required platform modules stay on so the admin shell remains reachable.</p>
           </div>
           <div className="module-toggle-grid">

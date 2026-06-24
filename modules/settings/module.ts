@@ -25,10 +25,10 @@ export const manifest = {
     { label: "Policy controls", status: "planned" },
     { label: "Role and audit controls", status: "foundation" }
   ],
-  adminRoutes: ["/admin/modules/settings"],
+  adminRoutes: ["/admin/modules/settings", "/admin/modules/settings/modules"],
   dependencies: ["dashboard"],
   dataModels: ["SiteSettings"],
   permissions: ["settings:update"],
-  settingsSections: ["Business", "Modules", "Theme", "Media", "Security", "Data"],
+  settingsSections: ["Business", "Module enablement", "Module settings", "Theme", "Media", "Security", "Data"],
   healthChecks: ["module-enabled-state", "required-module-state"]
 } satisfies ShellModule;

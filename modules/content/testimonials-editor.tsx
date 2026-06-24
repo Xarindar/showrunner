@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import NextImage from "next/image";
-import { ChevronLeft, ChevronRight, Image as ImageIcon, MessageSquareQuote, Plus, Star, Trash2, Upload } from "lucide-react";
+import { ChevronLeft, ChevronRight, Image as ImageIcon, MessageSquareQuote, Plus, Save, Star, Trash2, Upload } from "lucide-react";
 import { Button, Card, Modal } from "@/components/ui";
 import type { HeroMediaAssetOption } from "./hero-content-editor";
 import type { ContentTestimonial } from "./testimonials-data";
@@ -15,12 +15,14 @@ type TestimonialsEditorProps = {
   mediaAssets: HeroMediaAssetOption[];
   removeAction: TestimonialAction;
   testimonials: ContentTestimonial[];
+  updateAction: TestimonialAction;
 };
 
 type ComposeView = "compose" | "image";
 
 type TestimonialDraft = {
   featured: boolean;
+  id: string;
   imageUrl: string;
   name: string;
   quote: string;
@@ -30,6 +32,7 @@ type TestimonialDraft = {
 
 const emptyDraft: TestimonialDraft = {
   featured: true,
+  id: "",
   imageUrl: "",
   name: "",
   quote: "",
@@ -39,7 +42,14 @@ const emptyDraft: TestimonialDraft = {
 
 const minQuoteLength = 10;
 
-export function TestimonialsEditor({ canUploadImage, createAction, mediaAssets, removeAction, testimonials }: TestimonialsEditorProps) {
+export function TestimonialsEditor({
+  canUploadImage,
+  createAction,
+  mediaAssets,
+  removeAction,
+  testimonials,
+  updateAction
+}: TestimonialsEditorProps) {
   const railRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -51,6 +61,7 @@ export function TestimonialsEditor({ canUploadImage, createAction, mediaAssets, 
   const [canScrollRight, setCanScrollRight] = useState(false);
 
   const previewImageSrc = previewUrl || draft.imageUrl;
+  const isEditing = Boolean(draft.id);
   const canSubmit = draft.name.trim().length > 0 && draft.quote.trim().length >= minQuoteLength;
 
   const updateScrollState = useCallback(() => {
@@ -100,7 +111,25 @@ export function TestimonialsEditor({ canUploadImage, createAction, mediaAssets, 
     setOpen(true);
   }
 
-  function closeAdd() {
+  function openEdit(testimonial: ContentTestimonial) {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setPreviewUrl("");
+    setUploadName("");
+    setDraft({
+      featured: testimonial.featured,
+      id: testimonial.id,
+      imageUrl: testimonial.imageUrl,
+      name: testimonial.authorName,
+      quote: testimonial.quote,
+      rating: testimonial.rating,
+      role: testimonial.authorRole || testimonial.serviceName
+    });
+    setView("compose");
+    setOpen(true);
+  }
+
+  function closeModal() {
     setOpen(false);
     resetDraft();
   }
@@ -159,18 +188,14 @@ export function TestimonialsEditor({ canUploadImage, createAction, mediaAssets, 
           {testimonials.map((testimonial) => (
             <div className="content-testimonial-rail-item" key={testimonial.id}>
               <TestimonialPreviewCard
+                featured={testimonial.featured}
                 imageSrc={testimonial.imageUrl}
                 name={testimonial.authorName}
+                onClick={() => openEdit(testimonial)}
                 quote={testimonial.quote}
                 rating={testimonial.rating}
                 role={testimonial.authorRole || testimonial.serviceName}
               />
-              {testimonial.featured ? (
-                <span className="content-testimonial-flag">
-                  <Star size={12} aria-hidden="true" />
-                  Featured
-                </span>
-              ) : null}
               <form action={removeAction} className="content-testimonial-remove">
                 <input name="id" type="hidden" value={testimonial.id} />
                 <button aria-label={`Remove ${testimonial.authorName}'s testimonial`} type="submit">
@@ -201,16 +226,17 @@ export function TestimonialsEditor({ canUploadImage, createAction, mediaAssets, 
         </button>
       </div>
       <p className="content-hero-hint" aria-hidden="true">
-        Approved testimonials show here and on the public site. Use the arrows to browse, Add to publish a new one, or hover a card to remove it.
+        Approved testimonials show here and on the public site. Use the arrows to browse, select a card to edit it, or hover a card to remove it.
       </p>
 
       <Modal
         className="content-testimonial-modal"
-        onClose={closeAdd}
+        onClose={closeModal}
         open={open}
-        title={view === "image" ? "Choose a photo" : "Add testimonial"}
+        title={view === "image" ? "Choose a photo" : isEditing ? "Edit testimonial" : "Add testimonial"}
       >
-        <form action={createAction} className="content-testimonial-compose" data-view={view} encType="multipart/form-data">
+        <form action={isEditing ? updateAction : createAction} className="content-testimonial-compose" data-view={view}>
+          {isEditing ? <input name="id" readOnly type="hidden" value={draft.id} /> : null}
           <input name="imageUrl" readOnly type="hidden" value={draft.imageUrl} />
           <input name="rating" readOnly type="hidden" value={draft.rating} />
           <input
@@ -227,6 +253,7 @@ export function TestimonialsEditor({ canUploadImage, createAction, mediaAssets, 
               <div className="content-testimonial-compose-preview">
                 <span className="content-compose-label">Live preview</span>
                 <TestimonialPreviewCard
+                  featured={draft.featured}
                   imageSrc={previewImageSrc}
                   name={draft.name}
                   placeholder
@@ -305,23 +332,29 @@ export function TestimonialsEditor({ canUploadImage, createAction, mediaAssets, 
                   </div>
                 </div>
 
-                <label className="ui-check-row">
+                <label className="content-featured-toggle">
                   <input
                     checked={draft.featured}
                     name="featured"
                     onChange={(event) => setDraft((current) => ({ ...current, featured: event.target.checked }))}
                     type="checkbox"
                   />
-                  Feature on the homepage
+                  <span aria-hidden="true" className="content-featured-toggle-control">
+                    <span />
+                  </span>
+                  <span className="content-featured-toggle-copy">
+                    <strong>Featured</strong>
+                    <span>Show this testimonial in featured sections.</span>
+                  </span>
                 </label>
 
                 <div className="content-modal-actions">
-                  <Button onClick={closeAdd} type="button" variant="ghost">
+                  <Button onClick={closeModal} type="button" variant="ghost">
                     Cancel
                   </Button>
                   <Button disabled={!canSubmit} type="submit">
-                    <Plus size={16} aria-hidden="true" />
-                    Add testimonial
+                    {isEditing ? <Save size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
+                    {isEditing ? "Save changes" : "Add testimonial"}
                   </Button>
                 </div>
               </div>
@@ -356,15 +389,19 @@ export function TestimonialsEditor({ canUploadImage, createAction, mediaAssets, 
 }
 
 function TestimonialPreviewCard({
+  featured,
   imageSrc,
   name,
+  onClick,
   placeholder,
   quote,
   rating,
   role
 }: {
+  featured?: boolean;
   imageSrc: string;
   name: string;
+  onClick?: () => void;
   placeholder?: boolean;
   quote: string;
   rating: number;
@@ -374,7 +411,21 @@ function TestimonialPreviewCard({
   const displayQuote = quote.trim() || (placeholder ? "Their kind words will appear here." : "");
 
   return (
-    <article className="content-testimonial-card" data-placeholder={placeholder && !quote.trim()}>
+    <article
+      aria-label={onClick ? `Edit ${displayName || "testimonial"}` : undefined}
+      className="content-testimonial-card"
+      data-clickable={Boolean(onClick)}
+      data-placeholder={placeholder && !quote.trim()}
+      onClick={onClick}
+      onKeyDown={(event) => {
+        if (!onClick || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        onClick();
+      }}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
+      {featured ? <Star aria-label="Featured" className="content-testimonial-featured-star" size={18} /> : null}
       <div aria-hidden="true" className="content-testimonial-stars">
         {[1, 2, 3, 4, 5].map((value) => (
           <Star className="content-testimonial-star" data-on={value <= rating} key={value} size={15} />

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, Menu, Settings, UserRound, X } from "lucide-react";
+import { ChevronDown, Gauge, LayoutTemplate, LogOut, Menu, Settings, UserRound, X } from "lucide-react";
 import type { AdminRole } from "@prisma/client";
 import { usePathname } from "next/navigation";
 import { hasAdminPermission } from "@/lib/admin-permissions";
@@ -25,9 +25,13 @@ function roleLabel(role: AdminRole) {
 export function AdminSidebar({ businessName, enabledModules, userEmail, userRole }: AdminSidebarProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const canUpdateSettings = hasAdminPermission({ role: userRole }, "settings:update");
+  const settingsPathActive = pathname.startsWith("/admin/modules/settings");
+  const settingsSubmenuOpen = settingsMenuOpen || settingsPathActive;
 
   const closeMenu = () => setMenuOpen(false);
+  const toggleSettingsMenu = () => setSettingsMenuOpen((open) => !open);
 
   return (
     <>
@@ -87,6 +91,40 @@ export function AdminSidebar({ businessName, enabledModules, userEmail, userRole
                 );
               }
 
+              if (item.id === "settings") {
+                return (
+                  <div className="admin-nav-group" key={item.id}>
+                    <button
+                      aria-controls="settings-submenu"
+                      aria-expanded={settingsSubmenuOpen}
+                      className={isActive ? "active" : undefined}
+                      onClick={toggleSettingsMenu}
+                      type="button"
+                    >
+                      <Icon size={18} />
+                      <span>{item.label}</span>
+                      <ChevronDown className="admin-nav-chevron" size={16} />
+                    </button>
+                    {settingsSubmenuOpen ? (
+                      <div className="admin-subnav" id="settings-submenu">
+                        <Link className={pathname === "/admin/modules/settings" ? "active" : undefined} href="/admin/modules/settings" onClick={closeMenu}>
+                          <Gauge size={15} />
+                          Dashboard
+                        </Link>
+                        <Link
+                          className={pathname.startsWith("/admin/modules/settings/modules") ? "active" : undefined}
+                          href="/admin/modules/settings/modules"
+                          onClick={closeMenu}
+                        >
+                          <LayoutTemplate size={15} />
+                          Modules
+                        </Link>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              }
+
               return (
                 <Link className={isActive ? "active" : undefined} key={item.id} href={item.href} onClick={closeMenu}>
                   <Icon size={18} />
@@ -107,9 +145,9 @@ export function AdminSidebar({ businessName, enabledModules, userEmail, userRole
           </span>
           <span className="admin-user-actions">
             {canUpdateSettings ? (
-              <Link href="/admin/modules/settings" aria-label="Open settings" className="admin-user-icon-button" onClick={closeMenu} title="Settings">
+              <button aria-label="Open settings menu" className="admin-user-icon-button" onClick={toggleSettingsMenu} title="Settings" type="button">
                 <Settings size={17} />
-              </Link>
+              </button>
             ) : null}
             <form action={logoutAction}>
               <Button aria-label="Sign out" className="admin-user-icon-button" title="Sign out" variant="ghost" type="submit">

@@ -6,7 +6,7 @@ import { getSiteSettings } from "@/lib/site";
 import { updateContentAction } from "./actions";
 import { HeroContentEditor } from "./hero-content-editor";
 import { getHeroPresentationForSite } from "./hero-presentation.server";
-import { createContentTestimonialAction, removeContentTestimonialAction } from "./testimonials-actions";
+import { createContentTestimonialAction, removeContentTestimonialAction, updateContentTestimonialAction } from "./testimonials-actions";
 import { getContentTestimonials } from "./testimonials-data";
 import { TestimonialsEditor } from "./testimonials-editor";
 
@@ -78,6 +78,7 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
         mediaAssets={mediaAssetOptions}
         removeAction={removeContentTestimonialAction}
         testimonials={testimonials}
+        updateAction={updateContentTestimonialAction}
       />
     </div>);
 

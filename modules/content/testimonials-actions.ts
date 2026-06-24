@@ -24,7 +24,7 @@ const contentTestimonialSchema = z
   .object({
     authorName: requiredText,
     authorRole: optionalStoredText,
-    serviceName: optionalStoredText,
+    serviceName: optionalStoredText.optional().transform((value) => value || ""),
     quote: requiredText.pipe(z.string().min(10, "Use a quote with at least 10 characters.")),
     rating: z.coerce.number().int().min(1).max(5).catch(5),
     imageUrl: storedImageUrl,
@@ -38,6 +38,12 @@ const contentTestimonialSchema = z
 const removeTestimonialSchema = z.object({
   id: requiredText
 });
+
+const updateContentTestimonialSchema = contentTestimonialSchema.and(
+  z.object({
+    id: requiredText
+  })
+);
 
 function refreshTestimonials() {
   revalidatePath("/");
@@ -79,6 +85,35 @@ export async function createContentTestimonialAction(formData: FormData) {
 
   refreshTestimonials();
   redirect(`${contentPath}?saved=testimonial`);
+}
+
+export async function updateContentTestimonialAction(formData: FormData) {
+  const user = await requireAdmin("content:manage");
+  const input = await parseForm(updateContentTestimonialSchema, formData, contentPath);
+  const siteId = await getCurrentSiteId();
+
+  const uploadedImageUrl = await uploadTestimonialImageIfPresent(formData, {
+    authorName: input.authorName,
+    siteId,
+    user
+  });
+  const imageUrl = uploadedImageUrl || input.imageUrl;
+
+  await prisma.testimonial.updateMany({
+    where: { id: input.id, siteId, status: TestimonialStatus.APPROVED },
+    data: {
+      authorName: input.authorName,
+      authorRole: input.authorRole,
+      serviceName: input.serviceName,
+      quote: input.quote,
+      rating: input.rating,
+      imageUrl,
+      featured: input.featured
+    }
+  });
+
+  refreshTestimonials();
+  redirect(`${contentPath}?saved=testimonial-updated`);
 }
 
 // Archive rather than delete so the entry can be restored from the moderation

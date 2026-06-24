@@ -22,7 +22,7 @@ import {
   updateCommerceOrderStatusAction,
   updateProductAction,
   updateProductStatusAction } from "./actions";
-import { Button, ButtonAnchor, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, ButtonAnchor, ButtonLink, Card, EqualGrid, Pagination, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -421,21 +421,13 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               null}
             </tbody>
           </Table>
-          <div className="ui-zero">
-            <ButtonAnchor href={`/admin/modules/products?status=${statusFilter}&page=${Math.max(1, page - 1)}`} aria-disabled={page <= 1} variant="secondary">
-              Previous
-            </ButtonAnchor>
-            <span className="ui-badge">
-              Page {Math.min(page, pageCount)} of {pageCount}
-            </span>
-            <ButtonAnchor
-
-              href={`/admin/modules/products?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
-              aria-disabled={page >= pageCount} variant="secondary">
-              
-              Next
-            </ButtonAnchor>
-          </div>
+          <Pagination
+            label="Product pages"
+            nextHref={`/admin/modules/products?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
+            page={page}
+            pageCount={pageCount}
+            previousHref={`/admin/modules/products?status=${statusFilter}&page=${Math.max(1, page - 1)}`}
+          />
         </Card>
       </EqualGrid>
 

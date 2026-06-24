@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ClientPipelineStage, EmailOutboxStatus, MessageLogStatus, type Prisma } from "@prisma/client";
-import { CalendarCheck, GitMerge, Save, Search } from "lucide-react";
+import { GitMerge, Save, Search } from "lucide-react";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { enumLabel, formatDateTime, formatMoney, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
@@ -534,7 +534,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
       {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
       {error ? <div className="error">{error}</div> : null}
 
-      <EqualGrid as="section">
+      <EqualGrid as="section" className="clients-detail-primary">
         <Card action={updateClientAction} as="form" minHeight="none" bodyClassName="form-grid">
           <input type="hidden" name="id" value={client.id} />
           <h2 className="section-title">Profile</h2>
@@ -900,7 +900,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
 
       <EqualGrid as="section">
         <Card>
-          <h2 className="section-title">Appointment history</h2>
+          <h2 className="section-title">Service history</h2>
           <Table>
             <tbody>
               {client.bookings.map((booking) =>
@@ -919,7 +919,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               )}
               {!client.bookings.length ?
               <tr>
-                  <td>No appointment history yet.</td>
+                  <td>No service history yet.</td>
                 </tr> :
               null}
             </tbody>
@@ -950,14 +950,6 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           </div>
         </Card>
       </EqualGrid>
-
-      <Card as="section">
-        <CalendarCheck size={22} />
-        <h2 className="section-title">Service history</h2>
-        <p className="lead lead-compact">
-          This history is generated from appointments. Future product modules can attach purchases and packages here too.
-        </p>
-      </Card>
     </div>);
 
 }

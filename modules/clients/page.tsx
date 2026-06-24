@@ -2,8 +2,6 @@ import Link from "next/link";
 import { ClientPipelineStage, Prisma } from "@prisma/client";
 import {
   Activity,
-  ChevronLeft,
-  ChevronRight,
   Download,
   ExternalLink,
   Plus,
@@ -22,7 +20,7 @@ import { enumLabel, formatDateTime } from "@/lib/format";
 import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Button, ButtonLink, EqualGrid, Table } from "@/components/ui";
+import { Button, ButtonLink, EqualGrid, Pagination, Table } from "@/components/ui";
 import {
   createClientAction,
   createClientSegmentAction,
@@ -35,6 +33,15 @@ import { ClientsActionModals } from "./clients-action-modals";
 export const dynamic = "force-dynamic";
 
 const pageSize = 25;
+const clientMetricOptions = [
+  { heading: "Appts", id: "appointments", label: "Appointments" },
+  { heading: "Orders", id: "orders", label: "Orders" },
+  { heading: "Docs", id: "documents", label: "Documents" },
+  { heading: "Forms", id: "forms", label: "Forms" },
+  { heading: "Notes", id: "notes", label: "Notes" }
+] as const;
+type ClientMetricId = (typeof clientMetricOptions)[number]["id"];
+const defaultClientMetricIds = clientMetricOptions.map((option) => option.id);
 const hiddenClientFields = [
   "alternateEmails",
   "alternatePhones",
@@ -58,6 +65,7 @@ type ClientsPageProps = {
     imported?: string;
     page?: string;
     q?: string;
+    metrics?: string | string[];
     saved?: string;
     segment?: string;
     skipped?: string;
@@ -127,12 +135,26 @@ function tableLabel(value: string) {
   return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
 }
 
+function normalizeMetricIds(value?: string | string[]): ClientMetricId[] {
+  if (value === undefined) return [...defaultClientMetricIds];
+  const rawValues = Array.isArray(value) ? value : value.split(",");
+  return rawValues.filter((item): item is ClientMetricId =>
+    clientMetricOptions.some((option) => option.id === item)
+  );
+}
+
+function usesDefaultMetrics(metricIds: ClientMetricId[]) {
+  return metricIds.length === defaultClientMetricIds.length && defaultClientMetricIds.every((id) => metricIds.includes(id));
+}
+
 function clientsHref({
+  metrics,
   page,
   q,
   segment,
   stage
 }: {
+  metrics?: ClientMetricId[];
   page?: number;
   q?: string;
   segment?: string;
@@ -142,6 +164,13 @@ function clientsHref({
   if (q) params.set("q", q);
   if (segment) params.set("segment", segment);
   if (stage) params.set("stage", stage);
+  if (metrics && !usesDefaultMetrics(metrics)) {
+    if (metrics.length) {
+      metrics.forEach((metric) => params.append("metrics", metric));
+    } else {
+      params.append("metrics", "none");
+    }
+  }
   if (page && page > 1) params.set("page", String(page));
 
   const query = params.toString();
@@ -155,6 +184,9 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
   const page = Math.max(1, Number(params.page || 1) || 1);
   const query = String(params.q || "").trim();
   const selectedStage = selectedPipelineStage(params.stage);
+  const selectedMetricIds = normalizeMetricIds(params.metrics);
+  const activeMetricOptions = clientMetricOptions.filter((option) => selectedMetricIds.includes(option.id));
+  const tableColumnCount = activeMetricOptions.length + 6;
   const segments = await prisma.clientSegment.findMany({
     where: { siteId: settings.siteId },
     orderBy: { name: "asc" }
@@ -296,7 +328,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         <div className="clients-filter-pills">
           <Link
             className={!selectedSegment ? "ui-button ui-button-sm" : "ui-button ui-button-secondary ui-button-sm"}
-            href={clientsHref({ q: query, stage: selectedStage })}>
+            href={clientsHref({ metrics: selectedMetricIds, q: query, stage: selectedStage })}>
             All clients
           </Link>
           {segments.map((segment) => (
@@ -306,7 +338,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                   ? "ui-button ui-button-sm"
                   : "ui-button ui-button-secondary ui-button-sm"
               }
-              href={clientsHref({ q: query, segment: segment.key, stage: selectedStage })}
+              href={clientsHref({ metrics: selectedMetricIds, q: query, segment: segment.key, stage: selectedStage })}
               key={segment.id}>
               {segment.name}
             </Link>
@@ -326,6 +358,33 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
           </form>
         ) : null}
       </section>
+
+      <form action="/admin/modules/clients" className="clients-modal-section clients-metrics-form">
+        <h3>Activity columns</h3>
+        {query ? <input type="hidden" name="q" value={query} /> : null}
+        {selectedSegment ? <input type="hidden" name="segment" value={selectedSegment.key} /> : null}
+        {selectedStage ? <input type="hidden" name="stage" value={selectedStage} /> : null}
+        <input type="hidden" name="metrics" value="none" />
+        <p className="ui-muted-flush">Choose which activity metrics appear as individual table columns.</p>
+        <div className="clients-check-grid clients-metric-grid">
+          {clientMetricOptions.map((option) => (
+            <label className="ui-check-row" key={option.id}>
+              <input
+                defaultChecked={selectedMetricIds.includes(option.id)}
+                name="metrics"
+                type="checkbox"
+                value={option.id}
+              />
+              {option.label}
+            </label>
+          ))}
+        </div>
+        <div className="clients-modal-actions">
+          <Button size="sm" type="submit" variant="secondary">
+            Apply columns
+          </Button>
+        </div>
+      </form>
 
       <form action={createClientSegmentAction} className="clients-modal-section clients-filter-form">
         <h3>Create filter</h3>
@@ -444,14 +503,14 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
           <div className="ui-data-table-tabs" aria-label="Pipeline stages">
             <Link
               className={`ui-data-table-tab${!selectedStage ? " is-active" : ""}`}
-              href={clientsHref({ q: query, segment: selectedSegment?.key })}>
+              href={clientsHref({ metrics: selectedMetricIds, q: query, segment: selectedSegment?.key })}>
               All
               <span>{baseClientCount}</span>
             </Link>
             {Object.values(ClientPipelineStage).map((stage) => (
               <Link
                 className={`ui-data-table-tab${selectedStage === stage ? " is-active" : ""}`}
-                href={clientsHref({ q: query, segment: selectedSegment?.key, stage })}
+                href={clientsHref({ metrics: selectedMetricIds, q: query, segment: selectedSegment?.key, stage })}
                 key={stage}>
                 {tableLabel(stage)}
                 <span>{pipelineCount(stage)}</span>
@@ -463,6 +522,11 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
             <form action="/admin/modules/clients" className="clients-search-form ui-data-table-search">
               {selectedSegment ? <input type="hidden" name="segment" value={selectedSegment.key} /> : null}
               {selectedStage ? <input type="hidden" name="stage" value={selectedStage} /> : null}
+              {!usesDefaultMetrics(selectedMetricIds)
+                ? selectedMetricIds.length
+                  ? selectedMetricIds.map((metric) => <input key={metric} type="hidden" name="metrics" value={metric} />)
+                  : <input type="hidden" name="metrics" value="none" />
+                : null}
               <input aria-label="Search clients" id="clients-search" name="q" placeholder="Search clients" defaultValue={query} />
               <Button size="sm" type="submit" variant="secondary">
                 <Search size={15} />
@@ -475,8 +539,11 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         <Table className="ui-data-table-scroll clients-table-wrap" tableClassName="ui-data-table clients-table">
           <colgroup>
             <col className="clients-col-client" />
-            <col className="clients-col-contact" />
-            <col className="clients-col-activity" />
+            <col className="clients-col-email" />
+            <col className="clients-col-phone" />
+            {activeMetricOptions.map((metric) => (
+              <col className={`clients-col-metric clients-col-metric-${metric.id}`} key={metric.id} />
+            ))}
             <col className="clients-col-date" />
             <col className="clients-col-status" />
             <col className="clients-col-actions" />
@@ -484,8 +551,13 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
           <thead>
             <tr>
               <th>Client</th>
-              <th>Contact</th>
-              <th>Activity</th>
+              <th>Email</th>
+              <th>Phone</th>
+              {activeMetricOptions.map((metric) => (
+                <th className="clients-metric-heading" key={metric.id}>
+                  {metric.heading}
+                </th>
+              ))}
               <th>Last appointment</th>
               <th>Status</th>
               <th>Actions</th>
@@ -495,6 +567,13 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
             {clients.map((client) => {
               const visibleTags = client.tags.slice(0, 3);
               const hiddenTagCount = Math.max(0, client.tags.length - visibleTags.length);
+              const metricCounts: Record<ClientMetricId, number> = {
+                appointments: client._count.bookings,
+                documents: client._count.billingDocuments,
+                forms: client._count.formSubmissions,
+                notes: client._count.notes,
+                orders: client._count.orders
+              };
               const portalHref = clientPortalPath({
                 clientId: client.id,
                 email: client.email,
@@ -522,22 +601,17 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                       ) : null}
                     </div>
                   </td>
-                  <td>
-                    <div className="clients-contact-cell">
-                      <span>{client.email}</span>
-                      <span className="muted-text">{client.phone || "No phone"}</span>
-                    </div>
+                  <td className="clients-email-cell">
+                    <span>{client.email}</span>
                   </td>
-                  <td>
-                    <div className="clients-activity-cell">
-                      <span>{client._count.bookings} appts</span>
-                      <span>{client._count.orders} orders</span>
-                      <span>{client._count.billingDocuments} docs</span>
-                      <span className="muted-text">
-                        {client._count.formSubmissions} forms, {client._count.notes} notes
-                      </span>
-                    </div>
+                  <td className="clients-phone-cell">
+                    <span className={client.phone ? undefined : "muted-text"}>{client.phone || "No phone"}</span>
                   </td>
+                  {activeMetricOptions.map((metric) => (
+                    <td className="clients-metric-cell" key={metric.id}>
+                      <strong>{metricCounts[metric.id]}</strong>
+                    </td>
+                  ))}
                   <td>{client.bookings[0] ? formatDateTime(client.bookings[0].startsAt, settings.timezone) : "None yet"}</td>
                   <td>
                     <div className="clients-status-cell">
@@ -573,7 +647,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
             })}
             {!clients.length ? (
               <tr>
-                <td className="ui-data-table-empty" colSpan={6}>
+                <td className="ui-data-table-empty" colSpan={tableColumnCount}>
                   No clients yet.
                 </td>
               </tr>
@@ -582,37 +656,26 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         </Table>
 
         <div className="ui-data-table-footer">
-          <div className="clients-pagination">
-            <ButtonLink
-              aria-disabled={page <= 1}
-              href={clientsHref({
-                page: Math.max(1, page - 1),
-                q: query,
-                segment: selectedSegment?.key,
-                stage: selectedStage
-              })}
-              size="sm"
-              variant="secondary">
-              <ChevronLeft size={15} />
-              Previous
-            </ButtonLink>
-            <span className="ui-badge">
-              Page {Math.min(page, pageCount)} of {pageCount}
-            </span>
-            <ButtonLink
-              aria-disabled={page >= pageCount}
-              href={clientsHref({
-                page: Math.min(pageCount, page + 1),
-                q: query,
-                segment: selectedSegment?.key,
-                stage: selectedStage
-              })}
-              size="sm"
-              variant="secondary">
-              Next
-              <ChevronRight size={15} />
-            </ButtonLink>
-          </div>
+          <Pagination
+            className="clients-pagination"
+            label="Client pages"
+            nextHref={clientsHref({
+              page: Math.min(pageCount, page + 1),
+              metrics: selectedMetricIds,
+              q: query,
+              segment: selectedSegment?.key,
+              stage: selectedStage
+            })}
+            page={page}
+            pageCount={pageCount}
+            previousHref={clientsHref({
+              page: Math.max(1, page - 1),
+              metrics: selectedMetricIds,
+              q: query,
+              segment: selectedSegment?.key,
+              stage: selectedStage
+            })}
+          />
         </div>
 
         <div className="ui-data-table-stats" aria-label="Client summary">

@@ -12,7 +12,7 @@ import {
   setHeroImageAction,
   updateMediaAssetAction,
   uploadMediaAction } from "./actions";
-import { Button, ButtonAnchor, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, Card, EqualGrid, Pagination, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -340,17 +340,13 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
           )}
           {!mediaAssets.length ? <p>No uploaded media yet.</p> : null}
         </EqualGrid>
-        <div className="ui-zero">
-          <ButtonAnchor href={`/admin/modules/media?page=${Math.max(1, page - 1)}`} aria-disabled={page <= 1} variant="secondary">
-            Previous
-          </ButtonAnchor>
-          <span className="ui-badge">
-            Page {Math.min(page, pageCount)} of {pageCount}
-          </span>
-          <ButtonAnchor href={`/admin/modules/media?page=${Math.min(pageCount, page + 1)}`} aria-disabled={page >= pageCount} variant="secondary">
-            Next
-          </ButtonAnchor>
-        </div>
+        <Pagination
+          label="Media pages"
+          nextHref={`/admin/modules/media?page=${Math.min(pageCount, page + 1)}`}
+          page={page}
+          pageCount={pageCount}
+          previousHref={`/admin/modules/media?page=${Math.max(1, page - 1)}`}
+        />
       </Card>
 
       {archivedAssets.length ?

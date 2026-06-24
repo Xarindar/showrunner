@@ -10,7 +10,7 @@ import { addDaysToDateKey, getTodayDateKey, parseZonedDateKey } from "@/lib/time
 import { promoteWaitlistEntryAction, updateWaitlistEntryStatusAction } from "./actions";
 import { AppointmentCalendar, type AppointmentCalendarBooking, type AppointmentCalendarDay } from "./components/appointment-calendar";
 import { AppointmentsTable } from "./components/appointments-table";
-import { Button, ButtonLink, Card, EqualGrid, Table, TabLink, Tabs } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid, Pagination, Table, TabLink, Tabs } from "@/components/ui";
 import { addDashboardCardAction } from "@/modules/dashboard/actions";
 
 export const dynamic = "force-dynamic";
@@ -614,39 +614,27 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
           </div>
         </div>
         <AppointmentsTable bookings={bookings} timezone={settings.timezone} />
-        <div className="ui-zero">
-          <ButtonLink
-            aria-disabled={page <= 1}
-
-            href={calendarHref({
-              dateKey: selectedDateKey,
-              page: Math.max(1, page - 1),
-              resourceId: selectedResourceId,
-              staffId: selectedStaffId,
-              statusFilter,
-              view
-            })} variant="secondary">
-            
-            Previous
-          </ButtonLink>
-          <span className="ui-badge">
-            Page {Math.min(page, pageCount)} of {pageCount}
-          </span>
-          <ButtonLink
-            aria-disabled={page >= pageCount}
-
-            href={calendarHref({
-              dateKey: selectedDateKey,
-              page: Math.min(pageCount, page + 1),
-              resourceId: selectedResourceId,
-              staffId: selectedStaffId,
-              statusFilter,
-              view
-            })} variant="secondary">
-            
-            Next
-          </ButtonLink>
-        </div>
+        <Pagination
+          label="Appointment pages"
+          nextHref={calendarHref({
+            dateKey: selectedDateKey,
+            page: Math.min(pageCount, page + 1),
+            resourceId: selectedResourceId,
+            staffId: selectedStaffId,
+            statusFilter,
+            view
+          })}
+          page={page}
+          pageCount={pageCount}
+          previousHref={calendarHref({
+            dateKey: selectedDateKey,
+            page: Math.max(1, page - 1),
+            resourceId: selectedResourceId,
+            staffId: selectedStaffId,
+            statusFilter,
+            view
+          })}
+        />
       </Card>
     </div>);
 
