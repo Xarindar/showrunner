@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import NextImage from "next/image";
 import { ChevronLeft, ChevronRight, Image as ImageIcon, MessageSquareQuote, Plus, Save, Star, Trash2, Upload } from "lucide-react";
-import { Button, Card, Modal } from "@/components/ui";
+import { Button, Card, Modal, Switch } from "@/components/ui";
 import type { HeroMediaAssetOption } from "./hero-content-editor";
 import type { ContentTestimonial } from "./testimonials-data";
 
@@ -332,21 +332,13 @@ export function TestimonialsEditor({
                   </div>
                 </div>
 
-                <label className="content-featured-toggle">
-                  <input
-                    checked={draft.featured}
-                    name="featured"
-                    onChange={(event) => setDraft((current) => ({ ...current, featured: event.target.checked }))}
-                    type="checkbox"
-                  />
-                  <span aria-hidden="true" className="content-featured-toggle-control">
-                    <span />
-                  </span>
-                  <span className="content-featured-toggle-copy">
-                    <strong>Featured</strong>
-                    <span>Show this testimonial in featured sections.</span>
-                  </span>
-                </label>
+                <Switch
+                  checked={draft.featured}
+                  description="Show this testimonial in featured sections."
+                  label="Featured"
+                  name="featured"
+                  onChange={(event) => setDraft((current) => ({ ...current, featured: event.target.checked }))}
+                />
 
                 <div className="content-modal-actions">
                   <Button onClick={closeModal} type="button" variant="ghost">
