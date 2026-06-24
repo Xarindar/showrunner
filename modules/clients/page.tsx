@@ -163,6 +163,11 @@ function clientsHref({
   return `/admin/modules/clients${query ? `?${query}` : ""}`;
 }
 
+function phoneHref(value: string) {
+  const dialable = value.replace(/[^\d+]/g, "");
+  return `tel:${dialable || value}`;
+}
+
 export default async function ClientsPage({ searchParams }: ClientsPageProps = {}) {
   const params = searchParams ? await searchParams : {};
   const user = await requireAdmin("clients:manage");
@@ -631,6 +636,96 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
             ) : null}
           </tbody>
         </Table>
+
+        <div aria-label="Clients" className="clients-mobile-list">
+          {clients.map((client) => {
+            const visibleTags = client.tags.slice(0, 3);
+            const hiddenTagCount = Math.max(0, client.tags.length - visibleTags.length);
+            const vipSummary = vipSummaries.get(client.id);
+            const metricCounts: Record<ClientMetricId, number> = {
+              appointments: client._count.bookings,
+              orders: client._count.orders
+            };
+            const detailHref = `/admin/clients/${client.id}`;
+            const lastAppointment = client.bookings[0] ? formatDateTime(client.bookings[0].startsAt, settings.timezone) : "None yet";
+
+            return (
+              <article className="clients-mobile-card" key={client.id}>
+                <div className="clients-mobile-card-head">
+                  <Link className="clients-mobile-title" href={detailHref}>
+                    <span className="clients-name-line">
+                      <strong>{client.name}</strong>
+                      {vipSummary?.qualifies ? (
+                        <Tooltip content={vipSummary.tooltip} focusable={false}>
+                          <span aria-label="VIP qualified" className="clients-vip-crown">
+                            <Crown aria-hidden="true" size={14} />
+                          </span>
+                        </Tooltip>
+                      ) : null}
+                    </span>
+                    <span className="muted-text">{client.companyName || client.familyName || "Individual client"}</span>
+                  </Link>
+                  <span className="ui-badge">{clientStatusLabel(client.status)}</span>
+                </div>
+
+                <div className="clients-mobile-contact-grid">
+                  <a href={`mailto:${client.email}`}>
+                    <span>Email</span>
+                    <strong>{client.email}</strong>
+                  </a>
+                  {client.phone ? (
+                    <a href={phoneHref(client.phone)}>
+                      <span>Phone</span>
+                      <strong>{client.phone}</strong>
+                    </a>
+                  ) : (
+                    <span>
+                      <span>Phone</span>
+                      <strong>No phone</strong>
+                    </span>
+                  )}
+                </div>
+
+                <Link className="clients-mobile-summary" href={detailHref}>
+                  <span>
+                    <small>Last appointment</small>
+                    <strong>{lastAppointment}</strong>
+                  </span>
+                  {activeMetricOptions.length ? (
+                    <span className="clients-mobile-metrics">
+                      {activeMetricOptions.map((metric) => (
+                        <span key={metric.id}>
+                          <small>{metric.heading}</small>
+                          <strong>{metricCounts[metric.id]}</strong>
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
+                  {visibleTags.length ? (
+                    <span className="clients-tag-row">
+                      {visibleTags.map((tag) => (
+                        <span className="ui-badge" key={tag.id}>
+                          {tag.label}
+                        </span>
+                      ))}
+                      {hiddenTagCount ? <span className="ui-badge">+{hiddenTagCount}</span> : null}
+                    </span>
+                  ) : null}
+                </Link>
+
+                <ClientRowActions
+                  alternateEmails={stringArrayFromUnknown(client.alternateEmails)}
+                  alternatePhones={stringArrayFromUnknown(client.alternatePhones)}
+                  detailHref={detailHref}
+                  email={client.email}
+                  name={client.name}
+                  phone={client.phone || ""}
+                />
+              </article>
+            );
+          })}
+          {!clients.length ? <p className="clients-mobile-empty">No clients yet.</p> : null}
+        </div>
 
         <div className="ui-data-table-footer">
           <Pagination

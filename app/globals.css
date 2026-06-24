@@ -6981,6 +6981,10 @@ button.button:disabled,
   box-shadow: var(--shadow-panel);
 }
 
+.clients-data-table > .ui-data-table-header {
+  padding-bottom: var(--space-3);
+}
+
 .clients-detail-primary {
   align-items: start;
   grid-template-columns: minmax(0, 1fr);
@@ -7091,6 +7095,10 @@ button.button:disabled,
 
 .clients-table {
   min-width: 1240px;
+}
+
+.clients-mobile-list {
+  display: none;
 }
 
 .clients-table th,
@@ -7230,6 +7238,137 @@ button.button:disabled,
   width: 34px;
 }
 
+.clients-mobile-card {
+  background: var(--color-surface);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+}
+
+.clients-mobile-card-head {
+  align-items: start;
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.clients-mobile-card-head > .ui-badge {
+  align-self: start;
+  justify-self: end;
+  max-width: min(190px, 46vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clients-mobile-title,
+.clients-mobile-summary {
+  color: inherit;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.clients-mobile-title:focus-visible,
+.clients-mobile-summary:focus-visible,
+.clients-mobile-contact-grid a:focus-visible {
+  border-radius: var(--radius-control);
+  box-shadow: 0 0 0 3px var(--color-focus);
+  outline: 0;
+}
+
+.clients-mobile-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clients-mobile-contact-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.clients-mobile-contact-grid a,
+.clients-mobile-contact-grid > span,
+.clients-mobile-summary {
+  background: color-mix(in srgb, var(--color-border) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
+  border-radius: var(--radius-control);
+  min-width: 0;
+  padding: 9px 10px;
+}
+
+.clients-mobile-contact-grid a,
+.clients-mobile-contact-grid > span {
+  color: inherit;
+  display: grid;
+  gap: 3px;
+}
+
+.clients-mobile-contact-grid a > span,
+.clients-mobile-contact-grid > span > span,
+.clients-mobile-summary small,
+.clients-mobile-metrics small {
+  color: var(--color-muted);
+  font-size: var(--type-caption);
+  font-weight: 720;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.clients-mobile-contact-grid strong,
+.clients-mobile-summary strong {
+  display: block;
+  font-size: var(--type-small);
+  font-weight: 650;
+  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clients-mobile-metrics {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.clients-mobile-metrics > span {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+}
+
+.clients-mobile-metrics strong {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+}
+
+.clients-mobile-card > .clients-row-actions {
+  justify-content: stretch;
+}
+
+.clients-mobile-card > .clients-row-actions .clients-action-icon {
+  flex: 1 1 0;
+  min-height: 40px;
+  width: auto;
+}
+
+.clients-mobile-empty {
+  color: var(--color-muted);
+  margin: 0;
+  padding: var(--space-4);
+}
+
 .clients-contact-modal {
   max-width: min(520px, calc(100vw - var(--space-6)));
 }
@@ -7340,10 +7479,51 @@ button.button:disabled,
   }
 }
 
+@media (max-width: 700px) {
+  .clients-data-table {
+    --data-table-scroll-height: none;
+    min-height: 0;
+  }
+
+  .clients-table-wrap {
+    display: none;
+  }
+
+  .clients-mobile-list {
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+    display: grid;
+    min-width: 0;
+  }
+
+  .clients-data-table .ui-data-table-stats {
+    flex-wrap: nowrap;
+    margin-inline: calc(var(--space-3) * -1);
+    overflow-x: auto;
+    padding-inline: var(--space-3);
+    scrollbar-gutter: stable;
+  }
+
+  .clients-data-table .ui-data-table-stat-pill {
+    flex: 0 0 auto;
+    min-width: max-content;
+    padding-inline: 16px;
+  }
+}
+
 @media (max-width: 560px) {
-  .clients-card-actions .ui-button,
   .clients-modal-actions .ui-button {
     flex: 1 1 100%;
+  }
+
+  .clients-card-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .clients-card-actions .ui-button {
+    min-width: 0;
+    width: 100%;
   }
 
   .clients-search-form,
@@ -7354,6 +7534,10 @@ button.button:disabled,
 
   .clients-search-form select {
     width: 100%;
+  }
+
+  .clients-mobile-contact-grid {
+    grid-template-columns: 1fr;
   }
 
 }
