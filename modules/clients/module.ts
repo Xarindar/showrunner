@@ -7,7 +7,7 @@ export const manifest = {
   href: "/admin/modules/clients",
   icon: "Users",
   order: 40,
-  description: "Client profiles, pipeline stages, saved segments, files, private notes, and unified relationship history.",
+  description: "Client profiles, pipeline stages, saved segments, documents, private notes, and unified relationship history.",
   layout: "standard",
   status: "active",
   enabledByDefault: true,
@@ -15,7 +15,7 @@ export const manifest = {
     level: "partial",
     mode: "live",
     summary:
-      "Client records, notes, linked bookings/forms/testimonials, timeline, segments, pipeline stages, preferences, files, CSV import/export, duplicate merge, and tokenized client portal views are live.",
+      "Client records, notes, linked bookings/forms/testimonials, timeline, segments, pipeline stages, preferences, documents, CSV import/export, duplicate merge, and tokenized client portal views are live.",
     primaryGap: "Formal consent document versioning is still pending."
   },
   capabilities: [

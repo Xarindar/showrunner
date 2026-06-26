@@ -1,0 +1,1 @@
+ALTER TABLE "Client" ADD COLUMN "photoUrl" TEXT NOT NULL DEFAULT '';

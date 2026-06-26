@@ -324,7 +324,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
       </div>
     </form>
   );
-  const recordManualNoteForm = (
+  const recordManualCommunicationForm = (
     <form action={recordMessageLogAction} className="form-grid">
       <EqualGrid>
         <div className="ui-field">
@@ -694,11 +694,11 @@ export default async function CommunicationsPage({ searchParams }: Communication
             <ModuleActionModals
               items={[
                 {
-                  content: recordManualNoteForm,
+                  content: recordManualCommunicationForm,
                   icon: "send",
-                  id: "note",
-                  label: "Manual note",
-                  title: "Record manual delivery note"
+                  id: "communication",
+                  label: "Manual communication",
+                  title: "Record manual communication"
                 }
               ]}
               toolbarLabel="Outbox tools"
@@ -784,7 +784,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
             </tbody>
           </Table>
           <div className="subpanel">
-            <h3 className="subsection-title">Manual notes</h3>
+            <h3 className="subsection-title">Manual communications</h3>
             <Table>
               <thead>
                 <tr>

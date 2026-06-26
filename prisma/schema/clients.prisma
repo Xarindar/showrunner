@@ -31,6 +31,7 @@ model Client {
   country                 String              @default("")
   timezone                String              @default("")
   pronouns                String              @default("")
+  photoUrl                String              @default("")
   birthday                DateTime?
   anniversary             DateTime?
   preferences             Json                @default("{}")
@@ -96,6 +97,8 @@ model ClientFile {
   site       Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   clientId   String
   client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  mediaAssetId String?
+  mediaAsset MediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
   title      String
   url        String
   category   String   @default("")
@@ -105,6 +108,7 @@ model ClientFile {
   updatedAt  DateTime @updatedAt
 
   @@index([siteId, clientId])
+  @@index([mediaAssetId])
   @@index([category])
   @@index([uploadedAt])
 }

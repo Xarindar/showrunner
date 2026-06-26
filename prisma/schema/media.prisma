@@ -41,6 +41,7 @@ model MediaAsset {
   deletedAt         DateTime?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+  clientFiles       ClientFile[]
   variants          MediaAssetVariant[]
 
   @@index([siteId, folder])

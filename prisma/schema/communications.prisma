@@ -2,6 +2,7 @@
 
 enum MessageChannel {
   EMAIL
+  PHONE
   SMS
 }
 
@@ -186,6 +187,7 @@ model MessageLog {
   @@index([clientId])
   @@index([siteId, status])
   @@index([recipientEmail])
+  @@index([recipientPhone])
 }
 
 model SuppressionListEntry {

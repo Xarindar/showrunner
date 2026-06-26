@@ -70,6 +70,7 @@ const builderTemplateSettingsSchema = z.object({
 
 const messageLogSchema = z
   .object({
+    clientId: optionalStoredText,
     templateId: optionalStoredText,
     channel: z.enum(MessageChannel).catch(MessageChannel.EMAIL),
     purpose: optionalStoredText,
@@ -574,10 +575,23 @@ export async function recordMessageLogAction(formData: FormData) {
   const input = await parseForm(messageLogSchema, formData, "/admin/modules/communications");
   const settings = await getSiteSettings();
   const sentAt = input.status === MessageLogStatus.SENT ? new Date() : undefined;
+  const clientId = input.clientId
+    ? await prisma.client
+        .findFirst({
+          where: { id: input.clientId, siteId: settings.siteId },
+          select: { id: true }
+        })
+        .then((client) => client?.id || "")
+    : "";
+
+  if (input.clientId && !clientId) {
+    communicationsError("Client not found.");
+  }
 
   await prisma.messageLog.create({
     data: {
       siteId: settings.siteId,
+      clientId: clientId || undefined,
       templateId: input.templateId || undefined,
       channel: input.channel,
       purpose: input.purpose || "general",

@@ -50,6 +50,7 @@ const hiddenClientFields = [
   "country",
   "timezone",
   "pronouns",
+  "photoUrl",
   "birthday",
   "anniversary",
   "preferences",

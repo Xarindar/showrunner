@@ -90,6 +90,7 @@ export async function GET(request: Request) {
     "Country",
     "Timezone",
     "Pronouns",
+    "Photo URL",
     "Birthday",
     "Anniversary",
     "Tags",
@@ -113,7 +114,7 @@ export async function GET(request: Request) {
     "Proof Approvals",
     "Proof Decisions",
     "Notes",
-    "Files",
+    "Documents",
     "Created At",
     "Updated At"
   ];
@@ -137,6 +138,7 @@ export async function GET(request: Request) {
     client.country,
     client.timezone,
     client.pronouns,
+    client.photoUrl,
     isoDate(client.birthday),
     isoDate(client.anniversary),
     client.tags.map((tag) => tag.label).join(", "),

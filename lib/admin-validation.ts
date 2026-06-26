@@ -191,6 +191,7 @@ export const clientFormSchema = z.object({
   country: optionalStoredText,
   timezone: optionalStoredText,
   pronouns: optionalStoredText,
+  photoUrl: optionalStoredText,
   birthday: optionalStoredDate,
   anniversary: optionalStoredDate,
   tags: trimmed.transform(csvList),
@@ -222,10 +223,6 @@ export const clientNoteDeleteFormSchema = z.object({
 export const clientFileFormSchema = z.object({
   clientId: id,
   title: requiredText,
-  url: requiredText.refine(
-    (value) => value.startsWith("/") || value.startsWith("https://"),
-    "Use a site path or public https URL."
-  ),
   category: optionalStoredText,
   notes: optionalStoredText
 });

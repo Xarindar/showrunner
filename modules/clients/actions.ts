@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { recordAuditLog } from "@/lib/audit";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
 import { normalizeClientStatus, parseClientStatus } from "@/lib/clients/status";
+import { deleteMediaAsset, privateMediaUploadMimeTypes, uploadMedia } from "@/lib/media";
 import {
   clientFileFormSchema,
   clientFileDeleteFormSchema,
@@ -20,7 +21,7 @@ import {
   parseForm
 } from "@/lib/admin-validation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentSiteId } from "@/lib/site";
+import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
 import { slugify } from "@/lib/slug";
 
 function preferencesJson(notes: string) {
@@ -57,6 +58,7 @@ function clientData(input: Awaited<ReturnType<typeof clientFormSchema.parseAsync
     country: input.country,
     timezone: input.timezone,
     pronouns: input.pronouns,
+    photoUrl: input.photoUrl,
     birthday: input.birthday,
     anniversary: input.anniversary,
     preferences: preferencesJson(input.preferences),
@@ -444,7 +446,8 @@ export async function deleteClientNoteAction(formData: FormData) {
 export async function addClientFileAction(formData: FormData) {
   const user = await requireAdmin("clients:manage");
   const input = await parseForm(clientFileFormSchema, formData);
-  const siteId = await getCurrentSiteId();
+  const settings = await getSiteSettings();
+  const siteId = settings.siteId;
   const client = await prisma.client.findFirst({
     where: await getAccessibleClientWhere(user, siteId, { id: input.clientId }),
     select: { id: true }
@@ -454,16 +457,51 @@ export async function addClientFileAction(formData: FormData) {
     redirect("/admin/modules/clients?error=Client%20not%20found.");
   }
 
-  await prisma.clientFile.create({
-    data: {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/admin/clients/${input.clientId}?error=${encodeURIComponent("Choose a document file before uploading.")}`);
+  }
+
+  let asset;
+  try {
+    asset = await uploadMedia(
+      file,
+      {
+        alt: input.title,
+        folder: `clients/${input.clientId}`,
+        isPrivate: true,
+        tags: ["client-document", input.category].filter(Boolean),
+        usageContext: `client:${input.clientId}:document`
+      },
+      settings.mediaDriver,
       siteId,
-      clientId: input.clientId,
-      title: input.title,
-      url: input.url,
-      category: input.category,
-      notes: input.notes
-    }
-  });
+      {
+        allowedMimeTypes: privateMediaUploadMimeTypes,
+        requireImage: false
+      }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Document upload failed.";
+    redirect(`/admin/clients/${input.clientId}?error=${encodeURIComponent(message)}`);
+  }
+
+  try {
+    await prisma.clientFile.create({
+      data: {
+        siteId,
+        clientId: input.clientId,
+        mediaAssetId: asset.id,
+        title: input.title,
+        url: asset.url,
+        category: input.category,
+        notes: input.notes
+      }
+    });
+  } catch (error) {
+    await deleteMediaAsset(asset.id, siteId);
+    const message = error instanceof Error ? error.message : "Document upload could not be saved.";
+    redirect(`/admin/clients/${input.clientId}?error=${encodeURIComponent(message)}`);
+  }
 
   revalidatePath(`/admin/clients/${input.clientId}`);
   redirect(`/admin/clients/${input.clientId}?saved=file`);
@@ -475,7 +513,7 @@ export async function deleteClientFileAction(formData: FormData) {
   const siteId = await getCurrentSiteId();
 
   if (input.confirmDelete !== "on") {
-    redirect(`/admin/clients/${input.clientId}?error=${encodeURIComponent("Confirm file delete before removing it.")}`);
+    redirect(`/admin/clients/${input.clientId}?error=${encodeURIComponent("Confirm document delete before removing it.")}`);
   }
 
   const client = await prisma.client.findFirst({
@@ -495,6 +533,7 @@ export async function deleteClientFileAction(formData: FormData) {
     },
     select: {
       id: true,
+      mediaAssetId: true,
       title: true,
       url: true
     }
@@ -507,6 +546,17 @@ export async function deleteClientFileAction(formData: FormData) {
       siteId
     }
   });
+  if (file?.mediaAssetId) {
+    const remainingReferences = await prisma.clientFile.count({
+      where: {
+        mediaAssetId: file.mediaAssetId,
+        siteId
+      }
+    });
+    if (remainingReferences === 0) {
+      await deleteMediaAsset(file.mediaAssetId, siteId);
+    }
+  }
   await recordAuditLog({
     action: "client_file.deleted",
     actor: user,
@@ -643,6 +693,7 @@ export async function importClientsCsvAction(formData: FormData) {
         country: rowValue(row, ["country"]),
         timezone: rowValue(row, ["timezone", "time zone"]),
         pronouns: rowValue(row, ["pronouns"]),
+        photoUrl: rowValue(row, ["photo", "photo url", "image", "image url", "avatar"]),
         birthday: parseDate(rowValue(row, ["birthday", "birthdate"])),
         anniversary: parseDate(rowValue(row, ["anniversary"])),
         preferences: preferencesJson(rowValue(row, ["preferences", "preference notes"])),
@@ -757,6 +808,7 @@ export async function mergeClientsAction(formData: FormData) {
         country: fillBlank(survivor.country, duplicate.country),
         timezone: fillBlank(survivor.timezone, duplicate.timezone),
         pronouns: fillBlank(survivor.pronouns, duplicate.pronouns),
+        photoUrl: fillBlank(survivor.photoUrl, duplicate.photoUrl),
         birthday: survivor.birthday || duplicate.birthday,
         anniversary: survivor.anniversary || duplicate.anniversary,
         preferences: mergePreferences(survivor.preferences, duplicate.preferences),
