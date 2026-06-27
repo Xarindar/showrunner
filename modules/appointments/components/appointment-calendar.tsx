@@ -146,13 +146,6 @@ function fullCalendarViewFor(view: (typeof calendarViews)[number]) {
   return "timeGridDay";
 }
 
-function appointmentViewFor(fullCalendarView: string): (typeof calendarViews)[number] {
-  if (fullCalendarView === "dayGridMonth") return "month";
-  if (fullCalendarView === "timeGridWeek") return "week";
-  if (fullCalendarView === "appointmentAgenda") return "agenda";
-  return "day";
-}
-
 function slotTime(hour: number) {
   const clamped = Math.max(0, Math.min(24, hour));
   return `${String(clamped).padStart(2, "0")}:00:00`;
@@ -401,7 +394,6 @@ function AppointmentFloatingDetails({
 export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, timezone, view }: AppointmentCalendarProps) {
   const router = useRouter();
   const calendarRef = useRef<FullCalendar | null>(null);
-  const [activeView, setActiveView] = useState(view);
   const [message, setMessage] = useState("");
   const [selectedBookingId, setSelectedBookingId] = useState("");
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(null);
@@ -409,7 +401,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, ti
   const [isPending, startTransition] = useTransition();
   const bookingById = useMemo(() => new Map(bookings.map((booking) => [booking.id, booking])), [bookings]);
   const dayLabels = useMemo(() => new Map(days.map((day) => [day.dateKey, day.label])), [days]);
-  const visibleDays = useMemo(() => daysForView(days, activeView, selectedDateKey), [activeView, days, selectedDateKey]);
+  const visibleDays = useMemo(() => daysForView(days, view, selectedDateKey), [days, selectedDateKey, view]);
   const visibleDateKeys = useMemo(() => new Set(visibleDays.map((day) => day.dateKey)), [visibleDays]);
   const visibleBookings = useMemo(
     () => bookings.filter((booking) => visibleDateKeys.has(booking.dateKey)),
@@ -417,7 +409,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, ti
   );
   const selectedBooking = selectedBookingId ? bookingById.get(selectedBookingId) || null : null;
   const selectedDayLabel = selectedBooking ? dayLabels.get(selectedBooking.dateKey) || selectedBooking.dateKey : "";
-  const viewSummary = rangeSummary(activeView, visibleDays, visibleBookings.length);
+  const viewSummary = rangeSummary(view, visibleDays, visibleBookings.length);
   const slotMinHour = Math.max(0, Math.min(...hours, 7));
   const slotMaxHour = Math.min(24, Math.max(...hours, 19) + 1);
 
@@ -445,8 +437,8 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, ti
   useEffect(() => {
     const api = calendarRef.current?.getApi();
     if (!api) return;
-    api.changeView(fullCalendarViewFor(activeView), selectedDateKey);
-  }, [activeView, selectedDateKey]);
+    api.changeView(fullCalendarViewFor(view), selectedDateKey);
+  }, [selectedDateKey, view]);
 
   useEffect(() => {
     if (!selectedBookingId) return;
@@ -462,7 +454,6 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, ti
   }, [selectedBookingId]);
 
   function changeView(nextView: (typeof calendarViews)[number]) {
-    setActiveView(nextView);
     setSelectedBookingId("");
     setMessage("");
     setConfirmStage("");
@@ -545,7 +536,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, ti
     <div className="appointment-calendar-client-bar">
       <Tabs className="appointment-calendar-view-tabs" aria-label="Calendar view">
         {calendarViews.map((item) => (
-          <Tab aria-selected={item === activeView} key={item} onClick={() => changeView(item)}>
+          <Tab aria-selected={item === view} key={item} onClick={() => changeView(item)}>
             {item}
           </Tab>
         ))}
@@ -647,7 +638,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, ti
           headerToolbar={false}
           height="100%"
           initialDate={selectedDateKey}
-          initialView={fullCalendarViewFor(activeView)}
+          initialView={fullCalendarViewFor(view)}
           listDayFormat={{ month: "short", day: "numeric", weekday: "short" }}
           listDaySideFormat={false}
           moreLinkClick="popover"
@@ -665,10 +656,6 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, ti
               duration: { days: 14 },
               type: "list"
             }
-          }}
-          viewDidMount={(info) => {
-            const nextView = appointmentViewFor(info.view.type);
-            if (nextView !== activeView) setActiveView(nextView);
           }}
         />
       </div>
