@@ -1,5 +1,5 @@
 import NextImage from "next/image";
-import { CartStatus, CouponType, GiftCardStatus, OrderStatus, PaymentStatus, Prisma, ProductStatus, ProductType } from "@prisma/client";
+import { CartStatus, GiftCardStatus, OrderStatus, PaymentStatus, Prisma, ProductStatus, ProductType } from "@prisma/client";
 import { BadgeDollarSign, Boxes, CreditCard, Download, ImageIcon, PackagePlus, ReceiptText, Search, Tags, Truck } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { nextOrderStatuses } from "@/lib/commerce/orders";
@@ -9,7 +9,6 @@ import { getSiteSettings } from "@/lib/site";
 import {
   clearCommerceOrderCheckoutLinkAction,
   createCollectionAction,
-  createCouponAction,
   createGiftCardAction,
   createProductAction,
   fulfillCommerceOrderAction,
@@ -120,7 +119,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     {})
   };
 
-  const [products, productCount, activeCount, collections, coupons, giftCards, orderCount, paidOrderTotals, openCartCount, orders] = await Promise.all([
+  const [products, productCount, activeCount, collections, giftCards, orderCount, paidOrderTotals, openCartCount, orders] = await Promise.all([
   prisma.product.findMany({
     where: productWhere,
     include: {
@@ -137,7 +136,6 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   prisma.product.count({ where: productWhere }),
   prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.ACTIVE } }),
   prisma.collection.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }] }),
-  prisma.coupon.findMany({ where: { siteId: settings.siteId }, orderBy: { createdAt: "desc" }, take: 12 }),
   prisma.giftCard.findMany({ where: { siteId: settings.siteId }, orderBy: { createdAt: "desc" }, take: 12 }),
   prisma.order.count({ where: { siteId: settings.siteId } }),
   prisma.order.groupBy({
@@ -350,7 +348,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         <div>
           <p className="eyebrow">Products</p>
           <h1>Commerce catalog</h1>
-          <p>Manage products, variants, collections, coupons, orders, and checkout status.</p>
+          <p>Manage products, variants, collections, orders, and checkout status.</p>
         </div>
       </header>
 
@@ -1063,77 +1061,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </Card>
 
         <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Coupons</h2>
-          <form action={createCouponAction} className="subpanel form-grid">
-            <EqualGrid min="220px">
-              <div className="ui-field">
-                <label htmlFor="couponCode">Code</label>
-                <input id="couponCode" name="code" placeholder="WELCOME10" required />
-              </div>
-              <div className="ui-field">
-                <label htmlFor="couponType">Type</label>
-                <select id="couponType" name="type" defaultValue={CouponType.PERCENT}>
-                  <option value={CouponType.PERCENT}>percent</option>
-                  <option value={CouponType.FIXED}>fixed amount</option>
-                </select>
-              </div>
-              <label className="ui-zero">
-                <input name="isActive" type="checkbox" defaultChecked />
-                Active
-              </label>
-            </EqualGrid>
-            <EqualGrid min="220px">
-              <div className="ui-field">
-                <label htmlFor="percentOff">Percent off</label>
-                <input id="percentOff" name="percentOff" min="0" max="100" type="number" />
-              </div>
-              <div className="ui-field">
-                <label htmlFor="amount">Fixed amount</label>
-                <input id="amount" name="amount" inputMode="decimal" />
-              </div>
-              <div className="ui-field">
-                <label htmlFor="maxRedemptions">Max redemptions</label>
-                <input id="maxRedemptions" name="maxRedemptions" min="0" type="number" />
-              </div>
-            </EqualGrid>
-            <Button type="submit" variant="secondary">
-              Add coupon
-            </Button>
-          </form>
-          <Table>
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Value</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {coupons.map((coupon) =>
-              <tr key={coupon.id}>
-                  <td>
-                    <strong>{coupon.code}</strong>
-                    <br />
-                    <span className="muted-text">{coupon.redemptionCount} redemptions</span>
-                  </td>
-                  <td>
-                    {coupon.type === CouponType.PERCENT ?
-                  `${coupon.percentOff || 0}%` :
-                  formatMoney(coupon.amountCents || 0)}
-                  </td>
-                  <td>
-                    <span className={coupon.isActive ? "ui-badge ui-badge-success" : "ui-badge ui-badge-danger"}>{coupon.isActive ? "active" : "inactive"}</span>
-                  </td>
-                </tr>
-              )}
-              {!coupons.length ?
-              <tr>
-                  <td colSpan={3}>No coupons yet.</td>
-                </tr> :
-              null}
-            </tbody>
-          </Table>
-
+          <h2 className="section-title">Gift cards</h2>
           <div className="subpanel form-grid">
             <h3 className="subsection-title">Issue gift card</h3>
             <form action={createGiftCardAction} className="form-grid">

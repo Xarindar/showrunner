@@ -5688,6 +5688,210 @@ button.button:disabled,
   margin: 0;
 }
 
+.appointment-fullcalendar {
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.appointment-fullcalendar .fc {
+  --fc-border-color: var(--workspace-border);
+  --fc-button-bg-color: var(--primary);
+  --fc-button-border-color: var(--primary);
+  --fc-button-hover-bg-color: var(--primary-dark);
+  --fc-button-hover-border-color: var(--primary-dark);
+  --fc-event-bg-color: transparent;
+  --fc-event-border-color: transparent;
+  --fc-event-text-color: var(--ink);
+  --fc-list-event-hover-bg-color: color-mix(in srgb, var(--color-brand-soft) 38%, var(--panel));
+  --fc-neutral-bg-color: color-mix(in srgb, var(--workspace-surface-soft) 76%, var(--panel));
+  --fc-now-indicator-color: var(--danger);
+  --fc-page-bg-color: transparent;
+  --fc-today-bg-color: color-mix(in srgb, var(--color-brand-soft) 46%, transparent);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  height: 100%;
+}
+
+.appointment-fullcalendar .fc .fc-scrollgrid {
+  border: 0;
+}
+
+.appointment-fullcalendar .fc .fc-scrollgrid-section-sticky > *,
+.appointment-fullcalendar .fc .fc-col-header-cell,
+.appointment-fullcalendar .fc .fc-timegrid-axis,
+.appointment-fullcalendar .fc .fc-list-day > * {
+  background: color-mix(in srgb, var(--color-surface) 94%, var(--workspace-bg));
+}
+
+.appointment-fullcalendar .fc .fc-col-header-cell-cushion,
+.appointment-fullcalendar .fc .fc-timegrid-axis-cushion,
+.appointment-fullcalendar .fc .fc-list-day-cushion {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.appointment-fullcalendar .fc .fc-daygrid-day-number {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 720;
+  padding: 8px;
+}
+
+.appointment-fullcalendar .fc .fc-timegrid-slot-label-cushion {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.appointment-fullcalendar .fc .fc-daygrid-day-frame,
+.appointment-fullcalendar .fc .fc-timegrid-col-frame {
+  background: color-mix(in srgb, var(--panel) 88%, var(--bg));
+}
+
+.appointment-fullcalendar .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-frame,
+.appointment-fullcalendar .fc .fc-timegrid-col.fc-day-today .fc-timegrid-col-frame {
+  background: color-mix(in srgb, var(--color-brand-soft) 38%, var(--panel));
+}
+
+.appointment-fullcalendar .fc .fc-timegrid-now-indicator-line {
+  border-width: 2px 0 0;
+}
+
+.appointment-fullcalendar .fc .fc-timegrid-now-indicator-arrow {
+  border-width: 5px 0 5px 6px;
+}
+
+.appointment-fullcalendar .fc .appointment-fc-event {
+  --appointment-event-accent: var(--primary);
+  background: color-mix(in srgb, var(--appointment-event-accent) 12%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--appointment-event-accent) 26%, var(--workspace-border));
+  border-left: 3px solid var(--appointment-event-accent);
+  border-radius: 7px;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--appointment-event-accent) 10%, transparent);
+  cursor: pointer;
+  margin: 1px 2px;
+  overflow: hidden;
+}
+
+.appointment-fullcalendar .fc .appointment-fc-event.status-pending {
+  --appointment-event-accent: #a86700;
+}
+
+.appointment-fullcalendar .fc .appointment-fc-event.status-confirmed {
+  --appointment-event-accent: var(--primary);
+}
+
+.appointment-fullcalendar .fc .appointment-fc-event.status-completed {
+  --appointment-event-accent: var(--success);
+}
+
+.appointment-fullcalendar .fc .appointment-fc-event.status-canceled {
+  --appointment-event-accent: var(--danger);
+  opacity: 0.72;
+}
+
+.appointment-fullcalendar .fc .appointment-fc-event.has-warning {
+  border-color: color-mix(in srgb, #a86700 52%, var(--workspace-border));
+}
+
+.appointment-fullcalendar .fc .appointment-fc-event.locked {
+  cursor: default;
+}
+
+.appointment-fullcalendar .fc .appointment-fc-event .fc-event-main {
+  color: var(--ink);
+}
+
+.appointment-fullcalendar .fc .fc-event-dragging {
+  opacity: 0.82;
+}
+
+.appointment-fc-event-content {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+.appointment-fc-event-content span,
+.appointment-fc-event-content small,
+.appointment-fc-event-content em {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+
+.appointment-fc-event-content span {
+  color: color-mix(in srgb, var(--muted) 90%, var(--ink));
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+
+.appointment-fc-event-content strong {
+  font-size: 0.82rem;
+  font-weight: 760;
+  line-height: 1.15;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointment-fc-event-content small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 620;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointment-fc-event-content em {
+  color: #8a5a00;
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 690;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointment-fullcalendar .fc .fc-list {
+  border: 0;
+}
+
+.appointment-fullcalendar .fc .fc-list-table td {
+  border-color: var(--workspace-border);
+}
+
+.appointment-fullcalendar .fc .fc-list-event-time {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.appointment-fullcalendar .fc .fc-list-event-title {
+  padding: 4px 8px;
+}
+
+.appointment-fullcalendar .fc .fc-list-event-title .appointment-fc-event-content {
+  padding: 4px 0;
+}
+
+.appointment-fullcalendar .fc .fc-list-empty {
+  background: color-mix(in srgb, var(--panel) 88%, var(--bg));
+  color: var(--muted);
+  font-weight: 650;
+}
+
 .appointment-month-grid {
   display: grid;
   gap: 1px;
@@ -8284,6 +8488,36 @@ button.button:disabled,
   flex-wrap: wrap;
   gap: 10px;
 }
+
+.payments-page-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.payments-coupons-table {
+  --data-table-min-width: 760px;
+  --data-table-row-height: 54px;
+  --data-table-scroll-height: min(360px, calc(100dvh - 330px));
+  min-height: 0;
+}
+
+.payments-coupons-index-table th,
+.payments-coupons-index-table td {
+  white-space: nowrap;
+}
+
+.payments-coupon-thumb {
+  color: var(--color-brand-dark);
+}
+
+.payments-coupons-col-code { width: 210px; }
+.payments-coupons-col-value { width: 120px; }
+.payments-coupons-col-redemptions { width: 132px; }
+.payments-coupons-col-availability { width: 210px; }
+.payments-coupons-col-created { width: 110px; }
 
 /* Guided wizard dialog */
 .pay-dialog {

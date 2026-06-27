@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { PaymentGatewayConnectionStatus, PaymentProvider } from "@prisma/client";
+import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
+import { couponFormSchema, formObject } from "@/lib/admin-validation";
 import { recordAuditLog } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
@@ -30,6 +31,12 @@ export const initialPaymentActionState: PaymentActionState = { status: "idle" };
 
 function errorState(error: unknown, fallback: string): PaymentActionState {
   return { status: "error", message: error instanceof Error ? error.message : fallback };
+}
+
+function validationErrorMessage(error: { issues: Array<{ message: string; path: PropertyKey[] }> }) {
+  const issue = error.issues[0];
+  const field = issue?.path.length ? `${issue.path.join(".")}: ` : "";
+  return `${field}${issue?.message || "Check the coupon and try again."}`;
 }
 
 // Audit logging never records the pasted secret values themselves — only that a provider changed.
@@ -74,6 +81,58 @@ export async function connectStripeAction(
 
   revalidatePath("/", "layout");
   return { status: "success" };
+}
+
+export async function createCouponAction(
+  _prev: PaymentActionState,
+  formData: FormData
+): Promise<PaymentActionState> {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+  const parsed = couponFormSchema.safeParse(formObject(formData));
+
+  if (!parsed.success) {
+    return { status: "error", message: validationErrorMessage(parsed.error) };
+  }
+
+  const input = parsed.data;
+
+  try {
+    await prisma.coupon.create({
+      data: {
+        siteId: site.id,
+        code: input.code,
+        type: input.type,
+        amountCents: input.amount,
+        percentOff: input.percentOff,
+        maxRedemptions: input.maxRedemptions,
+        isActive: input.isActive
+      }
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { status: "error", message: `Coupon ${input.code} already exists.` };
+    }
+
+    return errorState(error, "Could not create coupon.");
+  }
+
+  await recordAuditLog({
+    action: "settings.coupon.created",
+    actor: user,
+    metadata: {
+      code: input.code,
+      type: input.type
+    },
+    siteId: site.id,
+    targetId: site.id,
+    targetLabel: input.code,
+    targetType: "coupon"
+  });
+
+  revalidatePath("/admin/modules/payments");
+  revalidatePath("/cart");
+  return { status: "success", message: `Coupon ${input.code} created.` };
 }
 
 export async function connectSquareAction(

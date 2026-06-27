@@ -608,7 +608,15 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
             </div>
         }
       >
-        <AppointmentCalendar bookings={calendarItems} days={days} hours={calendarHours} selectedDateKey={selectedDateKey} view={view} />
+        <AppointmentCalendar
+          bookings={calendarItems}
+          days={days}
+          hours={calendarHours}
+          key={`${selectedDateKey}:${view}:${settings.timezone}`}
+          selectedDateKey={selectedDateKey}
+          timezone={settings.timezone}
+          view={view}
+        />
       </AppointmentCalendarShell>
     </div>);
 

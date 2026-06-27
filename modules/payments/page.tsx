@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { publicAppBaseUrl } from "@/lib/env";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { getStripePaymentMethodSettings } from "@/lib/payments/methods";
+import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { PaymentsWorkspace, type ProviderCard } from "./components/payments-workspace";
 
@@ -25,10 +26,15 @@ export default async function PaymentsPage() {
   await requireAdmin("settings:update");
   const settings = await getSiteSettings();
 
-  const [stripeMethods, squareCredential, paypalCredential] = await Promise.all([
+  const [stripeMethods, squareCredential, paypalCredential, coupons] = await Promise.all([
     getStripePaymentMethodSettings(settings.siteId),
     getConnectedGatewayCredential(settings.siteId, PaymentProvider.SQUARE),
-    getConnectedGatewayCredential(settings.siteId, PaymentProvider.PAYPAL)
+    getConnectedGatewayCredential(settings.siteId, PaymentProvider.PAYPAL),
+    prisma.coupon.findMany({
+      where: { siteId: settings.siteId, isActive: true },
+      orderBy: { createdAt: "desc" },
+      take: 50
+    })
   ]);
 
   const stripeCredential = stripeMethods.credential;
@@ -113,6 +119,18 @@ export default async function PaymentsPage() {
         disconnected: selectedDisconnected,
         providers: checkoutProviders
       }}
+      coupons={coupons.map((coupon) => ({
+        amountCents: coupon.amountCents,
+        code: coupon.code,
+        createdAt: coupon.createdAt.toISOString(),
+        endsAt: coupon.endsAt?.toISOString() ?? null,
+        id: coupon.id,
+        maxRedemptions: coupon.maxRedemptions,
+        percentOff: coupon.percentOff,
+        redemptionCount: coupon.redemptionCount,
+        startsAt: coupon.startsAt?.toISOString() ?? null,
+        type: coupon.type
+      }))}
       featuredConnected={stripeConnected}
       methods={{
         applePayStatus: stripeMethods.applePayDomain.status,

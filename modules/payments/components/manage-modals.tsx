@@ -1,10 +1,12 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
-import { CreditCard, KeyRound, Loader2, RefreshCw, Unplug } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CreditCard, KeyRound, Loader2, Plus, RefreshCw, TicketPercent, Unplug } from "lucide-react";
 import { Button } from "@/components/ui";
 import { MethodMark } from "./brand-marks";
 import {
+  createCouponAction,
   disconnectProviderAction,
   initialPaymentActionState,
   reverifyProviderAction,
@@ -79,6 +81,72 @@ export function MethodsModal({
         <Button aria-busy={pending} disabled={pending} type="submit">
           {pending ? <Loader2 className="pay-spin" size={18} /> : <CreditCard size={18} />}
           Save ways to pay
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+export function CouponModal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const [state, formAction, pending] = useActionState(createCouponAction, initialPaymentActionState);
+
+  useEffect(() => {
+    if (state.status !== "success") return;
+    router.refresh();
+    onClose();
+  }, [onClose, router, state.status]);
+
+  return (
+    <form action={formAction} className="form-grid">
+      <p className="pay-step-lead">
+        Create a reusable checkout discount code. Percent coupons use the percent field; fixed amount coupons use the fixed amount field.
+      </p>
+      <div className="module-toggle-grid">
+        <label className="module-toggle-row">
+          <input name="isActive" type="checkbox" defaultChecked />
+          <span className="module-toggle-main">
+            <span>
+              <TicketPercent size={15} />
+              <strong>Active at checkout</strong>
+            </span>
+            <small>Active coupons can be entered by customers in the cart.</small>
+          </span>
+        </label>
+      </div>
+      <div className="form-grid">
+        <div className="ui-field">
+          <label htmlFor="couponCode">Code</label>
+          <input autoCapitalize="characters" id="couponCode" name="code" placeholder="WELCOME10" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="couponType">Type</label>
+          <select id="couponType" name="type" defaultValue="PERCENT">
+            <option value="PERCENT">percent</option>
+            <option value="FIXED">fixed amount</option>
+          </select>
+        </div>
+        <div className="ui-field">
+          <label htmlFor="percentOff">Percent off</label>
+          <input id="percentOff" name="percentOff" min="0" max="100" placeholder="10" type="number" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="amount">Fixed amount</label>
+          <input id="amount" name="amount" inputMode="decimal" placeholder="25.00" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="maxRedemptions">Max redemptions</label>
+          <input id="maxRedemptions" name="maxRedemptions" min="0" placeholder="No limit" type="number" />
+        </div>
+      </div>
+      {state.status === "error" ? <p className="error ui-zero">{state.message}</p> : null}
+      <div className="pay-step-actions">
+        <Button onClick={onClose} type="button" variant="secondary">
+          Cancel
+        </Button>
+        <Button aria-busy={pending} disabled={pending} type="submit">
+          {pending ? <Loader2 className="pay-spin" size={18} /> : <Plus size={18} />}
+          Add coupon
         </Button>
       </div>
     </form>

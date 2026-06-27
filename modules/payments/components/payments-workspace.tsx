@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, CreditCard, Lock, Settings2 } from "lucide-react";
-import { Button, Modal } from "@/components/ui";
+import { AlertTriangle, CheckCircle2, CreditCard, Lock, Settings2, TicketPlus } from "lucide-react";
+import { Button, Modal, Table } from "@/components/ui";
 import { MethodMark, ProviderMark } from "./brand-marks";
 import { buildConnectWizards, ConnectWizard, type WebhookUrls } from "./connect-wizard";
-import { CheckoutModal, ManageProviderModal, MethodsModal, type MethodOption } from "./manage-modals";
+import { CheckoutModal, CouponModal, ManageProviderModal, MethodsModal, type MethodOption } from "./manage-modals";
 
 type ProviderKey = "STRIPE" | "SQUARE" | "PAYPAL";
+type CouponValueType = "PERCENT" | "FIXED";
 
 export type ProviderCard = {
   provider: ProviderKey;
@@ -19,6 +20,19 @@ export type ProviderCard = {
   manageDetail: string;
 };
 
+export type ActiveCoupon = {
+  amountCents: number | null;
+  code: string;
+  createdAt: string;
+  endsAt: string | null;
+  id: string;
+  maxRedemptions: number | null;
+  percentOff: number | null;
+  redemptionCount: number;
+  startsAt: string | null;
+  type: CouponValueType;
+};
+
 export type PaymentsWorkspaceProps = {
   providers: ProviderCard[];
   methods: { connected: boolean; enabledKeys: string[]; options: MethodOption[]; applePayStatus?: string };
@@ -28,6 +42,7 @@ export type PaymentsWorkspaceProps = {
     disconnected: boolean;
     providers: { value: string; label: string; connected: boolean }[];
   };
+  coupons: ActiveCoupon[];
   featuredConnected: boolean;
   webhooks: WebhookUrls;
 };
@@ -37,9 +52,31 @@ type ActiveModal =
   | { kind: "manage"; provider: ProviderKey }
   | { kind: "methods" }
   | { kind: "checkout" }
+  | { kind: "coupon" }
   | null;
 
-export function PaymentsWorkspace({ checkout, featuredConnected, methods, providers, webhooks }: PaymentsWorkspaceProps) {
+function couponValueLabel(coupon: ActiveCoupon) {
+  if (coupon.type === "PERCENT") return `${coupon.percentOff || 0}% off`;
+  return new Intl.NumberFormat("en-US", { currency: "USD", style: "currency" }).format((coupon.amountCents || 0) / 100);
+}
+
+function couponLimitLabel(coupon: ActiveCoupon) {
+  if (coupon.maxRedemptions === null) return "No limit";
+  return `${coupon.redemptionCount} / ${coupon.maxRedemptions}`;
+}
+
+function dateLabel(value: string) {
+  return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(value));
+}
+
+function couponAvailabilityLabel(coupon: ActiveCoupon) {
+  if (coupon.startsAt && coupon.endsAt) return `${dateLabel(coupon.startsAt)} to ${dateLabel(coupon.endsAt)}`;
+  if (coupon.startsAt) return `Starts ${dateLabel(coupon.startsAt)}`;
+  if (coupon.endsAt) return `Ends ${dateLabel(coupon.endsAt)}`;
+  return "Always available";
+}
+
+export function PaymentsWorkspace({ checkout, coupons, featuredConnected, methods, providers, webhooks }: PaymentsWorkspaceProps) {
   const [active, setActive] = useState<ActiveModal>(null);
   const close = () => setActive(null);
 
@@ -71,6 +108,8 @@ export function PaymentsWorkspace({ checkout, featuredConnected, methods, provid
           ? "Ways customers pay"
           : active?.kind === "checkout"
             ? "Checkout account"
+            : active?.kind === "coupon"
+              ? "Add coupon"
             : "";
 
   return (
@@ -84,10 +123,79 @@ export function PaymentsWorkspace({ checkout, featuredConnected, methods, provid
             we verify them live, store them encrypted, and charge directly on your own account.
           </p>
         </div>
-        <span className={done === steps.length ? "guided-progress guided-progress-done" : "guided-progress"}>
-          {done} of {steps.length} set up
-        </span>
+        <div className="payments-page-actions">
+          <Button onClick={() => setActive({ kind: "coupon" })} type="button">
+            <TicketPlus size={16} />
+            Add coupon
+          </Button>
+          <span className={done === steps.length ? "guided-progress guided-progress-done" : "guided-progress"}>
+            {done} of {steps.length} set up
+          </span>
+        </div>
       </header>
+
+      <section aria-labelledby="active-coupons-title" className="ui-data-table-shell payments-coupons-table">
+        <div className="ui-data-table-header">
+          <div className="ui-data-table-titlebar">
+            <div>
+              <h2 className="section-title" id="active-coupons-title">
+                Active coupons
+              </h2>
+              <p className="ui-zero">{coupons.length} available at checkout</p>
+            </div>
+          </div>
+        </div>
+        <Table className="ui-data-table-scroll" tableClassName="ui-data-table payments-coupons-index-table">
+          <colgroup>
+            <col className="payments-coupons-col-code" />
+            <col className="payments-coupons-col-value" />
+            <col className="payments-coupons-col-redemptions" />
+            <col className="payments-coupons-col-availability" />
+            <col className="payments-coupons-col-created" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Value</th>
+              <th>Redemptions</th>
+              <th>Availability</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {coupons.map((coupon) => (
+              <tr key={coupon.id}>
+                <td>
+                  <div className="ui-object-cell">
+                    <span aria-hidden="true" className="ui-object-thumb ui-object-thumb-empty payments-coupon-thumb">
+                      <TicketPlus size={16} />
+                    </span>
+                    <span className="ui-object-copy">
+                      <strong className="ui-truncate" title={coupon.code}>{coupon.code}</strong>
+                      <span className="ui-object-meta">{coupon.type === "PERCENT" ? "Percent" : "Fixed"}</span>
+                    </span>
+                  </div>
+                </td>
+                <td>{couponValueLabel(coupon)}</td>
+                <td>{couponLimitLabel(coupon)}</td>
+                <td>
+                  <span className="ui-truncate" title={couponAvailabilityLabel(coupon)}>
+                    {couponAvailabilityLabel(coupon)}
+                  </span>
+                </td>
+                <td>{dateLabel(coupon.createdAt)}</td>
+              </tr>
+            ))}
+            {!coupons.length ? (
+              <tr>
+                <td className="ui-data-table-empty" colSpan={5}>
+                  No active coupons yet.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </Table>
+      </section>
 
       {/* Cash App Pay + Affirm gating callout ------------------------------ */}
       <section className={featuredConnected ? "subpanel pay-feature pay-feature-on" : "subpanel pay-feature"}>
@@ -281,6 +389,7 @@ export function PaymentsWorkspace({ checkout, featuredConnected, methods, provid
         {active?.kind === "checkout" ? (
           <CheckoutModal active={checkout.active} key="checkout" onClose={close} providers={checkout.providers} />
         ) : null}
+        {active?.kind === "coupon" ? <CouponModal key="coupon" onClose={close} /> : null}
       </Modal>
     </div>
   );

@@ -10,7 +10,6 @@ import { generateGiftCardCode } from "@/lib/commerce/gift-cards";
 import {
   collectionFormSchema,
   collectionProductFormSchema,
-  couponFormSchema,
   currencyCode,
   moneyCents,
   optionalEmailStored,
@@ -466,35 +465,6 @@ export async function addProductToCollectionAction(formData: FormData) {
   refreshProducts();
   revalidatePath(productEditPath(input.productId));
   redirect(productEditPath(input.productId, { saved: "collection-product" }));
-}
-
-export async function createCouponAction(formData: FormData) {
-  await requireAdmin("products:manage");
-  const input = await parseForm(couponFormSchema, formData);
-  const siteId = await getCurrentSiteId();
-
-  try {
-    await prisma.coupon.create({
-      data: {
-        siteId,
-        code: input.code,
-        type: input.type,
-        amountCents: input.amount,
-        percentOff: input.percentOff,
-        maxRedemptions: input.maxRedemptions,
-        isActive: input.isActive
-      }
-    });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      redirect(`/admin/modules/products?error=${encodeURIComponent(`Coupon ${input.code} already exists.`)}`);
-    }
-
-    throw error;
-  }
-
-  refreshProducts();
-  redirect("/admin/modules/products?saved=coupon");
 }
 
 export async function createGiftCardAction(formData: FormData) {

@@ -1,10 +1,15 @@
 "use client";
 
+import dayGridPlugin from "@fullcalendar/daygrid";
+import interactionPlugin from "@fullcalendar/interaction";
+import listPlugin from "@fullcalendar/list";
+import FullCalendar from "@fullcalendar/react";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import type { EventClickArg, EventContentArg, EventDropArg, EventInput } from "@fullcalendar/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { CSSProperties, DragEvent, PointerEvent as ReactPointerEvent } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { AlertTriangle, Ban, CalendarClock, CalendarDays, Check, ExternalLink, GripVertical, ListChecks, Mail, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { AlertTriangle, Ban, CalendarClock, Check, ExternalLink, GripVertical, ListChecks, Mail, X } from "lucide-react";
 import { Modal, Tab, Tabs } from "@/components/ui";
 import { rescheduleBookingFromCalendarAction, updateBookingStatusAction } from "../actions";
 
@@ -63,12 +68,8 @@ type AppointmentCalendarProps = {
   days: AppointmentCalendarDay[];
   hours: number[];
   selectedDateKey: string;
+  timezone: string;
   view: "month" | "week" | "day" | "agenda";
-};
-
-type DraggedBooking = {
-  id: string;
-  minute: number;
 };
 
 type PendingReschedule = {
@@ -76,103 +77,12 @@ type PendingReschedule = {
   dateKey: string;
   hour: number;
   minute: number;
-  newStartLabel: string;
+  newDateLabel: string;
   newEndLabel: string;
+  newStartLabel: string;
 };
 
 type ConfirmStage = "" | "change" | "email";
-
-type PointerDragRender = {
-  bookingId: string;
-  dx: number;
-  dy: number;
-  moved: boolean;
-  targetDateKey: string;
-  targetMinute: number;
-};
-
-type PointerDragSession = {
-  bookingId: string;
-  pointerId: number;
-  startX: number;
-  startY: number;
-  grabOffsetPx: number;
-  durationMinutes: number;
-  originDateKey: string;
-  originMinute: number;
-  targetDateKey: string;
-  targetMinute: number;
-  moved: boolean;
-};
-
-type IndicatorStyle = CSSProperties & {
-  "--appointment-indicator-height": string;
-  "--appointment-marker-top": string;
-};
-
-type TimeBounds = {
-  endMinute: number;
-  height: number;
-  markers: TimeMarker[];
-  startMinute: number;
-  totalMinutes: number;
-};
-
-type TimeMarker = {
-  kind: "half" | "hour" | "quarter";
-  minute: number;
-};
-
-type PositionedBooking = {
-  booking: AppointmentCalendarBooking;
-  columnCount: number;
-  columnIndex: number;
-  heightPercent: number;
-  topPercent: number;
-};
-
-type TimelineStyle = CSSProperties & {
-  "--appointment-height": string;
-  "--appointment-left": string;
-  "--appointment-top": string;
-  "--appointment-width": string;
-};
-
-type StripStyle = CSSProperties & {
-  "--appointment-strip-height": string;
-};
-
-type MarkerStyle = CSSProperties & {
-  "--appointment-marker-top": string;
-};
-
-function bookingsByDate(bookings: AppointmentCalendarBooking[]) {
-  const grouped = new Map<string, AppointmentCalendarBooking[]>();
-  for (const booking of bookings) {
-    const dayBookings = grouped.get(booking.dateKey) || [];
-    dayBookings.push(booking);
-    grouped.set(booking.dateKey, dayBookings);
-  }
-  for (const dayBookings of grouped.values()) {
-    dayBookings.sort((left, right) => left.startsAt.localeCompare(right.startsAt));
-  }
-  return grouped;
-}
-
-function hourLabel(hour: number) {
-  const suffix = hour >= 12 ? "PM" : "AM";
-  const display = hour % 12 || 12;
-  return `${display} ${suffix}`;
-}
-
-function formatClockLabel(totalMinutes: number) {
-  const normalized = ((Math.round(totalMinutes) % (24 * 60)) + 24 * 60) % (24 * 60);
-  const hour = Math.floor(normalized / 60);
-  const minute = normalized % 60;
-  const suffix = hour >= 12 ? "PM" : "AM";
-  const display = hour % 12 || 12;
-  return `${display}:${String(minute).padStart(2, "0")} ${suffix}`;
-}
 
 function dateKeyToUtcDate(dateKey: string) {
   const [year, month, day] = dateKey.split("-").map(Number);
@@ -224,143 +134,72 @@ function daysForView(days: AppointmentCalendarDay[], view: (typeof calendarViews
 
 function rangeSummary(view: (typeof calendarViews)[number], days: AppointmentCalendarDay[], appointmentCount: number) {
   const appointmentLabel = appointmentCount === 1 ? "appointment" : "appointments";
-  if (!days.length) return `No days | ${appointmentCount} ${appointmentLabel}`;
+  if (!days.length) return `${appointmentCount} ${appointmentLabel}`;
   if (view === "day") return `${days[0].label} | ${appointmentCount} ${appointmentLabel}`;
   return `${days[0].shortLabel} - ${days[days.length - 1].shortLabel} | ${appointmentCount} ${appointmentLabel}`;
 }
 
-function timeMarkerLabel(marker: TimeMarker) {
-  if (marker.kind === "quarter") return "";
-  const hour = Math.floor(marker.minute / 60);
-  if (marker.kind === "hour") return hourLabel(hour);
-
-  const suffix = hour >= 12 ? "PM" : "AM";
-  const display = hour % 12 || 12;
-  return `${display}:30 ${suffix}`;
+function fullCalendarViewFor(view: (typeof calendarViews)[number]) {
+  if (view === "month") return "dayGridMonth";
+  if (view === "week") return "timeGridWeek";
+  if (view === "agenda") return "appointmentAgenda";
+  return "timeGridDay";
 }
 
-function minutesFromStartOfDay(booking: AppointmentCalendarBooking) {
-  return booking.hour * 60 + booking.minute;
+function appointmentViewFor(fullCalendarView: string): (typeof calendarViews)[number] {
+  if (fullCalendarView === "dayGridMonth") return "month";
+  if (fullCalendarView === "timeGridWeek") return "week";
+  if (fullCalendarView === "appointmentAgenda") return "agenda";
+  return "day";
 }
 
-function minutesUntilEnd(booking: AppointmentCalendarBooking) {
-  return minutesFromStartOfDay(booking) + Math.max(booking.durationMinutes, 15);
+function slotTime(hour: number) {
+  const clamped = Math.max(0, Math.min(24, hour));
+  return `${String(clamped).padStart(2, "0")}:00:00`;
 }
 
-function clamp(value: number, minimum: number, maximum: number) {
-  return Math.min(Math.max(value, minimum), maximum);
+function addMinutes(date: Date, minutes: number) {
+  return new Date(date.getTime() + minutes * 60_000);
 }
 
-function timeBoundsFor(bookings: AppointmentCalendarBooking[], hours: number[], availableHeight?: number | null): TimeBounds {
-  const bookingStartCandidates = bookings.map((booking) => minutesFromStartOfDay(booking));
-  const bookingEndCandidates = bookings.map((booking) => minutesUntilEnd(booking));
-  const fallbackStart = hours.length ? Math.min(...hours.map((hour) => hour * 60)) : 8 * 60;
-  const fallbackEnd = hours.length ? Math.max(...hours.map((hour) => (hour + 1) * 60)) : 18 * 60;
-  const startMinuteSource = bookingStartCandidates.length ? Math.min(...bookingStartCandidates) : fallbackStart;
-  const endMinuteSource = bookingEndCandidates.length ? Math.max(...bookingEndCandidates) : fallbackEnd;
-  const startMinute = clamp(Math.floor(startMinuteSource / 30) * 30, 0, 23 * 60);
-  const endMinute = clamp(Math.ceil(endMinuteSource / 30) * 30 + 30, startMinute + 60, 24 * 60);
-  const totalMinutes = Math.max(60, endMinute - startMinute);
-  const markers: TimeMarker[] = [];
-  for (let marker = startMinute; marker <= endMinute; marker += 15) {
-    markers.push({
-      kind: marker % 60 === 0 ? "hour" : marker % 30 === 0 ? "half" : "quarter",
-      minute: marker
-    });
-  }
-
-  const fallbackHeight = Math.max(720, Math.round(totalMinutes * 1.65));
-  const height = availableHeight ? Math.max(420, Math.round(availableHeight)) : fallbackHeight;
-
-  return {
-    endMinute,
-    height,
-    markers,
-    startMinute,
-    totalMinutes
-  };
+function formatClockLabel(date: Date, timeZone: string) {
+  return new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit", timeZone }).format(date);
 }
 
-function positionedBookingsFor(dayBookings: AppointmentCalendarBooking[], bounds: TimeBounds): PositionedBooking[] {
-  const sortedBookings = [...dayBookings].sort(
-    (left, right) => minutesFromStartOfDay(left) - minutesFromStartOfDay(right) || minutesUntilEnd(left) - minutesUntilEnd(right)
+function formatDateLabel(date: Date, timeZone: string) {
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", weekday: "short", timeZone }).format(date);
+}
+
+function zonedDateParts(date: Date, timeZone: string) {
+  const values = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      day: "2-digit",
+      hour: "2-digit",
+      hourCycle: "h23",
+      minute: "2-digit",
+      month: "2-digit",
+      timeZone,
+      year: "numeric"
+    })
+      .formatToParts(date)
+      .map((part) => [part.type, part.value])
   );
-  const groups: AppointmentCalendarBooking[][] = [];
-  let group: AppointmentCalendarBooking[] = [];
-  let groupEnd = -1;
 
-  for (const booking of sortedBookings) {
-    const start = minutesFromStartOfDay(booking);
-    if (group.length && start >= groupEnd) {
-      groups.push(group);
-      group = [];
-      groupEnd = -1;
-    }
-    group.push(booking);
-    groupEnd = Math.max(groupEnd, minutesUntilEnd(booking));
-  }
-  if (group.length) groups.push(group);
-
-  return groups.flatMap((bookingGroup) => {
-    const columnEnds: number[] = [];
-    const assigned = bookingGroup.map((booking) => {
-      const start = minutesFromStartOfDay(booking);
-      const end = minutesUntilEnd(booking);
-      let columnIndex = columnEnds.findIndex((columnEnd) => columnEnd <= start);
-      if (columnIndex === -1) {
-        columnIndex = columnEnds.length;
-        columnEnds.push(end);
-      } else {
-        columnEnds[columnIndex] = end;
-      }
-      return { booking, columnIndex };
-    });
-    const columnCount = Math.max(1, columnEnds.length);
-
-    return assigned.map(({ booking, columnIndex }) => {
-      const visibleStart = clamp(minutesFromStartOfDay(booking), bounds.startMinute, bounds.endMinute);
-      const visibleEnd = clamp(minutesUntilEnd(booking), bounds.startMinute, bounds.endMinute);
-      return {
-        booking,
-        columnCount,
-        columnIndex,
-        heightPercent: Math.max(4, ((visibleEnd - visibleStart) / bounds.totalMinutes) * 100),
-        topPercent: ((visibleStart - bounds.startMinute) / bounds.totalMinutes) * 100
-      };
-    });
-  });
-}
-
-function timelineStyle(position: PositionedBooking, bounds: TimeBounds): TimelineStyle {
-  const columnWidth = 100 / position.columnCount;
   return {
-    "--appointment-height": `${(position.heightPercent / 100) * bounds.height}px`,
-    "--appointment-left": `${position.columnIndex * columnWidth}%`,
-    "--appointment-top": `${(position.topPercent / 100) * bounds.height}px`,
-    "--appointment-width": `calc(${columnWidth}% - 6px)`
-  };
-}
-
-function markerStyle(marker: number, bounds: TimeBounds): MarkerStyle {
-  return {
-    "--appointment-marker-top": `${((marker - bounds.startMinute) / bounds.totalMinutes) * bounds.height}px`
+    dateKey: `${values.year}-${values.month}-${values.day}`,
+    hour: Number(values.hour),
+    minute: Number(values.minute)
   };
 }
 
 function initialsFor(name: string, email: string) {
-  const source = name || email;
-  const initials = source
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-  return initials || "C";
+  const source = name || email || "Client";
+  const words = source.trim().split(/\s+/).slice(0, 2);
+  return words.map((word) => word[0]?.toUpperCase()).join("") || "C";
 }
 
 function phoneHref(value: string) {
-  const dialable = value.replace(/[^\d+]/g, "");
-  return `tel:${dialable || value}`;
+  return `tel:${value.replace(/[^\d+]/g, "")}`;
 }
 
 function canDrag(booking: AppointmentCalendarBooking) {
@@ -368,180 +207,58 @@ function canDrag(booking: AppointmentCalendarBooking) {
 }
 
 function quickStatuses(booking: AppointmentCalendarBooking) {
-  if (booking.status === "CANCELED" || booking.status === "COMPLETED") return [];
-
-  return [
-    ...(booking.status === "PENDING" ? [{ icon: Check, label: "Confirm", status: "CONFIRMED" as const }] : []),
-    { icon: Ban, label: "Cancel", status: "CANCELED" as const },
-    { icon: ListChecks, label: "Complete", status: "COMPLETED" as const }
-  ];
-}
-
-function isInteractiveTarget(target: EventTarget | null) {
-  return target instanceof HTMLElement && Boolean(target.closest("a, button, input, select, textarea, form"));
-}
-
-function AppointmentCard({
-  booking,
-  dayLabel = "",
-  display = "standard",
-  dragging = false,
-  dragOffset,
-  expanded = false,
-  onClose,
-  onDragStart,
-  onPointerDragStart,
-  onSelect,
-  selected = false,
-  style
-}: {
-  booking: AppointmentCalendarBooking;
-  dayLabel?: string;
-  display?: "compact" | "standard" | "timeline";
-  dragging?: boolean;
-  dragOffset?: { dx: number; dy: number };
-  expanded?: boolean;
-  onClose?: () => void;
-  onSelect: (bookingId: string) => void;
-  onPointerDragStart?: (booking: AppointmentCalendarBooking, event: ReactPointerEvent<HTMLElement>) => void;
-  selected?: boolean;
-  style?: TimelineStyle;
-  onDragStart: (booking: AppointmentCalendarBooking) => void;
-}) {
-  if (display === "timeline" && expanded) {
-    return (
-      <article
-        aria-label={`${booking.serviceName} details`}
-        aria-modal="false"
-        className="appointment-calendar-event timeline expanded"
-        onClick={(event) => event.stopPropagation()}
-        role="dialog"
-        style={style}
-      >
-        <div className="appointment-grow-head">
-          <div className="appointment-grow-head-copy">
-            <span>{booking.timeLabel} - {booking.endTimeLabel}</span>
-            <strong>{booking.serviceName}</strong>
-          </div>
-          <button aria-label="Close appointment details" className="appointment-event-close" onClick={onClose} type="button">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="appointment-grow-body">
-          <AppointmentExpandedDetails booking={booking} dayLabel={dayLabel} />
-        </div>
-      </article>
-    );
+  if (booking.status === "PENDING") return [{ icon: Check, label: "Confirm", status: "CONFIRMED" }];
+  if (booking.status === "CONFIRMED") {
+    return [
+      { icon: Check, label: "Complete", status: "COMPLETED" },
+      { icon: Ban, label: "Cancel", status: "CANCELED" }
+    ];
   }
-
-  const actions = !selected && display === "standard" ? quickStatuses(booking) : [];
-  const isTimeline = display === "timeline";
-  const className = [
-    "appointment-calendar-event",
-    display === "compact" ? "compact" : "",
-    isTimeline ? "timeline" : "",
-    selected ? "selected" : "",
-    dragging ? "dragging" : ""
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const secondaryLabel =
-    display === "timeline" ?
-    booking.durationLabel :
-    `${booking.serviceName}${booking.staffName ? ` | ${booking.staffName}` : ""}`;
-  // Timeline chips use custom pointer dragging (so the card visibly lifts and
-  // follows the cursor); other views keep the native drag-and-drop ghost.
-  const composedStyle: CSSProperties | undefined =
-    isTimeline && dragging && dragOffset ? { ...style, transform: `translate(${dragOffset.dx}px, ${dragOffset.dy}px)` } : style;
-
-  return (
-    <article
-      aria-expanded={selected}
-      aria-label={`${booking.serviceName}, ${booking.timeLabel} to ${booking.endTimeLabel}, ${booking.durationLabel}`}
-      className={className}
-      draggable={isTimeline ? undefined : canDrag(booking)}
-      onClick={(event) => {
-        if (isInteractiveTarget(event.target)) return;
-        onSelect(booking.id);
-      }}
-      onDragStart={
-        isTimeline
-          ? undefined
-          : (event) => {
-              if (!canDrag(booking)) {
-                event.preventDefault();
-                return;
-              }
-              event.dataTransfer.effectAllowed = "move";
-              event.dataTransfer.setData("text/plain", booking.id);
-              onDragStart(booking);
-            }
-      }
-      onPointerDown={
-        isTimeline && canDrag(booking)
-          ? (event) => {
-              if (isInteractiveTarget(event.target)) return;
-              onPointerDragStart?.(booking, event);
-            }
-          : undefined
-      }
-      onKeyDown={(event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        if (isInteractiveTarget(event.target)) return;
-        event.preventDefault();
-        onSelect(booking.id);
-      }}
-      role="button"
-      style={composedStyle}
-      tabIndex={0}
-    >
-      <div className="appointment-calendar-event-main">
-        <span>
-          {canDrag(booking) ? <GripVertical size={14} /> : null}
-          {display === "timeline" ? `${booking.timeLabel} - ${booking.endTimeLabel}` : booking.timeLabel}
-        </span>
-        <strong>{display === "timeline" ? booking.serviceName : booking.customerName}</strong>
-        <small>{secondaryLabel}</small>
-      </div>
-      {!selected && display !== "timeline" && booking.warnings.length ? (
-        <div className="appointment-conflict-warning">
-          <AlertTriangle size={14} />
-          {booking.warnings[0]}
-          {booking.warnings.length > 1 ? ` +${booking.warnings.length - 1} more` : ""}
-        </div>
-      ) : null}
-      {actions.length ? (
-        <div className="appointment-calendar-event-actions">
-          {actions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <form action={updateBookingStatusAction} key={action.status}>
-                <input name="id" type="hidden" value={booking.id} />
-                <input name="status" type="hidden" value={action.status} />
-                <button className={action.status === "CANCELED" ? "ui-button ui-button-danger" : "ui-button ui-button-secondary"} type="submit">
-                  <Icon size={14} />
-                  {action.label}
-                </button>
-              </form>
-            );
-          })}
-        </div>
-      ) : null}
-    </article>
-  );
+  return [];
 }
 
 function bookingClient(booking: AppointmentCalendarBooking): AppointmentCalendarClient {
-  return booking.client || {
-    affiliation: "Booking contact",
-    email: booking.customerEmail,
-    id: "",
-    name: booking.customerName,
-    phone: booking.customerPhone,
-    photoUrl: "",
-    pipeline: "No client record",
-    status: "Unlinked"
-  };
+  return (
+    booking.client || {
+      affiliation: "Booking contact",
+      email: booking.customerEmail,
+      id: "",
+      name: booking.customerName,
+      phone: booking.customerPhone,
+      photoUrl: "",
+      pipeline: "No client record",
+      status: "Unlinked"
+    }
+  );
+}
+
+function statusClass(booking: AppointmentCalendarBooking) {
+  return `status-${booking.status.toLowerCase()}`;
+}
+
+function AppointmentEventContent({ event }: EventContentArg) {
+  const booking = event.extendedProps.booking as AppointmentCalendarBooking | undefined;
+  if (!booking) return <span>{event.title}</span>;
+
+  return (
+    <div className="appointment-fc-event-content">
+      <span>
+        {canDrag(booking) ? <GripVertical size={13} /> : null}
+        {booking.timeLabel} - {booking.endTimeLabel}
+      </span>
+      <strong>{booking.customerName}</strong>
+      <small>
+        {booking.serviceName}
+        {booking.staffName ? ` | ${booking.staffName}` : ""}
+      </small>
+      {booking.warnings.length ? (
+        <em>
+          <AlertTriangle size={13} />
+          {booking.warnings[0]}
+        </em>
+      ) : null}
+    </div>
+  );
 }
 
 function AppointmentExpandedDetails({ booking, dayLabel }: { booking: AppointmentCalendarBooking; dayLabel: string }) {
@@ -564,6 +281,7 @@ function AppointmentExpandedDetails({ booking, dayLabel }: { booking: Appointmen
     { label: "Client notes", value: booking.notes || "None" },
     { label: "Internal notes", value: booking.adminNotes || "None" }
   ];
+  const statusActions = quickStatuses(booking);
 
   return (
     <div className="appointment-event-expanded" aria-live="polite" onClick={(event) => event.stopPropagation()}>
@@ -625,6 +343,23 @@ function AppointmentExpandedDetails({ booking, dayLabel }: { booking: Appointmen
             {booking.warnings.join(" ")}
           </div>
         ) : null}
+        {statusActions.length ? (
+          <div className="appointment-calendar-event-actions">
+            {statusActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <form action={updateBookingStatusAction} key={action.status}>
+                  <input name="id" type="hidden" value={booking.id} />
+                  <input name="status" type="hidden" value={action.status} />
+                  <button className={action.status === "CANCELED" ? "ui-button ui-button-danger" : "ui-button ui-button-secondary"} type="submit">
+                    <Icon size={14} />
+                    {action.label}
+                  </button>
+                </form>
+              );
+            })}
+          </div>
+        ) : null}
       </section>
     </div>
   );
@@ -663,25 +398,16 @@ function AppointmentFloatingDetails({
   );
 }
 
-export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, view }: AppointmentCalendarProps) {
+export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, timezone, view }: AppointmentCalendarProps) {
   const router = useRouter();
+  const calendarRef = useRef<FullCalendar | null>(null);
   const [activeView, setActiveView] = useState(view);
-  const [draggedBooking, setDraggedBooking] = useState<DraggedBooking | null>(null);
-  const [pendingTarget, setPendingTarget] = useState("");
   const [message, setMessage] = useState("");
   const [selectedBookingId, setSelectedBookingId] = useState("");
-  const [timelineViewportHeight, setTimelineViewportHeight] = useState<number | null>(null);
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(null);
   const [confirmStage, setConfirmStage] = useState<ConfirmStage>("");
-  const [pointerDrag, setPointerDrag] = useState<PointerDragRender | null>(null);
-  const calendarFrameRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<PointerDragSession | null>(null);
-  const dragAbortRef = useRef<AbortController | null>(null);
-  const suppressClickRef = useRef(false);
-  const timeBoundsRef = useRef<TimeBounds | null>(null);
-  const bookingsRef = useRef<AppointmentCalendarBooking[]>([]);
   const [isPending, startTransition] = useTransition();
-  const groupedBookings = useMemo(() => bookingsByDate(bookings), [bookings]);
+  const bookingById = useMemo(() => new Map(bookings.map((booking) => [booking.id, booking])), [bookings]);
   const dayLabels = useMemo(() => new Map(days.map((day) => [day.dateKey, day.label])), [days]);
   const visibleDays = useMemo(() => daysForView(days, activeView, selectedDateKey), [activeView, days, selectedDateKey]);
   const visibleDateKeys = useMemo(() => new Set(visibleDays.map((day) => day.dateKey)), [visibleDays]);
@@ -689,40 +415,38 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
     () => bookings.filter((booking) => visibleDateKeys.has(booking.dateKey)),
     [bookings, visibleDateKeys]
   );
-  const selectedBooking = useMemo(
-    () => visibleBookings.find((booking) => booking.id === selectedBookingId) || null,
-    [selectedBookingId, visibleBookings]
-  );
+  const selectedBooking = selectedBookingId ? bookingById.get(selectedBookingId) || null : null;
   const selectedDayLabel = selectedBooking ? dayLabels.get(selectedBooking.dateKey) || selectedBooking.dateKey : "";
-  const timeBounds = useMemo(
-    () => timeBoundsFor(visibleBookings, hours, timelineViewportHeight),
-    [visibleBookings, hours, timelineViewportHeight]
-  );
-  const stripStyle: StripStyle = { "--appointment-strip-height": `${timeBounds.height}px` };
   const viewSummary = rangeSummary(activeView, visibleDays, visibleBookings.length);
+  const slotMinHour = Math.max(0, Math.min(...hours, 7));
+  const slotMaxHour = Math.min(24, Math.max(...hours, 19) + 1);
+
+  const calendarEvents = useMemo<EventInput[]>(
+    () =>
+      bookings.map((booking) => ({
+        id: booking.id,
+        title: `${booking.customerName} - ${booking.serviceName}`,
+        start: booking.startsAt,
+        end: booking.endsAt,
+        editable: canDrag(booking),
+        startEditable: canDrag(booking),
+        durationEditable: false,
+        classNames: [
+          "appointment-fc-event",
+          statusClass(booking),
+          canDrag(booking) ? "can-reschedule" : "locked",
+          booking.warnings.length ? "has-warning" : ""
+        ].filter(Boolean),
+        extendedProps: { booking }
+      })),
+    [bookings]
+  );
 
   useEffect(() => {
-    timeBoundsRef.current = timeBounds;
-    bookingsRef.current = bookings;
-  });
-
-  useEffect(() => {
-    const frame = calendarFrameRef.current;
-    if (!frame || typeof ResizeObserver === "undefined") return;
-
-    const updateTimelineHeight = () => {
-      const controls = frame.querySelector(".appointment-calendar-client-bar");
-      const controlsHeight = controls instanceof HTMLElement ? controls.getBoundingClientRect().height : 0;
-      const frameHeight = frame.getBoundingClientRect().height;
-      const nextHeight = frameHeight - controlsHeight - 62;
-      setTimelineViewportHeight(nextHeight > 0 ? nextHeight : null);
-    };
-
-    updateTimelineHeight();
-    const observer = new ResizeObserver(updateTimelineHeight);
-    observer.observe(frame);
-    return () => observer.disconnect();
-  }, [activeView]);
+    const api = calendarRef.current?.getApi();
+    if (!api) return;
+    api.changeView(fullCalendarViewFor(activeView), selectedDateKey);
+  }, [activeView, selectedDateKey]);
 
   useEffect(() => {
     if (!selectedBookingId) return;
@@ -743,7 +467,6 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
     setMessage("");
     setConfirmStage("");
     setPendingReschedule(null);
-    setDraggedBooking(null);
 
     const viewInput = document.getElementById(calendarViewInputId);
     if (viewInput instanceof HTMLInputElement) {
@@ -752,38 +475,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
 
     const url = new URL(window.location.href);
     url.searchParams.set("view", nextView);
-    window.history.replaceState(null, "", url);
-  }
-
-  function dropBooking(dateKey: string, hour?: number, minuteOverride?: number) {
-    const bookingId = draggedBooking?.id;
-    if (!bookingId) return;
-    const minute = minuteOverride ?? draggedBooking.minute;
-    const targetHour = hour ?? bookings.find((booking) => booking.id === bookingId)?.hour ?? 9;
-    const targetKey = `${bookingId}:${dateKey}:${targetHour}:${minute}`;
-    setPendingTarget(targetKey);
-    setMessage("");
-
-    startTransition(async () => {
-      const result = await rescheduleBookingFromCalendarAction({
-        bookingId,
-        dateKey,
-        hour: targetHour,
-        minute
-      });
-
-      if (!result.ok) {
-        setMessage(result.error || "Unable to reschedule appointment.");
-        setPendingTarget("");
-        setDraggedBooking(null);
-        return;
-      }
-
-      setMessage("Appointment rescheduled.");
-      setPendingTarget("");
-      setDraggedBooking(null);
-      router.refresh();
-    });
+    router.replace(`${url.pathname}${url.search}`);
   }
 
   function cancelReschedule() {
@@ -796,7 +488,6 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
     if (!pending) return;
     setConfirmStage("");
     setMessage("");
-    setPendingTarget(`${pending.booking.id}:${pending.dateKey}:${pending.hour}:${pending.minute}`);
 
     startTransition(async () => {
       const result = await rescheduleBookingFromCalendarAction({
@@ -808,7 +499,6 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
       });
 
       setPendingReschedule(null);
-      setPendingTarget("");
 
       if (!result.ok) {
         setMessage(result.error || "Unable to reschedule appointment.");
@@ -820,111 +510,36 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
     });
   }
 
-  function allowDrop(event: DragEvent<HTMLElement>) {
-    if (!draggedBooking) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
+  function handleEventClick(info: EventClickArg) {
+    info.jsEvent.preventDefault();
+    setSelectedBookingId(info.event.id);
+    setMessage("");
   }
 
-  const handlePointerMove = useCallback((event: PointerEvent) => {
-    const drag = dragRef.current;
-    const bounds = timeBoundsRef.current;
-    if (!drag || !bounds || event.pointerId !== drag.pointerId) return;
-
-    const dx = event.clientX - drag.startX;
-    const dy = event.clientY - drag.startY;
-    drag.moved = drag.moved || Math.hypot(dx, dy) > 4;
-
-    // Find which day lane the pointer is over so dragging across days works too.
-    const node = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
-    const lane = node?.closest?.(".appointment-strip-day-lane") as HTMLElement | null;
-    const laneKey = lane?.dataset.dateKey;
-    if (lane && laneKey) {
-      const rect = lane.getBoundingClientRect();
-      const chipTopY = event.clientY - drag.grabOffsetPx;
-      const ratio = clamp((chipTopY - rect.top) / Math.max(rect.height, 1), 0, 1);
-      const rawMinute = bounds.startMinute + ratio * bounds.totalMinutes;
-      drag.targetDateKey = laneKey;
-      drag.targetMinute = clamp(Math.round(rawMinute / 15) * 15, bounds.startMinute, bounds.endMinute - drag.durationMinutes);
+  function handleEventDrop(info: EventDropArg) {
+    const booking = bookingById.get(info.event.id);
+    const start = info.event.start;
+    if (!booking || !start || !canDrag(booking)) {
+      info.revert();
+      return;
     }
 
-    if (drag.moved && event.cancelable) event.preventDefault();
-    setPointerDrag({
-      bookingId: drag.bookingId,
-      dx,
-      dy,
-      moved: drag.moved,
-      targetDateKey: drag.targetDateKey,
-      targetMinute: drag.targetMinute
-    });
-  }, []);
-
-  const handlePointerUp = useCallback((event: PointerEvent) => {
-    const drag = dragRef.current;
-    dragAbortRef.current?.abort();
-    dragAbortRef.current = null;
-    dragRef.current = null;
-    setPointerDrag(null);
-    if (!drag || event.pointerId !== drag.pointerId) return;
-    if (!drag.moved) return; // a tap, not a drag — let onClick expand the card
-
-    suppressClickRef.current = true;
-    const booking = bookingsRef.current.find((item) => item.id === drag.bookingId);
-    if (!booking) return;
-    if (drag.targetDateKey === drag.originDateKey && drag.targetMinute === drag.originMinute) return;
-
+    const end = info.event.end || addMinutes(start, booking.durationMinutes);
+    const parts = zonedDateParts(start, timezone);
+    setSelectedBookingId("");
     setMessage("");
     setPendingReschedule({
       booking,
-      dateKey: drag.targetDateKey,
-      hour: Math.floor(drag.targetMinute / 60),
-      minute: drag.targetMinute % 60,
-      newStartLabel: formatClockLabel(drag.targetMinute),
-      newEndLabel: formatClockLabel(drag.targetMinute + Math.max(booking.durationMinutes, 15))
+      dateKey: parts.dateKey,
+      hour: parts.hour,
+      minute: parts.minute,
+      newDateLabel: formatDateLabel(start, timezone),
+      newEndLabel: formatClockLabel(end, timezone),
+      newStartLabel: formatClockLabel(start, timezone)
     });
     setConfirmStage("change");
-  }, []);
-
-  function beginPointerDrag(booking: AppointmentCalendarBooking, event: ReactPointerEvent<HTMLElement>) {
-    if (!canDrag(booking)) return;
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-
-    const rect = event.currentTarget.getBoundingClientRect();
-    const originMinute = booking.hour * 60 + booking.minute;
-    dragRef.current = {
-      bookingId: booking.id,
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      grabOffsetPx: event.clientY - rect.top,
-      durationMinutes: Math.max(booking.durationMinutes, 15),
-      originDateKey: booking.dateKey,
-      originMinute,
-      targetDateKey: booking.dateKey,
-      targetMinute: originMinute,
-      moved: false
-    };
-    setSelectedBookingId("");
-    setMessage("");
-    setPointerDrag({ bookingId: booking.id, dx: 0, dy: 0, moved: false, targetDateKey: booking.dateKey, targetMinute: originMinute });
-
-    dragAbortRef.current?.abort();
-    const controller = new AbortController();
-    dragAbortRef.current = controller;
-    window.addEventListener("pointermove", handlePointerMove, { signal: controller.signal });
-    window.addEventListener("pointerup", handlePointerUp, { signal: controller.signal });
-    window.addEventListener("pointercancel", handlePointerUp, { signal: controller.signal });
+    info.revert();
   }
-
-  function selectTimelineBooking(bookingId: string) {
-    if (suppressClickRef.current) {
-      suppressClickRef.current = false;
-      return;
-    }
-    setSelectedBookingId(bookingId);
-  }
-
-  useEffect(() => () => dragAbortRef.current?.abort(), []);
 
   const viewControls = (
     <div className="appointment-calendar-client-bar">
@@ -938,6 +553,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
       <p className="ui-zero">{viewSummary}</p>
     </div>
   );
+
   const floatingDetails = selectedBooking ? (
     <AppointmentFloatingDetails
       booking={selectedBooking}
@@ -945,6 +561,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
       onClose={() => setSelectedBookingId("")}
     />
   ) : null;
+
   const rescheduleModals = pendingReschedule ? (
     <>
       <Modal onClose={cancelReschedule} open={confirmStage === "change"} title="Reschedule appointment?">
@@ -955,12 +572,17 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
           <div className="appointment-confirm-times">
             <div>
               <span>From</span>
-              <strong>{pendingReschedule.booking.timeLabel} - {pendingReschedule.booking.endTimeLabel}</strong>
+              <strong>
+                {dayLabels.get(pendingReschedule.booking.dateKey) || pendingReschedule.booking.dateKey} | {pendingReschedule.booking.timeLabel} -{" "}
+                {pendingReschedule.booking.endTimeLabel}
+              </strong>
             </div>
             <CalendarClock aria-hidden="true" size={20} />
             <div>
               <span>To</span>
-              <strong>{pendingReschedule.newStartLabel} - {pendingReschedule.newEndLabel}</strong>
+              <strong>
+                {pendingReschedule.newDateLabel} | {pendingReschedule.newStartLabel} - {pendingReschedule.newEndLabel}
+              </strong>
             </div>
           </div>
           <div className="appointment-confirm-actions">
@@ -977,7 +599,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
         <div className="appointment-confirm">
           <p className="appointment-confirm-lead">
             Let {pendingReschedule.booking.customerName} know their {pendingReschedule.booking.serviceName} moved to{" "}
-            {pendingReschedule.newStartLabel} - {pendingReschedule.newEndLabel}.
+            {pendingReschedule.newDateLabel} at {pendingReschedule.newStartLabel}.
           </p>
           {pendingReschedule.booking.customerEmail ? (
             <p className="appointment-confirm-note">A reschedule notice will be sent to {pendingReschedule.booking.customerEmail}.</p>
@@ -1003,188 +625,54 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
     </>
   ) : null;
 
-  if (activeView === "agenda") {
-    return (
-      <div className="appointment-calendar" ref={calendarFrameRef}>
-        <CalendarStatus message={message} pending={isPending} />
-        {viewControls}
-        <div className="appointment-agenda-list">
-          {visibleDays.map((day) => {
-            const dayBookings = groupedBookings.get(day.dateKey) || [];
-            return (
-              <section className="appointment-agenda-day" key={day.dateKey}>
-                <h3>
-                  <CalendarDays size={17} />
-                  {day.label}
-                </h3>
-                {dayBookings.length ? (
-                  dayBookings.map((booking) => (
-                    <AppointmentCard
-                      booking={booking}
-                      key={booking.id}
-                      onDragStart={(item) => setDraggedBooking(item)}
-                      onSelect={setSelectedBookingId}
-                      selected={selectedBookingId === booking.id}
-                    />
-                  ))
-                ) : (
-                  <p>No appointments.</p>
-                )}
-              </section>
-            );
-          })}
-        </div>
-        {floatingDetails}
-        {rescheduleModals}
-      </div>
-    );
-  }
-
-  if (activeView === "month") {
-    return (
-      <div className="appointment-calendar" ref={calendarFrameRef}>
-        <CalendarStatus message={message} pending={isPending} />
-        {viewControls}
-        <div className="appointment-month-grid">
-          {visibleDays.map((day) => {
-            const dayBookings = groupedBookings.get(day.dateKey) || [];
-            return (
-              <section
-                className={[
-                  "appointment-month-day",
-                  day.isToday ? "today" : "",
-                  day.isOutsideMonth ? "outside" : "",
-                  draggedBooking ? "drop-ready" : ""
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                key={day.dateKey}
-                onDragOver={allowDrop}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  dropBooking(day.dateKey);
-                }}
-              >
-                <h3>
-                  <span>{day.shortLabel}</span>
-                  <strong>{day.dayNumber}</strong>
-                </h3>
-                <div className="appointment-month-events">
-                  {dayBookings.slice(0, 4).map((booking) => (
-                    <AppointmentCard
-                      booking={booking}
-                      display="compact"
-                      key={booking.id}
-                      onDragStart={(item) => setDraggedBooking(item)}
-                      onSelect={setSelectedBookingId}
-                      selected={selectedBookingId === booking.id}
-                    />
-                  ))}
-                  {dayBookings.length > 4 ? <span className="ui-badge">+{dayBookings.length - 4} more</span> : null}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-        {floatingDetails}
-        {rescheduleModals}
-      </div>
-    );
-  }
-
   return (
-    <div className="appointment-calendar" ref={calendarFrameRef}>
+    <div className="appointment-calendar">
       <CalendarStatus message={message} pending={isPending} />
       {viewControls}
-      <div className={activeView === "day" ? "appointment-time-strip single-day" : "appointment-time-strip"} style={stripStyle}>
-        {selectedBooking ? (
-          <button
-            aria-label="Close appointment details"
-            className="appointment-grow-scrim"
-            onClick={() => setSelectedBookingId("")}
-            type="button"
-          />
-        ) : null}
-        <div className="appointment-strip-corner">Time</div>
-        {visibleDays.map((day) => (
-          <div className={day.isToday ? "appointment-strip-day-heading today" : "appointment-strip-day-heading"} key={day.dateKey}>
-            <span>{day.shortLabel}</span>
-            <strong>{day.dayNumber}</strong>
-          </div>
-        ))}
-        <div className="appointment-strip-label-rail">
-          {timeBounds.markers.filter((marker) => marker.kind !== "quarter").map((marker) => (
-            <span className={`appointment-strip-time-label ${marker.kind}`} key={marker.minute} style={markerStyle(marker.minute, timeBounds)}>
-              {timeMarkerLabel(marker)}
-            </span>
-          ))}
-        </div>
-        {visibleDays.map((day) => {
-          const dayBookings = groupedBookings.get(day.dateKey) || [];
-          const positionedBookings = positionedBookingsFor(dayBookings, timeBounds);
-          const pendingOnDay = pendingTarget ? pendingTarget.split(":")[1] === day.dateKey : false;
-          const dragOnDay = Boolean(pointerDrag?.moved) && pointerDrag?.targetDateKey === day.dateKey;
-          const dragDurationMinutes = pointerDrag
-            ? Math.max(bookings.find((item) => item.id === pointerDrag.bookingId)?.durationMinutes ?? 15, 15)
-            : 15;
-
-          return (
-            <section
-              className={[
-                "appointment-strip-day-lane",
-                day.isToday ? "today" : "",
-                pointerDrag?.moved ? "drop-ready" : "",
-                dragOnDay ? "drag-target" : "",
-                pendingOnDay ? "pending" : ""
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              data-date-key={day.dateKey}
-              key={day.dateKey}
-            >
-              <div className="appointment-strip-lines" aria-hidden="true">
-                {timeBounds.markers.map((marker) => (
-                  <span className={`appointment-strip-line ${marker.kind}`} key={marker.minute} style={markerStyle(marker.minute, timeBounds)} />
-                ))}
-              </div>
-              {dragOnDay && pointerDrag ? (
-                <div
-                  aria-hidden="true"
-                  className="appointment-drop-indicator"
-                  style={
-                    {
-                      "--appointment-indicator-height": `${(dragDurationMinutes / timeBounds.totalMinutes) * timeBounds.height}px`,
-                      "--appointment-marker-top": `${((pointerDrag.targetMinute - timeBounds.startMinute) / timeBounds.totalMinutes) * timeBounds.height}px`
-                    } as IndicatorStyle
-                  }
-                >
-                  <span>{formatClockLabel(pointerDrag.targetMinute)}</span>
-                </div>
-              ) : null}
-              {positionedBookings.map((position) => (
-                <AppointmentCard
-                  booking={position.booking}
-                  dayLabel={dayLabels.get(day.dateKey) || day.label}
-                  display="timeline"
-                  dragging={pointerDrag?.bookingId === position.booking.id && pointerDrag.moved}
-                  dragOffset={
-                    pointerDrag?.bookingId === position.booking.id ? { dx: pointerDrag.dx, dy: pointerDrag.dy } : undefined
-                  }
-                  expanded={selectedBookingId === position.booking.id}
-                  key={position.booking.id}
-                  onClose={() => setSelectedBookingId("")}
-                  onDragStart={(item) => setDraggedBooking(item)}
-                  onPointerDragStart={beginPointerDrag}
-                  onSelect={selectTimelineBooking}
-                  selected={selectedBookingId === position.booking.id}
-                  style={timelineStyle(position, timeBounds)}
-                />
-              ))}
-              {!positionedBookings.length ? <span className="appointment-strip-empty">No appointments</span> : null}
-            </section>
-          );
-        })}
+      <div className="appointment-fullcalendar">
+        <FullCalendar
+          ref={calendarRef}
+          allDaySlot={false}
+          dayMaxEvents
+          editable
+          eventClick={handleEventClick}
+          eventContent={(eventInfo) => <AppointmentEventContent {...eventInfo} />}
+          eventDisplay="block"
+          eventDrop={handleEventDrop}
+          eventDurationEditable={false}
+          eventMinHeight={28}
+          events={calendarEvents}
+          expandRows
+          firstDay={0}
+          headerToolbar={false}
+          height="100%"
+          initialDate={selectedDateKey}
+          initialView={fullCalendarViewFor(activeView)}
+          listDayFormat={{ month: "short", day: "numeric", weekday: "short" }}
+          listDaySideFormat={false}
+          moreLinkClick="popover"
+          nowIndicator
+          plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+          snapDuration="00:15:00"
+          slotDuration="00:30:00"
+          slotMaxTime={slotTime(slotMaxHour)}
+          slotMinTime={slotTime(slotMinHour)}
+          slotEventOverlap={false}
+          timeZone={timezone}
+          views={{
+            appointmentAgenda: {
+              buttonText: "agenda",
+              duration: { days: 14 },
+              type: "list"
+            }
+          }}
+          viewDidMount={(info) => {
+            const nextView = appointmentViewFor(info.view.type);
+            if (nextView !== activeView) setActiveView(nextView);
+          }}
+        />
       </div>
+      {floatingDetails}
       {rescheduleModals}
     </div>
   );
@@ -1192,10 +680,11 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
 
 function CalendarStatus({ message, pending }: { message: string; pending: boolean }) {
   if (!message && !pending) return null;
+  const success = message.startsWith("Appointment rescheduled");
 
   return (
-    <div className={message === "Appointment rescheduled." ? "success-message" : "error"}>
-      {message === "Appointment rescheduled." ? <ListChecks size={18} /> : <AlertTriangle size={18} />}
+    <div className={success ? "success-message" : "error"}>
+      {success ? <ListChecks size={18} /> : <AlertTriangle size={18} />}
       {pending ? "Checking conflicts..." : message}
     </div>
   );

@@ -18,7 +18,6 @@ export const manifest = {
   },
   capabilities: [
     { label: "Catalog admin", status: "foundation" },
-    { label: "Coupon admin", status: "foundation" },
     { label: "Checkout/storefront", status: "foundation" },
     { label: "Abandoned-cart recovery", status: "live" },
     { label: "Order dashboard", status: "foundation" }
@@ -27,7 +26,7 @@ export const manifest = {
   publicRoutes: ["/shop", "/shop/[slug]", "/cart", "/api/public/v1/products", "/api/public/v1/checkout"],
   widgetRoutes: ["/embed/v1/buy-button.js"],
   dependencies: ["media", "billing"],
-  dataModels: ["Product", "ProductVariant", "Collection", "Coupon", "Cart", "Order", "Payment"],
+  dataModels: ["Product", "ProductVariant", "Collection", "Cart", "Order", "Payment"],
   permissions: ["products:manage"],
   settingsSections: ["Commerce", "Payments"],
   healthChecks: ["active-products", "checkout-adapter"]
