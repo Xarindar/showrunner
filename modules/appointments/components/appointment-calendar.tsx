@@ -251,7 +251,7 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
-function timeBoundsFor(bookings: AppointmentCalendarBooking[], hours: number[]): TimeBounds {
+function timeBoundsFor(bookings: AppointmentCalendarBooking[], hours: number[], availableHeight?: number | null): TimeBounds {
   const bookingStartCandidates = bookings.map((booking) => minutesFromStartOfDay(booking));
   const bookingEndCandidates = bookings.map((booking) => minutesUntilEnd(booking));
   const fallbackStart = hours.length ? Math.min(...hours.map((hour) => hour * 60)) : 8 * 60;
@@ -269,9 +269,12 @@ function timeBoundsFor(bookings: AppointmentCalendarBooking[], hours: number[]):
     });
   }
 
+  const fallbackHeight = Math.max(720, Math.round(totalMinutes * 1.65));
+  const height = availableHeight ? Math.max(420, Math.round(availableHeight)) : fallbackHeight;
+
   return {
     endMinute,
-    height: Math.max(720, Math.round(totalMinutes * 1.65)),
+    height,
     markers,
     startMinute,
     totalMinutes
@@ -667,9 +670,11 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
   const [pendingTarget, setPendingTarget] = useState("");
   const [message, setMessage] = useState("");
   const [selectedBookingId, setSelectedBookingId] = useState("");
+  const [timelineViewportHeight, setTimelineViewportHeight] = useState<number | null>(null);
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(null);
   const [confirmStage, setConfirmStage] = useState<ConfirmStage>("");
   const [pointerDrag, setPointerDrag] = useState<PointerDragRender | null>(null);
+  const calendarFrameRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<PointerDragSession | null>(null);
   const dragAbortRef = useRef<AbortController | null>(null);
   const suppressClickRef = useRef(false);
@@ -689,7 +694,10 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
     [selectedBookingId, visibleBookings]
   );
   const selectedDayLabel = selectedBooking ? dayLabels.get(selectedBooking.dateKey) || selectedBooking.dateKey : "";
-  const timeBounds = useMemo(() => timeBoundsFor(visibleBookings, hours), [visibleBookings, hours]);
+  const timeBounds = useMemo(
+    () => timeBoundsFor(visibleBookings, hours, timelineViewportHeight),
+    [visibleBookings, hours, timelineViewportHeight]
+  );
   const stripStyle: StripStyle = { "--appointment-strip-height": `${timeBounds.height}px` };
   const viewSummary = rangeSummary(activeView, visibleDays, visibleBookings.length);
 
@@ -697,6 +705,24 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
     timeBoundsRef.current = timeBounds;
     bookingsRef.current = bookings;
   });
+
+  useEffect(() => {
+    const frame = calendarFrameRef.current;
+    if (!frame || typeof ResizeObserver === "undefined") return;
+
+    const updateTimelineHeight = () => {
+      const controls = frame.querySelector(".appointment-calendar-client-bar");
+      const controlsHeight = controls instanceof HTMLElement ? controls.getBoundingClientRect().height : 0;
+      const frameHeight = frame.getBoundingClientRect().height;
+      const nextHeight = frameHeight - controlsHeight - 62;
+      setTimelineViewportHeight(nextHeight > 0 ? nextHeight : null);
+    };
+
+    updateTimelineHeight();
+    const observer = new ResizeObserver(updateTimelineHeight);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [activeView]);
 
   useEffect(() => {
     if (!selectedBookingId) return;
@@ -979,7 +1005,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
 
   if (activeView === "agenda") {
     return (
-      <div className="appointment-calendar">
+      <div className="appointment-calendar" ref={calendarFrameRef}>
         <CalendarStatus message={message} pending={isPending} />
         {viewControls}
         <div className="appointment-agenda-list">
@@ -1016,7 +1042,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
 
   if (activeView === "month") {
     return (
-      <div className="appointment-calendar">
+      <div className="appointment-calendar" ref={calendarFrameRef}>
         <CalendarStatus message={message} pending={isPending} />
         {viewControls}
         <div className="appointment-month-grid">
@@ -1067,7 +1093,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
   }
 
   return (
-    <div className="appointment-calendar">
+    <div className="appointment-calendar" ref={calendarFrameRef}>
       <CalendarStatus message={message} pending={isPending} />
       {viewControls}
       <div className={activeView === "day" ? "appointment-time-strip single-day" : "appointment-time-strip"} style={stripStyle}>

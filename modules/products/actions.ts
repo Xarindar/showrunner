@@ -128,6 +128,11 @@ function refreshProducts() {
   revalidatePath("/shop");
 }
 
+function productEditPath(productId: string, params?: Record<string, string>) {
+  const query = new URLSearchParams(params).toString();
+  return `/admin/modules/products/${productId}${query ? `?${query}` : ""}`;
+}
+
 async function syncDefaultVariant(
   tx: Prisma.TransactionClient,
   input: {
@@ -217,7 +222,8 @@ export async function createProductAction(formData: FormData) {
   });
 
   refreshProducts();
-  redirect(`/admin/modules/products?saved=product&product=${product.id}`);
+  revalidatePath(productEditPath(product.id));
+  redirect(productEditPath(product.id, { saved: "product" }));
 }
 
 export async function updateProductAction(formData: FormData) {
@@ -275,7 +281,8 @@ export async function updateProductAction(formData: FormData) {
   });
 
   refreshProducts();
-  redirect(`/admin/modules/products?saved=product&product=${input.id}`);
+  revalidatePath(productEditPath(input.id));
+  redirect(productEditPath(input.id, { saved: "product" }));
 }
 
 export async function updateProductStatusAction(formData: FormData) {
@@ -399,7 +406,8 @@ export async function createProductVariantAction(formData: FormData) {
   });
 
   refreshProducts();
-  redirect(`/admin/modules/products?saved=variant&product=${input.productId}`);
+  revalidatePath(productEditPath(input.productId));
+  redirect(productEditPath(input.productId, { saved: "variant" }));
 }
 
 export async function createCollectionAction(formData: FormData) {
@@ -456,7 +464,8 @@ export async function addProductToCollectionAction(formData: FormData) {
   });
 
   refreshProducts();
-  redirect(`/admin/modules/products?saved=collection-product&product=${input.productId}`);
+  revalidatePath(productEditPath(input.productId));
+  redirect(productEditPath(input.productId, { saved: "collection-product" }));
 }
 
 export async function createCouponAction(formData: FormData) {

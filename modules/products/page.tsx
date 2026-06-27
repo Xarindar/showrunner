@@ -3,17 +3,15 @@ import { CartStatus, CouponType, GiftCardStatus, OrderStatus, PaymentStatus, Pri
 import { BadgeDollarSign, Boxes, CreditCard, Download, ImageIcon, PackagePlus, ReceiptText, Search, Tags, Truck } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { nextOrderStatuses } from "@/lib/commerce/orders";
-import { enumLabel, formatDateTime, formatMoney, stringArrayCsv } from "@/lib/format";
+import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
-  addProductToCollectionAction,
   clearCommerceOrderCheckoutLinkAction,
   createCollectionAction,
   createCouponAction,
   createGiftCardAction,
   createProductAction,
-  createProductVariantAction,
   fulfillCommerceOrderAction,
   markCommerceOrderFulfillmentExportedAction,
   recordCommerceOrderPrintLabHandoffAction,
@@ -21,7 +19,6 @@ import {
   setCommerceOrderCheckoutLinkAction,
   refundCommercePaymentAction,
   updateCommerceOrderStatusAction,
-  updateProductAction,
   updateProductStatusAction } from "./actions";
 import { Button, ButtonAnchor, ButtonLink, Card, EqualGrid, Pagination, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
@@ -32,7 +29,7 @@ const pageSize = 50;
 const statusFilters = ["all", ...Object.values(ProductStatus).map((status) => status.toLowerCase())] as const;
 
 type ProductsPageProps = {
-  searchParams: Promise<{saved?: string;error?: string;page?: string;status?: string;product?: string;order?: string;q?: string;}>;
+  searchParams: Promise<{saved?: string;error?: string;page?: string;status?: string;order?: string;q?: string;}>;
 };
 
 function normalizeStatusFilter(value?: string) {
@@ -66,12 +63,10 @@ function currencyTotalsLabel(totals: {currency: string;_sum: {totalCents: number
 
 function productsHref({
   page,
-  product,
   q,
   status
 }: {
   page?: number;
-  product?: string;
   q?: string;
   status?: string;
 }) {
@@ -79,7 +74,6 @@ function productsHref({
   if (status && status !== "all") params.set("status", status);
   if (q) params.set("q", q);
   if (page && page > 1) params.set("page", String(page));
-  if (product) params.set("product", product);
   const query = params.toString();
   return query ? `/admin/modules/products?${query}` : "/admin/modules/products";
 }
@@ -166,7 +160,6 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const pageCount = Math.max(1, Math.ceil(productCount / pageSize));
   const rangeStart = productCount ? (page - 1) * pageSize + 1 : 0;
   const rangeEnd = Math.min(productCount, page * pageSize);
-  const selectedProduct = products.find((product) => product.id === params.product) || products[0];
   const selectedOrderId = params.order || orders[0]?.id;
   const selectedOrder = selectedOrderId ?
   await prisma.order.findFirst({
@@ -514,7 +507,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   </td>
                   <td>
                     <div className="ui-data-table-row-actions">
-                      <ButtonAnchor href={productsHref({ page, product: product.id, q: searchQuery, status: statusFilter })} size="sm" variant="secondary">
+                      <ButtonAnchor href={`/admin/modules/products/${product.id}`} size="sm" variant="secondary">
                         Edit
                       </ButtonAnchor>
                       <form action={updateProductStatusAction} className="ui-inline-form">
@@ -550,196 +543,6 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           />
         </div>
       </section>
-
-      {selectedProduct ?
-      <EqualGrid as="section">
-          <Card action={updateProductAction} as="form" minHeight="none" bodyClassName="form-grid">
-            <h2 className="section-title">Edit selected product</h2>
-            <input type="hidden" name="id" value={selectedProduct.id} />
-            <EqualGrid>
-              <div className="ui-field">
-                <label htmlFor={`product-${selectedProduct.id}-name`}>Name</label>
-                <input id={`product-${selectedProduct.id}-name`} name="name" defaultValue={selectedProduct.name} required />
-              </div>
-              <div className="ui-field">
-                <label htmlFor={`product-${selectedProduct.id}-slug`}>Shop URL slug</label>
-                <input id={`product-${selectedProduct.id}-slug`} name="slug" defaultValue={selectedProduct.slug} />
-              </div>
-            </EqualGrid>
-            <EqualGrid min="220px">
-              <div className="ui-field">
-                <label htmlFor={`product-${selectedProduct.id}-type`}>Type</label>
-                <select id={`product-${selectedProduct.id}-type`} name="type" defaultValue={selectedProduct.type}>
-                  {Object.values(ProductType).map((type) =>
-                <option key={type} value={type}>
-                      {enumLabel(type)}
-                    </option>
-                )}
-                </select>
-              </div>
-              <div className="ui-field">
-                <label htmlFor={`product-${selectedProduct.id}-status`}>Status</label>
-                <select id={`product-${selectedProduct.id}-status`} name="status" defaultValue={selectedProduct.status}>
-                  {Object.values(ProductStatus).map((status) =>
-                <option key={status} value={status}>
-                      {status.toLowerCase()}
-                    </option>
-                )}
-                </select>
-              </div>
-              <div className="ui-field">
-                <label htmlFor={`product-${selectedProduct.id}-currency`}>Currency</label>
-                <input id={`product-${selectedProduct.id}-currency`} name="currency" defaultValue={selectedProduct.currency} maxLength={3} required />
-              </div>
-            </EqualGrid>
-            <EqualGrid min="220px">
-              <div className="ui-field">
-                <label htmlFor={`product-${selectedProduct.id}-base-price`}>Price</label>
-                <input id={`product-${selectedProduct.id}-base-price`} name="basePrice" defaultValue={moneyInput(selectedProduct.basePriceCents)} required />
-              </div>
-              <div className="ui-field">
-                <label htmlFor={`product-${selectedProduct.id}-compare-price`}>Compare-at price</label>
-                <input id={`product-${selectedProduct.id}-compare-price`} name="compareAtPrice" defaultValue={moneyInput(selectedProduct.compareAtPriceCents)} />
-              </div>
-              <div className="ui-field">
-                <label htmlFor={`product-${selectedProduct.id}-sku`}>SKU</label>
-                <input id={`product-${selectedProduct.id}-sku`} name="sku" defaultValue={selectedProduct.sku || ""} />
-              </div>
-            </EqualGrid>
-            <div className="ui-field">
-              <label htmlFor={`product-${selectedProduct.id}-summary`}>Summary</label>
-              <input id={`product-${selectedProduct.id}-summary`} name="summary" defaultValue={selectedProduct.summary} />
-            </div>
-            <div className="ui-field">
-              <label htmlFor={`product-${selectedProduct.id}-description`}>Description</label>
-              <textarea id={`product-${selectedProduct.id}-description`} name="description" defaultValue={selectedProduct.description} />
-            </div>
-            <EqualGrid>
-              <div className="ui-field">
-                <label htmlFor={`product-${selectedProduct.id}-image`}>Image URL</label>
-                <input id={`product-${selectedProduct.id}-image`} name="imageUrl" defaultValue={selectedProduct.imageUrl} />
-              </div>
-              <div className="ui-field">
-                <label htmlFor={`product-${selectedProduct.id}-tags`}>Tags</label>
-                <input id={`product-${selectedProduct.id}-tags`} name="tags" defaultValue={stringArrayCsv(selectedProduct.tags)} />
-              </div>
-            </EqualGrid>
-            <EqualGrid>
-              <label className="ui-zero">
-                <input name="trackInventory" type="checkbox" defaultChecked={selectedProduct.trackInventory} />
-                Track default variant inventory
-              </label>
-              <div className="ui-field">
-                <label htmlFor={`product-${selectedProduct.id}-inventory`}>Inventory quantity</label>
-                <input
-                id={`product-${selectedProduct.id}-inventory`}
-                name="inventoryQuantity"
-                min="0"
-                type="number"
-                defaultValue={selectedProduct.inventoryQuantity ?? ""} />
-              
-              </div>
-            </EqualGrid>
-            <p className="lead lead-compact">
-              Inventory is governed per variant. Saving this product syncs price, status, SKU, and inventory to the default variant.
-            </p>
-            <Button type="submit">
-              Save product
-            </Button>
-          </Card>
-
-          <Card bodyClassName="ui-stack">
-            <div>
-              <h2 className="section-title">Variants for {selectedProduct.name}</h2>
-              <p className="ui-zero">Variants let the same product support sizes, packages, print formats, or add-on choices.</p>
-            </div>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Option</th>
-                  <th>Price</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedProduct.variants.map((variant) =>
-              <tr key={variant.id}>
-                    <td>
-                      <strong>{variant.name}</strong>
-                      <br />
-                      <span className="muted-text">{variant.sku || "No SKU"}</span>
-                    </td>
-                    <td>
-                      {variant.optionName || "Default"}
-                      {variant.optionValue ? `: ${variant.optionValue}` : ""}
-                    </td>
-                    <td>{formatMoney(variant.priceCents ?? selectedProduct.basePriceCents, selectedProduct.currency)}</td>
-                    <td>
-                      <span className={variant.isActive ? "ui-badge ui-badge-success" : "ui-badge ui-badge-danger"}>{variant.isActive ? "active" : "inactive"}</span>
-                    </td>
-                  </tr>
-              )}
-              </tbody>
-            </Table>
-            <form action={createProductVariantAction} className="subpanel form-grid">
-              <input type="hidden" name="productId" value={selectedProduct.id} />
-              <h3 className="subsection-title">Add variant</h3>
-              <EqualGrid>
-                <div className="ui-field">
-                  <label htmlFor="variantName">Name</label>
-                  <input id="variantName" name="name" placeholder="Large print" required />
-                </div>
-                <div className="ui-field">
-                  <label htmlFor="variantSku">SKU</label>
-                  <input id="variantSku" name="sku" />
-                </div>
-              </EqualGrid>
-              <EqualGrid>
-                <div className="ui-field">
-                  <label htmlFor="optionName">Option name</label>
-                  <input id="optionName" name="optionName" placeholder="Size" />
-                </div>
-                <div className="ui-field">
-                  <label htmlFor="optionValue">Option value</label>
-                  <input id="optionValue" name="optionValue" placeholder="16x20" />
-                </div>
-              </EqualGrid>
-              <EqualGrid min="220px">
-                <div className="ui-field">
-                  <label htmlFor="variantPrice">Price override</label>
-                  <input id="variantPrice" name="price" inputMode="decimal" />
-                </div>
-                <div className="ui-field">
-                  <label htmlFor="variantCompareAt">Compare-at price</label>
-                  <input id="variantCompareAt" name="compareAtPrice" inputMode="decimal" />
-                </div>
-                <div className="ui-field">
-                  <label htmlFor="variantInventory">Inventory quantity</label>
-                  <input id="variantInventory" name="inventoryQuantity" min="0" type="number" />
-                </div>
-              </EqualGrid>
-              <div className="ui-zero">
-                <label className="ui-zero">
-                  <input name="trackInventory" type="checkbox" />
-                  Track inventory
-                </label>
-                <label className="ui-zero">
-                  <input name="isDefault" type="checkbox" />
-                  Default
-                </label>
-                <label className="ui-zero">
-                  <input name="isActive" type="checkbox" defaultChecked />
-                  Active
-                </label>
-              </div>
-              <Button type="submit" variant="secondary">
-                Add variant
-              </Button>
-            </form>
-          </Card>
-        </EqualGrid> :
-      null}
 
       <EqualGrid as="section">
         <Card bodyClassName="ui-stack">
@@ -1233,24 +1036,6 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               Add collection
             </Button>
           </form>
-          {selectedProduct && collections.length ?
-          <form action={addProductToCollectionAction} className="subpanel form-grid">
-              <input type="hidden" name="productId" value={selectedProduct.id} />
-              <div className="ui-field">
-                <label htmlFor="collectionId">Add {selectedProduct.name} to collection</label>
-                <select id="collectionId" name="collectionId">
-                  {collections.map((collection) =>
-                <option key={collection.id} value={collection.id}>
-                      {collection.name}
-                    </option>
-                )}
-                </select>
-              </div>
-              <Button type="submit" variant="secondary">
-                Add to collection
-              </Button>
-            </form> :
-          null}
           <Table>
             <thead>
               <tr>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BookingStatus, BookingWaitlistStatus, Prisma } from "@prisma/client";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, Filter, ListChecks, Plus } from "lucide-react";
+import { CalendarDays, Clock, ListChecks, Plus } from "lucide-react";
 import { getAccessibleBookingWaitlistWhere, getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import { bookingConflictWarnings } from "@/lib/bookings/conflicts";
 import { clientStatusLabel } from "@/lib/clients/status";
@@ -10,6 +10,7 @@ import { getSiteSettings } from "@/lib/site";
 import { addDaysToDateKey, getTodayDateKey, parseZonedDateKey } from "@/lib/timezone";
 import { promoteWaitlistEntryAction, updateWaitlistEntryStatusAction } from "./actions";
 import { AppointmentCalendar, type AppointmentCalendarBooking, type AppointmentCalendarDay } from "./components/appointment-calendar";
+import { AppointmentCalendarShell } from "./components/appointment-calendar-shell";
 import { AppointmentsTable } from "./components/appointments-table";
 import { Button, ButtonLink, Pagination } from "@/components/ui";
 import { addDashboardCardAction } from "@/modules/dashboard/actions";
@@ -398,76 +399,88 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
 
   return (
     <div className="appointments-workspace">
-      <section className="appointments-scheduler-hero" aria-label="Appointment scheduler">
-        <header className="appointments-hero-bar">
-          <div className="appointments-hero-title">
-            <p className="eyebrow">Appointments</p>
-            <h1>Schedule</h1>
-            <p className="ui-zero">
-              {selectedRangeLabel} | {visibleCalendarItemCount} appointments
-            </p>
-          </div>
-          <div className="appointments-hero-actions">
-            <div className="appointments-date-controls" aria-label="Calendar range controls">
-              <ButtonLink
-                href={calendarHref({
-                  dateKey: calendarRange.previousDateKey,
-                  resourceId: selectedResourceId,
-                  staffId: selectedStaffId,
-                  statusFilter,
-                  view
-                })}
-                variant="secondary"
-              >
-                <ChevronLeft size={18} />
-                Previous
-              </ButtonLink>
-              <ButtonLink href={calendarHref({ dateKey: todayKey, resourceId: selectedResourceId, staffId: selectedStaffId, statusFilter, view })} variant="secondary">
-                Today
-              </ButtonLink>
-              <ButtonLink
-                href={calendarHref({
-                  dateKey: calendarRange.nextDateKey,
-                  resourceId: selectedResourceId,
-                  staffId: selectedStaffId,
-                  statusFilter,
-                  view
-                })}
-                variant="secondary"
-              >
-                Next
-                <ChevronRight size={18} />
-              </ButtonLink>
+      <AppointmentCalendarShell
+        appointmentCount={visibleCalendarItemCount}
+        appointmentListPanel={
+          <div className="appointments-modal-stack">
+            <div className="appointments-panel-head">
+              <div>
+                <h2>Appointment list</h2>
+                <p>{bookingCount} matching</p>
+              </div>
             </div>
-            <div className="appointments-secondary-actions">
-              <form action={addDashboardCardAction}>
-                <input name="cardId" type="hidden" value="appointments.today" />
-                <input name="returnTo" type="hidden" value={currentAppointmentsHref} />
-                <input name="size" type="hidden" value="lg" />
-                <Button type="submit" variant="secondary">
-                  <Plus size={18} />
-                  Add today card
-                </Button>
-              </form>
-              <ButtonLink href="/admin/modules/scheduling" variant="secondary">
+            <div className="appointments-status-filters">
+              {statusFilters.map((filter) => (
+                <Link
+                  className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"}
+                  href={calendarHref({
+                    dateKey: selectedDateKey,
+                    resourceId: selectedResourceId,
+                    staffId: selectedStaffId,
+                    statusFilter: filter,
+                    view
+                  })}
+                  key={filter}
+                >
+                  {filter}
+                </Link>
+              ))}
+            </div>
+            <div className="appointments-panel-table">
+              <AppointmentsTable bookings={bookings} timezone={settings.timezone} />
+            </div>
+            <Pagination
+              label="Appointment pages"
+              nextHref={calendarHref({
+                dateKey: selectedDateKey,
+                page: Math.min(pageCount, page + 1),
+                resourceId: selectedResourceId,
+                staffId: selectedStaffId,
+                statusFilter,
+                view
+              })}
+              page={page}
+              pageCount={pageCount}
+              previousHref={calendarHref({
+                dateKey: selectedDateKey,
+                page: Math.max(1, page - 1),
+                resourceId: selectedResourceId,
+                staffId: selectedStaffId,
+                statusFilter,
+                view
+              })}
+            />
+          </div>
+        }
+        bookingCount={bookingCount}
+        errorMessage={params.error}
+        filterPanel={
+          <div className="appointments-modal-stack">
+            <div className="appointments-inline-metrics" aria-label="Appointment status">
+              <div className="appointments-metric">
+                <Clock size={18} />
+                <span>
+                  <strong>{upcomingCount}</strong>
+                  Upcoming
+                </span>
+              </div>
+              <div className="appointments-metric">
+                <ListChecks size={18} />
+                <span>
+                  <strong>{pendingCount}</strong>
+                  Pending
+                </span>
+              </div>
+              <div className="appointments-metric">
                 <CalendarDays size={18} />
-                Scheduling setup
-              </ButtonLink>
+                <span>
+                  <strong>{waitlistCount}</strong>
+                  Waitlisted
+                </span>
+              </div>
             </div>
-          </div>
-        </header>
-
-        {params.saved || params.error ? (
-          <div className="appointments-workspace-messages">
-            {params.saved ? <div className="success-message">{savedMessage}</div> : null}
-            {params.error ? <div className="error">{params.error}</div> : null}
-          </div>
-        ) : null}
-
-        <div className="appointments-command-strip">
-          <form action="/admin/modules/appointments" className="appointment-calendar-filters appointments-hero-filters">
+            <form id="appointments-filter-form" action="/admin/modules/appointments" className="appointment-calendar-filters appointments-hero-filters">
             <input name="status" type="hidden" value={statusFilter} />
-            <input id="appointment-calendar-view-input" name="view" type="hidden" defaultValue={view} />
             <label>
               Date
               <input name="date" type="date" defaultValue={selectedDateKey} />
@@ -495,43 +508,49 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
               </select>
             </label>
             <Button type="submit" variant="secondary">
-              <Filter size={18} />
               Apply
             </Button>
-          </form>
-
-          <div className="appointments-inline-metrics" aria-label="Appointment status">
-            <div className="appointments-metric">
-              <Clock size={18} />
-              <span>
-                <strong>{upcomingCount}</strong>
-                Upcoming
-              </span>
-            </div>
-            <div className="appointments-metric">
-              <ListChecks size={18} />
-              <span>
-                <strong>{pendingCount}</strong>
-                Pending
-              </span>
-            </div>
-            <div className="appointments-metric">
-              <CalendarDays size={18} />
-              <span>
-                <strong>{waitlistCount}</strong>
-                Waitlisted
-              </span>
-            </div>
+            </form>
           </div>
-        </div>
-
-        <div className="appointments-hero-grid">
-          <section className="appointments-schedule-stage" aria-label="Schedule calendar">
-            <AppointmentCalendar bookings={calendarItems} days={days} hours={calendarHours} selectedDateKey={selectedDateKey} view={view} />
-          </section>
-
-          <aside className="appointments-context-rail" aria-label="Schedule tools">
-            <section className="appointments-rail-panel">
+        }
+        nextHref={calendarHref({
+          dateKey: calendarRange.nextDateKey,
+          resourceId: selectedResourceId,
+          staffId: selectedStaffId,
+          statusFilter,
+          view
+        })}
+        previousHref={calendarHref({
+          dateKey: calendarRange.previousDateKey,
+          resourceId: selectedResourceId,
+          staffId: selectedStaffId,
+          statusFilter,
+          view
+        })}
+        rangeLabel={selectedRangeLabel}
+        savedMessage={params.saved ? savedMessage : undefined}
+        todayHref={calendarHref({ dateKey: todayKey, resourceId: selectedResourceId, staffId: selectedStaffId, statusFilter, view })}
+        toolsPanel={
+          <div className="appointments-tools-list">
+            <form action={addDashboardCardAction}>
+              <input name="cardId" type="hidden" value="appointments.today" />
+              <input name="returnTo" type="hidden" value={currentAppointmentsHref} />
+              <input name="size" type="hidden" value="lg" />
+              <Button type="submit" variant="secondary">
+                <Plus size={18} />
+                Add today card
+              </Button>
+            </form>
+            <ButtonLink href="/admin/modules/scheduling" variant="secondary">
+              <CalendarDays size={18} />
+              Scheduling setup
+            </ButtonLink>
+          </div>
+        }
+        view={view}
+        waitlistCount={waitlistCount}
+        waitlistPanel={
+          <div className="appointments-modal-stack">
               <div className="appointments-panel-head">
                 <div>
                   <h2>Waitlist</h2>
@@ -586,60 +605,11 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
                 ))}
                 {!waitlistEntries.length ? <p className="ui-zero">No waitlist entries match these filters.</p> : null}
               </div>
-            </section>
-
-            <section className="appointments-rail-panel appointments-list-panel">
-              <div className="appointments-panel-head">
-                <div>
-                  <h2>Appointment list</h2>
-                  <p>{bookingCount} matching</p>
-                </div>
-              </div>
-              <div className="appointments-status-filters">
-                {statusFilters.map((filter) => (
-                  <Link
-                    className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"}
-                    href={calendarHref({
-                      dateKey: selectedDateKey,
-                      resourceId: selectedResourceId,
-                      staffId: selectedStaffId,
-                      statusFilter: filter,
-                      view
-                    })}
-                    key={filter}
-                  >
-                    {filter}
-                  </Link>
-                ))}
-              </div>
-              <div className="appointments-panel-table">
-                <AppointmentsTable bookings={bookings} timezone={settings.timezone} />
-              </div>
-              <Pagination
-                label="Appointment pages"
-                nextHref={calendarHref({
-                  dateKey: selectedDateKey,
-                  page: Math.min(pageCount, page + 1),
-                  resourceId: selectedResourceId,
-                  staffId: selectedStaffId,
-                  statusFilter,
-                  view
-                })}
-                page={page}
-                pageCount={pageCount}
-                previousHref={calendarHref({
-                  dateKey: selectedDateKey,
-                  page: Math.max(1, page - 1),
-                  resourceId: selectedResourceId,
-                  staffId: selectedStaffId,
-                  statusFilter,
-                  view
-                })}
-              />
-            </section>
-          </aside>
-        </div>
-      </section>
+            </div>
+        }
+      >
+        <AppointmentCalendar bookings={calendarItems} days={days} hours={calendarHours} selectedDateKey={selectedDateKey} view={view} />
+      </AppointmentCalendarShell>
     </div>);
 
 }

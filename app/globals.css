@@ -28,9 +28,12 @@ body {
   --workspace-surface-soft: color-mix(in srgb, var(--color-surface-sunken) 46%, var(--color-surface));
   --workspace-border: color-mix(in srgb, var(--color-border) 84%, transparent);
   --workspace-shadow: var(--shadow-panel);
+  --workspace-overlay: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  --workspace-overlay-strong: color-mix(in srgb, var(--color-surface) 96%, transparent);
   --workspace-rail-width: 360px;
   --workspace-gutter: var(--space-3);
   --workspace-inset: var(--space-4);
+  --workspace-mobile-bleed: 18px;
 }
 
 * {
@@ -1641,6 +1644,190 @@ button.button:disabled,
 .products-col-price { width: 100px; }
 .products-col-actions { width: 156px; }
 
+.product-editor-page {
+  gap: var(--space-4);
+}
+
+.product-editor-header,
+.product-editor-section-head,
+.product-editor-actions,
+.product-editor-checks,
+.product-editor-collection-list,
+.product-editor-collection-form {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.product-editor-header {
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hairline);
+  justify-content: space-between;
+  padding: var(--space-3);
+  position: sticky;
+  top: var(--space-3);
+  z-index: 4;
+}
+
+.product-editor-title {
+  display: grid;
+  gap: var(--space-2);
+  min-width: min(100%, 320px);
+}
+
+.product-editor-title h1 {
+  font-size: var(--type-h2);
+  margin-bottom: 0;
+}
+
+.product-editor-actions {
+  justify-content: flex-end;
+}
+
+.product-editor-grid {
+  align-items: start;
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  min-width: 0;
+}
+
+.product-editor-main,
+.product-editor-rail {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.product-editor-rail {
+  position: sticky;
+  top: calc(var(--space-3) + 94px);
+}
+
+.product-editor-panel {
+  background: var(--color-surface);
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hairline);
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+}
+
+.product-editor-section-head {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.product-editor-section-head p {
+  color: var(--color-muted);
+}
+
+.product-editor-panel textarea {
+  min-height: 160px;
+  resize: vertical;
+}
+
+.product-editor-media-row {
+  align-items: stretch;
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.product-editor-media-preview,
+.product-editor-media-empty {
+  aspect-ratio: 11 / 8;
+  background: color-mix(in srgb, var(--color-border) 28%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+  border-radius: var(--radius-control);
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.product-editor-media-empty {
+  align-items: center;
+  color: var(--color-muted);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.product-editor-variants-table {
+  min-width: 760px;
+}
+
+.product-editor-variants-table th,
+.product-editor-variants-table td {
+  height: 52px;
+  white-space: nowrap;
+}
+
+.product-editor-default-badge {
+  margin-left: var(--space-2);
+}
+
+.product-editor-add-form {
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding-top: var(--space-3);
+}
+
+.product-editor-checks {
+  justify-content: flex-start;
+}
+
+.product-editor-collection-list {
+  justify-content: flex-start;
+}
+
+.product-editor-collection-form {
+  align-items: flex-end;
+}
+
+.product-editor-collection-form .ui-field {
+  flex: 1 1 260px;
+}
+
+@media (max-width: 920px) {
+  .product-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-editor-rail {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .product-editor-header {
+    align-items: stretch;
+    position: static;
+  }
+
+  .product-editor-actions,
+  .product-editor-actions .ui-button {
+    width: 100%;
+  }
+
+  .product-editor-media-row {
+    grid-template-columns: 1fr;
+  }
+
+  .product-editor-panel {
+    padding: var(--space-3);
+  }
+}
+
 .ui-data-table-stats {
   background: var(--data-table-strip-bg);
   border-top: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
@@ -2916,6 +3103,12 @@ button.button:disabled,
   align-content: start;
   margin: 0 auto;
   max-width: 1360px;
+}
+
+.admin-main > .stack:has(.appointments-workspace) {
+  margin: 0;
+  max-width: none;
+  min-height: 100%;
 }
 
 .admin-main > .stack > .page-header {
@@ -5082,33 +5275,86 @@ button.button:disabled,
 }
 
 .appointments-workspace {
-  --appointments-hero-min-height: calc(100dvh - (var(--space-7) * 2));
-  min-height: var(--appointments-hero-min-height);
-  min-width: 0;
-}
-
-.appointments-scheduler-hero {
-  background: var(--workspace-bg);
-  border: 1px solid var(--workspace-border);
-  border-radius: var(--radius-card);
-  box-shadow: var(--workspace-shadow);
-  display: grid;
-  gap: var(--workspace-gutter);
-  grid-template-rows: auto auto minmax(0, 1fr);
-  min-height: var(--appointments-hero-min-height);
+  --appointments-header-height: 58px;
+  margin: calc(var(--space-7) * -1);
+  height: 100dvh;
+  min-height: 100dvh;
   min-width: 0;
   overflow: hidden;
-  padding: var(--workspace-inset);
 }
 
-.appointments-hero-bar,
-.appointments-command-strip,
-.appointments-hero-actions,
-.appointments-date-controls,
-.appointments-secondary-actions,
+.appointments-calendar-shell {
+  background: var(--workspace-bg);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.appointments-workspace-messages {
+  display: grid;
+  gap: var(--space-2);
+  left: 50%;
+  max-width: min(560px, calc(100vw - var(--space-8)));
+  position: absolute;
+  top: calc(var(--appointments-header-height) + var(--space-3));
+  transform: translateX(-50%);
+  width: 100%;
+  z-index: 20;
+}
+
+.appointments-subtle-header {
+  align-items: center;
+  background: var(--workspace-overlay);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--workspace-border);
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-height: var(--appointments-header-height);
+  min-width: 0;
+  padding: 8px var(--workspace-inset);
+  position: relative;
+  z-index: 4;
+}
+
+.appointments-subtle-title {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.appointments-subtle-title span {
+  color: var(--color-brand-dark);
+  font-size: 0.68rem;
+  font-weight: 780;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.appointments-subtle-title strong {
+  color: var(--color-text);
+  font-size: 0.96rem;
+  font-weight: 640;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointments-subtle-title small {
+  color: var(--color-muted);
+  font-size: var(--type-caption);
+  line-height: 1.2;
+}
+
+.appointments-header-nav,
+.appointments-header-actions,
 .appointments-inline-metrics,
 .appointments-status-filters,
-.appointments-waitlist-actions {
+.appointments-waitlist-actions,
+.appointments-tools-list {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
@@ -5116,62 +5362,147 @@ button.button:disabled,
   min-width: 0;
 }
 
-.appointments-hero-bar {
-  justify-content: space-between;
+.appointments-header-nav {
+  flex-wrap: nowrap;
 }
 
-.appointments-hero-title {
-  min-width: min(100%, 280px);
-}
-
-.appointments-hero-title h1 {
-  font-size: var(--type-h1);
-  margin-bottom: var(--space-2);
-}
-
-.appointments-hero-actions {
-  justify-content: flex-end;
-}
-
-.appointments-secondary-actions form {
-  display: contents;
-}
-
-.appointments-workspace-messages {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.appointments-command-strip {
-  background: var(--workspace-surface);
+.appointments-icon-link,
+.appointments-today-link,
+.appointments-action-button {
+  align-items: center;
+  appearance: none;
+  background: color-mix(in srgb, var(--color-surface) 68%, transparent);
   border: 1px solid var(--workspace-border);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-hairline);
-  justify-content: space-between;
-  padding: var(--space-2);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  cursor: pointer;
+  display: inline-flex;
+  gap: var(--space-2);
+  justify-content: center;
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0 10px;
+  transition:
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    color var(--motion-fast) ease;
 }
 
-.appointment-calendar-filters.appointments-hero-filters {
-  background: transparent;
+.appointments-icon-link:hover,
+.appointments-today-link:hover,
+.appointments-action-button:hover {
+  background: color-mix(in srgb, var(--color-brand) 8%, var(--color-surface));
+  border-color: var(--color-brand-border);
+  color: var(--color-brand-dark);
+}
+
+.appointments-today-link,
+.appointments-action-button {
+  font-size: var(--type-small);
+  font-weight: 650;
+}
+
+.appointments-action-button b {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
+  border-radius: var(--radius-pill);
+  color: var(--color-brand-dark);
+  display: inline-flex;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 760;
+  justify-content: center;
+  min-width: 20px;
+  padding: 2px 6px;
+}
+
+.appointments-action-button.icon-only {
+  padding-inline: 0;
+  width: 36px;
+}
+
+.appointments-calendar-canvas {
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.appointments-calendar-canvas .appointment-calendar {
+  gap: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+}
+
+.appointments-calendar-canvas .appointment-calendar-client-bar {
+  background: color-mix(in srgb, var(--color-surface) 94%, var(--workspace-bg));
+  border-bottom: 1px solid var(--workspace-border);
+  min-height: 48px;
+  padding: 6px var(--workspace-inset);
+}
+
+.appointments-calendar-canvas .appointment-time-strip {
   border: 0;
-  flex: 1 1 520px;
-  padding: 0;
+  border-radius: 0;
+  height: 100%;
+  min-height: 0;
+}
+
+.appointments-calendar-canvas .appointment-month-grid,
+.appointments-calendar-canvas .appointment-agenda-list {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.appointments-modal {
+  max-height: min(760px, calc(100svh - var(--space-6)));
+}
+
+.appointments-modal.wide {
+  max-width: min(980px, calc(100vw - var(--space-6)));
+}
+
+.appointments-modal-body,
+.appointments-modal-stack {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.appointments-modal-body-wide {
+  overflow: hidden;
+}
+
+.appointments-modal-filter-form,
+.appointment-calendar-filters.appointments-hero-filters {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  padding: var(--space-3);
+}
+
+.appointment-calendar-filters.appointments-hero-filters .ui-button {
+  align-self: end;
+  width: 100%;
 }
 
 .appointments-inline-metrics {
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .appointments-metric {
   align-items: center;
-  background: var(--workspace-surface-soft);
+  background: var(--workspace-overlay-strong);
   border: 1px solid var(--workspace-border);
   border-radius: var(--radius-control);
   color: var(--color-muted);
-  display: inline-flex;
-  gap: var(--space-2);
-  min-height: var(--control-height);
-  padding: 0 var(--space-3);
+  display: grid;
+  gap: var(--space-1);
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 54px;
+  min-width: 0;
+  padding: 9px 10px;
 }
 
 .appointments-metric strong {
@@ -5189,55 +5520,6 @@ button.button:disabled,
   font-weight: 700;
   line-height: 1.1;
   text-transform: uppercase;
-}
-
-.appointments-hero-grid {
-  display: grid;
-  gap: var(--workspace-gutter);
-  grid-template-columns: minmax(0, 1fr) minmax(280px, var(--workspace-rail-width));
-  min-height: 0;
-  min-width: 0;
-}
-
-.appointments-schedule-stage {
-  background: var(--workspace-surface);
-  border: 1px solid var(--workspace-border);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-hairline);
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-  padding: var(--space-3);
-}
-
-.appointments-schedule-stage .appointment-calendar {
-  height: 100%;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-.appointments-schedule-stage .appointment-time-strip {
-  height: 100%;
-  min-height: min(760px, calc(100dvh - 280px));
-}
-
-.appointments-context-rail {
-  align-content: start;
-  display: grid;
-  gap: var(--workspace-gutter);
-  min-height: 0;
-  min-width: 0;
-  overflow: auto;
-}
-
-.appointments-rail-panel {
-  background: var(--workspace-surface);
-  border: 1px solid var(--workspace-border);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-hairline);
-  display: grid;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: var(--space-3);
 }
 
 .appointments-panel-head {
@@ -5263,7 +5545,9 @@ button.button:disabled,
 .appointments-waitlist-list {
   display: grid;
   gap: var(--space-2);
+  max-height: min(520px, calc(100svh - 220px));
   min-width: 0;
+  overflow: auto;
 }
 
 .appointments-waitlist-card {
@@ -5317,6 +5601,20 @@ button.button:disabled,
 .appointments-panel-table {
   min-width: 0;
   overflow-x: auto;
+}
+
+.appointments-tools-heading {
+  align-items: center;
+  color: var(--color-muted);
+  display: flex;
+  font-size: var(--type-small);
+  font-weight: 720;
+  gap: var(--space-2);
+  text-transform: uppercase;
+}
+
+.appointments-tools-list form {
+  display: contents;
 }
 
 .appointment-calendar-card {
@@ -6307,58 +6605,46 @@ button.button:disabled,
 
 @media (max-width: 860px) {
   .appointments-workspace {
-    --appointments-hero-min-height: auto;
+    --appointments-header-height: auto;
+    height: calc(100dvh - 65px);
+    margin: calc(var(--workspace-mobile-bleed) * -1);
+    min-height: calc(100dvh - 65px);
   }
 
-  .appointments-scheduler-hero {
-    border-radius: 0;
-    margin: calc(var(--space-7) * -1);
-    min-height: calc(100dvh - 64px);
-    padding: var(--space-3);
-  }
-
-  .appointments-hero-bar,
-  .appointments-hero-actions,
-  .appointments-command-strip,
-  .appointment-calendar-filters.appointments-hero-filters {
+  .appointments-subtle-header {
     align-items: stretch;
     display: grid;
     grid-template-columns: 1fr;
+    padding: var(--space-2);
   }
 
-  .appointments-date-controls,
-  .appointments-secondary-actions,
-  .appointments-inline-metrics {
+  .appointments-header-nav {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .appointments-secondary-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .appointments-header-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .appointments-date-controls .ui-button,
-  .appointments-secondary-actions .ui-button,
-  .appointments-inline-metrics .appointments-metric {
+  .appointments-icon-link,
+  .appointments-today-link,
+  .appointments-action-button {
     min-width: 0;
     width: 100%;
   }
 
-  .appointments-metric {
-    justify-content: center;
-    padding: 0 var(--space-2);
-  }
-
-  .appointments-hero-grid {
+  .appointments-calendar-canvas .appointment-calendar-client-bar {
+    align-items: stretch;
+    display: grid;
     grid-template-columns: 1fr;
-  }
-
-  .appointments-schedule-stage {
     padding: var(--space-2);
   }
 
-  .appointments-context-rail {
-    overflow: visible;
+  .appointments-calendar-canvas .appointment-calendar-view-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .appointment-time-strip {
@@ -6371,40 +6657,32 @@ button.button:disabled,
 }
 
 @media (max-width: 560px) {
-  .appointments-scheduler-hero {
-    margin: calc(var(--space-4) * -1);
-    padding: var(--space-2);
+  .appointments-subtle-title strong {
+    font-size: 0.9rem;
   }
 
-  .appointments-hero-title h1 {
-    font-size: var(--type-h2);
+  .appointments-action-button {
+    padding-inline: var(--space-2);
   }
 
-  .appointments-date-controls,
-  .appointments-secondary-actions,
+  .appointments-action-button span {
+    display: none;
+  }
+
+  .appointments-action-button.icon-only {
+    width: 100%;
+  }
+
   .appointments-inline-metrics {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .appointments-secondary-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .appointment-calendar-filters.appointments-hero-filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .appointments-metric span {
-    font-size: 0.66rem;
+    grid-template-columns: 1fr;
   }
 
   .appointment-calendar-filters label {
     min-width: 0;
-  }
-
-  .appointments-hero-filters label:first-of-type,
-  .appointments-hero-filters .ui-button {
-    grid-column: 1 / -1;
   }
 
   .appointments-hero-filters input,
@@ -6412,25 +6690,8 @@ button.button:disabled,
     min-height: 34px;
   }
 
-  .appointments-date-controls .ui-button,
-  .appointments-secondary-actions .ui-button {
-    min-height: 38px;
-    padding-inline: var(--space-2);
-  }
-
-  .appointments-schedule-stage .appointment-calendar-client-bar {
-    align-items: stretch;
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .appointments-schedule-stage .appointment-calendar-view-tabs {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .appointments-schedule-stage .appointment-time-strip {
-    min-height: 680px;
+  .appointments-calendar-canvas .appointment-time-strip {
+    min-height: 0;
   }
 
   .appointment-expanded-list > div {
