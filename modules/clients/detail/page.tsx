@@ -951,29 +951,29 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
 
   return (
     <div className="stack">
-      <header className="page-header">
+      <header className="page-header clients-detail-page-header">
         <div>
-          <p className="eyebrow">Client</p>
-          <h1>{client.name}</h1>
-          <p>{client.email}</p>
+          <h1>Client Details</h1>
         </div>
         <div className="module-card-header-actions">
+          <ButtonLink href="/admin/modules/clients" variant="secondary">
+            Back to clients
+          </ButtonLink>
           <ModuleActionModals
+            className="clients-detail-overflow-actions"
             initialActiveId={openMergeModal ? "merge" : undefined}
             items={[
               {
                 content: mergeClientModal,
-                icon: "merge",
+                icon: "more",
                 id: "merge",
-                label: "Merge",
-                title: "Merge client"
+                label: "More",
+                title: "Client actions",
+                variant: "ghost"
               }
             ]}
-            toolbarLabel="Client record tools"
+            toolbarLabel="Client actions"
           />
-          <ButtonLink href="/admin/modules/clients" variant="secondary">
-            Back to clients
-          </ButtonLink>
         </div>
       </header>
 

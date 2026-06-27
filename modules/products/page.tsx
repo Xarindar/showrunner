@@ -1,5 +1,6 @@
-import { CartStatus, CouponType, GiftCardStatus, OrderStatus, PaymentStatus, ProductStatus, ProductType } from "@prisma/client";
-import { BadgeDollarSign, Boxes, CreditCard, Download, PackagePlus, ReceiptText, Tags, Truck } from "lucide-react";
+import NextImage from "next/image";
+import { CartStatus, CouponType, GiftCardStatus, OrderStatus, PaymentStatus, Prisma, ProductStatus, ProductType } from "@prisma/client";
+import { BadgeDollarSign, Boxes, CreditCard, Download, ImageIcon, PackagePlus, ReceiptText, Search, Tags, Truck } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { nextOrderStatuses } from "@/lib/commerce/orders";
 import { enumLabel, formatDateTime, formatMoney, stringArrayCsv } from "@/lib/format";
@@ -27,11 +28,11 @@ import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
 
-const pageSize = 20;
+const pageSize = 50;
 const statusFilters = ["all", ...Object.values(ProductStatus).map((status) => status.toLowerCase())] as const;
 
 type ProductsPageProps = {
-  searchParams: Promise<{saved?: string;error?: string;page?: string;status?: string;product?: string;order?: string;}>;
+  searchParams: Promise<{saved?: string;error?: string;page?: string;status?: string;product?: string;order?: string;q?: string;}>;
 };
 
 function normalizeStatusFilter(value?: string) {
@@ -63,6 +64,42 @@ function currencyTotalsLabel(totals: {currency: string;_sum: {totalCents: number
   return totals.map((row) => formatMoney(row._sum.totalCents || 0, row.currency)).join(" / ");
 }
 
+function productsHref({
+  page,
+  product,
+  q,
+  status
+}: {
+  page?: number;
+  product?: string;
+  q?: string;
+  status?: string;
+}) {
+  const params = new URLSearchParams();
+  if (status && status !== "all") params.set("status", status);
+  if (q) params.set("q", q);
+  if (page && page > 1) params.set("page", String(page));
+  if (product) params.set("product", product);
+  const query = params.toString();
+  return query ? `/admin/modules/products?${query}` : "/admin/modules/products";
+}
+
+function productInventoryLabel(product: {
+  inventoryQuantity: number | null;
+  trackInventory: boolean;
+  variants: {inventoryQuantity: number | null;trackInventory: boolean;}[];
+}) {
+  const trackedVariants = product.variants.filter((variant) => variant.trackInventory);
+  const trackedQuantities = trackedVariants.flatMap((variant) =>
+  typeof variant.inventoryQuantity === "number" ? [variant.inventoryQuantity] : []
+  );
+
+  if (!product.trackInventory && !trackedVariants.length) return "Not tracked";
+  if (trackedQuantities.length) return `${trackedQuantities.reduce((total, quantity) => total + quantity, 0)} in stock`;
+  if (typeof product.inventoryQuantity === "number") return `${product.inventoryQuantity} in stock`;
+  return "Tracked";
+}
+
 function refundablePaymentCents(payment: {amountCents: number;refundedCents: number;status: PaymentStatus;}) {
   if (payment.status !== PaymentStatus.PAID && payment.status !== PaymentStatus.AUTHORIZED) return 0;
   return Math.max(0, payment.amountCents - payment.refundedCents);
@@ -73,7 +110,21 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
-  const productWhere = statusFilter === "all" ? { siteId: settings.siteId } : { siteId: settings.siteId, status: statusFilter.toUpperCase() as ProductStatus };
+  const searchQuery = (params.q || "").trim().slice(0, 120);
+  const productWhere: Prisma.ProductWhereInput = {
+    siteId: settings.siteId,
+    ...(statusFilter === "all" ? {} : { status: statusFilter.toUpperCase() as ProductStatus }),
+    ...(searchQuery ?
+    {
+      OR: [
+      { name: { contains: searchQuery, mode: "insensitive" } },
+      { slug: { contains: searchQuery, mode: "insensitive" } },
+      { sku: { contains: searchQuery, mode: "insensitive" } },
+      { summary: { contains: searchQuery, mode: "insensitive" } }]
+
+    } :
+    {})
+  };
 
   const [products, productCount, activeCount, collections, coupons, giftCards, orderCount, paidOrderTotals, openCartCount, orders] = await Promise.all([
   prisma.product.findMany({
@@ -113,6 +164,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   })]
   );
   const pageCount = Math.max(1, Math.ceil(productCount / pageSize));
+  const rangeStart = productCount ? (page - 1) * pageSize + 1 : 0;
+  const rangeEnd = Math.min(productCount, page * pageSize);
   const selectedProduct = products.find((product) => product.id === params.product) || products[0];
   const selectedOrderId = params.order || orders[0]?.id;
   const selectedOrder = selectedOrderId ?
@@ -335,101 +388,168 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </Card>
       </EqualGrid>
 
-      <EqualGrid as="section">
-        <Card>
-          <div className="page-header compact-header">
+      <section aria-labelledby="products-table-title" className="ui-data-table-shell products-data-table">
+        <div className="ui-data-table-header">
+          <div className="ui-data-table-titlebar">
             <div>
-              <h2 className="section-title">Catalog list</h2>
-              <p>{productCount} matching products</p>
+              <h2 className="section-title" id="products-table-title">
+                Catalog list
+              </h2>
+              <p className="ui-zero">
+                {rangeStart}-{rangeEnd} of {productCount}
+                {searchQuery ? ` matching "${searchQuery}"` : " matching products"}
+              </p>
             </div>
-            <div className="ui-zero">
-              <ModuleActionModals
-                items={[
-                  {
-                    content: addProductForm,
-                    icon: "package",
-                    id: "product",
-                    label: "Product",
-                    title: "Add product"
-                  },
-                  {
-                    content: checkoutTotalsForm,
-                    icon: "receipt",
-                    id: "checkout",
-                    label: "Checkout totals",
-                    title: "Checkout totals"
-                  }
-                ]}
-                toolbarLabel="Catalog tools"
-              />
-              {statusFilters.map((filter) =>
-              <a className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"} href={`/admin/modules/products?status=${filter}`} key={filter}>
-                  {filter}
-                </a>
-              )}
-            </div>
+            <ModuleActionModals
+              items={[
+                {
+                  content: addProductForm,
+                  icon: "package",
+                  id: "product",
+                  label: "Product",
+                  title: "Add product"
+                },
+                {
+                  content: checkoutTotalsForm,
+                  icon: "receipt",
+                  id: "checkout",
+                  label: "Checkout totals",
+                  title: "Checkout totals"
+                }
+              ]}
+              toolbarLabel="Catalog tools"
+            />
           </div>
-          <Table>
+
+          <div className="ui-data-table-toolbar">
+            <form action="/admin/modules/products" className="ui-compact-search ui-data-table-search">
+              {statusFilter !== "all" ? <input type="hidden" name="status" value={statusFilter} /> : null}
+              <input aria-label="Search products" id="products-search" name="q" placeholder="Search products" defaultValue={searchQuery} />
+              <Button size="sm" type="submit" variant="secondary">
+                <Search size={15} />
+                Search
+              </Button>
+              {searchQuery ?
+              <ButtonAnchor href={productsHref({ status: statusFilter })} size="sm" variant="ghost">
+                  Clear
+                </ButtonAnchor> :
+              null}
+            </form>
+          </div>
+
+          <nav aria-label="Product status filters" className="ui-data-table-tabs products-status-tabs">
+            {statusFilters.map((filter) =>
+            <a className={filter === statusFilter ? "ui-data-table-tab is-active" : "ui-data-table-tab"} href={productsHref({ q: searchQuery, status: filter })} key={filter}>
+                {filter}
+              </a>
+            )}
+          </nav>
+        </div>
+
+        <Table className="ui-data-table-scroll products-table-wrap" tableClassName="ui-data-table ui-table-sticky-actions products-index-table">
+          <colgroup>
+            <col className="products-col-product" />
+            <col className="products-col-status" />
+            <col className="products-col-inventory" />
+            <col className="products-col-type" />
+            <col className="products-col-collections" />
+            <col className="products-col-price" />
+            <col className="products-col-actions" />
+          </colgroup>
             <thead>
               <tr>
                 <th>Product</th>
-                <th>Price</th>
                 <th>Status</th>
+                <th>Inventory</th>
+                <th>Type</th>
+                <th>Collections</th>
+                <th>Price</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {products.map((product) =>
-              <tr key={product.id}>
+              {products.map((product) => {
+                const defaultVariant = product.variants[0] || null;
+                const variantCount = product.variants.length;
+                const collectionsLabel = product.collectionProducts.map(({ collection }) => collection.name).join(", ") || "Unassigned";
+                const skuLabel = defaultVariant?.sku || product.sku || "No SKU";
+                const variantLabel = `${variantCount} ${variantCount === 1 ? "variant" : "variants"}`;
+                const priceCents = defaultVariant?.priceCents ?? product.basePriceCents;
+
+                return (
+                  <tr key={product.id}>
                   <td>
-                    <strong>{product.name}</strong>
-                    <br />
-                    <span className="muted-text">/shop/{product.slug}</span>
-                  </td>
-                  <td>
-                    {formatMoney(product.basePriceCents, product.currency)}
-                    <br />
-                    <span className="muted-text">{product.variants.length} variants</span>
+                    <div className="ui-object-cell">
+                      {product.imageUrl ?
+                      <NextImage
+                        alt={product.name}
+                        className="ui-object-thumb"
+                        height={40}
+                        src={product.imageUrl}
+                        unoptimized
+                        width={40} /> :
+
+                      <span aria-hidden="true" className="ui-object-thumb ui-object-thumb-empty">
+                          <ImageIcon size={16} />
+                        </span>
+                      }
+                      <span className="ui-object-copy">
+                        <strong className="ui-truncate" title={product.name}>{product.name}</strong>
+                        <span className="ui-object-meta ui-truncate" title={`/shop/${product.slug} - ${skuLabel} - ${variantLabel}`}>
+                          /shop/{product.slug} · {skuLabel} · {variantLabel}
+                        </span>
+                      </span>
+                    </div>
                   </td>
                   <td>
                     <span className={productStatusClass(product.status)}>{product.status.toLowerCase()}</span>
                   </td>
+                  <td>{productInventoryLabel(product)}</td>
+                  <td>{enumLabel(product.type)}</td>
                   <td>
-                    <div className="ui-zero">
-                      <ButtonAnchor href={`/admin/modules/products?status=${statusFilter}&product=${product.id}`} variant="secondary">
+                    <span className="ui-truncate" title={collectionsLabel}>{collectionsLabel}</span>
+                  </td>
+                  <td>
+                    <span className="ui-truncate">{formatMoney(priceCents, product.currency)}</span>
+                  </td>
+                  <td>
+                    <div className="ui-data-table-row-actions">
+                      <ButtonAnchor href={productsHref({ page, product: product.id, q: searchQuery, status: statusFilter })} size="sm" variant="secondary">
                         Edit
                       </ButtonAnchor>
-                      <form action={updateProductStatusAction}>
+                      <form action={updateProductStatusAction} className="ui-inline-form">
                         <input type="hidden" name="id" value={product.id} />
                         <input
                         type="hidden"
                         name="status"
                         value={product.status === ProductStatus.ACTIVE ? ProductStatus.DRAFT : ProductStatus.ACTIVE} />
                       
-                        <Button type="submit" variant="secondary">
+                        <Button size="sm" type="submit" variant="secondary">
                           {product.status === ProductStatus.ACTIVE ? "Draft" : "Activate"}
                         </Button>
                       </form>
                     </div>
                   </td>
-                </tr>
-              )}
+                </tr>);
+
+              })}
               {!products.length ?
               <tr>
-                  <td colSpan={4}>No products yet.</td>
+                  <td className="ui-data-table-empty" colSpan={7}>No products yet.</td>
                 </tr> :
               null}
             </tbody>
           </Table>
+        <div className="ui-data-table-footer">
           <Pagination
             label="Product pages"
-            nextHref={`/admin/modules/products?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
+            nextHref={productsHref({ page: Math.min(pageCount, page + 1), q: searchQuery, status: statusFilter })}
             page={page}
             pageCount={pageCount}
-            previousHref={`/admin/modules/products?status=${statusFilter}&page=${Math.max(1, page - 1)}`}
+            previousHref={productsHref({ page: Math.max(1, page - 1), q: searchQuery, status: statusFilter })}
           />
-        </Card>
-      </EqualGrid>
+        </div>
+      </section>
 
       {selectedProduct ?
       <EqualGrid as="section">

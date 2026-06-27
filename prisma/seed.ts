@@ -8,6 +8,8 @@ import {
   AutomationTrigger,
   BillingDocumentStatus,
   BillingDocumentType,
+  BookingStatus,
+  ClientPipelineStage,
   CouponType,
   FormDestination,
   FormFieldRole,
@@ -40,6 +42,10 @@ const prisma = new PrismaClient({ adapter });
 
 function generateSigningSecret() {
   return `whsec_${randomBytes(24).toString("base64url")}`;
+}
+
+function chicagoDateTime(year: number, month: number, day: number, hour: number, minute = 0) {
+  return new Date(Date.UTC(year, month - 1, day, hour + 5, minute));
 }
 
 const enabledModules = [
@@ -545,8 +551,263 @@ async function main() {
     });
   }
 
+  const sampleStaff = await prisma.staffMember.upsert({
+    where: { id: "seed-staff-mara-chen" },
+    update: {
+      email: "mara@example.com",
+      isActive: true,
+      name: "Mara Chen",
+      phone: "555-0198",
+      title: "Client lead"
+    },
+    create: {
+      id: "seed-staff-mara-chen",
+      siteId: settings.siteId,
+      email: "mara@example.com",
+      name: "Mara Chen",
+      phone: "555-0198",
+      title: "Client lead",
+      bio: "Sample staff member for appointment desk demos.",
+      isActive: true
+    }
+  });
+
+  const hasSampleStaffAvailability = await prisma.availabilityRule.count({
+    where: { siteId: settings.siteId, staffId: sampleStaff.id }
+  });
+  if (!hasSampleStaffAvailability) {
+    await prisma.availabilityRule.createMany({
+      data: [1, 2, 3, 4, 5].map((weekday) => ({
+        siteId: settings.siteId,
+        staffId: sampleStaff.id,
+        weekday,
+        startMinutes: 8 * 60,
+        endMinutes: 18 * 60
+      }))
+    });
+  }
+
+  const fauxServices = await Promise.all(
+    [
+      {
+        description: "Quick prep before a larger appointment.",
+        durationMinutes: 30,
+        id: "seed-service-prep-call",
+        name: "Prep Call",
+        slug: "prep-call"
+      },
+      {
+        description: "A focused appointment to understand the project and next steps.",
+        durationMinutes: 45,
+        id: consultation.id,
+        name: "Consultation",
+        slug: "consultation"
+      },
+      {
+        description: "Review proofs, selections, or creative direction.",
+        durationMinutes: 60,
+        id: "seed-service-proof-review",
+        name: "Proof Review",
+        slug: "proof-review"
+      },
+      {
+        description: "A longer hands-on session in the studio.",
+        durationMinutes: 90,
+        id: "seed-service-studio-session",
+        name: "Studio Session",
+        slug: "studio-session"
+      },
+      {
+        description: "Longer planning time for packages, albums, and follow-up work.",
+        durationMinutes: 120,
+        id: "seed-service-design-session",
+        name: "Design Session",
+        slug: "design-session"
+      }
+    ].map((service) =>
+      prisma.service.upsert({
+        where: { id: service.id },
+        update: {
+          description: service.description,
+          durationMinutes: service.durationMinutes,
+          isActive: true,
+          location: "Studio A",
+          name: service.name,
+          slug: service.slug
+        },
+        create: {
+          id: service.id,
+          siteId: settings.siteId,
+          description: service.description,
+          durationMinutes: service.durationMinutes,
+          isActive: true,
+          location: "Studio A",
+          name: service.name,
+          slug: service.slug
+        }
+      })
+    )
+  );
+
+  for (const service of fauxServices) {
+    await prisma.serviceResource.upsert({
+      where: {
+        serviceId_resourceId: {
+          resourceId: studioResource.id,
+          serviceId: service.id
+        }
+      },
+      update: {},
+      create: {
+        resourceId: studioResource.id,
+        serviceId: service.id,
+        siteId: settings.siteId
+      }
+    });
+
+    await prisma.serviceStaff.upsert({
+      where: {
+        serviceId_staffId: {
+          serviceId: service.id,
+          staffId: sampleStaff.id
+        }
+      },
+      update: {},
+      create: {
+        serviceId: service.id,
+        siteId: settings.siteId,
+        staffId: sampleStaff.id
+      }
+    });
+  }
+
+  const fauxClient = await prisma.client.upsert({
+    where: { siteId_email: { email: "riley.hart@example.com", siteId: settings.siteId } },
+    update: {
+      companyName: "Hart Studio",
+      phone: "555-0184",
+      pipelineStage: ClientPipelineStage.BOOKED,
+      privateNotes: "Seed client used to preview the appointment day strip with varied durations.",
+      status: "appointment_booked",
+      timezone: settings.timezone
+    },
+    create: {
+      id: "seed-client-riley-hart",
+      siteId: settings.siteId,
+      addressLine1: "214 W Sample Ave",
+      city: "Chicago",
+      companyName: "Hart Studio",
+      country: "US",
+      email: "riley.hart@example.com",
+      emailOptIn: true,
+      name: "Riley Hart",
+      phone: "555-0184",
+      pipelineStage: ClientPipelineStage.BOOKED,
+      policyAcceptanceHistory: [{ acceptedAt: "2026-06-25T15:00:00.000Z", source: "seed" }],
+      privateNotes: "Seed client used to preview the appointment day strip with varied durations.",
+      region: "IL",
+      smsOptIn: true,
+      status: "appointment_booked",
+      timezone: settings.timezone
+    }
+  });
+
+  const fauxAppointmentServices = new Map(fauxServices.map((service) => [service.id, service]));
+  const fauxAppointments = [
+    {
+      id: "seed-booking-riley-prep",
+      serviceId: "seed-service-prep-call",
+      startsAt: chicagoDateTime(2026, 6, 26, 8, 30),
+      status: BookingStatus.CONFIRMED,
+      notes: "Confirm wardrobe notes and arrival timing."
+    },
+    {
+      id: "seed-booking-riley-studio",
+      serviceId: "seed-service-studio-session",
+      startsAt: chicagoDateTime(2026, 6, 26, 9, 15),
+      status: BookingStatus.CONFIRMED,
+      notes: "Primary studio appointment. Client wants three backdrop options."
+    },
+    {
+      id: "seed-booking-riley-consult",
+      serviceId: consultation.id,
+      startsAt: chicagoDateTime(2026, 6, 26, 11, 15),
+      status: BookingStatus.PENDING,
+      notes: "Talk through package scope and timeline."
+    },
+    {
+      id: "seed-booking-riley-proof",
+      serviceId: "seed-service-proof-review",
+      startsAt: chicagoDateTime(2026, 6, 26, 13, 0),
+      status: BookingStatus.CONFIRMED,
+      notes: "Review selections from the last gallery."
+    },
+    {
+      id: "seed-booking-riley-design",
+      serviceId: "seed-service-design-session",
+      startsAt: chicagoDateTime(2026, 6, 26, 15, 0),
+      status: BookingStatus.CONFIRMED,
+      notes: "Long-form album and wall art planning session."
+    }
+  ];
+
+  for (const appointment of fauxAppointments) {
+    const service = fauxAppointmentServices.get(appointment.serviceId);
+    if (!service) continue;
+    const endsAt = new Date(appointment.startsAt.getTime() + service.durationMinutes * 60000);
+    const booking = await prisma.booking.upsert({
+      where: { id: appointment.id },
+      update: {
+        adminNotes: "Seeded faux appointment for timeline UI review.",
+        clientId: fauxClient.id,
+        customerEmail: fauxClient.email,
+        customerName: fauxClient.name,
+        customerPhone: fauxClient.phone,
+        endsAt,
+        notes: appointment.notes,
+        policyAccepted: true,
+        serviceId: service.id,
+        staffId: sampleStaff.id,
+        startsAt: appointment.startsAt,
+        status: appointment.status
+      },
+      create: {
+        id: appointment.id,
+        siteId: settings.siteId,
+        adminNotes: "Seeded faux appointment for timeline UI review.",
+        clientId: fauxClient.id,
+        customerEmail: fauxClient.email,
+        customerName: fauxClient.name,
+        customerPhone: fauxClient.phone,
+        endsAt,
+        notes: appointment.notes,
+        policyAccepted: true,
+        serviceId: service.id,
+        staffId: sampleStaff.id,
+        startsAt: appointment.startsAt,
+        status: appointment.status
+      }
+    });
+
+    await prisma.bookingResource.upsert({
+      where: {
+        bookingId_resourceId: {
+          bookingId: booking.id,
+          resourceId: studioResource.id
+        }
+      },
+      update: {},
+      create: {
+        bookingId: booking.id,
+        resourceId: studioResource.id,
+        siteId: settings.siteId
+      }
+    });
+  }
+
   console.log(`Seeded admin user ${email}${resetAdminPassword ? " with a reset password" : ""}.`);
   console.log(`Default service: ${consultation.name}`);
+  console.log(`Seeded faux appointment day for ${fauxClient.name} on June 26, 2026.`);
 
   const starterCollection = await prisma.collection.upsert({
     where: { siteId_slug: { siteId: settings.siteId, slug: "featured" } },

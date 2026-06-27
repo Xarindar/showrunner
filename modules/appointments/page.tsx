@@ -3,14 +3,15 @@ import { BookingStatus, BookingWaitlistStatus, Prisma } from "@prisma/client";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Filter, ListChecks, Plus } from "lucide-react";
 import { getAccessibleBookingWaitlistWhere, getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import { bookingConflictWarnings } from "@/lib/bookings/conflicts";
-import { formatDateTime } from "@/lib/format";
+import { clientStatusLabel } from "@/lib/clients/status";
+import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { addDaysToDateKey, getTodayDateKey, parseZonedDateKey } from "@/lib/timezone";
 import { promoteWaitlistEntryAction, updateWaitlistEntryStatusAction } from "./actions";
 import { AppointmentCalendar, type AppointmentCalendarBooking, type AppointmentCalendarDay } from "./components/appointment-calendar";
 import { AppointmentsTable } from "./components/appointments-table";
-import { Button, ButtonLink, Card, EqualGrid, Pagination, Table, TabLink, Tabs } from "@/components/ui";
+import { Button, ButtonLink, Pagination } from "@/components/ui";
 import { addDashboardCardAction } from "@/modules/dashboard/actions";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ function normalizeStatusFilter(value?: string) {
 }
 
 function normalizeCalendarView(value?: string): (typeof calendarViews)[number] {
-  return calendarViews.includes(value as (typeof calendarViews)[number]) ? value as (typeof calendarViews)[number] : "week";
+  return calendarViews.includes(value as (typeof calendarViews)[number]) ? value as (typeof calendarViews)[number] : "day";
 }
 
 function validDateKey(value: string | undefined, fallback: string) {
@@ -111,6 +112,23 @@ function calendarWindow(view: (typeof calendarViews)[number], dateKey: string) {
   };
 }
 
+function calendarDataWindow(view: (typeof calendarViews)[number], dateKey: string) {
+  const activeWindow = calendarWindow(view, dateKey);
+  const monthWindow = calendarWindow("month", dateKey);
+  const windows = [activeWindow, monthWindow, calendarWindow("week", dateKey), calendarWindow("day", dateKey), calendarWindow("agenda", dateKey)];
+  const startKey = windows.map((window) => window.startKey).sort()[0];
+  const endKeys = windows.map((window) => window.endKey).sort();
+  const endKey = endKeys[endKeys.length - 1] || activeWindow.endKey;
+
+  return {
+    activeMonth: monthWindow.activeMonth,
+    endKey,
+    nextDateKey: activeWindow.nextDateKey,
+    previousDateKey: activeWindow.previousDateKey,
+    startKey
+  };
+}
+
 function dayList(input: {activeMonth: number;endKey: string;startKey: string;todayKey: string;timeZone: string;}) {
   const days: AppointmentCalendarDay[] = [];
   for (let dateKey = input.startKey; dateKey < input.endKey; dateKey = addDaysToDateKey(dateKey, 1)) {
@@ -165,6 +183,16 @@ function formatDateTimeLocalInput(value: Date, timeZone: string) {
   return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}`;
 }
 
+function formatDurationLabel(minutes: number) {
+  const duration = Math.max(1, Math.round(minutes));
+  const hours = Math.floor(duration / 60);
+  const remainingMinutes = duration % 60;
+  const parts = [];
+  if (hours) parts.push(`${hours} hr${hours === 1 ? "" : "s"}`);
+  if (remainingMinutes) parts.push(`${remainingMinutes} min`);
+  return parts.join(" ") || "0 min";
+}
+
 function calendarHref(input: {
   dateKey: string;
   page?: number;
@@ -196,7 +224,8 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
   const selectedDateKey = validDateKey(params.date, todayKey);
   const selectedStaffId = params.staffId || "";
   const selectedResourceId = params.resourceId || "";
-  const calendarRange = calendarWindow(view, selectedDateKey);
+  const visibleCalendarRange = calendarWindow(view, selectedDateKey);
+  const calendarRange = calendarDataWindow(view, selectedDateKey);
   const rangeStart = parseZonedDateKey(calendarRange.startKey, settings.timezone) || now;
   const rangeEnd = parseZonedDateKey(calendarRange.endKey, settings.timezone) || now;
   const statusWhere: Prisma.BookingWhereInput =
@@ -266,6 +295,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
   prisma.booking.findMany({
     where: calendarWhere,
     include: {
+      client: true,
       resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
       service: { include: { resourceAssignments: { select: { resourceId: true } } } },
       staff: true
@@ -290,15 +320,44 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
     timeZone: settings.timezone,
     todayKey
   });
+  const visibleRangeDays = dayList({
+    activeMonth: calendarRange.activeMonth,
+    endKey: visibleCalendarRange.endKey,
+    startKey: visibleCalendarRange.startKey,
+    timeZone: settings.timezone,
+    todayKey
+  });
   const calendarItems: AppointmentCalendarBooking[] = calendarBookings.map((booking) => {
     const parts = localBookingParts(booking.startsAt, settings.timezone);
+    const endParts = localBookingParts(booking.endsAt, settings.timezone);
+    const durationMinutes = Math.max(1, Math.round((booking.endsAt.getTime() - booking.startsAt.getTime()) / 60000));
     return {
+      adminNotes: booking.adminNotes || "",
+      client: booking.client ?
+      {
+        affiliation: booking.client.companyName || booking.client.familyName || "Individual client",
+        email: booking.client.email,
+        id: booking.client.id,
+        name: booking.client.name,
+        phone: booking.client.phone || "",
+        photoUrl: booking.client.photoUrl,
+        pipeline: enumLabel(booking.client.pipelineStage),
+        status: clientStatusLabel(booking.client.status)
+      } :
+      null,
+      customerEmail: booking.customerEmail,
       customerName: booking.customerName,
+      customerPhone: booking.customerPhone || "",
       dateKey: parts.dateKey,
+      durationLabel: formatDurationLabel(durationMinutes),
+      durationMinutes,
+      endTimeLabel: endParts.timeLabel,
       endsAt: booking.endsAt.toISOString(),
       hour: parts.hour,
       id: booking.id,
       minute: parts.minute,
+      notes: booking.notes || "",
+      policyAccepted: booking.policyAccepted,
       resourceIds: booking.resources.map((assignment) => assignment.resourceId),
       resourceNames: booking.resources.map((assignment) => assignment.resource.name),
       serviceName: booking.service.name,
@@ -313,14 +372,19 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
   const calendarHours = Array.from(
     new Set([
     ...Array.from({ length: 13 }, (_, index) => index + 7),
-    ...calendarItems.map((booking) => booking.hour)]
+    ...calendarItems.flatMap((booking) => [
+      booking.hour,
+      Math.min(24, Math.max(booking.hour + 1, Math.ceil((booking.hour * 60 + booking.minute + booking.durationMinutes) / 60)))
+    ])]
     )
   ).sort((left, right) => left - right);
+  const visibleRangeDateKeys = new Set(visibleRangeDays.map((day) => day.dateKey));
+  const visibleCalendarItemCount = calendarItems.filter((booking) => visibleRangeDateKeys.has(booking.dateKey)).length;
   const selectedRangeLabel =
   view === "day" ?
-  days[0]?.label || selectedDateKey :
-  `${days[0]?.shortLabel || calendarRange.startKey} - ${
-  days[days.length - 1]?.shortLabel || addDaysToDateKey(calendarRange.endKey, -1)}`;
+  visibleRangeDays[0]?.label || selectedDateKey :
+  `${visibleRangeDays[0]?.shortLabel || visibleCalendarRange.startKey} - ${
+  visibleRangeDays[visibleRangeDays.length - 1]?.shortLabel || addDaysToDateKey(visibleCalendarRange.endKey, -1)}`;
   const currentAppointmentsHref = calendarHref({
     dateKey: selectedDateKey,
     page,
@@ -333,309 +397,249 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
 
 
   return (
-    <div className="stack">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Appointments</p>
-          <h1>Active appointment desk</h1>
-          <p>Review upcoming bookings, confirm requests, cancel conflicts, and mark completed work.</p>
-        </div>
-        <div className="dashboard-header-actions">
-          <form action={addDashboardCardAction}>
-            <input name="cardId" type="hidden" value="appointments.today" />
-            <input name="returnTo" type="hidden" value={currentAppointmentsHref} />
-            <input name="size" type="hidden" value="lg" />
+    <div className="appointments-workspace">
+      <section className="appointments-scheduler-hero" aria-label="Appointment scheduler">
+        <header className="appointments-hero-bar">
+          <div className="appointments-hero-title">
+            <p className="eyebrow">Appointments</p>
+            <h1>Schedule</h1>
+            <p className="ui-zero">
+              {selectedRangeLabel} | {visibleCalendarItemCount} appointments
+            </p>
+          </div>
+          <div className="appointments-hero-actions">
+            <div className="appointments-date-controls" aria-label="Calendar range controls">
+              <ButtonLink
+                href={calendarHref({
+                  dateKey: calendarRange.previousDateKey,
+                  resourceId: selectedResourceId,
+                  staffId: selectedStaffId,
+                  statusFilter,
+                  view
+                })}
+                variant="secondary"
+              >
+                <ChevronLeft size={18} />
+                Previous
+              </ButtonLink>
+              <ButtonLink href={calendarHref({ dateKey: todayKey, resourceId: selectedResourceId, staffId: selectedStaffId, statusFilter, view })} variant="secondary">
+                Today
+              </ButtonLink>
+              <ButtonLink
+                href={calendarHref({
+                  dateKey: calendarRange.nextDateKey,
+                  resourceId: selectedResourceId,
+                  staffId: selectedStaffId,
+                  statusFilter,
+                  view
+                })}
+                variant="secondary"
+              >
+                Next
+                <ChevronRight size={18} />
+              </ButtonLink>
+            </div>
+            <div className="appointments-secondary-actions">
+              <form action={addDashboardCardAction}>
+                <input name="cardId" type="hidden" value="appointments.today" />
+                <input name="returnTo" type="hidden" value={currentAppointmentsHref} />
+                <input name="size" type="hidden" value="lg" />
+                <Button type="submit" variant="secondary">
+                  <Plus size={18} />
+                  Add today card
+                </Button>
+              </form>
+              <ButtonLink href="/admin/modules/scheduling" variant="secondary">
+                <CalendarDays size={18} />
+                Scheduling setup
+              </ButtonLink>
+            </div>
+          </div>
+        </header>
+
+        {params.saved || params.error ? (
+          <div className="appointments-workspace-messages">
+            {params.saved ? <div className="success-message">{savedMessage}</div> : null}
+            {params.error ? <div className="error">{params.error}</div> : null}
+          </div>
+        ) : null}
+
+        <div className="appointments-command-strip">
+          <form action="/admin/modules/appointments" className="appointment-calendar-filters appointments-hero-filters">
+            <input name="status" type="hidden" value={statusFilter} />
+            <input id="appointment-calendar-view-input" name="view" type="hidden" defaultValue={view} />
+            <label>
+              Date
+              <input name="date" type="date" defaultValue={selectedDateKey} />
+            </label>
+            <label>
+              Staff
+              <select name="staffId" defaultValue={selectedStaffId}>
+                <option value="">All staff</option>
+                {staff.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Resource
+              <select name="resourceId" defaultValue={selectedResourceId}>
+                <option value="">All resources</option>
+                {resources.map((resource) => (
+                  <option key={resource.id} value={resource.id}>
+                    {resource.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <Button type="submit" variant="secondary">
-              <Plus size={18} />
-              Add today card
+              <Filter size={18} />
+              Apply
             </Button>
           </form>
-          <ButtonLink href="/admin/modules/scheduling" variant="secondary">
-            <CalendarDays size={18} />
-            Scheduling setup
-          </ButtonLink>
-        </div>
-      </header>
 
-      {params.saved ? <div className="success-message">{savedMessage}</div> : null}
-      {params.error ? <div className="error">{params.error}</div> : null}
-
-      <EqualGrid as="section" min="220px">
-        <Card>
-          <Clock size={22} />
-          <h3>{upcomingCount} upcoming</h3>
-          <p className="lead lead-compact">
-            Non-canceled appointments from today forward.
-          </p>
-        </Card>
-        <Card>
-          <ListChecks size={22} />
-          <h3>{pendingCount} pending</h3>
-          <p className="lead lead-compact">
-            Requests that may need confirmation.
-          </p>
-        </Card>
-        <Card>
-          <CalendarDays size={22} />
-          <h3>{waitlistCount} waitlisted</h3>
-          <p className="lead lead-compact">
-            Clients waiting for a full service/date.
-          </p>
-        </Card>
-      </EqualGrid>
-
-      <Card className="appointment-calendar-card" as="section">
-        <div className="page-header compact-header">
-          <div>
-            <h2 className="section-title">Calendar</h2>
-            <p className="ui-zero">
-              {selectedRangeLabel} | {calendarItems.length} appointments
-            </p>
-          </div>
-          <div className="appointment-calendar-toolbar">
-            <ButtonLink
-
-              href={calendarHref({
-                dateKey: calendarRange.previousDateKey,
-                resourceId: selectedResourceId,
-                staffId: selectedStaffId,
-                statusFilter,
-                view
-              })} variant="secondary">
-              
-              <ChevronLeft size={18} />
-              Previous
-            </ButtonLink>
-            <ButtonLink
-
-              href={calendarHref({ dateKey: todayKey, resourceId: selectedResourceId, staffId: selectedStaffId, statusFilter, view })} variant="secondary">
-              
-              Today
-            </ButtonLink>
-            <ButtonLink
-
-              href={calendarHref({
-                dateKey: calendarRange.nextDateKey,
-                resourceId: selectedResourceId,
-                staffId: selectedStaffId,
-                statusFilter,
-                view
-              })} variant="secondary">
-              
-              Next
-              <ChevronRight size={18} />
-            </ButtonLink>
+          <div className="appointments-inline-metrics" aria-label="Appointment status">
+            <div className="appointments-metric">
+              <Clock size={18} />
+              <span>
+                <strong>{upcomingCount}</strong>
+                Upcoming
+              </span>
+            </div>
+            <div className="appointments-metric">
+              <ListChecks size={18} />
+              <span>
+                <strong>{pendingCount}</strong>
+                Pending
+              </span>
+            </div>
+            <div className="appointments-metric">
+              <CalendarDays size={18} />
+              <span>
+                <strong>{waitlistCount}</strong>
+                Waitlisted
+              </span>
+            </div>
           </div>
         </div>
 
-        <form action="/admin/modules/appointments" className="appointment-calendar-filters">
-          <input name="status" type="hidden" value={statusFilter} />
-          <label>
-            View
-            <select name="view" defaultValue={view}>
-              {calendarViews.map((item) =>
-              <option key={item} value={item}>
-                  {item}
-                </option>
-              )}
-            </select>
-          </label>
-          <label>
-            Date
-            <input name="date" type="date" defaultValue={selectedDateKey} />
-          </label>
-          <label>
-            Staff
-            <select name="staffId" defaultValue={selectedStaffId}>
-              <option value="">All staff</option>
-              {staff.map((member) =>
-              <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              )}
-            </select>
-          </label>
-          <label>
-            Resource
-            <select name="resourceId" defaultValue={selectedResourceId}>
-              <option value="">All resources</option>
-              {resources.map((resource) =>
-              <option key={resource.id} value={resource.id}>
-                  {resource.name}
-                </option>
-              )}
-            </select>
-          </label>
-          <Button type="submit" variant="secondary">
-            <Filter size={18} />
-            Apply
-          </Button>
-        </form>
+        <div className="appointments-hero-grid">
+          <section className="appointments-schedule-stage" aria-label="Schedule calendar">
+            <AppointmentCalendar bookings={calendarItems} days={days} hours={calendarHours} selectedDateKey={selectedDateKey} view={view} />
+          </section>
 
-        <Tabs className="appointment-calendar-view-tabs" aria-label="Calendar view">
-          {calendarViews.map((item) =>
-          <TabLink
-            aria-selected={item === view}
-            href={calendarHref({
-              dateKey: selectedDateKey,
-              resourceId: selectedResourceId,
-              staffId: selectedStaffId,
-              statusFilter,
-              view: item
-            })}
-            key={item}>
-            
-              {item}
-            </TabLink>
-          )}
-        </Tabs>
-
-        <AppointmentCalendar bookings={calendarItems} days={days} hours={calendarHours} view={view} />
-      </Card>
-
-      <Card as="section">
-        <div className="page-header compact-header">
-          <div>
-            <h2 className="section-title">Waitlist</h2>
-            <p className="ui-zero">
-              {waitlistCount} waiting clients. Promote by choosing a real available slot.
-            </p>
-          </div>
-        </div>
-        <Table>
-          <thead>
-            <tr>
-              <th>Client</th>
-              <th>Service</th>
-              <th>Desired date</th>
-              <th>Promote</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {waitlistEntries.map((entry) =>
-            <tr key={entry.id}>
-                <td>
-                  <strong>{entry.customerName}</strong>
-                  <br />
-                  <span className="muted-text">{entry.customerEmail}</span>
-                  {entry.customerPhone ?
-                <>
-                      <br />
-                      <span className="muted-text">{entry.customerPhone}</span>
-                    </> :
-                null}
-                </td>
-                <td>
-                  {entry.service.name}
-                  <br />
-                  <span className="muted-text">{entry.staff?.name || "Any staff"}</span>
-                  {entry.notes ?
-                <>
-                      <br />
-                      <span className="muted-text">{entry.notes}</span>
-                    </> :
-                null}
-                </td>
-                <td>{formatDateTime(entry.startsAt, settings.timezone)}</td>
-                <td>
-                  <form action={promoteWaitlistEntryAction} className="form-grid ui-zero">
-                    <input type="hidden" name="id" value={entry.id} />
-                    <div className="ui-field">
+          <aside className="appointments-context-rail" aria-label="Schedule tools">
+            <section className="appointments-rail-panel">
+              <div className="appointments-panel-head">
+                <div>
+                  <h2>Waitlist</h2>
+                  <p>{waitlistCount} waiting</p>
+                </div>
+              </div>
+              <div className="appointments-waitlist-list">
+                {waitlistEntries.map((entry) => (
+                  <article className="appointments-waitlist-card" key={entry.id}>
+                    <div>
+                      <strong>{entry.customerName}</strong>
+                      <p>{entry.service.name}</p>
+                      <small>{formatDateTime(entry.startsAt, settings.timezone)}</small>
+                    </div>
+                    <form action={promoteWaitlistEntryAction} className="appointments-promote-form">
+                      <input type="hidden" name="id" value={entry.id} />
                       <label htmlFor={`waitlist-${entry.id}-startsAt`}>Start time</label>
                       <input
-                      id={`waitlist-${entry.id}-startsAt`}
-                      name="startsAt"
-                      type="datetime-local"
-                      defaultValue={formatDateTimeLocalInput(entry.startsAt, settings.timezone)}
-                      required />
-                    
-                    </div>
-                    {entry.service.staffAssignments.length ?
-                  <div className="ui-field">
-                        <label htmlFor={`waitlist-${entry.id}-staffId`}>Staff</label>
-                        <select id={`waitlist-${entry.id}-staffId`} name="staffId" defaultValue={entry.staffId || ""} required>
-                          <option value="">Choose staff</option>
-                          {entry.service.staffAssignments.map((assignment) =>
-                      <option key={assignment.staffId} value={assignment.staffId}>
-                              {assignment.staff.name}
-                            </option>
-                      )}
-                        </select>
-                      </div> :
-                  null}
-                    <Button type="submit" variant="secondary">
-                      Promote
-                    </Button>
-                  </form>
-                </td>
-                <td>
-                  <form action={updateWaitlistEntryStatusAction}>
-                    <input type="hidden" name="id" value={entry.id} />
-                    <input type="hidden" name="status" value={BookingWaitlistStatus.DECLINED} />
-                    <Button type="submit" variant="danger">
-                      decline
-                    </Button>
-                  </form>
-                </td>
-              </tr>
-            )}
-            {!waitlistEntries.length ?
-            <tr>
-                <td colSpan={5}>No waitlist entries match these filters.</td>
-              </tr> :
-            null}
-          </tbody>
-        </Table>
-      </Card>
+                        id={`waitlist-${entry.id}-startsAt`}
+                        name="startsAt"
+                        type="datetime-local"
+                        defaultValue={formatDateTimeLocalInput(entry.startsAt, settings.timezone)}
+                        required
+                      />
+                      {entry.service.staffAssignments.length ? (
+                        <>
+                          <label htmlFor={`waitlist-${entry.id}-staffId`}>Staff</label>
+                          <select id={`waitlist-${entry.id}-staffId`} name="staffId" defaultValue={entry.staffId || ""} required>
+                            <option value="">Choose staff</option>
+                            {entry.service.staffAssignments.map((assignment) => (
+                              <option key={assignment.staffId} value={assignment.staffId}>
+                                {assignment.staff.name}
+                              </option>
+                            ))}
+                          </select>
+                        </>
+                      ) : null}
+                      <div className="appointments-waitlist-actions">
+                        <Button size="sm" type="submit" variant="secondary">
+                          Promote
+                        </Button>
+                      </div>
+                    </form>
+                    <form action={updateWaitlistEntryStatusAction}>
+                      <input type="hidden" name="id" value={entry.id} />
+                      <input type="hidden" name="status" value={BookingWaitlistStatus.DECLINED} />
+                      <Button size="sm" type="submit" variant="danger">
+                        Decline
+                      </Button>
+                    </form>
+                  </article>
+                ))}
+                {!waitlistEntries.length ? <p className="ui-zero">No waitlist entries match these filters.</p> : null}
+              </div>
+            </section>
 
-      <Card as="section">
-        <div className="page-header compact-header">
-          <div>
-            <h2 className="section-title">Appointment list</h2>
-            <p className="ui-zero">{bookingCount} matching appointments</p>
-          </div>
-          <div className="ui-zero">
-            {statusFilters.map((filter) =>
-            <Link
-              className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"}
-              href={calendarHref({
-                dateKey: selectedDateKey,
-                resourceId: selectedResourceId,
-                staffId: selectedStaffId,
-                statusFilter: filter,
-                view
-              })}
-              key={filter}>
-              
-                {filter}
-              </Link>
-            )}
-          </div>
+            <section className="appointments-rail-panel appointments-list-panel">
+              <div className="appointments-panel-head">
+                <div>
+                  <h2>Appointment list</h2>
+                  <p>{bookingCount} matching</p>
+                </div>
+              </div>
+              <div className="appointments-status-filters">
+                {statusFilters.map((filter) => (
+                  <Link
+                    className={filter === statusFilter ? "ui-button" : "ui-button ui-button-secondary"}
+                    href={calendarHref({
+                      dateKey: selectedDateKey,
+                      resourceId: selectedResourceId,
+                      staffId: selectedStaffId,
+                      statusFilter: filter,
+                      view
+                    })}
+                    key={filter}
+                  >
+                    {filter}
+                  </Link>
+                ))}
+              </div>
+              <div className="appointments-panel-table">
+                <AppointmentsTable bookings={bookings} timezone={settings.timezone} />
+              </div>
+              <Pagination
+                label="Appointment pages"
+                nextHref={calendarHref({
+                  dateKey: selectedDateKey,
+                  page: Math.min(pageCount, page + 1),
+                  resourceId: selectedResourceId,
+                  staffId: selectedStaffId,
+                  statusFilter,
+                  view
+                })}
+                page={page}
+                pageCount={pageCount}
+                previousHref={calendarHref({
+                  dateKey: selectedDateKey,
+                  page: Math.max(1, page - 1),
+                  resourceId: selectedResourceId,
+                  staffId: selectedStaffId,
+                  statusFilter,
+                  view
+                })}
+              />
+            </section>
+          </aside>
         </div>
-        <AppointmentsTable bookings={bookings} timezone={settings.timezone} />
-        <Pagination
-          label="Appointment pages"
-          nextHref={calendarHref({
-            dateKey: selectedDateKey,
-            page: Math.min(pageCount, page + 1),
-            resourceId: selectedResourceId,
-            staffId: selectedStaffId,
-            statusFilter,
-            view
-          })}
-          page={page}
-          pageCount={pageCount}
-          previousHref={calendarHref({
-            dateKey: selectedDateKey,
-            page: Math.max(1, page - 1),
-            resourceId: selectedResourceId,
-            staffId: selectedStaffId,
-            statusFilter,
-            view
-          })}
-        />
-      </Card>
+      </section>
     </div>);
 
 }

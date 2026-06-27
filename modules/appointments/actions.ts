@@ -130,6 +130,7 @@ export async function rescheduleBookingFromCalendarAction(input: {
   dateKey: string;
   hour: number;
   minute: number;
+  notifyCustomer?: boolean;
 }) {
   const user = await requireAdmin("appointments:manage");
   const settings = await getSiteSettings();
@@ -176,6 +177,10 @@ export async function rescheduleBookingFromCalendarAction(input: {
   await emitModuleEvent("booking.rescheduled", {
     actorEmail: updated.customerEmail,
     metadata: {
+      // Gate the customer-facing reschedule email on the admin's choice in the
+      // drag-and-drop confirm flow. Omitted (undefined) elsewhere => email sends
+      // as before; explicit false suppresses it (see communications/auto-send).
+      notifyCustomer: input.notifyCustomer,
       previousEndsAt: booking.endsAt.toISOString(),
       previousStartsAt: booking.startsAt.toISOString(),
       serviceId: updated.serviceId,

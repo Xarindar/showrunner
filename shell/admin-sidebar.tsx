@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, Gauge, LayoutTemplate, LogOut, Menu, Settings, UserRound, X } from "lucide-react";
+import { LogOut, Menu, Settings, UserRound, X } from "lucide-react";
 import type { AdminRole } from "@prisma/client";
 import { usePathname } from "next/navigation";
 import { hasAdminPermission } from "@/lib/admin-permissions";
@@ -25,13 +25,9 @@ function roleLabel(role: AdminRole) {
 export function AdminSidebar({ businessName, enabledModules, userEmail, userRole }: AdminSidebarProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const canUpdateSettings = hasAdminPermission({ role: userRole }, "settings:update");
-  const settingsPathActive = pathname.startsWith("/admin/modules/settings");
-  const settingsSubmenuOpen = settingsMenuOpen || settingsPathActive;
 
   const closeMenu = () => setMenuOpen(false);
-  const toggleSettingsMenu = () => setSettingsMenuOpen((open) => !open);
 
   return (
     <>
@@ -81,6 +77,7 @@ export function AdminSidebar({ businessName, enabledModules, userEmail, userRole
               const visible = !item.permissions?.length || item.permissions.some((permission) => hasAdminPermission({ role: userRole }, permission));
 
               if (!visible) return null;
+              if (item.id === "settings") return null;
 
               if (!enabled || isFuture) {
                 return (
@@ -88,40 +85,6 @@ export function AdminSidebar({ businessName, enabledModules, userEmail, userRole
                     <Icon size={18} />
                     {item.label}
                   </span>
-                );
-              }
-
-              if (item.id === "settings") {
-                return (
-                  <div className="admin-nav-group" key={item.id}>
-                    <button
-                      aria-controls="settings-submenu"
-                      aria-expanded={settingsSubmenuOpen}
-                      className={isActive ? "active" : undefined}
-                      onClick={toggleSettingsMenu}
-                      type="button"
-                    >
-                      <Icon size={18} />
-                      <span>{item.label}</span>
-                      <ChevronDown className="admin-nav-chevron" size={16} />
-                    </button>
-                    {settingsSubmenuOpen ? (
-                      <div className="admin-subnav" id="settings-submenu">
-                        <Link className={pathname === "/admin/modules/settings" ? "active" : undefined} href="/admin/modules/settings" onClick={closeMenu}>
-                          <Gauge size={15} />
-                          Dashboard
-                        </Link>
-                        <Link
-                          className={pathname.startsWith("/admin/modules/settings/modules") ? "active" : undefined}
-                          href="/admin/modules/settings/modules"
-                          onClick={closeMenu}
-                        >
-                          <LayoutTemplate size={15} />
-                          Modules
-                        </Link>
-                      </div>
-                    ) : null}
-                  </div>
                 );
               }
 
@@ -145,9 +108,15 @@ export function AdminSidebar({ businessName, enabledModules, userEmail, userRole
           </span>
           <span className="admin-user-actions">
             {canUpdateSettings ? (
-              <button aria-label="Open settings menu" className="admin-user-icon-button" onClick={toggleSettingsMenu} title="Settings" type="button">
+              <Link
+                aria-label="Open settings"
+                className="admin-user-icon-button"
+                href="/admin/modules/settings"
+                onClick={closeMenu}
+                title="Settings"
+              >
                 <Settings size={17} />
-              </button>
+              </Link>
             ) : null}
             <form action={logoutAction}>
               <Button aria-label="Sign out" className="admin-user-icon-button" title="Sign out" variant="ghost" type="submit">
