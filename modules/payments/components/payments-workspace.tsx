@@ -1,11 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, CreditCard, Lock, Settings2, TicketPlus } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CreditCard, Lock, ReceiptText, Settings2, TicketPlus } from "lucide-react";
 import { Button, Modal, Table } from "@/components/ui";
 import { MethodMark, ProviderMark } from "./brand-marks";
 import { buildConnectWizards, ConnectWizard, type WebhookUrls } from "./connect-wizard";
-import { CheckoutModal, CouponModal, ManageProviderModal, MethodsModal, type MethodOption } from "./manage-modals";
+import {
+  CheckoutModal,
+  CheckoutTotalsModal,
+  CouponModal,
+  ManageProviderModal,
+  MethodsModal,
+  type CheckoutTotalsSettings,
+  type MethodOption
+} from "./manage-modals";
 
 type ProviderKey = "STRIPE" | "SQUARE" | "PAYPAL";
 type CouponValueType = "PERCENT" | "FIXED";
@@ -42,6 +50,7 @@ export type PaymentsWorkspaceProps = {
     disconnected: boolean;
     providers: { value: string; label: string; connected: boolean }[];
   };
+  checkoutTotals: CheckoutTotalsSettings;
   coupons: ActiveCoupon[];
   featuredConnected: boolean;
   webhooks: WebhookUrls;
@@ -52,6 +61,7 @@ type ActiveModal =
   | { kind: "manage"; provider: ProviderKey }
   | { kind: "methods" }
   | { kind: "checkout" }
+  | { kind: "checkoutTotals" }
   | { kind: "coupon" }
   | null;
 
@@ -76,7 +86,23 @@ function couponAvailabilityLabel(coupon: ActiveCoupon) {
   return "Always available";
 }
 
-export function PaymentsWorkspace({ checkout, coupons, featuredConnected, methods, providers, webhooks }: PaymentsWorkspaceProps) {
+function moneyLabel(cents?: number | null) {
+  return new Intl.NumberFormat("en-US", { currency: "USD", style: "currency" }).format((cents || 0) / 100);
+}
+
+function percentLabel(basisPoints?: number | null) {
+  return `${((basisPoints || 0) / 100).toFixed(2).replace(/\.?0+$/, "")}%`;
+}
+
+export function PaymentsWorkspace({
+  checkout,
+  checkoutTotals,
+  coupons,
+  featuredConnected,
+  methods,
+  providers,
+  webhooks
+}: PaymentsWorkspaceProps) {
   const [active, setActive] = useState<ActiveModal>(null);
   const close = () => setActive(null);
 
@@ -108,9 +134,18 @@ export function PaymentsWorkspace({ checkout, coupons, featuredConnected, method
           ? "Ways customers pay"
           : active?.kind === "checkout"
             ? "Checkout account"
-            : active?.kind === "coupon"
-              ? "Add coupon"
-            : "";
+            : active?.kind === "checkoutTotals"
+              ? "Checkout totals"
+              : active?.kind === "coupon"
+                ? "Add coupon"
+                : "";
+
+  const taxSummary = checkoutTotals.taxEnabled
+    ? `${checkoutTotals.taxLabel} · ${percentLabel(checkoutTotals.taxRateBps)}`
+    : "Tax off";
+  const shippingSummary = checkoutTotals.shippingEnabled
+    ? `${checkoutTotals.shippingLabel} · ${moneyLabel(checkoutTotals.shippingFlatCents)}`
+    : "Shipping off";
 
   return (
     <div className="stack">
@@ -362,6 +397,14 @@ export function PaymentsWorkspace({ checkout, coupons, featuredConnected, method
             </Button>
           </div>
         ) : null}
+        <div className="pay-checkout-row">
+          <span className={checkoutTotals.taxEnabled ? "pay-chip pay-chip-on" : "pay-chip"}>{taxSummary}</span>
+          <span className={checkoutTotals.shippingEnabled ? "pay-chip pay-chip-on" : "pay-chip"}>{shippingSummary}</span>
+          <Button onClick={() => setActive({ kind: "checkoutTotals" })} type="button" variant="secondary">
+            <ReceiptText size={16} />
+            Checkout totals
+          </Button>
+        </div>
       </section>
 
       {active?.kind === "connect" && connectConfig ? (
@@ -388,6 +431,9 @@ export function PaymentsWorkspace({ checkout, coupons, featuredConnected, method
         ) : null}
         {active?.kind === "checkout" ? (
           <CheckoutModal active={checkout.active} key="checkout" onClose={close} providers={checkout.providers} />
+        ) : null}
+        {active?.kind === "checkoutTotals" ? (
+          <CheckoutTotalsModal key="checkout-totals" onClose={close} settings={checkoutTotals} />
         ) : null}
         {active?.kind === "coupon" ? <CouponModal key="coupon" onClose={close} /> : null}
       </Modal>

@@ -6,21 +6,20 @@ export const manifest = {
   href: "/admin/modules/products",
   icon: "ShoppingBag",
   order: 90,
-  description: "Product catalog, variants, collections, and commerce setup.",
+  description: "Product catalog, variants, collections, and storefront organization.",
   layout: "standard",
   status: "active",
   enabledByDefault: true,
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Catalog admin, public storefront/cart, order creation, hosted checkout handoff records, buy-button embed API, and abandoned-cart recovery are live.",
-    primaryGap: "Refunds and fulfillment exports are pending."
+    summary: "Catalog admin, public storefront/cart, buy-button embed API, and abandoned-cart recovery are live.",
+    primaryGap: "Advanced storefront merchandising controls are pending."
   },
   capabilities: [
     { label: "Catalog admin", status: "foundation" },
     { label: "Checkout/storefront", status: "foundation" },
-    { label: "Abandoned-cart recovery", status: "live" },
-    { label: "Order dashboard", status: "foundation" }
+    { label: "Abandoned-cart recovery", status: "live" }
   ],
   adminRoutes: ["/admin/modules/products"],
   publicRoutes: ["/shop", "/shop/[slug]", "/cart", "/api/public/v1/products", "/api/public/v1/checkout"],

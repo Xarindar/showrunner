@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, KeyRound, Loader2, Plus, RefreshCw, TicketPercent, Unplug } from "lucide-react";
+import { CreditCard, KeyRound, Loader2, Plus, ReceiptText, RefreshCw, TicketPercent, Unplug } from "lucide-react";
 import { Button } from "@/components/ui";
 import { MethodMark } from "./brand-marks";
 import {
@@ -11,12 +11,31 @@ import {
   initialPaymentActionState,
   reverifyProviderAction,
   savePaymentMethodsAction,
-  setCheckoutProviderAction
+  setCheckoutProviderAction,
+  updateCheckoutTotalsAction
 } from "../actions";
 
 export type MethodOption = { key: string; label: string; type: string; stripePaymentMethod: string };
+export type CheckoutTotalsSettings = {
+  freeShippingThresholdCents: number | null;
+  shippingEnabled: boolean;
+  shippingFlatCents: number | null;
+  shippingLabel: string;
+  taxAppliesToShipping: boolean;
+  taxEnabled: boolean;
+  taxLabel: string;
+  taxRateBps: number | null;
+};
 
 const featuredMethodKeys = new Set(["CASH_APP_PAY", "AFFIRM"]);
+
+function moneyInput(cents?: number | null) {
+  return typeof cents === "number" ? (cents / 100).toFixed(2) : "";
+}
+
+function percentInput(basisPoints?: number | null) {
+  return typeof basisPoints === "number" ? (basisPoints / 100).toFixed(2) : "";
+}
 
 function methodHelpText(option: MethodOption) {
   if (option.key === "CASH_APP_PAY") return "Pay from a Cash App balance. Included with Stripe.";
@@ -206,6 +225,97 @@ export function CheckoutModal({
         <Button aria-busy={pending} disabled={pending} type="submit">
           {pending ? <Loader2 className="pay-spin" size={18} /> : <CreditCard size={18} />}
           Save checkout choice
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+export function CheckoutTotalsModal({
+  onClose,
+  settings
+}: {
+  onClose: () => void;
+  settings: CheckoutTotalsSettings;
+}) {
+  const router = useRouter();
+  const [state, formAction, pending] = useActionState(updateCheckoutTotalsAction, initialPaymentActionState);
+
+  useEffect(() => {
+    if (state.status !== "success") return;
+    router.refresh();
+    onClose();
+  }, [onClose, router, state.status]);
+
+  return (
+    <form action={formAction} className="form-grid">
+      <p className="pay-step-lead">
+        Set the tax rule and standard shipping amount customers see in cart and checkout.
+      </p>
+      <div className="module-toggle-grid">
+        <label className="module-toggle-row">
+          <input defaultChecked={settings.taxEnabled} name="commerceTaxEnabled" type="checkbox" />
+          <span className="module-toggle-main">
+            <span>
+              <ReceiptText size={15} />
+              <strong>Enable tax</strong>
+            </span>
+            <small>Apply a site-wide tax rate during checkout.</small>
+          </span>
+        </label>
+        <label className="module-toggle-row">
+          <input defaultChecked={settings.shippingEnabled} name="commerceShippingEnabled" type="checkbox" />
+          <span className="module-toggle-main">
+            <span>
+              <ReceiptText size={15} />
+              <strong>Enable standard shipping</strong>
+            </span>
+            <small>Show a flat shipping line when physical items are checked out.</small>
+          </span>
+        </label>
+      </div>
+      <div className="form-grid">
+        <div className="ui-field">
+          <label htmlFor="commerceTaxLabel">Tax label</label>
+          <input id="commerceTaxLabel" name="commerceTaxLabel" defaultValue={settings.taxLabel} required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="commerceTaxRate">Tax rate %</label>
+          <input id="commerceTaxRate" name="commerceTaxRate" inputMode="decimal" defaultValue={percentInput(settings.taxRateBps)} />
+        </div>
+        <label className="ui-zero">
+          <input name="commerceTaxAppliesToShipping" type="checkbox" defaultChecked={settings.taxAppliesToShipping} />
+          Tax shipping
+        </label>
+        <div className="ui-field">
+          <label htmlFor="commerceShippingLabel">Shipping label</label>
+          <input id="commerceShippingLabel" name="commerceShippingLabel" defaultValue={settings.shippingLabel} required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="commerceShippingFlat">Flat amount</label>
+          <input
+            id="commerceShippingFlat"
+            name="commerceShippingFlat"
+            inputMode="decimal"
+            defaultValue={moneyInput(settings.shippingFlatCents)} />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="commerceFreeShippingThreshold">Free shipping threshold</label>
+          <input
+            id="commerceFreeShippingThreshold"
+            name="commerceFreeShippingThreshold"
+            inputMode="decimal"
+            defaultValue={moneyInput(settings.freeShippingThresholdCents)} />
+        </div>
+      </div>
+      {state.status === "error" ? <p className="error ui-zero">{state.message}</p> : null}
+      <div className="pay-step-actions">
+        <Button onClick={onClose} type="button" variant="secondary">
+          Cancel
+        </Button>
+        <Button aria-busy={pending} disabled={pending} type="submit">
+          {pending ? <Loader2 className="pay-spin" size={18} /> : <ReceiptText size={18} />}
+          Save checkout totals
         </Button>
       </div>
     </form>

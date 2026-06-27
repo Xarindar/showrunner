@@ -6,7 +6,7 @@ export const manifest = {
   href: "/admin/modules/payments",
   icon: "Wallet",
   order: 95,
-  description: "Connect payment accounts, choose how customers pay, and manage checkout coupons.",
+  description: "Connect payment accounts, choose how customers pay, and manage checkout coupons and totals.",
   layout: "standard",
   status: "active",
   enabledByDefault: true,
@@ -14,7 +14,7 @@ export const manifest = {
   readiness: {
     level: "live",
     mode: "live",
-    summary: "Guided bring-your-own-credentials setup for Stripe, Square, and PayPal, with checkout, coupon, and payment-method controls.",
+    summary: "Guided bring-your-own-credentials setup for Stripe, Square, and PayPal, with checkout, coupon, tax, shipping, and payment-method controls.",
     primaryGap: "Cash App Pay and Affirm ride along with Stripe; both unlock once Stripe is connected."
   },
   capabilities: [
@@ -22,6 +22,7 @@ export const manifest = {
     { label: "Live credential verification", status: "live" },
     { label: "Payment-method controls", status: "live" },
     { label: "Coupon admin", status: "foundation" },
+    { label: "Checkout totals", status: "live" },
     { label: "Checkout provider selection", status: "live" }
   ],
   adminRoutes: ["/admin/modules/payments"],

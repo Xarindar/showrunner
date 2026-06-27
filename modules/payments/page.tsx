@@ -119,6 +119,16 @@ export default async function PaymentsPage() {
         disconnected: selectedDisconnected,
         providers: checkoutProviders
       }}
+      checkoutTotals={{
+        freeShippingThresholdCents: settings.commerceFreeShippingThresholdCents,
+        shippingEnabled: settings.commerceShippingEnabled,
+        shippingFlatCents: settings.commerceShippingFlatCents,
+        shippingLabel: settings.commerceShippingLabel,
+        taxAppliesToShipping: settings.commerceTaxAppliesToShipping,
+        taxEnabled: settings.commerceTaxEnabled,
+        taxLabel: settings.commerceTaxLabel,
+        taxRateBps: settings.commerceTaxRateBps
+      }}
       coupons={coupons.map((coupon) => ({
         amountCents: coupon.amountCents,
         code: coupon.code,

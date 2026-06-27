@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
-import { couponFormSchema, formObject } from "@/lib/admin-validation";
+import { z } from "zod";
+import { couponFormSchema, formObject, optionalMoneyCents, requiredText, zeroableMoneyCents } from "@/lib/admin-validation";
 import { recordAuditLog } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
@@ -36,8 +37,33 @@ function errorState(error: unknown, fallback: string): PaymentActionState {
 function validationErrorMessage(error: { issues: Array<{ message: string; path: PropertyKey[] }> }) {
   const issue = error.issues[0];
   const field = issue?.path.length ? `${issue.path.join(".")}: ` : "";
-  return `${field}${issue?.message || "Check the coupon and try again."}`;
+  return `${field}${issue?.message || "Check the values and try again."}`;
 }
+
+const percentRateBps = z
+  .string()
+  .transform((value) => value.trim())
+  .refine((value) => value === "" || /^\d+(\.\d{1,2})?$/.test(value), "Use a percentage such as 8.25.")
+  .transform((value) => (value === "" ? 0 : Math.round(Number(value) * 100)))
+  .refine((value) => value >= 0 && value <= 10_000, "Use a percentage from 0 to 100.");
+
+const checkoutTotalsSchema = z
+  .object({
+    commerceFreeShippingThreshold: optionalMoneyCents,
+    commerceShippingEnabled: z.literal("on").optional(),
+    commerceShippingFlat: zeroableMoneyCents,
+    commerceShippingLabel: requiredText,
+    commerceTaxAppliesToShipping: z.literal("on").optional(),
+    commerceTaxEnabled: z.literal("on").optional(),
+    commerceTaxLabel: requiredText,
+    commerceTaxRate: percentRateBps
+  })
+  .transform((value) => ({
+    ...value,
+    commerceShippingEnabled: value.commerceShippingEnabled === "on",
+    commerceTaxAppliesToShipping: value.commerceTaxAppliesToShipping === "on",
+    commerceTaxEnabled: value.commerceTaxEnabled === "on"
+  }));
 
 // Audit logging never records the pasted secret values themselves — only that a provider changed.
 async function auditPaymentProvider(
@@ -133,6 +159,80 @@ export async function createCouponAction(
   revalidatePath("/admin/modules/payments");
   revalidatePath("/cart");
   return { status: "success", message: `Coupon ${input.code} created.` };
+}
+
+export async function updateCheckoutTotalsAction(
+  _prev: PaymentActionState,
+  formData: FormData
+): Promise<PaymentActionState> {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+  const parsed = checkoutTotalsSchema.safeParse(formObject(formData));
+
+  if (!parsed.success) {
+    return { status: "error", message: validationErrorMessage(parsed.error) };
+  }
+
+  const input = parsed.data;
+  const before = await prisma.siteSettings.findUnique({
+    where: { siteId: site.id },
+    select: {
+      commerceFreeShippingThresholdCents: true,
+      commerceShippingEnabled: true,
+      commerceShippingFlatCents: true,
+      commerceShippingLabel: true,
+      commerceTaxAppliesToShipping: true,
+      commerceTaxEnabled: true,
+      commerceTaxLabel: true,
+      commerceTaxRateBps: true,
+      id: true
+    }
+  });
+
+  if (!before) {
+    return { status: "error", message: "Site settings not found." };
+  }
+
+  const after = await prisma.siteSettings.update({
+    where: { siteId: site.id },
+    data: {
+      commerceFreeShippingThresholdCents: input.commerceFreeShippingThreshold,
+      commerceShippingEnabled: input.commerceShippingEnabled,
+      commerceShippingFlatCents: input.commerceShippingFlat,
+      commerceShippingLabel: input.commerceShippingLabel,
+      commerceTaxAppliesToShipping: input.commerceTaxAppliesToShipping,
+      commerceTaxEnabled: input.commerceTaxEnabled,
+      commerceTaxLabel: input.commerceTaxLabel,
+      commerceTaxRateBps: input.commerceTaxRate
+    },
+    select: {
+      commerceFreeShippingThresholdCents: true,
+      commerceShippingEnabled: true,
+      commerceShippingFlatCents: true,
+      commerceShippingLabel: true,
+      commerceTaxAppliesToShipping: true,
+      commerceTaxEnabled: true,
+      commerceTaxLabel: true,
+      commerceTaxRateBps: true,
+      id: true
+    }
+  });
+
+  await recordAuditLog({
+    action: "settings.checkout_totals.updated",
+    actor: user,
+    metadata: { after, before },
+    siteId: site.id,
+    targetId: after.id,
+    targetLabel: "Checkout totals",
+    targetType: "site_settings"
+  });
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/modules/payments");
+  revalidatePath("/cart");
+  revalidatePath("/shop");
+  return { status: "success", message: "Checkout totals saved." };
 }
 
 export async function connectSquareAction(
