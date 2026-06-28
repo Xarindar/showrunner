@@ -2,21 +2,23 @@ import type { ShellModule } from "@/shell/module-types";
 
 export const manifest = {
   id: "scheduling",
-  label: "Scheduling",
-  href: "/admin/modules/scheduling",
+  label: "Services",
+  href: "/admin/modules/services",
   icon: "CalendarDays",
   order: 50,
-  description: "Services, availability, blockouts, and booking rules.",
+  description: "Base services, packages, availability, blockouts, and booking rules.",
   layout: "standard",
   status: "active",
   enabledByDefault: true,
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Native public booking is live with multi-staff service assignment, resource requirements, scoped availability, reminders, ICS feeds, Google free/busy checks, client self-service, and staff/resource-aware conflict checks.",
+    summary: "Native public booking is live with base services, service packages, multi-staff assignment, resource requirements, scoped availability, reminders, ICS feeds, Google free/busy checks, client self-service, and staff/resource-aware conflict checks.",
     primaryGap: "Cal.com calendar sync, capacity groups, and paid booking are pending."
   },
   capabilities: [
+    { label: "Base services", status: "live" },
+    { label: "Service packages", status: "foundation" },
     { label: "Native availability", status: "live" },
     { label: "Public booking", status: "live" },
     { label: "Multi-staff scheduling", status: "live" },
@@ -28,6 +30,7 @@ export const manifest = {
     { label: "Cal.com calendar sync", status: "planned" }
   ],
   adminRoutes: [
+    "/admin/modules/services",
     "/admin/modules/scheduling",
     "/api/scheduling/google-calendar/connect/start",
     "/api/scheduling/google-calendar/connect/callback"
@@ -48,6 +51,8 @@ export const manifest = {
   dependencies: ["appointments", "clients", "communications"],
   dataModels: [
     "Service",
+    "ServicePackage",
+    "ServicePackageItem",
     "StaffMember",
     "Resource",
     "ServiceStaff",
@@ -61,6 +66,6 @@ export const manifest = {
     "SchedulingSettings"
   ],
   permissions: ["scheduling:manage"],
-  settingsSections: ["Scheduling", "Notifications"],
+  settingsSections: ["Services", "Notifications"],
   healthChecks: ["active-services", "availability-rules", "booking-window", "booking-reminder-worker"]
 } satisfies ShellModule;

@@ -3,7 +3,7 @@
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CreditCard, KeyRound, Loader2, Plus, ReceiptText, RefreshCw, TicketPercent, Unplug } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button, SwitchReveal } from "@/components/ui";
 import { MethodMark } from "./brand-marks";
 import {
   createCouponAction,
@@ -252,61 +252,55 @@ export function CheckoutTotalsModal({
       <p className="pay-step-lead">
         Set the tax rule and standard shipping amount customers see in cart and checkout.
       </p>
-      <div className="module-toggle-grid">
-        <label className="module-toggle-row">
-          <input defaultChecked={settings.taxEnabled} name="commerceTaxEnabled" type="checkbox" />
-          <span className="module-toggle-main">
-            <span>
-              <ReceiptText size={15} />
-              <strong>Enable tax</strong>
-            </span>
-            <small>Apply a site-wide tax rate during checkout.</small>
-          </span>
-        </label>
-        <label className="module-toggle-row">
-          <input defaultChecked={settings.shippingEnabled} name="commerceShippingEnabled" type="checkbox" />
-          <span className="module-toggle-main">
-            <span>
-              <ReceiptText size={15} />
-              <strong>Enable standard shipping</strong>
-            </span>
-            <small>Show a flat shipping line when physical items are checked out.</small>
-          </span>
-        </label>
-      </div>
-      <div className="form-grid">
-        <div className="ui-field">
-          <label htmlFor="commerceTaxLabel">Tax label</label>
-          <input id="commerceTaxLabel" name="commerceTaxLabel" defaultValue={settings.taxLabel} required />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="commerceTaxRate">Tax rate %</label>
-          <input id="commerceTaxRate" name="commerceTaxRate" inputMode="decimal" defaultValue={percentInput(settings.taxRateBps)} />
-        </div>
-        <label className="ui-zero">
-          <input name="commerceTaxAppliesToShipping" type="checkbox" defaultChecked={settings.taxAppliesToShipping} />
-          Tax shipping
-        </label>
-        <div className="ui-field">
-          <label htmlFor="commerceShippingLabel">Shipping label</label>
-          <input id="commerceShippingLabel" name="commerceShippingLabel" defaultValue={settings.shippingLabel} required />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="commerceShippingFlat">Flat amount</label>
-          <input
-            id="commerceShippingFlat"
-            name="commerceShippingFlat"
-            inputMode="decimal"
-            defaultValue={moneyInput(settings.shippingFlatCents)} />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="commerceFreeShippingThreshold">Free shipping threshold</label>
-          <input
-            id="commerceFreeShippingThreshold"
-            name="commerceFreeShippingThreshold"
-            inputMode="decimal"
-            defaultValue={moneyInput(settings.freeShippingThresholdCents)} />
-        </div>
+      <div className="ui-switch-reveal-list">
+        <SwitchReveal
+          defaultChecked={settings.taxEnabled}
+          description="Apply a site-wide tax rate during checkout."
+          label="Enable tax"
+          name="commerceTaxEnabled">
+          <div className="ui-reveal-grid is-two">
+            <div className="ui-field">
+              <label htmlFor="commerceTaxLabel">Tax label</label>
+              <input id="commerceTaxLabel" name="commerceTaxLabel" defaultValue={settings.taxLabel} required />
+            </div>
+            <div className="ui-field">
+              <label htmlFor="commerceTaxRate">Tax rate %</label>
+              <input id="commerceTaxRate" name="commerceTaxRate" inputMode="decimal" defaultValue={percentInput(settings.taxRateBps)} />
+            </div>
+          </div>
+          <label className="ui-check-row ui-reveal-check">
+            <input name="commerceTaxAppliesToShipping" type="checkbox" defaultChecked={settings.taxAppliesToShipping} />
+            Tax shipping
+          </label>
+        </SwitchReveal>
+        <SwitchReveal
+          defaultChecked={settings.shippingEnabled}
+          description="Show a standard shipping line for physical items."
+          label="Enable standard shipping"
+          name="commerceShippingEnabled">
+          <div className="ui-reveal-grid is-three">
+            <div className="ui-field">
+              <label htmlFor="commerceShippingLabel">Shipping label</label>
+              <input id="commerceShippingLabel" name="commerceShippingLabel" defaultValue={settings.shippingLabel} required />
+            </div>
+            <div className="ui-field">
+              <label htmlFor="commerceShippingFlat">Flat amount</label>
+              <input
+                id="commerceShippingFlat"
+                name="commerceShippingFlat"
+                inputMode="decimal"
+                defaultValue={moneyInput(settings.shippingFlatCents)} />
+            </div>
+            <div className="ui-field">
+              <label htmlFor="commerceFreeShippingThreshold">Free shipping threshold</label>
+              <input
+                id="commerceFreeShippingThreshold"
+                name="commerceFreeShippingThreshold"
+                inputMode="decimal"
+                defaultValue={moneyInput(settings.freeShippingThresholdCents)} />
+            </div>
+          </div>
+        </SwitchReveal>
       </div>
       {state.status === "error" ? <p className="error ui-zero">{state.message}</p> : null}
       <div className="pay-step-actions">

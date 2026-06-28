@@ -200,6 +200,7 @@ export async function createPublicSchedulingBooking(input: {
   revalidatePath("/admin");
   revalidatePath("/admin/modules/appointments");
   revalidatePath("/admin/modules/clients");
+  revalidatePath("/admin/modules/services");
   revalidatePath("/admin/modules/scheduling");
   revalidatePath("/book");
 

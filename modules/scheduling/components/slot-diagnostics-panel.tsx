@@ -41,7 +41,8 @@ export function SlotDiagnosticsPanel({
         </div>
       </div>
 
-      <form action="/admin/modules/scheduling" className="subpanel form-grid">
+      <form action="/admin/modules/services" className="subpanel form-grid">
+        <input name="tab" type="hidden" value="availability" />
         <EqualGrid min="220px">
           <div className="ui-field">
             <label htmlFor="diagnosticServiceId">Service</label>

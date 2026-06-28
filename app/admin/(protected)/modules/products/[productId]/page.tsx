@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 type AdminProductEditRouteProps = {
   params: Promise<{ productId: string }>;
-  searchParams: Promise<{ error?: string; saved?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; tab?: string }>;
 };
 
 export default async function AdminProductEditRoute({ params, searchParams }: AdminProductEditRouteProps) {

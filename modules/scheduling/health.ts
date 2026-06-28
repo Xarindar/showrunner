@@ -25,10 +25,10 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
     warnings.push(
       warning(
         "No active services",
-        "Public booking has no active service to show until Scheduling has at least one active service.",
+        "Public booking has no active service to show until Services has at least one active service.",
         "critical",
         "scheduling",
-        "/admin/modules/scheduling"
+        "/admin/modules/services"
       )
     );
   }
@@ -40,7 +40,7 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
         "The native booking adapter cannot offer slots until at least one availability rule exists.",
         "critical",
         "scheduling",
-        "/admin/modules/scheduling"
+        "/admin/modules/services?tab=availability"
       )
     );
   }
@@ -54,7 +54,7 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
         } required by a service but has no resource availability rules.`,
         "warning",
         "scheduling",
-        "/admin/modules/scheduling"
+        "/admin/modules/services?tab=team"
       )
     );
   }
@@ -66,7 +66,7 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
         "Set BOOKING_REMINDER_WORKER_SECRET and provision the scheduled reminder sweep (npm run booking-reminders:process) before relying on appointment reminders.",
         "warning",
         "scheduling",
-        "/admin/modules/scheduling"
+        "/admin/modules/services?tab=calendar"
       )
     );
   }

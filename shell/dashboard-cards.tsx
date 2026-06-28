@@ -600,7 +600,7 @@ export const dashboardCardDefinitions: DashboardCardDefinition[] = [
     moduleId: "scheduling",
     render: renderSchedulingServices,
     sizes: ["sm", "md", "lg"],
-    title: "Scheduling setup"
+    title: "Services setup"
   },
   {
     defaultSize: "md",

@@ -79,6 +79,8 @@ model Service {
   description         String?
   durationMinutes     Int
   location            String?
+  category            String    @default("")
+  tags                Json      @default("[]")
   bufferBeforeMinutes Int       @default(0)
   bufferAfterMinutes  Int       @default(0)
   minimumNoticeHours  Int       @default(12)
@@ -96,9 +98,50 @@ model Service {
   waitlistEntries     BookingWaitlistEntry[]
   staffAssignments    ServiceStaff[]
   resourceAssignments ServiceResource[]
+  packageItems        ServicePackageItem[]
 
   @@unique([siteId, slug])
   @@index([siteId])
+  @@index([siteId, category])
+  @@index([siteId, isActive])
+}
+
+model ServicePackage {
+  id          String               @id @default(cuid())
+  siteId      String
+  site        Site                 @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  slug        String               @default(cuid())
+  name        String
+  description String               @default("")
+  tags        Json                 @default("[]")
+  isActive    Boolean              @default(true)
+  sortOrder   Int                  @default(0)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  items       ServicePackageItem[]
+
+  @@unique([siteId, slug])
+  @@index([siteId, isActive])
+  @@index([siteId, sortOrder])
+}
+
+model ServicePackageItem {
+  id        String         @id @default(cuid())
+  siteId    String
+  site      Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  packageId String
+  package   ServicePackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service        @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  quantity  Int            @default(1)
+  sortOrder Int            @default(0)
+  notes     String         @default("")
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([packageId, serviceId])
+  @@index([siteId, serviceId])
+  @@index([siteId, packageId])
 }
 
 model StaffMember {

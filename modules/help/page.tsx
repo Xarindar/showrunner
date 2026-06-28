@@ -14,9 +14,9 @@ function warningPillClassName(severity: PlatformWarningSeverity) {
 
 const commonWorkflows = [
 {
-  label: "Add or edit bookable time",
-  href: "/admin/modules/scheduling",
-  detail: "Update services, availability, or blockouts."
+  label: "Add or edit services",
+  href: "/admin/modules/services",
+  detail: "Update base services, packages, availability, or blockouts."
 },
 {
   label: "Manage a new booking",

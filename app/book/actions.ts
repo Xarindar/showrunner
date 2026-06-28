@@ -116,6 +116,7 @@ export async function createPublicBookingAction(_state: BookingFormState, formDa
     revalidatePath("/admin");
     revalidatePath("/admin/modules/appointments");
     revalidatePath("/admin/modules/clients");
+    revalidatePath("/admin/modules/services");
     revalidatePath("/admin/modules/scheduling");
     revalidatePath("/book");
     const formAttachments = await getPublicFormAttachments({
@@ -241,6 +242,7 @@ export async function joinPublicWaitlistAction(_state: WaitlistFormState, formDa
 
   revalidatePath("/admin");
   revalidatePath("/admin/modules/appointments");
+  revalidatePath("/admin/modules/services");
   revalidatePath("/admin/modules/scheduling");
   revalidatePath("/book");
 

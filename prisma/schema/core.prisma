@@ -47,6 +47,8 @@ model Site {
   publicRateLimits         PublicRateLimit[]
   siteApiKeys              SiteApiKey[]
   services                 Service[]
+  servicePackages          ServicePackage[]
+  servicePackageItems      ServicePackageItem[]
   staffMembers             StaffMember[]
   resources                Resource[]
   serviceStaff             ServiceStaff[]

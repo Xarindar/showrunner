@@ -17,6 +17,7 @@ import {
   optionalStoredText,
   parseForm,
   productFormSchema,
+  productQuickCreateFormSchema,
   productStatusFormSchema,
   productUpdateFormSchema,
   productVariantFormSchema,
@@ -97,6 +98,8 @@ const giftCardIssueSchema = z.object({
 const productMediaUploadSchema = z.object({
   productId: requiredText,
   alt: optionalStoredText,
+  previewMedia: z.preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string()),
+  returnTab: z.preprocess((value) => (value === "details" ? "details" : "media"), z.enum(["details", "media"])),
   role: z.enum(ProductMediaRole).catch(ProductMediaRole.GALLERY)
 });
 
@@ -106,7 +109,9 @@ const productMediaAttachSchema = productMediaUploadSchema.extend({
 
 const productMediaSelectSchema = z.object({
   id: requiredText,
-  productId: requiredText
+  previewMedia: z.preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string()),
+  productId: requiredText,
+  returnTab: z.preprocess((value) => (value === "details" ? "details" : "media"), z.enum(["details", "media"]))
 });
 
 const productCategoryFormSchema = z.object({
@@ -190,9 +195,16 @@ function productEditPath(productId: string, params?: Record<string, string>) {
   return `/admin/modules/products/${productId}${query ? `?${query}` : ""}`;
 }
 
+function productMediaReturnPath(input: { previewMedia?: string; productId: string; returnTab: "details" | "media" }, mediaId?: string) {
+  const params: Record<string, string> = { saved: "media", tab: input.returnTab };
+  const previewMedia = mediaId || input.previewMedia;
+  if (input.returnTab === "details" && previewMedia) params.previewMedia = previewMedia;
+  return productEditPath(input.productId, params);
+}
+
 function productBundlePath(productId: string, params?: Record<string, string>) {
-  const query = new URLSearchParams(params).toString();
-  return `/admin/modules/products/${productId}/bundles${query ? `?${query}` : ""}`;
+  // Bundle editing now lives inside the product editor's Bundle tab.
+  return productEditPath(productId, { ...params, tab: "bundle" });
 }
 
 function hasUpload(file: FormDataEntryValue | null): file is File {
@@ -425,6 +437,41 @@ export async function createProductAction(formData: FormData) {
   redirect(productEditPath(product.id, { saved: "product" }));
 }
 
+export async function createProductQuickAction(formData: FormData) {
+  await requireAdmin("products:manage");
+  const input = await parseForm(productQuickCreateFormSchema, formData, "/admin/modules/products");
+  const settings = await getSiteSettings();
+  const siteId = settings.siteId;
+  const slug = await generateUniqueCommerceSlug(prisma, "product", { name: input.name, siteId });
+  const basePriceCents = input.basePrice ?? 0;
+
+  const product = await prisma.product.create({
+    data: {
+      siteId,
+      slug,
+      name: input.name,
+      type: input.type,
+      status: ProductStatus.DRAFT,
+      basePriceCents,
+      currency: "USD",
+      requiresShipping: input.type === ProductType.PHYSICAL,
+      variants: {
+        create: {
+          name: "Default",
+          priceCents: basePriceCents,
+          isDefault: true,
+          isActive: false
+        }
+      }
+    },
+    select: { id: true }
+  });
+
+  refreshProducts();
+  revalidatePath(productEditPath(product.id));
+  redirect(productEditPath(product.id, { saved: "created" }));
+}
+
 export async function updateProductAction(formData: FormData) {
   await requireAdmin("products:manage");
   const input = await parseForm(productUpdateFormSchema, formData);
@@ -594,7 +641,7 @@ export async function createProductVariantAction(formData: FormData) {
 
   refreshProducts();
   revalidatePath(productEditPath(input.productId));
-  redirect(productEditPath(input.productId, { saved: "variant" }));
+  redirect(productEditPath(input.productId, { saved: "variant", tab: "variants" }));
 }
 
 export async function uploadProductMediaAction(formData: FormData) {
@@ -627,31 +674,33 @@ export async function uploadProductMediaAction(formData: FormData) {
   }
 
   const url = mediaAssetDisplayUrl(asset, MediaVariantType.HERO);
+  let createdMediaId = "";
   await prisma.$transaction(async (tx) => {
     const sortOrder = await tx.productMedia.count({ where: { productId: input.productId } });
-    if (input.role === ProductMediaRole.PRIMARY) {
+    const shouldBePrimary = input.role === ProductMediaRole.PRIMARY || sortOrder === 0;
+    if (shouldBePrimary) {
       await tx.productMedia.updateMany({
         where: { productId: input.productId, role: ProductMediaRole.PRIMARY },
         data: { role: ProductMediaRole.GALLERY }
       });
     }
-    await tx.productMedia.create({
+    const media = await tx.productMedia.create({
       data: {
         productId: input.productId,
         mediaAssetId: asset.id,
-        role: input.role,
+        role: shouldBePrimary ? ProductMediaRole.PRIMARY : input.role,
         url,
         alt: input.alt || asset.alt || asset.filename,
         sortOrder
-      }
+      },
+      select: { id: true }
     });
-    if (input.role === ProductMediaRole.PRIMARY) {
-      await syncProductPrimaryImage(tx, input.productId);
-    }
+    createdMediaId = media.id;
+    await syncProductPrimaryImage(tx, input.productId);
   });
 
   refreshProducts();
-  redirect(productEditPath(input.productId, { saved: "media" }));
+  redirect(productMediaReturnPath(input, createdMediaId));
 }
 
 export async function attachProductMediaAction(formData: FormData) {
@@ -669,31 +718,33 @@ export async function attachProductMediaAction(formData: FormData) {
   }
 
   const url = mediaAssetDisplayUrl(asset, MediaVariantType.HERO);
+  let createdMediaId = "";
   await prisma.$transaction(async (tx) => {
     const sortOrder = await tx.productMedia.count({ where: { productId: input.productId } });
-    if (input.role === ProductMediaRole.PRIMARY) {
+    const shouldBePrimary = input.role === ProductMediaRole.PRIMARY || sortOrder === 0;
+    if (shouldBePrimary) {
       await tx.productMedia.updateMany({
         where: { productId: input.productId, role: ProductMediaRole.PRIMARY },
         data: { role: ProductMediaRole.GALLERY }
       });
     }
-    await tx.productMedia.create({
+    const media = await tx.productMedia.create({
       data: {
         productId: input.productId,
         mediaAssetId: asset.id,
-        role: input.role,
+        role: shouldBePrimary ? ProductMediaRole.PRIMARY : input.role,
         url,
         alt: input.alt || asset.alt || asset.filename,
         sortOrder
-      }
+      },
+      select: { id: true }
     });
-    if (input.role === ProductMediaRole.PRIMARY) {
-      await syncProductPrimaryImage(tx, input.productId);
-    }
+    createdMediaId = media.id;
+    await syncProductPrimaryImage(tx, input.productId);
   });
 
   refreshProducts();
-  redirect(productEditPath(input.productId, { saved: "media" }));
+  redirect(productMediaReturnPath(input, createdMediaId));
 }
 
 export async function setPrimaryProductMediaAction(formData: FormData) {
@@ -721,7 +772,7 @@ export async function setPrimaryProductMediaAction(formData: FormData) {
   });
 
   refreshProducts();
-  redirect(productEditPath(input.productId, { saved: "media" }));
+  redirect(productMediaReturnPath(input, input.id));
 }
 
 export async function removeProductMediaAction(formData: FormData) {
@@ -736,7 +787,7 @@ export async function removeProductMediaAction(formData: FormData) {
   });
 
   refreshProducts();
-  redirect(productEditPath(input.productId, { saved: "media" }));
+  redirect(productMediaReturnPath(input));
 }
 
 export async function createProductCategoryAction(formData: FormData) {
@@ -800,7 +851,7 @@ export async function assignProductCategoryAction(formData: FormData) {
   });
 
   refreshProducts();
-  redirect(productEditPath(input.productId, { saved: "category" }));
+  redirect(productEditPath(input.productId, { saved: "category", tab: "organization" }));
 }
 
 export async function removeProductCategoryAction(formData: FormData) {
@@ -811,7 +862,7 @@ export async function removeProductCategoryAction(formData: FormData) {
   await prisma.productCategoryAssignment.deleteMany({ where: { id: input.id, productId: input.productId } });
 
   refreshProducts();
-  redirect(productEditPath(input.productId, { saved: "category" }));
+  redirect(productEditPath(input.productId, { saved: "category", tab: "organization" }));
 }
 
 export async function createProductOptionAction(formData: FormData) {
@@ -856,7 +907,7 @@ export async function createProductOptionAction(formData: FormData) {
   });
 
   refreshProducts();
-  redirect(productEditPath(input.productId, { saved: "option" }));
+  redirect(productEditPath(input.productId, { saved: "option", tab: "variants" }));
 }
 
 function optionCombinations<T>(groups: T[][]): T[][] {
@@ -951,7 +1002,7 @@ export async function generateProductVariantsFromOptionsAction(formData: FormDat
   });
 
   refreshProducts();
-  redirect(productEditPath(input.productId, { saved: "variants" }));
+  redirect(productEditPath(input.productId, { saved: "variants", tab: "variants" }));
 }
 
 export async function updateProductVariantAction(formData: FormData) {
@@ -985,7 +1036,7 @@ export async function updateProductVariantAction(formData: FormData) {
   });
 
   refreshProducts();
-  redirect(productEditPath(input.productId, { saved: "variant" }));
+  redirect(productEditPath(input.productId, { saved: "variant", tab: "variants" }));
 }
 
 export async function createBundleComponentAction(formData: FormData) {

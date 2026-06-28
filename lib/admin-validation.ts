@@ -101,6 +101,8 @@ export const serviceFormSchema = z
     description: optionalStoredText,
     durationMinutes: z.coerce.number().int().min(1).max(24 * 60),
     location: optionalStoredText,
+    category: optionalStoredText,
+    tags: optionalStoredText,
     bufferBeforeMinutes: nonNegativeInt.max(24 * 60),
     bufferAfterMinutes: nonNegativeInt.max(24 * 60),
     minimumNoticeHours: nonNegativeInt.max(24 * 365),
@@ -115,6 +117,7 @@ export const serviceFormSchema = z
   })
   .transform((value) => ({
     ...value,
+    tags: csvList(value.tags),
     requirePolicy: Boolean(value.requirePolicy && value.policyText.trim()),
     requestOnly: value.requestOnly === "on",
     waitlistEnabled: value.waitlistEnabled === "on",
@@ -337,6 +340,12 @@ export const productFormSchema = z
   }));
 
 export const productUpdateFormSchema = productFormSchema.and(z.object({ id }));
+
+export const productQuickCreateFormSchema = z.object({
+  name: requiredText,
+  basePrice: optionalMoneyCents,
+  type: z.enum(ProductType).catch(ProductType.PHYSICAL)
+});
 
 export const productStatusFormSchema = z.object({
   id,

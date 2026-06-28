@@ -541,9 +541,9 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
                 Add today card
               </Button>
             </form>
-            <ButtonLink href="/admin/modules/scheduling" variant="secondary">
+            <ButtonLink href="/admin/modules/services" variant="secondary">
               <CalendarDays size={18} />
-              Scheduling setup
+              Services setup
             </ButtonLink>
           </div>
         }

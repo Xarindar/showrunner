@@ -68,6 +68,7 @@ function refreshSelfServicePaths(bookingId: string) {
   revalidatePath("/admin");
   revalidatePath("/admin/modules/appointments");
   revalidatePath("/admin/modules/clients");
+  revalidatePath("/admin/modules/services");
   revalidatePath("/admin/modules/scheduling");
 }
 

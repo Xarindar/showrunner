@@ -25,7 +25,7 @@ export const manifest = {
     { label: "Checkout/storefront", status: "foundation" },
     { label: "Abandoned-cart recovery", status: "live" }
   ],
-  adminRoutes: ["/admin/modules/products"],
+  adminRoutes: ["/admin/modules/products", "/admin/modules/products/[productId]"],
   publicRoutes: ["/shop", "/shop/[slug]", "/cart", "/api/public/v1/products", "/api/public/v1/checkout"],
   widgetRoutes: ["/embed/v1/buy-button.js"],
   dependencies: ["media", "billing"],

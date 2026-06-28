@@ -67,9 +67,9 @@ export async function getOnboardingChecklist(settings: SiteSettingsWithModules):
     steps.push({
       id: "services",
       title: "Add a bookable service",
-      description: "Create at least one active service with a name, length, and price. Nothing can be booked until you do.",
+      description: "Create at least one active service with a name, length, category, and tags. Nothing can be booked until you do.",
       done: activeServices > 0,
-      href: "/admin/modules/scheduling",
+      href: "/admin/modules/services",
       cta: "Add a service"
     });
     steps.push({
@@ -77,7 +77,7 @@ export async function getOnboardingChecklist(settings: SiteSettingsWithModules):
       title: "Set your weekly hours",
       description: "Tell us the days and times you take appointments so customers only ever see real openings.",
       done: availabilityRules > 0,
-      href: "/admin/modules/scheduling",
+      href: "/admin/modules/services?tab=availability",
       cta: "Set hours"
     });
   }

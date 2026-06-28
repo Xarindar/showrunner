@@ -8,11 +8,12 @@ import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
   createGiftCardAction,
-  createProductAction,
+  createProductQuickAction,
   updateProductStatusAction
 } from "./actions";
 import { Button, ButtonLink, Pagination, TableFilterBar, type TableFilterSelect } from "@/components/ui";
 import { CatalogCreateMenu } from "./catalog-create-menu";
+import { ActivateConfirmButton } from "./activate-confirm";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +100,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       : {})
   };
 
-  const [products, productCount, activeCount, draftCount, archivedCount, categories] = await Promise.all([
+  const [products, productCount, activeCount, draftCount, archivedCount] = await Promise.all([
     prisma.product.findMany({
       where: productWhere,
       include: {
@@ -122,11 +123,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     prisma.product.count({ where: productWhere }),
     prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.ACTIVE } }),
     prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.DRAFT } }),
-    prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.ARCHIVED } }),
-    prisma.productCategory.findMany({
-      where: { siteId: settings.siteId },
-      orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }]
-    })
+    prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.ARCHIVED } })
   ]);
   const pageCount = Math.max(1, Math.ceil(productCount / pageSize));
   const rangeStart = productCount ? (page - 1) * pageSize + 1 : 0;
@@ -147,21 +144,20 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   };
 
   const addProductForm = (
-    <form action={createProductAction} className="catalog-form-grid">
+    <form action={createProductQuickAction} className="catalog-form-grid">
+      <p className="muted-text">Start with the basics — you can add media, variants, pricing details, and more on the next screen.</p>
+      <div className="ui-field">
+        <label htmlFor="name">Product name</label>
+        <input autoFocus id="name" name="name" placeholder="Starter package" required />
+      </div>
       <div className="catalog-form-grid is-two">
         <div className="ui-field">
-          <label htmlFor="name">Product name</label>
-          <input id="name" name="name" required />
+          <label htmlFor="basePrice">Price (optional)</label>
+          <input id="basePrice" inputMode="decimal" name="basePrice" placeholder="125.00" />
         </div>
-        <div className="ui-field">
-          <label htmlFor="slug">Shop URL slug</label>
-          <input id="slug" name="slug" placeholder="starter-package" />
-        </div>
-      </div>
-      <div className="catalog-form-grid is-three">
         <div className="ui-field">
           <label htmlFor="type">Type</label>
-          <select id="type" name="type" defaultValue={ProductType.PHYSICAL}>
+          <select defaultValue={ProductType.PHYSICAL} id="type" name="type">
             {Object.values(ProductType).map((type) => (
               <option key={type} value={type}>
                 {enumLabel(type)}
@@ -169,105 +165,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             ))}
           </select>
         </div>
-        <div className="ui-field">
-          <label htmlFor="status">Status</label>
-          <select id="status" name="status" defaultValue={ProductStatus.DRAFT}>
-            {Object.values(ProductStatus).map((status) => (
-              <option key={status} value={status}>
-                {status.toLowerCase()}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="ui-field">
-          <label htmlFor="currency">Currency</label>
-          <input id="currency" name="currency" defaultValue="USD" maxLength={3} required />
-        </div>
-      </div>
-      <div className="catalog-form-grid is-three">
-        <div className="ui-field">
-          <label htmlFor="basePrice">Price</label>
-          <input id="basePrice" name="basePrice" inputMode="decimal" placeholder="125.00" required />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="compareAtPrice">Compare-at price</label>
-          <input id="compareAtPrice" name="compareAtPrice" inputMode="decimal" />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="sku">SKU</label>
-          <input id="sku" name="sku" />
-        </div>
-      </div>
-      <div className="ui-field">
-        <label htmlFor="summary">Short summary</label>
-        <input id="summary" name="summary" />
-      </div>
-      <div className="ui-field">
-        <label htmlFor="description">Description</label>
-        <textarea id="description" name="description" />
-      </div>
-      <div className="catalog-form-grid is-two">
-        <div className="ui-field">
-          <label htmlFor="vendor">Vendor or brand</label>
-          <input id="vendor" name="vendor" />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="tags">Tags</label>
-          <input id="tags" name="tags" placeholder="package, featured" />
-        </div>
-      </div>
-      <div className="ui-field">
-        <label htmlFor="imageFile">Primary image</label>
-        <input id="imageFile" name="imageFile" type="file" accept="image/*" disabled={!canUpload} />
-        {!canUpload ? <small className="muted-text">Enable Server asset folder, R2, or Cloudflare Images in Settings to upload.</small> : null}
-      </div>
-      <fieldset className="catalog-check-fieldset">
-        <legend>Categories</legend>
-        {categories.length ? (
-          <div className="catalog-check-grid">
-            {categories.map((category) => (
-              <label className="ui-check-row" key={category.id}>
-                <input name="categoryIds" type="checkbox" value={category.id} />
-                {category.name}
-              </label>
-            ))}
-          </div>
-        ) : (
-          <span className="muted-text">No categories yet.</span>
-        )}
-        <div className="catalog-form-grid is-two">
-          <div className="ui-field">
-            <label htmlFor="newCategoryName">New category</label>
-            <input id="newCategoryName" name="newCategoryName" placeholder="Print packages" />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="newCategorySlug">Category URL slug</label>
-            <input id="newCategorySlug" name="newCategorySlug" placeholder="print-packages" />
-          </div>
-        </div>
-      </fieldset>
-      <div className="catalog-check-grid">
-        <label className="ui-check-row">
-          <input name="taxable" type="checkbox" defaultChecked />
-          Taxable
-        </label>
-        <label className="ui-check-row">
-          <input name="requiresShipping" type="checkbox" defaultChecked />
-          Requires shipping or fulfillment
-        </label>
-        <label className="ui-check-row">
-          <input name="trackInventory" type="checkbox" />
-          Track default inventory
-        </label>
-      </div>
-      <div className="ui-field">
-        <label htmlFor="inventoryQuantity">Inventory quantity</label>
-        <input id="inventoryQuantity" name="inventoryQuantity" min="0" type="number" />
       </div>
       <div className="module-modal-actions">
         <Button type="submit">
           <PackagePlus size={18} />
-          Create product
+          Create draft
         </Button>
       </div>
     </form>
@@ -438,9 +340,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                           <form action={updateProductStatusAction} className="ui-inline-form">
                             <input type="hidden" name="id" value={product.id} />
                             <input type="hidden" name="status" value={product.status === ProductStatus.ACTIVE ? ProductStatus.DRAFT : ProductStatus.ACTIVE} />
-                            <Button size="sm" type="submit" variant={product.status === ProductStatus.ACTIVE ? "ghost" : "primary"}>
+                            <ActivateConfirmButton
+                              needsConfirm={product.status !== ProductStatus.ACTIVE && priceCents === 0}
+                              size="sm"
+                              variant={product.status === ProductStatus.ACTIVE ? "ghost" : "primary"}>
                               {product.status === ProductStatus.ACTIVE ? "Draft" : "Activate"}
-                            </Button>
+                            </ActivateConfirmButton>
                           </form>
                         </div>
                       </td>

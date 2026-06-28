@@ -239,7 +239,7 @@ export function ModulesSettingsPanel({ initialVipSettings, updateVipSettingsActi
           title: "Clients"
         },
         {
-          description: "Booking behavior and appointment review defaults.",
+          description: "Service booking behavior and appointment review defaults.",
           groups: [
             {
               description: "Controls for priority access and manual review in the booking flow.",
@@ -282,7 +282,7 @@ export function ModulesSettingsPanel({ initialVipSettings, updateVipSettingsActi
           ],
           id: "scheduling",
           keywords: ["calendar", "appointments", "services"],
-          title: "Scheduling"
+          title: "Services"
         },
         {
           description: "Revenue settings that feed client value and storefront behavior.",
