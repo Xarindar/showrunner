@@ -115,6 +115,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               <label htmlFor="mediaDriver">Media mode</label>
               <select id="mediaDriver" name="mediaDriver" defaultValue={settings.mediaDriver}>
                 <option value="REPO">Repo assets</option>
+                <option value="SERVER_ASSETS">Server asset folder</option>
                 <option value="R2">Cloudflare R2 uploads</option>
                 <option value="CLOUDFLARE_IMAGES">Cloudflare Images</option>
               </select>

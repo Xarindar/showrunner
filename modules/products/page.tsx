@@ -1,17 +1,18 @@
 import NextImage from "next/image";
-import { GiftCardStatus, Prisma, ProductStatus, ProductType } from "@prisma/client";
-import { Boxes, ImageIcon, PackagePlus, Search, Tags } from "lucide-react";
+import { MediaDriver, MediaVariantType, Prisma, ProductStatus, ProductType } from "@prisma/client";
+import { Camera, ImageIcon, PackagePlus } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { enumLabel, formatMoney } from "@/lib/format";
+import { isCloudflareImagesConfigured, isR2Configured, isServerAssetStorageConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
-  createCollectionAction,
   createGiftCardAction,
   createProductAction,
-  updateProductStatusAction } from "./actions";
-import { Button, ButtonAnchor, Card, EqualGrid, Pagination, Table } from "@/components/ui";
-import { ModuleActionModals } from "@/components/ui/module-action-modals";
+  updateProductStatusAction
+} from "./actions";
+import { Button, ButtonLink, Pagination, TableFilterBar, type TableFilterSelect } from "@/components/ui";
+import { CatalogCreateMenu } from "./catalog-create-menu";
 
 export const dynamic = "force-dynamic";
 
@@ -19,28 +20,14 @@ const pageSize = 50;
 const statusFilters = ["all", ...Object.values(ProductStatus).map((status) => status.toLowerCase())] as const;
 
 type ProductsPageProps = {
-  searchParams: Promise<{saved?: string;error?: string;page?: string;status?: string;q?: string;}>;
+  searchParams: Promise<{ saved?: string; error?: string; page?: string; status?: string; q?: string }>;
 };
 
 function normalizeStatusFilter(value?: string) {
   return statusFilters.includes(value as (typeof statusFilters)[number]) ? value || "all" : "all";
 }
 
-function productStatusClass(status: ProductStatus) {
-  if (status === ProductStatus.ACTIVE) return "ui-badge ui-badge-success";
-  if (status === ProductStatus.ARCHIVED) return "ui-badge ui-badge-danger";
-  return "ui-badge";
-}
-
-function productsHref({
-  page,
-  q,
-  status
-}: {
-  page?: number;
-  q?: string;
-  status?: string;
-}) {
+function productsHref({ page, q, status }: { page?: number; q?: string; status?: string }) {
   const params = new URLSearchParams();
   if (status && status !== "all") params.set("status", status);
   if (q) params.set("q", q);
@@ -49,14 +36,27 @@ function productsHref({
   return query ? `/admin/modules/products?${query}` : "/admin/modules/products";
 }
 
+function canUploadWithDriver(driver: MediaDriver) {
+  if (driver === MediaDriver.SERVER_ASSETS) return isServerAssetStorageConfigured();
+  if (driver === MediaDriver.R2) return isR2Configured();
+  if (driver === MediaDriver.CLOUDFLARE_IMAGES) return isCloudflareImagesConfigured();
+  return false;
+}
+
+function productStatusClass(status: ProductStatus) {
+  if (status === ProductStatus.ACTIVE) return "catalog-status is-active";
+  if (status === ProductStatus.ARCHIVED) return "catalog-status is-archived";
+  return "catalog-status is-draft";
+}
+
 function productInventoryLabel(product: {
   inventoryQuantity: number | null;
   trackInventory: boolean;
-  variants: {inventoryQuantity: number | null;trackInventory: boolean;}[];
+  variants: { inventoryQuantity: number | null; trackInventory: boolean }[];
 }) {
   const trackedVariants = product.variants.filter((variant) => variant.trackInventory);
   const trackedQuantities = trackedVariants.flatMap((variant) =>
-  typeof variant.inventoryQuantity === "number" ? [variant.inventoryQuantity] : []
+    typeof variant.inventoryQuantity === "number" ? [variant.inventoryQuantity] : []
   );
 
   if (!product.trackInventory && !trackedVariants.length) return "Not tracked";
@@ -65,90 +65,126 @@ function productInventoryLabel(product: {
   return "Tracked";
 }
 
+function productMediaUrl(product: {
+  media: {
+    url: string;
+    mediaAsset: Parameters<typeof mediaAssetDisplayUrl>[0] | null;
+  }[];
+}) {
+  const media = product.media[0];
+  if (!media) return "";
+  return media.mediaAsset ? mediaAssetDisplayUrl(media.mediaAsset, MediaVariantType.CARD) : media.url;
+}
+
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
   await requireAdmin("products:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
   const searchQuery = (params.q || "").trim().slice(0, 120);
+  const canUpload = canUploadWithDriver(settings.mediaDriver);
   const productWhere: Prisma.ProductWhereInput = {
     siteId: settings.siteId,
     ...(statusFilter === "all" ? {} : { status: statusFilter.toUpperCase() as ProductStatus }),
-    ...(searchQuery ?
-    {
-      OR: [
-      { name: { contains: searchQuery, mode: "insensitive" } },
-      { slug: { contains: searchQuery, mode: "insensitive" } },
-      { sku: { contains: searchQuery, mode: "insensitive" } },
-      { summary: { contains: searchQuery, mode: "insensitive" } }]
-
-    } :
-    {})
+    ...(searchQuery
+      ? {
+          OR: [
+            { name: { contains: searchQuery, mode: "insensitive" } },
+            { slug: { contains: searchQuery, mode: "insensitive" } },
+            { sku: { contains: searchQuery, mode: "insensitive" } },
+            { summary: { contains: searchQuery, mode: "insensitive" } },
+            { vendor: { contains: searchQuery, mode: "insensitive" } }
+          ]
+        }
+      : {})
   };
 
-  const [products, productCount, activeCount, collections, giftCards] = await Promise.all([
-  prisma.product.findMany({
-    where: productWhere,
-    include: {
-      variants: { orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] },
-      collectionProducts: {
-        include: { collection: true },
-        orderBy: { createdAt: "asc" }
-      }
-    },
-    orderBy: { createdAt: "desc" },
-    skip: (page - 1) * pageSize,
-    take: pageSize
-  }),
-  prisma.product.count({ where: productWhere }),
-  prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.ACTIVE } }),
-  prisma.collection.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }] }),
-  prisma.giftCard.findMany({ where: { siteId: settings.siteId }, orderBy: { createdAt: "desc" }, take: 12 })]
-  );
+  const [products, productCount, activeCount, draftCount, archivedCount, categories] = await Promise.all([
+    prisma.product.findMany({
+      where: productWhere,
+      include: {
+        variants: { orderBy: [{ isDefault: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }] },
+        categoryAssignments: {
+          include: { category: true },
+          orderBy: { createdAt: "asc" }
+        },
+        media: {
+          include: { mediaAsset: true },
+          orderBy: [{ role: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+          take: 1
+        },
+        _count: { select: { bundleComponents: true, media: true, options: true } }
+      },
+      orderBy: { updatedAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize
+    }),
+    prisma.product.count({ where: productWhere }),
+    prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.ACTIVE } }),
+    prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.DRAFT } }),
+    prisma.product.count({ where: { siteId: settings.siteId, status: ProductStatus.ARCHIVED } }),
+    prisma.productCategory.findMany({
+      where: { siteId: settings.siteId },
+      orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }]
+    })
+  ]);
   const pageCount = Math.max(1, Math.ceil(productCount / pageSize));
   const rangeStart = productCount ? (page - 1) * pageSize + 1 : 0;
   const rangeEnd = Math.min(productCount, page * pageSize);
-  const savedMessage = params.saved ? "Commerce changes saved." : null;
+  const savedMessage = params.saved ? "Catalog changes saved." : null;
   const errorMessage = params.error || null;
+  const totalStatusCount = activeCount + draftCount + archivedCount;
+  const statusSelect: TableFilterSelect = {
+    id: "products-status-filter",
+    label: "Status",
+    name: "status",
+    value: statusFilter,
+    options: statusFilters.map((filter) => {
+      const count = filter === "all" ? totalStatusCount : filter === "active" ? activeCount : filter === "draft" ? draftCount : archivedCount;
+      const label = filter === "all" ? "All" : filter[0].toUpperCase() + filter.slice(1);
+      return { label: `${label} (${count})`, value: filter };
+    })
+  };
+
   const addProductForm = (
-    <form action={createProductAction} className="form-grid">
-      <EqualGrid>
+    <form action={createProductAction} className="catalog-form-grid">
+      <div className="catalog-form-grid is-two">
         <div className="ui-field">
-          <label htmlFor="name">Name</label>
+          <label htmlFor="name">Product name</label>
           <input id="name" name="name" required />
         </div>
         <div className="ui-field">
           <label htmlFor="slug">Shop URL slug</label>
           <input id="slug" name="slug" placeholder="starter-package" />
         </div>
-      </EqualGrid>
-      <EqualGrid min="220px">
+      </div>
+      <div className="catalog-form-grid is-three">
         <div className="ui-field">
           <label htmlFor="type">Type</label>
           <select id="type" name="type" defaultValue={ProductType.PHYSICAL}>
-            {Object.values(ProductType).map((type) =>
-            <option key={type} value={type}>
+            {Object.values(ProductType).map((type) => (
+              <option key={type} value={type}>
                 {enumLabel(type)}
               </option>
-            )}
+            ))}
           </select>
         </div>
         <div className="ui-field">
           <label htmlFor="status">Status</label>
           <select id="status" name="status" defaultValue={ProductStatus.DRAFT}>
-            {Object.values(ProductStatus).map((status) =>
-            <option key={status} value={status}>
+            {Object.values(ProductStatus).map((status) => (
+              <option key={status} value={status}>
                 {status.toLowerCase()}
               </option>
-            )}
+            ))}
           </select>
         </div>
         <div className="ui-field">
           <label htmlFor="currency">Currency</label>
           <input id="currency" name="currency" defaultValue="USD" maxLength={3} required />
         </div>
-      </EqualGrid>
-      <EqualGrid min="220px">
+      </div>
+      <div className="catalog-form-grid is-three">
         <div className="ui-field">
           <label htmlFor="basePrice">Price</label>
           <input id="basePrice" name="basePrice" inputMode="decimal" placeholder="125.00" required />
@@ -161,223 +197,271 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           <label htmlFor="sku">SKU</label>
           <input id="sku" name="sku" />
         </div>
-      </EqualGrid>
+      </div>
       <div className="ui-field">
-        <label htmlFor="summary">Summary</label>
+        <label htmlFor="summary">Short summary</label>
         <input id="summary" name="summary" />
       </div>
       <div className="ui-field">
         <label htmlFor="description">Description</label>
         <textarea id="description" name="description" />
       </div>
-      <EqualGrid>
+      <div className="catalog-form-grid is-two">
         <div className="ui-field">
-          <label htmlFor="imageUrl">Image URL</label>
-          <input id="imageUrl" name="imageUrl" placeholder="/hero.svg" />
+          <label htmlFor="vendor">Vendor or brand</label>
+          <input id="vendor" name="vendor" />
         </div>
         <div className="ui-field">
           <label htmlFor="tags">Tags</label>
           <input id="tags" name="tags" placeholder="package, featured" />
         </div>
-      </EqualGrid>
-      <EqualGrid>
-        <label className="ui-zero">
-          <input name="trackInventory" type="checkbox" />
-          Track default variant inventory
-        </label>
-        <div className="ui-field">
-          <label htmlFor="inventoryQuantity">Inventory quantity</label>
-          <input id="inventoryQuantity" name="inventoryQuantity" min="0" type="number" />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="imageFile">Primary image</label>
+        <input id="imageFile" name="imageFile" type="file" accept="image/*" disabled={!canUpload} />
+        {!canUpload ? <small className="muted-text">Enable Server asset folder, R2, or Cloudflare Images in Settings to upload.</small> : null}
+      </div>
+      <fieldset className="catalog-check-fieldset">
+        <legend>Categories</legend>
+        {categories.length ? (
+          <div className="catalog-check-grid">
+            {categories.map((category) => (
+              <label className="ui-check-row" key={category.id}>
+                <input name="categoryIds" type="checkbox" value={category.id} />
+                {category.name}
+              </label>
+            ))}
+          </div>
+        ) : (
+          <span className="muted-text">No categories yet.</span>
+        )}
+        <div className="catalog-form-grid is-two">
+          <div className="ui-field">
+            <label htmlFor="newCategoryName">New category</label>
+            <input id="newCategoryName" name="newCategoryName" placeholder="Print packages" />
+          </div>
+          <div className="ui-field">
+            <label htmlFor="newCategorySlug">Category URL slug</label>
+            <input id="newCategorySlug" name="newCategorySlug" placeholder="print-packages" />
+          </div>
         </div>
-      </EqualGrid>
-      <p className="lead lead-compact">
-        Inventory is governed per variant. This product-level value seeds and mirrors the default variant.
-      </p>
+      </fieldset>
+      <div className="catalog-check-grid">
+        <label className="ui-check-row">
+          <input name="taxable" type="checkbox" defaultChecked />
+          Taxable
+        </label>
+        <label className="ui-check-row">
+          <input name="requiresShipping" type="checkbox" defaultChecked />
+          Requires shipping or fulfillment
+        </label>
+        <label className="ui-check-row">
+          <input name="trackInventory" type="checkbox" />
+          Track default inventory
+        </label>
+      </div>
+      <div className="ui-field">
+        <label htmlFor="inventoryQuantity">Inventory quantity</label>
+        <input id="inventoryQuantity" name="inventoryQuantity" min="0" type="number" />
+      </div>
       <div className="module-modal-actions">
         <Button type="submit">
           <PackagePlus size={18} />
-          Add product
+          Create product
         </Button>
       </div>
     </form>
   );
 
-  return (
-    <div className="stack">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Products</p>
-          <h1>Commerce catalog</h1>
-          <p>Manage products, variants, collections, and gift cards.</p>
+  const giftCardForm = (
+    <form action={createGiftCardAction} className="catalog-form-grid">
+      <div className="catalog-form-grid is-three">
+        <div className="ui-field">
+          <label htmlFor="giftCardCode">Code</label>
+          <input id="giftCardCode" name="code" placeholder="Auto-generate" />
         </div>
+        <div className="ui-field">
+          <label htmlFor="giftCardAmount">Amount</label>
+          <input id="giftCardAmount" name="amount" inputMode="decimal" required />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="giftCardCurrency">Currency</label>
+          <input id="giftCardCurrency" name="currency" defaultValue="USD" maxLength={3} required />
+        </div>
+      </div>
+      <div className="catalog-form-grid is-two">
+        <div className="ui-field">
+          <label htmlFor="giftCardRecipientName">Recipient name</label>
+          <input id="giftCardRecipientName" name="recipientName" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="giftCardRecipientEmail">Recipient email</label>
+          <input id="giftCardRecipientEmail" name="recipientEmail" type="email" />
+        </div>
+      </div>
+      <div className="catalog-form-grid is-two">
+        <div className="ui-field">
+          <label htmlFor="giftCardPurchaserName">Purchaser name</label>
+          <input id="giftCardPurchaserName" name="purchaserName" />
+        </div>
+        <div className="ui-field">
+          <label htmlFor="giftCardPurchaserEmail">Purchaser email</label>
+          <input id="giftCardPurchaserEmail" name="purchaserEmail" type="email" />
+        </div>
+      </div>
+      <div className="ui-field">
+        <label htmlFor="giftCardNote">Note</label>
+        <input id="giftCardNote" name="note" />
+      </div>
+      <Button type="submit" variant="secondary">
+        Issue gift card
+      </Button>
+    </form>
+  );
+
+  return (
+    <div className="products-workspace">
+      <header className="products-page-header">
+        <h1>Products</h1>
       </header>
 
       {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-      {errorMessage ? <div className="error">{errorMessage}</div> : null}
+      {errorMessage ? <div className="error">{decodeURIComponent(errorMessage)}</div> : null}
 
-      <EqualGrid as="section" min="220px">
-        <Card>
-          <PackagePlus size={22} />
-          <h3>{activeCount} active products</h3>
-          <p className="lead lead-compact">
-            Items available to the public storefront and cart.
-          </p>
-        </Card>
-        <Card>
-          <Boxes size={22} />
-          <h3>{collections.length} collections</h3>
-          <p className="lead lead-compact">
-            Group products for shops, galleries, packages, and featured blocks.
-          </p>
-        </Card>
-      </EqualGrid>
-
-      <section aria-labelledby="products-table-title" className="ui-data-table-shell products-data-table">
-        <div className="ui-data-table-header">
-          <div className="ui-data-table-titlebar">
+      <main className="catalog-board" aria-labelledby="products-board-title">
+          <div className="catalog-board-header">
             <div>
-              <h2 className="section-title" id="products-table-title">
-                Catalog list
-              </h2>
-              <p className="ui-zero">
+              <p className="catalog-rail-label">Inventory</p>
+              <h2 id="products-board-title">Product board</h2>
+              <p>
                 {rangeStart}-{rangeEnd} of {productCount}
-                {searchQuery ? ` matching "${searchQuery}"` : " matching products"}
+                {searchQuery ? ` matching "${searchQuery}"` : " products"}
               </p>
             </div>
-            <ModuleActionModals
-              items={[
-                {
-                  content: addProductForm,
-                  icon: "package",
-                  id: "product",
-                  label: "Product",
-                  title: "Add product"
-                }
-              ]}
-              toolbarLabel="Catalog tools"
-            />
+            <div className="catalog-board-actions">
+              <span className="catalog-pill is-blue">
+                <Camera size={15} />
+                {canUpload ? "Uploads ready" : "Storage setup needed"}
+              </span>
+              <CatalogCreateMenu
+                items={[
+                  { content: addProductForm, description: "Create a sellable catalog item.", id: "product", label: "Product", title: "Create product", type: "product" },
+                  { content: giftCardForm, description: "Issue store credit for a customer.", id: "gift-card", label: "Gift card", title: "Issue gift card", type: "gift-card" }
+                ]}
+              />
+            </div>
           </div>
 
-          <div className="ui-data-table-toolbar">
-            <form action="/admin/modules/products" className="ui-compact-search ui-data-table-search">
-              {statusFilter !== "all" ? <input type="hidden" name="status" value={statusFilter} /> : null}
-              <input aria-label="Search products" id="products-search" name="q" placeholder="Search products" defaultValue={searchQuery} />
-              <Button size="sm" type="submit" variant="secondary">
-                <Search size={15} />
-                Search
-              </Button>
-              {searchQuery ?
-              <ButtonAnchor href={productsHref({ status: statusFilter })} size="sm" variant="ghost">
-                  Clear
-                </ButtonAnchor> :
-              null}
-            </form>
+          <TableFilterBar
+            action="/admin/modules/products"
+            className="catalog-board-filters"
+            clearHref="/admin/modules/products"
+            searchId="products-search"
+            searchPlaceholder="Search product, SKU, vendor"
+            searchValue={searchQuery}
+            selects={[statusSelect]}
+            showClear={Boolean(searchQuery || statusFilter !== "all")}
+          />
+
+          <div className="catalog-table-scroll">
+            <table className="catalog-product-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Status</th>
+                  <th>Type</th>
+                  <th>Inventory</th>
+                  <th>Categories</th>
+                  <th>Build</th>
+                  <th>Price</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((product) => {
+                  const defaultVariant = product.variants[0] || null;
+                  const priceCents = defaultVariant?.priceCents ?? product.basePriceCents;
+                  const categoryLabel = product.categoryAssignments.map(({ category }) => category.name).join(", ") || "Uncategorized";
+                  const skuLabel = defaultVariant?.sku || product.sku || "No SKU";
+                  const imageUrl = productMediaUrl(product);
+                  const buildLabel = [
+                    `${product.variants.length} var`,
+                    `${product._count.options} opt`,
+                    `${product._count.media} img`,
+                    product._count.bundleComponents ? `${product._count.bundleComponents} bundle` : ""
+                  ].filter(Boolean).join(" / ");
+
+                  return (
+                    <tr key={product.id}>
+                      <td>
+                        <div className="catalog-product-cell">
+                          <div className="catalog-row-thumb">
+                            {imageUrl ? (
+                              <NextImage alt={product.name} fill sizes="44px" src={imageUrl} unoptimized />
+                            ) : (
+                              <span>
+                                <ImageIcon size={17} />
+                              </span>
+                            )}
+                          </div>
+                          <div className="catalog-row-copy">
+                            <strong title={product.name}>{product.name}</strong>
+                            <small title={`/shop/${product.slug} · ${skuLabel} · ${product.summary || product.description || "No product copy yet."}`}>
+                              {skuLabel} · {product.summary || product.description || "No product copy yet."}
+                            </small>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={productStatusClass(product.status)}>{product.status.toLowerCase()}</span>
+                      </td>
+                      <td>
+                        <span className="catalog-cell-text" title={enumLabel(product.type)}>{enumLabel(product.type)}</span>
+                      </td>
+                      <td>
+                        <span className="catalog-cell-text" title={productInventoryLabel(product)}>{productInventoryLabel(product)}</span>
+                      </td>
+                      <td>
+                        <span className="catalog-cell-text" title={categoryLabel}>{categoryLabel}</span>
+                      </td>
+                      <td>
+                        <span className="catalog-cell-text" title={buildLabel}>{buildLabel}</span>
+                      </td>
+                      <td>
+                        <strong className="catalog-price-cell">{formatMoney(priceCents, product.currency)}</strong>
+                      </td>
+                      <td>
+                        <div className="catalog-row-actions">
+                          <ButtonLink href={`/admin/modules/products/${product.id}`} size="sm" variant="secondary">
+                            Edit
+                          </ButtonLink>
+                          <form action={updateProductStatusAction} className="ui-inline-form">
+                            <input type="hidden" name="id" value={product.id} />
+                            <input type="hidden" name="status" value={product.status === ProductStatus.ACTIVE ? ProductStatus.DRAFT : ProductStatus.ACTIVE} />
+                            <Button size="sm" type="submit" variant={product.status === ProductStatus.ACTIVE ? "ghost" : "primary"}>
+                              {product.status === ProductStatus.ACTIVE ? "Draft" : "Activate"}
+                            </Button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!products.length ? (
+                  <tr>
+                    <td colSpan={8}>
+                      <div className="catalog-empty-state">
+                        <PackagePlus size={30} />
+                        <h3>No products yet</h3>
+                        <p>Create the first product to start building the catalog.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
           </div>
 
-          <nav aria-label="Product status filters" className="ui-data-table-tabs products-status-tabs">
-            {statusFilters.map((filter) =>
-            <a className={filter === statusFilter ? "ui-data-table-tab is-active" : "ui-data-table-tab"} href={productsHref({ q: searchQuery, status: filter })} key={filter}>
-                {filter}
-              </a>
-            )}
-          </nav>
-        </div>
-
-        <Table className="ui-data-table-scroll products-table-wrap" tableClassName="ui-data-table ui-table-sticky-actions products-index-table">
-          <colgroup>
-            <col className="products-col-product" />
-            <col className="products-col-status" />
-            <col className="products-col-inventory" />
-            <col className="products-col-type" />
-            <col className="products-col-collections" />
-            <col className="products-col-price" />
-            <col className="products-col-actions" />
-          </colgroup>
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Status</th>
-                <th>Inventory</th>
-                <th>Type</th>
-                <th>Collections</th>
-                <th>Price</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((product) => {
-                const defaultVariant = product.variants[0] || null;
-                const variantCount = product.variants.length;
-                const collectionsLabel = product.collectionProducts.map(({ collection }) => collection.name).join(", ") || "Unassigned";
-                const skuLabel = defaultVariant?.sku || product.sku || "No SKU";
-                const variantLabel = `${variantCount} ${variantCount === 1 ? "variant" : "variants"}`;
-                const priceCents = defaultVariant?.priceCents ?? product.basePriceCents;
-
-                return (
-                  <tr key={product.id}>
-                  <td>
-                    <div className="ui-object-cell">
-                      {product.imageUrl ?
-                      <NextImage
-                        alt={product.name}
-                        className="ui-object-thumb"
-                        height={40}
-                        src={product.imageUrl}
-                        unoptimized
-                        width={40} /> :
-
-                      <span aria-hidden="true" className="ui-object-thumb ui-object-thumb-empty">
-                          <ImageIcon size={16} />
-                        </span>
-                      }
-                      <span className="ui-object-copy">
-                        <strong className="ui-truncate" title={product.name}>{product.name}</strong>
-                        <span className="ui-object-meta ui-truncate" title={`/shop/${product.slug} - ${skuLabel} - ${variantLabel}`}>
-                          /shop/{product.slug} · {skuLabel} · {variantLabel}
-                        </span>
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={productStatusClass(product.status)}>{product.status.toLowerCase()}</span>
-                  </td>
-                  <td>{productInventoryLabel(product)}</td>
-                  <td>{enumLabel(product.type)}</td>
-                  <td>
-                    <span className="ui-truncate" title={collectionsLabel}>{collectionsLabel}</span>
-                  </td>
-                  <td>
-                    <span className="ui-truncate">{formatMoney(priceCents, product.currency)}</span>
-                  </td>
-                  <td>
-                    <div className="ui-data-table-row-actions">
-                      <ButtonAnchor href={`/admin/modules/products/${product.id}`} size="sm" variant="secondary">
-                        Edit
-                      </ButtonAnchor>
-                      <form action={updateProductStatusAction} className="ui-inline-form">
-                        <input type="hidden" name="id" value={product.id} />
-                        <input
-                        type="hidden"
-                        name="status"
-                        value={product.status === ProductStatus.ACTIVE ? ProductStatus.DRAFT : ProductStatus.ACTIVE} />
-                      
-                        <Button size="sm" type="submit" variant="secondary">
-                          {product.status === ProductStatus.ACTIVE ? "Draft" : "Activate"}
-                        </Button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>);
-
-              })}
-              {!products.length ?
-              <tr>
-                  <td className="ui-data-table-empty" colSpan={7}>No products yet.</td>
-                </tr> :
-              null}
-            </tbody>
-          </Table>
-        <div className="ui-data-table-footer">
           <Pagination
             label="Product pages"
             nextHref={productsHref({ page: Math.min(pageCount, page + 1), q: searchQuery, status: statusFilter })}
@@ -385,172 +469,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             pageCount={pageCount}
             previousHref={productsHref({ page: Math.max(1, page - 1), q: searchQuery, status: statusFilter })}
           />
-        </div>
-      </section>
-
-      <EqualGrid as="section">
-        <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Collections</h2>
-          <form action={createCollectionAction} className="subpanel form-grid">
-            <EqualGrid>
-              <div className="ui-field">
-                <label htmlFor="collectionName">Name</label>
-                <input id="collectionName" name="name" required />
-              </div>
-              <div className="ui-field">
-                <label htmlFor="collectionSlug">Slug</label>
-                <input id="collectionSlug" name="slug" />
-              </div>
-            </EqualGrid>
-            <EqualGrid min="220px">
-              <div className="ui-field">
-                <label htmlFor="collectionStatus">Status</label>
-                <select id="collectionStatus" name="status" defaultValue={ProductStatus.DRAFT}>
-                  {Object.values(ProductStatus).map((status) =>
-                  <option key={status} value={status}>
-                      {status.toLowerCase()}
-                    </option>
-                  )}
-                </select>
-              </div>
-              <div className="ui-field">
-                <label htmlFor="sortOrder">Sort order</label>
-                <input id="sortOrder" name="sortOrder" type="number" defaultValue="0" />
-              </div>
-              <label className="ui-zero">
-                <input name="isFeatured" type="checkbox" />
-                Featured
-              </label>
-            </EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="collectionDescription">Description</label>
-              <textarea id="collectionDescription" name="description" />
-            </div>
-            <Button type="submit" variant="secondary">
-              <Tags size={18} />
-              Add collection
-            </Button>
-          </form>
-          <Table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Featured</th>
-              </tr>
-            </thead>
-            <tbody>
-              {collections.map((collection) =>
-              <tr key={collection.id}>
-                  <td>
-                    <strong>{collection.name}</strong>
-                    <br />
-                    <span className="muted-text">/shop/collections/{collection.slug}</span>
-                  </td>
-                  <td>
-                    <span className={productStatusClass(collection.status)}>{collection.status.toLowerCase()}</span>
-                  </td>
-                  <td>{collection.isFeatured ? "yes" : "no"}</td>
-                </tr>
-              )}
-            </tbody>
-          </Table>
-        </Card>
-
-        <Card bodyClassName="ui-stack">
-          <h2 className="section-title">Gift cards</h2>
-          <div className="subpanel form-grid">
-            <h3 className="subsection-title">Issue gift card</h3>
-            <form action={createGiftCardAction} className="form-grid">
-              <EqualGrid min="220px">
-                <div className="ui-field">
-                  <label htmlFor="giftCardCode">Code</label>
-                  <input id="giftCardCode" name="code" placeholder="Auto-generate" />
-                </div>
-                <div className="ui-field">
-                  <label htmlFor="giftCardAmount">Amount</label>
-                  <input id="giftCardAmount" name="amount" inputMode="decimal" required />
-                </div>
-                <div className="ui-field">
-                  <label htmlFor="giftCardCurrency">Currency</label>
-                  <input id="giftCardCurrency" name="currency" defaultValue="USD" maxLength={3} required />
-                </div>
-              </EqualGrid>
-              <EqualGrid>
-                <div className="ui-field">
-                  <label htmlFor="giftCardRecipientName">Recipient name</label>
-                  <input id="giftCardRecipientName" name="recipientName" />
-                </div>
-                <div className="ui-field">
-                  <label htmlFor="giftCardRecipientEmail">Recipient email</label>
-                  <input id="giftCardRecipientEmail" name="recipientEmail" type="email" />
-                </div>
-              </EqualGrid>
-              <EqualGrid>
-                <div className="ui-field">
-                  <label htmlFor="giftCardPurchaserName">Purchaser name</label>
-                  <input id="giftCardPurchaserName" name="purchaserName" />
-                </div>
-                <div className="ui-field">
-                  <label htmlFor="giftCardPurchaserEmail">Purchaser email</label>
-                  <input id="giftCardPurchaserEmail" name="purchaserEmail" type="email" />
-                </div>
-              </EqualGrid>
-              <EqualGrid>
-                <div className="ui-field">
-                  <label htmlFor="giftCardExpiresAt">Expires</label>
-                  <input id="giftCardExpiresAt" name="expiresAt" type="date" />
-                </div>
-                <div className="ui-field">
-                  <label htmlFor="giftCardNote">Note</label>
-                  <input id="giftCardNote" name="note" />
-                </div>
-              </EqualGrid>
-              <Button type="submit" variant="secondary">
-                Issue gift card
-              </Button>
-            </form>
-          </div>
-
-          <Table>
-            <thead>
-              <tr>
-                <th>Gift card</th>
-                <th>Balance</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {giftCards.map((giftCard) =>
-              <tr key={giftCard.id}>
-                  <td>
-                    <strong>{giftCard.code}</strong>
-                    <br />
-                    <span className="muted-text">
-                      {giftCard.recipientEmail || giftCard.recipientName || "No recipient"}
-                    </span>
-                  </td>
-                  <td>
-                    {formatMoney(giftCard.balanceCents, giftCard.currency)}
-                    <br />
-                    <span className="muted-text">of {formatMoney(giftCard.initialAmountCents, giftCard.currency)}</span>
-                  </td>
-                  <td>
-                    <span className={giftCard.status === GiftCardStatus.ACTIVE ? "ui-badge ui-badge-success" : "ui-badge ui-badge-danger"}>
-                      {enumLabel(giftCard.status)}
-                    </span>
-                  </td>
-                </tr>
-              )}
-              {!giftCards.length ?
-              <tr>
-                  <td colSpan={3}>No gift cards yet.</td>
-                </tr> :
-              null}
-            </tbody>
-          </Table>
-        </Card>
-      </EqualGrid>
-    </div>);
-
+      </main>
+    </div>
+  );
 }

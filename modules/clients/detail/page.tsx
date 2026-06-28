@@ -6,7 +6,7 @@ import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
 import { clientStatusLabel, clientStatusOptions, defaultClientStatus, normalizeClientStatus } from "@/lib/clients/status";
 import { prisma } from "@/lib/prisma";
 import { enumLabel, formatDateTime, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
-import { isR2Configured, mediaAssetDisplayUrl, privateMediaUploadMimeTypes } from "@/lib/media";
+import { isR2Configured, isServerAssetStorageConfigured, mediaAssetDisplayUrl, privateMediaUploadMimeTypes } from "@/lib/media";
 import { isRecord } from "@/lib/objects";
 import { getSiteSettings } from "@/lib/site";
 import { addDaysToDateKey, getZonedDateKey } from "@/lib/timezone";
@@ -164,6 +164,7 @@ function clientRecordsTabFromQuery(queryParams: Awaited<ClientDetailPageProps["s
 }
 
 function canUploadClientDocuments(driver: MediaDriver) {
+  if (driver === MediaDriver.SERVER_ASSETS) return isServerAssetStorageConfigured();
   return driver === MediaDriver.R2 && isR2Configured();
 }
 
@@ -738,7 +739,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         />
       </div>
       {!clientDocumentUploadEnabled ? (
-        <p className="muted-text ui-zero">Document uploads need R2 media storage configured.</p>
+        <p className="muted-text ui-zero">Document uploads need Server asset folder or R2 media storage configured.</p>
       ) : null}
       <div className="ui-field">
         <label htmlFor="client-document-notes">Notes</label>

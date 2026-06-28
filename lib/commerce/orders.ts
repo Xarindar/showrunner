@@ -307,7 +307,7 @@ export async function updateOrderStatus(input: {
       await decrementInventoryForPaidOrder(tx, order);
     }
 
-    if (becameFulfilled && !order.items.some((item) => item.product.type === ProductType.PHYSICAL)) {
+    if (becameFulfilled && !order.items.some((item) => item.product.requiresShipping || item.product.type === ProductType.PHYSICAL)) {
       throw new Error("Only orders with physical products can be fulfilled.");
     }
 

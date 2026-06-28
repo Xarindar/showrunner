@@ -27,6 +27,7 @@ prisma/dev.db-journal
 *.sqlite
 *.sqlite3
 .dev-postgres/
+.media-assets/
 
 # Logs
 *.log

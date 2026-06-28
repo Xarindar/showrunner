@@ -1,3 +1,4 @@
+export * from "./asset-picker";
 export * from "./badge";
 export * from "./button";
 export * from "./card";
@@ -12,6 +13,7 @@ export * from "./settings";
 export * from "./states";
 export * from "./switch";
 export * from "./table";
+export * from "./table-filter-bar";
 export * from "./tabs";
 export * from "./tooltip";
 export * from "./toast";

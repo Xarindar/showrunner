@@ -14,17 +14,18 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Repo assets, R2/Cloudflare Images uploads, metadata, focal points, signed private URLs, on-demand R2 image variants, and archive/restore controls are live.",
-    primaryGap: "Production virus scanning and non-R2 private Cloudflare signed delivery remain pending."
+    summary: "Repo assets, server-folder/R2/Cloudflare Images uploads, metadata, focal points, signed private URLs, on-demand image variants, and archive/restore controls are live.",
+    primaryGap: "Production virus scanning and private Cloudflare signed delivery remain pending."
   },
   capabilities: [
     { label: "Repo asset references", status: "live" },
+    { label: "Server asset folder upload", status: "live", note: "Use MEDIA_ASSET_DIR for a persistent Railway volume or mounted storage path." },
     { label: "R2 image upload", status: "live", note: "Requires R2 environment variables." },
     { label: "Cloudflare Images upload", status: "live", note: "Requires Cloudflare Images environment variables." },
     { label: "Folders, tags, focal point, usage context", status: "live" },
     { label: "Archive lifecycle", status: "live" },
     { label: "Signed variants", status: "live" },
-    { label: "R2 responsive transforms", status: "live" }
+    { label: "Responsive transforms", status: "live" }
   ],
   adminRoutes: ["/admin/modules/media"],
   dependencies: ["settings"],

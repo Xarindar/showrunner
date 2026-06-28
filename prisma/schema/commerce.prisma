@@ -10,7 +10,13 @@ enum ProductType {
   PHYSICAL
   DIGITAL
   SERVICE_PACKAGE
+  BUNDLE
   GIFT_CARD
+}
+
+enum ProductMediaRole {
+  PRIMARY
+  GALLERY
 }
 
 enum CouponType {
@@ -95,6 +101,13 @@ model Product {
   currency            String              @default("USD")
   sku                 String?
   imageUrl            String              @default("")
+  seoTitle            String              @default("")
+  seoDescription      String              @default("")
+  vendor              String              @default("")
+  taxable             Boolean             @default(true)
+  requiresShipping    Boolean             @default(false)
+  weightGrams         Int?
+  externalReference   String              @default("")
   tags                Json                @default("[]")
   attributes          Json                @default("{}")
   trackInventory      Boolean             @default(false)
@@ -102,6 +115,11 @@ model Product {
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   variants            ProductVariant[]
+  options             ProductOption[]
+  media               ProductMedia[]
+  categoryAssignments ProductCategoryAssignment[]
+  bundleComponents    ProductBundleComponent[] @relation("BundleProduct")
+  bundledIn           ProductBundleComponent[] @relation("ComponentProduct")
   collectionProducts  CollectionProduct[]
   cartItems           CartItem[]
   orderItems          OrderItem[]
@@ -125,13 +143,129 @@ model ProductVariant {
   inventoryQuantity   Int?
   isDefault           Boolean     @default(false)
   isActive            Boolean     @default(true)
+  sortOrder           Int         @default(0)
+  metadata            Json        @default("{}")
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
+  optionValues        ProductVariantOptionValue[]
+  bundleComponents    ProductBundleComponent[]
   cartItems           CartItem[]
   orderItems          OrderItem[]
 
   @@index([productId])
   @@index([isActive])
+}
+
+model ProductOption {
+  id        String               @id @default(cuid())
+  productId String
+  product   Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  sortOrder Int                  @default(0)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  values    ProductOptionValue[]
+
+  @@unique([productId, name])
+  @@index([productId, sortOrder])
+}
+
+model ProductOptionValue {
+  id             String                      @id @default(cuid())
+  optionId       String
+  option         ProductOption               @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  value          String
+  sortOrder      Int                         @default(0)
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+  variantValues  ProductVariantOptionValue[]
+
+  @@unique([optionId, value])
+  @@index([optionId, sortOrder])
+}
+
+model ProductVariantOptionValue {
+  id            String             @id @default(cuid())
+  variantId     String
+  variant       ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  optionValueId String
+  optionValue   ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, optionValueId])
+  @@index([optionValueId])
+}
+
+model ProductMedia {
+  id           String           @id @default(cuid())
+  productId    String
+  product      Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mediaAssetId String?
+  mediaAsset   MediaAsset?      @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  role         ProductMediaRole @default(GALLERY)
+  url          String           @default("")
+  alt          String           @default("")
+  sortOrder    Int              @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([productId, sortOrder])
+  @@index([mediaAssetId])
+}
+
+model ProductCategory {
+  id          String                      @id @default(cuid())
+  siteId      String
+  site        Site                        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      ProductCategory?            @relation("ProductCategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    ProductCategory[]           @relation("ProductCategoryTree")
+  slug        String                      @default(cuid())
+  name        String
+  description String                      @default("")
+  status      ProductStatus               @default(DRAFT)
+  isFeatured  Boolean                     @default(false)
+  sortOrder   Int                         @default(0)
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+  products    ProductCategoryAssignment[]
+
+  @@unique([siteId, slug])
+  @@index([siteId, status])
+  @@index([parentId])
+  @@index([isFeatured])
+}
+
+model ProductCategoryAssignment {
+  id         String          @id @default(cuid())
+  categoryId String
+  category   ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sortOrder  Int             @default(0)
+  createdAt  DateTime        @default(now())
+
+  @@unique([categoryId, productId])
+  @@index([productId])
+}
+
+model ProductBundleComponent {
+  id                 String          @id @default(cuid())
+  bundleProductId    String
+  bundleProduct      Product         @relation("BundleProduct", fields: [bundleProductId], references: [id], onDelete: Cascade)
+  componentProductId String
+  componentProduct   Product         @relation("ComponentProduct", fields: [componentProductId], references: [id], onDelete: Restrict)
+  componentVariantId String?
+  componentVariant   ProductVariant? @relation(fields: [componentVariantId], references: [id], onDelete: SetNull)
+  quantity           Int             @default(1)
+  sortOrder          Int             @default(0)
+  isOptional         Boolean         @default(false)
+  notes              String          @default("")
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@unique([bundleProductId, componentProductId, componentVariantId])
+  @@index([componentProductId])
+  @@index([componentVariantId])
 }
 
 model Collection {

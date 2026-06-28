@@ -65,6 +65,14 @@ export async function listPublicCommerceProducts(siteId: string) {
       variants: {
         where: { isActive: true },
         orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }]
+      },
+      categoryAssignments: {
+        include: { category: true },
+        orderBy: { createdAt: "asc" }
+      },
+      options: {
+        include: { values: { orderBy: [{ sortOrder: "asc" }, { value: "asc" }] } },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
       }
     },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }]
@@ -78,10 +86,25 @@ export async function listPublicCommerceProducts(siteId: string) {
     id: product.id,
     imageUrl: product.imageUrl,
     inStock: !product.trackInventory || (product.inventoryQuantity || 0) > 0,
+    categories: product.categoryAssignments.map(({ category }) => ({
+      id: category.id,
+      name: category.name,
+      slug: category.slug
+    })),
+    options: product.options.map((option) => ({
+      id: option.id,
+      name: option.name,
+      values: option.values.map((value) => ({
+        id: value.id,
+        value: value.value
+      }))
+    })),
+    requiresShipping: product.requiresShipping,
     sku: product.sku,
     slug: product.slug,
     summary: product.summary,
     tags: jsonArray(product.tags),
+    taxable: product.taxable,
     type: product.type,
     name: product.name,
     variants: product.variants.map(publicVariant)

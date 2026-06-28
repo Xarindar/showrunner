@@ -74,6 +74,7 @@ model Site {
   portfolioProofApprovals  PortfolioProofApproval[]
   portfolioProofDecisions  PortfolioProofItemDecision[]
   products                 Product[]
+  productCategories        ProductCategory[]
   collections              Collection[]
   coupons                  Coupon[]
   carts                    Cart[]

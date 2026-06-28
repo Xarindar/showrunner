@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getCurrentSiteId } from "@/lib/site";
 import { slugify } from "@/lib/slug";
 
-type CommerceSlugModel = "product" | "collection";
+type CommerceSlugModel = "product" | "collection" | "category";
 
 async function slugExists(prisma: PrismaClient, model: CommerceSlugModel, slug: string, siteId: string, exceptId?: string) {
   if (model === "product") {
@@ -14,10 +14,16 @@ async function slugExists(prisma: PrismaClient, model: CommerceSlugModel, slug: 
     return Boolean(item && item.id !== exceptId);
   }
 
-  const item = await prisma.collection.findFirst({
-    where: { siteId, slug },
-    select: { id: true }
-  });
+  const item =
+    model === "collection"
+      ? await prisma.collection.findFirst({
+          where: { siteId, slug },
+          select: { id: true }
+        })
+      : await prisma.productCategory.findFirst({
+          where: { siteId, slug },
+          select: { id: true }
+        });
 
   return Boolean(item && item.id !== exceptId);
 }

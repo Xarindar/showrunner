@@ -1,6 +1,6 @@
 "use server";
 
-import { GiftCardStatus, OrderStatus, PaymentProvider, PaymentStatus, Prisma, ProductStatus, ProductType } from "@prisma/client";
+import { GiftCardStatus, MediaVariantType, OrderStatus, PaymentProvider, PaymentStatus, Prisma, ProductMediaRole, ProductStatus, ProductType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -8,11 +8,12 @@ import { requireAdmin } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { generateGiftCardCode } from "@/lib/commerce/gift-cards";
 import {
-  collectionFormSchema,
-  collectionProductFormSchema,
   currencyCode,
   moneyCents,
   optionalEmailStored,
+  optionalId,
+  optionalMoneyCents,
+  optionalNonNegativeInt,
   optionalStoredText,
   parseForm,
   productFormSchema,
@@ -24,9 +25,10 @@ import {
 } from "@/lib/admin-validation";
 import { updateOrderStatus } from "@/lib/commerce/orders";
 import { generateUniqueCommerceSlug } from "@/lib/commerce/slugs";
+import { mediaAssetDisplayUrl, uploadMedia } from "@/lib/media";
 import { refundPaymentGatewayPayment } from "@/lib/payments/refunds";
 import { prisma } from "@/lib/prisma";
-import { getCurrentSiteId } from "@/lib/site";
+import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
 
 const orderStatusFormSchema = z.object({
   id: requiredText,
@@ -92,6 +94,89 @@ const giftCardIssueSchema = z.object({
   recipientName: optionalStoredText
 });
 
+const productMediaUploadSchema = z.object({
+  productId: requiredText,
+  alt: optionalStoredText,
+  role: z.enum(ProductMediaRole).catch(ProductMediaRole.GALLERY)
+});
+
+const productMediaAttachSchema = productMediaUploadSchema.extend({
+  mediaAssetId: requiredText
+});
+
+const productMediaSelectSchema = z.object({
+  id: requiredText,
+  productId: requiredText
+});
+
+const productCategoryFormSchema = z.object({
+  name: requiredText,
+  slug: optionalStoredText,
+  parentId: optionalId,
+  description: optionalStoredText,
+  status: z.enum(ProductStatus).catch(ProductStatus.DRAFT),
+  isFeatured: z.literal("on").optional(),
+  sortOrder: z.coerce.number().int().default(0)
+});
+
+const productCategoryAssignmentFormSchema = z.object({
+  categoryId: requiredText,
+  productId: requiredText
+});
+
+const productCategoryAssignmentDeleteSchema = z.object({
+  id: requiredText,
+  productId: requiredText
+});
+
+const productOptionFormSchema = z.object({
+  productId: requiredText,
+  name: requiredText,
+  values: optionalStoredText,
+  sortOrder: z.coerce.number().int().default(0)
+});
+
+const productVariantMatrixSchema = z.object({
+  productId: requiredText
+});
+
+const productVariantUpdateSchema = z
+  .object({
+    id: requiredText,
+    productId: requiredText,
+    name: requiredText,
+    sku: optionalStoredText,
+    price: optionalMoneyCents,
+    compareAtPrice: optionalMoneyCents,
+    trackInventory: z.literal("on").optional(),
+    inventoryQuantity: optionalNonNegativeInt,
+    isDefault: z.literal("on").optional(),
+    isActive: z.literal("on").optional(),
+    sortOrder: z.coerce.number().int().default(0)
+  })
+  .transform((value) => ({
+    ...value,
+    trackInventory: value.trackInventory === "on",
+    inventoryQuantity: value.trackInventory === "on" ? value.inventoryQuantity ?? 0 : undefined,
+    isDefault: value.isDefault === "on",
+    isActive: value.isActive === "on"
+  }));
+
+const bundleComponentFormSchema = z.object({
+  productId: requiredText,
+  componentProductId: requiredText,
+  componentVariantId: optionalId,
+  quantity: z.coerce.number().int().min(1).max(999),
+  sortOrder: z.coerce.number().int().default(0),
+  isOptional: z.literal("on").optional(),
+  notes: optionalStoredText
+});
+
+const bundleComponentDeleteSchema = z.object({
+  id: requiredText,
+  productId: requiredText
+});
+
 function refreshProducts() {
   revalidatePath("/admin");
   revalidatePath("/admin/modules/products");
@@ -103,6 +188,70 @@ function refreshProducts() {
 function productEditPath(productId: string, params?: Record<string, string>) {
   const query = new URLSearchParams(params).toString();
   return `/admin/modules/products/${productId}${query ? `?${query}` : ""}`;
+}
+
+function productBundlePath(productId: string, params?: Record<string, string>) {
+  const query = new URLSearchParams(params).toString();
+  return `/admin/modules/products/${productId}/bundles${query ? `?${query}` : ""}`;
+}
+
+function hasUpload(file: FormDataEntryValue | null): file is File {
+  return file instanceof File && file.size > 0;
+}
+
+function uniqueIds(values: FormDataEntryValue[]) {
+  return Array.from(new Set(values.map(String).map((value) => value.trim()).filter(Boolean)));
+}
+
+function csvValues(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[,\n]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function productRequiresShipping(input: { requiresShipping: boolean; type: ProductType }) {
+  return input.requiresShipping || input.type === ProductType.PHYSICAL;
+}
+
+async function assertProductForSite(productId: string, siteId: string) {
+  const product = await prisma.product.findFirst({
+    where: { id: productId, siteId },
+    select: { id: true, imageUrl: true, name: true, sku: true, type: true }
+  });
+
+  if (!product) {
+    redirect(`/admin/modules/products?error=${encodeURIComponent("Product not found.")}`);
+  }
+
+  return product;
+}
+
+async function productPrimaryImageUrl(tx: Prisma.TransactionClient, productId: string) {
+  const primary =
+    (await tx.productMedia.findFirst({
+      where: { productId, role: ProductMediaRole.PRIMARY },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { url: true }
+    })) ||
+    (await tx.productMedia.findFirst({
+      where: { productId },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { url: true }
+    }));
+
+  return primary?.url || "";
+}
+
+async function syncProductPrimaryImage(tx: Prisma.TransactionClient, productId: string) {
+  await tx.product.update({
+    where: { id: productId },
+    data: { imageUrl: await productPrimaryImageUrl(tx, productId) }
+  });
 }
 
 async function syncDefaultVariant(
@@ -154,43 +303,121 @@ async function syncDefaultVariant(
 export async function createProductAction(formData: FormData) {
   await requireAdmin("products:manage");
   const input = await parseForm(productFormSchema, formData);
-  const siteId = await getCurrentSiteId();
+  const settings = await getSiteSettings();
+  const siteId = settings.siteId;
   const slug = await generateUniqueCommerceSlug(prisma, "product", {
     name: input.name,
     slug: input.slug || "",
     siteId
   });
+  const categoryIds = uniqueIds(formData.getAll("categoryIds"));
+  const validCategories = categoryIds.length
+    ? await prisma.productCategory.findMany({
+        where: { id: { in: categoryIds }, siteId },
+        select: { id: true }
+      })
+    : [];
+  const newCategorySlug = input.newCategoryName
+    ? await generateUniqueCommerceSlug(prisma, "category", {
+        name: input.newCategoryName,
+        slug: input.newCategorySlug || "",
+        siteId
+      })
+    : "";
+  const imageFile = formData.get("imageFile");
+  let uploadedMedia:
+    | Awaited<ReturnType<typeof uploadMedia>>
+    | null = null;
 
-  const product = await prisma.product.create({
-    data: {
-      siteId,
-      slug,
-      name: input.name,
-      summary: input.summary,
-      description: input.description,
-      type: input.type,
-      status: input.status,
-      basePriceCents: input.basePrice,
-      compareAtPriceCents: input.compareAtPrice,
-      currency: input.currency,
-      sku: input.sku,
-      imageUrl: input.imageUrl,
-      tags: input.tags,
-      trackInventory: input.trackInventory,
-      inventoryQuantity: input.inventoryQuantity,
-      variants: {
-        create: {
-          name: "Default",
-          sku: input.sku,
-          priceCents: input.basePrice,
-          compareAtPriceCents: input.compareAtPrice,
-          trackInventory: input.trackInventory,
-          inventoryQuantity: input.inventoryQuantity,
-          isDefault: true,
-          isActive: input.status === ProductStatus.ACTIVE
+  if (hasUpload(imageFile)) {
+    try {
+      uploadedMedia = await uploadMedia(
+        imageFile,
+        {
+          alt: input.summary || input.name,
+          folder: "products",
+          tags: ["product", input.type.toLowerCase()],
+          usageContext: "product"
+        },
+        settings.mediaDriver,
+        siteId
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Product image upload failed.";
+      redirect(`/admin/modules/products?error=${encodeURIComponent(message)}`);
+    }
+  }
+
+  const mediaUrl = uploadedMedia ? mediaAssetDisplayUrl(uploadedMedia, MediaVariantType.HERO) : "";
+
+  const product = await prisma.$transaction(async (tx) => {
+    const createdCategory = input.newCategoryName
+      ? await tx.productCategory.create({
+          data: {
+            siteId,
+            name: input.newCategoryName,
+            slug: newCategorySlug,
+            status: input.status,
+            sortOrder: 0
+          },
+          select: { id: true }
+        })
+      : null;
+    const productCategories = createdCategory ? [...validCategories, createdCategory] : validCategories;
+
+    return tx.product.create({
+      data: {
+        siteId,
+        slug,
+        name: input.name,
+        summary: input.summary,
+        description: input.description,
+        type: input.type,
+        status: input.status,
+        basePriceCents: input.basePrice,
+        compareAtPriceCents: input.compareAtPrice,
+        currency: input.currency,
+        sku: input.sku,
+        imageUrl: mediaUrl,
+        seoTitle: input.seoTitle,
+        seoDescription: input.seoDescription,
+        vendor: input.vendor,
+        taxable: input.taxable,
+        requiresShipping: productRequiresShipping(input),
+        weightGrams: input.weightGrams,
+        externalReference: input.externalReference,
+        tags: input.tags,
+        trackInventory: input.trackInventory,
+        inventoryQuantity: input.inventoryQuantity,
+        categoryAssignments: productCategories.length
+          ? {
+              create: productCategories.map((category) => ({ categoryId: category.id }))
+            }
+          : undefined,
+        media: uploadedMedia
+          ? {
+              create: {
+                mediaAssetId: uploadedMedia.id,
+                role: ProductMediaRole.PRIMARY,
+                url: mediaUrl,
+                alt: uploadedMedia.alt || input.name
+              }
+            }
+          : undefined,
+        variants: {
+          create: {
+            name: "Default",
+            sku: input.sku,
+            priceCents: input.basePrice,
+            compareAtPriceCents: input.compareAtPrice,
+            trackInventory: input.trackInventory,
+            inventoryQuantity: input.inventoryQuantity,
+            isDefault: true,
+            isActive: input.status === ProductStatus.ACTIVE
+          }
         }
       }
-    }
+    });
   });
 
   refreshProducts();
@@ -201,10 +428,11 @@ export async function createProductAction(formData: FormData) {
 export async function updateProductAction(formData: FormData) {
   await requireAdmin("products:manage");
   const input = await parseForm(productUpdateFormSchema, formData);
-  const siteId = await getCurrentSiteId();
+  const settings = await getSiteSettings();
+  const siteId = settings.siteId;
   const currentProduct = await prisma.product.findFirst({
     where: { id: input.id, siteId },
-    select: { siteId: true, slug: true }
+    select: { imageUrl: true, siteId: true, slug: true }
   });
 
   if (!currentProduct) {
@@ -220,6 +448,32 @@ export async function updateProductAction(formData: FormData) {
       })
     : currentProduct?.slug || (await generateUniqueCommerceSlug(prisma, "product", { name: input.name, siteId, exceptId: input.id }));
 
+  const imageFile = formData.get("imageFile");
+  let uploadedMedia:
+    | Awaited<ReturnType<typeof uploadMedia>>
+    | null = null;
+
+  if (hasUpload(imageFile)) {
+    try {
+      uploadedMedia = await uploadMedia(
+        imageFile,
+        {
+          alt: input.summary || input.name,
+          folder: "products",
+          tags: ["product", input.type.toLowerCase()],
+          usageContext: "product"
+        },
+        settings.mediaDriver,
+        siteId
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Product image upload failed.";
+      redirect(productEditPath(input.id, { error: message }));
+    }
+  }
+
+  const uploadedMediaUrl = uploadedMedia ? mediaAssetDisplayUrl(uploadedMedia, MediaVariantType.HERO) : "";
+
   await prisma.$transaction(async (tx) => {
     await tx.product.update({
       where: { id: input.id },
@@ -234,12 +488,35 @@ export async function updateProductAction(formData: FormData) {
         compareAtPriceCents: input.compareAtPrice,
         currency: input.currency,
         sku: input.sku,
-        imageUrl: input.imageUrl,
+        imageUrl: uploadedMediaUrl || currentProduct.imageUrl,
+        seoTitle: input.seoTitle,
+        seoDescription: input.seoDescription,
+        vendor: input.vendor,
+        taxable: input.taxable,
+        requiresShipping: productRequiresShipping(input),
+        weightGrams: input.weightGrams,
+        externalReference: input.externalReference,
         tags: input.tags,
         trackInventory: input.trackInventory,
         inventoryQuantity: input.inventoryQuantity
       }
     });
+
+    if (uploadedMedia) {
+      await tx.productMedia.updateMany({
+        where: { productId: input.id, role: ProductMediaRole.PRIMARY },
+        data: { role: ProductMediaRole.GALLERY }
+      });
+      await tx.productMedia.create({
+        data: {
+          productId: input.id,
+          mediaAssetId: uploadedMedia.id,
+          role: ProductMediaRole.PRIMARY,
+          url: uploadedMediaUrl,
+          alt: uploadedMedia.alt || input.name
+        }
+      });
+    }
 
     await syncDefaultVariant(tx, {
       productId: input.id,
@@ -320,19 +597,169 @@ export async function createProductVariantAction(formData: FormData) {
   redirect(productEditPath(input.productId, { saved: "variant" }));
 }
 
-export async function createCollectionAction(formData: FormData) {
+export async function uploadProductMediaAction(formData: FormData) {
   await requireAdmin("products:manage");
-  const input = await parseForm(collectionFormSchema, formData);
+  const input = await parseForm(productMediaUploadSchema, formData);
+  const settings = await getSiteSettings();
+  await assertProductForSite(input.productId, settings.siteId);
+
+  const file = formData.get("file");
+  if (!hasUpload(file)) {
+    redirect(productEditPath(input.productId, { error: "Choose an image before uploading." }));
+  }
+
+  let asset: Awaited<ReturnType<typeof uploadMedia>>;
+  try {
+    asset = await uploadMedia(
+      file,
+      {
+        alt: input.alt,
+        folder: "products",
+        tags: ["product"],
+        usageContext: "product"
+      },
+      settings.mediaDriver,
+      settings.siteId
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Product image upload failed.";
+    redirect(productEditPath(input.productId, { error: message }));
+  }
+
+  const url = mediaAssetDisplayUrl(asset, MediaVariantType.HERO);
+  await prisma.$transaction(async (tx) => {
+    const sortOrder = await tx.productMedia.count({ where: { productId: input.productId } });
+    if (input.role === ProductMediaRole.PRIMARY) {
+      await tx.productMedia.updateMany({
+        where: { productId: input.productId, role: ProductMediaRole.PRIMARY },
+        data: { role: ProductMediaRole.GALLERY }
+      });
+    }
+    await tx.productMedia.create({
+      data: {
+        productId: input.productId,
+        mediaAssetId: asset.id,
+        role: input.role,
+        url,
+        alt: input.alt || asset.alt || asset.filename,
+        sortOrder
+      }
+    });
+    if (input.role === ProductMediaRole.PRIMARY) {
+      await syncProductPrimaryImage(tx, input.productId);
+    }
+  });
+
+  refreshProducts();
+  redirect(productEditPath(input.productId, { saved: "media" }));
+}
+
+export async function attachProductMediaAction(formData: FormData) {
+  await requireAdmin("products:manage");
+  const input = await parseForm(productMediaAttachSchema, formData);
   const siteId = await getCurrentSiteId();
-  const slug = await generateUniqueCommerceSlug(prisma, "collection", {
+  await assertProductForSite(input.productId, siteId);
+
+  const asset = await prisma.mediaAsset.findFirst({
+    where: { id: input.mediaAssetId, siteId, deletedAt: null, isPrivate: false },
+    select: { alt: true, driver: true, filename: true, id: true, isPrivate: true, key: true, storageProviderId: true, url: true }
+  });
+  if (!asset) {
+    redirect(productEditPath(input.productId, { error: "Choose an active public media asset." }));
+  }
+
+  const url = mediaAssetDisplayUrl(asset, MediaVariantType.HERO);
+  await prisma.$transaction(async (tx) => {
+    const sortOrder = await tx.productMedia.count({ where: { productId: input.productId } });
+    if (input.role === ProductMediaRole.PRIMARY) {
+      await tx.productMedia.updateMany({
+        where: { productId: input.productId, role: ProductMediaRole.PRIMARY },
+        data: { role: ProductMediaRole.GALLERY }
+      });
+    }
+    await tx.productMedia.create({
+      data: {
+        productId: input.productId,
+        mediaAssetId: asset.id,
+        role: input.role,
+        url,
+        alt: input.alt || asset.alt || asset.filename,
+        sortOrder
+      }
+    });
+    if (input.role === ProductMediaRole.PRIMARY) {
+      await syncProductPrimaryImage(tx, input.productId);
+    }
+  });
+
+  refreshProducts();
+  redirect(productEditPath(input.productId, { saved: "media" }));
+}
+
+export async function setPrimaryProductMediaAction(formData: FormData) {
+  await requireAdmin("products:manage");
+  const input = await parseForm(productMediaSelectSchema, formData);
+  const siteId = await getCurrentSiteId();
+  await assertProductForSite(input.productId, siteId);
+
+  await prisma.$transaction(async (tx) => {
+    const media = await tx.productMedia.findFirst({
+      where: { id: input.id, productId: input.productId },
+      select: { id: true }
+    });
+    if (!media) throw new Error("Product image not found.");
+
+    await tx.productMedia.updateMany({
+      where: { productId: input.productId, role: ProductMediaRole.PRIMARY },
+      data: { role: ProductMediaRole.GALLERY }
+    });
+    await tx.productMedia.update({
+      where: { id: media.id },
+      data: { role: ProductMediaRole.PRIMARY }
+    });
+    await syncProductPrimaryImage(tx, input.productId);
+  });
+
+  refreshProducts();
+  redirect(productEditPath(input.productId, { saved: "media" }));
+}
+
+export async function removeProductMediaAction(formData: FormData) {
+  await requireAdmin("products:manage");
+  const input = await parseForm(productMediaSelectSchema, formData);
+  const siteId = await getCurrentSiteId();
+  await assertProductForSite(input.productId, siteId);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.productMedia.deleteMany({ where: { id: input.id, productId: input.productId } });
+    await syncProductPrimaryImage(tx, input.productId);
+  });
+
+  refreshProducts();
+  redirect(productEditPath(input.productId, { saved: "media" }));
+}
+
+export async function createProductCategoryAction(formData: FormData) {
+  await requireAdmin("products:manage");
+  const input = await parseForm(productCategoryFormSchema, formData);
+  const siteId = await getCurrentSiteId();
+  const parent = input.parentId
+    ? await prisma.productCategory.findFirst({ where: { id: input.parentId, siteId }, select: { id: true } })
+    : null;
+  if (input.parentId && !parent) {
+    redirect(`/admin/modules/products?error=${encodeURIComponent("Parent category not found.")}`);
+  }
+
+  const slug = await generateUniqueCommerceSlug(prisma, "category", {
     name: input.name,
     slug: input.slug || "",
     siteId
   });
 
-  await prisma.collection.create({
+  await prisma.productCategory.create({
     data: {
       siteId,
+      parentId: parent?.id,
       slug,
       name: input.name,
       description: input.description,
@@ -343,39 +770,292 @@ export async function createCollectionAction(formData: FormData) {
   });
 
   refreshProducts();
-  redirect("/admin/modules/products?saved=collection");
+  redirect("/admin/modules/products?saved=category");
 }
 
-export async function addProductToCollectionAction(formData: FormData) {
+export async function assignProductCategoryAction(formData: FormData) {
   await requireAdmin("products:manage");
-  const input = await parseForm(collectionProductFormSchema, formData);
+  const input = await parseForm(productCategoryAssignmentFormSchema, formData);
   const siteId = await getCurrentSiteId();
-  const [collection, product] = await Promise.all([
-    prisma.collection.findFirst({ where: { id: input.collectionId, siteId }, select: { id: true } }),
+  const [category, product] = await Promise.all([
+    prisma.productCategory.findFirst({ where: { id: input.categoryId, siteId }, select: { id: true } }),
     prisma.product.findFirst({ where: { id: input.productId, siteId }, select: { id: true } })
   ]);
-
-  if (!collection || !product) {
-    redirect(`/admin/modules/products?error=${encodeURIComponent("Product or collection not found.")}`);
+  if (!category || !product) {
+    redirect(productEditPath(input.productId, { error: "Product or category not found." }));
   }
 
-  await prisma.collectionProduct.upsert({
+  await prisma.productCategoryAssignment.upsert({
     where: {
-      collectionId_productId: {
-        collectionId: input.collectionId,
+      categoryId_productId: {
+        categoryId: input.categoryId,
         productId: input.productId
       }
     },
     update: {},
     create: {
-      collectionId: input.collectionId,
+      categoryId: input.categoryId,
       productId: input.productId
     }
   });
 
   refreshProducts();
-  revalidatePath(productEditPath(input.productId));
-  redirect(productEditPath(input.productId, { saved: "collection-product" }));
+  redirect(productEditPath(input.productId, { saved: "category" }));
+}
+
+export async function removeProductCategoryAction(formData: FormData) {
+  await requireAdmin("products:manage");
+  const input = await parseForm(productCategoryAssignmentDeleteSchema, formData);
+  const siteId = await getCurrentSiteId();
+  await assertProductForSite(input.productId, siteId);
+  await prisma.productCategoryAssignment.deleteMany({ where: { id: input.id, productId: input.productId } });
+
+  refreshProducts();
+  redirect(productEditPath(input.productId, { saved: "category" }));
+}
+
+export async function createProductOptionAction(formData: FormData) {
+  await requireAdmin("products:manage");
+  const input = await parseForm(productOptionFormSchema, formData);
+  const siteId = await getCurrentSiteId();
+  await assertProductForSite(input.productId, siteId);
+  const values = csvValues(input.values);
+
+  await prisma.$transaction(async (tx) => {
+    const option = await tx.productOption.upsert({
+      where: {
+        productId_name: {
+          productId: input.productId,
+          name: input.name
+        }
+      },
+      update: { sortOrder: input.sortOrder },
+      create: {
+        productId: input.productId,
+        name: input.name,
+        sortOrder: input.sortOrder
+      }
+    });
+
+    for (const [index, value] of values.entries()) {
+      await tx.productOptionValue.upsert({
+        where: {
+          optionId_value: {
+            optionId: option.id,
+            value
+          }
+        },
+        update: { sortOrder: index },
+        create: {
+          optionId: option.id,
+          value,
+          sortOrder: index
+        }
+      });
+    }
+  });
+
+  refreshProducts();
+  redirect(productEditPath(input.productId, { saved: "option" }));
+}
+
+function optionCombinations<T>(groups: T[][]): T[][] {
+  return groups.reduce<T[][]>((acc, group) => acc.flatMap((items) => group.map((item) => [...items, item])), [[]]);
+}
+
+export async function generateProductVariantsFromOptionsAction(formData: FormData) {
+  await requireAdmin("products:manage");
+  const input = await parseForm(productVariantMatrixSchema, formData);
+  const siteId = await getCurrentSiteId();
+  const product = await prisma.product.findFirst({
+    where: { id: input.productId, siteId },
+    include: {
+      options: {
+        include: { values: { orderBy: [{ sortOrder: "asc" }, { value: "asc" }] } },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
+      },
+      variants: {
+        include: { optionValues: { select: { optionValueId: true } } },
+        orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }]
+      }
+    }
+  });
+
+  if (!product) {
+    redirect(`/admin/modules/products?error=${encodeURIComponent("Product not found.")}`);
+  }
+
+  const valueGroups = product.options.map((option) => option.values);
+  if (!valueGroups.length || valueGroups.some((values) => values.length === 0)) {
+    redirect(productEditPath(input.productId, { error: "Add at least one value for each option before generating variants." }));
+  }
+
+  const combinations = optionCombinations(valueGroups).slice(0, 250);
+  const existingKeys = new Set(
+    product.variants.map((variant) => variant.optionValues.map((item) => item.optionValueId).sort().join("|")).filter(Boolean)
+  );
+
+  await prisma.$transaction(async (tx) => {
+    let reusableDefault = product.variants.find((variant) => variant.isDefault && variant.optionValues.length === 0 && variant.name === "Default");
+
+    for (const [index, combination] of combinations.entries()) {
+      const key = combination.map((value) => value.id).sort().join("|");
+      if (existingKeys.has(key)) continue;
+
+      const name = combination.map((value) => value.value).join(" / ");
+      const firstValue = combination[0];
+      const firstOption = product.options.find((option) => option.id === firstValue.optionId);
+      const data = {
+        name,
+        optionName: product.options.length === 1 ? firstOption?.name || "" : "Options",
+        optionValue: name,
+        priceCents: product.basePriceCents,
+        compareAtPriceCents: product.compareAtPriceCents,
+        sku: "",
+        trackInventory: false,
+        inventoryQuantity: undefined,
+        isActive: product.status === ProductStatus.ACTIVE,
+        sortOrder: index
+      };
+
+      if (reusableDefault) {
+        const variantId = reusableDefault.id;
+        await tx.productVariant.update({
+          where: { id: variantId },
+          data
+        });
+        await tx.productVariantOptionValue.createMany({
+          data: combination.map((value) => ({
+            variantId,
+            optionValueId: value.id
+          })),
+          skipDuplicates: true
+        });
+        reusableDefault = undefined;
+        continue;
+      }
+
+      await tx.productVariant.create({
+        data: {
+          productId: product.id,
+          ...data,
+          isDefault: false,
+          optionValues: {
+            create: combination.map((value) => ({
+              optionValueId: value.id
+            }))
+          }
+        }
+      });
+    }
+  });
+
+  refreshProducts();
+  redirect(productEditPath(input.productId, { saved: "variants" }));
+}
+
+export async function updateProductVariantAction(formData: FormData) {
+  await requireAdmin("products:manage");
+  const input = await parseForm(productVariantUpdateSchema, formData);
+  const siteId = await getCurrentSiteId();
+  await assertProductForSite(input.productId, siteId);
+
+  await prisma.$transaction(async (tx) => {
+    if (input.isDefault) {
+      await tx.productVariant.updateMany({
+        where: { productId: input.productId },
+        data: { isDefault: false }
+      });
+    }
+
+    await tx.productVariant.updateMany({
+      where: { id: input.id, productId: input.productId },
+      data: {
+        name: input.name,
+        sku: input.sku,
+        priceCents: input.price,
+        compareAtPriceCents: input.compareAtPrice,
+        trackInventory: input.trackInventory,
+        inventoryQuantity: input.inventoryQuantity,
+        isDefault: input.isDefault,
+        isActive: input.isActive,
+        sortOrder: input.sortOrder
+      }
+    });
+  });
+
+  refreshProducts();
+  redirect(productEditPath(input.productId, { saved: "variant" }));
+}
+
+export async function createBundleComponentAction(formData: FormData) {
+  await requireAdmin("products:manage");
+  const input = await parseForm(bundleComponentFormSchema, formData);
+  const siteId = await getCurrentSiteId();
+  const [bundle, component] = await Promise.all([
+    prisma.product.findFirst({ where: { id: input.productId, siteId }, select: { id: true } }),
+    prisma.product.findFirst({ where: { id: input.componentProductId, siteId }, select: { id: true } })
+  ]);
+
+  if (!bundle || !component || input.productId === input.componentProductId) {
+    redirect(productBundlePath(input.productId, { error: "Choose a different product to include in the bundle." }));
+  }
+
+  if (input.componentVariantId) {
+    const variant = await prisma.productVariant.findFirst({
+      where: { id: input.componentVariantId, productId: input.componentProductId },
+      select: { id: true }
+    });
+    if (!variant) {
+      redirect(productBundlePath(input.productId, { error: "Bundle variant not found for that product." }));
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.productBundleComponent.findFirst({
+      where: {
+        bundleProductId: input.productId,
+        componentProductId: input.componentProductId,
+        componentVariantId: input.componentVariantId || null
+      },
+      select: { id: true }
+    });
+
+    if (existing) {
+      redirect(productBundlePath(input.productId, { error: "That bundle component is already included." }));
+    }
+
+    await tx.product.update({
+      where: { id: input.productId },
+      data: { type: ProductType.BUNDLE }
+    });
+
+    await tx.productBundleComponent.create({
+      data: {
+        bundleProductId: input.productId,
+        componentProductId: input.componentProductId,
+        componentVariantId: input.componentVariantId,
+        quantity: input.quantity,
+        sortOrder: input.sortOrder,
+        isOptional: input.isOptional === "on",
+        notes: input.notes
+      }
+    });
+  });
+
+  refreshProducts();
+  redirect(productBundlePath(input.productId, { saved: "bundle" }));
+}
+
+export async function removeBundleComponentAction(formData: FormData) {
+  await requireAdmin("products:manage");
+  const input = await parseForm(bundleComponentDeleteSchema, formData);
+  const siteId = await getCurrentSiteId();
+  await assertProductForSite(input.productId, siteId);
+  await prisma.productBundleComponent.deleteMany({ where: { id: input.id, bundleProductId: input.productId } });
+
+  refreshProducts();
+  redirect(productBundlePath(input.productId, { saved: "bundle" }));
 }
 
 export async function createGiftCardAction(formData: FormData) {
@@ -481,7 +1161,7 @@ export async function fulfillCommerceOrderAction(formData: FormData) {
     if (order.status !== OrderStatus.PAID) {
       throw new Error("Only paid orders can be fulfilled.");
     }
-    if (!order.items.some((item) => item.product.type === ProductType.PHYSICAL)) {
+    if (!order.items.some((item) => item.product.requiresShipping || item.product.type === ProductType.PHYSICAL)) {
       throw new Error("Only orders with physical products can be fulfilled.");
     }
 
@@ -536,7 +1216,7 @@ export async function markCommerceOrderFulfillmentExportedAction(formData: FormD
     if (order.status !== OrderStatus.PAID) {
       throw new Error("Only paid physical orders can be marked exported.");
     }
-    const physicalItemCount = order.items.filter((item) => item.product.type === ProductType.PHYSICAL).length;
+    const physicalItemCount = order.items.filter((item) => item.product.requiresShipping || item.product.type === ProductType.PHYSICAL).length;
     if (!physicalItemCount) {
       throw new Error("Only orders with physical products can be marked exported.");
     }
@@ -592,7 +1272,7 @@ export async function recordCommerceOrderPrintLabHandoffAction(formData: FormDat
     if (order.status !== OrderStatus.PAID && order.status !== OrderStatus.FULFILLED) {
       throw new Error("Only paid or fulfilled physical orders can be handed off to a print lab.");
     }
-    const physicalItemCount = order.items.filter((item) => item.product.type === ProductType.PHYSICAL).length;
+    const physicalItemCount = order.items.filter((item) => item.product.requiresShipping || item.product.type === ProductType.PHYSICAL).length;
     if (!physicalItemCount) {
       throw new Error("Only orders with physical products can be handed off to a print lab.");
     }

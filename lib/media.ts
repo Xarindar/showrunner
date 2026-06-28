@@ -1,6 +1,8 @@
 import "server-only";
 
 import { createHmac, randomUUID, timingSafeEqual } from "crypto";
+import { mkdir, readFile, rm, writeFile } from "fs/promises";
+import path from "path";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { MediaDriver, MediaVariantType, type MediaAsset } from "@prisma/client";
 import type { NextRequest } from "next/server";
@@ -44,6 +46,7 @@ export type MediaUploadMetadata = {
   folder?: string;
   isDecorative?: boolean;
   isPrivate?: boolean;
+  siteId?: string;
   tags?: string | string[];
   uploadedByStaffId?: string;
   usageContext?: string;
@@ -89,6 +92,14 @@ export function isR2Configured() {
 
 export function isCloudflareImagesConfigured() {
   return Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_IMAGES_API_TOKEN && process.env.CLOUDFLARE_IMAGES_ACCOUNT_HASH);
+}
+
+export function serverAssetStorageRoot() {
+  return path.resolve(process.env.MEDIA_ASSET_DIR || path.join(process.cwd(), ".media-assets"));
+}
+
+export function isServerAssetStorageConfigured() {
+  return Boolean(serverAssetStorageRoot());
 }
 
 function getR2Client() {
@@ -251,6 +262,21 @@ function appMediaRoute(assetId: string, type: MediaVariantType) {
   return `/api/media/assets/${encodeURIComponent(assetId)}?${params.toString()}`;
 }
 
+function serverAssetRelativeKey(key: string) {
+  return key.replace(/\\/g, "/").replace(/^\/+/, "");
+}
+
+function serverAssetPath(key: string) {
+  const root = serverAssetStorageRoot();
+  const target = path.resolve(root, serverAssetRelativeKey(key));
+  const relative = path.relative(root, target);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("Invalid media asset path.");
+  }
+
+  return target;
+}
+
 function cloudflareImagesDeliveryUrl(imageId: string, type: MediaVariantType) {
   const accountHash = process.env.CLOUDFLARE_IMAGES_ACCOUNT_HASH;
   if (!accountHash || !imageId) return "";
@@ -265,7 +291,35 @@ const repoAdapter: MediaAdapter = {
   generateVariantUrl: (asset, type) => (asset.isPrivate ? appMediaRoute(asset.id, type) : asset.url),
   signPrivateUrl: (asset, type = MediaVariantType.FULL, ttlSeconds = signedUrlTtlSeconds) => createSignedMediaUrl(asset.id, type, ttlSeconds),
   upload: async () => {
-    throw new Error("Repo media assets are reference-only. Use an existing public asset path or switch media mode to R2/Cloudflare Images.");
+    throw new Error("Repo media assets are reference-only. Use an existing public asset path or switch media mode to Server asset folder, R2, or Cloudflare Images.");
+  }
+};
+
+const serverAssetsAdapter: MediaAdapter = {
+  driver: MediaDriver.SERVER_ASSETS,
+  canUpload: isServerAssetStorageConfigured,
+  delete: async (asset) => {
+    if (!asset.key) return;
+    await rm(serverAssetPath(asset.key), { force: true }).catch(() => {});
+  },
+  generateVariantUrl: (asset, type) => appMediaRoute(asset.id, type),
+  signPrivateUrl: (asset, type = MediaVariantType.FULL, ttlSeconds = signedUrlTtlSeconds) => createSignedMediaUrl(asset.id, type, ttlSeconds),
+  upload: async (file, metadata) => {
+    const extension = mimeTypeExtension(file.type);
+    const sitePrefix = slugify(metadata.siteId || "site") || "site";
+    const folder = normalizeMediaFolder(metadata.folder);
+    const folderPrefix = folder ? `${folder}/` : "";
+    const key = `sites/${sitePrefix}/uploads/${folderPrefix}${randomUUID()}.${extension}`;
+    const target = serverAssetPath(key);
+
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, Buffer.from(await file.arrayBuffer()));
+
+    return {
+      driver: MediaDriver.SERVER_ASSETS,
+      key,
+      url: ""
+    };
   }
 };
 
@@ -358,6 +412,7 @@ const cloudflareImagesAdapter: MediaAdapter = {
 };
 
 export function getMediaAdapter(driver: MediaDriver | string): MediaAdapter {
+  if (driver === MediaDriver.SERVER_ASSETS) return serverAssetsAdapter;
   if (driver === MediaDriver.R2) return r2Adapter;
   if (driver === MediaDriver.CLOUDFLARE_IMAGES) return cloudflareImagesAdapter;
   return repoAdapter;
@@ -424,17 +479,18 @@ export async function uploadMedia(
   siteId?: string,
   validation: MediaUploadValidationOptions = {}
 ) {
-  if (metadata.isPrivate && driver !== MediaDriver.R2) {
-    throw new Error("Private media delivery is currently supported only for R2 assets.");
+  const currentSiteId = siteId || (await getCurrentSiteId());
+
+  if (metadata.isPrivate && driver !== MediaDriver.R2 && driver !== MediaDriver.SERVER_ASSETS) {
+    throw new Error("Private media delivery is currently supported only for server assets or R2 assets.");
   }
 
   const safeAlt = await assertUploadFile(file, metadata, validation);
   const scanResult = await runVirusScanHook(file);
   const adapter = getMediaAdapter(driver);
-  const stored = await adapter.upload(file, metadata);
+  const stored = await adapter.upload(file, { ...metadata, siteId: currentSiteId });
   const folder = normalizeMediaFolder(metadata.folder);
   const assetId = randomUUID();
-  const currentSiteId = siteId || (await getCurrentSiteId());
   const isPrivate = Boolean(metadata.isPrivate);
   const assetRoute = appMediaRoute(assetId, MediaVariantType.FULL);
 
@@ -563,6 +619,19 @@ async function r2ObjectResponse(asset: Pick<MediaAsset, "key" | "mimeType">) {
   });
 }
 
+async function serverAssetObjectResponse(asset: Pick<MediaAsset, "key" | "mimeType">) {
+  try {
+    const bytes = await readFile(serverAssetPath(asset.key));
+    return new Response(new Uint8Array(bytes), {
+      headers: {
+        "content-type": asset.mimeType || "application/octet-stream"
+      }
+    });
+  } catch {
+    return null;
+  }
+}
+
 async function safeR2ObjectResponse(asset: Pick<MediaAsset, "key" | "mimeType">) {
   try {
     return await r2ObjectResponse(asset);
@@ -584,6 +653,11 @@ function isTransformableImage(asset: Pick<MediaAsset, "mimeType">) {
 }
 
 function r2VariantObjectKey(asset: Pick<MediaAsset, "key">, type: MediaVariantType) {
+  const sourceKey = asset.key.replace(/\\/g, "/").replace(/[^A-Za-z0-9._/-]/g, "_").replace(/\.[^./]+$/, "");
+  return `variants/${sourceKey}/${type.toLowerCase()}.webp`;
+}
+
+function serverAssetVariantObjectKey(asset: Pick<MediaAsset, "key">, type: MediaVariantType) {
   const sourceKey = asset.key.replace(/\\/g, "/").replace(/[^A-Za-z0-9._/-]/g, "_").replace(/\.[^./]+$/, "");
   return `variants/${sourceKey}/${type.toLowerCase()}.webp`;
 }
@@ -713,13 +787,110 @@ async function transformedR2VariantResponse(
   });
 }
 
+async function transformedServerAssetVariantResponse(
+  asset: Pick<MediaAsset, "id" | "isPrivate" | "key" | "mimeType">,
+  type: MediaVariantType
+) {
+  if (!generatedImageVariantTypes.has(type) || !isTransformableImage(asset)) {
+    return serverAssetObjectResponse(asset);
+  }
+
+  const existingVariant = await prisma.mediaAssetVariant.findUnique({
+    where: {
+      assetId_type: {
+        assetId: asset.id,
+        type
+      }
+    },
+    select: { metadata: true }
+  });
+  const metadata = mediaVariantMetadata(existingVariant?.metadata);
+  const existingKey = typeof metadata.serverAssetKey === "string" ? metadata.serverAssetKey : "";
+  if (existingKey) {
+    const existingResponse = await serverAssetObjectResponse({ key: existingKey, mimeType: generatedVariantContentType });
+    if (existingResponse) return existingResponse;
+  }
+
+  let sourceBytes: Buffer;
+  try {
+    sourceBytes = await readFile(serverAssetPath(asset.key));
+  } catch {
+    return null;
+  }
+
+  const resized = await sharp(sourceBytes, { limitInputPixels: 80_000_000 })
+    .rotate()
+    .resize(transformFit(type))
+    .webp({ effort: 4, quality: type === MediaVariantType.THUMBNAIL ? 72 : 82 })
+    .toBuffer({ resolveWithObject: true });
+
+  const variantKey = serverAssetVariantObjectKey(asset, type);
+  const variantPath = serverAssetPath(variantKey);
+  await mkdir(path.dirname(variantPath), { recursive: true });
+  await writeFile(variantPath, resized.data);
+
+  await prisma.mediaAssetVariant.upsert({
+    where: {
+      assetId_type: {
+        assetId: asset.id,
+        type
+      }
+    },
+    create: {
+      assetId: asset.id,
+      format: "webp",
+      height: resized.info.height || mediaVariantPresets[type].height,
+      metadata: {
+        contentType: generatedVariantContentType,
+        fit: mediaVariantPresets[type].fit,
+        generatedBy: "sharp-server-assets",
+        serverAssetKey: variantKey,
+        sourceKey: asset.key
+      },
+      sizeBytes: resized.data.byteLength,
+      type,
+      url: appMediaRoute(asset.id, type),
+      width: resized.info.width || mediaVariantPresets[type].width
+    },
+    update: {
+      format: "webp",
+      height: resized.info.height || mediaVariantPresets[type].height,
+      metadata: {
+        contentType: generatedVariantContentType,
+        fit: mediaVariantPresets[type].fit,
+        generatedBy: "sharp-server-assets",
+        serverAssetKey: variantKey,
+        sourceKey: asset.key
+      },
+      sizeBytes: resized.data.byteLength,
+      url: appMediaRoute(asset.id, type),
+      width: resized.info.width || mediaVariantPresets[type].width
+    }
+  });
+
+  return new Response(new Uint8Array(resized.data), {
+    headers: {
+      "content-type": generatedVariantContentType
+    },
+    status: 200
+  });
+}
+
 export async function fetchMediaAssetSource(
   asset: Pick<MediaAsset, "driver" | "id" | "isPrivate" | "key" | "mimeType" | "storageProviderId" | "url">,
   request: NextRequest,
   type: MediaVariantType
 ) {
-  if (asset.isPrivate && asset.driver !== MediaDriver.R2) {
+  if (asset.isPrivate && asset.driver !== MediaDriver.R2 && asset.driver !== MediaDriver.SERVER_ASSETS) {
     return null;
+  }
+
+  if (asset.driver === MediaDriver.SERVER_ASSETS && type !== MediaVariantType.DOWNLOAD) {
+    return transformedServerAssetVariantResponse(asset, type);
+  }
+
+  if (asset.driver === MediaDriver.SERVER_ASSETS) {
+    return serverAssetObjectResponse(asset);
   }
 
   if (asset.driver === MediaDriver.R2 && type !== MediaVariantType.DOWNLOAD) {

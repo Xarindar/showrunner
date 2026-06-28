@@ -270,7 +270,7 @@ export async function repriceCart(tx: CommerceTx, cartId: string, options: Repri
     if (item.product.currency !== currency) throw new Error("A cart can only contain one currency.");
     const isGiftCardItem = item.product.type === ProductType.GIFT_CARD;
     if (isGiftCardItem) hasGiftCardItems = true;
-    if (item.product.type === ProductType.PHYSICAL) hasShippableItems = true;
+    if (item.product.requiresShipping || item.product.type === ProductType.PHYSICAL) hasShippableItems = true;
 
     const unitPriceCents = item.variant?.priceCents ?? item.product.basePriceCents;
     const nextLineTotalCents = lineTotal(unitPriceCents, nextQuantity);

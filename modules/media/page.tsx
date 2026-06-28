@@ -3,7 +3,7 @@ import { Archive, Folder, ImagePlus, RotateCcw, Star, Tag } from "lucide-react";
 import { MediaDriver, MediaVariantType, type Prisma } from "@prisma/client";
 import { getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
 import { nonEmptyStringArrayFromUnknown, stringArrayCsv } from "@/lib/format";
-import { isCloudflareImagesConfigured, isR2Configured, mediaAssetDisplayUrl } from "@/lib/media";
+import { isCloudflareImagesConfigured, isR2Configured, isServerAssetStorageConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
@@ -37,6 +37,7 @@ function fileSizeLabel(bytes: number) {
 }
 
 function canUploadWithDriver(driver: MediaDriver) {
+  if (driver === MediaDriver.SERVER_ASSETS) return isServerAssetStorageConfigured();
   if (driver === MediaDriver.R2) return isR2Configured();
   if (driver === MediaDriver.CLOUDFLARE_IMAGES) return isCloudflareImagesConfigured();
   return false;
@@ -79,7 +80,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
   const uploadForm = (
     <form action={uploadMediaAction} className="form-grid">
       <p className="lead lead-compact">
-        Current media mode: <strong>{settings.mediaDriver}</strong>. Uploads require the matching storage env vars in `.env`.
+        Current media mode: <strong>{settings.mediaDriver}</strong>. Server asset folders work on a mounted volume; cloud modes require matching storage env vars.
       </p>
       <div className="ui-field">
         <label htmlFor="media-file">Image file</label>
@@ -139,7 +140,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       </div>
       {!canUpload ? (
         <p className="lead lead-compact">
-          Switch media mode to R2 or Cloudflare Images in Settings and add credentials to enable uploads.
+          Switch media mode to Server asset folder, R2, or Cloudflare Images in Settings to enable uploads.
         </p>
       ) : null}
     </form>
@@ -170,7 +171,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
         <div>
           <p className="eyebrow">Media</p>
           <h1>Images and assets</h1>
-          <p>Repo assets stay simple; R2 uploads turn on when this client needs editable media.</p>
+          <p>Use repo references for static assets, or upload into a server folder, R2, or Cloudflare Images for editable media.</p>
         </div>
       </header>
 

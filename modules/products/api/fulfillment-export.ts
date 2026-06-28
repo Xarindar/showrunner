@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { OrderStatus, ProductType } from "@prisma/client";
+import { OrderStatus } from "@prisma/client";
 import { csvDocument } from "@/lib/api/csv";
 import { recordAuditLog } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth";
@@ -68,14 +68,14 @@ export async function GET(request: Request) {
       ...(unexportedOnly ? { fulfillmentExportedAt: null } : {}),
       items: {
         some: {
-          product: { type: ProductType.PHYSICAL }
+          product: { requiresShipping: true }
         }
       }
     },
     include: {
       items: {
         where: {
-          product: { type: ProductType.PHYSICAL }
+          product: { requiresShipping: true }
         },
         include: {
           product: true,

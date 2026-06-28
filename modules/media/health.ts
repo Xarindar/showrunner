@@ -7,7 +7,7 @@ import { warning, type ModuleHealthCheck } from "@/lib/platform-health";
 
 export const getHealth: ModuleHealthCheck = async ({ settings }) => {
   const warnings = [];
-  const [mediaAssetCount, generatedR2VariantCount] = await Promise.all([
+  const [mediaAssetCount, generatedR2VariantCount, generatedServerVariantCount] = await Promise.all([
     prisma.mediaAsset.count({ where: { siteId: settings.siteId } }),
     prisma.mediaAssetVariant.count({
       where: {
@@ -15,6 +15,15 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
         metadata: {
           path: ["generatedBy"],
           equals: "sharp-r2"
+        }
+      }
+    }),
+    prisma.mediaAssetVariant.count({
+      where: {
+        asset: { driver: MediaDriver.SERVER_ASSETS, siteId: settings.siteId },
+        metadata: {
+          path: ["generatedBy"],
+          equals: "sharp-server-assets"
         }
       }
     })
@@ -53,6 +62,18 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
       warning(
         "R2 variants generate on first view",
         `Responsive R2 variants (${Object.keys(mediaVariantPresets).join(", ")}) are generated and cached when gallery/media routes first request them.`,
+        "info",
+        "media",
+        "/admin/modules/media"
+      )
+    );
+  }
+
+  if (settings.mediaDriver === MediaDriver.SERVER_ASSETS && mediaAssetCount > 0 && generatedServerVariantCount === 0) {
+    warnings.push(
+      warning(
+        "Server asset variants generate on first view",
+        `Responsive server-folder variants (${Object.keys(mediaVariantPresets).join(", ")}) are generated and cached beside the uploaded originals when media routes first request them.`,
         "info",
         "media",
         "/admin/modules/media"

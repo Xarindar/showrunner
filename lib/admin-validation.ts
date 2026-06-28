@@ -313,13 +313,24 @@ export const productFormSchema = z
     compareAtPrice: optionalMoneyCents,
     currency: currencyCode.catch("USD"),
     sku: optionalStoredText,
-    imageUrl: optionalStoredText,
+    imageUrl: optionalStoredText.optional().transform((value) => value || ""),
+    seoTitle: optionalStoredText,
+    seoDescription: optionalStoredText,
+    vendor: optionalStoredText,
+    externalReference: optionalStoredText,
+    newCategoryName: optionalStoredText.optional().transform((value) => value || ""),
+    newCategorySlug: optionalText.optional(),
+    taxable: z.literal("on").optional(),
+    requiresShipping: z.literal("on").optional(),
+    weightGrams: optionalNonNegativeInt,
     tags: optionalStoredText,
     trackInventory: z.literal("on").optional(),
     inventoryQuantity: optionalNonNegativeInt
   })
   .transform((value) => ({
     ...value,
+    taxable: value.taxable !== undefined,
+    requiresShipping: value.requiresShipping === "on",
     tags: csvList(value.tags),
     trackInventory: value.trackInventory === "on",
     inventoryQuantity: value.trackInventory === "on" ? value.inventoryQuantity ?? 0 : undefined
@@ -353,20 +364,6 @@ export const productVariantFormSchema = z
     isDefault: value.isDefault === "on",
     isActive: value.isActive === "on"
   }));
-
-export const collectionFormSchema = z.object({
-  name: requiredText,
-  slug: optionalText,
-  description: optionalStoredText,
-  status: z.enum(ProductStatus).catch(ProductStatus.DRAFT),
-  isFeatured: z.literal("on").optional(),
-  sortOrder: z.coerce.number().int().default(0)
-});
-
-export const collectionProductFormSchema = z.object({
-  collectionId: id,
-  productId: id
-});
 
 export const couponFormSchema = z
   .object({

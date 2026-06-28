@@ -120,7 +120,7 @@ export default async function HomePage() {
             <Card>
               <ImageIcon size={22} />
               <h3>Media</h3>
-              <p>Use stable repo assets or turn on R2 uploads for image-heavy clients.</p>
+              <p>Use repo assets, a server storage folder, or cloud uploads for image-heavy clients.</p>
             </Card>
             {portfolioEnabled ?
             <Card>

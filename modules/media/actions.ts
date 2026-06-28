@@ -107,8 +107,8 @@ export async function updateMediaAssetAction(formData: FormData) {
     redirect(`/admin/modules/media?error=${encodeURIComponent("Media asset not found.")}`);
   }
 
-  if (input.isPrivate && existingAsset.driver !== MediaDriver.R2) {
-    redirect(`/admin/modules/media?error=${encodeURIComponent("Private media delivery is currently supported only for R2 assets.")}`);
+  if (input.isPrivate && existingAsset.driver !== MediaDriver.R2 && existingAsset.driver !== MediaDriver.SERVER_ASSETS) {
+    redirect(`/admin/modules/media?error=${encodeURIComponent("Private media delivery is currently supported only for server assets or R2 assets.")}`);
   }
 
   await prisma.mediaAsset.updateMany({

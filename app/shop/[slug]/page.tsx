@@ -28,16 +28,16 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
   const product = await prisma.product.findUnique({
     where: { siteId_slug: { siteId: settings.siteId, slug } },
-    select: { description: true, imageUrl: true, name: true, status: true, summary: true }
+    select: { description: true, imageUrl: true, name: true, seoDescription: true, seoTitle: true, status: true, summary: true }
   });
 
   if (!product || product.status !== ProductStatus.ACTIVE) return {};
 
   return buildPageMetadata(settings, {
     canonicalPath: `/shop/${slug}`,
-    description: product.summary || product.description,
+    description: product.seoDescription || product.summary || product.description,
     image: product.imageUrl,
-    title: product.name
+    title: product.seoTitle || product.name
   });
 }
 
@@ -59,8 +59,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
         where: { isActive: true },
         orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }]
       },
-      collectionProducts: {
-        include: { collection: true },
+      categoryAssignments: {
+        include: { category: true },
         orderBy: { createdAt: "asc" }
       }
     }
@@ -71,7 +71,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const defaultVariant = product.variants[0] || null;
   const defaultPriceCents = defaultVariant?.priceCents ?? product.basePriceCents;
   const isGiftCard = product.type === ProductType.GIFT_CARD;
-  const categories = product.collectionProducts.map(({ collection }) => collection.name);
+  const categories = product.categoryAssignments.map(({ category }) => category.name);
   const viewItemEvent = buildViewItemEvent({
     categories,
     currency: product.currency,
@@ -170,11 +170,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
             <strong className="ui-zero">{formatMoney(defaultPriceCents, product.currency)}</strong>
 
-            {product.collectionProducts.length ?
+            {product.categoryAssignments.length ?
             <div className="ui-zero">
-                {product.collectionProducts.map(({ collection }) =>
-              <span className="ui-badge" key={collection.id}>
-                    {collection.name}
+                {product.categoryAssignments.map(({ category }) =>
+              <span className="ui-badge" key={category.id}>
+                    {category.name}
                   </span>
               )}
               </div> :

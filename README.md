@@ -8,7 +8,7 @@ Showrunner is a reusable per-client website/admin template for service businesse
 - Email/password admin auth with role-based permissions
 - Native service appointment scheduling with multi-staff support
 - SMTP email outbox with worker processing and dev console fallback
-- Repo media by default, Cloudflare R2 uploads when configured
+- Repo media by default, plus server-folder, Cloudflare R2, or Cloudflare Images uploads when configured
 - Hosted commerce payments on the owner's own Stripe / Square / PayPal accounts (bring-your-own-credentials, pasted in Settings → Payments), including owner-controlled Stripe payment methods
 - Request-resolved site boundary for tenant-owned data
 - Theme tokens with client-safe style presets
@@ -75,7 +75,7 @@ Future modules such as contracts and deeper client self-service surfaces can be 
 - Communications: transactional outbox, booking template settings, visual template builder, sender/recipient controls, and suppressions.
 - Scheduling: setup for services, assigned staff, bookable resources, per-staff/resource availability, blockouts, booking rules, intake prompts, policies, and booking reminders.
 - Content: controlled public-site copy and hero image edits.
-- Media: repo assets by default, R2/Cloudflare Images uploads when configured, folders/tags/focal points, archive lifecycle, signed delivery, and signed Sharp/R2 image variants.
+- Media: repo assets by default; server-folder, R2, or Cloudflare Images uploads when configured; folders/tags/focal points, archive lifecycle, signed delivery, and signed Sharp image variants. Set `MEDIA_ASSET_DIR` to a Railway volume or mounted storage folder for persistent server assets.
 - Portfolio: gallery admin, access-link delivery, proofing favorites/comments/approvals, public widgets/lightbox, signed image variants, and ZIP bundles.
 - Forms: reusable public forms, intake questions, and a submission inbox.
 - Testimonials: review collection, approval workflow, featured quotes, and public proof pages.

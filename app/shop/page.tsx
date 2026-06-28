@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings();
   return buildPageMetadata(settings, {
     canonicalPath: "/shop",
-    description: "Browse active products, packages, and collections.",
+    description: "Browse active products and packages.",
     title: "Shop"
   });
 }
@@ -30,21 +30,25 @@ export default async function ShopPage() {
   if (!settings.enabledModuleIds.includes("products")) notFound();
   const baseUrl = await getCanonicalBaseUrl(settings.siteId);
 
-  const [products, collections] = await Promise.all([
+  const [products, categories] = await Promise.all([
   prisma.product.findMany({
     where: { siteId: settings.siteId, status: ProductStatus.ACTIVE },
     include: {
       variants: {
         where: { isActive: true },
         orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }]
+      },
+      categoryAssignments: {
+        include: { category: true },
+        orderBy: { createdAt: "asc" }
       }
     },
     orderBy: { createdAt: "desc" }
   }),
-  prisma.collection.findMany({
+  prisma.productCategory.findMany({
     where: { siteId: settings.siteId, status: ProductStatus.ACTIVE, isFeatured: true },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    take: 6
+    take: 8
   })]
   );
 
@@ -81,11 +85,11 @@ export default async function ShopPage() {
           </div>
         </div>
 
-        {collections.length ?
+        {categories.length ?
         <div className="ui-zero">
-            {collections.map((collection) =>
-          <span className="ui-badge" key={collection.id}>
-                {collection.name}
+            {categories.map((category) =>
+          <span className="ui-badge" key={category.id}>
+                {category.name}
               </span>
           )}
           </div> :

@@ -1,6 +1,6 @@
 import { MediaDriver, MediaVariantType, type Prisma } from "@prisma/client";
 import { getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
-import { isCloudflareImagesConfigured, isR2Configured, mediaAssetDisplayUrl } from "@/lib/media";
+import { isCloudflareImagesConfigured, isR2Configured, isServerAssetStorageConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { updateContentAction } from "./actions";
@@ -85,6 +85,7 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
 }
 
 function canUploadWithDriver(driver: MediaDriver) {
+  if (driver === MediaDriver.SERVER_ASSETS) return isServerAssetStorageConfigured();
   if (driver === MediaDriver.R2) return isR2Configured();
   if (driver === MediaDriver.CLOUDFLARE_IMAGES) return isCloudflareImagesConfigured();
   return false;
