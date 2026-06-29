@@ -11,6 +11,7 @@ export * from "./modal";
 export * from "./onboarding-modal";
 export * from "./pagination";
 export * from "./settings";
+export * from "./select-menu";
 export * from "./states";
 export * from "./switch";
 export * from "./switch-reveal";

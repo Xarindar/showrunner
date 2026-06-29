@@ -1754,44 +1754,115 @@ button.button:disabled,
 }
 
 .ui-table-filter-select {
+  flex: 0 0 auto;
+  min-width: 176px;
+}
+
+.ui-select-menu {
+  display: inline-flex;
+  min-width: 0;
+  position: relative;
+}
+
+.ui-select-trigger {
   align-items: center;
+  appearance: none;
   background: var(--color-surface);
   border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
   border-radius: var(--radius-control);
-  display: inline-flex;
-  flex: 0 0 auto;
+  color: var(--color-text);
+  cursor: pointer;
+  display: grid;
   gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   min-height: 34px;
-  min-width: 176px;
-  padding: 0 8px 0 10px;
+  min-width: 100%;
+  padding: 0 10px;
+  text-align: left;
 }
 
-.ui-table-filter-select span {
+.ui-select-label {
   color: var(--color-muted);
   font-size: var(--type-caption);
   font-weight: 850;
   text-transform: uppercase;
 }
 
-.ui-table-filter-select select {
-  background: transparent;
-  border: 0;
-  color: var(--color-text);
-  flex: 1 1 auto;
+.ui-select-value {
   font-weight: 750;
-  min-height: 32px;
   min-width: 0;
-  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.ui-table-filter-select:focus-within {
+.ui-select-trigger svg {
+  flex: 0 0 auto;
+}
+
+.ui-select-menu[data-open="true"] .ui-select-trigger,
+.ui-select-trigger:focus-visible {
   border-color: var(--color-brand);
   box-shadow: 0 0 0 3px var(--color-focus);
+  outline: 0;
 }
 
-.ui-table-filter-select select:focus {
-  box-shadow: none;
+.ui-select-popover {
+  background: var(--color-surface);
+  border: 1px solid var(--catalog-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-raised);
+  display: grid;
+  gap: 4px;
+  left: 0;
+  max-height: min(280px, calc(100vh - 140px));
+  min-width: 100%;
+  overflow: auto;
+  padding: 6px;
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 35;
+}
+
+.ui-select-option {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--color-text);
+  cursor: pointer;
+  display: grid;
+  font-weight: 760;
+  gap: var(--space-2);
+  grid-template-columns: minmax(0, 1fr) 16px;
+  min-height: 34px;
+  min-width: 0;
+  padding: 0 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.ui-select-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-select-option:hover,
+.ui-select-option:focus-visible {
+  background: color-mix(in srgb, var(--catalog-teal) 8%, var(--color-surface));
   outline: 0;
+}
+
+.ui-select-option.is-selected {
+  background: color-mix(in srgb, var(--catalog-teal) 12%, var(--color-surface));
+  color: color-mix(in srgb, var(--catalog-teal) 72%, var(--color-text));
+}
+
+.ui-select-option svg {
+  color: color-mix(in srgb, var(--catalog-teal) 78%, var(--color-text));
 }
 
 .ui-table-filter-extra {

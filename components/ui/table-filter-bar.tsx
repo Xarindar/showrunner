@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Search, X } from "lucide-react";
 import { Button, ButtonAnchor } from "./button";
+import { SelectMenu } from "./select-menu";
 import { cx } from "./utils";
 
 export type TableFilterSelect = {
@@ -59,16 +60,15 @@ export function TableFilterBar({
         </span>
 
         {selects.map((select) => (
-          <label className="ui-table-filter-select" htmlFor={select.id} key={select.id}>
-            <span>{select.label}</span>
-            <select id={select.id} name={select.name} defaultValue={select.value}>
-              {select.options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectMenu
+            className="ui-table-filter-select"
+            id={select.id}
+            key={select.id}
+            label={select.label}
+            name={select.name}
+            options={select.options}
+            value={select.value}
+          />
         ))}
 
         <Button size="sm" type="submit" variant="secondary">
