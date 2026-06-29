@@ -4,13 +4,15 @@ import { cx } from "./utils";
 type SwitchProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
   description?: ReactNode;
   label?: ReactNode;
+  variant?: "card" | "inline";
 };
 
-export function Switch({ className, description, label, ...props }: SwitchProps) {
+export function Switch({ className, description, label, variant = "card", ...props }: SwitchProps) {
   const hasCopy = Boolean(label || description);
+  const copyClassName = variant === "inline" ? "ui-switch-inline" : "ui-switch-with-copy";
 
   return (
-    <label className={cx("ui-switch", hasCopy && "ui-switch-with-copy", className)}>
+    <label className={cx("ui-switch", hasCopy && copyClassName, className)}>
       {hasCopy ? (
         <span className="ui-switch-copy">
           {label ? <strong>{label}</strong> : null}

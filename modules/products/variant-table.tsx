@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { Save } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button, Switch } from "@/components/ui";
 import { cx } from "@/components/ui/utils";
 import { useEditorTabBadge } from "./product-editor-tabs";
 
@@ -91,16 +91,16 @@ export function VariantTable({ productId, updateAction, variants }: VariantTable
                   <input aria-label="SKU" defaultValue={variant.sku} form={formId} name="sku" />
                 </td>
                 <td className="variant-check-cell">
-                  <input aria-label="Track inventory" defaultChecked={variant.trackInventory} form={formId} name="trackInventory" type="checkbox" />
+                  <Switch aria-label="Track inventory" defaultChecked={variant.trackInventory} form={formId} name="trackInventory" />
                 </td>
                 <td>
                   <input aria-label="Quantity" defaultValue={variant.inventoryQuantity} form={formId} min="0" name="inventoryQuantity" type="number" />
                 </td>
                 <td className="variant-check-cell">
-                  <input aria-label="Default variant" defaultChecked={variant.isDefault} form={formId} name="isDefault" type="checkbox" />
+                  <Switch aria-label="Default variant" defaultChecked={variant.isDefault} form={formId} name="isDefault" />
                 </td>
                 <td className="variant-check-cell">
-                  <input aria-label="Active" defaultChecked={variant.isActive} form={formId} name="isActive" type="checkbox" />
+                  <Switch aria-label="Active" defaultChecked={variant.isActive} form={formId} name="isActive" />
                 </td>
                 <td>
                   <Button

@@ -22,7 +22,7 @@ import { enumLabel, stringArrayCsv } from "@/lib/format";
 import { isCloudflareImagesConfigured, isR2Configured, isServerAssetStorageConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { AssetPicker, Button, ButtonLink, SwitchReveal, type AssetPickerAsset } from "@/components/ui";
+import { AssetPicker, Button, ButtonLink, Switch, SwitchReveal, type AssetPickerAsset } from "@/components/ui";
 import {
   assignProductCategoryAction,
   attachProductMediaAction,
@@ -39,6 +39,7 @@ import {
   uploadProductMediaAction
 } from "./actions";
 import { ProductEditorTabs, type ProductEditorTab } from "./product-editor-tabs";
+import { ProductSlugFields } from "./product-slug-fields";
 import { VariantTable, type VariantRow } from "./variant-table";
 
 type ProductEditPageProps = {
@@ -63,6 +64,12 @@ type ProductWithEditorData = Prisma.ProductGetPayload<{
 
 function moneyInput(cents?: number | null) {
   return typeof cents === "number" ? (cents / 100).toFixed(2) : "";
+}
+
+function percentLabel(basisPoints?: number | null) {
+  if (typeof basisPoints !== "number") return "0%";
+  const percent = basisPoints / 100;
+  return `${Number.isInteger(percent) ? percent.toFixed(0) : percent.toFixed(2)}%`;
 }
 
 function statusClass(status: ProductStatus) {
@@ -192,6 +199,9 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
   const showBundleTab = isBundle || product.bundleComponents.length > 0;
   const priceIsZero = product.basePriceCents === 0;
   const showZeroPriceWarning = priceIsZero && product.status !== ProductStatus.ARCHIVED;
+  const taxRuleSummary = settings.commerceTaxEnabled
+    ? `${settings.commerceTaxLabel || "Sales tax"} · ${percentLabel(settings.commerceTaxRateBps)}`
+    : "Tax is disabled in Payments settings";
 
   const mediaAssetOptions: AssetPickerAsset[] = mediaAssets.map((asset) => ({
     alt: asset.alt || asset.filename,
@@ -237,17 +247,28 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
               <div className="product-details-media">
                 <p className="catalog-rail-label">Product images</p>
                 <div className="product-image-manager">
-                  <div className={selectedMediaUrl ? "product-image-stage has-image" : "product-image-stage"}>
-                    {selectedMediaUrl ? (
-                      <a aria-label="Open selected product image full size" className="product-image-preview-link" href={selectedMediaUrl} rel="noreferrer" target="_blank">
+                  <div className="product-image-stage-shell">
+                    <AssetPicker
+                      assets={mediaAssetOptions}
+                      attachFields={{ productId: product.id, returnTab: "details", role: ProductMediaRole.GALLERY }}
+                      attachFormId={detailsAttachFormId}
+                      canUpload={canUpload}
+                      defaultAlt={product.name}
+                      emptyLibraryMessage="No reusable product assets yet."
+                      title="Add product image"
+                      triggerClassName={selectedMediaUrl ? "product-image-stage product-image-stage-trigger has-image" : "product-image-stage product-image-stage-trigger"}
+                      triggerHint=""
+                      uploadFields={{ productId: product.id, returnTab: "details", role: ProductMediaRole.GALLERY }}
+                      uploadFormId={detailsUploadFormId}>
+                      {selectedMediaUrl ? (
                         <NextImage alt={selectedMedia?.alt || product.name} fill priority sizes="(max-width: 760px) 100vw, (max-width: 1280px) 300px, 320px" src={selectedMediaUrl} unoptimized />
-                      </a>
-                    ) : (
-                      <span className="studio-media-empty">
-                        <ImageIcon size={26} />
-                        <span>No product image</span>
-                      </span>
-                    )}
+                      ) : (
+                        <span className="studio-media-empty">
+                          <ImageIcon size={26} />
+                          <span>No product image</span>
+                        </span>
+                      )}
+                    </AssetPicker>
                     {selectedMedia ? (
                       selectedMediaIsPrimary ? (
                         <span aria-label="This is the main image customers see" className="product-image-primary-star is-active" title="Main image customers see">
@@ -265,29 +286,6 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
                           <Star size={16} />
                         </Button>
                       )
-                    ) : null}
-                  </div>
-                  <div className="product-image-toolbar">
-                    <AssetPicker
-                      assets={mediaAssetOptions}
-                      attachFields={{ productId: product.id, returnTab: "details", role: ProductMediaRole.GALLERY }}
-                      attachFormId={detailsAttachFormId}
-                      canUpload={canUpload}
-                      defaultAlt={product.name}
-                      emptyLibraryMessage="No reusable product assets yet."
-                      title="Add product image"
-                      triggerClassName="ui-button ui-button-secondary ui-button-sm product-image-picker-action"
-                      triggerHint=""
-                      uploadFields={{ productId: product.id, returnTab: "details", role: ProductMediaRole.GALLERY }}
-                      uploadFormId={detailsUploadFormId}>
-                      <Images size={15} />
-                      Add image
-                    </AssetPicker>
-                    {selectedMediaUrl ? (
-                      <a className="product-image-open-link" href={selectedMediaUrl} rel="noreferrer" target="_blank">
-                        <ExternalLink size={14} />
-                        Full size
-                      </a>
                     ) : null}
                   </div>
                   {product.media.length ? (
@@ -319,25 +317,17 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
                         );
                       })}
                     </div>
-                  ) : null}
+                  ) : (
+                    <div aria-hidden="true" className="product-image-strip is-empty">
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <span className="product-image-thumb-skeleton" key={index} />
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {!canUpload ? <p className="muted-text">Enable Server asset folder, R2, or Cloudflare Images in Settings to upload.</p> : null}
               </div>
               <div className="catalog-form-grid">
-                <div className="ui-field">
-                  <label htmlFor={`product-${product.id}-name`}>Title</label>
-                  <input defaultValue={product.name} id={`product-${product.id}-name`} name="name" required />
-                </div>
-                <div className="catalog-form-grid is-two">
-                  <div className="ui-field">
-                    <label htmlFor={`product-${product.id}-slug`}>Shop URL slug</label>
-                    <input defaultValue={product.slug} id={`product-${product.id}-slug`} name="slug" />
-                  </div>
-                  <div className="ui-field">
-                    <label htmlFor={`product-${product.id}-summary`}>Short summary</label>
-                    <input defaultValue={product.summary} id={`product-${product.id}-summary`} name="summary" />
-                  </div>
-                </div>
+                <ProductSlugFields productId={product.id} slug={product.slug} summary={product.summary} title={product.name} />
                 <div className="ui-field">
                   <label htmlFor={`product-${product.id}-description`}>Description</label>
                   <textarea defaultValue={product.description} id={`product-${product.id}-description`} name="description" />
@@ -373,15 +363,23 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
                 This product is $0.00 — customers can buy it for free. Set a price before activating if that is not intended.
               </p>
             ) : null}
-            <div className="catalog-form-grid is-two">
+            <div className="catalog-form-grid is-two product-pricing-meta">
               <div className="ui-field">
                 <label htmlFor={`product-${product.id}-sku`}>SKU</label>
                 <input defaultValue={product.sku || defaultVariant?.sku || ""} id={`product-${product.id}-sku`} name="sku" />
               </div>
-              <label className="ui-check-row product-editor-inline-check">
-                <input defaultChecked={product.taxable} name="taxable" type="checkbox" />
-                Charge tax on this product
-              </label>
+              <div className="ui-switch-reveal-list product-tax-switch">
+                <SwitchReveal
+                  defaultChecked={product.taxable}
+                  description="Include this item in the taxable checkout subtotal."
+                  label="Charge tax on this product"
+                  name="taxable">
+                  <div className="ui-field ui-reveal-field">
+                    <label htmlFor={`product-${product.id}-tax-rule`}>Tax rule</label>
+                    <input id={`product-${product.id}-tax-rule`} readOnly value={taxRuleSummary} />
+                  </div>
+                </SwitchReveal>
+              </div>
             </div>
           </section>
 
@@ -611,18 +609,9 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
               </div>
             </div>
             <div className="studio-toggle-strip">
-              <label className="ui-check-row">
-                <input name="trackInventory" type="checkbox" />
-                Track inventory
-              </label>
-              <label className="ui-check-row">
-                <input name="isDefault" type="checkbox" />
-                Default
-              </label>
-              <label className="ui-check-row">
-                <input defaultChecked name="isActive" type="checkbox" />
-                Active
-              </label>
+              <Switch label="Track inventory" name="trackInventory" variant="inline" />
+              <Switch label="Default" name="isDefault" variant="inline" />
+              <Switch defaultChecked label="Active" name="isActive" variant="inline" />
             </div>
             <Button type="submit" variant="secondary">
               <Plus size={16} />
@@ -859,10 +848,7 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
               <label htmlFor="bundleSort">Sort</label>
               <input defaultValue={product.bundleComponents.length} id="bundleSort" name="sortOrder" type="number" />
             </div>
-            <label className="ui-check-row product-editor-inline-check">
-              <input name="isOptional" type="checkbox" />
-              Optional component
-            </label>
+            <Switch label="Optional component" name="isOptional" variant="inline" />
           </div>
           <div className="ui-field">
             <label htmlFor="bundleNotes">Notes</label>

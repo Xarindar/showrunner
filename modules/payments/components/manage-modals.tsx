@@ -3,7 +3,7 @@
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CreditCard, KeyRound, Loader2, Plus, ReceiptText, RefreshCw, TicketPercent, Unplug } from "lucide-react";
-import { Button, SwitchReveal } from "@/components/ui";
+import { Button, Switch, SwitchReveal } from "@/components/ui";
 import { MethodMark } from "./brand-marks";
 import {
   createCouponAction,
@@ -72,8 +72,8 @@ export function MethodsModal({
           const checked = enabledKeys.includes(option.key);
           const showApplePay = option.key === "APPLE_PAY" ? applePayStatus : "";
           return (
-            <label className="module-toggle-row" key={option.key}>
-              <input defaultChecked={checked} name="stripePaymentMethods" type="checkbox" value={option.key} />
+            <div className="module-toggle-row" key={option.key}>
+              <Switch aria-label={`Enable ${option.label}`} defaultChecked={checked} name="stripePaymentMethods" value={option.key} />
               <span className="module-toggle-main">
                 <span>
                   <MethodMark methodKey={option.key} size={15} />
@@ -88,7 +88,7 @@ export function MethodsModal({
                 </span>
                 <small>{methodHelpText(option)}</small>
               </span>
-            </label>
+            </div>
           );
         })}
       </div>
@@ -122,8 +122,8 @@ export function CouponModal({ onClose }: { onClose: () => void }) {
         Create a reusable checkout discount code. Percent coupons use the percent field; fixed amount coupons use the fixed amount field.
       </p>
       <div className="module-toggle-grid">
-        <label className="module-toggle-row">
-          <input name="isActive" type="checkbox" defaultChecked />
+        <div className="module-toggle-row">
+          <Switch aria-label="Active at checkout" name="isActive" defaultChecked />
           <span className="module-toggle-main">
             <span>
               <TicketPercent size={15} />
@@ -131,7 +131,7 @@ export function CouponModal({ onClose }: { onClose: () => void }) {
             </span>
             <small>Active coupons can be entered by customers in the cart.</small>
           </span>
-        </label>
+        </div>
       </div>
       <div className="form-grid">
         <div className="ui-field">
@@ -268,10 +268,13 @@ export function CheckoutTotalsModal({
               <input id="commerceTaxRate" name="commerceTaxRate" inputMode="decimal" defaultValue={percentInput(settings.taxRateBps)} />
             </div>
           </div>
-          <label className="ui-check-row ui-reveal-check">
-            <input name="commerceTaxAppliesToShipping" type="checkbox" defaultChecked={settings.taxAppliesToShipping} />
-            Tax shipping
-          </label>
+          <Switch
+            className="ui-reveal-check"
+            defaultChecked={settings.taxAppliesToShipping}
+            label="Tax shipping"
+            name="commerceTaxAppliesToShipping"
+            variant="inline"
+          />
         </SwitchReveal>
         <SwitchReveal
           defaultChecked={settings.shippingEnabled}
