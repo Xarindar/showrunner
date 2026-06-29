@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
-import { Boxes, CalendarCheck, Clock3, ExternalLink, Plus, Tags } from "lucide-react";
+import { Boxes, CalendarCheck, Plus } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Button, ButtonLink, FolderTabs, Switch, type FolderTab, type SelectMenuOption } from "@/components/ui";
+import { Button, FolderTabs, Switch, type FolderTab, type SelectMenuOption } from "@/components/ui";
 import {
   addServicePackageItemAction,
   createServiceAction,
@@ -285,39 +285,8 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
 
   return (
     <div className="products-workspace service-workspace">
-      <header className="product-studio-header service-studio-header">
-        <div className="product-studio-title">
-          <div className="service-header-mark" aria-hidden="true">
-            <CalendarCheck size={20} />
-          </div>
-          <div>
-            <p className="catalog-kicker">Services</p>
-            <h1>Services</h1>
-            <p>Build a catalog of base services and combine them into packages.</p>
-          </div>
-          <div className="product-studio-badges">
-            <span className="catalog-pill is-green">
-              <Clock3 size={14} />
-              {activeServices} active services
-            </span>
-            <span className="catalog-pill is-blue">
-              <Tags size={14} />
-              {categories.length} categories
-            </span>
-          </div>
-        </div>
-        <div className="product-studio-actions">
-          <ButtonLink href="/book" rel="noreferrer" size="sm" target="_blank" variant="secondary">
-            <ExternalLink size={15} />
-            View booking
-          </ButtonLink>
-          <ServiceCreateMenu
-            items={[
-              { content: createServiceForm, description: "Create a bookable catalog service.", id: "service-header", label: "Service", title: "Create service", type: "service" },
-              { content: createPackageForm, description: "Compose multiple services together.", id: "package-header", label: "Package", title: "Create package", type: "package" }
-            ]}
-          />
-        </div>
+      <header className="products-page-header">
+        <h1>Services</h1>
       </header>
 
       {savedMessage ? <div className="success-message">{savedMessage}</div> : null}

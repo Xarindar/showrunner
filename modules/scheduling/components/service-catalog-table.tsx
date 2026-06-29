@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { Boxes, CalendarCheck, Search, X } from "lucide-react";
+import { Boxes, CalendarCheck, ExternalLink, Search, X } from "lucide-react";
 import { Button, ButtonLink, SelectMenu, type SelectMenuOption } from "@/components/ui";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
@@ -111,6 +111,10 @@ export function ServiceCatalogTable({
             <Boxes size={15} />
             {activePackages} packages
           </span>
+          <ButtonLink href="/book" rel="noreferrer" size="sm" target="_blank" variant="secondary">
+            <ExternalLink size={15} />
+            View booking
+          </ButtonLink>
           {createAction}
         </div>
       </div>
