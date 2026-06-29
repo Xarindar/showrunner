@@ -233,8 +233,8 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
                   <td>{item.quantity}</td>
                   <td>{item.sortOrder}</td>
                   <td>
-                    <ButtonLink href="/admin/modules/services?tab=packages" size="sm" variant="secondary">
-                      Edit packages
+                    <ButtonLink href={`/admin/modules/services/packages/${item.package.id}`} size="sm" variant="secondary">
+                      Edit package
                     </ButtonLink>
                   </td>
                 </tr>
@@ -246,7 +246,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
         <div className="catalog-empty-state">
           <Boxes size={28} />
           <h3>No package memberships</h3>
-          <p>Add this service to a package from the package builder.</p>
+          <p>Open a package to add this service to its builder.</p>
           <ButtonLink href="/admin/modules/services?tab=packages" variant="secondary">
             Open packages
           </ButtonLink>

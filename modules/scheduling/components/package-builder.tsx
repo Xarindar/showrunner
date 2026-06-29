@@ -110,7 +110,7 @@ export function PackageBuilder({
           </span>
         </div>
 
-        {packages.length ? (
+        {packages.length > 1 ? (
           <label className="service-package-target-select" htmlFor="package-add-target">
             <span>Add buttons target</span>
             <select id="package-add-target" value={selectedPackage?.id || ""} onChange={(event) => setSelectedPackageId(event.target.value)}>

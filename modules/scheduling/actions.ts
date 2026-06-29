@@ -91,6 +91,11 @@ function serviceEditPath(serviceId: string, params?: Record<string, string>) {
   return `${SERVICES_ADMIN_PATH}/${serviceId}${query ? `?${query}` : ""}`;
 }
 
+function servicePackageEditPath(packageId: string, params?: Record<string, string>) {
+  const query = new URLSearchParams(params).toString();
+  return `${SERVICES_ADMIN_PATH}/packages/${packageId}${query ? `?${query}` : ""}`;
+}
+
 function appointmentRulesPath(tab: "availability" | "team" | "calendar", params?: Record<string, string>) {
   const query = new URLSearchParams({ panel: "rules", tab, ...params }).toString();
   return `${APPOINTMENTS_ADMIN_PATH}?${query}`;
@@ -318,7 +323,7 @@ export async function createServicePackageAction(formData: FormData) {
     slug: input.slug
   });
 
-  await prisma.servicePackage.create({
+  const servicePackage = await prisma.servicePackage.create({
     data: {
       siteId: settings.siteId,
       slug,
@@ -331,7 +336,8 @@ export async function createServicePackageAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "package", tab: "packages" }));
+  revalidatePath(servicePackageEditPath(servicePackage.id));
+  redirect(servicePackageEditPath(servicePackage.id, { saved: "created" }));
 }
 
 export async function updateServicePackageAction(formData: FormData) {
@@ -370,7 +376,8 @@ export async function updateServicePackageAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "package", tab: "packages" }));
+  revalidatePath(servicePackageEditPath(input.id));
+  redirect(servicePackageEditPath(input.id, { saved: "package" }));
 }
 
 export async function addServicePackageItemAction(formData: FormData) {
@@ -388,10 +395,10 @@ export async function addServicePackageItemAction(formData: FormData) {
   ]);
 
   if (!servicePackage || !service) {
-    redirect(servicesAdminPath({ error: "Choose a valid service and package.", tab: "packages" }));
+    redirect(servicePackageEditPath(input.packageId, { error: "Choose a valid service and package." }));
   }
   if (existing) {
-    redirect(servicesAdminPath({ error: "That service is already in this package.", tab: "packages" }));
+    redirect(servicePackageEditPath(input.packageId, { error: "That service is already in this package." }));
   }
 
   await prisma.servicePackageItem.create({
@@ -406,7 +413,8 @@ export async function addServicePackageItemAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "package-item", tab: "packages" }));
+  revalidatePath(servicePackageEditPath(input.packageId));
+  redirect(servicePackageEditPath(input.packageId, { saved: "package-item" }));
 }
 
 export async function removeServicePackageItemAction(formData: FormData) {
@@ -422,11 +430,12 @@ export async function removeServicePackageItemAction(formData: FormData) {
   });
 
   if (deleted.count !== 1) {
-    redirect(servicesAdminPath({ error: "Package item not found.", tab: "packages" }));
+    redirect(servicePackageEditPath(input.packageId, { error: "Package item not found." }));
   }
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "package-item", tab: "packages" }));
+  revalidatePath(servicePackageEditPath(input.packageId));
+  redirect(servicePackageEditPath(input.packageId, { saved: "package-item" }));
 }
 
 export async function createStaffMemberAction(formData: FormData) {

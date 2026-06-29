@@ -29,6 +29,7 @@ export function ServiceCreateMenu({ items }: ServiceCreateMenuProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const activeItem = items.find((item) => item.id === activeId);
+  const singleItem = items.length === 1 ? items[0] : null;
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -49,13 +50,24 @@ export function ServiceCreateMenu({ items }: ServiceCreateMenuProps) {
   return (
     <>
       <div className="catalog-create-menu" ref={ref}>
-        <Button aria-expanded={menuOpen} aria-haspopup="menu" onClick={() => setMenuOpen((value) => !value)} size="sm" type="button">
+        <Button
+          aria-expanded={singleItem ? undefined : menuOpen}
+          aria-haspopup={singleItem ? undefined : "menu"}
+          onClick={() => {
+            if (singleItem) {
+              setActiveId(singleItem.id);
+              return;
+            }
+            setMenuOpen((value) => !value);
+          }}
+          size="sm"
+          type="button">
           <Plus size={15} />
           New service
-          <ChevronDown size={14} />
+          {singleItem ? null : <ChevronDown size={14} />}
         </Button>
 
-        {menuOpen ? (
+        {menuOpen && !singleItem ? (
           <div className="catalog-create-popover" role="menu">
             {items.map((item) => {
               const Icon = icons[item.type];

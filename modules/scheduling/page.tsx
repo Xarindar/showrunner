@@ -6,16 +6,12 @@ import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { Button, FolderTabs, Switch, type FolderTab, type SelectMenuOption } from "@/components/ui";
 import {
-  addServicePackageItemAction,
   createServiceAction,
-  createServicePackageAction,
-  removeServicePackageItemAction,
-  toggleServiceAction,
-  updateServicePackageAction
+  toggleServiceAction
 } from "./actions";
-import { PackageBuilder, type PackageBuilderPackage, type PackageBuilderService } from "./components/package-builder";
 import { ServiceCatalogTable, type ServiceCatalogTableService } from "./components/service-catalog-table";
 import { ServiceCreateMenu } from "./components/service-create-menu";
+import { ServicePackageTable, type ServicePackageTablePackage } from "./components/service-package-table";
 
 export const dynamic = "force-dynamic";
 
@@ -61,26 +57,6 @@ function savedServiceMessage(saved?: string) {
   return null;
 }
 
-function toPackageBuilderService(service: {
-  category: string;
-  description: string | null;
-  durationMinutes: number;
-  id: string;
-  isActive: boolean;
-  name: string;
-  tags: Prisma.JsonValue;
-}): PackageBuilderService {
-  return {
-    category: serviceCategory(service),
-    description: service.description || "",
-    durationMinutes: service.durationMinutes,
-    id: service.id,
-    isActive: service.isActive,
-    name: service.name,
-    tags: serviceTags(service)
-  };
-}
-
 function toServiceCatalogTableService(service: ServiceCatalogItem): ServiceCatalogTableService {
   return {
     bookingPath: `/book/${service.slug}`,
@@ -96,21 +72,21 @@ function toServiceCatalogTableService(service: ServiceCatalogItem): ServiceCatal
   };
 }
 
-function toPackageBuilderPackage(servicePackage: ServicePackageWithItems): PackageBuilderPackage {
+function toServicePackageTablePackage(servicePackage: ServicePackageWithItems): ServicePackageTablePackage {
+  const serviceNames = servicePackage.items.map((item) => item.service.name);
+  const durationMinutes = servicePackage.items.reduce((total, item) => total + item.quantity * item.service.durationMinutes, 0);
+
   return {
+    bookingPath: `/book/packages/${servicePackage.slug}`,
     description: servicePackage.description,
+    durationMinutes,
     id: servicePackage.id,
     isActive: servicePackage.isActive,
+    itemCount: servicePackage.items.length,
     name: servicePackage.name,
-    slug: servicePackage.slug,
+    serviceNames,
     sortOrder: servicePackage.sortOrder,
-    tags: jsonStringArray(servicePackage.tags),
-    items: servicePackage.items.map((item) => ({
-      id: item.id,
-      quantity: item.quantity,
-      service: toPackageBuilderService(item.service),
-      sortOrder: item.sortOrder
-    }))
+    tags: jsonStringArray(servicePackage.tags)
   };
 }
 
@@ -215,37 +191,6 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
     </form>
   );
 
-  const createPackageForm = (
-    <form action={createServicePackageAction} className="catalog-form-grid">
-      <p className="muted-text">Packages group base services together, such as a head spa plus a premium face mask.</p>
-      <div className="ui-field">
-        <label htmlFor="new-package-name">Package name</label>
-        <input autoFocus id="new-package-name" name="name" placeholder="Glow reset package" required />
-      </div>
-      <div className="catalog-form-grid is-two">
-        <div className="ui-field">
-          <label htmlFor="new-package-slug">Package slug</label>
-          <input id="new-package-slug" name="slug" placeholder="glow-reset" />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="new-package-tags">Tags</label>
-          <input id="new-package-tags" name="tags" placeholder="spa, premium" />
-        </div>
-      </div>
-      <div className="ui-field">
-        <label htmlFor="new-package-description">Description</label>
-        <textarea id="new-package-description" name="description" />
-      </div>
-      <Switch defaultChecked label="Active" name="isActive" variant="inline" />
-      <div className="module-modal-actions">
-        <Button type="submit">
-          <Boxes size={18} />
-          Create package
-        </Button>
-      </div>
-    </form>
-  );
-
   const servicesContent = (
     <ServiceCatalogTable
       activePackages={activePackages}
@@ -254,8 +199,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       createAction={
         <ServiceCreateMenu
           items={[
-            { content: createServiceForm, description: "Create a bookable catalog service.", id: "service", label: "Service", title: "Create service", type: "service" },
-            { content: createPackageForm, description: "Compose multiple services together.", id: "package", label: "Package", title: "Create package", type: "package" }
+            { content: createServiceForm, description: "Create a bookable catalog service.", id: "service", label: "Service", title: "Create service", type: "service" }
           ]}
         />
       }
@@ -269,13 +213,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   );
 
   const packagesContent = (
-    <PackageBuilder
-      addPackageItemAction={addServicePackageItemAction}
-      packages={servicePackages.map(toPackageBuilderPackage)}
-      removePackageItemAction={removeServicePackageItemAction}
-      services={services.map(toPackageBuilderService)}
-      updatePackageAction={updateServicePackageAction}
-    />
+    <ServicePackageTable activePackages={activePackages} packages={servicePackages.map(toServicePackageTablePackage)} />
   );
 
   const tabs: FolderTab[] = [
