@@ -79,7 +79,7 @@ export function FolderTabs({
   };
 
   return (
-    <section className={cx("ui-folder-tabs", className)}>
+    <section className={cx("ui-folder-tabs", className)} data-first-tab-active={activeId === firstTabId ? "true" : undefined}>
       <div aria-label={ariaLabel} className="ui-folder-tablist" role="tablist">
         {tabs.map((tab, index) => {
           const selected = tab.id === activeId;
