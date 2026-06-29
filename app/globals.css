@@ -3767,9 +3767,9 @@ button.button:disabled,
   align-items: flex-end;
   display: flex;
   gap: 0;
+  margin-bottom: -1px;
   min-width: 0;
   overflow-x: auto;
-  padding: 0 var(--space-3);
   position: relative;
   scrollbar-width: thin;
   z-index: 4;
@@ -3780,7 +3780,6 @@ button.button:disabled,
   appearance: none;
   background: color-mix(in srgb, var(--color-surface-sunken) 68%, var(--color-surface));
   border: 1px solid color-mix(in srgb, var(--catalog-border) 88%, var(--color-muted));
-  border-bottom: 0;
   border-radius: 8px 8px 0 0;
   color: var(--color-muted);
   cursor: pointer;
@@ -3817,16 +3816,17 @@ button.button:disabled,
 .ui-folder-tab.is-active {
   background: var(--catalog-panel);
   border-color: var(--catalog-border);
+  border-bottom-color: var(--catalog-panel);
   color: var(--color-text);
-  transform: translateY(1px);
+  transform: translateY(0);
   z-index: 5;
 }
 
 .ui-folder-tab.is-active::after {
   background: var(--catalog-panel);
-  bottom: -2px;
+  bottom: -1px;
   content: "";
-  height: 3px;
+  height: 2px;
   left: 0;
   position: absolute;
   right: 0;
@@ -3865,10 +3865,6 @@ button.button:disabled,
 }
 
 @media (max-width: 760px) {
-  .ui-folder-tablist {
-    padding-inline: var(--space-2);
-  }
-
   .ui-folder-tab {
     min-width: 104px;
     padding-inline: var(--space-3);
