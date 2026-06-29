@@ -1,0 +1,292 @@
+import { notFound } from "next/navigation";
+import type { Prisma } from "@prisma/client";
+import { ArrowLeft, Boxes, CalendarCheck, Clock3, ExternalLink, FileText, Save, Tags } from "lucide-react";
+import { requireAdmin } from "@/lib/auth";
+import { stringArrayCsv } from "@/lib/format";
+import { prisma } from "@/lib/prisma";
+import { getSiteSettings } from "@/lib/site";
+import { Button, ButtonLink, Switch } from "@/components/ui";
+import { updateServiceAction } from "./actions";
+import { ServiceWorkspaceTabs, type ServiceWorkspaceTab } from "./components/service-workspace-tabs";
+
+type ServiceEditPageProps = {
+  searchParams: Promise<{ error?: string; saved?: string; tab?: string }>;
+  serviceId: string;
+};
+
+type ServiceWithBuilderData = Prisma.ServiceGetPayload<{
+  include: {
+    packageItems: {
+      include: {
+        package: true;
+      };
+    };
+  };
+}>;
+
+function serviceTags(service: ServiceWithBuilderData) {
+  return stringArrayCsv(service.tags);
+}
+
+function serviceDurationLabel(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`;
+}
+
+function savedServiceMessage(saved?: string) {
+  if (saved === "created") return "Service created. Build out the details below.";
+  if (saved === "service") return "Service changes saved.";
+  if (saved) return "Service updated.";
+  return null;
+}
+
+function serviceStatusClass(isActive: boolean) {
+  return isActive ? "catalog-status is-active" : "catalog-status is-draft";
+}
+
+function hiddenSchedulingValues(service: ServiceWithBuilderData) {
+  return (
+    <>
+      <input name="bufferBeforeMinutes" type="hidden" value={service.bufferBeforeMinutes} />
+      <input name="bufferAfterMinutes" type="hidden" value={service.bufferAfterMinutes} />
+      <input name="minimumNoticeHours" type="hidden" value={service.minimumNoticeHours} />
+      <input name="maxAdvanceDays" type="hidden" value={service.maxAdvanceDays} />
+      <input name="slotIntervalMinutes" type="hidden" value={service.slotIntervalMinutes} />
+    </>
+  );
+}
+
+export default async function ServiceEditPage({ searchParams, serviceId }: ServiceEditPageProps) {
+  await requireAdmin("scheduling:manage");
+  const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
+  const service = await prisma.service.findFirst({
+    where: { id: serviceId, siteId: settings.siteId },
+    include: {
+      packageItems: {
+        include: { package: true },
+        orderBy: [{ package: { sortOrder: "asc" } }, { createdAt: "asc" }]
+      }
+    }
+  });
+
+  if (!service) notFound();
+
+  const savedMessage = savedServiceMessage(params.saved);
+  const errorMessage = params.error ? decodeURIComponent(params.error) : null;
+  const bookingPath = `/book/${service.slug}`;
+  const tagsValue = serviceTags(service);
+  const packageCount = service.packageItems.length;
+
+  const detailsContent = (
+    <form action={updateServiceAction} className="product-studio-save-grid" id="service-core-form">
+      <input name="id" type="hidden" value={service.id} />
+      {hiddenSchedulingValues(service)}
+      <main className="product-studio-main">
+        <section className="studio-panel">
+          <div className="studio-section-head">
+            <div>
+              <p className="catalog-rail-label">Service details</p>
+              <h2>Name, category &amp; description</h2>
+            </div>
+            <FileText size={20} />
+          </div>
+
+          <div className="catalog-form-grid is-two">
+            <div className="ui-field">
+              <label htmlFor="service-name">Service name</label>
+              <input defaultValue={service.name} id="service-name" name="name" required />
+            </div>
+            <div className="ui-field">
+              <label htmlFor="service-slug">Booking URL slug</label>
+              <input defaultValue={service.slug} id="service-slug" name="slug" />
+            </div>
+          </div>
+
+          <div className="catalog-form-grid is-three">
+            <div className="ui-field">
+              <label htmlFor="service-duration">Duration</label>
+              <input defaultValue={service.durationMinutes} id="service-duration" min="1" name="durationMinutes" step="5" type="number" required />
+            </div>
+            <div className="ui-field">
+              <label htmlFor="service-category">Category</label>
+              <input defaultValue={service.category} id="service-category" name="category" />
+            </div>
+            <div className="ui-field">
+              <label htmlFor="service-location">Location label</label>
+              <input defaultValue={service.location || ""} id="service-location" name="location" />
+            </div>
+          </div>
+
+          <div className="ui-field">
+            <label htmlFor="service-tags">Tags</label>
+            <input defaultValue={tagsValue} id="service-tags" name="tags" />
+          </div>
+
+          <div className="ui-field">
+            <label htmlFor="service-description">Description</label>
+            <textarea defaultValue={service.description || ""} id="service-description" name="description" />
+          </div>
+        </section>
+
+        <section className="studio-panel">
+          <div className="studio-section-head">
+            <div>
+              <p className="catalog-rail-label">Booking copy</p>
+              <h2>Customer prompts &amp; policy</h2>
+            </div>
+            <CalendarCheck size={20} />
+          </div>
+
+          <div className="catalog-form-grid is-two">
+            <div className="ui-field">
+              <label htmlFor="service-intake">Intake question</label>
+              <input defaultValue={service.intakePrompt || ""} id="service-intake" name="intakePrompt" />
+            </div>
+            <div className="ui-field">
+              <label htmlFor="service-policy">Booking policy</label>
+              <input defaultValue={service.policyText || ""} id="service-policy" name="policyText" />
+            </div>
+          </div>
+
+          <div className="studio-toggle-strip">
+            <Switch
+              defaultChecked={service.requirePolicy && Boolean(service.policyText?.trim())}
+              label="Require policy acceptance"
+              name="requirePolicy"
+              variant="inline"
+            />
+            <Switch defaultChecked={service.requestOnly} label="Request-only approval" name="requestOnly" variant="inline" />
+            <Switch defaultChecked={service.waitlistEnabled} label="Offer waitlist" name="waitlistEnabled" variant="inline" />
+            <Switch defaultChecked={service.isActive} label="Active" name="isActive" variant="inline" />
+          </div>
+        </section>
+      </main>
+
+      <aside className="product-studio-sidecar">
+        <section className="studio-panel">
+          <p className="catalog-rail-label">Status</p>
+          <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
+          <dl className="service-editor-summary">
+            <div>
+              <dt>Duration</dt>
+              <dd>{serviceDurationLabel(service.durationMinutes)}</dd>
+            </div>
+            <div>
+              <dt>Packages</dt>
+              <dd>{packageCount}</dd>
+            </div>
+            <div>
+              <dt>Booking URL</dt>
+              <dd>{bookingPath}</dd>
+            </div>
+          </dl>
+          <Button form="service-core-form" type="submit">
+            <Save size={16} />
+            Save service
+          </Button>
+          <ButtonLink href="/admin/modules/appointments?panel=rules&tab=availability" variant="secondary">
+            <Clock3 size={16} />
+            Appointment rules
+          </ButtonLink>
+          <ButtonLink href={bookingPath} rel="noreferrer" target="_blank" variant="ghost">
+            <ExternalLink size={16} />
+            Preview booking
+          </ButtonLink>
+        </section>
+      </aside>
+    </form>
+  );
+
+  const packagesContent = (
+    <section className="studio-panel">
+      <div className="studio-section-head">
+        <div>
+          <p className="catalog-rail-label">Packages</p>
+          <h2>Package membership</h2>
+        </div>
+        <Boxes size={20} />
+      </div>
+
+      {service.packageItems.length ? (
+        <div className="catalog-table-scroll">
+          <table className="catalog-product-table">
+            <thead>
+              <tr>
+                <th>Package</th>
+                <th>Status</th>
+                <th>Quantity</th>
+                <th>Sort</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {service.packageItems.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    <span className="catalog-cell-text" title={item.package.name}>{item.package.name}</span>
+                  </td>
+                  <td>
+                    <span className={serviceStatusClass(item.package.isActive)}>{item.package.isActive ? "active" : "draft"}</span>
+                  </td>
+                  <td>{item.quantity}</td>
+                  <td>{item.sortOrder}</td>
+                  <td>
+                    <ButtonLink href="/admin/modules/services?tab=packages" size="sm" variant="secondary">
+                      Edit packages
+                    </ButtonLink>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="catalog-empty-state">
+          <Boxes size={28} />
+          <h3>No package memberships</h3>
+          <p>Add this service to a package from the package builder.</p>
+          <ButtonLink href="/admin/modules/services?tab=packages" variant="secondary">
+            Open packages
+          </ButtonLink>
+        </div>
+      )}
+    </section>
+  );
+
+  const tabs: ServiceWorkspaceTab[] = [
+    { content: detailsContent, icon: <FileText size={15} />, id: "details", label: "Details" },
+    { content: packagesContent, icon: <Boxes size={15} />, id: "packages", label: "Packages" }
+  ];
+
+  return (
+    <div className="product-studio-page product-editor-page service-editor-page">
+      <header className="product-studio-header service-studio-header">
+        <div className="product-studio-title">
+          <ButtonLink href="/admin/modules/services" size="sm" variant="ghost">
+            <ArrowLeft size={15} />
+            Services
+          </ButtonLink>
+          <div>
+            <p className="catalog-kicker">Service builder</p>
+            <h1>{service.name}</h1>
+            <p>{service.description || service.category || "Build the catalog details customers see before booking."}</p>
+          </div>
+          <div className="product-studio-badges">
+            <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
+            <span className="catalog-pill is-blue">
+              <Tags size={14} />
+              {service.category || "Uncategorized"}
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
+      {errorMessage ? <div className="error">{errorMessage}</div> : null}
+
+      <ServiceWorkspaceTabs initialTab={params.tab} tabs={tabs} />
+    </div>
+  );
+}

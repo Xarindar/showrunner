@@ -3280,7 +3280,6 @@ button.button:disabled,
 }
 
 .service-header-mark,
-.service-row-thumb,
 .service-tile-mark {
   align-items: center;
   background: color-mix(in srgb, var(--catalog-blue) 11%, var(--color-surface));
@@ -3296,35 +3295,39 @@ button.button:disabled,
   width: 42px;
 }
 
-.service-row-thumb {
-  border-radius: 8px;
-  height: 44px;
-  width: 44px;
+.service-editor-summary {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
 }
 
-.service-table-tags {
+.service-editor-summary div {
+  border-bottom: 1px solid var(--catalog-border);
+  display: grid;
+  gap: 2px;
+  padding: 0 0 var(--space-2);
+}
+
+.service-editor-summary div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.service-editor-summary dt {
   color: var(--color-muted);
-  display: block;
   font-size: var(--type-caption);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.service-editor-summary dd {
+  font-weight: 800;
+  margin: 0;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.service-edit-row > td {
-  background: color-mix(in srgb, var(--color-surface-sunken) 34%, var(--color-surface));
-  height: auto;
-  padding: var(--space-2);
-}
-
-.service-board-table th:nth-child(1) { width: 28%; }
-.service-board-table th:nth-child(2) { width: 15%; }
-.service-board-table th:nth-child(3) { width: 9%; }
-.service-board-table th:nth-child(4) { width: 17%; }
-.service-board-table th:nth-child(5) { width: 14%; }
-.service-board-table th:nth-child(6) { width: 8%; }
-.service-board-table th:nth-child(7) { width: 9%; }
 
 .service-package-builder {
   align-items: start;
@@ -3752,6 +3755,123 @@ button.button:disabled,
 @media (max-width: 560px) {
   .ui-data-table-stat-pill {
     flex-basis: 100%;
+  }
+}
+
+.ui-folder-tabs {
+  display: grid;
+  min-width: 0;
+}
+
+.ui-folder-tablist {
+  align-items: flex-end;
+  display: flex;
+  gap: 0;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 0 var(--space-3);
+  position: relative;
+  scrollbar-width: thin;
+  z-index: 4;
+}
+
+.ui-folder-tab {
+  align-items: center;
+  appearance: none;
+  background: color-mix(in srgb, var(--color-surface-sunken) 68%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--catalog-border) 88%, var(--color-muted));
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  color: var(--color-muted);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: var(--type-small);
+  font-weight: 850;
+  gap: var(--space-2);
+  justify-content: center;
+  line-height: 1;
+  min-height: 42px;
+  min-width: 118px;
+  padding: 0 var(--space-4);
+  position: relative;
+  transform: translateY(8px);
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.ui-folder-tab + .ui-folder-tab {
+  margin-left: -1px;
+}
+
+.ui-folder-tab:hover {
+  background: color-mix(in srgb, var(--catalog-teal) 7%, var(--color-surface));
+  color: var(--color-text);
+  transform: translateY(5px);
+}
+
+.ui-folder-tab.is-active {
+  background: var(--catalog-panel);
+  border-color: var(--catalog-border);
+  color: var(--color-text);
+  transform: translateY(1px);
+  z-index: 5;
+}
+
+.ui-folder-tab.is-active::after {
+  background: var(--catalog-panel);
+  bottom: -2px;
+  content: "";
+  height: 3px;
+  left: 0;
+  position: absolute;
+  right: 0;
+}
+
+.ui-folder-tab:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-brand) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.ui-folder-tab svg {
+  flex: 0 0 auto;
+}
+
+.ui-folder-panel {
+  background: var(--catalog-panel);
+  border: 1px solid var(--catalog-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-hairline);
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-3);
+  position: relative;
+  z-index: 3;
+}
+
+.ui-folder-panel[hidden] {
+  display: none;
+}
+
+.service-catalog-folder-panel {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .ui-folder-tablist {
+    padding-inline: var(--space-2);
+  }
+
+  .ui-folder-tab {
+    min-width: 104px;
+    padding-inline: var(--space-3);
   }
 }
 

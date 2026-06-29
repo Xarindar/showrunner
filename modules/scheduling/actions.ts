@@ -19,6 +19,7 @@ import { slugify } from "@/lib/slug";
 import { parseZonedDateTimeInput } from "@/lib/timezone";
 
 const SERVICES_ADMIN_PATH = "/admin/modules/services";
+const APPOINTMENTS_ADMIN_PATH = "/admin/modules/appointments";
 const LEGACY_SCHEDULING_ADMIN_PATH = "/admin/modules/scheduling";
 
 const staffMemberFormSchema = z.object({
@@ -85,9 +86,20 @@ function servicesAdminPath(params?: Record<string, string>) {
   return `${SERVICES_ADMIN_PATH}${query ? `?${query}` : ""}`;
 }
 
+function serviceEditPath(serviceId: string, params?: Record<string, string>) {
+  const query = new URLSearchParams(params).toString();
+  return `${SERVICES_ADMIN_PATH}/${serviceId}${query ? `?${query}` : ""}`;
+}
+
+function appointmentRulesPath(tab: "availability" | "team" | "calendar", params?: Record<string, string>) {
+  const query = new URLSearchParams({ panel: "rules", tab, ...params }).toString();
+  return `${APPOINTMENTS_ADMIN_PATH}?${query}`;
+}
+
 function refreshScheduling() {
   revalidatePath("/admin");
   revalidatePath(SERVICES_ADMIN_PATH);
+  revalidatePath(APPOINTMENTS_ADMIN_PATH);
   revalidatePath(LEGACY_SCHEDULING_ADMIN_PATH);
   revalidatePath("/book");
 }
@@ -238,7 +250,8 @@ export async function createServiceAction(formData: FormData) {
   await syncServiceResources(service.id, settings.siteId, selectedResourceIds(formData));
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "service" }));
+  revalidatePath(serviceEditPath(service.id));
+  redirect(serviceEditPath(service.id, { saved: "created" }));
 }
 
 export async function toggleServiceAction(formData: FormData) {
@@ -283,11 +296,16 @@ export async function updateServiceAction(formData: FormData) {
       isActive: input.isActive
     }
   });
-  await syncServiceStaff(input.id, settings.siteId, selectedStaffIds(formData));
-  await syncServiceResources(input.id, settings.siteId, selectedResourceIds(formData));
+  if (formData.has("syncStaffAssignments")) {
+    await syncServiceStaff(input.id, settings.siteId, selectedStaffIds(formData));
+  }
+  if (formData.has("syncResourceAssignments")) {
+    await syncServiceResources(input.id, settings.siteId, selectedResourceIds(formData));
+  }
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "service" }));
+  revalidatePath(serviceEditPath(input.id));
+  redirect(serviceEditPath(input.id, { saved: "service" }));
 }
 
 export async function createServicePackageAction(formData: FormData) {
@@ -422,7 +440,7 @@ export async function createStaffMemberAction(formData: FormData) {
     isActive: formData.get("isActive") || undefined
   });
   if (!parsed.success) {
-    redirect(servicesAdminPath({ error: parsed.error.issues[0]?.message || "Check the staff form.", tab: "team" }));
+    redirect(appointmentRulesPath("team", { error: parsed.error.issues[0]?.message || "Check the staff form." }));
   }
   const settings = await getSiteSettings();
 
@@ -439,7 +457,7 @@ export async function createStaffMemberAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "staff", tab: "team" }));
+  redirect(appointmentRulesPath("team", { saved: "staff" }));
 }
 
 export async function updateStaffMemberAction(formData: FormData) {
@@ -454,7 +472,7 @@ export async function updateStaffMemberAction(formData: FormData) {
     isActive: formData.get("isActive") || undefined
   });
   if (!parsed.success || !parsed.data.id) {
-    redirect(servicesAdminPath({ error: parsed.error?.issues[0]?.message || "Choose a staff member to update.", tab: "team" }));
+    redirect(appointmentRulesPath("team", { error: parsed.error?.issues[0]?.message || "Choose a staff member to update." }));
   }
   const settings = await getSiteSettings();
 
@@ -471,7 +489,7 @@ export async function updateStaffMemberAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "staff", tab: "team" }));
+  redirect(appointmentRulesPath("team", { saved: "staff" }));
 }
 
 const staffAdminLinkFormSchema = z.object({
@@ -486,7 +504,7 @@ export async function linkStaffMemberAdminUserAction(formData: FormData) {
     adminUserId: formData.get("adminUserId") || ""
   });
   if (!parsed.success) {
-    redirect(servicesAdminPath({ error: parsed.error.issues[0]?.message || "Choose a staff member to link.", tab: "team" }));
+    redirect(appointmentRulesPath("team", { error: parsed.error.issues[0]?.message || "Choose a staff member to link." }));
   }
   const settings = await getSiteSettings();
   const adminUserId = parsed.data.adminUserId || null;
@@ -496,13 +514,13 @@ export async function linkStaffMemberAdminUserAction(formData: FormData) {
     select: { id: true }
   });
   if (!staffMember) {
-    redirect(servicesAdminPath({ error: "Staff member not found.", tab: "team" }));
+    redirect(appointmentRulesPath("team", { error: "Staff member not found." }));
   }
 
   if (adminUserId) {
     const adminUser = await prisma.adminUser.findUnique({ where: { id: adminUserId }, select: { id: true } });
     if (!adminUser) {
-      redirect(servicesAdminPath({ error: "Admin user not found.", tab: "team" }));
+      redirect(appointmentRulesPath("team", { error: "Admin user not found." }));
     }
   }
 
@@ -521,7 +539,7 @@ export async function linkStaffMemberAdminUserAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "staff-link", tab: "team" }));
+  redirect(appointmentRulesPath("team", { saved: "staff-link" }));
 }
 
 export async function createResourceAction(formData: FormData) {
@@ -535,7 +553,7 @@ export async function createResourceAction(formData: FormData) {
     isActive: formData.get("isActive") || undefined
   });
   if (!parsed.success) {
-    redirect(servicesAdminPath({ error: parsed.error.issues[0]?.message || "Check the resource form.", tab: "team" }));
+    redirect(appointmentRulesPath("team", { error: parsed.error.issues[0]?.message || "Check the resource form." }));
   }
   const settings = await getSiteSettings();
 
@@ -552,7 +570,7 @@ export async function createResourceAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "resource", tab: "team" }));
+  redirect(appointmentRulesPath("team", { saved: "resource" }));
 }
 
 export async function updateResourceAction(formData: FormData) {
@@ -567,7 +585,7 @@ export async function updateResourceAction(formData: FormData) {
     isActive: formData.get("isActive") || undefined
   });
   if (!parsed.success || !parsed.data.id) {
-    redirect(servicesAdminPath({ error: parsed.error?.issues[0]?.message || "Choose a resource to update.", tab: "team" }));
+    redirect(appointmentRulesPath("team", { error: parsed.error?.issues[0]?.message || "Choose a resource to update." }));
   }
   const settings = await getSiteSettings();
 
@@ -584,7 +602,7 @@ export async function updateResourceAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "resource", tab: "team" }));
+  redirect(appointmentRulesPath("team", { saved: "resource" }));
 }
 
 export async function updateReminderSettingsAction(formData: FormData) {
@@ -594,7 +612,7 @@ export async function updateReminderSettingsAction(formData: FormData) {
     leadHours: formData.get("leadHours") || 24
   });
   if (!parsed.success) {
-    redirect(servicesAdminPath({ error: parsed.error.issues[0]?.message || "Check reminder settings.", tab: "calendar" }));
+    redirect(appointmentRulesPath("calendar", { error: parsed.error.issues[0]?.message || "Check reminder settings." }));
   }
   const settings = await getSiteSettings();
   const leadMinutes = parsed.data.leadHours * 60;
@@ -613,7 +631,7 @@ export async function updateReminderSettingsAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "reminders", tab: "calendar" }));
+  redirect(appointmentRulesPath("calendar", { saved: "reminders" }));
 }
 
 export async function createAvailabilityAction(formData: FormData) {
@@ -623,7 +641,7 @@ export async function createAvailabilityAction(formData: FormData) {
   const staffId = String(formData.get("staffId") || "");
   const resourceId = String(formData.get("resourceId") || "");
   if (staffId && resourceId) {
-    redirect(servicesAdminPath({ error: "Choose staff or resource availability, not both.", tab: "availability" }));
+    redirect(appointmentRulesPath("availability", { error: "Choose staff or resource availability, not both." }));
   }
 
   await prisma.availabilityRule.create({
@@ -638,7 +656,7 @@ export async function createAvailabilityAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "availability", tab: "availability" }));
+  redirect(appointmentRulesPath("availability", { saved: "availability" }));
 }
 
 export async function deleteAvailabilityAction(formData: FormData) {
@@ -661,7 +679,7 @@ export async function createBlockoutAction(formData: FormData) {
   const resourceId = String(formData.get("resourceId") || "");
 
   if (!startsAt || !endsAt || endsAt <= startsAt) {
-    redirect(servicesAdminPath({ error: "blockout", tab: "availability" }));
+    redirect(appointmentRulesPath("availability", { error: "blockout" }));
   }
   if (resourceId) {
     const resource = await prisma.resource.findFirst({
@@ -669,7 +687,7 @@ export async function createBlockoutAction(formData: FormData) {
       select: { id: true }
     });
     if (!resource) {
-      redirect(servicesAdminPath({ error: "Choose a valid resource for the blockout.", tab: "availability" }));
+      redirect(appointmentRulesPath("availability", { error: "Choose a valid resource for the blockout." }));
     }
   }
 
@@ -684,7 +702,7 @@ export async function createBlockoutAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(servicesAdminPath({ saved: "blockout", tab: "availability" }));
+  redirect(appointmentRulesPath("availability", { saved: "blockout" }));
 }
 
 export async function deleteBlockoutAction(formData: FormData) {

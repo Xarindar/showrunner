@@ -40,7 +40,7 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
         "The native booking adapter cannot offer slots until at least one availability rule exists.",
         "critical",
         "scheduling",
-        "/admin/modules/services?tab=availability"
+        "/admin/modules/appointments?panel=rules&tab=availability"
       )
     );
   }
@@ -54,7 +54,7 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
         } required by a service but has no resource availability rules.`,
         "warning",
         "scheduling",
-        "/admin/modules/services?tab=team"
+        "/admin/modules/appointments?panel=rules&tab=team"
       )
     );
   }
@@ -66,7 +66,7 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
         "Set BOOKING_REMINDER_WORKER_SECRET and provision the scheduled reminder sweep (npm run booking-reminders:process) before relying on appointment reminders.",
         "warning",
         "scheduling",
-        "/admin/modules/services?tab=calendar"
+        "/admin/modules/appointments?panel=rules&tab=calendar"
       )
     );
   }

@@ -77,7 +77,7 @@ export async function getOnboardingChecklist(settings: SiteSettingsWithModules):
       title: "Set your weekly hours",
       description: "Tell us the days and times you take appointments so customers only ever see real openings.",
       done: availabilityRules > 0,
-      href: "/admin/modules/services?tab=availability",
+      href: "/admin/modules/appointments?panel=rules&tab=availability",
       cta: "Set hours"
     });
   }

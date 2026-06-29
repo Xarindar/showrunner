@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, ListChecks, MoreHorizontal, SlidersHorizontal, Table2 } from "lucide-react";
 import { Modal } from "@/components/ui";
 
-type AppointmentsModalKey = "filters" | "list" | "tools" | "waitlist" | null;
+type AppointmentsModalKey = "filters" | "list" | "rules" | "tools" | "waitlist" | null;
 
 type AppointmentCalendarShellProps = {
   appointmentCount: number;
@@ -14,9 +14,11 @@ type AppointmentCalendarShellProps = {
   children: ReactNode;
   errorMessage?: string;
   filterPanel: ReactNode;
+  initialPanel?: AppointmentsModalKey;
   nextHref: string;
   previousHref: string;
   rangeLabel: string;
+  rulesPanel: ReactNode;
   savedMessage?: string;
   todayHref: string;
   toolsPanel: ReactNode;
@@ -32,9 +34,11 @@ export function AppointmentCalendarShell({
   children,
   errorMessage,
   filterPanel,
+  initialPanel = null,
   nextHref,
   previousHref,
   rangeLabel,
+  rulesPanel,
   savedMessage,
   todayHref,
   toolsPanel,
@@ -42,7 +46,7 @@ export function AppointmentCalendarShell({
   waitlistCount,
   waitlistPanel
 }: AppointmentCalendarShellProps) {
-  const [openPanel, setOpenPanel] = useState<AppointmentsModalKey>(null);
+  const [openPanel, setOpenPanel] = useState<AppointmentsModalKey>(initialPanel);
 
   return (
     <section className="appointments-calendar-shell" aria-label="Appointment scheduler">
@@ -81,6 +85,10 @@ export function AppointmentCalendarShell({
             <span>List</span>
             <b>{bookingCount}</b>
           </button>
+          <button aria-label="Open scheduling rules" className="appointments-action-button" onClick={() => setOpenPanel("rules")} title="Scheduling rules" type="button">
+            <CalendarDays size={16} />
+            <span>Rules</span>
+          </button>
           <button aria-label="Open schedule tools" className="appointments-action-button icon-only" onClick={() => setOpenPanel("tools")} title="Schedule tools" type="button">
             <MoreHorizontal size={18} />
           </button>
@@ -104,6 +112,9 @@ export function AppointmentCalendarShell({
       </Modal>
       <Modal bodyClassName="appointments-modal-body appointments-modal-body-wide" className="appointments-modal wide" onClose={() => setOpenPanel(null)} open={openPanel === "list"} title="Appointment list">
         {appointmentListPanel}
+      </Modal>
+      <Modal bodyClassName="appointments-modal-body appointments-modal-body-wide" className="appointments-modal wide" onClose={() => setOpenPanel(null)} open={openPanel === "rules"} title="Scheduling rules">
+        {rulesPanel}
       </Modal>
       <Modal bodyClassName="appointments-modal-body" className="appointments-modal" onClose={() => setOpenPanel(null)} open={openPanel === "tools"} title="Schedule tools">
         <div className="appointments-tools-heading">

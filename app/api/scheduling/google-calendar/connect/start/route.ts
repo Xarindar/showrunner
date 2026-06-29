@@ -7,7 +7,8 @@ import { createGoogleCalendarAuthorizeUrl } from "@/lib/scheduling/google-calend
 import { getCurrentSiteId } from "@/lib/site";
 
 function schedulingRedirect(key: "error" | "saved", value: string) {
-  const url = new URL("/admin/modules/services", publicAppBaseUrl());
+  const url = new URL("/admin/modules/appointments", publicAppBaseUrl());
+  url.searchParams.set("panel", "rules");
   url.searchParams.set("tab", "calendar");
   url.searchParams.set(key, value);
   return NextResponse.redirect(url);

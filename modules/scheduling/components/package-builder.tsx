@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState, type DragEvent } from "react";
 import { Boxes, Clock3, GripVertical, Layers3, Plus, Tag, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button, Switch } from "@/components/ui";
 import { cx } from "@/components/ui/utils";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
@@ -14,8 +14,6 @@ export type PackageBuilderService = {
   id: string;
   isActive: boolean;
   name: string;
-  resourceLabel: string;
-  staffLabel: string;
   tags: string[];
 };
 
@@ -150,7 +148,7 @@ export function PackageBuilder({
                         <Clock3 size={13} />
                         {serviceDurationLabel(service.durationMinutes)}
                       </span>
-                      <span title={service.staffLabel}>{service.staffLabel}</span>
+                      <span>{service.isActive ? "Active" : "Draft"}</span>
                     </div>
                     <div className="service-tag-row">
                       {service.tags.slice(0, 3).map((tag) => (
@@ -290,10 +288,7 @@ export function PackageBuilder({
                           <input defaultValue={servicePackage.sortOrder} id={`package-${servicePackage.id}-sort`} name="sortOrder" type="number" />
                         </div>
                       </div>
-                      <label className="ui-check-row product-editor-inline-check">
-                        <input defaultChecked={servicePackage.isActive} name="isActive" type="checkbox" />
-                        Active package
-                      </label>
+                      <Switch defaultChecked={servicePackage.isActive} label="Active package" name="isActive" variant="inline" />
                       <Button type="submit" variant="secondary">
                         Save package
                       </Button>

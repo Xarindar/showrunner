@@ -16,7 +16,12 @@ const commonWorkflows = [
 {
   label: "Add or edit services",
   href: "/admin/modules/services",
-  detail: "Update base services, packages, availability, or blockouts."
+  detail: "Update base services, categories, tags, and packages."
+},
+{
+  label: "Set appointment rules",
+  href: "/admin/modules/appointments?panel=rules",
+  detail: "Manage weekly hours, team resources, blockouts, reminders, and calendar connections."
 },
 {
   label: "Manage a new booking",
