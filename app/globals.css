@@ -3919,7 +3919,7 @@ button.button:disabled,
 
 .ui-folder-tab.is-active::after {
   background: var(--catalog-panel);
-  bottom: -3px;
+  bottom: 0;
   content: "";
   height: 5px;
   left: 1px;
