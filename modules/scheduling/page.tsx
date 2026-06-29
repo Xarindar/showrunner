@@ -4,7 +4,7 @@ import { Boxes, CalendarCheck, Clock3, ExternalLink, Plus, Tags } from "lucide-r
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Button, ButtonLink, FolderTabs, Switch, TableFilterBar, type FolderTab, type TableFilterSelect } from "@/components/ui";
+import { Button, ButtonLink, FolderTabs, Switch, type FolderTab, type SelectMenuOption } from "@/components/ui";
 import {
   addServicePackageItemAction,
   createServiceAction,
@@ -14,11 +14,10 @@ import {
   updateServicePackageAction
 } from "./actions";
 import { PackageBuilder, type PackageBuilderPackage, type PackageBuilderService } from "./components/package-builder";
+import { ServiceCatalogTable, type ServiceCatalogTableService } from "./components/service-catalog-table";
 import { ServiceCreateMenu } from "./components/service-create-menu";
 
 export const dynamic = "force-dynamic";
-
-const servicesAdminPath = "/admin/modules/services";
 
 type SchedulingPageProps = {
   searchParams: Promise<{
@@ -55,37 +54,11 @@ function serviceTags(service: { tags: Prisma.JsonValue }) {
   return jsonStringArray(service.tags);
 }
 
-function serviceDurationLabel(minutes: number) {
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`;
-}
-
-function serviceStatusClass(isActive: boolean) {
-  return isActive ? "catalog-status is-active" : "catalog-status is-draft";
-}
-
 function savedServiceMessage(saved?: string) {
   if (saved === "package") return "Package changes saved.";
   if (saved === "package-item") return "Package contents updated.";
   if (saved) return "Services catalog updated.";
   return null;
-}
-
-function serviceMatchesSearch(service: ServiceCatalogItem, searchQuery: string) {
-  if (!searchQuery) return true;
-  const haystack = [
-    service.name,
-    service.slug,
-    service.description || "",
-    service.location || "",
-    serviceCategory(service),
-    ...serviceTags(service)
-  ]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(searchQuery.toLowerCase());
 }
 
 function toPackageBuilderService(service: {
@@ -104,6 +77,21 @@ function toPackageBuilderService(service: {
     id: service.id,
     isActive: service.isActive,
     name: service.name,
+    tags: serviceTags(service)
+  };
+}
+
+function toServiceCatalogTableService(service: ServiceCatalogItem): ServiceCatalogTableService {
+  return {
+    bookingPath: `/book/${service.slug}`,
+    category: serviceCategory(service) || "Uncategorized",
+    description: service.description || "",
+    durationMinutes: service.durationMinutes,
+    id: service.id,
+    isActive: service.isActive,
+    location: service.location || "",
+    name: service.name,
+    packageCount: service._count.packageItems,
     tags: serviceTags(service)
   };
 }
@@ -179,36 +167,19 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   const tags = Array.from(new Set(services.flatMap(serviceTags))).sort((left, right) => left.localeCompare(right));
   const categoryFilter = categories.includes(params.category || "") ? String(params.category) : "all";
   const tagFilter = tags.includes(params.tag || "") ? String(params.tag) : "all";
-  const filteredServices = services.filter((service) => {
-    if (categoryFilter !== "all" && serviceCategory(service) !== categoryFilter) return false;
-    if (tagFilter !== "all" && !serviceTags(service).includes(tagFilter)) return false;
-    return serviceMatchesSearch(service, searchQuery);
-  });
 
   const activeServices = services.filter((service) => service.isActive).length;
   const activePackages = servicePackages.filter((servicePackage) => servicePackage.isActive).length;
   const savedMessage = savedServiceMessage(params.saved);
   const errorMessage = params.error ? decodeURIComponent(params.error) : null;
-  const categorySelect: TableFilterSelect = {
-    id: "services-category-filter",
-    label: "Category",
-    name: "category",
-    value: categoryFilter,
-    options: [
-      { label: "All categories", value: "all" },
-      ...categories.map((category) => ({ label: category, value: category }))
-    ]
-  };
-  const tagSelect: TableFilterSelect = {
-    id: "services-tag-filter",
-    label: "Tag",
-    name: "tag",
-    value: tagFilter,
-    options: [
-      { label: "All tags", value: "all" },
-      ...tags.map((tag) => ({ label: tag, value: tag }))
-    ]
-  };
+  const categoryOptions: SelectMenuOption[] = [
+    { label: "All categories", value: "all" },
+    ...categories.map((category) => ({ label: category, value: category }))
+  ];
+  const tagOptions: SelectMenuOption[] = [
+    { label: "All tags", value: "all" },
+    ...tags.map((tag) => ({ label: tag, value: tag }))
+  ];
 
   const createServiceForm = (
     <form action={createServiceAction} className="catalog-form-grid">
@@ -276,132 +247,25 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   );
 
   const servicesContent = (
-    <div className="service-catalog-folder-panel" aria-labelledby="services-board-title">
-      <div className="catalog-board-header">
-        <div>
-          <p className="catalog-rail-label">Catalog</p>
-          <h2 id="services-board-title">Service catalog</h2>
-          <p>
-            {filteredServices.length} of {services.length}
-            {searchQuery ? ` matching "${searchQuery}"` : " services"}
-          </p>
-        </div>
-        <div className="catalog-board-actions">
-          <span className="catalog-pill is-green">
-            <CalendarCheck size={15} />
-            {activeServices} active
-          </span>
-          <span className="catalog-pill is-blue">
-            <Boxes size={15} />
-            {activePackages} packages
-          </span>
-          <ServiceCreateMenu
-            items={[
-              { content: createServiceForm, description: "Create a bookable catalog service.", id: "service", label: "Service", title: "Create service", type: "service" },
-              { content: createPackageForm, description: "Compose multiple services together.", id: "package", label: "Package", title: "Create package", type: "package" }
-            ]}
-          />
-        </div>
-      </div>
-
-      <TableFilterBar
-        action={servicesAdminPath}
-        className="catalog-board-filters"
-        clearHref={servicesAdminPath}
-        searchId="services-search"
-        searchPlaceholder="Search service, category, tag"
-        searchValue={searchQuery}
-        selects={[categorySelect, tagSelect]}
-        showClear={Boolean(searchQuery || categoryFilter !== "all" || tagFilter !== "all")}
-      />
-
-      <div className="catalog-table-scroll">
-        <table className="catalog-product-table">
-          <thead>
-            <tr>
-              <th>Service</th>
-              <th>Status</th>
-              <th>Category</th>
-              <th>Tags</th>
-              <th>Duration</th>
-              <th>Packages</th>
-              <th>Booking</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredServices.map((service) => {
-              const category = serviceCategory(service) || "Uncategorized";
-              const tagsLabel = serviceTags(service).join(", ") || "No tags";
-              const bookingPath = `/book/${service.slug}`;
-              const packageLabel = `${service._count.packageItems} pkg`;
-              return (
-                <tr key={service.id}>
-                  <td>
-                    <div className="catalog-product-cell">
-                      <div className="catalog-row-thumb">
-                        <span>
-                          <CalendarCheck size={17} />
-                        </span>
-                      </div>
-                      <div className="catalog-row-copy">
-                        <strong title={service.name}>{service.name}</strong>
-                        <small title={`${bookingPath} · ${service.description || service.location || "No service copy yet."}`}>
-                          {bookingPath} · {service.description || service.location || "No service copy yet."}
-                        </small>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
-                  </td>
-                  <td>
-                    <span className="catalog-cell-text" title={category}>{category}</span>
-                  </td>
-                  <td>
-                    <span className="catalog-cell-text" title={tagsLabel}>{tagsLabel}</span>
-                  </td>
-                  <td>
-                    <strong className="catalog-price-cell">{serviceDurationLabel(service.durationMinutes)}</strong>
-                  </td>
-                  <td>
-                    <span className="catalog-cell-text" title={packageLabel}>{packageLabel}</span>
-                  </td>
-                  <td>
-                    <span className="catalog-cell-text" title={bookingPath}>{bookingPath}</span>
-                  </td>
-                  <td>
-                    <div className="catalog-row-actions">
-                      <ButtonLink href={`${servicesAdminPath}/${service.id}`} size="sm" variant="secondary">
-                        Edit
-                      </ButtonLink>
-                      <form action={toggleServiceAction} className="ui-inline-form">
-                        <input name="id" type="hidden" value={service.id} />
-                        <input name="isActive" type="hidden" value={service.isActive ? "false" : "true"} />
-                        <Button size="sm" type="submit" variant={service.isActive ? "ghost" : "primary"}>
-                          {service.isActive ? "Draft" : "Activate"}
-                        </Button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {!filteredServices.length ? (
-              <tr>
-                <td colSpan={8}>
-                  <div className="catalog-empty-state">
-                    <CalendarCheck size={30} />
-                    <h3>No services found</h3>
-                    <p>Create a service or adjust the current filters.</p>
-                  </div>
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <ServiceCatalogTable
+      activePackages={activePackages}
+      activeServices={activeServices}
+      categoryOptions={categoryOptions}
+      createAction={
+        <ServiceCreateMenu
+          items={[
+            { content: createServiceForm, description: "Create a bookable catalog service.", id: "service", label: "Service", title: "Create service", type: "service" },
+            { content: createPackageForm, description: "Compose multiple services together.", id: "package", label: "Package", title: "Create package", type: "package" }
+          ]}
+        />
+      }
+      initialCategory={categoryFilter}
+      initialSearch={searchQuery}
+      initialTag={tagFilter}
+      services={services.map(toServiceCatalogTableService)}
+      tagOptions={tagOptions}
+      toggleServiceAction={toggleServiceAction}
+    />
   );
 
   const packagesContent = (
@@ -409,7 +273,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       addPackageItemAction={addServicePackageItemAction}
       packages={servicePackages.map(toPackageBuilderPackage)}
       removePackageItemAction={removeServicePackageItemAction}
-      services={filteredServices.map(toPackageBuilderService)}
+      services={services.map(toPackageBuilderService)}
       updatePackageAction={updateServicePackageAction}
     />
   );

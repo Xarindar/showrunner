@@ -14,6 +14,7 @@ type SelectMenuProps = {
   id: string;
   label: string;
   name: string;
+  onValueChange?: (value: string) => void;
   options: SelectMenuOption[];
   value: string;
 };
@@ -22,15 +23,20 @@ function normalizedValue(options: SelectMenuOption[], value: string) {
   return options.some((option) => option.value === value) ? value : options[0]?.value || "";
 }
 
-export function SelectMenu({ className, id, label, name, options, value }: SelectMenuProps) {
+export function SelectMenu({ className, id, label, name, onValueChange, options, value }: SelectMenuProps) {
   const generatedId = useId();
   const [open, setOpen] = useState(false);
-  const [selectedValue, setSelectedValue] = useState(() => normalizedValue(options, value));
+  const [internalValue, setInternalValue] = useState(() => normalizedValue(options, value));
   const rootRef = useRef<HTMLDivElement>(null);
   const labelId = `${id || generatedId}-label`;
   const listboxId = `${id || generatedId}-listbox`;
-  const safeSelectedValue = normalizedValue(options, selectedValue);
+  const safeSelectedValue = normalizedValue(options, onValueChange ? value : internalValue);
   const selectedOption = options.find((option) => option.value === safeSelectedValue) || options[0] || { label: "", value: "" };
+
+  const selectValue = (nextValue: string) => {
+    if (onValueChange) onValueChange(nextValue);
+    else setInternalValue(nextValue);
+  };
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -52,7 +58,7 @@ export function SelectMenu({ className, id, label, name, options, value }: Selec
     if (!options.length) return;
     const currentIndex = Math.max(0, options.findIndex((option) => option.value === safeSelectedValue));
     const nextIndex = (currentIndex + direction + options.length) % options.length;
-    setSelectedValue(options[nextIndex].value);
+    selectValue(options[nextIndex].value);
     setOpen(true);
   };
 
@@ -98,7 +104,7 @@ export function SelectMenu({ className, id, label, name, options, value }: Selec
                 className={cx("ui-select-option", selected && "is-selected")}
                 key={option.value}
                 onClick={() => {
-                  setSelectedValue(option.value);
+                  selectValue(option.value);
                   setOpen(false);
                 }}
                 role="option"
