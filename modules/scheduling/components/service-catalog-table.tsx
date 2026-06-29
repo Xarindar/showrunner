@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Boxes, CalendarCheck, ExternalLink, Search, X } from "lucide-react";
-import { Button, ButtonLink, SelectMenu, type SelectMenuOption } from "@/components/ui";
+import { Button, ButtonLink, Pagination, SelectMenu, type SelectMenuOption } from "@/components/ui";
+import { useCatalogTablePagination } from "./use-catalog-table-pagination";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
 
@@ -84,11 +85,27 @@ export function ServiceCatalogTable({
       }),
     [categoryFilter, normalizedSearch, services, tagFilter]
   );
+  const {
+    currentPage,
+    emptyRowCount,
+    endIndex,
+    fillerRowCount,
+    firstPage,
+    nextPage,
+    pageCount,
+    previousPage,
+    setTableFrameRef,
+    startIndex
+  } = useCatalogTablePagination(filteredServices.length);
+  const pagedServices = filteredServices.slice(startIndex, endIndex);
+  const rangeStart = filteredServices.length ? startIndex + 1 : 0;
+  const rangeEnd = endIndex;
 
   const resetFilters = () => {
     setSearchQuery("");
     setCategoryFilter("all");
     setTagFilter("all");
+    firstPage();
   };
 
   return (
@@ -98,7 +115,7 @@ export function ServiceCatalogTable({
           <p className="catalog-rail-label">Catalog</p>
           <h2 id="services-board-title">Service catalog</h2>
           <p>
-            {filteredServices.length} of {services.length}
+            {filteredServices.length ? `${rangeStart}-${rangeEnd}` : "0"} of {filteredServices.length || services.length}
             {normalizedSearch ? ` matching "${normalizedSearch}"` : " services"}
           </p>
         </div>
@@ -128,7 +145,10 @@ export function ServiceCatalogTable({
             <Search aria-hidden="true" size={15} />
             <input
               id="services-search"
-              onChange={(event) => setSearchQuery(event.currentTarget.value)}
+              onChange={(event) => {
+                setSearchQuery(event.currentTarget.value);
+                firstPage();
+              }}
               placeholder="Search service, category, tag"
               value={searchQuery}
             />
@@ -139,7 +159,10 @@ export function ServiceCatalogTable({
             id="services-category-filter"
             label="Category"
             name="category"
-            onValueChange={setCategoryFilter}
+            onValueChange={(value) => {
+              setCategoryFilter(value);
+              firstPage();
+            }}
             options={categoryOptions}
             value={categoryFilter}
           />
@@ -148,7 +171,10 @@ export function ServiceCatalogTable({
             id="services-tag-filter"
             label="Tag"
             name="tag"
-            onValueChange={setTagFilter}
+            onValueChange={(value) => {
+              setTagFilter(value);
+              firstPage();
+            }}
             options={tagOptions}
             value={tagFilter}
           />
@@ -162,7 +188,7 @@ export function ServiceCatalogTable({
         </div>
       </div>
 
-      <div className="catalog-table-scroll">
+      <div className="catalog-table-scroll catalog-viewport-table" ref={setTableFrameRef}>
         <table className="catalog-product-table">
           <thead>
             <tr>
@@ -177,7 +203,7 @@ export function ServiceCatalogTable({
             </tr>
           </thead>
           <tbody>
-            {filteredServices.map((service) => {
+            {pagedServices.map((service) => {
               const category = service.category || "Uncategorized";
               const tagsLabel = service.tags.join(", ") || "No tags";
               const packageLabel = `${service.packageCount} pkg`;
@@ -233,8 +259,18 @@ export function ServiceCatalogTable({
                 </tr>
               );
             })}
+            {fillerRowCount ? (
+              <tr
+                aria-hidden="true"
+                className="catalog-table-filler-row"
+                style={{ "--catalog-table-filler-rows": fillerRowCount } as CSSProperties}>
+                <td colSpan={8} />
+              </tr>
+            ) : null}
             {!filteredServices.length ? (
-              <tr>
+              <tr
+                className="catalog-table-empty-state-row"
+                style={{ "--catalog-table-empty-rows": emptyRowCount } as CSSProperties}>
                 <td colSpan={8}>
                   <div className="catalog-empty-state">
                     <CalendarCheck size={30} />
@@ -247,6 +283,14 @@ export function ServiceCatalogTable({
           </tbody>
         </table>
       </div>
+      <Pagination
+        className="ui-pagination-round catalog-table-pagination"
+        label="Service catalog pages"
+        onNext={nextPage}
+        onPrevious={previousPage}
+        page={currentPage}
+        pageCount={pageCount}
+      />
     </div>
   );
 }

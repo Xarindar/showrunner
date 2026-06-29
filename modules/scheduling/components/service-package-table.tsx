@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { Boxes, Plus, Search, X } from "lucide-react";
-import { Button, ButtonLink } from "@/components/ui";
+import { Button, ButtonLink, Pagination } from "@/components/ui";
+import { useCatalogTablePagination } from "./use-catalog-table-pagination";
 
 export type ServicePackageTablePackage = {
   bookingPath: string;
@@ -51,6 +52,21 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
     () => packages.filter((servicePackage) => packageMatchesSearch(servicePackage, normalizedSearch)),
     [normalizedSearch, packages]
   );
+  const {
+    currentPage,
+    emptyRowCount,
+    endIndex,
+    fillerRowCount,
+    firstPage,
+    nextPage,
+    pageCount,
+    previousPage,
+    setTableFrameRef,
+    startIndex
+  } = useCatalogTablePagination(filteredPackages.length);
+  const pagedPackages = filteredPackages.slice(startIndex, endIndex);
+  const rangeStart = filteredPackages.length ? startIndex + 1 : 0;
+  const rangeEnd = endIndex;
 
   return (
     <div className="service-catalog-folder-panel" aria-labelledby="packages-board-title">
@@ -59,7 +75,7 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
           <p className="catalog-rail-label">Catalog</p>
           <h2 id="packages-board-title">Package catalog</h2>
           <p>
-            {filteredPackages.length} of {packages.length}
+            {filteredPackages.length ? `${rangeStart}-${rangeEnd}` : "0"} of {filteredPackages.length || packages.length}
             {normalizedSearch ? ` matching "${normalizedSearch}"` : " packages"}
           </p>
         </div>
@@ -84,13 +100,23 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
             <Search aria-hidden="true" size={15} />
             <input
               id="packages-search"
-              onChange={(event) => setSearchQuery(event.currentTarget.value)}
+              onChange={(event) => {
+                setSearchQuery(event.currentTarget.value);
+                firstPage();
+              }}
               placeholder="Search package, service, tag"
               value={searchQuery}
             />
           </span>
           {normalizedSearch ? (
-            <Button onClick={() => setSearchQuery("")} size="sm" type="button" variant="ghost">
+            <Button
+              onClick={() => {
+                setSearchQuery("");
+                firstPage();
+              }}
+              size="sm"
+              type="button"
+              variant="ghost">
               <X size={15} />
               Reset
             </Button>
@@ -98,7 +124,7 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
         </div>
       </div>
 
-      <div className="catalog-table-scroll">
+      <div className="catalog-table-scroll catalog-viewport-table" ref={setTableFrameRef}>
         <table className="catalog-product-table service-package-table">
           <thead>
             <tr>
@@ -112,7 +138,7 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
             </tr>
           </thead>
           <tbody>
-            {filteredPackages.map((servicePackage) => {
+            {pagedPackages.map((servicePackage) => {
               const tagsLabel = servicePackage.tags.join(", ") || "No tags";
               const servicesLabel = servicePackage.serviceNames.join(", ") || "No services";
               return (
@@ -159,8 +185,18 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
                 </tr>
               );
             })}
+            {fillerRowCount ? (
+              <tr
+                aria-hidden="true"
+                className="catalog-table-filler-row"
+                style={{ "--catalog-table-filler-rows": fillerRowCount } as CSSProperties}>
+                <td colSpan={7} />
+              </tr>
+            ) : null}
             {!filteredPackages.length ? (
-              <tr>
+              <tr
+                className="catalog-table-empty-state-row"
+                style={{ "--catalog-table-empty-rows": emptyRowCount } as CSSProperties}>
                 <td colSpan={7}>
                   <div className="catalog-empty-state">
                     <Boxes size={30} />
@@ -173,6 +209,14 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
           </tbody>
         </table>
       </div>
+      <Pagination
+        className="ui-pagination-round catalog-table-pagination"
+        label="Package catalog pages"
+        onNext={nextPage}
+        onPrevious={previousPage}
+        page={currentPage}
+        pageCount={pageCount}
+      />
     </div>
   );
 }
