@@ -6,7 +6,7 @@ import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { createTestimonialAction, deleteTestimonialAction, updateTestimonialModerationAction } from "./actions";
-import { Button, ButtonLink, Card, EqualGrid, Pagination, Table } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid, Pagination, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -111,14 +111,8 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
         </div>
       </EqualGrid>
       <div className="module-check-grid">
-        <label className="ui-check-row">
-          <input name="permissionGranted" type="checkbox" />
-          Permission granted
-        </label>
-        <label className="ui-check-row">
-          <input name="featured" type="checkbox" />
-          Featured
-        </label>
+        <Switch label="Permission granted" name="permissionGranted" variant="inline" />
+        <Switch label="Featured" name="featured" variant="inline" />
       </div>
       <div className="module-modal-actions">
         <Button type="submit">
@@ -288,10 +282,7 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
                       </form>
                       <form action={deleteTestimonialAction} className="form-grid">
                         <input type="hidden" name="id" value={testimonial.id} />
-                        <label className="ui-zero">
-                          <input name="confirmDelete" type="checkbox" required />
-                          Delete
-                        </label>
+                        <Switch label="Delete" name="confirmDelete" required variant="inline" />
                         <Button type="submit" variant="danger">
                           Delete
                         </Button>

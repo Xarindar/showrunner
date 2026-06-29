@@ -14,7 +14,7 @@ import {
   revokeSiteApiKeyAction,
   updateSettingsAction,
   updateSiteApiKeyOriginsAction } from "./actions";
-import { Button, ButtonLink, Card, EqualGrid } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid, Switch } from "@/components/ui";
 import { SettingsNav } from "./settings-nav";
 
 export const dynamic = "force-dynamic";
@@ -177,11 +177,11 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               const required = isRequiredModule(item.module.id);
 
               return (
-                <label key={item.module.id} className="module-toggle-row">
+                <div key={item.module.id} className="module-toggle-row">
                   {required ? <input type="hidden" name="enabledModules" value={item.module.id} /> : null}
-                  <input
+                  <Switch
+                    aria-label={`Enable ${item.module.label}`}
                     name="enabledModules"
-                    type="checkbox"
                     value={item.module.id}
                     defaultChecked={item.enabled || required}
                     disabled={status === "future" || required} />
@@ -195,7 +195,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                     {item.module.readiness.primaryGap ? <small>{item.module.readiness.primaryGap}</small> : null}
                   </span>
                   <span className={item.pillClassName}>{item.readinessLabel}</span>
-                </label>);
+                </div>);
 
             })}
           </div>
@@ -344,21 +344,21 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               Browser widgets need every site origin they load on. Originless server calls are blocked unless enabled below.
             </small>
           </div>
-          <label className="module-toggle-row">
-            <input type="checkbox" name="allowServerToServer" />
+          <div className="module-toggle-row">
+            <Switch aria-label="Allow server-to-server calls without Origin" name="allowServerToServer" />
             <span className="module-toggle-main">
               <strong>Allow server-to-server calls without Origin</strong>
               <small>Use only for deliberate backend integrations; browser widgets should rely on the origin allowlist.</small>
             </span>
-          </label>
+          </div>
           <div className="module-toggle-grid">
             {EMBED_SCOPES.map((scope) =>
-            <label className="module-toggle-row" key={scope}>
-                <input type="checkbox" name="scopes" value={scope} defaultChecked={scope === "scheduling:read"} />
+            <div className="module-toggle-row" key={scope}>
+                <Switch aria-label={`Enable ${scope} scope`} name="scopes" value={scope} defaultChecked={scope === "scheduling:read"} />
                 <span className="module-toggle-main">
                   <strong>{scope}</strong>
                 </span>
-              </label>
+              </div>
             )}
           </div>
           <Button type="submit">Create key</Button>

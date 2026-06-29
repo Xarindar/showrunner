@@ -24,7 +24,7 @@ import {
   updateMessageTemplateBuilderAction,
   updateMessageTemplateStatusAction } from "./actions";
 import { EmailTemplateBuilder } from "./components/email-template-builder";
-import { Button, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, Card, EqualGrid, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -266,10 +266,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
             ))}
           </select>
         </div>
-        <label className="ui-check-row">
-          <input name="isActive" type="checkbox" defaultChecked />
-          Active
-        </label>
+        <Switch defaultChecked label="Active" name="isActive" variant="inline" />
       </EqualGrid>
       <div className="ui-field">
         <label htmlFor="template-subject">Subject</label>
@@ -525,10 +522,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                         </small>
                       </div>
                       <div className="ui-zero">
-                        <label className="ui-zero">
-                          <input name="confirmRestore" type="checkbox" required />
-                          Restore
-                        </label>
+                        <Switch label="Restore" name="confirmRestore" required variant="inline" />
                         <Button type="submit" variant="secondary">
                           <RotateCcw size={16} />
                           Restore version
@@ -855,10 +849,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
                   <td>
                     <form action={deleteSuppressionEntryAction} className="form-grid">
                       <input type="hidden" name="id" value={entry.id} />
-                      <label className="ui-zero">
-                        <input name="confirmDelete" type="checkbox" required />
-                        Remove
-                      </label>
+                      <Switch label="Remove" name="confirmDelete" required variant="inline" />
                       <Button type="submit" variant="secondary">
                         Unsuppress
                       </Button>

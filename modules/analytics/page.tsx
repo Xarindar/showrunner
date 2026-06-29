@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Badge, Button, ButtonLink, Card, EqualGrid, Feedback, Field, Input, Select, Stack, StatTile, Table } from "@/components/ui";
+import { Badge, Button, ButtonLink, Card, EqualGrid, Feedback, Field, Input, Select, Stack, StatTile, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 import { createAnalyticsGoalAction, recordAnalyticsEventAction, updateAnalyticsGoalStatusAction } from "./actions";
 
@@ -175,10 +175,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         <Field label="Target value" htmlFor="goal-target-value"><Input id="goal-target-value" name="targetValue" inputMode="decimal" /></Field>
         <Field label="Currency" htmlFor="goal-currency"><Input id="goal-currency" name="currency" defaultValue="USD" maxLength={3} /></Field>
       </EqualGrid>
-      <label className="ui-check-row">
-        <input name="isActive" type="checkbox" defaultChecked />
-        Active
-      </label>
+      <Switch defaultChecked label="Active" name="isActive" variant="inline" />
       <div className="module-modal-actions">
         <Button variant="secondary" type="submit">
           Add goal

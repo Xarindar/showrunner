@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Badge, Button, Card, EqualGrid, Feedback, Field, Input, Select, StatTile, Table } from "@/components/ui";
+import { Badge, Button, Card, EqualGrid, Feedback, Field, Input, Select, StatTile, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 import { createAdminUserAction, deleteAdminUserAction, updateAdminUserRoleAction } from "./actions";
 
@@ -140,10 +140,12 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
                     <td>
                       <form action={deleteAdminUserAction} className="ui-inline-actions">
                         <input type="hidden" name="id" value={user.id} />
-                        <label className="ui-check-row">
-                          <input name="confirmDelete" type="checkbox" disabled={isSelf || isLastOwner} />
-                          Confirm
-                        </label>
+                        <Switch
+                          disabled={isSelf || isLastOwner}
+                          label="Confirm"
+                          name="confirmDelete"
+                          variant="inline"
+                        />
                         <Button variant="danger" type="submit" disabled={isSelf || isLastOwner}>
                           <Trash2 size={16} />
                           Delete

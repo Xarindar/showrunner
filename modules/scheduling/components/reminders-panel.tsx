@@ -1,6 +1,6 @@
 import { Bell, Save } from "lucide-react";
 import { updateReminderSettingsAction } from "../actions";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, Switch } from "@/components/ui";
 
 type RemindersPanelProps = {
   enabled: boolean;
@@ -17,10 +17,7 @@ export function RemindersPanel({ enabled, leadMinutes }: RemindersPanelProps) {
         <h2 className="section-title">Booking reminders</h2>
       </div>
       <form action={updateReminderSettingsAction} className="grid-2">
-        <label className="ui-zero">
-          <input name="enabled" type="checkbox" defaultChecked={enabled} />
-          Email customers before appointments
-        </label>
+        <Switch defaultChecked={enabled} label="Email customers before appointments" name="enabled" variant="inline" />
         <div className="ui-field">
           <label htmlFor="bookingReminderLeadHours">Hours before appointment</label>
           <input

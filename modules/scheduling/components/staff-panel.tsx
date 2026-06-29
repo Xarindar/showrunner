@@ -1,7 +1,7 @@
 import type { AdminRole, StaffMember } from "@prisma/client";
 import { Link2, Plus, Save } from "lucide-react";
 import { createStaffMemberAction, linkStaffMemberAdminUserAction, updateStaffMemberAction } from "../actions";
-import { Button, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, Card, EqualGrid, Switch, Table } from "@/components/ui";
 
 type StaffPanelProps = {
   staff: StaffMember[];
@@ -40,10 +40,7 @@ export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, 
           <label htmlFor="staff-bio">Bio</label>
           <textarea id="staff-bio" name="bio" />
         </div>
-        <label className="ui-zero">
-          <input name="isActive" type="checkbox" defaultChecked />
-          Active for booking
-        </label>
+        <Switch defaultChecked label="Active for booking" name="isActive" variant="inline" />
         <Button type="submit">
           <Plus size={18} />
           Add staff
@@ -100,10 +97,7 @@ export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, 
                         <label htmlFor={`staff-${member.id}-bio`}>Bio</label>
                         <textarea id={`staff-${member.id}-bio`} name="bio" defaultValue={member.bio} />
                       </div>
-                      <label className="ui-zero">
-                        <input name="isActive" type="checkbox" defaultChecked={member.isActive} />
-                        Active for booking
-                      </label>
+                      <Switch defaultChecked={member.isActive} label="Active for booking" name="isActive" variant="inline" />
                       <Button type="submit" variant="secondary">
                         <Save size={16} />
                         Save staff

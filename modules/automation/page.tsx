@@ -22,7 +22,7 @@ import {
   updateAutomationAction,
   updateWebhookEndpointAction,
   updateAutomationStatusAction } from "./actions";
-import { Button, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, Card, EqualGrid, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -554,10 +554,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
             </form>
             <form action={deleteAutomationAction} className="subpanel form-grid">
               <input type="hidden" name="id" value={selectedAutomation.id} />
-              <label className="ui-zero">
-                <input name="confirmDelete" type="checkbox" required />
-                Delete this automation and its run records.
-              </label>
+              <Switch label="Delete this automation and its run records." name="confirmDelete" required variant="inline" />
               <Button type="submit" variant="danger">
                 Delete automation
               </Button>
@@ -687,10 +684,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
                       </form>
                       <form action={deleteWebhookEndpointAction} className="form-grid ui-zero">
                         <input type="hidden" name="id" value={endpoint.id} />
-                        <label className="ui-zero">
-                          <input name="confirmDelete" type="checkbox" required />
-                          Delete this endpoint and delivery records.
-                        </label>
+                        <Switch label="Delete this endpoint and delivery records." name="confirmDelete" required variant="inline" />
                         <Button type="submit" variant="danger">
                           Delete endpoint
                         </Button>

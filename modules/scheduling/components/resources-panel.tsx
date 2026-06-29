@@ -1,7 +1,7 @@
 import type { Resource } from "@prisma/client";
 import { Box, Save } from "lucide-react";
 import { createResourceAction, updateResourceAction } from "../actions";
-import { Button, Card, EqualGrid } from "@/components/ui";
+import { Button, Card, EqualGrid, Switch } from "@/components/ui";
 
 type ResourcesPanelProps = {
   resources: Resource[];
@@ -38,10 +38,7 @@ export function ResourcesPanel({ assignedResourceIds, resources, resourceIdsWith
           <label htmlFor="resource-description">Description</label>
           <textarea id="resource-description" name="description" />
         </div>
-        <label className="ui-zero">
-          <input name="isActive" type="checkbox" defaultChecked />
-          Active
-        </label>
+        <Switch defaultChecked label="Active" name="isActive" variant="inline" />
         <Button type="submit">
           <Box size={18} />
           Add resource
@@ -94,10 +91,7 @@ export function ResourcesPanel({ assignedResourceIds, resources, resourceIdsWith
                     <label htmlFor={`resource-${resource.id}-description`}>Description</label>
                     <textarea id={`resource-${resource.id}-description`} name="description" defaultValue={resource.description} />
                   </div>
-                  <label className="ui-zero">
-                    <input name="isActive" type="checkbox" defaultChecked={resource.isActive} />
-                    Active
-                  </label>
+                  <Switch defaultChecked={resource.isActive} label="Active" name="isActive" variant="inline" />
                   <Button type="submit">
                     <Save size={18} />
                     Save resource

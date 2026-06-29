@@ -10,7 +10,7 @@ import { themeToCssVars } from "@/lib/theme/tokens";
 import { prisma } from "@/lib/prisma";
 import { createPublicTestimonialAction } from "@/modules/testimonials/actions";
 import { TestimonialAvatar } from "@/components/testimonial-avatar";
-import { Button, ButtonLink, Card, EqualGrid } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid, Switch } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -157,12 +157,17 @@ export default async function TestimonialsPublicPage({ searchParams }: Testimoni
               <label htmlFor="rating">Rating</label>
               <input id="rating" name="rating" type="number" min="1" max="5" defaultValue="5" />
             </div>
-            <label className="ui-check-row">
-              <input name="permissionGranted" required aria-required="true" type="checkbox" />
-              <span>
+            <Switch
+              aria-required="true"
+              label={
+                <span>
                 I give permission to display this testimonial publicly after review. <span aria-hidden="true">*</span>
-              </span>
-            </label>
+                </span>
+              }
+              name="permissionGranted"
+              required
+              variant="inline"
+            />
             <Button type="submit">
               Submit testimonial
             </Button>

@@ -21,7 +21,7 @@ import {
   updatePortfolioGalleryLayoutAction,
   updatePortfolioGalleryStatusAction,
   updatePortfolioProofRoundStatusAction } from "./actions";
-import { Button, ButtonAnchor, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, ButtonAnchor, Card, EqualGrid, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -198,14 +198,8 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
         <input id="gallery-cover" name="coverImageUrl" placeholder="/hero.svg" />
       </div>
       <EqualGrid>
-        <label className="ui-zero">
-          <input name="proofingEnabled" type="checkbox" defaultChecked />
-          Proofing enabled
-        </label>
-        <label className="ui-zero">
-          <input name="downloadEnabled" type="checkbox" />
-          Downloads enabled
-        </label>
+        <Switch defaultChecked label="Proofing enabled" name="proofingEnabled" variant="inline" />
+        <Switch label="Downloads enabled" name="downloadEnabled" variant="inline" />
       </EqualGrid>
       <div className="ui-field">
         <label htmlFor="gallery-access-code">Password access code</label>
@@ -416,10 +410,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                   <input type="hidden" name="id" value={selectedGallery.id} />
                   <input type="hidden" name="status" value={status} />
                   {status === PortfolioGalleryStatus.ARCHIVED ?
-              <label className="ui-zero">
-                      <input name="confirmArchive" type="checkbox" />
-                      Confirm archive
-                    </label> :
+              <Switch label="Confirm archive" name="confirmArchive" variant="inline" /> :
               null}
                   <Button type="submit" variant="secondary">
                     Mark {enumLabel(status)}
@@ -478,18 +469,9 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               <textarea id="item-caption" name="caption" />
             </div>
             <EqualGrid min="220px">
-              <label className="ui-zero">
-                <input name="isCover" type="checkbox" />
-                Use as cover
-              </label>
-              <label className="ui-zero">
-                <input name="isDownloadable" type="checkbox" />
-                Downloadable
-              </label>
-              <label className="ui-zero">
-                <input name="isWatermarked" type="checkbox" defaultChecked />
-                Watermarked
-              </label>
+              <Switch label="Use as cover" name="isCover" variant="inline" />
+              <Switch label="Downloadable" name="isDownloadable" variant="inline" />
+              <Switch defaultChecked label="Watermarked" name="isWatermarked" variant="inline" />
             </EqualGrid>
             <div className="ui-field">
               <label htmlFor="item-license">License notes</label>
@@ -567,10 +549,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                       <form action={updatePortfolioProofRoundStatusAction} className="stack ui-zero" key={status}>
                               <input type="hidden" name="id" value={round.id} />
                               <input type="hidden" name="status" value={status} />
-                              <label className="ui-zero">
-                                <input name="confirmTransition" type="checkbox" />
-                                Confirm {enumLabel(status).toLowerCase()}
-                              </label>
+                              <Switch label={`Confirm ${enumLabel(status).toLowerCase()}`} name="confirmTransition" variant="inline" />
                               <Button type="submit" variant="secondary">
                                 Mark {enumLabel(status)}
                               </Button>

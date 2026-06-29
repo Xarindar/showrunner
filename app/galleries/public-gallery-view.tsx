@@ -24,7 +24,7 @@ import {
   favoriteGalleryItemAction,
   saveGalleryItemDecisionAction,
   submitGalleryApprovalAction } from "@/modules/portfolio/public-actions";
-import { Badge, Button, ButtonAnchor, ButtonLink, Card, EqualGrid } from "@/components/ui";
+import { Badge, Button, ButtonAnchor, ButtonLink, Card, EqualGrid, Switch } from "@/components/ui";
 
 type GallerySearchParams = Record<string, string | string[] | undefined>;
 
@@ -385,10 +385,11 @@ export async function PublicGalleryView({ accessToken = "", searchParams, slug }
                   <label htmlFor="proof-notes">Round notes</label>
                   <textarea id="proof-notes" name="notes" />
                 </div>
-                <label className="inline-controls">
-                  <input name="approvalConfirmed" type="checkbox" />
-                  I approve this gallery for delivery or production.
-                </label>
+                <Switch
+                  label="I approve this gallery for delivery or production."
+                  name="approvalConfirmed"
+                  variant="inline"
+                />
                 <Button type="submit">
                   <CheckCircle2 size={16} />
                   Submit response

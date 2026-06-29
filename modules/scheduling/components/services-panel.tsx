@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import type { Resource, Service, ServiceResource, ServiceStaff, StaffMember } from "@prisma/client";
 import { Check, CircleOff, Plus, Save } from "lucide-react";
 import { createServiceAction, toggleServiceAction, updateServiceAction } from "../actions";
-import { Button, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, Card, EqualGrid, Switch, Table } from "@/components/ui";
 
 type ServiceWithStaff = Service & {
   resourceAssignments: Array<ServiceResource & {resource: Resource;}>;
@@ -15,15 +15,15 @@ type ServicesPanelProps = {
   staff: StaffMember[];
 };
 
-function StaffCheckboxes({
+function StaffSwitches({
   assignedStaffIds,
-  checkboxIdPrefix,
+  switchIdPrefix,
   staff
 
 
 
 
-}: {assignedStaffIds: string[];checkboxIdPrefix: string;staff: StaffMember[];}) {
+}: {assignedStaffIds: string[];staff: StaffMember[];switchIdPrefix: string;}) {
   if (!staff.length) {
     return <p className="ui-zero">Add staff to assign this service to specific people.</p>;
   }
@@ -33,32 +33,30 @@ function StaffCheckboxes({
       <label>Staff who can take this service</label>
       <div className="ui-zero">
         {staff.map((member) =>
-        <label className="ui-zero" key={member.id}>
-            <input
-            id={`${checkboxIdPrefix}-${member.id}`}
+        <Switch
+            id={`${switchIdPrefix}-${member.id}`}
+            key={member.id}
+            label={member.name}
             name="staffIds"
-            type="checkbox"
             value={member.id}
             defaultChecked={assignedStaffIds.includes(member.id)}
-            disabled={!member.isActive} />
-          
-            {member.name}
-          </label>
+            disabled={!member.isActive}
+            variant="inline" />
         )}
       </div>
     </div>);
 
 }
 
-function ResourceCheckboxes({
+function ResourceSwitches({
   assignedResourceIds,
-  checkboxIdPrefix,
+  switchIdPrefix,
   resources
 
 
 
 
-}: {assignedResourceIds: string[];checkboxIdPrefix: string;resources: Resource[];}) {
+}: {assignedResourceIds: string[];resources: Resource[];switchIdPrefix: string;}) {
   if (!resources.length) {
     return <p className="ui-zero">Add rooms or equipment before requiring resources for a service.</p>;
   }
@@ -68,17 +66,15 @@ function ResourceCheckboxes({
       <label>Required rooms or equipment</label>
       <div className="ui-zero">
         {resources.map((resource) =>
-        <label className="ui-zero" key={resource.id}>
-            <input
-            id={`${checkboxIdPrefix}-${resource.id}`}
+        <Switch
+            id={`${switchIdPrefix}-${resource.id}`}
+            key={resource.id}
+            label={resource.name}
             name="resourceIds"
-            type="checkbox"
             value={resource.id}
             defaultChecked={assignedResourceIds.includes(resource.id)}
-            disabled={!resource.isActive} />
-          
-            {resource.name}
-          </label>
+            disabled={!resource.isActive}
+            variant="inline" />
         )}
       </div>
     </div>);
@@ -145,24 +141,12 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
           <label htmlFor="policyText">Booking policy</label>
           <textarea id="policyText" name="policyText" placeholder="Cancellation, deposit, or preparation policy" />
         </div>
-        <label className="ui-zero">
-          <input name="requirePolicy" type="checkbox" defaultChecked />
-          Require policy acceptance
-        </label>
-        <label className="ui-zero">
-          <input name="requestOnly" type="checkbox" />
-          Request-only approval
-        </label>
-        <label className="ui-zero">
-          <input name="waitlistEnabled" type="checkbox" />
-          Offer waitlist when full
-        </label>
-        <label className="ui-zero">
-          <input name="isActive" type="checkbox" defaultChecked />
-          Active
-        </label>
-        <StaffCheckboxes assignedStaffIds={[]} checkboxIdPrefix="new-service-staff" staff={staff} />
-        <ResourceCheckboxes assignedResourceIds={[]} checkboxIdPrefix="new-service-resource" resources={resources} />
+        <Switch defaultChecked label="Require policy acceptance" name="requirePolicy" variant="inline" />
+        <Switch label="Request-only approval" name="requestOnly" variant="inline" />
+        <Switch label="Offer waitlist when full" name="waitlistEnabled" variant="inline" />
+        <Switch defaultChecked label="Active" name="isActive" variant="inline" />
+        <StaffSwitches assignedStaffIds={[]} staff={staff} switchIdPrefix="new-service-staff" />
+        <ResourceSwitches assignedResourceIds={[]} resources={resources} switchIdPrefix="new-service-resource" />
         <Button type="submit">
           <Plus size={18} />
           Add service
@@ -339,30 +323,23 @@ export function ServicesPanel({ resources, services, staff }: ServicesPanelProps
                           <label htmlFor={`service-${service.id}-policy`}>Booking policy</label>
                           <textarea id={`service-${service.id}-policy`} name="policyText" defaultValue={service.policyText || ""} />
                         </div>
-                        <label className="ui-zero">
-                          <input name="requirePolicy" type="checkbox" defaultChecked={service.requirePolicy && Boolean(service.policyText?.trim())} />
-                          Require policy acceptance
-                        </label>
-                        <label className="ui-zero">
-                          <input name="requestOnly" type="checkbox" defaultChecked={service.requestOnly} />
-                          Request-only approval
-                        </label>
-                        <label className="ui-zero">
-                          <input name="waitlistEnabled" type="checkbox" defaultChecked={service.waitlistEnabled} />
-                          Offer waitlist when full
-                        </label>
-                        <label className="ui-zero">
-                          <input name="isActive" type="checkbox" defaultChecked={service.isActive} />
-                          Active
-                        </label>
-                        <StaffCheckboxes
+                        <Switch
+                          defaultChecked={service.requirePolicy && Boolean(service.policyText?.trim())}
+                          label="Require policy acceptance"
+                          name="requirePolicy"
+                          variant="inline"
+                        />
+                        <Switch defaultChecked={service.requestOnly} label="Request-only approval" name="requestOnly" variant="inline" />
+                        <Switch defaultChecked={service.waitlistEnabled} label="Offer waitlist when full" name="waitlistEnabled" variant="inline" />
+                        <Switch defaultChecked={service.isActive} label="Active" name="isActive" variant="inline" />
+                        <StaffSwitches
                         assignedStaffIds={service.staffAssignments.map((assignment) => assignment.staffId)}
-                        checkboxIdPrefix={`service-${service.id}-staff`}
+                        switchIdPrefix={`service-${service.id}-staff`}
                         staff={staff} />
                       
-                        <ResourceCheckboxes
+                        <ResourceSwitches
                         assignedResourceIds={service.resourceAssignments.map((assignment) => assignment.resourceId)}
-                        checkboxIdPrefix={`service-${service.id}-resource`}
+                        switchIdPrefix={`service-${service.id}-resource`}
                         resources={resources} />
                       
                         <Button type="submit">

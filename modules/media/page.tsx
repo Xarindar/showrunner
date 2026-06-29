@@ -12,7 +12,7 @@ import {
   setHeroImageAction,
   updateMediaAssetAction,
   uploadMediaAction } from "./actions";
-import { Button, Card, EqualGrid, Pagination, Table } from "@/components/ui";
+import { Button, Card, EqualGrid, Pagination, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -90,10 +90,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
         <label htmlFor="media-alt">Alt text</label>
         <input id="media-alt" name="alt" disabled={!canUpload} />
       </div>
-      <label className="ui-check-row">
-        <input name="isDecorative" type="checkbox" disabled={!canUpload} />
-        Decorative image
-      </label>
+      <Switch disabled={!canUpload} label="Decorative image" name="isDecorative" variant="inline" />
       <EqualGrid>
         <div className="ui-field">
           <label htmlFor="media-folder">Folder</label>
@@ -128,10 +125,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
           <input id="media-focalPointY" name="focalPointY" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
         </div>
       </EqualGrid>
-      <label className="ui-check-row">
-        <input name="isPrivate" type="checkbox" disabled={!canUpload} />
-        Private delivery asset
-      </label>
+      <Switch disabled={!canUpload} label="Private delivery asset" name="isPrivate" variant="inline" />
       <div className="module-modal-actions">
         <Button type="submit" disabled={!canUpload}>
           <ImagePlus size={18} />
@@ -312,14 +306,8 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                     </div>
                   </EqualGrid>
                   <EqualGrid>
-                    <label className="ui-zero">
-                      <input name="isDecorative" type="checkbox" defaultChecked={asset.isDecorative} />
-                      Decorative
-                    </label>
-                    <label className="ui-zero">
-                      <input name="isPrivate" type="checkbox" defaultChecked={asset.isPrivate} />
-                      Private
-                    </label>
+                    <Switch defaultChecked={asset.isDecorative} label="Decorative" name="isDecorative" variant="inline" />
+                    <Switch defaultChecked={asset.isPrivate} label="Private" name="isPrivate" variant="inline" />
                   </EqualGrid>
                   <Button type="submit" variant="secondary">
                     Save metadata
@@ -327,10 +315,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
                 </form>
                 <form action={archiveMediaAssetAction} className="form-grid ui-zero">
                   <input type="hidden" name="id" value={asset.id} />
-                  <label className="ui-zero">
-                    <input name="confirmArchive" type="checkbox" required />
-                    Archive this asset.
-                  </label>
+                  <Switch label="Archive this asset." name="confirmArchive" required variant="inline" />
                   <Button type="submit" variant="danger">
                     <Archive size={16} />
                     Archive asset

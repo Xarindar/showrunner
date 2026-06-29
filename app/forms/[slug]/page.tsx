@@ -17,7 +17,7 @@ import { normalizeUploadRules } from "@/modules/forms/upload-fields";
 import { normalizeValidationRules } from "@/modules/forms/validation-rules";
 import { PublicFormBehavior } from "./public-form-behavior";
 import { SignatureField } from "./signature-field";
-import { ButtonLink, Card } from "@/components/ui";
+import { ButtonLink, Card, Switch } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -177,16 +177,14 @@ function renderField(field: FormField) {
   if (field.type === FormFieldType.CHECKBOX) {
     return wrapField(
       <div className="ui-field">
-        <label className="ui-zero">
-          <input
-            name={name}
-            required={field.isRequired}
-            aria-required={field.isRequired || undefined}
-            aria-describedby={helpId}
-            type="checkbox" />
-          
-          {labelText(field.label, field.isRequired)}
-        </label>
+        <Switch
+          aria-describedby={helpId}
+          aria-required={field.isRequired || undefined}
+          label={labelText(field.label, field.isRequired)}
+          name={name}
+          required={field.isRequired}
+          variant="inline"
+        />
         {field.helpText ?
         <small className="ui-zero" id={helpId}>
             {field.helpText}

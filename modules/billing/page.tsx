@@ -18,7 +18,7 @@ import {
   updateBillingDocumentAction,
   updateBillingLineItemAction,
   updateBillingDocumentStatusAction } from "./actions";
-import { Button, ButtonAnchor, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, ButtonAnchor, Card, EqualGrid, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -521,10 +521,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 {selectedDocument.checkoutUrl && !selectedDocumentIsFinal ?
               <form action={clearBillingCheckoutLinkAction} className="form-grid">
                     <input type="hidden" name="id" value={selectedDocument.id} />
-                    <label className="ui-zero">
-                      <input name="confirmClear" type="checkbox" required />
-                      Clear this hosted payment link.
-                    </label>
+                    <Switch label="Clear this hosted payment link." name="confirmClear" required variant="inline" />
                     <Button type="submit" variant="danger">
                       Clear payment link
                     </Button>
@@ -713,10 +710,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                           <form action={deleteBillingLineItemAction} className="form-grid ui-zero">
                             <input type="hidden" name="id" value={item.id} />
                             <input type="hidden" name="billingDocumentId" value={selectedDocument.id} />
-                            <label className="ui-zero">
-                              <input name="confirmDelete" type="checkbox" required />
-                              Delete this line item.
-                            </label>
+                            <Switch label="Delete this line item." name="confirmDelete" required variant="inline" />
                             <Button type="submit" variant="danger">
                               Delete line
                             </Button>

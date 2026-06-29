@@ -20,7 +20,7 @@ import { enumLabel, formatDateTime, stringArrayFromUnknown } from "@/lib/format"
 import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Button, ButtonLink, EqualGrid, Pagination, Table, Tooltip } from "@/components/ui";
+import { Button, ButtonLink, EqualGrid, Pagination, Switch, Table, Tooltip } from "@/components/ui";
 import {
   createClientAction,
   createClientSegmentAction,
@@ -344,10 +344,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         {selectedSegment ? (
           <form action={deleteClientSegmentAction} className="clients-delete-filter">
             <input type="hidden" name="id" value={selectedSegment.id} />
-            <label className="ui-check-row">
-              <input name="confirmDelete" type="checkbox" />
-              Confirm filter delete
-            </label>
+            <Switch label="Confirm filter delete" name="confirmDelete" variant="inline" />
             <Button size="sm" type="submit" variant="danger">
               <Trash2 size={15} />
               Delete selected
@@ -365,15 +362,14 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         <p className="ui-muted-flush">Choose which activity metrics appear as individual table columns.</p>
         <div className="clients-check-grid clients-metric-grid">
           {clientMetricOptions.map((option) => (
-            <label className="ui-check-row" key={option.id}>
-              <input
-                defaultChecked={selectedMetricIds.includes(option.id)}
-                name="metrics"
-                type="checkbox"
-                value={option.id}
-              />
-              {option.label}
-            </label>
+            <Switch
+              defaultChecked={selectedMetricIds.includes(option.id)}
+              key={option.id}
+              label={option.label}
+              name="metrics"
+              value={option.id}
+              variant="inline"
+            />
           ))}
         </div>
         <div className="clients-modal-actions">
@@ -420,14 +416,8 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
           </div>
         </EqualGrid>
         <div className="clients-check-grid">
-          <label className="ui-check-row">
-            <input name="pastDue" type="checkbox" />
-            Past due
-          </label>
-          <label className="ui-check-row">
-            <input name="upcomingAppointment" type="checkbox" />
-            Upcoming appointment
-          </label>
+          <Switch label="Past due" name="pastDue" variant="inline" />
+          <Switch label="Upcoming appointment" name="upcomingAppointment" variant="inline" />
         </div>
         <EqualGrid>
           <div className="ui-field">

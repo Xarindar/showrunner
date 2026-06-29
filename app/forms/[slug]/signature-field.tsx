@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import { normalizeValidationRules } from "@/modules/forms/validation-rules";
-import { Button } from "@/components/ui";
+import { Button, Switch } from "@/components/ui";
 
 type SignatureFieldProps = {
   fieldId: string;
@@ -145,10 +145,13 @@ export function SignatureField({ fieldId, helpText, isRequired, label, name, pla
           {helpText}
         </small> :
       null}
-      <label className="ui-zero" htmlFor={consentId}>
-        <input id={consentId} name={`${name}-consent`} required={isRequired || Boolean(typedName || drawnDataUrl)} type="checkbox" />
-        <span>{consentStatement}</span>
-      </label>
+      <Switch
+        id={consentId}
+        label={<span>{consentStatement}</span>}
+        name={`${name}-consent`}
+        required={isRequired || Boolean(typedName || drawnDataUrl)}
+        variant="inline"
+      />
     </div>);
 
 }

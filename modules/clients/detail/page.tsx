@@ -17,7 +17,7 @@ import {
   deleteClientNoteAction,
   mergeClientsAction,
   updateClientAction } from "../actions";
-import { Button, ButtonLink, Card, EqualGrid, Pagination, Table } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid, Pagination, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 import { ClientNotesDocumentsCard } from "./client-notes-documents-card";
 import { ClientProfileCard } from "./client-profile-card";
@@ -617,32 +617,14 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         <textarea id="preferences" name="preferences" defaultValue={preferencesNotes(client.preferences)} />
       </div>
       <EqualGrid min="220px">
-        <label className="ui-zero">
-          <input name="emailOptIn" type="checkbox" defaultChecked={client.emailOptIn} />
-          Email opt-in
-        </label>
-        <label className="ui-zero">
-          <input name="smsOptIn" type="checkbox" defaultChecked={client.smsOptIn} />
-          SMS opt-in
-        </label>
-        <label className="ui-zero">
-          <input name="photoUsageRelease" type="checkbox" defaultChecked={client.photoUsageRelease} />
-          Photo release
-        </label>
+        <Switch defaultChecked={client.emailOptIn} label="Email opt-in" name="emailOptIn" variant="inline" />
+        <Switch defaultChecked={client.smsOptIn} label="SMS opt-in" name="smsOptIn" variant="inline" />
+        <Switch defaultChecked={client.photoUsageRelease} label="Photo release" name="photoUsageRelease" variant="inline" />
       </EqualGrid>
       <EqualGrid min="220px">
-        <label className="ui-zero">
-          <input name="policyAccepted" type="checkbox" />
-          Record policy acceptance
-        </label>
-        <label className="ui-zero">
-          <input name="dataExportRequested" type="checkbox" defaultChecked={Boolean(client.dataExportRequestedAt)} />
-          Data export requested
-        </label>
-        <label className="ui-zero">
-          <input name="dataDeletionRequested" type="checkbox" defaultChecked={Boolean(client.dataDeletionRequestedAt)} />
-          Deletion requested
-        </label>
+        <Switch label="Record policy acceptance" name="policyAccepted" variant="inline" />
+        <Switch defaultChecked={Boolean(client.dataExportRequestedAt)} label="Data export requested" name="dataExportRequested" variant="inline" />
+        <Switch defaultChecked={Boolean(client.dataDeletionRequestedAt)} label="Deletion requested" name="dataDeletionRequested" variant="inline" />
       </EqualGrid>
       <div className="ui-field">
         <label htmlFor="privateNotes">Private summary</label>
@@ -771,10 +753,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
               <form action={deleteClientNoteAction} className="clients-records-action-form">
                 <input type="hidden" name="id" value={note.id} />
                 <input type="hidden" name="clientId" value={client.id} />
-                <label className="ui-zero">
-                  <input name="confirmDelete" type="checkbox" />
-                  Confirm
-                </label>
+                <Switch label="Confirm" name="confirmDelete" variant="inline" />
                 <Button size="sm" type="submit" variant="secondary">
                   Delete
                 </Button>
@@ -820,10 +799,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
                 <form action={deleteClientFileAction} className="clients-records-action-form">
                   <input type="hidden" name="id" value={file.id} />
                   <input type="hidden" name="clientId" value={client.id} />
-                  <label className="ui-zero">
-                    <input name="confirmDelete" type="checkbox" />
-                    Confirm
-                  </label>
+                  <Switch label="Confirm" name="confirmDelete" variant="inline" />
                   <Button size="sm" type="submit" variant="secondary">
                     Delete
                   </Button>
@@ -936,10 +912,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             ) : null}
           </div>
         </div>
-        <label className="ui-check-row">
-          <input name="confirmMerge" type="checkbox" />
-          Confirm duplicate merge
-        </label>
+        <Switch label="Confirm duplicate merge" name="confirmMerge" variant="inline" />
         <div className="module-modal-actions">
           <Button disabled={!mergeCandidates.length} type="submit" variant="secondary">
             <GitMerge size={16} />

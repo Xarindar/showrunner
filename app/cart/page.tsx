@@ -19,7 +19,7 @@ import { getPublicFormAttachments, publicFormAttachmentHref } from "@/lib/forms/
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { themeToCssVars } from "@/lib/theme/tokens";
-import { Button, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid, Switch, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -312,10 +312,12 @@ export default async function CartPage({ searchParams }: CartPageProps) {
                     <label htmlFor="recovery-email">Email</label>
                     <input id="recovery-email" name="customerEmail" type="email" required />
                   </div>
-                  <label className="checkbox-row">
-                    <input name="marketingConsent" type="checkbox" required />
-                    <span>Email me only about this saved cart if I do not finish checkout.</span>
-                  </label>
+                  <Switch
+                    label={<span>Email me only about this saved cart if I do not finish checkout.</span>}
+                    name="marketingConsent"
+                    required
+                    variant="inline"
+                  />
                   <Button type="submit" variant="secondary">
                     Save cart
                   </Button>

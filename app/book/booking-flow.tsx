@@ -4,7 +4,7 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { CalendarCheck, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, FileText, MapPin } from "lucide-react";
 import { slugify } from "@/lib/slug";
 import { createPublicBookingAction, joinPublicWaitlistAction, type BookingFormState, type WaitlistFormState } from "./actions";
-import { Button, ButtonAnchor } from "@/components/ui";
+import { Button, ButtonAnchor, Switch } from "@/components/ui";
 
 type BookableService = {
   id: string;
@@ -461,16 +461,13 @@ export function BookingFlow({ services, defaultDate, initialServiceSlug }: Booki
             </div>
 
             {selectedService?.policyText ?
-          <label className="policy-check">
-                <input
+          <Switch
               checked={policyAccepted}
+              label={<span>{selectedService.policyText}</span>}
               name="policyAccepted"
               onChange={(event) => setPolicyAccepted(event.target.checked)}
               required={selectedService.requirePolicy}
-              type="checkbox" />
-            
-                <span>{selectedService.policyText}</span>
-              </label> :
+              variant="inline" /> :
           null}
 
             <div className="booking-actions">

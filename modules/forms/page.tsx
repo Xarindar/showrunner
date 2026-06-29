@@ -25,7 +25,7 @@ import {
   updateFormFieldAction,
   updateFormStatusAction } from "./actions";
 import { formTemplates } from "./templates";
-import { Button, ButtonLink, Card, EqualGrid, Pagination, Table } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid, Pagination, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -169,10 +169,7 @@ function conditionalControls(input: {field?: BuilderField;fields: BuilderField[]
     <details>
       <summary>Conditional visibility</summary>
       <div className="form-grid ui-zero">
-        <label className="ui-zero">
-          <input name="conditionEnabled" type="checkbox" defaultChecked={logic.enabled} disabled={!hasSourceFields} />
-          Enable rule
-        </label>
+        <Switch defaultChecked={logic.enabled} disabled={!hasSourceFields} label="Enable rule" name="conditionEnabled" variant="inline" />
         <EqualGrid>
           <div className="ui-field">
             <label htmlFor={`${input.idPrefix}-condition-action`}>Action</label>
@@ -529,10 +526,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
         <label htmlFor="successMessage">Success message</label>
         <input id="successMessage" name="successMessage" placeholder="Thanks. Your form was submitted." />
       </div>
-      <label className="ui-zero">
-        <input name="enableSteps" type="checkbox" />
-        Use multi-step pages
-      </label>
+      <Switch label="Use multi-step pages" name="enableSteps" variant="inline" />
       <div className="module-modal-actions">
         <Button type="submit">
           <Plus size={18} />
@@ -742,10 +736,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               <label htmlFor={`selected-${selectedForm.id}-success`}>Success message</label>
               <input id={`selected-${selectedForm.id}-success`} name="successMessage" defaultValue={selectedForm.successMessage} />
             </div>
-            <label className="ui-zero">
-              <input name="enableSteps" type="checkbox" defaultChecked={selectedForm.enableSteps} />
-              Use multi-step pages
-            </label>
+            <Switch defaultChecked={selectedForm.enableSteps} label="Use multi-step pages" name="enableSteps" variant="inline" />
             <Button type="submit">
               Save form
             </Button>
@@ -779,10 +770,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
             </form>
             <form action={deleteFormAction} className="subpanel form-grid">
               <input type="hidden" name="id" value={selectedForm.id} />
-              <label className="ui-zero">
-                <input name="confirmDelete" type="checkbox" required />
-                Delete this form, its fields, and its submissions.
-              </label>
+              <Switch label="Delete this form, its fields, and its submissions." name="confirmDelete" required variant="inline" />
               <Button type="submit" variant="danger">
                 Delete form
               </Button>
@@ -816,10 +804,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                     </select>
                   </div>
                   {group.targets[0]?.meta ? <p className="ui-zero">{group.targets[0].meta}</p> : null}
-                  <label className="ui-zero">
-                    <input name="isRequired" type="checkbox" />
-                    Required
-                  </label>
+                  <Switch label="Required" name="isRequired" variant="inline" />
                   <Button disabled={!group.targets.length} type="submit" variant="secondary">
                     <Paperclip size={16} />
                     Attach
@@ -938,14 +923,8 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                 </div>
               </EqualGrid>
               <div className="ui-zero">
-                <label className="ui-zero">
-                  <input name="isRequired" type="checkbox" />
-                  Required
-                </label>
-                <label className="ui-zero">
-                  <input name="isHidden" type="checkbox" />
-                  Hidden metadata
-                </label>
+                <Switch label="Required" name="isRequired" variant="inline" />
+                <Switch label="Hidden metadata" name="isHidden" variant="inline" />
               </div>
               {conditionalControls({ fields: selectedForm.fields, idPrefix: "field-new" })}
               {validationControls({ idPrefix: "field-new" })}
@@ -1054,14 +1033,8 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                             <input id={`field-${field.id}-help`} name="helpText" defaultValue={field.helpText} />
                           </div>
                           <div className="ui-zero">
-                            <label className="ui-zero">
-                              <input name="isRequired" type="checkbox" defaultChecked={field.isRequired} />
-                              Required
-                            </label>
-                            <label className="ui-zero">
-                              <input name="isHidden" type="checkbox" defaultChecked={field.isHidden} />
-                              Hidden metadata
-                            </label>
+                            <Switch defaultChecked={field.isRequired} label="Required" name="isRequired" variant="inline" />
+                            <Switch defaultChecked={field.isHidden} label="Hidden metadata" name="isHidden" variant="inline" />
                           </div>
                           {conditionalControls({ field, fields: selectedForm.fields, idPrefix: `field-${field.id}` })}
                           {validationControls({ field, idPrefix: `field-${field.id}` })}
@@ -1073,10 +1046,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                         <form action={deleteFormFieldAction} className="form-grid ui-zero">
                           <input type="hidden" name="id" value={field.id} />
                           <input type="hidden" name="formId" value={selectedForm.id} />
-                          <label className="ui-zero">
-                            <input name="confirmDelete" type="checkbox" required />
-                            Delete this field.
-                          </label>
+                          <Switch label="Delete this field." name="confirmDelete" required variant="inline" />
                           <Button type="submit" variant="danger">
                             Delete field
                           </Button>
