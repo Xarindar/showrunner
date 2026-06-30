@@ -5,8 +5,10 @@ import { requireAdmin } from "@/lib/auth";
 import { stringArrayCsv } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Button, ButtonLink, Switch } from "@/components/ui";
-import { updateServiceAction } from "./actions";
+import { Button, ButtonLink } from "@/components/ui";
+import { createServiceAction, updateServiceAction } from "./actions";
+import { ServiceBookingRulesTable } from "./components/service-booking-rules-table";
+import { ServicePresetField } from "./components/service-preset-field";
 import { ServiceWorkspaceTabs, type ServiceWorkspaceTab } from "./components/service-workspace-tabs";
 
 type ServiceEditPageProps = {
@@ -23,6 +25,19 @@ type ServiceWithBuilderData = Prisma.ServiceGetPayload<{
     };
   };
 }>;
+
+type ServiceTaxonomyOption = {
+  category: string;
+  intakePrompt: string | null;
+  location: string | null;
+  policyText: string | null;
+};
+
+function uniqueSortedStrings(values: Array<string | null | undefined>) {
+  return Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))).sort((left, right) =>
+    left.localeCompare(right)
+  );
+}
 
 function serviceTags(service: ServiceWithBuilderData) {
   return stringArrayCsv(service.tags);
@@ -58,21 +73,243 @@ function hiddenSchedulingValues(service: ServiceWithBuilderData) {
   );
 }
 
+function ServiceCreatePage({
+  categoryOptions,
+  errorMessage,
+  intakeOptions,
+  locationOptions,
+  policyOptions
+}: {
+  categoryOptions: string[];
+  errorMessage: string | null;
+  intakeOptions: string[];
+  locationOptions: string[];
+  policyOptions: string[];
+}) {
+  return (
+    <div className="product-studio-page product-editor-page service-editor-page">
+      <header className="product-studio-header service-studio-header">
+        <div className="product-studio-title">
+          <ButtonLink href="/admin/modules/services" size="sm" variant="ghost">
+            <ArrowLeft size={15} />
+            Services
+          </ButtonLink>
+          <div>
+            <p className="catalog-kicker">Service builder</p>
+            <h1>New service</h1>
+            <p>Set up the customer-facing service details, booking behavior, and scheduling rules before publishing.</p>
+          </div>
+          <div className="product-studio-badges">
+            <span className="catalog-status is-draft">new</span>
+          </div>
+        </div>
+      </header>
+
+      {errorMessage ? <div className="error">{errorMessage}</div> : null}
+
+      <form action={createServiceAction} className="product-studio-save-grid" id="service-create-form">
+        <main className="product-studio-main">
+          <section className="studio-panel">
+            <div className="studio-section-head">
+              <div>
+                <p className="catalog-rail-label">Service details</p>
+                <h2>Name, category &amp; description</h2>
+              </div>
+              <FileText size={20} />
+            </div>
+
+            <div className="catalog-form-grid is-two">
+              <div className="ui-field">
+                <label htmlFor="new-service-name">Service name</label>
+                <input autoFocus id="new-service-name" name="name" placeholder="30-minute head spa" required />
+              </div>
+              <div className="ui-field">
+                <label htmlFor="new-service-slug">Booking URL slug</label>
+                <input id="new-service-slug" name="slug" placeholder="head-spa" />
+              </div>
+            </div>
+
+            <div className="catalog-form-grid is-three">
+              <div className="ui-field">
+                <label htmlFor="new-service-duration">Duration</label>
+                <input defaultValue="30" id="new-service-duration" min="1" name="durationMinutes" step="5" type="number" required />
+              </div>
+              <ServicePresetField
+                emptyLabel="Uncategorized"
+                id="new-service-category"
+                label="Category"
+                name="category"
+                newLabel="New category"
+                newPlaceholder="Category name"
+                options={categoryOptions}
+              />
+              <ServicePresetField
+                emptyLabel="No location label"
+                id="new-service-location"
+                label="Location label"
+                name="location"
+                newLabel="New location label"
+                newPlaceholder="Location label name"
+                options={locationOptions}
+              />
+            </div>
+
+            <div className="ui-field">
+              <label htmlFor="new-service-tags">Tags</label>
+              <input id="new-service-tags" name="tags" placeholder="relaxation, featured" />
+            </div>
+
+            <div className="ui-field">
+              <label htmlFor="new-service-description">Description</label>
+              <textarea id="new-service-description" name="description" placeholder="Describe what customers should expect before booking." />
+            </div>
+          </section>
+
+          <section className="studio-panel">
+            <div className="studio-section-head">
+              <div>
+                <p className="catalog-rail-label">Booking copy</p>
+                <h2>Customer prompts &amp; policy</h2>
+              </div>
+              <CalendarCheck size={20} />
+            </div>
+
+            <ServiceBookingRulesTable
+              defaultIsActive
+              idPrefix="new-service"
+              intakeOptions={intakeOptions}
+              policyOptions={policyOptions}
+            />
+          </section>
+
+          <section className="studio-panel">
+            <div className="studio-section-head">
+              <div>
+                <p className="catalog-rail-label">Booking rules</p>
+                <h2>Notice, buffers &amp; slot timing</h2>
+              </div>
+              <Clock3 size={20} />
+            </div>
+
+            <div className="catalog-form-grid is-three">
+              <div className="ui-field">
+                <label htmlFor="new-service-buffer-before">Buffer before</label>
+                <input defaultValue="0" id="new-service-buffer-before" min="0" name="bufferBeforeMinutes" step="5" type="number" />
+              </div>
+              <div className="ui-field">
+                <label htmlFor="new-service-buffer-after">Buffer after</label>
+                <input defaultValue="15" id="new-service-buffer-after" min="0" name="bufferAfterMinutes" step="5" type="number" />
+              </div>
+              <div className="ui-field">
+                <label htmlFor="new-service-slot-interval">Slot interval</label>
+                <input defaultValue="30" id="new-service-slot-interval" min="1" name="slotIntervalMinutes" step="5" type="number" />
+              </div>
+            </div>
+
+            <div className="catalog-form-grid is-two">
+              <div className="ui-field">
+                <label htmlFor="new-service-minimum-notice">Minimum notice hours</label>
+                <input defaultValue="12" id="new-service-minimum-notice" min="0" name="minimumNoticeHours" type="number" />
+              </div>
+              <div className="ui-field">
+                <label htmlFor="new-service-max-advance">Max advance days</label>
+                <input defaultValue="60" id="new-service-max-advance" min="1" name="maxAdvanceDays" type="number" />
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <aside className="product-studio-sidecar">
+          <section className="studio-panel">
+            <p className="catalog-rail-label">Create service</p>
+            <span className="catalog-status is-draft">ready to create</span>
+            <dl className="service-editor-summary">
+              <div>
+                <dt>After save</dt>
+                <dd>Open the full editor</dd>
+              </div>
+              <div>
+                <dt>Packages</dt>
+                <dd>Add after creation</dd>
+              </div>
+              <div>
+                <dt>Booking URL</dt>
+                <dd>Generated from name or slug</dd>
+              </div>
+            </dl>
+            <Button form="service-create-form" type="submit">
+              <Save size={16} />
+              Create service
+            </Button>
+            <ButtonLink href="/admin/modules/services" variant="secondary">
+              <ArrowLeft size={16} />
+              Back to services
+            </ButtonLink>
+            <ButtonLink href="/admin/modules/appointments?panel=rules&tab=availability" variant="ghost">
+              <Clock3 size={16} />
+              Appointment rules
+            </ButtonLink>
+          </section>
+        </aside>
+      </form>
+    </div>
+  );
+}
+
 export default async function ServiceEditPage({ searchParams, serviceId }: ServiceEditPageProps) {
   await requireAdmin("scheduling:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const service = await prisma.service.findFirst({
-    where: { id: serviceId, siteId: settings.siteId },
-    include: {
-      packageItems: {
-        include: { package: true },
-        orderBy: [{ package: { sortOrder: "asc" } }, { createdAt: "asc" }]
-      }
-    }
+  const taxonomyServicesPromise = prisma.service.findMany({
+    where: { siteId: settings.siteId },
+    select: { category: true, intakePrompt: true, location: true, policyText: true }
   });
+  const intakeFormFieldsPromise = prisma.formField.findMany({
+    where: {
+      form: { siteId: settings.siteId },
+      isHidden: false
+    },
+    select: { label: true },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }]
+  });
+
+  if (serviceId === "new") {
+    const [taxonomyServices, intakeFormFields] = await Promise.all([taxonomyServicesPromise, intakeFormFieldsPromise]);
+    const categoryOptions = uniqueSortedStrings(taxonomyServices.map((service) => service.category));
+    const intakeOptions = uniqueSortedStrings([...taxonomyServices.map((service) => service.intakePrompt), ...intakeFormFields.map((field) => field.label)]);
+    const locationOptions = uniqueSortedStrings(taxonomyServices.map((service) => service.location));
+    const policyOptions = uniqueSortedStrings(taxonomyServices.map((service) => service.policyText));
+    const errorMessage = params.error ? decodeURIComponent(params.error) : null;
+    return (
+      <ServiceCreatePage
+        categoryOptions={categoryOptions}
+        errorMessage={errorMessage}
+        intakeOptions={intakeOptions}
+        locationOptions={locationOptions}
+        policyOptions={policyOptions}
+      />
+    );
+  }
+
+  const [service, taxonomyServices, intakeFormFields] = await Promise.all([
+    prisma.service.findFirst({
+      where: { id: serviceId, siteId: settings.siteId },
+      include: {
+        packageItems: {
+          include: { package: true },
+          orderBy: [{ package: { sortOrder: "asc" } }, { createdAt: "asc" }]
+        }
+      }
+    }),
+    taxonomyServicesPromise,
+    intakeFormFieldsPromise
+  ]);
 
   if (!service) notFound();
 
+  const categoryOptions = uniqueSortedStrings(taxonomyServices.map((item: ServiceTaxonomyOption) => item.category));
+  const intakeOptions = uniqueSortedStrings([...taxonomyServices.map((item: ServiceTaxonomyOption) => item.intakePrompt), ...intakeFormFields.map((field) => field.label)]);
+  const locationOptions = uniqueSortedStrings(taxonomyServices.map((item: ServiceTaxonomyOption) => item.location));
+  const policyOptions = uniqueSortedStrings(taxonomyServices.map((item: ServiceTaxonomyOption) => item.policyText));
   const savedMessage = savedServiceMessage(params.saved);
   const errorMessage = params.error ? decodeURIComponent(params.error) : null;
   const bookingPath = `/book/${service.slug}`;
@@ -109,14 +346,26 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
               <label htmlFor="service-duration">Duration</label>
               <input defaultValue={service.durationMinutes} id="service-duration" min="1" name="durationMinutes" step="5" type="number" required />
             </div>
-            <div className="ui-field">
-              <label htmlFor="service-category">Category</label>
-              <input defaultValue={service.category} id="service-category" name="category" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="service-location">Location label</label>
-              <input defaultValue={service.location || ""} id="service-location" name="location" />
-            </div>
+            <ServicePresetField
+              defaultValue={service.category}
+              emptyLabel="Uncategorized"
+              id="service-category"
+              label="Category"
+              name="category"
+              newLabel="New category"
+              newPlaceholder="Category name"
+              options={categoryOptions}
+            />
+            <ServicePresetField
+              defaultValue={service.location || ""}
+              emptyLabel="No location label"
+              id="service-location"
+              label="Location label"
+              name="location"
+              newLabel="New location label"
+              newPlaceholder="Location label name"
+              options={locationOptions}
+            />
           </div>
 
           <div className="ui-field">
@@ -139,28 +388,17 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
             <CalendarCheck size={20} />
           </div>
 
-          <div className="catalog-form-grid is-two">
-            <div className="ui-field">
-              <label htmlFor="service-intake">Intake question</label>
-              <input defaultValue={service.intakePrompt || ""} id="service-intake" name="intakePrompt" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="service-policy">Booking policy</label>
-              <input defaultValue={service.policyText || ""} id="service-policy" name="policyText" />
-            </div>
-          </div>
-
-          <div className="studio-toggle-strip">
-            <Switch
-              defaultChecked={service.requirePolicy && Boolean(service.policyText?.trim())}
-              label="Require policy acceptance"
-              name="requirePolicy"
-              variant="inline"
-            />
-            <Switch defaultChecked={service.requestOnly} label="Request-only approval" name="requestOnly" variant="inline" />
-            <Switch defaultChecked={service.waitlistEnabled} label="Offer waitlist" name="waitlistEnabled" variant="inline" />
-            <Switch defaultChecked={service.isActive} label="Active" name="isActive" variant="inline" />
-          </div>
+          <ServiceBookingRulesTable
+            defaultIntakePrompt={service.intakePrompt}
+            defaultIsActive={service.isActive}
+            defaultPolicyText={service.policyText}
+            defaultRequirePolicy={service.requirePolicy}
+            defaultRequestOnly={service.requestOnly}
+            defaultWaitlistEnabled={service.waitlistEnabled}
+            idPrefix="service"
+            intakeOptions={intakeOptions}
+            policyOptions={policyOptions}
+          />
         </section>
       </main>
 

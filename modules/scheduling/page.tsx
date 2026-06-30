@@ -1,16 +1,13 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { Boxes, CalendarCheck, Plus } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Button, FolderTabs, Switch, type FolderTab, type SelectMenuOption } from "@/components/ui";
-import {
-  createServiceAction,
-  toggleServiceAction
-} from "./actions";
+import { ButtonLink, FolderTabs, type FolderTab, type SelectMenuOption } from "@/components/ui";
+import { toggleServiceAction } from "./actions";
 import { ServiceCatalogTable, type ServiceCatalogTableService } from "./components/service-catalog-table";
-import { ServiceCreateMenu } from "./components/service-create-menu";
 import { ServicePackageTable, type ServicePackageTablePackage } from "./components/service-package-table";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +47,18 @@ function serviceTags(service: { tags: Prisma.JsonValue }) {
   return jsonStringArray(service.tags);
 }
 
+function uniqueSortedStrings(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean))).sort((left, right) => left.localeCompare(right));
+}
+
+function servicePackageCategories(servicePackage: ServicePackageWithItems) {
+  return uniqueSortedStrings(servicePackage.items.map((item) => serviceCategory(item.service)));
+}
+
+function servicePackageTags(servicePackage: { tags: Prisma.JsonValue }) {
+  return jsonStringArray(servicePackage.tags);
+}
+
 function savedServiceMessage(saved?: string) {
   if (saved === "package") return "Package changes saved.";
   if (saved === "package-item") return "Package contents updated.";
@@ -78,6 +87,7 @@ function toServicePackageTablePackage(servicePackage: ServicePackageWithItems): 
 
   return {
     bookingPath: `/book/packages/${servicePackage.slug}`,
+    categories: servicePackageCategories(servicePackage),
     description: servicePackage.description,
     durationMinutes,
     id: servicePackage.id,
@@ -86,22 +96,8 @@ function toServicePackageTablePackage(servicePackage: ServicePackageWithItems): 
     name: servicePackage.name,
     serviceNames,
     sortOrder: servicePackage.sortOrder,
-    tags: jsonStringArray(servicePackage.tags)
+    tags: servicePackageTags(servicePackage)
   };
-}
-
-function hiddenServiceDefaults() {
-  return (
-    <>
-      <input name="bufferBeforeMinutes" type="hidden" value="0" />
-      <input name="bufferAfterMinutes" type="hidden" value="15" />
-      <input name="minimumNoticeHours" type="hidden" value="12" />
-      <input name="maxAdvanceDays" type="hidden" value="60" />
-      <input name="slotIntervalMinutes" type="hidden" value="30" />
-      <input name="intakePrompt" type="hidden" value="" />
-      <input name="policyText" type="hidden" value="" />
-    </>
-  );
 }
 
 function redirectLegacyRulesTab(params: Awaited<SchedulingPageProps["searchParams"]>) {
@@ -139,8 +135,10 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   ]);
 
   const searchQuery = (params.q || "").trim().slice(0, 120);
-  const categories = Array.from(new Set(services.map(serviceCategory).filter(Boolean))).sort((left, right) => left.localeCompare(right));
-  const tags = Array.from(new Set(services.flatMap(serviceTags))).sort((left, right) => left.localeCompare(right));
+  const categories = uniqueSortedStrings(services.map(serviceCategory));
+  const tags = uniqueSortedStrings(services.flatMap(serviceTags));
+  const packageCategories = uniqueSortedStrings(servicePackages.flatMap(servicePackageCategories));
+  const packageTags = uniqueSortedStrings(servicePackages.flatMap(servicePackageTags));
   const categoryFilter = categories.includes(params.category || "") ? String(params.category) : "all";
   const tagFilter = tags.includes(params.tag || "") ? String(params.tag) : "all";
 
@@ -156,40 +154,14 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
     { label: "All tags", value: "all" },
     ...tags.map((tag) => ({ label: tag, value: tag }))
   ];
-
-  const createServiceForm = (
-    <form action={createServiceAction} className="catalog-form-grid">
-      {hiddenServiceDefaults()}
-      <p className="muted-text">Start with the service basics. You can build out copy, tags, and booking behavior on the next screen.</p>
-      <div className="ui-field">
-        <label htmlFor="new-service-name">Service name</label>
-        <input autoFocus id="new-service-name" name="name" placeholder="30-minute head spa" required />
-      </div>
-      <div className="catalog-form-grid is-two">
-        <div className="ui-field">
-          <label htmlFor="new-service-duration">Duration</label>
-          <input defaultValue="30" id="new-service-duration" min="5" name="durationMinutes" step="5" type="number" required />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="new-service-category">Category</label>
-          <input id="new-service-category" name="category" placeholder="Spa treatments" />
-        </div>
-      </div>
-      <div className="ui-field">
-        <label htmlFor="new-service-tags">Tags</label>
-        <input id="new-service-tags" name="tags" placeholder="relaxation, featured" />
-      </div>
-      <input name="description" type="hidden" value="" />
-      <input name="location" type="hidden" value="" />
-      <Switch defaultChecked label="Active" name="isActive" variant="inline" />
-      <div className="module-modal-actions">
-        <Button type="submit">
-          <Plus size={18} />
-          Create service
-        </Button>
-      </div>
-    </form>
-  );
+  const packageCategoryOptions: SelectMenuOption[] = [
+    { label: "All categories", value: "all" },
+    ...packageCategories.map((category) => ({ label: category, value: category }))
+  ];
+  const packageTagOptions: SelectMenuOption[] = [
+    { label: "All tags", value: "all" },
+    ...packageTags.map((tag) => ({ label: tag, value: tag }))
+  ];
 
   const servicesContent = (
     <ServiceCatalogTable
@@ -197,11 +169,15 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       activeServices={activeServices}
       categoryOptions={categoryOptions}
       createAction={
-        <ServiceCreateMenu
-          items={[
-            { content: createServiceForm, description: "Create a bookable catalog service.", id: "service", label: "Service", title: "Create service", type: "service" }
-          ]}
-        />
+        <ButtonLink href="/admin/modules/services/new" size="sm">
+          <Plus size={15} />
+          New service
+        </ButtonLink>
+      }
+      emptyCreateAction={
+        <Link className="catalog-empty-state-link" href="/admin/modules/services/new">
+          Click here to make your first service
+        </Link>
       }
       initialCategory={categoryFilter}
       initialSearch={searchQuery}
@@ -213,7 +189,12 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   );
 
   const packagesContent = (
-    <ServicePackageTable activePackages={activePackages} packages={servicePackages.map(toServicePackageTablePackage)} />
+    <ServicePackageTable
+      activePackages={activePackages}
+      categoryOptions={packageCategoryOptions}
+      packages={servicePackages.map(toServicePackageTablePackage)}
+      tagOptions={packageTagOptions}
+    />
   );
 
   const tabs: FolderTab[] = [

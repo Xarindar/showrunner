@@ -2,11 +2,13 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import { Boxes, Plus, Search, X } from "lucide-react";
-import { Button, ButtonLink, Pagination } from "@/components/ui";
+import Link from "next/link";
+import { Button, ButtonLink, Pagination, SelectMenu, type SelectMenuOption } from "@/components/ui";
 import { useCatalogTablePagination } from "./use-catalog-table-pagination";
 
 export type ServicePackageTablePackage = {
   bookingPath: string;
+  categories: string[];
   description: string;
   durationMinutes: number;
   id: string;
@@ -20,7 +22,9 @@ export type ServicePackageTablePackage = {
 
 type ServicePackageTableProps = {
   activePackages: number;
+  categoryOptions: SelectMenuOption[];
   packages: ServicePackageTablePackage[];
+  tagOptions: SelectMenuOption[];
 };
 
 function packageDurationLabel(minutes: number) {
@@ -37,6 +41,7 @@ function packageMatchesSearch(servicePackage: ServicePackageTablePackage, search
     servicePackage.name,
     servicePackage.bookingPath,
     servicePackage.description,
+    ...servicePackage.categories,
     ...servicePackage.tags,
     ...servicePackage.serviceNames
   ]
@@ -45,12 +50,20 @@ function packageMatchesSearch(servicePackage: ServicePackageTablePackage, search
   return haystack.includes(searchQuery.toLowerCase());
 }
 
-export function ServicePackageTable({ activePackages, packages }: ServicePackageTableProps) {
+export function ServicePackageTable({ activePackages, categoryOptions, packages, tagOptions }: ServicePackageTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [tagFilter, setTagFilter] = useState("all");
   const normalizedSearch = searchQuery.trim().slice(0, 120);
+  const filtersActive = Boolean(normalizedSearch || categoryFilter !== "all" || tagFilter !== "all");
   const filteredPackages = useMemo(
-    () => packages.filter((servicePackage) => packageMatchesSearch(servicePackage, normalizedSearch)),
-    [normalizedSearch, packages]
+    () =>
+      packages.filter((servicePackage) => {
+        if (categoryFilter !== "all" && !servicePackage.categories.includes(categoryFilter)) return false;
+        if (tagFilter !== "all" && !servicePackage.tags.includes(tagFilter)) return false;
+        return packageMatchesSearch(servicePackage, normalizedSearch);
+      }),
+    [categoryFilter, normalizedSearch, packages, tagFilter]
   );
   const {
     currentPage,
@@ -67,6 +80,14 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
   const pagedPackages = filteredPackages.slice(startIndex, endIndex);
   const rangeStart = filteredPackages.length ? startIndex + 1 : 0;
   const rangeEnd = endIndex;
+  const hasPackages = Boolean(packages.length);
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setCategoryFilter("all");
+    setTagFilter("all");
+    firstPage();
+  };
 
   return (
     <div className="service-catalog-folder-panel" aria-labelledby="packages-board-title">
@@ -80,10 +101,6 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
           </p>
         </div>
         <div className="catalog-board-actions">
-          <span className="catalog-pill is-blue">
-            <Boxes size={15} />
-            {activePackages} active
-          </span>
           <ButtonLink href="/admin/modules/services/packages/new" size="sm">
             <Plus size={15} />
             New package
@@ -94,7 +111,7 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
       <div className="ui-table-filter-bar catalog-board-filters">
         <div className="ui-table-filter-search" role="search">
           <label className="ui-sr-only" htmlFor="packages-search">
-            Search package, service, tag
+            Search package, service, category, tag
           </label>
           <span className="ui-table-filter-input">
             <Search aria-hidden="true" size={15} />
@@ -104,19 +121,37 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
                 setSearchQuery(event.currentTarget.value);
                 firstPage();
               }}
-              placeholder="Search package, service, tag"
+              placeholder="Search package, service, category, tag"
               value={searchQuery}
             />
           </span>
-          {normalizedSearch ? (
-            <Button
-              onClick={() => {
-                setSearchQuery("");
-                firstPage();
-              }}
-              size="sm"
-              type="button"
-              variant="ghost">
+          <SelectMenu
+            className="ui-table-filter-select"
+            id="packages-category-filter"
+            label="Category"
+            name="category"
+            onValueChange={(value) => {
+              setCategoryFilter(value);
+              firstPage();
+            }}
+            options={categoryOptions}
+            value={categoryFilter}
+          />
+          <SelectMenu
+            className="ui-table-filter-select"
+            id="packages-tag-filter"
+            label="Tag"
+            name="tag"
+            onValueChange={(value) => {
+              setTagFilter(value);
+              firstPage();
+            }}
+            options={tagOptions}
+            value={tagFilter}
+          />
+
+          {filtersActive ? (
+            <Button onClick={resetFilters} size="sm" type="button" variant="ghost">
               <X size={15} />
               Reset
             </Button>
@@ -199,9 +234,21 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
                 style={{ "--catalog-table-empty-rows": emptyRowCount } as CSSProperties}>
                 <td colSpan={7}>
                   <div className="catalog-empty-state">
-                    <Boxes size={30} />
-                    <h3>No packages found</h3>
-                    <p>Create a package or adjust the current search.</p>
+                    {hasPackages ? (
+                      <>
+                        <h3>No packages found</h3>
+                        <p>Adjust the current filters.</p>
+                      </>
+                    ) : (
+                      <>
+                        <h3>No packages made</h3>
+                        <p>
+                          <Link className="catalog-empty-state-link" href="/admin/modules/services/packages/new">
+                            Click here to make your first package
+                          </Link>
+                        </p>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -210,13 +257,19 @@ export function ServicePackageTable({ activePackages, packages }: ServicePackage
         </table>
       </div>
       <Pagination
-        className="ui-pagination-round catalog-table-pagination"
+        className="catalog-table-pagination"
         label="Package catalog pages"
         onNext={nextPage}
         onPrevious={previousPage}
         page={currentPage}
         pageCount={pageCount}
       />
+      <div className="catalog-table-status-strip" aria-label="Package catalog status">
+        <span className="catalog-pill is-blue">
+          <Boxes size={15} />
+          {activePackages} active
+        </span>
+      </div>
     </div>
   );
 }

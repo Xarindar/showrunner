@@ -17,12 +17,14 @@ export function useCatalogTablePagination(itemCount: number) {
 
     const frameRect = frame.getBoundingClientRect();
     const viewportHeight = window.visualViewport?.height || window.innerHeight;
-    const paginationHeight = frame.parentElement?.querySelector(".catalog-table-pagination")?.getBoundingClientRect().height || 36;
+    const footerHeight = [".catalog-table-status-strip", ".catalog-table-pagination"].reduce((total, selector) => {
+      return total + (frame.parentElement?.querySelector(selector)?.getBoundingClientRect().height || 0);
+    }, 0);
     const headerHeight = frame.querySelector("thead")?.getBoundingClientRect().height || fallbackHeaderHeight;
     const rowHeight =
       frame.querySelector("tbody tr:not(.catalog-table-filler-row):not(.catalog-table-empty-state-row)")?.getBoundingClientRect().height ||
       fallbackRowHeight;
-    const bottomReserve = paginationHeight + 30;
+    const bottomReserve = Math.max(36, footerHeight) + 42;
     const availableHeight = Math.max(headerHeight + rowHeight * minRowsPerPage, viewportHeight - frameRect.top - bottomReserve);
     const nextRowsPerPage = Math.max(minRowsPerPage, Math.floor((availableHeight - headerHeight) / rowHeight));
 

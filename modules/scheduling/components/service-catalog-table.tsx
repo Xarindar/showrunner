@@ -25,6 +25,7 @@ type ServiceCatalogTableProps = {
   activeServices: number;
   categoryOptions: SelectMenuOption[];
   createAction: ReactNode;
+  emptyCreateAction?: ReactNode;
   initialCategory: string;
   initialSearch: string;
   initialTag: string;
@@ -64,6 +65,7 @@ export function ServiceCatalogTable({
   activeServices,
   categoryOptions,
   createAction,
+  emptyCreateAction,
   initialCategory,
   initialSearch,
   initialTag,
@@ -100,6 +102,7 @@ export function ServiceCatalogTable({
   const pagedServices = filteredServices.slice(startIndex, endIndex);
   const rangeStart = filteredServices.length ? startIndex + 1 : 0;
   const rangeEnd = endIndex;
+  const hasServices = Boolean(services.length);
 
   const resetFilters = () => {
     setSearchQuery("");
@@ -120,14 +123,6 @@ export function ServiceCatalogTable({
           </p>
         </div>
         <div className="catalog-board-actions">
-          <span className="catalog-pill is-green">
-            <CalendarCheck size={15} />
-            {activeServices} active
-          </span>
-          <span className="catalog-pill is-blue">
-            <Boxes size={15} />
-            {activePackages} packages
-          </span>
           <ButtonLink href="/book" rel="noreferrer" size="sm" target="_blank" variant="secondary">
             <ExternalLink size={15} />
             View booking
@@ -273,9 +268,19 @@ export function ServiceCatalogTable({
                 style={{ "--catalog-table-empty-rows": emptyRowCount } as CSSProperties}>
                 <td colSpan={8}>
                   <div className="catalog-empty-state">
-                    <CalendarCheck size={30} />
-                    <h3>No services found</h3>
-                    <p>Create a service or adjust the current filters.</p>
+                    {hasServices ? (
+                      <>
+                        <h3>No services found</h3>
+                        <p>Adjust the current filters.</p>
+                      </>
+                    ) : (
+                      <>
+                        <h3>No services made</h3>
+                        <div className="catalog-empty-state-action">
+                          {emptyCreateAction || "Create a service or adjust the current filters."}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -284,13 +289,23 @@ export function ServiceCatalogTable({
         </table>
       </div>
       <Pagination
-        className="ui-pagination-round catalog-table-pagination"
+        className="catalog-table-pagination"
         label="Service catalog pages"
         onNext={nextPage}
         onPrevious={previousPage}
         page={currentPage}
         pageCount={pageCount}
       />
+      <div className="catalog-table-status-strip" aria-label="Service catalog status">
+        <span className="catalog-pill is-green">
+          <CalendarCheck size={15} />
+          {activeServices} active
+        </span>
+        <span className="catalog-pill is-blue">
+          <Boxes size={15} />
+          {activePackages} packages
+        </span>
+      </div>
     </div>
   );
 }

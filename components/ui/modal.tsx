@@ -57,7 +57,7 @@ export function Modal({
         <h2 className="ui-zero" id={titleId}>
           {title}
         </h2>
-        <Button aria-label={closeLabel} onClick={onClose} size="sm" type="button" variant="ghost">
+        <Button aria-label={closeLabel} className="ui-dialog-close" onClick={onClose} size="sm" type="button" variant="ghost">
           <X size={16} />
         </Button>
       </div>
