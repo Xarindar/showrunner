@@ -474,6 +474,10 @@
   }
 
   function updatePanels() {
+    if (els.root) {
+      els.root.dataset.activeStep = state.activeStep;
+    }
+
     els.panels.forEach((panel) => {
       const isActive = panel.dataset.stepPanel === state.activeStep;
       panel.hidden = !isActive;
