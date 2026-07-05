@@ -15,10 +15,9 @@ import { Button, Field, Input, OnboardingModal, Select } from "@/components/ui";
 import {
   connectPayPalAction,
   connectStripeAction,
-  connectSquareAction,
-  initialPaymentActionState,
-  type PaymentActionState
+  connectSquareAction
 } from "../actions";
+import { initialPaymentActionState, type PaymentActionState } from "../state";
 
 // ---------------------------------------------------------------------------
 // Shared small building blocks

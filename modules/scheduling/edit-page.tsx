@@ -5,9 +5,11 @@ import { requireAdmin } from "@/lib/auth";
 import { stringArrayCsv } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Button, ButtonLink } from "@/components/ui";
+import { Button, ButtonLink, Switch } from "@/components/ui";
+import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
 import { createServiceAction, updateServiceAction } from "./actions";
 import { ServiceBookingRulesTable } from "./components/service-booking-rules-table";
+import { ServiceDurationField } from "./components/service-duration-field";
 import { ServicePresetField } from "./components/service-preset-field";
 import { ServiceWorkspaceTabs, type ServiceWorkspaceTab } from "./components/service-workspace-tabs";
 
@@ -73,6 +75,34 @@ function hiddenSchedulingValues(service: ServiceWithBuilderData) {
   );
 }
 
+function ServiceTimingField({
+  defaultValue,
+  id,
+  label,
+  min,
+  name,
+  step,
+  unit
+}: {
+  defaultValue: number;
+  id: string;
+  label: string;
+  min: number;
+  name: string;
+  step?: number;
+  unit: string;
+}) {
+  return (
+    <div className="service-timing-field">
+      <label htmlFor={id}>{label}</label>
+      <div className="service-timing-input">
+        <input defaultValue={defaultValue} id={id} min={min} name={name} step={step} type="number" />
+        <span aria-hidden="true">{unit}</span>
+      </div>
+    </div>
+  );
+}
+
 function ServiceCreatePage({
   categoryOptions,
   errorMessage,
@@ -87,7 +117,8 @@ function ServiceCreatePage({
   policyOptions: string[];
 }) {
   return (
-    <div className="product-studio-page product-editor-page service-editor-page">
+    <div className="product-studio-page product-editor-page service-editor-page has-mobile-shell-header">
+      <AdminMobileHeaderSlot backHref="/admin/modules/services" title="New service" />
       <header className="product-studio-header service-studio-header">
         <div className="product-studio-title">
           <ButtonLink href="/admin/modules/services" size="sm" variant="ghost">
@@ -107,13 +138,12 @@ function ServiceCreatePage({
 
       {errorMessage ? <div className="error">{errorMessage}</div> : null}
 
-      <form action={createServiceAction} className="product-studio-save-grid" id="service-create-form">
+      <form action={createServiceAction} className="product-studio-save-grid service-create-form" id="service-create-form">
         <main className="product-studio-main">
           <section className="studio-panel">
             <div className="studio-section-head">
               <div>
-                <p className="catalog-rail-label">Service details</p>
-                <h2>Name, category &amp; description</h2>
+                <h2>Service details</h2>
               </div>
               <FileText size={20} />
             </div>
@@ -124,16 +154,14 @@ function ServiceCreatePage({
                 <input autoFocus id="new-service-name" name="name" placeholder="30-minute head spa" required />
               </div>
               <div className="ui-field">
-                <label htmlFor="new-service-slug">Booking URL slug</label>
+                <label htmlFor="new-service-slug">Booking page link</label>
                 <input id="new-service-slug" name="slug" placeholder="head-spa" />
+                <span className="ui-field-hint">Use the final part of the booking link, such as head-spa.</span>
               </div>
             </div>
 
-            <div className="catalog-form-grid is-three">
-              <div className="ui-field">
-                <label htmlFor="new-service-duration">Duration</label>
-                <input defaultValue="30" id="new-service-duration" min="1" name="durationMinutes" step="5" type="number" required />
-              </div>
+            <div className="catalog-form-grid is-three service-details-meta-grid">
+              <ServiceDurationField defaultMinutes={30} idPrefix="new-service" />
               <ServicePresetField
                 emptyLabel="Uncategorized"
                 id="new-service-category"
@@ -144,38 +172,36 @@ function ServiceCreatePage({
                 options={categoryOptions}
               />
               <ServicePresetField
-                emptyLabel="No location label"
+                emptyLabel="No location"
                 id="new-service-location"
-                label="Location label"
+                label="Location"
                 name="location"
-                newLabel="New location label"
-                newPlaceholder="Location label name"
+                newLabel="New location"
+                newPlaceholder="Location name"
                 options={locationOptions}
               />
-            </div>
-
-            <div className="ui-field">
-              <label htmlFor="new-service-tags">Tags</label>
-              <input id="new-service-tags" name="tags" placeholder="relaxation, featured" />
             </div>
 
             <div className="ui-field">
               <label htmlFor="new-service-description">Description</label>
               <textarea id="new-service-description" name="description" placeholder="Describe what customers should expect before booking." />
             </div>
+
+            <div className="ui-field">
+              <label htmlFor="new-service-tags">Tags</label>
+              <input id="new-service-tags" name="tags" placeholder="relaxation, featured" />
+            </div>
           </section>
 
           <section className="studio-panel">
             <div className="studio-section-head">
               <div>
-                <p className="catalog-rail-label">Booking copy</p>
-                <h2>Customer prompts &amp; policy</h2>
+                <h2>Booking rules</h2>
               </div>
               <CalendarCheck size={20} />
             </div>
 
             <ServiceBookingRulesTable
-              defaultIsActive
               idPrefix="new-service"
               intakeOptions={intakeOptions}
               policyOptions={policyOptions}
@@ -185,73 +211,67 @@ function ServiceCreatePage({
           <section className="studio-panel">
             <div className="studio-section-head">
               <div>
-                <p className="catalog-rail-label">Booking rules</p>
-                <h2>Notice, buffers &amp; slot timing</h2>
+                <h2>Scheduling</h2>
               </div>
               <Clock3 size={20} />
             </div>
 
-            <div className="catalog-form-grid is-three">
-              <div className="ui-field">
-                <label htmlFor="new-service-buffer-before">Buffer before</label>
-                <input defaultValue="0" id="new-service-buffer-before" min="0" name="bufferBeforeMinutes" step="5" type="number" />
-              </div>
-              <div className="ui-field">
-                <label htmlFor="new-service-buffer-after">Buffer after</label>
-                <input defaultValue="15" id="new-service-buffer-after" min="0" name="bufferAfterMinutes" step="5" type="number" />
-              </div>
-              <div className="ui-field">
-                <label htmlFor="new-service-slot-interval">Slot interval</label>
-                <input defaultValue="30" id="new-service-slot-interval" min="1" name="slotIntervalMinutes" step="5" type="number" />
-              </div>
-            </div>
-
-            <div className="catalog-form-grid is-two">
-              <div className="ui-field">
-                <label htmlFor="new-service-minimum-notice">Minimum notice hours</label>
-                <input defaultValue="12" id="new-service-minimum-notice" min="0" name="minimumNoticeHours" type="number" />
-              </div>
-              <div className="ui-field">
-                <label htmlFor="new-service-max-advance">Max advance days</label>
-                <input defaultValue="60" id="new-service-max-advance" min="1" name="maxAdvanceDays" type="number" />
-              </div>
+            <div className="service-timing-grid">
+              <ServiceTimingField
+                defaultValue={0}
+                id="new-service-buffer-before"
+                label="Before"
+                min={0}
+                name="bufferBeforeMinutes"
+                step={5}
+                unit="min"
+              />
+              <ServiceTimingField
+                defaultValue={15}
+                id="new-service-buffer-after"
+                label="After"
+                min={0}
+                name="bufferAfterMinutes"
+                step={5}
+                unit="min"
+              />
+              <ServiceTimingField
+                defaultValue={30}
+                id="new-service-slot-interval"
+                label="Slot size"
+                min={1}
+                name="slotIntervalMinutes"
+                step={5}
+                unit="min"
+              />
+              <ServiceTimingField
+                defaultValue={12}
+                id="new-service-minimum-notice"
+                label="Notice"
+                min={0}
+                name="minimumNoticeHours"
+                unit="hr"
+              />
+              <ServiceTimingField
+                defaultValue={60}
+                id="new-service-max-advance"
+                label="Book ahead"
+                min={1}
+                name="maxAdvanceDays"
+                unit="days"
+              />
             </div>
           </section>
         </main>
-
-        <aside className="product-studio-sidecar">
-          <section className="studio-panel">
-            <p className="catalog-rail-label">Create service</p>
-            <span className="catalog-status is-draft">ready to create</span>
-            <dl className="service-editor-summary">
-              <div>
-                <dt>After save</dt>
-                <dd>Open the full editor</dd>
-              </div>
-              <div>
-                <dt>Packages</dt>
-                <dd>Add after creation</dd>
-              </div>
-              <div>
-                <dt>Booking URL</dt>
-                <dd>Generated from name or slug</dd>
-              </div>
-            </dl>
-            <Button form="service-create-form" type="submit">
-              <Save size={16} />
-              Create service
-            </Button>
-            <ButtonLink href="/admin/modules/services" variant="secondary">
-              <ArrowLeft size={16} />
-              Back to services
-            </ButtonLink>
-            <ButtonLink href="/admin/modules/appointments?panel=rules&tab=availability" variant="ghost">
-              <Clock3 size={16} />
-              Appointment rules
-            </ButtonLink>
-          </section>
-        </aside>
       </form>
+
+      <footer className="product-studio-sticky-footer service-editor-footer">
+        <Switch defaultChecked form="service-create-form" label="Active" name="isActive" variant="inline" />
+        <Button form="service-create-form" type="submit">
+          <Save size={16} />
+          Create Service
+        </Button>
+      </footer>
     </div>
   );
 }
@@ -324,8 +344,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
         <section className="studio-panel">
           <div className="studio-section-head">
             <div>
-              <p className="catalog-rail-label">Service details</p>
-              <h2>Name, category &amp; description</h2>
+              <h2>Service details</h2>
             </div>
             <FileText size={20} />
           </div>
@@ -336,16 +355,14 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
               <input defaultValue={service.name} id="service-name" name="name" required />
             </div>
             <div className="ui-field">
-              <label htmlFor="service-slug">Booking URL slug</label>
+              <label htmlFor="service-slug">Booking page link</label>
               <input defaultValue={service.slug} id="service-slug" name="slug" />
+              <span className="ui-field-hint">Use the final part of the booking link, such as head-spa.</span>
             </div>
           </div>
 
-          <div className="catalog-form-grid is-three">
-            <div className="ui-field">
-              <label htmlFor="service-duration">Duration</label>
-              <input defaultValue={service.durationMinutes} id="service-duration" min="1" name="durationMinutes" step="5" type="number" required />
-            </div>
+          <div className="catalog-form-grid is-three service-details-meta-grid">
+            <ServiceDurationField defaultMinutes={service.durationMinutes} idPrefix="service" />
             <ServicePresetField
               defaultValue={service.category}
               emptyLabel="Uncategorized"
@@ -358,39 +375,37 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
             />
             <ServicePresetField
               defaultValue={service.location || ""}
-              emptyLabel="No location label"
+              emptyLabel="No location"
               id="service-location"
-              label="Location label"
+              label="Location"
               name="location"
-              newLabel="New location label"
-              newPlaceholder="Location label name"
+              newLabel="New location"
+              newPlaceholder="Location name"
               options={locationOptions}
             />
-          </div>
-
-          <div className="ui-field">
-            <label htmlFor="service-tags">Tags</label>
-            <input defaultValue={tagsValue} id="service-tags" name="tags" />
           </div>
 
           <div className="ui-field">
             <label htmlFor="service-description">Description</label>
             <textarea defaultValue={service.description || ""} id="service-description" name="description" />
           </div>
+
+          <div className="ui-field">
+            <label htmlFor="service-tags">Tags</label>
+            <input defaultValue={tagsValue} id="service-tags" name="tags" />
+          </div>
         </section>
 
         <section className="studio-panel">
           <div className="studio-section-head">
             <div>
-              <p className="catalog-rail-label">Booking copy</p>
-              <h2>Customer prompts &amp; policy</h2>
+              <h2>Booking rules</h2>
             </div>
             <CalendarCheck size={20} />
           </div>
 
           <ServiceBookingRulesTable
             defaultIntakePrompt={service.intakePrompt}
-            defaultIsActive={service.isActive}
             defaultPolicyText={service.policyText}
             defaultRequirePolicy={service.requirePolicy}
             defaultRequestOnly={service.requestOnly}
@@ -406,6 +421,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
         <section className="studio-panel">
           <p className="catalog-rail-label">Status</p>
           <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
+          <Switch defaultChecked={service.isActive} label="Active" name="isActive" variant="inline" />
           <dl className="service-editor-summary">
             <div>
               <dt>Duration</dt>
@@ -441,8 +457,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     <section className="studio-panel">
       <div className="studio-section-head">
         <div>
-          <p className="catalog-rail-label">Packages</p>
-          <h2>Package membership</h2>
+          <h2>Packages</h2>
         </div>
         <Boxes size={20} />
       </div>
@@ -499,7 +514,8 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   ];
 
   return (
-    <div className="product-studio-page product-editor-page service-editor-page">
+    <div className="product-studio-page product-editor-page service-editor-page has-mobile-shell-header">
+      <AdminMobileHeaderSlot backHref="/admin/modules/services" title={service.name} />
       <header className="product-studio-header service-studio-header">
         <div className="product-studio-title">
           <ButtonLink href="/admin/modules/services" size="sm" variant="ghost">

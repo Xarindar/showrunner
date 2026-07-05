@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalendarClock, Save } from "lucide-react";
+import { CalendarClock, ChevronDown, Save } from "lucide-react";
 import { FormAttachmentTargetType } from "@prisma/client";
 import { getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -8,7 +8,7 @@ import { formatDateTime } from "@/lib/format";
 import { publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { getSiteSettings } from "@/lib/site";
 import { rescheduleBookingAction, updateBookingDetailAction, updateBookingStatusAction } from "../actions";
-import { Button, ButtonLink, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, ButtonLink, Card, Table } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -78,9 +78,21 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
       {saved ? <div className="success-message">Appointment updated.</div> : null}
       {error ? <div className="error">{error}</div> : null}
 
-      <EqualGrid as="section">
-        <Card>
-          <h2 className="section-title">Appointment details</h2>
+      <section aria-label="Status actions" className="appointment-detail-toolbar">
+        <span className="ui-badge">{booking.status.toLowerCase()}</span>
+        {(["CONFIRMED", "CANCELED", "COMPLETED"] as const).map((status) =>
+        <form key={status} action={updateBookingStatusAction}>
+            <input type="hidden" name="id" value={booking.id} />
+            <input type="hidden" name="status" value={status} />
+            <Button size="sm" type="submit" variant={status === "CANCELED" ? "danger" : "secondary"}>
+              {status === "CONFIRMED" ? "Confirm" : status === "CANCELED" ? "Cancel" : "Complete"}
+            </Button>
+          </form>
+        )}
+      </section>
+
+      <Card as="section" minHeight="none">
+        <h2 className="section-title">Appointment details</h2>
           <Table>
             <tbody>
               <tr>
@@ -138,23 +150,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
               </tr>
             </tbody>
           </Table>
-        </Card>
-
-        <Card minHeight="none" bodyClassName="form-grid">
-          <h2 className="section-title">Status actions</h2>
-          <div className="ui-zero">
-            {(["CONFIRMED", "CANCELED", "COMPLETED"] as const).map((status) =>
-            <form key={status} action={updateBookingStatusAction}>
-                <input type="hidden" name="id" value={booking.id} />
-                <input type="hidden" name="status" value={status} />
-                <button className={status === "CANCELED" ? "ui-button ui-button-danger" : "ui-button ui-button-secondary"} type="submit">
-                  {status.toLowerCase()}
-                </button>
-              </form>
-            )}
-          </div>
-        </Card>
-      </EqualGrid>
+      </Card>
 
       {formAttachments.length ?
       <Card as="section" bodyClassName="ui-stack">
@@ -198,10 +194,14 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
         </Card> :
       null}
 
-      <Card action={rescheduleBookingAction} as="form" minHeight="none" bodyClassName="form-grid">
-        <input type="hidden" name="id" value={booking.id} />
-        <h2 className="section-title">Reschedule</h2>
-        <EqualGrid>
+      <details className="ui-disclosure">
+        <summary>
+          <span>Reschedule</span>
+          <small>Checked against availability, buffers, blockouts, and conflicts</small>
+          <ChevronDown aria-hidden="true" className="ui-disclosure-caret" size={16} />
+        </summary>
+        <form action={rescheduleBookingAction} className="form-grid">
+          <input type="hidden" name="id" value={booking.id} />
           <div className="ui-field">
             <label htmlFor="startsAt">New start time</label>
             <input
@@ -210,35 +210,41 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
               type="datetime-local"
               defaultValue={formatDateTimeLocalInput(booking.startsAt, settings.timezone)}
               required />
-            
+
+          </div>
+          <div>
+            <Button type="submit" variant="secondary">
+              <CalendarClock size={18} />
+              Reschedule appointment
+            </Button>
+          </div>
+        </form>
+      </details>
+
+      <details className="ui-disclosure" open={Boolean(booking.adminNotes || booking.cancellationReason)}>
+        <summary>
+          <span>Internal notes</span>
+          <small>{booking.adminNotes ? "Notes saved" : "No notes yet"}</small>
+          <ChevronDown aria-hidden="true" className="ui-disclosure-caret" size={16} />
+        </summary>
+        <form action={updateBookingDetailAction} className="form-grid">
+          <input type="hidden" name="id" value={booking.id} />
+          <div className="ui-field">
+            <label htmlFor="adminNotes">Admin notes</label>
+            <textarea id="adminNotes" name="adminNotes" defaultValue={booking.adminNotes || ""} />
           </div>
           <div className="ui-field">
-            <label>Validation</label>
-            <span className="ui-badge">availability, buffers, blockouts, conflicts</span>
+            <label htmlFor="cancellationReason">Cancellation reason</label>
+            <input id="cancellationReason" name="cancellationReason" defaultValue={booking.cancellationReason || ""} />
           </div>
-        </EqualGrid>
-        <Button type="submit" variant="secondary">
-          <CalendarClock size={18} />
-          Reschedule appointment
-        </Button>
-      </Card>
-
-      <Card action={updateBookingDetailAction} as="form" minHeight="none" bodyClassName="form-grid">
-        <input type="hidden" name="id" value={booking.id} />
-        <h2 className="section-title">Internal appointment notes</h2>
-        <div className="ui-field">
-          <label htmlFor="adminNotes">Admin notes</label>
-          <textarea id="adminNotes" name="adminNotes" defaultValue={booking.adminNotes || ""} />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="cancellationReason">Cancellation reason</label>
-          <input id="cancellationReason" name="cancellationReason" defaultValue={booking.cancellationReason || ""} />
-        </div>
-        <Button type="submit">
-          <Save size={18} />
-          Save appointment notes
-        </Button>
-      </Card>
+          <div>
+            <Button type="submit">
+              <Save size={18} />
+              Save appointment notes
+            </Button>
+          </div>
+        </form>
+      </details>
     </div>);
 
 }

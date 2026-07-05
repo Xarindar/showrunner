@@ -6,6 +6,10 @@ const fallbackHeaderHeight = 36;
 const fallbackRowHeight = 56;
 const minRowsPerPage = 3;
 
+function visibleElementHeight(element: Element) {
+  return element.getClientRects().length ? element.getBoundingClientRect().height : 0;
+}
+
 export function useCatalogTablePagination(itemCount: number) {
   const tableFrameRef = useRef<HTMLDivElement | null>(null);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -17,8 +21,13 @@ export function useCatalogTablePagination(itemCount: number) {
 
     const frameRect = frame.getBoundingClientRect();
     const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    const measurementRoot = frame.closest(".ui-folder-tabs") || frame.parentElement;
     const footerHeight = [".catalog-table-status-strip", ".catalog-table-pagination"].reduce((total, selector) => {
-      return total + (frame.parentElement?.querySelector(selector)?.getBoundingClientRect().height || 0);
+      const visibleHeight = Array.from(measurementRoot?.querySelectorAll(selector) || []).reduce(
+        (sum, element) => sum + visibleElementHeight(element),
+        0
+      );
+      return total + visibleHeight;
     }, 0);
     const headerHeight = frame.querySelector("thead")?.getBoundingClientRect().height || fallbackHeaderHeight;
     const rowHeight =

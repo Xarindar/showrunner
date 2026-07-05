@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { parseStoredThemePalette, type ParsedThemePalette } from "./palette-url";
 
 type ThemePreset = {
   label: string;
@@ -273,6 +274,34 @@ function withBrandOverride(preset: ThemePreset, primary?: string | null): ThemeP
   };
 }
 
+function withPaletteOverride(preset: ThemePreset, palette: ParsedThemePalette): ThemePreset {
+  const [primary, accent = preset.colors.accent, neutral = preset.colors.surfaceSunken, text = preset.colors.text, background = preset.colors.page] =
+    palette.colors;
+  const surfaceSunken = mixHex(neutral, background, 0.22);
+  const surface = mixHex(background, "#ffffff", 0.62);
+  const surfaceRaised = mixHex(background, "#ffffff", 0.78);
+  const border = mixHex(neutral, text, 0.14);
+  const mutedText = ensureContrast(mixHex(text, background, 0.34), background, 4.5);
+  const brandDark = ensureContrast(mixHex(primary, text, 0.32), surface, 4.5);
+
+  return {
+    ...preset,
+    colors: {
+      ...preset.colors,
+      page: background,
+      surface,
+      surfaceRaised,
+      surfaceSunken,
+      text,
+      muted: mutedText,
+      border,
+      brand: primary,
+      brandDark,
+      accent
+    }
+  };
+}
+
 function hexToRgb(hex: string) {
   const value = hex.replace("#", "");
   return {
@@ -315,8 +344,12 @@ function contrastRatio(a: string, b: string) {
 
 function ensureContrast(foreground: string, background: string, minRatio: number) {
   let color = foreground;
+  const darkened = mixHex(color, "#000000", 0.08);
+  const lightened = mixHex(color, "#ffffff", 0.08);
+  const contrastTarget = contrastRatio(darkened, background) >= contrastRatio(lightened, background) ? "#000000" : "#ffffff";
+
   for (let step = 0; step < 12 && contrastRatio(color, background) < minRatio; step += 1) {
-    color = mixHex(color, "#000000", 0.08);
+    color = mixHex(color, contrastTarget, 0.08);
   }
   return color;
 }
@@ -375,7 +408,9 @@ function rotateHue(hex: string, degrees: number) {
 }
 
 export function themeToCssVars(input: { themePreset?: string | null; themePrimary?: string | null }): CSSProperties {
-  const preset = withBrandOverride(themePresets[normalizeThemePreset(input.themePreset)], input.themePrimary);
+  const basePreset = themePresets[normalizeThemePreset(input.themePreset)];
+  const storedPalette = parseStoredThemePalette(input.themePrimary);
+  const preset = storedPalette ? withPaletteOverride(basePreset, storedPalette) : withBrandOverride(basePreset, input.themePrimary);
   const accentContrast = contrastRatio("#ffffff", preset.colors.accent) >= 4.5
     ? "#ffffff"
     : ensureContrast(preset.colors.text, preset.colors.accent, 4.5);

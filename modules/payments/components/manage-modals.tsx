@@ -8,12 +8,12 @@ import { MethodMark } from "./brand-marks";
 import {
   createCouponAction,
   disconnectProviderAction,
-  initialPaymentActionState,
   reverifyProviderAction,
   savePaymentMethodsAction,
   setCheckoutProviderAction,
   updateCheckoutTotalsAction
 } from "../actions";
+import { initialPaymentActionState } from "../state";
 
 export type MethodOption = { key: string; label: string; type: string; stripePaymentMethod: string };
 export type CheckoutTotalsSettings = {

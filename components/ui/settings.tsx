@@ -35,7 +35,7 @@ export function SettingsGroup({ children, className, description, title, ...prop
   );
 }
 
-type SettingRowProps = HTMLAttributes<HTMLDivElement> & {
+type SettingRowProps = Omit<HTMLAttributes<HTMLDivElement>, "title"> & {
   description?: ReactNode;
   title: ReactNode;
 };

@@ -13,7 +13,6 @@ type BookingRuleOption = {
 
 type ServiceBookingRulesTableProps = {
   defaultIntakePrompt?: string | null;
-  defaultIsActive?: boolean;
   defaultPolicyText?: string | null;
   defaultRequirePolicy?: boolean;
   defaultRequestOnly?: boolean;
@@ -59,7 +58,6 @@ function RuleIcon({ kind }: { kind: BookingRuleKind }) {
 
 export function ServiceBookingRulesTable({
   defaultIntakePrompt = "",
-  defaultIsActive = false,
   defaultPolicyText = "",
   defaultRequirePolicy = false,
   defaultRequestOnly = false,
@@ -73,7 +71,6 @@ export function ServiceBookingRulesTable({
   const [requirePolicy, setRequirePolicy] = useState(() => Boolean(defaultRequirePolicy && normalizeValue(defaultPolicyText)));
   const [requestOnly, setRequestOnly] = useState(defaultRequestOnly);
   const [waitlistEnabled, setWaitlistEnabled] = useState(defaultWaitlistEnabled);
-  const [isActive, setIsActive] = useState(defaultIsActive);
   const [modalOpen, setModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [draftKind, setDraftKind] = useState<BookingRuleKind>("intake");
@@ -148,10 +145,6 @@ export function ServiceBookingRulesTable({
       <input name="policyText" type="hidden" value={policyText} />
 
       <div className="booking-rules-toolbar">
-        <div>
-          <p className="catalog-rail-label">Rules</p>
-          <h3>Intake and policy</h3>
-        </div>
         <Button onClick={openModal} size="sm" type="button">
           <Plus size={15} />
           Add rule
@@ -236,13 +229,6 @@ export function ServiceBookingRulesTable({
           label="Offer waitlist"
           name="waitlistEnabled"
           onChange={(event) => setWaitlistEnabled(event.currentTarget.checked)}
-          variant="inline"
-        />
-        <Switch
-          checked={isActive}
-          label="Active"
-          name="isActive"
-          onChange={(event) => setIsActive(event.currentTarget.checked)}
           variant="inline"
         />
       </div>

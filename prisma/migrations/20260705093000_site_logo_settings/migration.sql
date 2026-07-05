@@ -1,0 +1,1 @@
+ALTER TABLE "SiteSettings" ADD COLUMN "logoImageUrl" TEXT NOT NULL DEFAULT '';

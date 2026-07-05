@@ -10,6 +10,7 @@ export const adminPermissions = [
   "clients:manage",
   "communications:manage",
   "content:manage",
+  "deployments:manage",
   "forms:export",
   "forms:manage",
   "media:manage",
@@ -26,7 +27,7 @@ export type AdminPermission = (typeof adminPermissions)[number];
 
 const rolePermissions: Record<AdminRole, readonly AdminPermission[]> = {
   OWNER: adminPermissions,
-  ADMIN: adminPermissions.filter((permission) => permission !== "users:manage"),
+  ADMIN: adminPermissions.filter((permission) => !["deployments:manage", "users:manage"].includes(permission)),
   STAFF: ["appointments:manage", "clients:manage", "forms:manage", "testimonials:manage"],
   PHOTOGRAPHER: ["clients:manage", "media:manage", "portfolio:manage"],
   FULFILLMENT: ["media:manage", "portfolio:manage", "products:manage", "orders:manage"],

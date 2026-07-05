@@ -22,6 +22,7 @@ type SchedulingPageProps = {
     error?: string;
     q?: string;
     saved?: string;
+    statusService?: string;
     tab?: string;
     tag?: string;
   }>;
@@ -162,11 +163,11 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
     { label: "All tags", value: "all" },
     ...packageTags.map((tag) => ({ label: tag, value: tag }))
   ];
+  const serviceRows = services.map(toServiceCatalogTableService);
+  const statusActionService = serviceRows.find((service) => service.id === params.statusService) || null;
 
   const servicesContent = (
     <ServiceCatalogTable
-      activePackages={activePackages}
-      activeServices={activeServices}
       categoryOptions={categoryOptions}
       createAction={
         <ButtonLink href="/admin/modules/services/new" size="sm">
@@ -182,7 +183,8 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       initialCategory={categoryFilter}
       initialSearch={searchQuery}
       initialTag={tagFilter}
-      services={services.map(toServiceCatalogTableService)}
+      services={serviceRows}
+      statusActionService={statusActionService}
       tagOptions={tagOptions}
       toggleServiceAction={toggleServiceAction}
     />
@@ -190,7 +192,6 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
 
   const packagesContent = (
     <ServicePackageTable
-      activePackages={activePackages}
       categoryOptions={packageCategoryOptions}
       packages={servicePackages.map(toServicePackageTablePackage)}
       tagOptions={packageTagOptions}
@@ -198,8 +199,38 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   );
 
   const tabs: FolderTab[] = [
-    { content: servicesContent, icon: <CalendarCheck size={15} />, id: "services", label: "Services" },
-    { content: packagesContent, icon: <Boxes size={15} />, id: "packages", label: "Packages" }
+    {
+      content: servicesContent,
+      footer: (
+        <div className="catalog-table-status-strip" aria-label="Service catalog status">
+          <span className="catalog-pill is-green">
+            <CalendarCheck size={15} />
+            {activeServices} active
+          </span>
+          <span className="catalog-pill is-blue">
+            <Boxes size={15} />
+            {activePackages} packages
+          </span>
+        </div>
+      ),
+      icon: <CalendarCheck size={15} />,
+      id: "services",
+      label: "Services"
+    },
+    {
+      content: packagesContent,
+      footer: (
+        <div className="catalog-table-status-strip" aria-label="Package catalog status">
+          <span className="catalog-pill is-blue">
+            <Boxes size={15} />
+            {activePackages} active
+          </span>
+        </div>
+      ),
+      icon: <Boxes size={15} />,
+      id: "packages",
+      label: "Packages"
+    }
   ];
 
   return (

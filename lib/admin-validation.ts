@@ -8,6 +8,7 @@ import { formDataObject } from "@/lib/form-data";
 import { timeToMinutes } from "@/lib/format";
 import { clientStatusValues, defaultClientStatus } from "@/lib/clients/status";
 import { isSafeExternalHttpsUrl } from "@/lib/security/urls";
+import { normalizeThemeColorValue } from "@/lib/theme/palette-url";
 
 export const maxIntCents = 2_147_483_647;
 export const trimmed = z.string().transform((value) => value.trim());
@@ -276,10 +277,7 @@ export const settingsFormSchema = z.object({
   contactEmail: z.email().transform((value) => value.trim().toLowerCase()),
   timezone: requiredText.refine((value) => Intl.supportedValuesOf("timeZone").includes(value), "Use a valid timezone."),
   themePreset: optionalStoredText,
-  themePrimary: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/)
-    .catch("#116466"),
+  themePrimary: trimmed.transform((value) => normalizeThemeColorValue(value)),
   mediaDriver: z.enum(MediaDriver).catch(MediaDriver.REPO),
   ga4MeasurementId: optionalStoredText,
   googleAdsTagId: optionalStoredText,

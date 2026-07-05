@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { getPlatformStatus, platformFoundationItems, type PlatformWarningSeverity } from "@/lib/platform-status";
 import { getSiteSettings } from "@/lib/site";
 import { moduleIcons } from "@/shell/modules";
@@ -63,34 +64,26 @@ export default async function HelpPage() {
         <div>
           <p className="eyebrow">Help</p>
           <h1>Admin user guide</h1>
-          <p>Operating notes, setup status, and readiness context for the modules currently enabled in this admin.</p>
+          <p>Setup status, active warnings, and common workflows for the modules enabled in this admin.</p>
         </div>
         <ButtonLink href="/admin/modules/settings" variant="secondary">
           Settings
         </ButtonLink>
       </header>
 
-      <section className="dashboard-stat-grid" aria-label="Help readiness snapshot">
-        <Link className="dashboard-stat" href="/admin/modules/settings">
-          <span>Enabled</span>
-          <strong>{platformStatus.enabledCount}</strong>
-          <small>modules in the shell</small>
-        </Link>
-        <Link className="dashboard-stat" href="/admin/modules/help">
-          <span>Runtime</span>
-          <strong>{platformStatus.liveCount}</strong>
-          <small>live or mixed modules</small>
-        </Link>
-        <Link className="dashboard-stat" href="/admin/modules/help">
-          <span>Manual</span>
-          <strong>{platformStatus.manualCount}</strong>
-          <small>manual-mode modules</small>
-        </Link>
-        <Link className="dashboard-stat" href="/admin/modules/help">
-          <span>Warnings</span>
-          <strong>{warnings.length}</strong>
-          <small>setup and operations notes</small>
-        </Link>
+      <section className="help-status-strip" aria-label="Readiness snapshot">
+        <span>
+          <strong>{platformStatus.enabledCount}</strong> modules enabled
+        </span>
+        <span>
+          <strong>{platformStatus.liveCount}</strong> live or mixed
+        </span>
+        <span>
+          <strong>{platformStatus.manualCount}</strong> manual mode
+        </span>
+        <span className={warnings.length ? "help-status-alert" : undefined}>
+          <strong>{warnings.length}</strong> setup warnings
+        </span>
       </section>
 
       <Card as="section">
@@ -126,34 +119,44 @@ export default async function HelpPage() {
         }
       </Card>
 
-      <section className="stack" aria-label="Enabled module guide">
-        <div className="page-header">
-          <div>
-            <h2 className="ui-zero">Enabled modules</h2>
-            <p>Live, manual, and admin-foundation status for the modules visible in the sidebar.</p>
-          </div>
-        </div>
+      <Card as="section">
+        <h2 className="section-title">Enabled modules</h2>
+        <Table>
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th>Readiness</th>
+              <th>Mode</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {enabledModules.map((item) => {
+              const Icon = moduleIcons[item.module.icon];
 
-        <div className="module-readiness-grid">
-          {enabledModules.map((item) => {
-            const Icon = moduleIcons[item.module.icon];
+              return (
+                <tr key={item.module.id}>
+                  <td>
+                    <Link className="help-module-link" href={item.module.href}>
+                      <Icon size={16} aria-hidden="true" />
+                      {item.module.label}
+                    </Link>
+                  </td>
+                  <td>
+                    <span className={item.pillClassName}>{item.readinessLabel}</span>
+                  </td>
+                  <td>{item.modeLabel}</td>
+                  <td>
+                    {item.module.readiness.primaryGap ||
+                    item.module.readiness.summary ||
+                    (item.hasPublicRoute ? "Public route declared." : "Admin-only surface.")}
+                  </td>
+                </tr>);
 
-            return (
-              <Link className="module-readiness-card" href={item.module.href} key={item.module.id}>
-                <span className={item.pillClassName}>{item.readinessLabel}</span>
-                <strong>
-                  <Icon size={18} aria-hidden="true" /> {item.module.label}
-                </strong>
-                <small>{item.modeLabel}</small>
-                <p>{item.module.readiness.summary}</p>
-                <span className="module-readiness-meta">
-                  {item.module.readiness.primaryGap || (item.hasPublicRoute ? "Public route declared." : "Admin-only surface.")}
-                </span>
-              </Link>);
-
-          })}
-        </div>
-      </section>
+            })}
+          </tbody>
+        </Table>
+      </Card>
 
       <Card as="section">
         <h2 className="section-title">Common workflows</h2>
@@ -171,8 +174,12 @@ export default async function HelpPage() {
         </Table>
       </Card>
 
-      <Card as="section">
-        <h2 className="section-title">Security and compliance foundations</h2>
+      <details className="ui-disclosure">
+        <summary>
+          <span>Security and compliance foundations</span>
+          <small>{platformFoundationItems.length} platform safeguards</small>
+          <ChevronDown aria-hidden="true" className="ui-disclosure-caret" size={16} />
+        </summary>
         <div className="foundation-list">
           {platformFoundationItems.map((item) =>
           <div className="foundation-row" key={item.key}>
@@ -185,15 +192,19 @@ export default async function HelpPage() {
             </div>
           )}
         </div>
-      </Card>
+      </details>
 
-      <Card as="section">
-        <h2 className="section-title">If a time is missing from booking</h2>
-        <p className="lead lead-compact">
+      <details className="ui-disclosure">
+        <summary>
+          <span>If a time is missing from booking</span>
+          <small>Quick checklist</small>
+          <ChevronDown aria-hidden="true" className="ui-disclosure-caret" size={16} />
+        </summary>
+        <p className="ui-disclosure-note">
           Check that the service is active, weekly availability exists, there is no blockout, minimum notice has passed,
           the selected date is inside the advance booking window, and no appointment or buffer is already using that time.
         </p>
-      </Card>
+      </details>
     </div>);
 
 }

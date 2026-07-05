@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { Boxes, CalendarCheck, ExternalLink, Search, X } from "lucide-react";
-import { Button, ButtonLink, Pagination, SelectMenu, type SelectMenuOption } from "@/components/ui";
+import { CalendarCheck, ExternalLink, Eye, EyeOff, Pencil, Search, X } from "lucide-react";
+import { Button, ButtonLink, Pagination, SelectMenu, Tooltip, type SelectMenuOption } from "@/components/ui";
 import { useCatalogTablePagination } from "./use-catalog-table-pagination";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
@@ -21,8 +21,6 @@ export type ServiceCatalogTableService = {
 };
 
 type ServiceCatalogTableProps = {
-  activePackages: number;
-  activeServices: number;
   categoryOptions: SelectMenuOption[];
   createAction: ReactNode;
   emptyCreateAction?: ReactNode;
@@ -30,6 +28,7 @@ type ServiceCatalogTableProps = {
   initialSearch: string;
   initialTag: string;
   services: ServiceCatalogTableService[];
+  statusActionService?: ServiceCatalogTableService | null;
   tagOptions: SelectMenuOption[];
   toggleServiceAction: ServerAction;
 };
@@ -42,7 +41,7 @@ function serviceDurationLabel(minutes: number) {
 }
 
 function serviceStatusClass(isActive: boolean) {
-  return isActive ? "catalog-status is-active" : "catalog-status is-draft";
+  return isActive ? "catalog-status is-active" : "catalog-status is-inactive";
 }
 
 function serviceMatchesSearch(service: ServiceCatalogTableService, searchQuery: string) {
@@ -61,8 +60,6 @@ function serviceMatchesSearch(service: ServiceCatalogTableService, searchQuery: 
 }
 
 export function ServiceCatalogTable({
-  activePackages,
-  activeServices,
   categoryOptions,
   createAction,
   emptyCreateAction,
@@ -70,6 +67,7 @@ export function ServiceCatalogTable({
   initialSearch,
   initialTag,
   services,
+  statusActionService,
   tagOptions,
   toggleServiceAction
 }: ServiceCatalogTableProps) {
@@ -103,6 +101,14 @@ export function ServiceCatalogTable({
   const rangeStart = filteredServices.length ? startIndex + 1 : 0;
   const rangeEnd = endIndex;
   const hasServices = Boolean(services.length);
+  const statusModalService = statusActionService || null;
+  const nextToggleState = statusModalService?.isActive ? "inactive" : "active";
+  const toggleModalTitle = statusModalService ? `Mark ${statusModalService.name} ${nextToggleState}?` : "Update service status";
+  const toggleModalCopy =
+    statusModalService?.isActive
+      ? "This service will be removed from public booking, but its catalog details and existing appointments will stay in place."
+      : "This service will become available anywhere active services are shown, including booking surfaces.";
+  const servicesHref = "/admin/modules/services";
 
   const resetFilters = () => {
     setSearchQuery("");
@@ -220,7 +226,7 @@ export function ServiceCatalogTable({
                     </div>
                   </td>
                   <td>
-                    <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
+                    <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "inactive"}</span>
                   </td>
                   <td>
                     <span className="catalog-cell-text" title={category}>{category}</span>
@@ -239,16 +245,29 @@ export function ServiceCatalogTable({
                   </td>
                   <td>
                     <div className="catalog-row-actions">
-                      <ButtonLink href={`/admin/modules/services/${service.id}`} size="sm" variant="secondary">
-                        Edit
-                      </ButtonLink>
-                      <form action={toggleServiceAction} className="ui-inline-form">
-                        <input name="id" type="hidden" value={service.id} />
-                        <input name="isActive" type="hidden" value={service.isActive ? "false" : "true"} />
-                        <Button size="sm" type="submit" variant={service.isActive ? "ghost" : "primary"}>
-                          {service.isActive ? "Draft" : "Activate"}
-                        </Button>
-                      </form>
+                      <Tooltip content="Edit service" focusable={false}>
+                        <ButtonLink
+                          aria-label={`Edit ${service.name}`}
+                          className="catalog-icon-button"
+                          href={`/admin/modules/services/${service.id}`}
+                          size="sm"
+                          title="Edit service"
+                          variant="secondary">
+                          <Pencil aria-hidden="true" size={15} />
+                        </ButtonLink>
+                      </Tooltip>
+                      <Tooltip content={service.isActive ? "Mark inactive" : "Mark active"} focusable={false}>
+                        <ButtonLink
+                          aria-haspopup="dialog"
+                          aria-label={service.isActive ? `Mark ${service.name} inactive` : `Mark ${service.name} active`}
+                          className={`catalog-icon-button catalog-visibility-toggle ${service.isActive ? "is-live" : "is-muted"}`}
+                          href={`${servicesHref}?statusService=${encodeURIComponent(service.id)}`}
+                          size="sm"
+                          title={service.isActive ? "Mark inactive" : "Mark active"}
+                          variant="secondary">
+                          {service.isActive ? <Eye aria-hidden="true" size={16} /> : <EyeOff aria-hidden="true" size={16} />}
+                        </ButtonLink>
+                      </Tooltip>
                     </div>
                   </td>
                 </tr>
@@ -296,16 +315,41 @@ export function ServiceCatalogTable({
         page={currentPage}
         pageCount={pageCount}
       />
-      <div className="catalog-table-status-strip" aria-label="Service catalog status">
-        <span className="catalog-pill is-green">
-          <CalendarCheck size={15} />
-          {activeServices} active
-        </span>
-        <span className="catalog-pill is-blue">
-          <Boxes size={15} />
-          {activePackages} packages
-        </span>
-      </div>
+      {statusModalService ? (
+        <>
+          <div aria-hidden="true" className="catalog-confirm-backdrop" />
+          <dialog aria-labelledby="service-status-dialog-title" aria-modal="true" className="ui-dialog catalog-confirm-modal" open>
+            <div className="ui-modal-head">
+              <h2 className="ui-zero" id="service-status-dialog-title">
+                {toggleModalTitle}
+              </h2>
+              <ButtonLink
+                aria-label="Close dialog"
+                className="ui-dialog-close"
+                href={servicesHref}
+                size="sm"
+                title="Close dialog"
+                variant="ghost">
+                <X aria-hidden="true" size={16} />
+              </ButtonLink>
+            </div>
+            <form action={toggleServiceAction} className="catalog-confirm-form">
+              <p className="catalog-confirm-copy">{toggleModalCopy}</p>
+              <input name="id" type="hidden" value={statusModalService.id} />
+              <input name="isActive" type="hidden" value={statusModalService.isActive ? "false" : "true"} />
+              <div className="module-modal-actions">
+                <ButtonLink href={servicesHref} variant="ghost">
+                  Cancel
+                </ButtonLink>
+                <Button type="submit" variant={statusModalService.isActive ? "danger" : "primary"}>
+                  {statusModalService.isActive ? <EyeOff aria-hidden="true" size={15} /> : <Eye aria-hidden="true" size={15} />}
+                  {statusModalService.isActive ? "Mark inactive" : "Mark active"}
+                </Button>
+              </div>
+            </form>
+          </dialog>
+        </>
+      ) : null}
     </div>
   );
 }

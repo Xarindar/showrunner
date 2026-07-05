@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, CreditCard, Lock, ReceiptText, Settings2, TicketPlus } from "lucide-react";
-import { Button, Modal, Table } from "@/components/ui";
-import { MethodMark, ProviderMark } from "./brand-marks";
+import { TicketPlus } from "lucide-react";
+import { Button, Modal, SettingRow, SettingsGroup, Table } from "@/components/ui";
+import { ProviderMark } from "./brand-marks";
 import { buildConnectWizards, ConnectWizard, type WebhookUrls } from "./connect-wizard";
 import {
   CheckoutModal,
@@ -98,7 +98,6 @@ export function PaymentsWorkspace({
   checkout,
   checkoutTotals,
   coupons,
-  featuredConnected,
   methods,
   providers,
   webhooks
@@ -135,17 +134,18 @@ export function PaymentsWorkspace({
           : active?.kind === "checkout"
             ? "Checkout account"
             : active?.kind === "checkoutTotals"
-              ? "Checkout totals"
+              ? "Tax & shipping"
               : active?.kind === "coupon"
                 ? "Add coupon"
                 : "";
 
   const taxSummary = checkoutTotals.taxEnabled
-    ? `${checkoutTotals.taxLabel} · ${percentLabel(checkoutTotals.taxRateBps)}`
+    ? `${checkoutTotals.taxLabel} ${percentLabel(checkoutTotals.taxRateBps)}`
     : "Tax off";
   const shippingSummary = checkoutTotals.shippingEnabled
-    ? `${checkoutTotals.shippingLabel} · ${moneyLabel(checkoutTotals.shippingFlatCents)}`
+    ? `${checkoutTotals.shippingLabel} ${moneyLabel(checkoutTotals.shippingFlatCents)}`
     : "Shipping off";
+  const activeCheckoutLabel = checkout.providers.find((provider) => provider.value === checkout.active)?.label;
 
   return (
     <div className="stack">
@@ -154,21 +154,112 @@ export function PaymentsWorkspace({
           <p className="eyebrow">Payments</p>
           <h1>Get paid</h1>
           <p>
-            Connect your own payment accounts and choose how customers pay. You paste credentials from each provider once;
-            we verify them live, store them encrypted, and charge directly on your own account.
+            Connect your own payment accounts and choose how customers pay. Credentials are verified live, stored
+            encrypted, and charges settle to your own account.
           </p>
         </div>
-        <div className="payments-page-actions">
-          <Button onClick={() => setActive({ kind: "coupon" })} type="button">
-            <TicketPlus size={16} />
-            Add coupon
-          </Button>
-          <span className={done === steps.length ? "guided-progress guided-progress-done" : "guided-progress"}>
-            {done} of {steps.length} set up
-          </span>
-        </div>
+        <span className={done === steps.length ? "guided-progress guided-progress-done" : "guided-progress"}>
+          {done} of {steps.length} set up
+        </span>
       </header>
 
+      {/* Setup state and next actions; every detail opens in a modal ------- */}
+      <SettingsGroup
+        description="Connect an account, switch on ways to pay, and choose which account runs checkout."
+        title="Payment setup">
+        {providers.map((provider) => (
+          <SettingRow
+            description={provider.connected ? provider.manageDetail : provider.headline}
+            key={provider.provider}
+            title={
+              <span className="pay-row-title">
+                <ProviderMark provider={provider.provider} size={18} />
+                {provider.name}
+                {provider.connected ? (
+                  <span className={provider.needsAttention ? "ui-badge ui-badge-warning" : "ui-badge ui-badge-success"}>
+                    {provider.needsAttention ? "Needs attention" : "Connected"}
+                  </span>
+                ) : provider.recommended ? (
+                  <span className="ui-badge">Recommended</span>
+                ) : null}
+              </span>
+            }>
+            {provider.connected ? (
+              <Button onClick={() => setActive({ kind: "manage", provider: provider.provider })} size="sm" type="button" variant="secondary">
+                Manage
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setActive({ kind: "connect", provider: provider.provider })}
+                size="sm"
+                type="button"
+                variant={provider.recommended && connectedCount === 0 ? undefined : "secondary"}>
+                Connect
+              </Button>
+            )}
+          </SettingRow>
+        ))}
+
+        <SettingRow
+          description={
+            methods.connected
+              ? `On now: ${enabledMethodLabels.join(", ") || "none"}. Cash App Pay and Affirm are included with Stripe — no separate accounts to create.`
+              : "Cards, wallets, Cash App Pay, and Affirm all come from the Stripe connection. Connect Stripe above to switch them on."
+          }
+          title={
+            <span className="pay-row-title">
+              Ways customers pay
+              {methods.connected ? (
+                <span className="ui-badge ui-badge-success">{methods.enabledKeys.length} on</span>
+              ) : (
+                <span className="ui-badge ui-badge-warning">Waiting on Stripe</span>
+              )}
+            </span>
+          }>
+          {methods.connected ? (
+            <Button onClick={() => setActive({ kind: "methods" })} size="sm" type="button" variant="secondary">
+              Manage
+            </Button>
+          ) : null}
+        </SettingRow>
+
+        <SettingRow
+          description={
+            checkout.disconnected
+              ? "The selected account is disconnected, so checkout cannot take payment. Pick a connected account."
+              : checkout.anyConnected
+                ? "The account that takes payment when customers check out."
+                : "Connect a payment account above before customers can check out."
+          }
+          title={
+            <span className="pay-row-title">
+              Checkout account
+              {checkout.disconnected ? (
+                <span className="ui-badge ui-badge-danger">Disconnected</span>
+              ) : checkout.anyConnected && activeCheckoutLabel ? (
+                <span className="ui-badge ui-badge-success">{activeCheckoutLabel}</span>
+              ) : (
+                <span className="ui-badge ui-badge-warning">Waiting on a connection</span>
+              )}
+            </span>
+          }>
+          {checkout.anyConnected ? (
+            <Button onClick={() => setActive({ kind: "checkout" })} size="sm" type="button" variant="secondary">
+              Change
+            </Button>
+          ) : null}
+        </SettingRow>
+
+        <SettingRow
+          description={`${taxSummary} · ${shippingSummary} — shown in cart and checkout totals.`}
+          title="Tax & shipping">
+          <Button onClick={() => setActive({ kind: "checkoutTotals" })} size="sm" type="button" variant="secondary">
+            Edit
+          </Button>
+        </SettingRow>
+      </SettingsGroup>
+
+      {/* Coupons: the primary dense surface -------------------------------- */}
       <section aria-labelledby="active-coupons-title" className="ui-data-table-shell payments-coupons-table">
         <div className="ui-data-table-header">
           <div className="ui-data-table-titlebar">
@@ -178,6 +269,10 @@ export function PaymentsWorkspace({
               </h2>
               <p className="ui-zero">{coupons.length} available at checkout</p>
             </div>
+            <Button onClick={() => setActive({ kind: "coupon" })} size="sm" type="button">
+              <TicketPlus size={16} />
+              Add coupon
+            </Button>
           </div>
         </div>
         <Table className="ui-data-table-scroll" tableClassName="ui-data-table payments-coupons-index-table">
@@ -230,181 +325,6 @@ export function PaymentsWorkspace({
             ) : null}
           </tbody>
         </Table>
-      </section>
-
-      {/* Cash App Pay + Affirm gating callout ------------------------------ */}
-      <section className={featuredConnected ? "subpanel pay-feature pay-feature-on" : "subpanel pay-feature"}>
-        <div className="pay-feature-main">
-          <span className="pay-feature-icon">{featuredConnected ? <CheckCircle2 size={20} /> : <Lock size={20} />}</span>
-          <div>
-            <strong>Cash App Pay &amp; Affirm</strong>
-            <p className="ui-zero">
-              {featuredConnected
-                ? "Included with Stripe. Switch them on under “Ways customers pay.”"
-                : "These ride along with Stripe. Connect Stripe first, then you can switch them on — there’s no separate Cash App or Affirm account to create."}
-            </p>
-            <div className="pay-chips">
-              <span className={featuredConnected ? "pay-chip pay-chip-on" : "pay-chip pay-chip-locked"}>
-                {featuredConnected ? <MethodMark methodKey="CASH_APP_PAY" size={14} /> : <Lock size={12} />} Cash App Pay
-              </span>
-              <span className={featuredConnected ? "pay-chip pay-chip-on" : "pay-chip pay-chip-locked"}>
-                {featuredConnected ? <MethodMark methodKey="AFFIRM" size={14} /> : <Lock size={12} />} Affirm
-              </span>
-            </div>
-          </div>
-        </div>
-        {featuredConnected ? (
-          <Button onClick={() => setActive({ kind: "methods" })} type="button" variant="secondary">
-            Manage ways to pay
-          </Button>
-        ) : (
-          <Button onClick={() => setActive({ kind: "connect", provider: "STRIPE" })} type="button">
-            Set up Stripe first
-          </Button>
-        )}
-      </section>
-
-      {/* Payment providers ------------------------------------------------- */}
-      <section className="subpanel form-grid pay-provider-panel">
-        <div className="module-toggle-main">
-          <span>
-            <strong>Payment Providers</strong>
-          </span>
-          <small>Pick a provider to set up — the whole tile is the button. You can connect more than one and choose which runs checkout below.</small>
-        </div>
-        <div className="pay-provider-row">
-          {providers.map((provider) => (
-            <button
-              className={[
-                "pay-provider-tile",
-                provider.connected ? "is-connected" : "",
-                provider.connected && provider.needsAttention ? "needs-attention" : ""
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              key={provider.provider}
-              onClick={() =>
-                setActive(
-                  provider.connected
-                    ? { kind: "manage", provider: provider.provider }
-                    : { kind: "connect", provider: provider.provider }
-                )
-              }
-              type="button">
-              {provider.recommended ? <span className="pay-provider-rec">Recommended</span> : null}
-              <span className="pay-provider-logo">
-                <ProviderMark provider={provider.provider} size={38} />
-              </span>
-              <span className="pay-provider-name">{provider.name}</span>
-              <span className="pay-provider-status">
-                {provider.connected ? (
-                  provider.needsAttention ? (
-                    <>
-                      <AlertTriangle size={13} /> Needs attention
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 size={13} /> Connected · Manage
-                    </>
-                  )
-                ) : (
-                  "Click to set up"
-                )}
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* Ways to pay ------------------------------------------------------- */}
-      <section className="subpanel form-grid">
-        <div className="module-toggle-main">
-          <span>
-            <strong>Ways customers pay</strong>
-            {methods.connected ? null : <span className="ui-badge ui-badge-warning">Connect Stripe</span>}
-          </span>
-          <small>
-            {methods.connected
-              ? "Cards, wallets, Cash App Pay, and Affirm — switch each on or off."
-              : "Connect Stripe to switch on cards, wallets, Cash App Pay, and Affirm."}
-          </small>
-        </div>
-        {methods.connected ? (
-          <>
-            <div className="pay-chips">
-              {methods.options.map((option) => (
-                <span
-                  className={methods.enabledKeys.includes(option.key) ? "pay-chip pay-chip-on" : "pay-chip"}
-                  key={option.key}>
-                  <MethodMark methodKey={option.key} size={14} />
-                  {option.label}
-                </span>
-              ))}
-            </div>
-            <div>
-              <Button onClick={() => setActive({ kind: "methods" })} type="button" variant="secondary">
-                <CreditCard size={16} />
-                Manage ways to pay
-              </Button>
-            </div>
-            <small className="muted-text">On now: {enabledMethodLabels.join(", ") || "none"}.</small>
-          </>
-        ) : (
-          <>
-            <div className="pay-chips">
-              {methods.options.map((option) => (
-                <span className="pay-chip pay-chip-locked" key={option.key}>
-                  <Lock size={12} />
-                  {option.label}
-                </span>
-              ))}
-            </div>
-            <div>
-              <Button onClick={() => setActive({ kind: "connect", provider: "STRIPE" })} type="button">
-                Set up Stripe
-              </Button>
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* Checkout account -------------------------------------------------- */}
-      <section className="subpanel form-grid">
-        <div className="module-toggle-main">
-          <span>
-            <strong>Checkout account</strong>
-            {checkout.anyConnected ? null : <span className="ui-badge ui-badge-warning">Connect a provider</span>}
-          </span>
-          <small>
-            {checkout.anyConnected
-              ? "The account that takes payment when customers check out."
-              : "Connect a payment account above before customers can check out."}
-          </small>
-        </div>
-        {checkout.disconnected ? (
-          <p className="error ui-zero">
-            <AlertTriangle size={14} /> Your selected checkout account is disconnected. Pick a connected one.
-          </p>
-        ) : null}
-        {checkout.anyConnected ? (
-          <div className="pay-checkout-row">
-            <span className="pay-chip pay-chip-on">
-              {checkout.providers.find((provider) => provider.value === checkout.active)?.label || "Not chosen"}
-            </span>
-            <Button onClick={() => setActive({ kind: "checkout" })} type="button" variant="secondary">
-              <Settings2 size={16} />
-              Change checkout account
-            </Button>
-          </div>
-        ) : null}
-        <div className="pay-checkout-row">
-          <span className={checkoutTotals.taxEnabled ? "pay-chip pay-chip-on" : "pay-chip"}>{taxSummary}</span>
-          <span className={checkoutTotals.shippingEnabled ? "pay-chip pay-chip-on" : "pay-chip"}>{shippingSummary}</span>
-          <Button onClick={() => setActive({ kind: "checkoutTotals" })} type="button" variant="secondary">
-            <ReceiptText size={16} />
-            Checkout totals
-          </Button>
-        </div>
       </section>
 
       {active?.kind === "connect" && connectConfig ? (

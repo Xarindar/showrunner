@@ -2,7 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
-import { moduleRegistry, normalizeModules, requiredModuleIds, type ModuleId } from "@/shell/modules";
+import { defaultEnabledModules, moduleRegistry, normalizeModules, requiredModuleIds, type ModuleId } from "@/shell/modules";
 
 export type ModuleInstallationState = {
   moduleId: ModuleId;
@@ -52,10 +52,10 @@ export async function setModuleEnablement(enabledIds: ModuleId[], siteId = DEFAU
 // seeded. The result is always normalized: required modules forced in, build-excluded modules filtered
 // out (normalizeModules only keeps ids known to the current build's registry).
 export async function resolveEnabledModuleIds(legacyEnabled: ModuleId[], siteId = DEFAULT_SITE_ID): Promise<ModuleId[]> {
-  let rows: { moduleId: string }[];
+  let rows: { enabled: boolean; moduleId: string }[];
 
   try {
-    rows = await prisma.moduleInstallation.findMany({ where: { siteId, enabled: true }, select: { moduleId: true } });
+    rows = await prisma.moduleInstallation.findMany({ where: { siteId }, select: { enabled: true, moduleId: true } });
   } catch {
     return normalizeModules(legacyEnabled);
   }
@@ -66,5 +66,11 @@ export async function resolveEnabledModuleIds(legacyEnabled: ModuleId[], siteId 
     return normalizeModules(legacyEnabled);
   }
 
-  return normalizeModules(rows.map((row) => row.moduleId));
+  const installedIds = new Set(rows.map((row) => row.moduleId));
+  const missingDefaultIds = defaultEnabledModules.filter((moduleId) => !installedIds.has(moduleId));
+  if (missingDefaultIds.length) {
+    await ensureModuleInstallations([...legacyEnabled, ...missingDefaultIds], siteId).catch(() => {});
+  }
+
+  return normalizeModules([...rows.filter((row) => row.enabled).map((row) => row.moduleId), ...missingDefaultIds]);
 }

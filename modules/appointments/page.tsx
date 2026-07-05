@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BookingStatus, BookingWaitlistStatus, Prisma } from "@prisma/client";
-import { CalendarClock, CalendarDays, Clock, ListChecks, Plus, Users } from "lucide-react";
+import { CalendarClock, CalendarDays, ChevronDown, Clock, ListChecks, Plus, Users } from "lucide-react";
 import { getAccessibleBookingWaitlistWhere, getAccessibleBookingWhere, hasAdminPermission, requireAdmin } from "@/lib/auth";
 import { bookingConflictWarnings } from "@/lib/bookings/conflicts";
 import { clientStatusLabel } from "@/lib/clients/status";
@@ -707,47 +707,55 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
               <div className="appointments-waitlist-list">
                 {waitlistEntries.map((entry) => (
                   <article className="appointments-waitlist-card" key={entry.id}>
-                    <div>
-                      <strong>{entry.customerName}</strong>
-                      <p>{entry.service.name}</p>
-                      <small>{formatDateTime(entry.startsAt, settings.timezone)}</small>
-                    </div>
-                    <form action={promoteWaitlistEntryAction} className="appointments-promote-form">
-                      <input type="hidden" name="id" value={entry.id} />
-                      <label htmlFor={`waitlist-${entry.id}-startsAt`}>Start time</label>
-                      <input
-                        id={`waitlist-${entry.id}-startsAt`}
-                        name="startsAt"
-                        type="datetime-local"
-                        defaultValue={formatDateTimeLocalInput(entry.startsAt, settings.timezone)}
-                        required
-                      />
-                      {entry.service.staffAssignments.length ? (
-                        <>
-                          <label htmlFor={`waitlist-${entry.id}-staffId`}>Staff</label>
-                          <select id={`waitlist-${entry.id}-staffId`} name="staffId" defaultValue={entry.staffId || ""} required>
-                            <option value="">Choose staff</option>
-                            {entry.service.staffAssignments.map((assignment) => (
-                              <option key={assignment.staffId} value={assignment.staffId}>
-                                {assignment.staff.name}
-                              </option>
-                            ))}
-                          </select>
-                        </>
-                      ) : null}
-                      <div className="appointments-waitlist-actions">
-                        <Button size="sm" type="submit" variant="secondary">
-                          Promote
-                        </Button>
+                    <div className="appointments-waitlist-row">
+                      <div>
+                        <strong>{entry.customerName}</strong>
+                        <p>{entry.service.name}</p>
+                        <small>{formatDateTime(entry.startsAt, settings.timezone)}</small>
                       </div>
-                    </form>
-                    <form action={updateWaitlistEntryStatusAction}>
-                      <input type="hidden" name="id" value={entry.id} />
-                      <input type="hidden" name="status" value={BookingWaitlistStatus.DECLINED} />
-                      <Button size="sm" type="submit" variant="danger">
-                        Decline
-                      </Button>
-                    </form>
+                      <form action={updateWaitlistEntryStatusAction}>
+                        <input type="hidden" name="id" value={entry.id} />
+                        <input type="hidden" name="status" value={BookingWaitlistStatus.DECLINED} />
+                        <Button size="sm" type="submit" variant="danger">
+                          Decline
+                        </Button>
+                      </form>
+                    </div>
+                    <details className="ui-disclosure">
+                      <summary>
+                        <span>Promote to appointment</span>
+                        <ChevronDown aria-hidden="true" className="ui-disclosure-caret" size={16} />
+                      </summary>
+                      <form action={promoteWaitlistEntryAction} className="appointments-promote-form">
+                        <input type="hidden" name="id" value={entry.id} />
+                        <label htmlFor={`waitlist-${entry.id}-startsAt`}>Start time</label>
+                        <input
+                          id={`waitlist-${entry.id}-startsAt`}
+                          name="startsAt"
+                          type="datetime-local"
+                          defaultValue={formatDateTimeLocalInput(entry.startsAt, settings.timezone)}
+                          required
+                        />
+                        {entry.service.staffAssignments.length ? (
+                          <>
+                            <label htmlFor={`waitlist-${entry.id}-staffId`}>Staff</label>
+                            <select id={`waitlist-${entry.id}-staffId`} name="staffId" defaultValue={entry.staffId || ""} required>
+                              <option value="">Choose staff</option>
+                              {entry.service.staffAssignments.map((assignment) => (
+                                <option key={assignment.staffId} value={assignment.staffId}>
+                                  {assignment.staff.name}
+                                </option>
+                              ))}
+                            </select>
+                          </>
+                        ) : null}
+                        <div className="appointments-waitlist-actions">
+                          <Button size="sm" type="submit" variant="secondary">
+                            Promote
+                          </Button>
+                        </div>
+                      </form>
+                    </details>
                   </article>
                 ))}
                 {!waitlistEntries.length ? <p className="ui-zero">No waitlist entries match these filters.</p> : null}

@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, Menu, Settings, UserRound, X } from "lucide-react";
+import { ArrowLeft, LogOut, Menu, Settings, UserRound, X } from "lucide-react";
 import type { AdminRole } from "@prisma/client";
 import { usePathname } from "next/navigation";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import { moduleIcons, moduleRegistry, type ModuleId } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
+import { useAdminMobileHeaderContext } from "@/shell/admin-mobile-header";
 import { logoutAction } from "@/app/admin/(protected)/actions";
 import { Button } from "@/components/ui";
 import { useState } from "react";
@@ -25,17 +26,27 @@ function roleLabel(role: AdminRole) {
 export function AdminSidebar({ businessName, enabledModules, userEmail, userRole }: AdminSidebarProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const mobileHeaderContext = useAdminMobileHeaderContext();
   const canUpdateSettings = hasAdminPermission({ role: userRole }, "settings:update");
 
   const closeMenu = () => setMenuOpen(false);
 
   return (
     <>
-      <header className="admin-mobile-bar">
+      <header className={`admin-mobile-bar ${mobileHeaderContext ? "is-contextual" : ""}`}>
         <Link href="/admin" className="brand" onClick={closeMenu}>
           <span className="brand-mark" />
           <span>{businessName}</span>
         </Link>
+        {mobileHeaderContext ? (
+          <>
+            <Link className="admin-mobile-context-back" href={mobileHeaderContext.backHref} onClick={closeMenu}>
+              <ArrowLeft size={17} />
+              <span>Back</span>
+            </Link>
+            <strong className="admin-mobile-context-title">{mobileHeaderContext.title}</strong>
+          </>
+        ) : null}
         <button
           aria-controls="admin-sidebar"
           aria-expanded={menuOpen}

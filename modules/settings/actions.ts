@@ -2,18 +2,47 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { MediaVariantType } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
-import { applyDataScopePreset, dataScopeConfigFromFormData, dataScopePresets, requireAdmin, type DataScopePreset } from "@/lib/auth";
+import {
+  applyDataScopePreset,
+  dataScopeConfigFromFormData,
+  dataScopePresets,
+  getOwnerStaffIds,
+  requireAdmin,
+  resolveDataScopeMode,
+  type DataScopePreset
+} from "@/lib/auth";
 import { parseForm, settingsFormSchema } from "@/lib/admin-validation";
 import { setModuleEnablement } from "@/lib/modules/installation";
 import { clientVipSettingsFromFormData } from "@/lib/clients/vip-settings";
 import { saveClientVipSettings } from "@/lib/clients/vip";
 import { createSiteApiKey, parseOriginsInput, revokeSiteApiKey, updateSiteApiKeyOrigins } from "@/lib/embed/keys";
+import { mediaAssetDisplayUrl, uploadMedia } from "@/lib/media";
 import { normalizeScopes } from "@/lib/embed/scopes";
 import { normalizeModules } from "@/shell/modules";
 import { prisma } from "@/lib/prisma";
-import { resolveCurrentSite } from "@/lib/site";
+import { getSiteSettings, resolveCurrentSite } from "@/lib/site";
+import { parseStoredThemePalette, parseThemePaletteInput, serializeThemePalette } from "@/lib/theme/palette-url";
 import { normalizeThemePreset } from "@/lib/theme/tokens";
+
+function refreshSettings() {
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/modules/settings");
+  revalidatePath("/admin/modules/media");
+  revalidatePath("/sitemap.xml");
+}
+
+function hasUpload(value: FormDataEntryValue | null): value is File {
+  return value instanceof File && value.size > 0;
+}
+
+async function setLogoImageUrl(siteId: string, logoImageUrl: string) {
+  await prisma.siteSettings.update({
+    where: { siteId },
+    data: { logoImageUrl }
+  });
+}
 
 export async function updateSettingsAction(formData: FormData) {
   const user = await requireAdmin("settings:update");
@@ -23,6 +52,13 @@ export async function updateSettingsAction(formData: FormData) {
   const safeModules = normalizeModules(enabledModules);
   const themePreset = normalizeThemePreset(input.themePreset);
   const site = await resolveCurrentSite();
+  const paletteInput = String(formData.get("themePaletteUrl") || "").trim();
+  const importedPalette = parseThemePaletteInput(paletteInput);
+  if (paletteInput && !importedPalette) {
+    redirect(`/admin/modules/settings?error=${encodeURIComponent("Use a valid Admit One palette URL.")}`);
+  }
+  const themePrimary =
+    importedPalette && !parseStoredThemePalette(input.themePrimary) ? serializeThemePalette(importedPalette.colors) : input.themePrimary;
   const dataScopePreset = String(formData.get("dataScopePreset") || "custom");
   const dataScopeConfig = dataScopePresets.includes(dataScopePreset as DataScopePreset)
     ? applyDataScopePreset(dataScopePreset as DataScopePreset)
@@ -35,7 +71,7 @@ export async function updateSettingsAction(formData: FormData) {
       contactEmail: input.contactEmail,
       timezone: input.timezone,
       themePreset,
-      themePrimary: input.themePrimary,
+      themePrimary,
       mediaDriver: input.mediaDriver,
       ga4MeasurementId: input.ga4MeasurementId,
       googleAdsTagId: input.googleAdsTagId,
@@ -51,7 +87,7 @@ export async function updateSettingsAction(formData: FormData) {
       contactEmail: input.contactEmail,
       timezone: input.timezone,
       themePreset,
-      themePrimary: input.themePrimary,
+      themePrimary,
       mediaDriver: input.mediaDriver,
       ga4MeasurementId: input.ga4MeasurementId,
       googleAdsTagId: input.googleAdsTagId,
@@ -78,6 +114,7 @@ export async function updateSettingsAction(formData: FormData) {
       googleAdsTagId: input.googleAdsTagId,
       metaPixelId: input.metaPixelId,
       mediaDriver: input.mediaDriver,
+      themePaletteColors: importedPalette?.colors.length || parseStoredThemePalette(themePrimary)?.colors.length || 0,
       analyticsRetentionDays: input.analyticsRetentionDays,
       searchConsoleVerification: input.searchConsoleVerification,
       dataScopePreset,
@@ -90,8 +127,112 @@ export async function updateSettingsAction(formData: FormData) {
     targetType: "site_settings"
   });
 
-  revalidatePath("/", "layout");
+  refreshSettings();
   redirect("/admin/modules/settings?saved=1");
+}
+
+export async function uploadSiteLogoAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const settings = await getSiteSettings();
+  const file = formData.get("file");
+  if (!hasUpload(file)) {
+    redirect(`/admin/modules/settings?error=${encodeURIComponent("Choose a logo image before uploading.")}`);
+  }
+
+  const ownerStaffIds = await getOwnerStaffIds(user, settings.siteId);
+  if ((await resolveDataScopeMode(user, settings.siteId, "media")) === "OWN" && !ownerStaffIds.length) {
+    redirect(`/admin/modules/settings?error=${encodeURIComponent("Create an active staff profile before uploading scoped media.")}`);
+  }
+
+  let asset: Awaited<ReturnType<typeof uploadMedia>>;
+  try {
+    asset = await uploadMedia(
+      file,
+      {
+        alt: String(formData.get("alt") || `${settings.businessName} logo`).trim() || `${settings.businessName} logo`,
+        folder: "brand/logo",
+        tags: ["brand", "logo"],
+        uploadedByStaffId: ownerStaffIds[0],
+        usageContext: "site logo"
+      },
+      settings.mediaDriver,
+      settings.siteId
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Logo upload failed.";
+    redirect(`/admin/modules/settings?error=${encodeURIComponent(message)}`);
+  }
+
+  const logoImageUrl = mediaAssetDisplayUrl(asset, MediaVariantType.FULL);
+  await setLogoImageUrl(settings.siteId, logoImageUrl);
+  await recordAuditLog({
+    action: "settings.logo.uploaded",
+    actor: user,
+    metadata: {
+      logoImageUrl,
+      mediaAssetId: asset.id
+    },
+    siteId: settings.siteId,
+    targetId: settings.siteId,
+    targetLabel: settings.businessName,
+    targetType: "site_settings"
+  });
+
+  refreshSettings();
+  redirect("/admin/modules/settings?saved=logo");
+}
+
+export async function attachSiteLogoAction(formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const settings = await getSiteSettings();
+  const mediaAssetId = String(formData.get("mediaAssetId") || "").trim();
+  if (!mediaAssetId) {
+    redirect(`/admin/modules/settings?error=${encodeURIComponent("Choose an active logo asset.")}`);
+  }
+
+  const asset = await prisma.mediaAsset.findFirst({
+    where: { id: mediaAssetId, siteId: settings.siteId, deletedAt: null, isPrivate: false },
+    select: { alt: true, driver: true, filename: true, id: true, isPrivate: true, key: true, storageProviderId: true, url: true }
+  });
+  if (!asset) {
+    redirect(`/admin/modules/settings?error=${encodeURIComponent("Choose an active public logo asset.")}`);
+  }
+
+  const logoImageUrl = mediaAssetDisplayUrl(asset, MediaVariantType.FULL);
+  await setLogoImageUrl(settings.siteId, logoImageUrl);
+  await recordAuditLog({
+    action: "settings.logo.attached",
+    actor: user,
+    metadata: {
+      logoImageUrl,
+      mediaAssetId: asset.id
+    },
+    siteId: settings.siteId,
+    targetId: settings.siteId,
+    targetLabel: settings.businessName,
+    targetType: "site_settings"
+  });
+
+  refreshSettings();
+  redirect("/admin/modules/settings?saved=logo");
+}
+
+export async function removeSiteLogoAction(_formData: FormData) {
+  void _formData;
+  const user = await requireAdmin("settings:update");
+  const settings = await getSiteSettings();
+  await setLogoImageUrl(settings.siteId, "");
+  await recordAuditLog({
+    action: "settings.logo.removed",
+    actor: user,
+    siteId: settings.siteId,
+    targetId: settings.siteId,
+    targetLabel: settings.businessName,
+    targetType: "site_settings"
+  });
+
+  refreshSettings();
+  redirect("/admin/modules/settings?saved=logo-removed");
 }
 
 export async function updateClientVipSettingsAction(formData: FormData) {
@@ -144,7 +285,7 @@ export async function createSiteApiKeyAction(formData: FormData) {
     targetType: "site_api_key"
   });
 
-  revalidatePath("/", "layout");
+  refreshSettings();
   redirect("/admin/modules/settings?saved=embed");
 }
 
@@ -176,7 +317,7 @@ export async function revokeSiteApiKeyAction(formData: FormData) {
     targetType: "site_api_key"
   });
 
-  revalidatePath("/", "layout");
+  refreshSettings();
   redirect("/admin/modules/settings?saved=embed");
 }
 
@@ -205,6 +346,6 @@ export async function updateSiteApiKeyOriginsAction(formData: FormData) {
     targetType: "site_api_key"
   });
 
-  revalidatePath("/", "layout");
+  refreshSettings();
   redirect("/admin/modules/settings?saved=embed");
 }

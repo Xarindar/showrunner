@@ -8,6 +8,7 @@ import { manifest as clientsModule } from "@/modules/clients/module";
 import { manifest as communicationsModule } from "@/modules/communications/module";
 import { manifest as contentModule } from "@/modules/content/module";
 import { manifest as dashboardModule } from "@/modules/dashboard/module";
+import { manifest as deploymentsModule } from "@/modules/deployments/module";
 import { manifest as formsModule } from "@/modules/forms/module";
 import { manifest as helpModule } from "@/modules/help/module";
 import { manifest as mediaModule } from "@/modules/media/module";
@@ -33,6 +34,7 @@ const registeredModules = [
   testimonialsModule,
   settingsModule,
   usersModule,
+  deploymentsModule,
   helpModule,
   productsModule,
   paymentsModule,

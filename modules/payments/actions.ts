@@ -20,16 +20,10 @@ import {
 import { prisma } from "@/lib/prisma";
 import { normalizeModules } from "@/shell/modules";
 import { resolveCurrentSite } from "@/lib/site";
+import type { PaymentActionState } from "./state";
 
 // All payment actions return a small serializable state so the guided modals can show inline success
 // and errors with useActionState — no full-page redirects that would tear down the wizard mid-flow.
-export type PaymentActionState =
-  | { status: "idle" }
-  | { status: "success"; message?: string }
-  | { status: "error"; message: string };
-
-export const initialPaymentActionState: PaymentActionState = { status: "idle" };
-
 function errorState(error: unknown, fallback: string): PaymentActionState {
   return { status: "error", message: error instanceof Error ? error.message : fallback };
 }

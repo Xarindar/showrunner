@@ -19,6 +19,7 @@ model AdminUser {
   updatedAt    DateTime   @updatedAt
   auditLogs    AuditLog[]
   staffProfiles StaffMember[]
+  clientDeployments ClientDeployment[]
 }
 
 model Tenant {
@@ -101,6 +102,7 @@ model Site {
   analyticsEvents          AnalyticsEvent[]
   analyticsGoals           AnalyticsGoal[]
   auditLogs                AuditLog[]
+  clientDeployments        ClientDeployment[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
@@ -130,6 +132,7 @@ model SiteSettings {
   timezone        String      @default("America/Chicago")
   themePreset     String      @default("clean")
   themePrimary    String      @default("#116466")
+  logoImageUrl    String      @default("")
   heroImageUrl    String      @default("/hero.svg")
   heroHeadline    String      @default("Book services without the back-and-forth")
   heroSubheadline String      @default("A client-ready website and admin panel for service appointments.")

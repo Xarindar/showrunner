@@ -1,10 +1,11 @@
 "use client";
 
-import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cx } from "./utils";
 
 export type FolderTab = {
   content: ReactNode;
+  footer?: ReactNode;
   icon?: ReactNode;
   id: string;
   label: string;
@@ -107,15 +108,21 @@ export function FolderTabs({
       {tabs.map((tab) => {
         const safeId = safeDomId(tab.id);
         return (
-          <div
-            aria-labelledby={`${rootId}-tab-${safeId}`}
-            className={cx("ui-folder-panel", panelClassName)}
-            hidden={tab.id !== activeId}
-            id={`${rootId}-panel-${safeId}`}
-            key={tab.id}
-            role="tabpanel">
-            {tab.content}
-          </div>
+          <Fragment key={tab.id}>
+            <div
+              aria-labelledby={`${rootId}-tab-${safeId}`}
+              className={cx("ui-folder-panel", panelClassName)}
+              hidden={tab.id !== activeId}
+              id={`${rootId}-panel-${safeId}`}
+              role="tabpanel">
+              {tab.content}
+            </div>
+            {tab.footer ? (
+              <div className="ui-folder-tab-footer" hidden={tab.id !== activeId}>
+                {tab.footer}
+              </div>
+            ) : null}
+          </Fragment>
         );
       })}
     </section>

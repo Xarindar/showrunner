@@ -1,0 +1,40 @@
+// Internal client deployment invites and GitHub handoff state.
+
+enum ClientDeploymentStatus {
+  READY
+  CLAIMED
+  EXPIRED
+  REVOKED
+  FAILED
+}
+
+model ClientDeployment {
+  id                 String                 @id @default(cuid())
+  siteId             String
+  site               Site                   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  createdById        String?
+  createdBy          AdminUser?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  clientName         String
+  clientEmail        String                 @default("")
+  repoOwner          String                 @default("")
+  repoName           String
+  templateRepository String
+  selectedModules    Json                   @default("[]")
+  moduleInclude      String                 @default("")
+  inviteTokenHash    String                 @unique
+  inviteTokenPreview String                 @default("")
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  claimedAt          DateTime?
+  githubUsername     String                 @default("")
+  githubRepositoryUrl String                @default("")
+  status             ClientDeploymentStatus @default(READY)
+  failureReason      String                 @default("")
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([siteId, createdAt])
+  @@index([createdById])
+  @@index([status, expiresAt])
+  @@index([clientEmail])
+}

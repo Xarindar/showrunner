@@ -10,6 +10,7 @@ const modulePageLoaders = {
   communications: () => import("@/modules/communications/page"),
   content: () => import("@/modules/content/page"),
   dashboard: () => import("@/modules/dashboard/page"),
+  deployments: () => import("@/modules/deployments/page"),
   forms: () => import("@/modules/forms/page"),
   help: () => import("@/modules/help/page"),
   media: () => import("@/modules/media/page"),

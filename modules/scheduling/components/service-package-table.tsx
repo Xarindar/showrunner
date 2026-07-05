@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties } from "react";
-import { Boxes, Plus, Search, X } from "lucide-react";
+import { Boxes, Pencil, Plus, Search, X } from "lucide-react";
 import Link from "next/link";
-import { Button, ButtonLink, Pagination, SelectMenu, type SelectMenuOption } from "@/components/ui";
+import { Button, ButtonLink, Pagination, SelectMenu, Tooltip, type SelectMenuOption } from "@/components/ui";
 import { useCatalogTablePagination } from "./use-catalog-table-pagination";
 
 export type ServicePackageTablePackage = {
@@ -21,7 +21,6 @@ export type ServicePackageTablePackage = {
 };
 
 type ServicePackageTableProps = {
-  activePackages: number;
   categoryOptions: SelectMenuOption[];
   packages: ServicePackageTablePackage[];
   tagOptions: SelectMenuOption[];
@@ -50,7 +49,7 @@ function packageMatchesSearch(servicePackage: ServicePackageTablePackage, search
   return haystack.includes(searchQuery.toLowerCase());
 }
 
-export function ServicePackageTable({ activePackages, categoryOptions, packages, tagOptions }: ServicePackageTableProps) {
+export function ServicePackageTable({ categoryOptions, packages, tagOptions }: ServicePackageTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState("all");
@@ -212,9 +211,17 @@ export function ServicePackageTable({ activePackages, categoryOptions, packages,
                   </td>
                   <td>
                     <div className="catalog-row-actions">
-                      <ButtonLink href={`/admin/modules/services/packages/${servicePackage.id}`} size="sm" variant="secondary">
-                        Edit
-                      </ButtonLink>
+                      <Tooltip content="Edit package" focusable={false}>
+                        <ButtonLink
+                          aria-label={`Edit ${servicePackage.name}`}
+                          className="catalog-icon-button"
+                          href={`/admin/modules/services/packages/${servicePackage.id}`}
+                          size="sm"
+                          title="Edit package"
+                          variant="secondary">
+                          <Pencil aria-hidden="true" size={15} />
+                        </ButtonLink>
+                      </Tooltip>
                     </div>
                   </td>
                 </tr>
@@ -264,12 +271,6 @@ export function ServicePackageTable({ activePackages, categoryOptions, packages,
         page={currentPage}
         pageCount={pageCount}
       />
-      <div className="catalog-table-status-strip" aria-label="Package catalog status">
-        <span className="catalog-pill is-blue">
-          <Boxes size={15} />
-          {activePackages} active
-        </span>
-      </div>
     </div>
   );
 }

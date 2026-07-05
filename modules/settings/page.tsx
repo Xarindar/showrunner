@@ -1,21 +1,28 @@
 import Link from "next/link";
 import { Save } from "lucide-react";
+import { MediaDriver, MediaVariantType } from "@prisma/client";
 import { dataScopePresets, parseDataScopeConfig, requireAdmin, scopableModules } from "@/lib/auth";
 import { listSiteApiKeys } from "@/lib/embed/keys";
 import { EMBED_SCOPES } from "@/lib/embed/scopes";
 import { enumLabel } from "@/lib/format";
+import { isCloudflareImagesConfigured, isR2Configured, isServerAssetStorageConfigured, mediaAssetDisplayUrl } from "@/lib/media";
+import { prisma } from "@/lib/prisma";
 import { isRequiredModule } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
 import { getPlatformStatus, platformFoundationItems } from "@/lib/platform-status";
 import { getSiteSettings } from "@/lib/site";
-import { normalizeThemePreset, themePresetOptions } from "@/lib/theme/tokens";
 import {
+  attachSiteLogoAction,
   createSiteApiKeyAction,
+  removeSiteLogoAction,
   revokeSiteApiKeyAction,
   updateSettingsAction,
-  updateSiteApiKeyOriginsAction } from "./actions";
-import { Button, ButtonLink, Card, EqualGrid, Switch } from "@/components/ui";
+  updateSiteApiKeyOriginsAction,
+  uploadSiteLogoAction } from "./actions";
+import { Button, ButtonLink, Card, EqualGrid, Switch, type AssetPickerAsset } from "@/components/ui";
+import { BusinessSettings } from "./business-settings";
 import { SettingsNav } from "./settings-nav";
+import { ThemeMediaSettings } from "./theme-media-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +33,45 @@ type SettingsPageProps = {
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   await requireAdmin("settings:update");
   const [{ saved, error }, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [platformStatus, apiKeys] = await Promise.all([getPlatformStatus(settings), listSiteApiKeys(settings.siteId)]);
+  const currentLogoAssetId = mediaAssetIdFromUrl(settings.logoImageUrl);
+  const [platformStatus, apiKeys, logoAssets, currentLogoAsset] = await Promise.all([
+    getPlatformStatus(settings),
+    listSiteApiKeys(settings.siteId),
+    prisma.mediaAsset.findMany({
+      where: { siteId: settings.siteId, deletedAt: null, isPrivate: false },
+      orderBy: { createdAt: "desc" },
+      take: 40
+    }),
+    currentLogoAssetId
+      ? prisma.mediaAsset.findFirst({
+          where: { id: currentLogoAssetId, siteId: settings.siteId, deletedAt: null, isPrivate: false },
+          select: { alt: true, driver: true, filename: true, id: true, isPrivate: true, key: true, storageProviderId: true, url: true }
+        })
+      : Promise.resolve(null)
+  ]);
   const dataScopeConfig = parseDataScopeConfig(settings.dataScopeConfig);
   const dataScopeModules = scopableModules();
   const errorMessage = error || "";
+  const logoAssetOptions: AssetPickerAsset[] = logoAssets.map((asset) => ({
+    alt: asset.alt || asset.filename,
+    filename: asset.filename,
+    id: asset.id,
+    thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD)
+  }));
+  const logoUrl = currentLogoAssetId
+    ? currentLogoAsset
+      ? mediaAssetDisplayUrl(currentLogoAsset, MediaVariantType.FULL)
+      : ""
+    : settings.logoImageUrl;
+  const activeLogo = logoUrl
+    ? {
+        alt: currentLogoAsset?.alt || `${settings.businessName} logo`,
+        url: logoUrl
+      }
+    : null;
+  const logoUploadFormId = "settings-logo-upload-form";
+  const logoAttachFormId = "settings-logo-attach-form";
+  const logoRemoveFormId = "settings-logo-remove-form";
 
   return (
     <div className="stack">
@@ -75,53 +117,17 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       </Card>
 
       <Card action={updateSettingsAction} as="form" minHeight="none" bodyClassName="form-grid">
-        <section className="subpanel form-grid">
-          <h2 className="compact-title">Business</h2>
-          <EqualGrid>
-            <div className="ui-field">
-              <label htmlFor="businessName">Business name</label>
-              <input id="businessName" name="businessName" defaultValue={settings.businessName} required />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="contactEmail">Contact email</label>
-              <input id="contactEmail" name="contactEmail" type="email" defaultValue={settings.contactEmail} required />
-            </div>
-          </EqualGrid>
+        <BusinessSettings
+          attachFormId={logoAttachFormId}
+          canUploadLogo={canUploadWithDriver(settings.mediaDriver)}
+          logo={activeLogo}
+          logoAssets={logoAssetOptions}
+          removeFormId={logoRemoveFormId}
+          settings={settings}
+          uploadFormId={logoUploadFormId}
+        />
 
-          <div className="ui-field">
-            <label htmlFor="timezone">Timezone</label>
-            <input id="timezone" name="timezone" defaultValue={settings.timezone} required />
-          </div>
-        </section>
-
-        <section className="subpanel form-grid">
-          <h2 className="compact-title">Theme and media</h2>
-          <EqualGrid min="220px">
-            <div className="ui-field">
-              <label htmlFor="themePreset">Style preset</label>
-              <select id="themePreset" name="themePreset" defaultValue={normalizeThemePreset(settings.themePreset)}>
-                {themePresetOptions.map((preset) =>
-                <option key={preset.id} value={preset.id}>
-                    {preset.label}
-                  </option>
-                )}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="themePrimary">Primary color</label>
-              <input id="themePrimary" name="themePrimary" type="color" defaultValue={settings.themePrimary} />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="mediaDriver">Media mode</label>
-              <select id="mediaDriver" name="mediaDriver" defaultValue={settings.mediaDriver}>
-                <option value="REPO">Repo assets</option>
-                <option value="SERVER_ASSETS">Server asset folder</option>
-                <option value="R2">Cloudflare R2 uploads</option>
-                <option value="CLOUDFLARE_IMAGES">Cloudflare Images</option>
-              </select>
-            </div>
-          </EqualGrid>
-        </section>
+        <ThemeMediaSettings settings={settings} />
 
         <section className="subpanel form-grid">
           <div>
@@ -270,6 +276,10 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </Button>
       </Card>
 
+      <form action={uploadSiteLogoAction} id={logoUploadFormId} />
+      <form action={attachSiteLogoAction} id={logoAttachFormId} />
+      <form action={removeSiteLogoAction} id={logoRemoveFormId} />
+
       <Card aria-label="Embeds and public API" as="section" minHeight="none" bodyClassName="form-grid">
         <div>
           <h2 className="compact-title">Embeds &amp; public API</h2>
@@ -366,4 +376,23 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       </Card>
     </div>);
 
+}
+
+function mediaAssetIdFromUrl(value: string) {
+  if (!value) return "";
+  try {
+    const url = new URL(value, "http://localhost");
+    const match = url.pathname.match(/^\/api\/media\/assets\/([^/]+)$/);
+    return match?.[1] ? decodeURIComponent(match[1]) : "";
+  } catch {
+    const match = value.match(/^\/api\/media\/assets\/([^?]+)/);
+    return match?.[1] ? decodeURIComponent(match[1]) : "";
+  }
+}
+
+function canUploadWithDriver(driver: MediaDriver) {
+  if (driver === MediaDriver.SERVER_ASSETS) return isServerAssetStorageConfigured();
+  if (driver === MediaDriver.R2) return isR2Configured();
+  if (driver === MediaDriver.CLOUDFLARE_IMAGES) return isCloudflareImagesConfigured();
+  return false;
 }
