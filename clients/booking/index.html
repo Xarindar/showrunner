@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Client Booking</title>
+    <link rel="stylesheet" href="./styles/booking-theme.css" />
+    <link rel="stylesheet" href="./styles/booking.css" />
+  </head>
+  <body>
+    <div class="booking-page" data-booking-root>
+      <header class="booking-topbar">
+        <a class="booking-brand" href="#" aria-label="Booking home">
+          <span class="booking-brand-mark" aria-hidden="true"></span>
+          <span data-business-name>Client Studio</span>
+        </a>
+        <div class="booking-topbar-meta">
+          <span data-business-location>Book online</span>
+          <a data-support-link href="mailto:hello@example.com">Need help?</a>
+        </div>
+      </header>
+
+      <main class="booking-main">
+        <section class="booking-intro" aria-labelledby="booking-title">
+          <div>
+            <span class="booking-eyebrow" data-business-kicker>Online booking</span>
+            <h1 id="booking-title" data-business-heading>Choose your service</h1>
+            <p data-business-tagline>Select a category, pick a service, choose a time, and confirm your visit.</p>
+          </div>
+          <div class="booking-intro-meta" aria-label="Booking details">
+            <span data-business-hours>Open today</span>
+            <strong data-business-promise>Fast confirmation</strong>
+          </div>
+        </section>
+
+        <section class="booking-workspace">
+          <div class="booking-stage">
+            <section class="booking-panel is-active" data-step-panel="categories" aria-labelledby="category-title">
+              <div class="booking-panel-head">
+                <div>
+                  <span class="booking-kicker">Categories</span>
+                  <h2 id="category-title">What are you booking?</h2>
+                </div>
+              </div>
+
+              <div class="booking-discovery">
+                <div class="booking-home-search-row">
+                  <label class="booking-home-search">
+                    <span class="booking-visually-hidden">Search services and categories</span>
+                    <input data-home-search type="search" placeholder="Search services, specialists" autocomplete="off" />
+                  </label>
+                  <button class="booking-filter-button" type="button" aria-label="Open filters">
+                    <span aria-hidden="true"></span>
+                  </button>
+                </div>
+
+                <button class="booking-promo" type="button" data-promo-card hidden>
+                  <span>
+                    <strong data-promo-title></strong>
+                    <small data-promo-copy></small>
+                  </span>
+                  <em data-promo-cta></em>
+                </button>
+
+                <div class="booking-category-strip-head">
+                  <h3>Category</h3>
+                  <button class="booking-plain-link" type="button" data-clear-category-filter>See all</button>
+                </div>
+                <div class="booking-pill-rail" data-category-pills aria-label="Service categories"></div>
+              </div>
+
+              <div class="booking-category-grid" data-category-grid></div>
+              <p class="booking-empty" data-category-empty hidden>No categories match that search.</p>
+            </section>
+
+            <section class="booking-panel" data-step-panel="services" aria-labelledby="service-title" hidden>
+              <div class="booking-panel-head">
+                <div>
+                  <span class="booking-kicker" data-selected-category-kicker>Services</span>
+                  <h2 id="service-title">Choose a service</h2>
+                </div>
+                <button class="booking-plain-button" type="button" data-back-to-categories>Back</button>
+              </div>
+
+              <div class="booking-service-toolbar">
+                <label class="booking-search">
+                  <span>Search services</span>
+                  <input data-service-search type="search" placeholder="Search by name or detail" autocomplete="off" />
+                </label>
+                <label class="booking-select">
+                  <span>Sort</span>
+                  <select data-service-sort>
+                    <option value="recommended">Recommended</option>
+                    <option value="name">A to Z</option>
+                    <option value="duration">Duration</option>
+                    <option value="price">Price</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="booking-table-wrap">
+                <table class="booking-service-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Service</th>
+                      <th scope="col">Length</th>
+                      <th scope="col">Price</th>
+                      <th scope="col">Details</th>
+                      <th scope="col"><span class="booking-visually-hidden">Select</span></th>
+                    </tr>
+                  </thead>
+                  <tbody data-service-list></tbody>
+                </table>
+              </div>
+              <p class="booking-empty" data-service-empty hidden>No services match that search.</p>
+            </section>
+
+            <section class="booking-panel" data-step-panel="time" aria-labelledby="time-title" hidden>
+              <div class="booking-panel-head">
+                <div>
+                  <span class="booking-kicker" data-selected-service-kicker>Time</span>
+                  <h2 id="time-title">Pick a date and time</h2>
+                </div>
+                <button class="booking-plain-button" type="button" data-back-to-services>Back</button>
+              </div>
+
+              <div class="booking-time-controls">
+                <label class="booking-select" data-staff-control hidden>
+                  <span>Provider</span>
+                  <select data-staff-select></select>
+                </label>
+                <label class="booking-date-input">
+                  <span>Date</span>
+                  <input data-date-input type="date" />
+                </label>
+              </div>
+
+              <div class="booking-date-rail" data-date-rail aria-label="Available dates"></div>
+              <div class="booking-slot-head">
+                <h3 data-slot-heading>Available times</h3>
+                <span data-timezone-label></span>
+              </div>
+              <div class="booking-slot-grid" data-slot-grid></div>
+              <p class="booking-empty" data-slot-empty hidden>No times are available for this date.</p>
+              <div class="booking-status" data-availability-status role="status" aria-live="polite"></div>
+              <div class="booking-step-actions">
+                <button class="booking-button" type="button" data-review-booking disabled>Review booking</button>
+              </div>
+            </section>
+
+            <section class="booking-panel" data-step-panel="confirm" aria-labelledby="confirm-title" hidden>
+              <div class="booking-panel-head">
+                <div>
+                  <span class="booking-kicker">Confirmation</span>
+                  <h2 id="confirm-title">Confirm your booking</h2>
+                </div>
+                <button class="booking-plain-button" type="button" data-back-to-time>Back</button>
+              </div>
+
+              <div class="booking-confirm-layout">
+                <div class="booking-confirm-summary" data-confirm-summary></div>
+                <form class="booking-form" data-booking-form>
+                  <input data-honeypot class="booking-honeypot" name="companyWebsite" type="text" tabindex="-1" autocomplete="off" />
+
+                  <label>
+                    <span>Name</span>
+                    <input name="customerName" type="text" autocomplete="name" required />
+                  </label>
+                  <label>
+                    <span>Email</span>
+                    <input name="customerEmail" type="email" autocomplete="email" required />
+                  </label>
+                  <label>
+                    <span>Phone</span>
+                    <input name="customerPhone" type="tel" autocomplete="tel" />
+                  </label>
+                  <label data-intake-field hidden>
+                    <span data-intake-label>Appointment notes</span>
+                    <textarea name="intakeResponse" rows="3"></textarea>
+                  </label>
+                  <label>
+                    <span>Notes</span>
+                    <textarea name="notes" rows="3" placeholder="Anything we should know before you arrive?"></textarea>
+                  </label>
+                  <label class="booking-policy" data-policy-field hidden>
+                    <input name="policyAccepted" type="checkbox" />
+                    <span data-policy-text></span>
+                  </label>
+
+                  <div class="booking-form-actions">
+                    <button class="booking-button" type="submit" data-submit-booking>Confirm booking</button>
+                    <p class="booking-form-status" data-form-status role="status" aria-live="polite"></p>
+                  </div>
+                </form>
+              </div>
+            </section>
+
+            <section class="booking-panel booking-success" data-step-panel="success" aria-labelledby="success-title" hidden>
+              <span class="booking-success-icon" aria-hidden="true"></span>
+              <span class="booking-kicker">Confirmed</span>
+              <h2 id="success-title">You're booked</h2>
+              <p data-success-copy>Your appointment request has been received.</p>
+              <div class="booking-confirm-summary" data-success-summary></div>
+              <div class="booking-success-links" data-success-links></div>
+              <button class="booking-button booking-button-secondary" type="button" data-new-booking>Book another service</button>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./scripts/booking-assets.js"></script>
+    <script src="./scripts/booking-data.js"></script>
+    <script src="./scripts/booking.js"></script>
+  </body>
+</html>
