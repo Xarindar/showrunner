@@ -22,6 +22,7 @@
     "analytics:process": "tsx scripts/process-analytics-retention.ts",
     "booking-reminders:process": "tsx scripts/process-booking-reminders.ts",
     "abandoned-carts:process": "tsx scripts/process-abandoned-carts.ts",
+    "payments:refresh-square": "tsx scripts/refresh-square-tokens.ts",
     "seed": "tsx prisma/seed.ts"
   },
   "prisma": {

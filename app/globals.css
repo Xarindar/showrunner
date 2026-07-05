@@ -11276,6 +11276,22 @@ button.button:disabled,
   flex: none;
 }
 
+/* Banner shown after the one-click connect round-trip returns to this page */
+.pay-connect-notice {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.pay-connect-notice svg {
+  flex: none;
+}
+
+.pay-connect-notice span {
+  flex: 1;
+  min-width: 0;
+}
+
 .payments-coupons-table {
   --data-table-min-width: 760px;
   --data-table-row-height: 54px;

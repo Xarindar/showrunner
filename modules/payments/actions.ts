@@ -13,6 +13,7 @@ import {
   reverifyPaymentProvider,
   savePayPalCredentials,
   saveSquareCredentials,
+  saveSquareWebhookSignatureKey,
   saveStripeCredentials,
   type PayPalEnvironment,
   type SquareEnvironment
@@ -256,6 +257,29 @@ export async function connectSquareAction(
 
   revalidatePath("/", "layout");
   return { status: "success" };
+}
+
+// Companion to one-click Square connect: OAuth stores the tokens, but the webhook signature key
+// still has to be pasted once (Square webhook subscriptions cannot be created with merchant tokens).
+export async function saveSquareWebhookKeyAction(
+  _prev: PaymentActionState,
+  formData: FormData
+): Promise<PaymentActionState> {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+
+  try {
+    await saveSquareWebhookSignatureKey({
+      siteId: site.id,
+      webhookSignatureKey: String(formData.get("squareWebhookSignatureKey") || "")
+    });
+    await auditPaymentProvider(user, site.id, site.name, "settings.payment_provider.webhook_key_updated", PaymentProvider.SQUARE);
+  } catch (error) {
+    return errorState(error, "Could not save the Square webhook signature key.");
+  }
+
+  revalidatePath("/", "layout");
+  return { status: "success", message: "Square webhook signature key saved." };
 }
 
 export async function connectPayPalAction(
