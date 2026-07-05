@@ -2,7 +2,7 @@ import "server-only";
 
 import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
 import Stripe from "stripe";
-import { decryptGatewaySecret, getConnectedGatewayCredential, upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
+import { decryptGatewaySecret, encryptGatewaySecret, getConnectedGatewayCredential, upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { prisma } from "@/lib/prisma";
 
 // Self-hosted, bring-your-own-credentials onboarding. Each merchant pastes their own provider keys;
@@ -16,7 +16,7 @@ export type PayPalEnvironment = "live" | "sandbox";
 
 const stripeWallets = ["APPLE_PAY", "GOOGLE_PAY", "CASH_APP_PAY"];
 
-function secretHint(value: string) {
+export function secretHint(value: string) {
   const trimmed = value.trim();
   if (trimmed.length <= 4) return trimmed ? "••••" : "";
   return `••••${trimmed.slice(-4)}`;
@@ -90,14 +90,16 @@ export async function saveStripeCredentials(input: { apiKey: string; siteId: str
 // Square
 // ---------------------------------------------------------------------------
 
-type SquareLocation = {
+export type SquareLocation = {
   id?: string;
   merchant_id?: string;
   name?: string;
   status?: string;
 };
 
-async function squareVerify(environment: SquareEnvironment, accessToken: string) {
+// Fetch the account's locations, which doubles as a live check that the access token works.
+// Shared by the paste flow, re-verify, and the one-click OAuth handoff.
+export async function squareVerify(environment: SquareEnvironment, accessToken: string) {
   const response = await fetch(`${squareApiBaseUrl(environment)}/v2/locations`, {
     headers: {
       Accept: "application/json",
@@ -152,6 +154,25 @@ export async function saveSquareCredentials(input: {
   });
 
   return { displayName: location.name || location.merchant_id || "Square", environment };
+}
+
+// One-click (OAuth) Square connections store tokens without a webhook signature key, because
+// Square webhook subscriptions are app-level and cannot be created with a merchant token. This
+// lets the merchant paste just the signature key afterwards without disturbing the OAuth tokens.
+export async function saveSquareWebhookSignatureKey(input: { siteId: string; webhookSignatureKey: string }) {
+  const webhookSignatureKey = requireValue(input.webhookSignatureKey, "Paste the Square webhook signature key.");
+  const credential = await getConnectedGatewayCredential(input.siteId, PaymentProvider.SQUARE);
+  if (!credential || credential.status !== PaymentGatewayConnectionStatus.CONNECTED) {
+    throw new Error("Connect Square before adding its webhook signature key.");
+  }
+
+  await prisma.paymentGatewayCredential.update({
+    where: { id: credential.id },
+    data: {
+      encryptedWebhookSecret: encryptGatewaySecret(webhookSignatureKey),
+      webhookSecretHint: secretHint(webhookSignatureKey)
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

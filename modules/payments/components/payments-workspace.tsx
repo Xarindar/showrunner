@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { TicketPlus } from "lucide-react";
+import { CheckCircle2, TicketPlus, TriangleAlert, X, Zap } from "lucide-react";
 import { Button, Modal, SettingRow, SettingsGroup, Table } from "@/components/ui";
 import { ProviderMark } from "./brand-marks";
 import { buildConnectWizards, ConnectWizard, type WebhookUrls } from "./connect-wizard";
@@ -26,7 +26,20 @@ export type ProviderCard = {
   needsAttention: boolean;
   headline: string;
   manageDetail: string;
+  // One-click OAuth connect through the AdmitOne Connect broker (Stripe/Square only).
+  oauthConnect?: boolean;
+  // Rendered as the de-emphasized "paste your own keys" option (PayPal when OAuth is on).
+  advanced?: boolean;
+  // Connected but no webhook secret stored: Square OAuth needs a signature key pasted
+  // once; Stripe only hits this when automatic webhook creation failed (fix = reconnect).
+  webhookMissing?: boolean;
 };
+
+export type ConnectNotice = { kind: "success" | "error"; message: string };
+
+function connectStartHref(provider: ProviderKey) {
+  return `/api/payments/connect/${provider.toLowerCase()}/start`;
+}
 
 export type ActiveCoupon = {
   amountCents: number | null;
@@ -53,6 +66,7 @@ export type PaymentsWorkspaceProps = {
   checkoutTotals: CheckoutTotalsSettings;
   coupons: ActiveCoupon[];
   featuredConnected: boolean;
+  notice?: ConnectNotice | null;
   webhooks: WebhookUrls;
 };
 
@@ -99,11 +113,14 @@ export function PaymentsWorkspace({
   checkoutTotals,
   coupons,
   methods,
+  notice,
   providers,
   webhooks
 }: PaymentsWorkspaceProps) {
   const [active, setActive] = useState<ActiveModal>(null);
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
   const close = () => setActive(null);
+  const oneClickAvailable = providers.some((provider) => provider.oauthConnect);
 
   const wizards = useMemo(() => buildConnectWizards(webhooks), [webhooks]);
   const connectedCount = providers.filter((provider) => provider.connected).length;
@@ -154,14 +171,25 @@ export function PaymentsWorkspace({
           <p className="eyebrow">Payments</p>
           <h1>Get paid</h1>
           <p>
-            Connect your own payment accounts and choose how customers pay. Credentials are verified live, stored
-            encrypted, and charges settle to your own account.
+            {oneClickAvailable
+              ? "Connect your own payment accounts with one click and choose how customers pay. Tokens are stored encrypted, and charges settle directly to your own account."
+              : "Connect your own payment accounts and choose how customers pay. Credentials are verified live, stored encrypted, and charges settle to your own account."}
           </p>
         </div>
         <span className={done === steps.length ? "guided-progress guided-progress-done" : "guided-progress"}>
           {done} of {steps.length} set up
         </span>
       </header>
+
+      {notice && !noticeDismissed ? (
+        <div className={`pay-connect-notice ${notice.kind === "success" ? "success-message" : "error"}`} role="status">
+          {notice.kind === "success" ? <CheckCircle2 size={16} /> : <TriangleAlert size={16} />}
+          <span>{notice.message}</span>
+          <Button aria-label="Dismiss" onClick={() => setNoticeDismissed(true)} size="sm" type="button" variant="ghost">
+            <X size={14} />
+          </Button>
+        </div>
+      ) : null}
 
       {/* Setup state and next actions; every detail opens in a modal ------- */}
       <SettingsGroup
@@ -182,19 +210,42 @@ export function PaymentsWorkspace({
                 ) : provider.recommended ? (
                   <span className="ui-badge">Recommended</span>
                 ) : null}
+                {provider.connected && provider.webhookMissing ? (
+                  <span className="ui-badge ui-badge-warning">
+                    {provider.provider === "SQUARE" ? "Add webhook key" : "Webhook needs setup"}
+                  </span>
+                ) : null}
               </span>
             }>
             {provider.connected ? (
               <Button onClick={() => setActive({ kind: "manage", provider: provider.provider })} size="sm" type="button" variant="secondary">
                 Manage
               </Button>
+            ) : provider.oauthConnect ? (
+              // One-click OAuth: a real navigation to the start route (which redirects to the
+              // provider's hosted login), so this must be an anchor rather than a modal trigger.
+              <span className="pay-row-title">
+                <Button
+                  onClick={() => setActive({ kind: "connect", provider: provider.provider })}
+                  size="sm"
+                  type="button"
+                  variant="ghost">
+                  Paste keys
+                </Button>
+                <a
+                  className={`ui-button ui-button-sm${provider.recommended && connectedCount === 0 ? "" : " ui-button-secondary"}`}
+                  href={connectStartHref(provider.provider)}>
+                  <Zap size={15} />
+                  Connect
+                </a>
+              </span>
             ) : (
               <Button
                 onClick={() => setActive({ kind: "connect", provider: provider.provider })}
                 size="sm"
                 type="button"
-                variant={provider.recommended && connectedCount === 0 ? undefined : "secondary"}>
-                Connect
+                variant={provider.recommended && connectedCount === 0 && !provider.advanced ? undefined : "secondary"}>
+                {provider.advanced ? "Connect (paste keys)" : "Connect"}
               </Button>
             )}
           </SettingRow>
@@ -337,9 +388,11 @@ export function PaymentsWorkspace({
             detail={manageProvider.manageDetail}
             key={`manage-${active.provider}`}
             name={manageProvider.name}
+            oauthReconnectHref={manageProvider.oauthConnect ? connectStartHref(manageProvider.provider) : undefined}
             onClose={close}
             onReplace={() => setActive({ kind: "connect", provider: manageProvider.provider })}
-            provider={manageProvider.provider} />
+            provider={manageProvider.provider}
+            webhookMissing={manageProvider.webhookMissing} />
         ) : null}
         {active?.kind === "methods" ? (
           <MethodsModal

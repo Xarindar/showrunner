@@ -1,10 +1,11 @@
 import "server-only";
 
-import crypto from "node:crypto";
 import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
+import { maybeRefreshSquareAccessToken } from "@/lib/payments/connect/square-refresh";
+import { decryptGatewaySecret, encryptGatewaySecret } from "@/lib/payments/credential-crypto";
 import { prisma } from "@/lib/prisma";
 
-const algorithm = "aes-256-gcm";
+export { decryptGatewaySecret, encryptGatewaySecret };
 
 type ConnectedCredentialInput = {
   accessToken?: string;
@@ -29,53 +30,6 @@ export type PayPalSiteCredentials = {
   merchantId: string;
   webhookId: string;
 };
-
-function isWeakProductionSecret(value: string) {
-  const normalized = value.trim().toLowerCase();
-  return normalized.length < 32 || normalized.includes("replace-with") || normalized.includes("local-dev") || normalized.includes("change-me");
-}
-
-function credentialSecret() {
-  const secret = process.env.PAYMENT_CREDENTIAL_ENCRYPTION_KEY || process.env.AUTH_SECRET || "";
-  if (process.env.NODE_ENV === "production" && (!secret || isWeakProductionSecret(secret))) {
-    throw new Error("PAYMENT_CREDENTIAL_ENCRYPTION_KEY must be set before storing payment gateway credentials.");
-  }
-
-  return secret || "local-dev-payment-credential-secret";
-}
-
-function encryptionKey() {
-  return crypto.createHash("sha256").update(credentialSecret()).digest();
-}
-
-export function encryptGatewaySecret(value: string) {
-  const plaintext = value.trim();
-  if (!plaintext) return "";
-
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv(algorithm, encryptionKey(), iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-
-  return ["v1", iv.toString("base64url"), tag.toString("base64url"), encrypted.toString("base64url")].join(":");
-}
-
-export function decryptGatewaySecret(value: string) {
-  if (!value) return "";
-  const [version, ivText, tagText, encryptedText] = value.split(":");
-  if (version !== "v1" || !ivText || !tagText || !encryptedText) {
-    throw new Error("Payment gateway credential payload is not recognized.");
-  }
-
-  const decipher = crypto.createDecipheriv(algorithm, encryptionKey(), Buffer.from(ivText, "base64url"));
-  decipher.setAuthTag(Buffer.from(tagText, "base64url"));
-  const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(encryptedText, "base64url")),
-    decipher.final()
-  ]);
-
-  return decrypted.toString("utf8");
-}
 
 export async function upsertConnectedGatewayCredential(input: ConnectedCredentialInput) {
   return prisma.paymentGatewayCredential.upsert({
@@ -146,12 +100,16 @@ function isConnected(credential: { encryptedSecretKey?: string; status: PaymentG
   return credential?.status === PaymentGatewayConnectionStatus.CONNECTED;
 }
 
-// Stripe API key the merchant pasted for this site (direct-charge model). Empty string when not
-// configured; callers fall back to the STRIPE_SECRET_KEY env var for self-hosted-by-Cosmic demos.
+// Stripe API key for this site (direct-charge model): either the key the merchant pasted or the
+// OAuth access token from one-click connect (Stripe Connect Standard tokens act as the merchant's
+// own secret key). Empty string when not configured; callers fall back to the STRIPE_SECRET_KEY env
+// var for self-hosted-by-Cosmic demos.
 export async function getStripeApiKeyForSite(siteId: string) {
   const credential = await getConnectedGatewayCredential(siteId, PaymentProvider.STRIPE);
-  if (!isConnected(credential) || !credential?.encryptedSecretKey) return "";
-  return decryptGatewaySecret(credential.encryptedSecretKey);
+  if (!isConnected(credential) || !credential) return "";
+  if (credential.encryptedSecretKey) return decryptGatewaySecret(credential.encryptedSecretKey);
+  if (credential.encryptedAccessToken) return decryptGatewaySecret(credential.encryptedAccessToken);
+  return "";
 }
 
 // Every connected site's Stripe webhook signing secret. The webhook route tries each (plus the env
@@ -201,15 +159,18 @@ function toPayPalSiteCredentials(credential: {
   };
 }
 
-// Square access token + environment the merchant pasted for this site.
+// Square access token + environment for this site — pasted or OAuth-connected. OAuth tokens
+// expire (~30 days), so this refreshes through the AdmitOne Connect broker when close to expiry;
+// every charge/refund/webhook caller gets a token with runway without knowing about OAuth.
 export async function getSquareAccessToken(siteId: string) {
   const credential = await getConnectedGatewayCredential(siteId, PaymentProvider.SQUARE);
   if (!credential?.encryptedAccessToken) throw new Error("Connect Square before using Square checkout.");
   const metadata = credentialMetadata(credential.metadata);
   const environment = metadataString(metadata, "environment") === "sandbox" ? "sandbox" : "production";
+  const refreshedToken = await maybeRefreshSquareAccessToken(credential);
 
   return {
-    accessToken: decryptGatewaySecret(credential.encryptedAccessToken),
+    accessToken: refreshedToken ?? decryptGatewaySecret(credential.encryptedAccessToken),
     credential,
     environment: environment as "production" | "sandbox"
   };

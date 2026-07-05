@@ -1,15 +1,33 @@
 import { PaymentGatewayConnectionStatus, type PaymentGatewayCredential, PaymentProvider, Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { publicAppBaseUrl } from "@/lib/env";
+import { isConnectBrokerConfigured } from "@/lib/payments/connect/config";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { getStripePaymentMethodSettings } from "@/lib/payments/methods";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { PaymentsWorkspace, type ProviderCard } from "./components/payments-workspace";
+import { PaymentsWorkspace, type ConnectNotice, type ProviderCard } from "./components/payments-workspace";
 
 export const dynamic = "force-dynamic";
 
 type Credential = PaymentGatewayCredential | null;
+
+type PaymentsPageProps = {
+  searchParams?: Promise<Record<string, string | undefined>>;
+};
+
+// Banner state for the OAuth connect round-trip: the callback route redirects back
+// here with ?connected={provider} or ?connectError={message}.
+function connectNotice(params: Record<string, string | undefined>): ConnectNotice | null {
+  const connected = (params.connected || "").trim().toLowerCase();
+  if (connected === "stripe" || connected === "square") {
+    const label = connected === "stripe" ? "Stripe" : "Square";
+    return { kind: "success", message: `${label} is connected. Charges settle directly to your own ${label} account.` };
+  }
+  const error = (params.connectError || "").trim();
+  if (error) return { kind: "error", message: error.slice(0, 500) };
+  return null;
+}
 
 function metadataString(credential: Credential, key: string) {
   const metadata = credential?.metadata;
@@ -22,9 +40,11 @@ function lastChecked(credential: Credential) {
   return credential?.lastVerifiedAt ? ` Last checked ${credential.lastVerifiedAt.toISOString().slice(0, 10)}.` : "";
 }
 
-export default async function PaymentsPage() {
+export default async function PaymentsPage({ searchParams }: PaymentsPageProps) {
   await requireAdmin("settings:update");
   const settings = await getSiteSettings();
+  const notice = connectNotice(searchParams ? await searchParams : {});
+  const oauthEnabled = isConnectBrokerConfigured();
 
   const [stripeMethods, squareCredential, paypalCredential, coupons] = await Promise.all([
     getStripePaymentMethodSettings(settings.siteId),
@@ -51,6 +71,12 @@ export default async function PaymentsPage() {
   const squareEnv = metadataString(squareCredential, "environment") || "production";
   const paypalEnv = metadataString(paypalCredential, "environment") === "live" ? "Live" : "Sandbox";
 
+  const squareOAuth = metadataString(squareCredential, "onboarding") === "oauth";
+  const squareWebhookMissing = squareConnected && !squareCredential?.webhookSecretHint;
+  // Paste-flow Stripe always has a webhook secret; this only trips when one-click connect
+  // could not create the webhook endpoint automatically (the admin retries via Reconnect).
+  const stripeWebhookMissing = stripeConnected && !stripeCredential?.webhookSecretHint;
+
   const providers: ProviderCard[] = [
     {
       provider: "STRIPE",
@@ -58,9 +84,13 @@ export default async function PaymentsPage() {
       recommended: true,
       connected: stripeConnected,
       needsAttention: needsAttention(stripeCredential),
+      oauthConnect: oauthEnabled,
+      webhookMissing: stripeWebhookMissing,
       headline: stripeConnected
         ? `${stripeCredential?.displayName || "Stripe account"} · ${stripeMode}.${lastChecked(stripeCredential)}`
-        : "Cards, Apple Pay, Google Pay, Cash App Pay, and Affirm — all from one connection.",
+        : oauthEnabled
+          ? "One click: sign in to Stripe and you're set — cards, Apple Pay, Google Pay, Cash App Pay, and Affirm. No keys to copy."
+          : "Cards, Apple Pay, Google Pay, Cash App Pay, and Affirm — all from one connection.",
       manageDetail: stripeConnected
         ? `${stripeCredential?.displayName || "Stripe account"} · ${stripeMode}.${lastChecked(stripeCredential)}`
         : "Stripe is not connected yet."
@@ -70,11 +100,15 @@ export default async function PaymentsPage() {
       name: "Square",
       connected: squareConnected,
       needsAttention: needsAttention(squareCredential),
+      oauthConnect: oauthEnabled,
+      webhookMissing: squareWebhookMissing,
       headline: squareConnected
         ? `${squareCredential?.displayName || "Square"} · ${squareEnv}.${lastChecked(squareCredential)}`
-        : "Optional. Square-hosted checkout with cards, wallets, and Cash App Pay.",
+        : oauthEnabled
+          ? "Optional. One click: sign in to Square for hosted checkout with cards, wallets, and Cash App Pay."
+          : "Optional. Square-hosted checkout with cards, wallets, and Cash App Pay.",
       manageDetail: squareConnected
-        ? `${squareCredential?.displayName || "Square"} · ${squareEnv}.${lastChecked(squareCredential)}`
+        ? `${squareCredential?.displayName || "Square"} · ${squareEnv}${squareOAuth ? " · connected with one-click" : ""}.${lastChecked(squareCredential)}`
         : "Square is not connected yet."
     },
     {
@@ -82,9 +116,12 @@ export default async function PaymentsPage() {
       name: "PayPal",
       connected: paypalConnected,
       needsAttention: needsAttention(paypalCredential),
+      advanced: oauthEnabled,
       headline: paypalConnected
         ? `${paypalEnv} app connected.${lastChecked(paypalCredential)}`
-        : "Optional. PayPal checkout settled to your own PayPal business account.",
+        : oauthEnabled
+          ? "Advanced — paste your own PayPal REST app keys. Settles to your PayPal business account."
+          : "Optional. PayPal checkout settled to your own PayPal business account.",
       manageDetail: paypalConnected ? `${paypalEnv} app connected.${lastChecked(paypalCredential)}` : "PayPal is not connected yet."
     }
   ];
@@ -142,6 +179,7 @@ export default async function PaymentsPage() {
         type: coupon.type
       }))}
       featuredConnected={stripeConnected}
+      notice={notice}
       methods={{
         applePayStatus: stripeMethods.applePayDomain.status,
         connected: stripeConnected,

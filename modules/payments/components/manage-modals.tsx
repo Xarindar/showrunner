@@ -2,14 +2,15 @@
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, KeyRound, Loader2, Plus, ReceiptText, RefreshCw, TicketPercent, Unplug } from "lucide-react";
-import { Button, Switch, SwitchReveal } from "@/components/ui";
+import { CreditCard, KeyRound, Loader2, Plus, ReceiptText, RefreshCw, TicketPercent, Unplug, Webhook, Zap } from "lucide-react";
+import { Button, Field, Input, Switch, SwitchReveal } from "@/components/ui";
 import { MethodMark } from "./brand-marks";
 import {
   createCouponAction,
   disconnectProviderAction,
   reverifyProviderAction,
   savePaymentMethodsAction,
+  saveSquareWebhookKeyAction,
   setCheckoutProviderAction,
   updateCheckoutTotalsAction
 } from "../actions";
@@ -322,17 +323,25 @@ export function CheckoutTotalsModal({
 export function ManageProviderModal({
   detail,
   name,
+  oauthReconnectHref,
   onClose,
   onReplace,
-  provider
+  provider,
+  webhookMissing
 }: {
   detail: string;
   name: string;
+  oauthReconnectHref?: string;
   onClose: () => void;
   onReplace?: () => void;
   provider: string;
+  webhookMissing?: boolean;
 }) {
   const [recheckState, recheckAction, recheckPending] = useActionState(reverifyProviderAction, initialPaymentActionState);
+  const [webhookKeyState, webhookKeyAction, webhookKeyPending] = useActionState(
+    saveSquareWebhookKeyAction,
+    initialPaymentActionState
+  );
   const [disconnectState, disconnectAction, disconnectPending] = useActionState(
     disconnectProviderAction,
     initialPaymentActionState
@@ -352,11 +361,42 @@ export function ManageProviderModal({
       {recheckState.status === "error" ? <p className="error ui-zero">{recheckState.message}</p> : null}
       {disconnectState.status === "error" ? <p className="error ui-zero">{disconnectState.message}</p> : null}
 
+      {provider === "STRIPE" && webhookMissing ? (
+        <p className="error ui-zero">
+          Stripe is connected, but the payment webhook could not be created automatically, so payment
+          updates will not arrive. Click &quot;Reconnect with Stripe&quot; to retry the webhook setup.
+        </p>
+      ) : null}
+
+      {provider === "SQUARE" && webhookMissing && webhookKeyState.status !== "success" ? (
+        <form action={webhookKeyAction} className="form-grid">
+          <Field
+            hint="One-click connect stores your Square tokens, but Square only shares webhook signature keys in its Developer dashboard. Paste the key for the webhook subscription that points at this site."
+            label="Square webhook signature key">
+            <Input autoComplete="off" name="squareWebhookSignatureKey" placeholder="Signature key" type="password" />
+          </Field>
+          {webhookKeyState.status === "error" ? <p className="error ui-zero">{webhookKeyState.message}</p> : null}
+          <Button aria-busy={webhookKeyPending} disabled={webhookKeyPending} size="sm" type="submit" variant="secondary">
+            {webhookKeyPending ? <Loader2 className="pay-spin" size={16} /> : <Webhook size={16} />}
+            Save webhook key
+          </Button>
+        </form>
+      ) : null}
+      {webhookKeyState.status === "success" ? (
+        <p className="success-message ui-zero">{webhookKeyState.message}</p>
+      ) : null}
+
       <div className="pay-step-actions">
+        {oauthReconnectHref ? (
+          <a className="ui-button ui-button-secondary" href={oauthReconnectHref}>
+            <Zap size={16} />
+            Reconnect with {name}
+          </a>
+        ) : null}
         {onReplace ? (
           <Button onClick={onReplace} type="button" variant="secondary">
             <KeyRound size={16} />
-            Replace credentials
+            {oauthReconnectHref ? "Paste keys instead" : "Replace credentials"}
           </Button>
         ) : null}
         <form action={recheckAction}>
