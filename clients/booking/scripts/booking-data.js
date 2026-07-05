@@ -20,7 +20,7 @@
     },
     currency: "USD",
     schedule: {
-      daysToShow: 10,
+      daysToShow: 7,
       demoStartHour: 9,
       demoEndHour: 18,
       demoIntervalMinutes: 30,

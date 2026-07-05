@@ -129,20 +129,29 @@
                   <span>Provider</span>
                   <select data-staff-select></select>
                 </label>
-                <label class="booking-date-input">
-                  <span>Date</span>
-                  <input data-date-input type="date" />
-                </label>
               </div>
 
-              <div class="booking-date-rail" data-date-rail aria-label="Available dates"></div>
-              <div class="booking-slot-head">
-                <h3 data-slot-heading>Available times</h3>
-                <span data-timezone-label></span>
+              <div class="booking-calendar-section">
+                <div class="booking-calendar-head">
+                  <h3 data-month-heading>Month</h3>
+                  <label class="booking-date-input booking-date-jump">
+                    <span>Date</span>
+                    <input data-date-input type="date" />
+                  </label>
+                </div>
+                <div class="booking-date-rail" data-date-rail aria-label="Available dates"></div>
               </div>
-              <div class="booking-slot-grid" data-slot-grid></div>
-              <p class="booking-empty" data-slot-empty hidden>No times are available for this date.</p>
-              <div class="booking-status" data-availability-status role="status" aria-live="polite"></div>
+
+              <div class="booking-time-section">
+                <div class="booking-slot-head">
+                  <h3 data-slot-heading>Time</h3>
+                  <span data-timezone-label></span>
+                </div>
+                <div class="booking-slot-grid" data-slot-grid></div>
+                <p class="booking-empty" data-slot-empty hidden>No times are available for this date.</p>
+                <div class="booking-status" data-availability-status role="status" aria-live="polite"></div>
+              </div>
+
               <div class="booking-step-actions">
                 <button class="booking-button" type="button" data-review-booking disabled>Review booking</button>
               </div>

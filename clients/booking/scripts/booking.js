@@ -9,7 +9,7 @@
     categoryId: null,
     categoryFocusId: "",
     serviceId: null,
-    selectedDate: dateKey(new Date()),
+    selectedDate: dateKey(initialSelectedDate()),
     selectedSlot: null,
     staffId: "",
     lastBooking: null
@@ -62,10 +62,12 @@
     els.serviceSort = document.querySelector("[data-service-sort]");
     els.selectedCategoryKicker = document.querySelector("[data-selected-category-kicker]");
     els.selectedServiceKicker = document.querySelector("[data-selected-service-kicker]");
+    els.timeControls = document.querySelector(".booking-time-controls");
     els.staffControl = document.querySelector("[data-staff-control]");
     els.staffSelect = document.querySelector("[data-staff-select]");
     els.dateInput = document.querySelector("[data-date-input]");
     els.dateRail = document.querySelector("[data-date-rail]");
+    els.monthHeading = document.querySelector("[data-month-heading]");
     els.slotGrid = document.querySelector("[data-slot-grid]");
     els.slotEmpty = document.querySelector("[data-slot-empty]");
     els.slotHeading = document.querySelector("[data-slot-heading]");
@@ -303,13 +305,16 @@
   function renderStaffSelect() {
     const service = selectedService();
     const staff = service?.staff || [];
-    if (!service || !staff.length) {
+    const showStaffFilter = config.features?.showStaffFilter === true;
+    if (!service || !staff.length || !showStaffFilter) {
+      if (els.timeControls) els.timeControls.hidden = true;
       els.staffControl.hidden = true;
       els.staffSelect.innerHTML = "";
       state.staffId = "";
       return;
     }
 
+    if (els.timeControls) els.timeControls.hidden = false;
     els.staffControl.hidden = false;
     els.staffSelect.innerHTML = [
       `<option value="">Any available provider</option>`,
@@ -330,6 +335,9 @@
     if (els.dateInput) {
       els.dateInput.min = dateKey(today);
       els.dateInput.value = state.selectedDate;
+    }
+    if (els.monthHeading) {
+      els.monthHeading.textContent = formatMonthYear(state.selectedDate);
     }
 
     els.dateRail.innerHTML = dates
@@ -381,10 +389,10 @@
       els.selectedServiceKicker.textContent = service ? service.name : "Time";
     }
     if (els.slotHeading) {
-      els.slotHeading.textContent = state.selectedDate ? `Available times for ${formatLongDate(state.selectedDate)}` : "Available times";
+      els.slotHeading.textContent = "Time";
     }
     if (els.timezoneLabel) {
-      els.timezoneLabel.textContent = config.business?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+      els.timezoneLabel.textContent = "";
     }
 
     els.slotEmpty.hidden = slots.length > 0;
@@ -833,6 +841,14 @@
     }).format(date);
   }
 
+  function formatMonthYear(value) {
+    const date = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? parseDateKey(value) : new Date(value);
+    return new Intl.DateTimeFormat(undefined, {
+      month: "long",
+      year: "numeric"
+    }).format(date);
+  }
+
   function weekdayShort(date) {
     return new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date);
   }
@@ -863,6 +879,16 @@
     return String(value || "services")
       .replace(/[-_]+/g, " ")
       .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  function initialSelectedDate() {
+    const closed = config.schedule?.demoClosedWeekdays || [];
+    const next = startOfDay(new Date());
+    for (let index = 0; index < 14; index += 1) {
+      if (!closed.includes(next.getDay())) return next;
+      next.setDate(next.getDate() + 1);
+    }
+    return startOfDay(new Date());
   }
 
   function setStatus(message, isError) {
