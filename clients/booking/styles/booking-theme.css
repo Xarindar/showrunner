@@ -25,5 +25,5 @@
   --booking-radius-control: 8px;
   --booking-shadow-panel: 0 18px 44px var(--booking-color-shadow);
   --booking-shadow-soft: 0 8px 24px rgba(43, 36, 28, 0.1);
-  --booking-page-max: 1180px;
+  --booking-page-max: 1680px;
 }
