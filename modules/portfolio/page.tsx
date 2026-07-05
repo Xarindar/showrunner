@@ -1,4 +1,4 @@
-import { Camera, Download, Image as ImageIcon, KeyRound, RotateCcw, Star } from "lucide-react";
+import { Camera, Image as ImageIcon, KeyRound, RotateCcw, Star } from "lucide-react";
 import {
   PortfolioAccessStatus,
   PortfolioGalleryLayout,
@@ -21,7 +21,7 @@ import {
   updatePortfolioGalleryLayoutAction,
   updatePortfolioGalleryStatusAction,
   updatePortfolioProofRoundStatusAction } from "./actions";
-import { Button, ButtonAnchor, Card, EqualGrid, Switch, Table } from "@/components/ui";
+import { Button, Card, EqualGrid, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -234,7 +234,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
         <div>
           <p className="eyebrow">Portfolio</p>
           <h1>Photography galleries and proofing</h1>
-          <p>Create public or private galleries, organize image records, issue access links, and prepare proofing workflows.</p>
+          <p>Create galleries, organize image records, issue access records, and prepare proofing workflows.</p>
         </div>
       </header>
 
@@ -346,14 +346,6 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                   <td>Slug</td>
                   <td>
                     {selectedGallery.slug}
-                    {selectedGallery.status === PortfolioGalleryStatus.PUBLISHED ?
-                  <>
-                        <br />
-                        <a className="ui-zero" href={`/galleries/${selectedGallery.slug}`}>
-                          Open public gallery
-                        </a>
-                      </> :
-                  null}
                   </td>
                 </tr>
                 <tr>
@@ -686,26 +678,8 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                 {selectedDownloadableCount} media-backed downloadable item{selectedDownloadableCount === 1 ? "" : "s"} ready for a ZIP delivery bundle.
               </p>
               {selectedGallery.downloadEnabled && selectedDownloadableCount ?
-            <div className="ui-zero">
-                  {selectedGallery.visibility === PortfolioGalleryVisibility.PUBLIC ?
-              <ButtonAnchor href={`/galleries/${selectedGallery.slug}/bundle`} variant="secondary">
-                      <Download size={16} />
-                      Public bundle
-                    </ButtonAnchor> :
-              null}
-                  {selectedGallery.accesses.
-              filter((access) => access.status === PortfolioAccessStatus.ACTIVE).
-              slice(0, 4).
-              map((access) =>
-              <ButtonAnchor href={`/galleries/${selectedGallery.slug}/bundle?access=${access.accessToken}`} key={access.id} variant="secondary">
-                        <Download size={16} />
-                        {access.recipientEmail}
-                      </ButtonAnchor>
-              )}
-                </div> :
-
-            <p className="ui-zero">Enable gallery downloads and mark media-backed items downloadable to create a bundle.</p>
-            }
+            <p className="ui-zero">Delivery bundle data is ready for the rebuilt client gallery surface.</p> :
+            <p className="ui-zero">Enable gallery downloads and mark media-backed items downloadable to prepare a bundle.</p>}
             </div>
             <div className="stack">
               <h3>Round responses</h3>
@@ -783,10 +757,6 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
                       </span>
                     </td>
                     <td>
-                      <a className="ui-zero" href={`/galleries/access/${access.accessToken}`}>
-                        Open access route
-                      </a>
-                      <br />
                       <span className="muted-text">{access.accessToken}</span>
                     </td>
                     <td>

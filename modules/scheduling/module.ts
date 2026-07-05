@@ -6,22 +6,22 @@ export const manifest = {
   href: "/admin/modules/services",
   icon: "CalendarDays",
   order: 50,
-  description: "Base services, service builder, packages, and public booking catalog organization.",
+  description: "Base services, service builder, packages, and booking catalog organization.",
   layout: "standard",
   status: "active",
   enabledByDefault: true,
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Native public booking is live with base services, service packages, catalog metadata, client self-service, and booking-facing service copy.",
-    primaryGap: "Cal.com calendar sync, capacity groups, and paid booking are pending."
+    summary: "Service administration, packages, catalog metadata, availability, and booking operations are live.",
+    primaryGap: "The public booking experience is being rebuilt in the new clients surface."
   },
   capabilities: [
     { label: "Base services", status: "live" },
     { label: "Service builder", status: "live" },
     { label: "Service packages", status: "foundation" },
-    { label: "Public booking", status: "live" },
-    { label: "Client self-service", status: "live" },
+    { label: "Public booking", status: "planned" },
+    { label: "Client self-service", status: "planned" },
     { label: "Cal.com calendar sync", status: "planned" }
   ],
   adminRoutes: [
@@ -31,19 +31,7 @@ export const manifest = {
     "/api/scheduling/google-calendar/connect/start",
     "/api/scheduling/google-calendar/connect/callback"
   ],
-  publicRoutes: [
-    "/book",
-    "/book/[serviceSlug]",
-    "/bookings/[id]",
-    "/api/availability",
-    "/bookings/[id]/availability",
-    "/api/public/v1/services",
-    "/api/public/v1/availability",
-    "/api/public/v1/bookings",
-    "/api/calendar/feed.ics",
-    "/api/calendar/booking.ics"
-  ],
-  widgetRoutes: ["/embed/v1/booking.js", "/embed/v1/booking"],
+  publicRoutes: ["/api/public/v1/services", "/api/public/v1/availability", "/api/public/v1/bookings"],
   dependencies: ["appointments", "clients", "communications"],
   dataModels: [
     "Service",

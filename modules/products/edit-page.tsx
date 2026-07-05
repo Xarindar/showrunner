@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   Boxes,
-  ExternalLink,
   FileText,
   ImageIcon,
   Images,
@@ -884,7 +883,7 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
           <div>
             <p className="catalog-kicker">Product editor</p>
             <h1>{product.name}</h1>
-            <p>/shop/{product.slug}</p>
+            <p>Slug: {product.slug}</p>
           </div>
           <div className="product-studio-badges">
             <span className={statusClass(product.status)}>{product.status.toLowerCase()}</span>
@@ -892,12 +891,6 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
           </div>
         </div>
         <div className="product-studio-actions">
-          {product.status === ProductStatus.ACTIVE ? (
-            <ButtonLink href={`/shop/${product.slug}`} rel="noreferrer" size="sm" target="_blank" variant="secondary">
-              <ExternalLink size={15} />
-              View shop
-            </ButtonLink>
-          ) : null}
           <Button form="product-core-form" size="sm" type="submit">
             <Save size={15} />
             Save details

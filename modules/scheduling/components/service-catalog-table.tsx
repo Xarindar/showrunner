@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { CalendarCheck, ExternalLink, Eye, EyeOff, Pencil, Search, X } from "lucide-react";
+import { CalendarCheck, Eye, EyeOff, Pencil, Search, X } from "lucide-react";
 import { Button, ButtonLink, Pagination, SelectMenu, Tooltip, type SelectMenuOption } from "@/components/ui";
 import { useCatalogTablePagination } from "./use-catalog-table-pagination";
 
@@ -129,10 +129,7 @@ export function ServiceCatalogTable({
           </p>
         </div>
         <div className="catalog-board-actions">
-          <ButtonLink href="/book" rel="noreferrer" size="sm" target="_blank" variant="secondary">
-            <ExternalLink size={15} />
-            View booking
-          </ButtonLink>
+          <span className="ui-badge">Client booking rebuild pending</span>
           {createAction}
         </div>
       </div>

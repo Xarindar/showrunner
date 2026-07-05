@@ -7,26 +7,25 @@ export const manifest = {
   href: "/admin/modules/forms",
   icon: "ClipboardList",
   order: 62,
-  description: "Reusable public forms, intake questions, and submission inbox.",
+  description: "Reusable forms, intake questions, and submission inbox.",
   layout: "standard",
   status: "active",
   enabledByDefault: true,
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Public forms, builder CRUD, template cloning, submission storage, client/inquiry linking, honeypot, rate limits, and lead-form embeds are live.",
-    primaryGap: "Field versioning and richer conditional workflows are pending."
+    summary: "Form builder CRUD, template cloning, submission storage, client/inquiry linking, honeypot, and rate limits are live.",
+    primaryGap: "The public form experience is being rebuilt in the new clients surface."
   },
   capabilities: [
-    { label: "Public form route", status: "live" },
+    { label: "Public form route", status: "planned" },
     { label: "Builder CRUD", status: "live" },
     { label: "Starter template catalog", status: "live" },
     { label: "Booking, order, and gallery attachments", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/forms"],
-  publicRoutes: ["/forms/[slug]", "/api/public/v1/forms/[slug]", "/api/public/v1/forms/[slug]/submissions"],
+  publicRoutes: ["/api/public/v1/forms/[slug]", "/api/public/v1/forms/[slug]/submissions"],
   dependencies: ["clients", "communications"],
-  widgetRoutes: ["/embed/v1/form.js"],
   dataModels: ["Form", "FormField", "FormSubmission", "PublicRateLimit"],
   permissions: ["forms:manage", "forms:export"],
   settingsSections: ["Forms", "Notifications"],

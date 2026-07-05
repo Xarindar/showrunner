@@ -4,7 +4,6 @@ import { FormAttachmentTargetType, FormDestination, FormFieldRole, FormFieldType
 import { ClipboardList, CopyPlus, FileText, Inbox, Paperclip, Plus, Trash2 } from "lucide-react";
 import { getAccessibleBookingWhere, getAccessibleFormSubmissionWhere, getAccessibleGalleryWhere, requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime, stringArrayCsv } from "@/lib/format";
-import { publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -439,7 +438,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
     targets: galleryTargets.map((gallery) => ({
       id: gallery.id,
       label: gallery.title,
-      meta: `/galleries/${gallery.slug}`
+      meta: `Gallery slug: ${gallery.slug}`
     }))
   }];
 
@@ -541,15 +540,9 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
       <header className="page-header">
         <div>
           <p className="eyebrow">Forms</p>
-          <h1>Intake and public forms</h1>
+          <h1>Intake forms</h1>
           <p>Build lead, intake, inquiry, and attachment-ready forms with a submission inbox.</p>
         </div>
-        {selectedForm ?
-        <ButtonLink href={`/forms/${selectedForm.slug}`} variant="secondary">
-            <FileText size={18} />
-            Public form
-          </ButtonLink> :
-        null}
       </header>
 
       {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
@@ -818,7 +811,6 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                   <th>Target</th>
                   <th>Rule</th>
                   <th>Submissions</th>
-                  <th>Public link</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -835,17 +827,6 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
                     </td>
                     <td>{attachment._count.submissions}</td>
                     <td>
-                      <Link
-                    href={publicFormAttachmentHref({
-                      formSlug: selectedForm.slug,
-                      targetId: attachment.targetId,
-                      targetType: attachment.targetType
-                    })}>
-                    
-                        Open form link
-                      </Link>
-                    </td>
-                    <td>
                       <form action={deleteFormAttachmentAction}>
                         <input type="hidden" name="id" value={attachment.id} />
                         <input type="hidden" name="formId" value={selectedForm.id} />
@@ -858,7 +839,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               )}
                 {!selectedForm.attachments.length ?
               <tr>
-                    <td colSpan={5}>No attachments yet.</td>
+                    <td colSpan={4}>No attachments yet.</td>
                   </tr> :
               null}
               </tbody>
@@ -1076,9 +1057,6 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
             <div className="ui-zero">
               <ButtonLink href={`/admin/modules/forms/export?formId=${selectedForm.id}`} variant="secondary">
                 Export CSV
-              </ButtonLink>
-              <ButtonLink href={`/forms/${selectedForm.slug}`} variant="secondary">
-                Open public form
               </ButtonLink>
             </div>
           </div>

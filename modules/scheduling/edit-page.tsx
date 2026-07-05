@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Prisma } from "@prisma/client";
-import { ArrowLeft, Boxes, CalendarCheck, Clock3, ExternalLink, FileText, Save, Tags } from "lucide-react";
+import { ArrowLeft, Boxes, CalendarCheck, Clock3, FileText, Save, Tags } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { stringArrayCsv } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -332,7 +332,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   const policyOptions = uniqueSortedStrings(taxonomyServices.map((item: ServiceTaxonomyOption) => item.policyText));
   const savedMessage = savedServiceMessage(params.saved);
   const errorMessage = params.error ? decodeURIComponent(params.error) : null;
-  const bookingPath = `/book/${service.slug}`;
+  const bookingPath = "Client booking rebuild pending";
   const tagsValue = serviceTags(service);
   const packageCount = service.packageItems.length;
 
@@ -355,9 +355,9 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
               <input defaultValue={service.name} id="service-name" name="name" required />
             </div>
             <div className="ui-field">
-              <label htmlFor="service-slug">Booking page link</label>
+              <label htmlFor="service-slug">Booking slug</label>
               <input defaultValue={service.slug} id="service-slug" name="slug" />
-              <span className="ui-field-hint">Use the final part of the booking link, such as head-spa.</span>
+              <span className="ui-field-hint">Use the future client-facing booking slug, such as head-spa.</span>
             </div>
           </div>
 
@@ -432,7 +432,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
               <dd>{packageCount}</dd>
             </div>
             <div>
-              <dt>Booking URL</dt>
+              <dt>Client route</dt>
               <dd>{bookingPath}</dd>
             </div>
           </dl>
@@ -443,10 +443,6 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
           <ButtonLink href="/admin/modules/appointments?panel=rules&tab=availability" variant="secondary">
             <Clock3 size={16} />
             Appointment rules
-          </ButtonLink>
-          <ButtonLink href={bookingPath} rel="noreferrer" target="_blank" variant="ghost">
-            <ExternalLink size={16} />
-            Preview booking
           </ButtonLink>
         </section>
       </aside>

@@ -13,8 +13,8 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Catalog admin, product media, categories, variants, bundles, public storefront/cart, buy-button embed API, and abandoned-cart recovery are live.",
-    primaryGap: "Advanced storefront merchandising and dynamic bundle pricing controls are pending."
+    summary: "Catalog admin, product media, categories, variants, bundles, and abandoned-cart recovery are live.",
+    primaryGap: "The public storefront is being rebuilt in the new clients surface."
   },
   capabilities: [
     { label: "Catalog admin", status: "live" },
@@ -22,12 +22,11 @@ export const manifest = {
     { label: "Categories", status: "live" },
     { label: "Variant options", status: "live" },
     { label: "Bundles", status: "foundation" },
-    { label: "Checkout/storefront", status: "foundation" },
+    { label: "Checkout/storefront", status: "planned" },
     { label: "Abandoned-cart recovery", status: "live" }
   ],
   adminRoutes: ["/admin/modules/products", "/admin/modules/products/[productId]"],
-  publicRoutes: ["/shop", "/shop/[slug]", "/cart", "/api/public/v1/products", "/api/public/v1/checkout"],
-  widgetRoutes: ["/embed/v1/buy-button.js"],
+  publicRoutes: ["/api/public/v1/products", "/api/public/v1/checkout"],
   dependencies: ["media", "billing"],
   dataModels: ["Product", "ProductVariant", "ProductOption", "ProductMedia", "ProductCategory", "ProductBundleComponent", "Cart", "Order", "Payment"],
   permissions: ["products:manage"],

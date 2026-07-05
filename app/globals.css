@@ -5949,6 +5949,10 @@ button.button:disabled,
   padding-bottom: 0;
 }
 
+.admin-main:has(.appointments-workspace) {
+  padding-bottom: 0;
+}
+
 .admin-main > .stack {
   align-content: start;
   margin: 0 auto;
@@ -8134,7 +8138,7 @@ button.button:disabled,
 
 .appointments-workspace {
   --appointments-header-height: 58px;
-  margin: calc(var(--space-7) * -1);
+  margin: 0 calc(var(--space-7) * -1);
   height: 100dvh;
   min-height: 100dvh;
   min-width: 0;

@@ -69,7 +69,7 @@ function savedServiceMessage(saved?: string) {
 
 function toServiceCatalogTableService(service: ServiceCatalogItem): ServiceCatalogTableService {
   return {
-    bookingPath: `/book/${service.slug}`,
+    bookingPath: "Client booking rebuild pending",
     category: serviceCategory(service) || "Uncategorized",
     description: service.description || "",
     durationMinutes: service.durationMinutes,
@@ -87,7 +87,7 @@ function toServicePackageTablePackage(servicePackage: ServicePackageWithItems): 
   const durationMinutes = servicePackage.items.reduce((total, item) => total + item.quantity * item.service.durationMinutes, 0);
 
   return {
-    bookingPath: `/book/packages/${servicePackage.slug}`,
+    bookingPath: "Client booking rebuild pending",
     categories: servicePackageCategories(servicePackage),
     description: servicePackage.description,
     durationMinutes,

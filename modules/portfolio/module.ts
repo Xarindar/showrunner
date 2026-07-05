@@ -14,22 +14,21 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Public galleries, selectable gallery layouts, access-token proofing, signed image variants, downloads, ZIP delivery bundles, favorite capture, widget/API embeds, and lightbox viewing are live.",
-    primaryGap: "Print/lab workflows, batch upload tooling, and watermark controls remain pending."
+    summary: "Gallery administration, access records, proofing data, signed image variants, downloads, and ZIP delivery bundles are live.",
+    primaryGap: "The public gallery experience is being rebuilt in the new clients surface."
   },
   capabilities: [
     { label: "Gallery admin", status: "foundation" },
     { label: "Access-token delivery", status: "live" },
     { label: "Proofing favorites", status: "live" },
     { label: "Comments and approvals", status: "live" },
-    { label: "Gallery widgets and lightbox", status: "live" },
+    { label: "Gallery widgets and lightbox", status: "planned" },
     { label: "Selectable gallery layouts", status: "live" },
     { label: "Signed image variants", status: "live" },
     { label: "ZIP delivery bundles", status: "live" }
   ],
   adminRoutes: ["/admin/modules/portfolio"],
-  publicRoutes: ["/galleries/[slug]", "/galleries/access/[token]", "/api/public/v1/galleries", "/api/public/v1/galleries/[slug]"],
-  widgetRoutes: ["/galleries/[slug]#gallery-grid", "/embed/v1/gallery.js"],
+  publicRoutes: ["/api/public/v1/galleries", "/api/public/v1/galleries/[slug]"],
   dependencies: ["media", "clients"],
   dataModels: ["PortfolioGallery", "PortfolioGalleryItem", "PortfolioGalleryAccess", "PortfolioGalleryFavorite", "PortfolioGalleryLayout"],
   permissions: ["portfolio:manage"],

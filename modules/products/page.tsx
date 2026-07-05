@@ -308,7 +308,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                           </div>
                           <div className="catalog-row-copy">
                             <strong title={product.name}>{product.name}</strong>
-                            <small title={`/shop/${product.slug} · ${skuLabel} · ${product.summary || product.description || "No product copy yet."}`}>
+                            <small title={`${skuLabel} · ${product.summary || product.description || "No product copy yet."}`}>
                               {skuLabel} · {product.summary || product.description || "No product copy yet."}
                             </small>
                           </div>

@@ -6,7 +6,7 @@ import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { createTestimonialAction, deleteTestimonialAction, updateTestimonialModerationAction } from "./actions";
-import { Button, ButtonLink, Card, EqualGrid, Pagination, Switch, Table } from "@/components/ui";
+import { Button, Card, EqualGrid, Pagination, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -129,7 +129,7 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
         <div>
           <p className="eyebrow">Testimonials</p>
           <h1>Reviews and social proof</h1>
-          <p>Collect first-party quotes, moderate submissions, and feature approved testimonials on the public site.</p>
+          <p>Collect first-party quotes, moderate submissions, and prepare approved testimonials for the rebuilt client surface.</p>
         </div>
       </header>
 
@@ -180,10 +180,6 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
                 ]}
                 toolbarLabel="Testimonial tools"
               />
-              <ButtonLink href="/testimonials" size="sm" variant="secondary">
-                <MessageSquare size={15} />
-                Public page
-              </ButtonLink>
             </div>
             <div className="ui-zero">
               {statusFilters.map((filter) =>

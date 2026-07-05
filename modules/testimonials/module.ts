@@ -7,24 +7,23 @@ export const manifest = {
   href: "/admin/modules/testimonials",
   icon: "Star",
   order: 64,
-  description: "Review collection, moderation, featured quotes, and public proof blocks.",
+  description: "Review collection, moderation, featured quotes, and proof content.",
   layout: "standard",
   status: "active",
   enabledByDefault: true,
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Public testimonial collection, moderation, featured display, moderation audit trail, honeypot, and rate limits are live.",
-    primaryGap: "Review requests, third-party imports, consent snapshots, and schema output are pending."
+    summary: "Testimonial moderation, featured display management, moderation audit trail, honeypot, and rate limits are live.",
+    primaryGap: "The public testimonial collection page is being rebuilt in the new clients surface."
   },
   capabilities: [
-    { label: "Public collection", status: "live" },
+    { label: "Public collection", status: "planned" },
     { label: "Moderation", status: "live" },
     { label: "Moderation audit trail", status: "live" },
     { label: "Request/import workflows", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/testimonials"],
-  publicRoutes: ["/testimonials"],
   dependencies: ["clients", "content"],
   dataModels: ["Testimonial", "Client", "PublicRateLimit"],
   permissions: ["testimonials:manage"],

@@ -1,6 +1,6 @@
 # Showrunner
 
-Showrunner is a reusable per-client website/admin template for service businesses. It is built for the handoff model: one Railway project, one Postgres database, public pages plus a protected `/admin` area.
+Showrunner is a reusable per-client admin template for service businesses. It is built for the handoff model: one Railway project, one Postgres database, and a protected `/admin` area.
 
 ## Stack
 
@@ -22,7 +22,7 @@ Showrunner is a reusable per-client website/admin template for service businesse
 5. Run `npm run seed`.
 6. Run `npm run dev`.
 
-The admin panel is available at `/admin`. Public booking is available at `/book`.
+The admin panel is available at `/admin`. The legacy public-facing pages have been removed; new client-facing surfaces start under `clients/booking`.
 
 For quick throwaway previews where you do not want to create a migration, `npx prisma db push` can sync the local database directly. Use migrations for deployable client projects.
 
@@ -120,14 +120,7 @@ Scheduling owns the rules that create bookable time:
 
 Appointments are the day-to-day operational queue. Admins can view appointment details, see customer notes/intake answers, confirm/cancel/complete appointments, and store internal appointment notes.
 
-The public booking page uses a guided flow rather than one long form: service, time, details, review, and confirmation. Availability is loaded through `/api/availability`.
-
-Service-specific booking links use stable slugs:
-
-- `/book?service=consultation`
-- `/book/consultation`
-
-Prefer `/book/service-slug` for public CTA buttons. Database IDs should not be used in public links.
+The legacy public booking page has been removed. The next booking surface should rebuild the client-facing flow from stable service slugs. Database IDs should not be used in public links.
 
 When an admin adds a service, the service slug is generated from the service name if the slug field is blank. Duplicate slugs receive a numeric suffix, such as `consultation-2`.
 

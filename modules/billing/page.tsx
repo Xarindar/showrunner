@@ -450,11 +450,9 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
               <h3 className="subsection-title">Client link and payment handoff</h3>
               <EqualGrid>
                 <div>
-                  <p className="ui-zero">Public document</p>
+                  <p className="ui-zero">Client document</p>
                   {selectedDocument.publicAccessToken && !selectedDocumentIsDraft ?
-                <ButtonAnchor href={`/billing/${selectedDocument.publicAccessToken}`} target="_blank" rel="noreferrer" variant="secondary">
-                      Open client view
-                    </ButtonAnchor> :
+                <span className="ui-badge">Client view rebuild pending</span> :
 
                 <span className="ui-badge">Available after send</span>
                 }
