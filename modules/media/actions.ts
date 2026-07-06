@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { HeroPresentationMode, HeroSlideElementType, MediaDriver } from "@prisma/client";
+import { HeroPresentationMode, HeroSlideElementType } from "@prisma/client";
 import { optionalStoredText, parseForm, requiredText } from "@/lib/admin-validation";
 import { getAccessibleMediaWhere, getOwnerStaffIds, requireAdmin, resolveDataScopeMode } from "@/lib/auth";
-import { ensureMediaAssetVariants, mediaTagsFromInput, normalizeMediaFolder, uploadMedia } from "@/lib/media";
+import { ensureMediaAssetVariants, mediaTagsFromInput, normalizeMediaFolder, supportsPrivateMediaDriver, uploadMedia } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId, getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
 import { defaultHeroSlideFromSettings, heroElementsArray, type HeroElementType } from "@/modules/content/hero-presentation";
@@ -107,8 +107,8 @@ export async function updateMediaAssetAction(formData: FormData) {
     redirect(`/admin/modules/media?error=${encodeURIComponent("Media asset not found.")}`);
   }
 
-  if (input.isPrivate && existingAsset.driver !== MediaDriver.R2 && existingAsset.driver !== MediaDriver.SERVER_ASSETS) {
-    redirect(`/admin/modules/media?error=${encodeURIComponent("Private media delivery is currently supported only for server assets or R2 assets.")}`);
+  if (input.isPrivate && !supportsPrivateMediaDriver(existingAsset.driver)) {
+    redirect(`/admin/modules/media?error=${encodeURIComponent("Private media delivery is currently supported only for server assets, S3, or R2 assets.")}`);
   }
 
   await prisma.mediaAsset.updateMany({

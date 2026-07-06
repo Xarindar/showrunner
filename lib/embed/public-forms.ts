@@ -10,6 +10,7 @@ import { EmbedRequestError } from "@/lib/embed/gateway";
 import { emitAnalyticsEvent, emitModuleEvent, requestAttribution } from "@/lib/events/emit";
 import { deleteMediaAsset, uploadMedia } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
+import { getSiteSettingsForSite } from "@/lib/site";
 import { computeVisibleFieldIds } from "@/modules/forms/conditional-logic";
 import { formAnalyticsEvents } from "@/modules/forms/analytics";
 import { normalizeUploadRules, validateUploadedFile } from "@/modules/forms/upload-fields";
@@ -143,6 +144,7 @@ export async function createPublicFormSubmission(input: {
   siteId: string;
   slug: string;
 }) {
+  const settings = await getSiteSettingsForSite(input.siteId);
   const form = await prisma.form.findFirst({
     where: { siteId: input.siteId, slug: input.slug, status: FormStatus.ACTIVE },
     include: { fields: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } }
@@ -249,7 +251,7 @@ export async function createPublicFormSubmission(input: {
             tags: ["forms", form.slug],
             usageContext: `form:${form.id}:field:${field.id}`
           },
-          undefined,
+          settings.mediaDriver,
           input.siteId,
           { allowedMimeTypes: uploadRules.allowedMimeTypes, maxBytes: uploadRules.maxSizeBytes, requireImage: false }
         );

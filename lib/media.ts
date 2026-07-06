@@ -36,6 +36,7 @@ export const mediaVariantPresets = {
 
 const mediaVariantTypes = Object.values(MediaVariantType);
 const generatedImageVariantTypes = new Set<MediaVariantType>(mediaVariantTypes.filter((type) => type !== MediaVariantType.DOWNLOAD));
+type ObjectStorageDriver = Extract<MediaDriver, "R2" | "S3">;
 
 export type MediaUploadMetadata = {
   alt?: string;
@@ -65,6 +66,18 @@ type MediaStoredObject = {
   url: string;
 };
 
+type ObjectStorageConfig = {
+  accessKeyId: string;
+  bucket: string;
+  driver: ObjectStorageDriver;
+  endpoint: string;
+  forcePathStyle: boolean;
+  label: string;
+  publicBaseUrl: string;
+  region: string;
+  secretAccessKey: string;
+};
+
 export type MediaAdapter = {
   driver: MediaDriver;
   canUpload(): boolean;
@@ -80,14 +93,61 @@ function boundedUnit(value: number | string | undefined, fallback = 0.5) {
   return Math.min(1, Math.max(0, numeric));
 }
 
+function firstEnv(...keys: string[]) {
+  for (const key of keys) {
+    const value = process.env[key]?.trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function booleanEnv(value: string | undefined, fallback = false) {
+  if (!value) return fallback;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
+function publicBaseUrl(...keys: string[]) {
+  return firstEnv(...keys).replace(/\/$/, "");
+}
+
+function r2Config(): ObjectStorageConfig {
+  return {
+    accessKeyId: firstEnv("R2_ACCESS_KEY_ID"),
+    bucket: firstEnv("R2_BUCKET"),
+    driver: MediaDriver.R2,
+    endpoint: firstEnv("R2_ENDPOINT") || (process.env.R2_ACCOUNT_ID ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : ""),
+    forcePathStyle: booleanEnv(process.env.R2_FORCE_PATH_STYLE),
+    label: "R2",
+    publicBaseUrl: publicBaseUrl("R2_PUBLIC_BASE_URL"),
+    region: firstEnv("R2_REGION") || "auto",
+    secretAccessKey: firstEnv("R2_SECRET_ACCESS_KEY")
+  };
+}
+
+function s3Config(): ObjectStorageConfig {
+  return {
+    accessKeyId: firstEnv("S3_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID", "ACCESS_KEY_ID"),
+    bucket: firstEnv("S3_BUCKET", "AWS_BUCKET", "BUCKET"),
+    driver: MediaDriver.S3,
+    endpoint: firstEnv("S3_ENDPOINT", "AWS_ENDPOINT_URL_S3", "AWS_ENDPOINT_URL", "ENDPOINT"),
+    forcePathStyle: booleanEnv(process.env.S3_FORCE_PATH_STYLE ?? process.env.AWS_S3_FORCE_PATH_STYLE),
+    label: "S3",
+    publicBaseUrl: publicBaseUrl("S3_PUBLIC_BASE_URL", "AWS_PUBLIC_BASE_URL"),
+    region: firstEnv("S3_REGION", "AWS_REGION", "REGION") || "auto",
+    secretAccessKey: firstEnv("S3_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY", "SECRET_ACCESS_KEY")
+  };
+}
+
+function isObjectStorageConfigured(config: ObjectStorageConfig) {
+  return Boolean(config.bucket && config.endpoint && config.accessKeyId && config.secretAccessKey);
+}
+
 export function isR2Configured() {
-  return Boolean(
-    process.env.R2_ACCOUNT_ID &&
-      process.env.R2_ACCESS_KEY_ID &&
-      process.env.R2_SECRET_ACCESS_KEY &&
-      process.env.R2_BUCKET &&
-      process.env.R2_PUBLIC_BASE_URL
-  );
+  return isObjectStorageConfigured(r2Config());
+}
+
+export function isS3Configured() {
+  return isObjectStorageConfigured(s3Config());
 }
 
 export function isCloudflareImagesConfigured() {
@@ -102,15 +162,32 @@ export function isServerAssetStorageConfigured() {
   return Boolean(serverAssetStorageRoot());
 }
 
-function getR2Client() {
+export function isMediaUploadDriverConfigured(driver: MediaDriver | string) {
+  if (driver === MediaDriver.SERVER_ASSETS) return isServerAssetStorageConfigured();
+  if (driver === MediaDriver.S3) return isS3Configured();
+  if (driver === MediaDriver.R2) return isR2Configured();
+  if (driver === MediaDriver.CLOUDFLARE_IMAGES) return isCloudflareImagesConfigured();
+  return false;
+}
+
+export function supportsPrivateMediaDriver(driver: MediaDriver | string) {
+  return driver === MediaDriver.SERVER_ASSETS || driver === MediaDriver.S3 || driver === MediaDriver.R2;
+}
+
+function getObjectStorageClient(config: ObjectStorageConfig) {
   return new S3Client({
-    region: "auto",
-    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    region: config.region,
+    endpoint: config.endpoint,
+    forcePathStyle: config.forcePathStyle,
     credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || ""
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey
     }
   });
+}
+
+function getObjectStorageConfig(driver: ObjectStorageDriver) {
+  return driver === MediaDriver.S3 ? s3Config() : r2Config();
 }
 
 export function mediaTagsFromInput(value?: string | string[]) {
@@ -291,7 +368,7 @@ const repoAdapter: MediaAdapter = {
   generateVariantUrl: (asset, type) => (asset.isPrivate ? appMediaRoute(asset.id, type) : asset.url),
   signPrivateUrl: (asset, type = MediaVariantType.FULL, ttlSeconds = signedUrlTtlSeconds) => createSignedMediaUrl(asset.id, type, ttlSeconds),
   upload: async () => {
-    throw new Error("Repo media assets are reference-only. Use an existing public asset path or switch media mode to Server asset folder, R2, or Cloudflare Images.");
+    throw new Error("Repo media assets are reference-only. Use an existing public asset path or switch media mode to Server asset folder, S3, R2, or Cloudflare Images.");
   }
 };
 
@@ -323,52 +400,65 @@ const serverAssetsAdapter: MediaAdapter = {
   }
 };
 
-const r2Adapter: MediaAdapter = {
-  driver: MediaDriver.R2,
-  canUpload: isR2Configured,
-  delete: async (asset) => {
-    if (!process.env.R2_BUCKET || !asset.key) return;
-    await getR2Client().send(
-      new DeleteObjectCommand({
-        Bucket: process.env.R2_BUCKET,
-        Key: asset.key
-      })
-    );
-  },
-  generateVariantUrl: (asset, type) => (asset.isPrivate ? appMediaRoute(asset.id, type) : asset.url || appMediaRoute(asset.id, type)),
-  signPrivateUrl: (asset, type = MediaVariantType.FULL, ttlSeconds = signedUrlTtlSeconds) => createSignedMediaUrl(asset.id, type, ttlSeconds),
-  upload: async (file, metadata) => {
-    if (!isR2Configured()) {
-      throw new Error("R2 media uploads are not configured. Use repo assets or add R2 env vars.");
+function objectStoragePublicObjectUrl(config: ObjectStorageConfig, key: string) {
+  return config.publicBaseUrl ? `${config.publicBaseUrl}/${key}` : "";
+}
+
+function objectStorageAdapter(driver: ObjectStorageDriver): MediaAdapter {
+  const configured = driver === MediaDriver.S3 ? isS3Configured : isR2Configured;
+
+  return {
+    driver,
+    canUpload: configured,
+    delete: async (asset) => {
+      const config = getObjectStorageConfig(driver);
+      if (!config.bucket || !asset.key) return;
+      await getObjectStorageClient(config).send(
+        new DeleteObjectCommand({
+          Bucket: config.bucket,
+          Key: asset.key
+        })
+      );
+    },
+    generateVariantUrl: (asset, type) => (asset.isPrivate ? appMediaRoute(asset.id, type) : asset.url || appMediaRoute(asset.id, type)),
+    signPrivateUrl: (asset, type = MediaVariantType.FULL, ttlSeconds = signedUrlTtlSeconds) => createSignedMediaUrl(asset.id, type, ttlSeconds),
+    upload: async (file, metadata) => {
+      const config = getObjectStorageConfig(driver);
+      if (!isObjectStorageConfigured(config)) {
+        throw new Error(`${config.label} media uploads are not configured. Use repo assets or add ${config.label} env vars.`);
+      }
+
+      const extension = mimeTypeExtension(file.type);
+      const folder = normalizeMediaFolder(metadata.folder);
+      const folderPrefix = folder ? `${folder}/` : "";
+      const sitePrefix = slugify(metadata.siteId || "site") || "site";
+      const key = `sites/${sitePrefix}/uploads/${folderPrefix}${randomUUID()}.${extension}`;
+      const bytes = Buffer.from(await file.arrayBuffer());
+
+      await getObjectStorageClient(config).send(
+        new PutObjectCommand({
+          Bucket: config.bucket,
+          Key: key,
+          Body: bytes,
+          ContentType: file.type || "application/octet-stream",
+          Metadata: {
+            decorative: metadata.isDecorative ? "true" : "false",
+            private: metadata.isPrivate ? "true" : "false"
+          }
+        })
+      );
+
+      return {
+        driver,
+        key,
+        url: metadata.isPrivate ? "" : objectStoragePublicObjectUrl(config, key)
+      };
     }
+  };
+}
 
-    const extension = mimeTypeExtension(file.type);
-    const folder = normalizeMediaFolder(metadata.folder);
-    const folderPrefix = folder ? `${folder}/` : "";
-    const key = `uploads/${folderPrefix}${randomUUID()}.${extension}`;
-    const bytes = Buffer.from(await file.arrayBuffer());
-
-    await getR2Client().send(
-      new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET,
-        Key: key,
-        Body: bytes,
-        ContentType: file.type || "application/octet-stream",
-        Metadata: {
-          decorative: metadata.isDecorative ? "true" : "false",
-          private: metadata.isPrivate ? "true" : "false"
-        }
-      })
-    );
-
-    const baseUrl = process.env.R2_PUBLIC_BASE_URL?.replace(/\/$/, "");
-    return {
-      driver: MediaDriver.R2,
-      key,
-      url: metadata.isPrivate ? "" : `${baseUrl}/${key}`
-    };
-  }
-};
+const r2Adapter = objectStorageAdapter(MediaDriver.R2);
+const s3Adapter = objectStorageAdapter(MediaDriver.S3);
 
 const cloudflareImagesAdapter: MediaAdapter = {
   driver: MediaDriver.CLOUDFLARE_IMAGES,
@@ -413,6 +503,7 @@ const cloudflareImagesAdapter: MediaAdapter = {
 
 export function getMediaAdapter(driver: MediaDriver | string): MediaAdapter {
   if (driver === MediaDriver.SERVER_ASSETS) return serverAssetsAdapter;
+  if (driver === MediaDriver.S3) return s3Adapter;
   if (driver === MediaDriver.R2) return r2Adapter;
   if (driver === MediaDriver.CLOUDFLARE_IMAGES) return cloudflareImagesAdapter;
   return repoAdapter;
@@ -481,8 +572,8 @@ export async function uploadMedia(
 ) {
   const currentSiteId = siteId || (await getCurrentSiteId());
 
-  if (metadata.isPrivate && driver !== MediaDriver.R2 && driver !== MediaDriver.SERVER_ASSETS) {
-    throw new Error("Private media delivery is currently supported only for server assets or R2 assets.");
+  if (metadata.isPrivate && driver !== MediaDriver.S3 && driver !== MediaDriver.R2 && driver !== MediaDriver.SERVER_ASSETS) {
+    throw new Error("Private media delivery is currently supported only for server assets, S3, or R2 assets.");
   }
 
   const safeAlt = await assertUploadFile(file, metadata, validation);
@@ -592,6 +683,8 @@ function isAllowedMediaSourceUrl(url: URL, request: NextRequest) {
   const allowedHosts = new Set(
     [
       configuredUrlHostname(process.env.R2_PUBLIC_BASE_URL),
+      configuredUrlHostname(process.env.S3_PUBLIC_BASE_URL),
+      configuredUrlHostname(process.env.AWS_PUBLIC_BASE_URL),
       process.env.CLOUDFLARE_IMAGES_ACCOUNT_HASH ? "imagedelivery.net" : ""
     ].filter(Boolean)
   );
@@ -599,12 +692,13 @@ function isAllowedMediaSourceUrl(url: URL, request: NextRequest) {
   return allowedHosts.has(hostname) || hostname.endsWith(".r2.cloudflarestorage.com") || hostname.endsWith(".cloudflarestorage.com");
 }
 
-async function r2ObjectResponse(asset: Pick<MediaAsset, "key" | "mimeType">) {
-  if (!process.env.R2_BUCKET) return null;
+async function objectStorageObjectResponse(driver: ObjectStorageDriver, asset: Pick<MediaAsset, "key" | "mimeType">) {
+  const config = getObjectStorageConfig(driver);
+  if (!isObjectStorageConfigured(config)) return null;
 
-  const object = await getR2Client().send(
+  const object = await getObjectStorageClient(config).send(
     new GetObjectCommand({
-      Bucket: process.env.R2_BUCKET,
+      Bucket: config.bucket,
       Key: asset.key
     })
   );
@@ -632,9 +726,9 @@ async function serverAssetObjectResponse(asset: Pick<MediaAsset, "key" | "mimeTy
   }
 }
 
-async function safeR2ObjectResponse(asset: Pick<MediaAsset, "key" | "mimeType">) {
+async function safeObjectStorageObjectResponse(driver: ObjectStorageDriver, asset: Pick<MediaAsset, "key" | "mimeType">) {
   try {
-    return await r2ObjectResponse(asset);
+    return await objectStorageObjectResponse(driver, asset);
   } catch {
     return null;
   }
@@ -652,7 +746,7 @@ function isTransformableImage(asset: Pick<MediaAsset, "mimeType">) {
   return allowedImageTypes.has(asset.mimeType) && asset.mimeType !== "image/gif";
 }
 
-function r2VariantObjectKey(asset: Pick<MediaAsset, "key">, type: MediaVariantType) {
+function objectStorageVariantObjectKey(asset: Pick<MediaAsset, "key">, type: MediaVariantType) {
   const sourceKey = asset.key.replace(/\\/g, "/").replace(/[^A-Za-z0-9._/-]/g, "_").replace(/\.[^./]+$/, "");
   return `variants/${sourceKey}/${type.toLowerCase()}.webp`;
 }
@@ -662,9 +756,12 @@ function serverAssetVariantObjectKey(asset: Pick<MediaAsset, "key">, type: Media
   return `variants/${sourceKey}/${type.toLowerCase()}.webp`;
 }
 
-function r2PublicObjectUrl(key: string) {
-  const baseUrl = process.env.R2_PUBLIC_BASE_URL?.replace(/\/$/, "");
-  return baseUrl ? `${baseUrl}/${key}` : "";
+function objectStorageVariantMetadataKey(driver: ObjectStorageDriver) {
+  return driver === MediaDriver.S3 ? "s3Key" : "r2Key";
+}
+
+function objectStorageVariantGeneratedBy(driver: ObjectStorageDriver) {
+  return driver === MediaDriver.S3 ? "sharp-s3" : "sharp-r2";
 }
 
 async function responseToBuffer(response: Response) {
@@ -690,13 +787,19 @@ function transformFit(type: MediaVariantType) {
   };
 }
 
-async function transformedR2VariantResponse(
+async function transformedObjectStorageVariantResponse(
+  driver: ObjectStorageDriver,
   asset: Pick<MediaAsset, "id" | "isPrivate" | "key" | "mimeType">,
   type: MediaVariantType
 ) {
   if (!generatedImageVariantTypes.has(type) || !isTransformableImage(asset)) {
-    return r2ObjectResponse(asset);
+    return objectStorageObjectResponse(driver, asset);
   }
+
+  const config = getObjectStorageConfig(driver);
+  if (!isObjectStorageConfigured(config)) return null;
+  const metadataKey = objectStorageVariantMetadataKey(driver);
+  const generatedBy = objectStorageVariantGeneratedBy(driver);
 
   const existingVariant = await prisma.mediaAssetVariant.findUnique({
     where: {
@@ -708,13 +811,13 @@ async function transformedR2VariantResponse(
     select: { metadata: true }
   });
   const metadata = mediaVariantMetadata(existingVariant?.metadata);
-  const existingKey = typeof metadata.r2Key === "string" ? metadata.r2Key : "";
+  const existingKey = typeof metadata[metadataKey] === "string" ? metadata[metadataKey] : "";
   if (existingKey) {
-    const existingResponse = await safeR2ObjectResponse({ key: existingKey, mimeType: generatedVariantContentType });
+    const existingResponse = await safeObjectStorageObjectResponse(driver, { key: existingKey, mimeType: generatedVariantContentType });
     if (existingResponse) return existingResponse;
   }
 
-  const original = await r2ObjectResponse(asset);
+  const original = await objectStorageObjectResponse(driver, asset);
   if (!original?.ok || !original.body) return null;
 
   const sourceBytes = await responseToBuffer(original);
@@ -724,16 +827,16 @@ async function transformedR2VariantResponse(
     .webp({ effort: 4, quality: type === MediaVariantType.THUMBNAIL ? 72 : 82 })
     .toBuffer({ resolveWithObject: true });
 
-  const variantKey = r2VariantObjectKey(asset, type);
-  await getR2Client().send(
+  const variantKey = objectStorageVariantObjectKey(asset, type);
+  await getObjectStorageClient(config).send(
     new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET,
+      Bucket: config.bucket,
       Key: variantKey,
       Body: resized.data,
       CacheControl: "public, max-age=31536000, immutable",
       ContentType: generatedVariantContentType,
       Metadata: {
-        generatedBy: "sharp-r2",
+        generatedBy,
         sourceKey: asset.key,
         variant: type
       }
@@ -754,13 +857,13 @@ async function transformedR2VariantResponse(
       metadata: {
         contentType: generatedVariantContentType,
         fit: mediaVariantPresets[type].fit,
-        generatedBy: "sharp-r2",
-        r2Key: variantKey,
+        generatedBy,
+        [metadataKey]: variantKey,
         sourceKey: asset.key
       },
       sizeBytes: resized.data.byteLength,
       type,
-      url: asset.isPrivate ? appMediaRoute(asset.id, type) : r2PublicObjectUrl(variantKey) || appMediaRoute(asset.id, type),
+      url: asset.isPrivate ? appMediaRoute(asset.id, type) : objectStoragePublicObjectUrl(config, variantKey) || appMediaRoute(asset.id, type),
       width: resized.info.width || mediaVariantPresets[type].width
     },
     update: {
@@ -769,12 +872,12 @@ async function transformedR2VariantResponse(
       metadata: {
         contentType: generatedVariantContentType,
         fit: mediaVariantPresets[type].fit,
-        generatedBy: "sharp-r2",
-        r2Key: variantKey,
+        generatedBy,
+        [metadataKey]: variantKey,
         sourceKey: asset.key
       },
       sizeBytes: resized.data.byteLength,
-      url: asset.isPrivate ? appMediaRoute(asset.id, type) : r2PublicObjectUrl(variantKey) || appMediaRoute(asset.id, type),
+      url: asset.isPrivate ? appMediaRoute(asset.id, type) : objectStoragePublicObjectUrl(config, variantKey) || appMediaRoute(asset.id, type),
       width: resized.info.width || mediaVariantPresets[type].width
     }
   });
@@ -785,6 +888,20 @@ async function transformedR2VariantResponse(
     },
     status: 200
   });
+}
+
+async function transformedR2VariantResponse(
+  asset: Pick<MediaAsset, "id" | "isPrivate" | "key" | "mimeType">,
+  type: MediaVariantType
+) {
+  return transformedObjectStorageVariantResponse(MediaDriver.R2, asset, type);
+}
+
+async function transformedS3VariantResponse(
+  asset: Pick<MediaAsset, "id" | "isPrivate" | "key" | "mimeType">,
+  type: MediaVariantType
+) {
+  return transformedObjectStorageVariantResponse(MediaDriver.S3, asset, type);
 }
 
 async function transformedServerAssetVariantResponse(
@@ -881,7 +998,7 @@ export async function fetchMediaAssetSource(
   request: NextRequest,
   type: MediaVariantType
 ) {
-  if (asset.isPrivate && asset.driver !== MediaDriver.R2 && asset.driver !== MediaDriver.SERVER_ASSETS) {
+  if (asset.isPrivate && asset.driver !== MediaDriver.S3 && asset.driver !== MediaDriver.R2 && asset.driver !== MediaDriver.SERVER_ASSETS) {
     return null;
   }
 
@@ -897,8 +1014,16 @@ export async function fetchMediaAssetSource(
     return transformedR2VariantResponse(asset, type);
   }
 
+  if (asset.driver === MediaDriver.S3 && type !== MediaVariantType.DOWNLOAD) {
+    return transformedS3VariantResponse(asset, type);
+  }
+
   if (asset.driver === MediaDriver.R2 && (asset.isPrivate || !asset.url || asset.url.startsWith("/api/media/assets/"))) {
-    return r2ObjectResponse(asset);
+    return objectStorageObjectResponse(MediaDriver.R2, asset);
+  }
+
+  if (asset.driver === MediaDriver.S3 && (asset.isPrivate || !asset.url || asset.url.startsWith("/api/media/assets/"))) {
+    return objectStorageObjectResponse(MediaDriver.S3, asset);
   }
 
   const adapter = getMediaAdapter(asset.driver);

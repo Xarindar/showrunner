@@ -594,7 +594,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
             <Upload size={18} aria-hidden="true" />
             Upload image
           </Button>
-          {!canUploadHeroImage ? <span className="muted-text">Uploads need Server asset folder, R2, or Cloudflare Images.</span> : null}
+          {!canUploadHeroImage ? <span className="muted-text">Uploads need Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images.</span> : null}
         </div>
         <div className="content-asset-grid">
           {mediaAssets.map((asset) => (

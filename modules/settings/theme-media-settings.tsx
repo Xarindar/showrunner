@@ -12,6 +12,7 @@ type ThemeMediaSettingsProps = {
 const mediaDriverOptions = [
   { label: "Repo assets", value: "REPO" },
   { label: "Server asset folder", value: "SERVER_ASSETS" },
+  { label: "Railway/S3 bucket", value: "S3" },
   { label: "Cloudflare R2 uploads", value: "R2" },
   { label: "Cloudflare Images", value: "CLOUDFLARE_IMAGES" }
 ];

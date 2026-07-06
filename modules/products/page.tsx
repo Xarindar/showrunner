@@ -3,7 +3,7 @@ import { MediaDriver, MediaVariantType, Prisma, ProductStatus, ProductType } fro
 import { Camera, ImageIcon, PackagePlus } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { enumLabel, formatMoney } from "@/lib/format";
-import { isCloudflareImagesConfigured, isR2Configured, isServerAssetStorageConfigured, mediaAssetDisplayUrl } from "@/lib/media";
+import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
@@ -38,10 +38,7 @@ function productsHref({ page, q, status }: { page?: number; q?: string; status?:
 }
 
 function canUploadWithDriver(driver: MediaDriver) {
-  if (driver === MediaDriver.SERVER_ASSETS) return isServerAssetStorageConfigured();
-  if (driver === MediaDriver.R2) return isR2Configured();
-  if (driver === MediaDriver.CLOUDFLARE_IMAGES) return isCloudflareImagesConfigured();
-  return false;
+  return isMediaUploadDriverConfigured(driver);
 }
 
 function productStatusClass(status: ProductStatus) {

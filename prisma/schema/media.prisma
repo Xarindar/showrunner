@@ -3,6 +3,7 @@
 enum MediaDriver {
   REPO
   SERVER_ASSETS
+  S3
   R2
   CLOUDFLARE_IMAGES
 }

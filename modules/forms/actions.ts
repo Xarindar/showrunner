@@ -802,7 +802,7 @@ export async function createPublicFormSubmissionAction(formData: FormData) {
   }
 
   // Track every private upload so a later validation failure / persistence error
-  // can clean up the orphaned R2 objects instead of leaking them.
+  // can clean up orphaned media objects instead of leaking them.
   const uploadedAssetIds: string[] = [];
   let uploadedBytesTotal = 0;
   let submissionPersisted = false;

@@ -363,7 +363,7 @@ export function TestimonialsEditor({
                   Upload
                 </Button>
               </div>
-              {!canUploadImage ? <span className="muted-text">Uploads need Server asset folder, R2, or Cloudflare Images. You can still pick from the library.</span> : null}
+              {!canUploadImage ? <span className="muted-text">Uploads need Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images. You can still pick from the library.</span> : null}
               <div className="content-asset-grid">
                 {mediaAssets.map((asset) => (
                   <button className="content-asset-option" key={asset.id} onClick={() => selectImage(asset)} type="button">

@@ -3,7 +3,7 @@ import { Archive, Folder, ImagePlus, RotateCcw, Star, Tag } from "lucide-react";
 import { MediaDriver, MediaVariantType, type Prisma } from "@prisma/client";
 import { getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
 import { nonEmptyStringArrayFromUnknown, stringArrayCsv } from "@/lib/format";
-import { isCloudflareImagesConfigured, isR2Configured, isServerAssetStorageConfigured, mediaAssetDisplayUrl } from "@/lib/media";
+import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
@@ -37,10 +37,7 @@ function fileSizeLabel(bytes: number) {
 }
 
 function canUploadWithDriver(driver: MediaDriver) {
-  if (driver === MediaDriver.SERVER_ASSETS) return isServerAssetStorageConfigured();
-  if (driver === MediaDriver.R2) return isR2Configured();
-  if (driver === MediaDriver.CLOUDFLARE_IMAGES) return isCloudflareImagesConfigured();
-  return false;
+  return isMediaUploadDriverConfigured(driver);
 }
 
 export default async function MediaPage({ searchParams }: MediaPageProps) {
@@ -134,7 +131,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       </div>
       {!canUpload ? (
         <p className="lead lead-compact">
-          Switch media mode to Server asset folder, R2, or Cloudflare Images in Settings to enable uploads.
+          Switch media mode to Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images in Settings to enable uploads.
         </p>
       ) : null}
     </form>
@@ -165,7 +162,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
         <div>
           <p className="eyebrow">Media</p>
           <h1>Images and assets</h1>
-          <p>Use repo references for static assets, or upload into a server folder, R2, or Cloudflare Images for editable media.</p>
+          <p>Use repo references for static assets, or upload into a server folder, Railway/S3 bucket, R2, or Cloudflare Images for editable media.</p>
         </div>
       </header>
 

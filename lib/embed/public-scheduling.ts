@@ -11,6 +11,7 @@ import { icsCalendarAdapter } from "@/lib/scheduling/calendar";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import type { Slot, SlotDiagnostics } from "@/lib/scheduling/types";
 import { getSiteSettingsForSite } from "@/lib/site";
+import { slugify } from "@/lib/slug";
 import { parseZonedDateKey } from "@/lib/timezone";
 
 const hiddenHoneypotField = "companyWebsite";
@@ -91,9 +92,12 @@ export function serializePublicSlotDiagnostics(diagnostics: SlotDiagnostics) {
 }
 
 export function serializePublicService(service: PublicService) {
+  const category = cleanOptionalString(service.category);
   return {
     id: service.id,
     slug: service.slug,
+    categoryId: category ? slugify(category) || "general" : "general",
+    categoryName: category,
     name: service.name,
     description: cleanOptionalString(service.description),
     durationMinutes: service.durationMinutes,
