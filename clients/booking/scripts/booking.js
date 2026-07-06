@@ -10,6 +10,7 @@
     categoryFocusId: "",
     serviceId: null,
     selectedDate: dateKey(initialSelectedDate()),
+    dateRailStart: null,
     selectedSlot: null,
     staffId: "",
     lastBooking: null
@@ -68,11 +69,16 @@
     els.dateInput = document.querySelector("[data-date-input]");
     els.dateRail = document.querySelector("[data-date-rail]");
     els.monthHeading = document.querySelector("[data-month-heading]");
+    els.weekPrev = document.querySelector("[data-week-prev]");
+    els.weekNext = document.querySelector("[data-week-next]");
     els.slotGrid = document.querySelector("[data-slot-grid]");
     els.slotEmpty = document.querySelector("[data-slot-empty]");
+    els.earliestAvailable = document.querySelector("[data-earliest-available]");
     els.slotHeading = document.querySelector("[data-slot-heading]");
     els.timezoneLabel = document.querySelector("[data-timezone-label]");
     els.availabilityStatus = document.querySelector("[data-availability-status]");
+    els.flowFooter = document.querySelector("[data-flow-footer]");
+    els.flowSummary = document.querySelector("[data-flow-summary]");
     els.reviewBooking = document.querySelector("[data-review-booking]");
     els.confirmSummary = document.querySelector("[data-confirm-summary]");
     els.successSummary = document.querySelector("[data-success-summary]");
@@ -89,19 +95,7 @@
 
   function applyBusinessCopy() {
     const business = config.business || {};
-    setText("[data-business-name]", business.name || "Client Studio");
-    setText("[data-business-heading]", business.heading || "Book your visit");
-    setText("[data-business-kicker]", business.kicker || "Online booking");
-    setText("[data-business-tagline]", business.tagline || "Choose a service and reserve your time.");
-    setText("[data-business-location]", business.location || "Book online");
-    setText("[data-business-hours]", business.hoursLabel || "Open today");
-    setText("[data-business-promise]", business.promise || "Fast confirmation");
-
-    const support = document.querySelector("[data-support-link]");
-    if (support) {
-      const email = business.supportEmail || "hello@example.com";
-      support.href = `mailto:${email}`;
-    }
+    setText("[data-business-heading]", business.heading || "Book with us");
   }
 
   function bindEvents() {
@@ -137,11 +131,15 @@
     els.dateInput?.addEventListener("change", () => {
       if (!els.dateInput.value) return;
       state.selectedDate = els.dateInput.value;
+      state.dateRailStart = null;
       state.selectedSlot = null;
       renderDates();
       updateInlineActions();
       loadAndRenderSlots();
     });
+    els.weekPrev?.addEventListener("click", () => shiftDateRail(-1));
+    els.weekNext?.addEventListener("click", () => shiftDateRail(1));
+    els.earliestAvailable?.addEventListener("click", jumpToEarliestAvailableDate);
     els.form?.addEventListener("submit", submitBooking);
   }
 
@@ -165,13 +163,11 @@
     els.categoryGrid.innerHTML = sorted
       .filter((category) => visible.includes(category))
       .map((category) => {
-        const count = servicesForCategory(category.id).length;
         const image = imageForCategory(category);
         const highlighted = state.categoryFocusId === category.id;
         return `
           <button class="booking-category-card ${highlighted ? "is-highlighted" : ""}" type="button" data-category-id="${escapeAttribute(category.id)}" style="--category-image: url('${escapeAttribute(image)}')">
             <span class="booking-category-card-copy">
-              <small>${count} ${count === 1 ? "service" : "services"}</small>
               <strong>${escapeHtml(category.name)}</strong>
               <span>${escapeHtml(category.description || "Select from available services.")}</span>
             </span>
@@ -285,6 +281,7 @@
     state.serviceId = serviceId;
     state.selectedSlot = null;
     state.staffId = "";
+    state.dateRailStart = null;
     renderStaffSelect();
     renderDates();
     goToStep("time");
@@ -326,9 +323,26 @@
   function renderDates() {
     const daysToShow = Number(config.schedule?.daysToShow || 10);
     const today = startOfDay(new Date());
+    let railStart = state.dateRailStart ? parseDateKey(state.dateRailStart) : null;
+
+    if (!railStart) {
+      const selected = parseDateKey(state.selectedDate);
+      const defaultLast = new Date(today);
+      defaultLast.setDate(today.getDate() + daysToShow - 1);
+      railStart = new Date(today);
+      if (selected > defaultLast) {
+        railStart = new Date(selected);
+        railStart.setDate(selected.getDate() - daysToShow + 1);
+      }
+    }
+    if (railStart < today) {
+      railStart = new Date(today);
+    }
+    state.dateRailStart = dateKey(railStart);
+
     const dates = Array.from({ length: daysToShow }, (_, index) => {
-      const next = new Date(today);
-      next.setDate(today.getDate() + index);
+      const next = new Date(railStart);
+      next.setDate(railStart.getDate() + index);
       return next;
     });
 
@@ -337,7 +351,10 @@
       els.dateInput.value = state.selectedDate;
     }
     if (els.monthHeading) {
-      els.monthHeading.textContent = formatMonthYear(state.selectedDate);
+      els.monthHeading.textContent = formatMonthYear(dates[Math.floor(dates.length / 2)]);
+    }
+    if (els.weekPrev) {
+      els.weekPrev.disabled = railStart <= today;
     }
 
     els.dateRail.innerHTML = dates
@@ -348,7 +365,6 @@
           <button class="booking-date-button ${selected ? "is-selected" : ""}" type="button" data-date="${key}" aria-pressed="${selected}">
             <span>${weekdayShort(date)}</span>
             <strong>${date.getDate()}</strong>
-            <small>${monthShort(date)}</small>
           </button>
         `;
       })
@@ -365,12 +381,29 @@
     });
   }
 
+  function shiftDateRail(direction) {
+    const daysToShow = Number(config.schedule?.daysToShow || 10);
+    const today = startOfDay(new Date());
+    const start = state.dateRailStart ? parseDateKey(state.dateRailStart) : new Date(today);
+    start.setDate(start.getDate() + direction * daysToShow);
+    if (start < today) {
+      start.setTime(today.getTime());
+    }
+    state.dateRailStart = dateKey(start);
+    renderDates();
+  }
+
   async function loadAndRenderSlots() {
     const service = selectedService();
     if (!service) return;
 
     els.slotGrid.innerHTML = "";
     els.slotEmpty.hidden = true;
+    if (els.earliestAvailable) {
+      els.earliestAvailable.hidden = true;
+      els.earliestAvailable.disabled = false;
+      els.earliestAvailable.textContent = "Earliest Available Date";
+    }
     setAvailabilityStatus("Checking times...");
 
     try {
@@ -379,11 +412,11 @@
       renderSlots(slots);
     } catch (error) {
       setAvailabilityStatus(error.message || "Times could not load.", true);
-      renderSlots([]);
+      renderSlots([], false);
     }
   }
 
-  function renderSlots(slots) {
+  function renderSlots(slots, showEarliestAction = true) {
     const service = selectedService();
     if (els.selectedServiceKicker) {
       els.selectedServiceKicker.textContent = service ? service.name : "Time";
@@ -396,14 +429,16 @@
     }
 
     els.slotEmpty.hidden = slots.length > 0;
+    if (els.earliestAvailable) {
+      els.earliestAvailable.hidden = slots.length > 0 || !showEarliestAction;
+      els.earliestAvailable.disabled = false;
+      els.earliestAvailable.textContent = "Earliest Available Date";
+    }
     els.slotGrid.innerHTML = slots
       .map((slot, index) => {
         const selected = state.selectedSlot?.startsAt === slot.startsAt && (state.selectedSlot?.staffId || "") === (slot.staffId || "");
         return `
-          <button class="booking-slot-button ${selected ? "is-selected" : ""}" type="button" data-slot-index="${index}" aria-pressed="${selected}">
-            <strong>${escapeHtml(slot.label || formatTime(slot.startsAt))}</strong>
-            <span>${escapeHtml(slot.staffName || selectedStaffName() || "Available")}</span>
-          </button>
+          <button class="booking-slot-button ${selected ? "is-selected" : ""}" type="button" data-slot-index="${index}" aria-pressed="${selected}">${formatSlotTime(slot.startsAt)}</button>
         `;
       })
       .join("");
@@ -415,6 +450,43 @@
         updateInlineActions();
       });
     });
+  }
+
+  async function jumpToEarliestAvailableDate() {
+    const service = selectedService();
+    if (!service) return;
+
+    if (els.earliestAvailable) {
+      els.earliestAvailable.disabled = true;
+      els.earliestAvailable.textContent = "Finding...";
+    }
+    setAvailabilityStatus("Finding the earliest available date...");
+
+    try {
+      const earliest = await findEarliestAvailableDate(service);
+      if (!earliest) {
+        setAvailabilityStatus("No upcoming availability was found.", true);
+        if (els.earliestAvailable) {
+          els.earliestAvailable.disabled = false;
+          els.earliestAvailable.textContent = "Earliest Available Date";
+        }
+        return;
+      }
+
+      state.selectedDate = earliest.date;
+      state.dateRailStart = null;
+      state.selectedSlot = null;
+      renderDates();
+      renderSlots(earliest.slots);
+      updateInlineActions();
+      setAvailabilityStatus("");
+    } catch (error) {
+      setAvailabilityStatus(error.message || "Availability could not be checked.", true);
+      if (els.earliestAvailable) {
+        els.earliestAvailable.disabled = false;
+        els.earliestAvailable.textContent = "Earliest Available Date";
+      }
+    }
   }
 
   function renderConfirm() {
@@ -446,6 +518,27 @@
     if (els.reviewBooking) {
       els.reviewBooking.disabled = !state.selectedSlot;
     }
+    updateFlowFooter();
+  }
+
+  function updateFlowFooter() {
+    const service = selectedService();
+    const isVisible = state.activeStep === "time" && Boolean(service);
+
+    if (els.root) {
+      els.root.classList.toggle("has-flow-footer", isVisible);
+    }
+    if (els.flowFooter) {
+      els.flowFooter.hidden = !isVisible;
+    }
+    if (!els.flowSummary || !service) return;
+
+    const parts = [service.name, formatFooterDate(state.selectedSlot?.startsAt || state.selectedDate)];
+    if (state.selectedSlot) {
+      parts.push(formatFooterTime(state.selectedSlot.startsAt));
+    }
+
+    els.flowSummary.textContent = parts.join(" | ");
   }
 
   function renderSuccess(bookingResult) {
@@ -553,14 +646,35 @@
   }
 
   async function loadSlots(service) {
+    return loadSlotsForDate(service, state.selectedDate);
+  }
+
+  async function loadSlotsForDate(service, date) {
     if (config.api?.enabled) {
-      const params = new URLSearchParams({ serviceId: service.id, date: state.selectedDate });
+      const params = new URLSearchParams({ serviceId: service.id, date });
       if (state.staffId) params.set("staffId", state.staffId);
       const response = await apiRequest(`/availability?${params.toString()}`);
       return (response.diagnostics?.slots || []).map(normalizeSlot);
     }
 
-    return demoSlots(service);
+    return demoSlots(service, date);
+  }
+
+  async function findEarliestAvailableDate(service) {
+    const start = startOfDay(new Date());
+    const maxAdvanceDays = Number(service.maxAdvanceDays || config.schedule?.maxAdvanceDays || 60);
+
+    for (let index = 0; index <= maxAdvanceDays; index += 1) {
+      const next = new Date(start);
+      next.setDate(start.getDate() + index);
+      const candidate = dateKey(next);
+      const slots = await loadSlotsForDate(service, candidate);
+      if (slots.length > 0) {
+        return { date: candidate, slots };
+      }
+    }
+
+    return null;
   }
 
   async function createBooking(payload) {
@@ -688,8 +802,8 @@
     };
   }
 
-  function demoSlots(service) {
-    const selected = parseDateKey(state.selectedDate);
+  function demoSlots(service, selectedDate = state.selectedDate) {
+    const selected = parseDateKey(selectedDate);
     const closed = config.schedule?.demoClosedWeekdays || [];
     if (closed.includes(selected.getDay())) return [];
 
@@ -730,6 +844,7 @@
     state.categoryId = null;
     state.categoryFocusId = "";
     state.serviceId = null;
+    state.dateRailStart = null;
     state.selectedSlot = null;
     state.staffId = "";
     state.lastBooking = null;
@@ -793,18 +908,18 @@
   }
 
   function summaryMarkup(service, slot, bookingId) {
-    const rows = [
-      ["Service", service.name],
-      ["Date", formatLongDate(slot.startsAt)],
-      ["Time", `${formatTime(slot.startsAt)}-${formatTime(slot.endsAt)}`],
-      ["Length", `${service.durationMinutes} minutes`],
-      ["Price", formatPrice(service.priceCents)]
-    ];
+    const rows = [["Length", `${service.durationMinutes} minutes`]];
     if (slot.staffName) rows.push(["Provider", slot.staffName]);
     if (bookingId) rows.push(["Reference", bookingId]);
 
     return `
-      <dl>
+      <p class="booking-summary-kicker">Your appointment</p>
+      <h3 class="booking-summary-service">${escapeHtml(service.name)}</h3>
+      <p class="booking-summary-when">
+        <strong>${escapeHtml(formatLongDate(slot.startsAt))}</strong>
+        <span>${escapeHtml(`${formatTime(slot.startsAt)} – ${formatTime(slot.endsAt)}`)}</span>
+      </p>
+      <dl class="booking-summary-rows">
         ${rows
           .map(
             ([label, value]) => `
@@ -815,6 +930,10 @@
             `
           )
           .join("")}
+        <div class="booking-summary-total">
+          <dt>Total</dt>
+          <dd>${escapeHtml(formatPrice(service.priceCents))}</dd>
+        </div>
       </dl>
     `;
   }
@@ -857,8 +976,33 @@
     return new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date);
   }
 
-  function monthShort(date) {
-    return new Intl.DateTimeFormat(undefined, { month: "short" }).format(date);
+  function formatSlotTime(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    const hour = date.getHours() % 12 || 12;
+    return `${String(hour).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  }
+
+  function formatFooterDate(value) {
+    const date = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? parseDateKey(value) : new Date(value);
+    const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(date);
+    const day = date.getDate();
+    return `${weekday} ${day}${ordinalSuffix(day)}`;
+  }
+
+  function formatFooterTime(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    const hour = date.getHours() % 12 || 12;
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const suffix = date.getHours() < 12 ? "AM" : "PM";
+    return `${hour}:${minutes}${suffix}`;
+  }
+
+  function ordinalSuffix(day) {
+    if (day % 100 >= 11 && day % 100 <= 13) return "th";
+    if (day % 10 === 1) return "st";
+    if (day % 10 === 2) return "nd";
+    if (day % 10 === 3) return "rd";
+    return "th";
   }
 
   function dateKey(date) {

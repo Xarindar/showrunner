@@ -9,27 +9,10 @@
   </head>
   <body>
     <div class="booking-page" data-active-step="categories" data-booking-root>
-      <header class="booking-topbar">
-        <a class="booking-brand" href="#" aria-label="Booking home">
-          <span class="booking-brand-mark" aria-hidden="true"></span>
-          <span data-business-name>Client Studio</span>
-        </a>
-        <div class="booking-topbar-meta">
-          <span data-business-location>Book online</span>
-          <a data-support-link href="mailto:hello@example.com">Need help?</a>
-        </div>
-      </header>
-
       <main class="booking-main">
         <section class="booking-intro" aria-labelledby="booking-title">
           <div>
-            <span class="booking-eyebrow" data-business-kicker>Online booking</span>
-            <h1 id="booking-title" data-business-heading>Choose your service</h1>
-            <p data-business-tagline>Select a category, pick a service, choose a time, and confirm your visit.</p>
-          </div>
-          <div class="booking-intro-meta" aria-label="Booking details">
-            <span data-business-hours>Open today</span>
-            <strong data-business-promise>Fast confirmation</strong>
+            <h1 id="booking-title" data-business-heading>Book with us</h1>
           </div>
         </section>
 
@@ -44,16 +27,6 @@
               </div>
 
               <div class="booking-discovery">
-                <div class="booking-home-search-row">
-                  <label class="booking-home-search">
-                    <span class="booking-visually-hidden">Search services and categories</span>
-                    <input data-home-search type="search" placeholder="Search services, specialists" autocomplete="off" />
-                  </label>
-                  <button class="booking-filter-button" type="button" aria-label="Open filters">
-                    <span aria-hidden="true"></span>
-                  </button>
-                </div>
-
                 <button class="booking-promo" type="button" data-promo-card hidden>
                   <span>
                     <strong data-promo-title></strong>
@@ -65,6 +38,12 @@
                 <div class="booking-category-strip-head">
                   <h3>Category</h3>
                   <button class="booking-plain-link" type="button" data-clear-category-filter>See all</button>
+                </div>
+                <div class="booking-home-search-row">
+                  <label class="booking-home-search">
+                    <span class="booking-visually-hidden">Search services and categories</span>
+                    <input data-home-search type="search" placeholder="Search services, specialists" autocomplete="off" />
+                  </label>
                 </div>
                 <div class="booking-pill-rail" data-category-pills aria-label="Service categories"></div>
               </div>
@@ -131,29 +110,32 @@
                 </label>
               </div>
 
-              <div class="booking-calendar-section">
-                <div class="booking-calendar-head">
-                  <h3 data-month-heading>Month</h3>
-                  <label class="booking-date-input booking-date-jump">
-                    <span>Date</span>
-                    <input data-date-input type="date" />
-                  </label>
+              <div class="booking-time-card">
+                <div class="booking-calendar-section">
+                  <div class="booking-calendar-head">
+                    <h3 data-month-heading>Month</h3>
+                    <div class="booking-calendar-nav">
+                      <button class="booking-week-arrow" type="button" data-week-prev aria-label="Earlier dates"></button>
+                      <button class="booking-week-arrow booking-week-arrow-next" type="button" data-week-next aria-label="Later dates"></button>
+                    </div>
+                    <label class="booking-date-input booking-date-jump">
+                      <span>Date</span>
+                      <input data-date-input type="date" />
+                    </label>
+                  </div>
+                  <div class="booking-date-rail" data-date-rail aria-label="Available dates"></div>
                 </div>
-                <div class="booking-date-rail" data-date-rail aria-label="Available dates"></div>
-              </div>
 
-              <div class="booking-time-section">
-                <div class="booking-slot-head">
-                  <h3 data-slot-heading>Time</h3>
-                  <span data-timezone-label></span>
+                <div class="booking-time-section">
+                  <div class="booking-slot-head">
+                    <h3 data-slot-heading>Time</h3>
+                    <span data-timezone-label></span>
+                  </div>
+                  <div class="booking-slot-grid" data-slot-grid></div>
+                  <p class="booking-empty" data-slot-empty hidden>No times are available for this date.</p>
+                  <button class="booking-earliest-button" type="button" data-earliest-available hidden>Earliest Available Date</button>
+                  <div class="booking-status" data-availability-status role="status" aria-live="polite"></div>
                 </div>
-                <div class="booking-slot-grid" data-slot-grid></div>
-                <p class="booking-empty" data-slot-empty hidden>No times are available for this date.</p>
-                <div class="booking-status" data-availability-status role="status" aria-live="polite"></div>
-              </div>
-
-              <div class="booking-step-actions">
-                <button class="booking-button" type="button" data-review-booking disabled>Review booking</button>
               </div>
             </section>
 
@@ -216,6 +198,13 @@
           </div>
         </section>
       </main>
+
+      <footer class="booking-flow-footer" data-flow-footer hidden>
+        <div class="booking-flow-footer-inner">
+          <p class="booking-flow-summary" data-flow-summary aria-live="polite"></p>
+          <button class="booking-button booking-flow-review" type="button" data-review-booking disabled>Review booking</button>
+        </div>
+      </footer>
     </div>
 
     <script src="./scripts/booking-assets.js"></script>

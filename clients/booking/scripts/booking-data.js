@@ -2,13 +2,7 @@
   window.BookingClientConfig = {
     business: {
       name: "Northline Studio",
-      heading: "Book your visit",
-      kicker: "Online booking",
-      tagline: "Browse service categories, compare services in a clean list, and reserve the time that works.",
-      location: "Chicago, IL",
-      hoursLabel: "Open Tue-Sat",
-      promise: "Confirmation in minutes",
-      supportEmail: "hello@example.com",
+      heading: "Book with us",
       timezone: "America/Chicago"
     },
     api: {
