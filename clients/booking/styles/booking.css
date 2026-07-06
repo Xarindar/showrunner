@@ -525,9 +525,46 @@ p {
 }
 
 .booking-service-name {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 220px;
+}
+
+.booking-service-name.has-image {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+.booking-service-thumb {
+  aspect-ratio: 1;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--booking-color-soft) 82%, white), color-mix(in srgb, var(--booking-color-chip) 72%, white));
+  border: 1px solid color-mix(in srgb, var(--booking-color-line) 78%, transparent);
+  border-radius: 8px;
+  display: block;
+  overflow: hidden;
+  position: relative;
+  width: 64px;
+}
+
+.booking-service-thumb::before {
+  background-image: var(--service-image);
+  background-position: center;
+  background-size: cover;
+  content: "";
+  inset: 0;
+  position: absolute;
+}
+
+.booking-service-thumb.is-empty {
+  display: none;
+}
+
+.booking-service-copy {
   display: grid;
   gap: 4px;
-  min-width: 220px;
+  min-width: 0;
 }
 
 .booking-service-name strong {
@@ -535,7 +572,7 @@ p {
   line-height: 1.2;
 }
 
-.booking-service-name span,
+.booking-service-copy > span,
 .booking-service-detail,
 .booking-service-meta {
   color: var(--booking-color-muted);

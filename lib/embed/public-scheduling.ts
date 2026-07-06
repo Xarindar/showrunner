@@ -1,12 +1,14 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { FormAttachmentTargetType } from "@prisma/client";
+import { FormAttachmentTargetType, MediaVariantType } from "@prisma/client";
 import { z } from "zod";
 import { bookingSelfServicePath } from "@/lib/bookings/self-service";
 import { EmbedRequestError } from "@/lib/embed/gateway";
 import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
 import { getPublicFormAttachments, publicFormAttachmentHref } from "@/lib/forms/attachments";
+import { mediaAssetDisplayUrl } from "@/lib/media";
+import { prisma } from "@/lib/prisma";
 import { icsCalendarAdapter } from "@/lib/scheduling/calendar";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import type { Slot, SlotDiagnostics } from "@/lib/scheduling/types";
@@ -31,10 +33,25 @@ const bookingSchema = z.object({
 });
 
 type PublicService = Awaited<ReturnType<typeof nativeSchedulingAdapter.listActiveServices>>[number];
+type PublicServiceCategory = Awaited<ReturnType<typeof listPublicSchedulingCategoryRows>>[number];
 
 function cleanOptionalString(value: string | null) {
   const text = value?.trim();
   return text || null;
+}
+
+function categoryKey(value: string | null | undefined) {
+  return value?.trim().toLowerCase() || "";
+}
+
+function publicServiceImageUrl(service: PublicService) {
+  if (service.mediaAsset) return mediaAssetDisplayUrl(service.mediaAsset, MediaVariantType.CARD);
+  return cleanOptionalString(service.imageUrl);
+}
+
+function publicCategoryImageUrl(category: PublicServiceCategory) {
+  if (category.mediaAsset) return mediaAssetDisplayUrl(category.mediaAsset, MediaVariantType.CARD);
+  return cleanOptionalString(category.imageUrl);
 }
 
 const expectedBookingErrorStatuses = new Map<string, number>([
@@ -91,15 +108,17 @@ export function serializePublicSlotDiagnostics(diagnostics: SlotDiagnostics) {
   };
 }
 
-export function serializePublicService(service: PublicService) {
+export function serializePublicService(service: PublicService, categoryRecord?: PublicServiceCategory) {
   const category = cleanOptionalString(service.category);
+  const fallbackCategoryId = category ? slugify(category) || "general" : "general";
   return {
     id: service.id,
     slug: service.slug,
-    categoryId: category ? slugify(category) || "general" : "general",
+    categoryId: categoryRecord?.slug || fallbackCategoryId,
     categoryName: category,
     name: service.name,
     description: cleanOptionalString(service.description),
+    imageUrl: publicServiceImageUrl(service),
     durationMinutes: service.durationMinutes,
     location: cleanOptionalString(service.location),
     minimumNoticeHours: service.minimumNoticeHours,
@@ -124,9 +143,73 @@ export function serializePublicService(service: PublicService) {
   };
 }
 
+function serializePublicCategory(category: PublicServiceCategory) {
+  return {
+    id: category.slug,
+    slug: category.slug,
+    name: category.name,
+    description: cleanOptionalString(category.description),
+    imageUrl: publicCategoryImageUrl(category),
+    sort: category.sortOrder
+  };
+}
+
+function serializeDerivedCategory(input: { id: string; name: string; sort: number }) {
+  return {
+    id: input.id,
+    slug: input.id,
+    name: input.name,
+    description: null,
+    imageUrl: null,
+    sort: input.sort
+  };
+}
+
+async function listPublicSchedulingCategoryRows(siteId: string) {
+  return prisma.serviceCategory.findMany({
+    where: { siteId },
+    include: { mediaAsset: true },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
+  });
+}
+
+export async function listPublicSchedulingCatalog(siteId: string) {
+  const [services, serviceCategories] = await Promise.all([
+    nativeSchedulingAdapter.listActiveServices({ siteId }),
+    listPublicSchedulingCategoryRows(siteId)
+  ]);
+  const categoriesByName = new Map(serviceCategories.map((category) => [categoryKey(category.name), category]));
+  const serializedServices = services.map((service) => serializePublicService(service, categoriesByName.get(categoryKey(service.category))));
+  const usedCategoryIds = new Set(serializedServices.map((service) => service.categoryId));
+  const categoriesById = new Map(
+    serviceCategories
+      .filter((category) => usedCategoryIds.has(category.slug))
+      .map((category) => [category.slug, serializePublicCategory(category)])
+  );
+
+  serializedServices.forEach((service, index) => {
+    if (categoriesById.has(service.categoryId)) return;
+    categoriesById.set(
+      service.categoryId,
+      serializeDerivedCategory({
+        id: service.categoryId,
+        name: service.categoryName || "Services",
+        sort: 10_000 + index
+      })
+    );
+  });
+
+  const categories = Array.from(categoriesById.values()).sort((left, right) => left.sort - right.sort || left.name.localeCompare(right.name));
+
+  return {
+    categories,
+    services: serializedServices
+  };
+}
+
 export async function listPublicSchedulingServices(siteId: string) {
-  const services = await nativeSchedulingAdapter.listActiveServices({ siteId });
-  return services.map(serializePublicService);
+  const catalog = await listPublicSchedulingCatalog(siteId);
+  return catalog.services;
 }
 
 export async function getPublicSchedulingDiagnostics(input: {

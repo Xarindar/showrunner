@@ -37,6 +37,7 @@ export type SlotDiagnostics = {
 
 export type ActiveService = Prisma.ServiceGetPayload<{
   include: {
+    mediaAsset: true;
     resourceAssignments: {
       include: { resource: true };
     };

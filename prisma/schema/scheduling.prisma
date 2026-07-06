@@ -74,9 +74,12 @@ model Service {
   id                  String    @id @default(cuid())
   siteId              String
   site                Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  mediaAssetId        String?
+  mediaAsset          MediaAsset? @relation("ServiceMediaAsset", fields: [mediaAssetId], references: [id], onDelete: SetNull)
   slug                String    @default(cuid())
   name                String
   description         String?
+  imageUrl            String    @default("")
   durationMinutes     Int
   location            String?
   category            String    @default("")
@@ -102,8 +105,28 @@ model Service {
 
   @@unique([siteId, slug])
   @@index([siteId])
+  @@index([mediaAssetId])
   @@index([siteId, category])
   @@index([siteId, isActive])
+}
+
+model ServiceCategory {
+  id           String      @id @default(cuid())
+  siteId       String
+  site         Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  mediaAssetId String?
+  mediaAsset   MediaAsset? @relation("ServiceCategoryMediaAsset", fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  slug         String
+  name         String
+  description  String      @default("")
+  imageUrl     String      @default("")
+  sortOrder    Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([siteId, slug])
+  @@index([siteId, sortOrder])
+  @@index([mediaAssetId])
 }
 
 model ServicePackage {

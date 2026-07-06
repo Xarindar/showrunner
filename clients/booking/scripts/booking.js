@@ -27,12 +27,14 @@
     setStatus("Loading services...");
 
     try {
-      state.services = await loadServices();
-      state.categories = normalizeCategories(config.categories || [], state.services);
+      const catalog = await loadServices();
+      state.services = catalog.services;
+      state.categories = normalizeCategories([...(catalog.categories || []), ...(config.categories || [])], state.services);
       setStatus("");
     } catch (error) {
       if (config.api?.demoFallback !== false) {
-        state.services = normalizeServices(config.services || []);
+        const fallbackCatalog = await loadServices(false);
+        state.services = fallbackCatalog.services;
         state.categories = normalizeCategories(config.categories || [], state.services);
         setStatus("Using demo services because live services could not load.");
       } else {
@@ -255,12 +257,18 @@
     els.serviceList.innerHTML = services
       .map((service) => {
         const detail = service.requestOnly ? "Request only" : service.location || "Online booking";
+        const image = service.imageUrl || "";
         return `
           <tr>
             <td>
-              <span class="booking-service-name">
-                <strong>${escapeHtml(service.name)}</strong>
-                <span>${escapeHtml(service.description || "Service details available at confirmation.")}</span>
+              <span class="booking-service-name ${image ? "has-image" : ""}">
+                <span class="booking-service-thumb ${image ? "" : "is-empty"}" ${
+                  image ? `style="--service-image: url('${escapeAttribute(image)}')"` : ""
+                } aria-hidden="true"></span>
+                <span class="booking-service-copy">
+                  <strong>${escapeHtml(service.name)}</strong>
+                  <span>${escapeHtml(service.description || "Service details available at confirmation.")}</span>
+                </span>
               </span>
             </td>
             <td><span class="booking-service-meta">${service.durationMinutes || 0} min</span></td>
@@ -642,11 +650,20 @@
     }
   }
 
-  async function loadServices() {
-    if (!config.api?.enabled) return normalizeServices(config.services || []);
+  async function loadServices(useApi = true) {
+    if (!useApi || !config.api?.enabled) {
+      return {
+        categories: config.categories || [],
+        services: normalizeServices(config.services || [])
+      };
+    }
     const response = await apiRequest("/services");
+    const liveCategories = Array.isArray(response.categories) ? response.categories : [];
     const liveServices = response.services || [];
-    return normalizeServices(liveServices.map(mergeServicePresentation));
+    return {
+      categories: liveCategories,
+      services: normalizeServices(liveServices.map(mergeServicePresentation))
+    };
   }
 
   async function loadSlots(service) {
@@ -744,8 +761,10 @@
         id: String(service.id || service.slug || `service-${index}`),
         slug: service.slug || "",
         categoryId: service.categoryId || "general",
+        categoryName: service.categoryName || "",
         name: service.name || "Untitled service",
         description: service.description || "",
+        imageUrl: service.imageUrl || "",
         durationMinutes: Number(service.durationMinutes || 0),
         priceCents: typeof service.priceCents === "number" ? service.priceCents : null,
         location: service.location || "",
@@ -765,29 +784,37 @@
   }
 
   function normalizeCategories(categories, services) {
-    const normalized = categories.map((category, index) => ({
-      id: String(category.id || `category-${index}`),
-      name: category.name || "Services",
-      description: category.description || "",
-      imageKey: category.imageKey || category.id || "fallback",
-      sort: Number.isFinite(Number(category.sort)) ? Number(category.sort) : index + 1
-    }));
+    const normalizedById = new Map();
+    categories.forEach((category, index) => {
+      const id = String(category.id || category.slug || `category-${index}`);
+      const existing = normalizedById.get(id) || {};
+      normalizedById.set(id, {
+        ...existing,
+        id,
+        name: category.name || existing.name || "Services",
+        description: category.description || existing.description || "",
+        imageKey: category.imageKey || existing.imageKey || category.slug || category.id || "fallback",
+        imageUrl: category.imageUrl || existing.imageUrl || "",
+        sort: Number.isFinite(Number(category.sort)) ? Number(category.sort) : existing.sort || index + 1
+      });
+    });
 
-    const known = new Set(normalized.map((category) => category.id));
+    const known = new Set(normalizedById.keys());
     services.forEach((service) => {
       if (!known.has(service.categoryId)) {
-        normalized.push({
+        normalizedById.set(service.categoryId, {
           id: service.categoryId,
-          name: titleCase(service.categoryId),
+          name: service.categoryName || titleCase(service.categoryId),
           description: "Available services",
           imageKey: service.categoryId,
-          sort: normalized.length + 1
+          imageUrl: "",
+          sort: normalizedById.size + 1
         });
         known.add(service.categoryId);
       }
     });
 
-    return normalized;
+    return Array.from(normalizedById.values()).sort(sortBySortThenName);
   }
 
   function mergeServicePresentation(service) {
