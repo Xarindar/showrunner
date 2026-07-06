@@ -282,6 +282,10 @@
     state.selectedSlot = null;
     state.staffId = "";
     state.dateRailStart = null;
+    const service = selectedService();
+    if (service) {
+      state.selectedDate = dateKey(minBookableDateFor(service));
+    }
     renderStaffSelect();
     renderDates();
     goToStep("time");
@@ -607,8 +611,8 @@
     const formData = new FormData(els.form);
     const payload = {
       serviceId: service.id,
-      staffId: slot.staffId || state.staffId || undefined,
-      resourceIds: slot.resourceIds || undefined,
+      staffId: slot.staffId || selectedStaffId(service) || undefined,
+      resourceIds: slot.resourceIds?.length ? slot.resourceIds : service.resources?.map((resource) => resource.id) || undefined,
       startsAt: slot.startsAt,
       customerName: String(formData.get("customerName") || "").trim(),
       customerEmail: String(formData.get("customerEmail") || "").trim(),
@@ -652,7 +656,8 @@
   async function loadSlotsForDate(service, date) {
     if (config.api?.enabled) {
       const params = new URLSearchParams({ serviceId: service.id, date });
-      if (state.staffId) params.set("staffId", state.staffId);
+      const staffId = selectedStaffId(service);
+      if (staffId) params.set("staffId", staffId);
       const response = await apiRequest(`/availability?${params.toString()}`);
       return (response.diagnostics?.slots || []).map(normalizeSlot);
     }
@@ -867,6 +872,12 @@
     return service.staff?.find((member) => member.id === state.staffId)?.name || "";
   }
 
+  function selectedStaffId(service) {
+    if (state.staffId) return state.staffId;
+    if (config.features?.autoSelectFirstStaff === false) return "";
+    return service?.staff?.[0]?.id || "";
+  }
+
   function servicesForCategory(categoryId) {
     return state.services.filter((service) => service.categoryId === categoryId);
   }
@@ -1037,6 +1048,15 @@
       next.setDate(next.getDate() + 1);
     }
     return startOfDay(new Date());
+  }
+
+  function minBookableDateFor(service) {
+    const noticeHours = Math.max(0, Number(service?.minimumNoticeHours || config.schedule?.minimumNoticeHours || 0));
+    const noticeDays = Math.ceil(noticeHours / 24);
+    const offsetDays = noticeDays > 0 ? noticeDays + 1 : 0;
+    const next = startOfDay(new Date());
+    next.setDate(next.getDate() + offsetDays);
+    return next;
   }
 
   function setStatus(message, isError) {
