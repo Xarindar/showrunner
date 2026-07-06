@@ -16,7 +16,6 @@ function notFound() {
 
 export async function GET(request: NextRequest, { params }: MediaAssetRouteProps) {
   const settings = await getSiteSettings();
-  if (!settings.enabledModuleIds.includes("media")) return notFound();
 
   const { assetId } = await params;
   const type = normalizeMediaVariantType(request.nextUrl.searchParams.get("variant"));

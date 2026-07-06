@@ -420,7 +420,11 @@ function objectStorageAdapter(driver: ObjectStorageDriver): MediaAdapter {
         })
       );
     },
-    generateVariantUrl: (asset, type) => (asset.isPrivate ? appMediaRoute(asset.id, type) : asset.url || appMediaRoute(asset.id, type)),
+    generateVariantUrl: (asset, type) => {
+      if (asset.isPrivate) return appMediaRoute(asset.id, type);
+      if (asset.url && !asset.url.startsWith("/api/media/assets/")) return asset.url;
+      return appMediaRoute(asset.id, type);
+    },
     signPrivateUrl: (asset, type = MediaVariantType.FULL, ttlSeconds = signedUrlTtlSeconds) => createSignedMediaUrl(asset.id, type, ttlSeconds),
     upload: async (file, metadata) => {
       const config = getObjectStorageConfig(driver);

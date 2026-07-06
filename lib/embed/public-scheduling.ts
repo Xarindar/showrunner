@@ -5,6 +5,7 @@ import { FormAttachmentTargetType, MediaVariantType } from "@prisma/client";
 import { z } from "zod";
 import { bookingSelfServicePath } from "@/lib/bookings/self-service";
 import { EmbedRequestError } from "@/lib/embed/gateway";
+import { publicAppBaseUrl } from "@/lib/env";
 import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
 import { getPublicFormAttachments, publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { mediaAssetDisplayUrl } from "@/lib/media";
@@ -44,14 +45,21 @@ function categoryKey(value: string | null | undefined) {
   return value?.trim().toLowerCase() || "";
 }
 
+function publicAssetUrl(value: string | null) {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("/")) return new URL(value, publicAppBaseUrl()).toString();
+  return value;
+}
+
 function publicServiceImageUrl(service: PublicService) {
-  if (service.mediaAsset) return mediaAssetDisplayUrl(service.mediaAsset, MediaVariantType.CARD);
-  return cleanOptionalString(service.imageUrl);
+  if (service.mediaAsset) return publicAssetUrl(mediaAssetDisplayUrl(service.mediaAsset, MediaVariantType.CARD));
+  return publicAssetUrl(cleanOptionalString(service.imageUrl));
 }
 
 function publicCategoryImageUrl(category: PublicServiceCategory) {
-  if (category.mediaAsset) return mediaAssetDisplayUrl(category.mediaAsset, MediaVariantType.CARD);
-  return cleanOptionalString(category.imageUrl);
+  if (category.mediaAsset) return publicAssetUrl(mediaAssetDisplayUrl(category.mediaAsset, MediaVariantType.CARD));
+  return publicAssetUrl(cleanOptionalString(category.imageUrl));
 }
 
 const expectedBookingErrorStatuses = new Map<string, number>([
@@ -118,7 +126,7 @@ export function serializePublicService(service: PublicService, categoryRecord?: 
     categoryName: category,
     name: service.name,
     description: cleanOptionalString(service.description),
-    imageUrl: publicServiceImageUrl(service),
+    imageUrl: publicServiceImageUrl(service) || (categoryRecord ? publicCategoryImageUrl(categoryRecord) : null),
     durationMinutes: service.durationMinutes,
     location: cleanOptionalString(service.location),
     minimumNoticeHours: service.minimumNoticeHours,

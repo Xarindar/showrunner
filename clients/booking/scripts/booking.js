@@ -755,6 +755,16 @@
     return new URL(`${base}${cleanPath}`, window.location.origin);
   }
 
+  function normalizeImageUrl(value) {
+    const url = String(value || "").trim();
+    if (!url || /^(?:https?:|data:|blob:)/i.test(url)) return url;
+    if (url.startsWith("/api/")) {
+      const apiBase = String(config.api?.baseUrl || "").trim();
+      if (/^https?:\/\//i.test(apiBase)) return new URL(url, apiBase).toString();
+    }
+    return url;
+  }
+
   function normalizeServices(services) {
     return services
       .map((service, index) => ({
@@ -764,7 +774,7 @@
         categoryName: service.categoryName || "",
         name: service.name || "Untitled service",
         description: service.description || "",
-        imageUrl: service.imageUrl || "",
+        imageUrl: normalizeImageUrl(service.imageUrl),
         durationMinutes: Number(service.durationMinutes || 0),
         priceCents: typeof service.priceCents === "number" ? service.priceCents : null,
         location: service.location || "",
@@ -794,7 +804,7 @@
         name: category.name || existing.name || "Services",
         description: category.description || existing.description || "",
         imageKey: category.imageKey || existing.imageKey || category.slug || category.id || "fallback",
-        imageUrl: category.imageUrl || existing.imageUrl || "",
+        imageUrl: normalizeImageUrl(category.imageUrl || existing.imageUrl),
         sort: Number.isFinite(Number(category.sort)) ? Number(category.sort) : existing.sort || index + 1
       });
     });
