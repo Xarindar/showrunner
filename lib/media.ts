@@ -585,48 +585,60 @@ export async function uploadMedia(
   const isPrivate = Boolean(metadata.isPrivate);
   const assetRoute = appMediaRoute(assetId, MediaVariantType.FULL);
 
-  const asset = await prisma.mediaAsset.create({
-    data: {
-      id: assetId,
-      siteId: currentSiteId,
-      driver: stored.driver,
-      key: stored.key,
-      storageProviderId: stored.storageProviderId || "",
-      url: isPrivate ? assetRoute : stored.url || assetRoute,
-      filename: file.name,
-      mimeType: file.type || "application/octet-stream",
-      sizeBytes: file.size,
-      folder,
-      tags: mediaTagsFromInput(metadata.tags),
-      caption: metadata.caption?.trim() || "",
-      credit: metadata.credit?.trim() || "",
-      usageContext: metadata.usageContext?.trim() || "",
-      focalPointX: boundedUnit(metadata.focalPointX),
-      focalPointY: boundedUnit(metadata.focalPointY),
-      alt: metadata.isDecorative ? "" : safeAlt,
-      isDecorative: Boolean(metadata.isDecorative),
-      isPrivate,
-      uploadedByStaffId: metadata.uploadedByStaffId || undefined,
-      variants: {
-        create: variantRowsForAsset({
-          driver: stored.driver,
-          id: assetId,
-          isPrivate,
-          key: stored.key,
-          storageProviderId: stored.storageProviderId || "",
-          url: isPrivate ? assetRoute : stored.url || assetRoute
-        }).map((row) => ({
-          ...row,
-          metadata: {
-            ...(row.metadata as Record<string, unknown>),
-            virusScan: scanResult
-          }
-        }))
+  try {
+    const asset = await prisma.mediaAsset.create({
+      data: {
+        id: assetId,
+        siteId: currentSiteId,
+        driver: stored.driver,
+        key: stored.key,
+        storageProviderId: stored.storageProviderId || "",
+        url: isPrivate ? assetRoute : stored.url || assetRoute,
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+        folder,
+        tags: mediaTagsFromInput(metadata.tags),
+        caption: metadata.caption?.trim() || "",
+        credit: metadata.credit?.trim() || "",
+        usageContext: metadata.usageContext?.trim() || "",
+        focalPointX: boundedUnit(metadata.focalPointX),
+        focalPointY: boundedUnit(metadata.focalPointY),
+        alt: metadata.isDecorative ? "" : safeAlt,
+        isDecorative: Boolean(metadata.isDecorative),
+        isPrivate,
+        uploadedByStaffId: metadata.uploadedByStaffId || undefined,
+        variants: {
+          create: variantRowsForAsset({
+            driver: stored.driver,
+            id: assetId,
+            isPrivate,
+            key: stored.key,
+            storageProviderId: stored.storageProviderId || "",
+            url: isPrivate ? assetRoute : stored.url || assetRoute
+          }).map((row) => ({
+            format: row.format,
+            height: row.height,
+            metadata: {
+              ...(row.metadata as Record<string, unknown>),
+              virusScan: scanResult
+            },
+            sizeBytes: row.sizeBytes,
+            type: row.type,
+            url: row.url,
+            width: row.width
+          }))
+        }
       }
-    }
-  });
+    });
 
-  return asset;
+    return asset;
+  } catch (error) {
+    if (adapter.delete) {
+      await adapter.delete({ key: stored.key, storageProviderId: stored.storageProviderId || "" }).catch(() => {});
+    }
+    throw error;
+  }
 }
 
 /**
