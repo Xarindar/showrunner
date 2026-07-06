@@ -33,7 +33,12 @@ const knownModules = [
   "automation",
   "analytics"
 ];
-const bookingOrigins = ["https://cottage616.com", "https://www.cottage616.com", "https://xarindar.com"];
+const bookingOrigins = [
+  "https://cottage616.com",
+  "https://www.cottage616.com",
+  "https://xarindar.com",
+  "https://cottage616-production.up.railway.app"
+];
 
 function publicKey() {
   return `pk_live_${randomBytes(24).toString("base64url")}`;
