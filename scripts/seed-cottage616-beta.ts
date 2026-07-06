@@ -11,7 +11,7 @@ const adapter = new PrismaPg({
 });
 const prisma = new PrismaClient({ adapter });
 
-const enabledModules = ["dashboard", "content", "appointments", "clients", "scheduling", "settings", "users", "help"];
+const enabledModules = ["dashboard", "content", "appointments", "clients", "scheduling"];
 const knownModules = [
   "dashboard",
   "content",
