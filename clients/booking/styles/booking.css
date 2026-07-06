@@ -366,7 +366,7 @@ p {
 
 .booking-category-card {
   align-items: end;
-  aspect-ratio: 1.35 / 1;
+  aspect-ratio: auto;
   background:
     linear-gradient(180deg, rgba(12, 11, 10, 0.04), rgba(12, 11, 10, 0.72)),
     var(--category-image),
@@ -379,11 +379,12 @@ p {
   color: white;
   cursor: pointer;
   display: grid;
-  max-height: 260px;
-  min-height: 176px;
+  height: clamp(170px, 30vw, 260px);
+  min-height: 0;
   overflow: hidden;
   padding: 0;
   text-align: left;
+  width: 100%;
 }
 
 .booking-category-card.is-highlighted {
@@ -1183,8 +1184,7 @@ p {
   }
 
   .booking-category-card {
-    aspect-ratio: 1 / 1.12;
-    min-height: 150px;
+    height: clamp(160px, 30vw, 220px);
   }
 
   .booking-service-table {
