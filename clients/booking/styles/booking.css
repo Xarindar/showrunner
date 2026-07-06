@@ -767,16 +767,50 @@ p {
   color: var(--booking-color-text);
   cursor: pointer;
   display: grid;
-  flex: 0 0 clamp(58px, 6vw, 72px);
-  gap: 10px;
+  flex: 0 0 clamp(62px, 6vw, 76px);
+  gap: 8px;
+  grid-template-rows: 28px 44px;
   justify-items: center;
-  min-height: 74px;
-  padding: 4px 2px;
+  min-height: 84px;
+  padding: 0 4px 8px;
+  position: relative;
   scroll-snap-align: start;
   text-align: center;
   transition:
     color 160ms ease,
     transform 160ms ease;
+}
+
+.booking-date-button::before,
+.booking-date-button::after {
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.booking-date-button::before {
+  background: var(--booking-color-primary);
+  border-radius: 999px;
+  height: 30px;
+  left: 7px;
+  right: 7px;
+  top: 0;
+  z-index: 0;
+}
+
+.booking-date-button::after {
+  border: 2px solid var(--booking-color-primary);
+  border-radius: 0 0 999px 999px;
+  border-top: 0;
+  height: 42px;
+  left: 9px;
+  right: 9px;
+  top: 28px;
+  z-index: 0;
 }
 
 .booking-date-button strong {
@@ -788,8 +822,10 @@ p {
   display: inline-flex;
   font-size: 1.02rem;
   font-weight: 860;
-  height: 44px;
+  height: 42px;
   justify-content: center;
+  position: relative;
+  z-index: 1;
   width: 44px;
 }
 
@@ -799,6 +835,8 @@ p {
   font-size: 0.82rem;
   font-weight: 780;
   line-height: 1;
+  position: relative;
+  z-index: 1;
 }
 
 .booking-date-button small {
@@ -813,15 +851,21 @@ p {
   transform: translateY(-2px);
 }
 
+.booking-date-button.is-selected::before,
+.booking-date-button.is-selected::after {
+  opacity: 1;
+}
+
 .booking-date-button.is-selected span {
-  color: var(--booking-color-primary);
+  color: var(--booking-color-primary-text);
 }
 
 .booking-date-button.is-selected strong {
-  background: color-mix(in srgb, var(--booking-color-surface-raised) 92%, white);
+  background: var(--booking-color-surface-raised);
   border-color: var(--booking-color-primary);
+  border-top-color: transparent;
   border-width: 2px;
-  color: var(--booking-color-primary);
+  color: var(--booking-color-text);
 }
 
 .booking-slot-head {
