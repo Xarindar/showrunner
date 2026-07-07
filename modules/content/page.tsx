@@ -3,7 +3,9 @@ import { getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { updateContentAction } from "./actions";
+import { updateContentAction, updateContentProfileAction } from "./actions";
+import { ContentProfileEditor } from "./content-profile-editor";
+import { normalizeContentProfiles } from "./content-profiles";
 import { HeroContentEditor } from "./hero-content-editor";
 import { getHeroPresentationForSite } from "./hero-presentation.server";
 import { createContentTestimonialAction, removeContentTestimonialAction, updateContentTestimonialAction } from "./testimonials-actions";
@@ -13,7 +15,7 @@ import { TestimonialsEditor } from "./testimonials-editor";
 export const dynamic = "force-dynamic";
 
 type ContentPageProps = {
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; profile?: string }>;
 };
 
 export default async function ContentPage({ searchParams }: ContentPageProps) {
@@ -23,15 +25,26 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
     deletedAt: null,
     isPrivate: false
   });
-  const [heroPresentation, mediaAssets, testimonials] = await Promise.all([
+  const [heroPresentation, mediaAssets, testimonials, services, servicePackages] = await Promise.all([
     getHeroPresentationForSite(settings.siteId, settings),
     prisma.mediaAsset.findMany({
       where: activeMediaWhere,
       orderBy: { createdAt: "desc" },
       take: 24
     }),
-    getContentTestimonials(settings.siteId)
+    getContentTestimonials(settings.siteId),
+    prisma.service.findMany({
+      where: { siteId: settings.siteId, isActive: true },
+      orderBy: [{ category: "asc" }, { name: "asc" }],
+      select: { category: true, id: true, name: true }
+    }),
+    prisma.servicePackage.findMany({
+      where: { siteId: settings.siteId, isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: { _count: { select: { items: true } }, id: true, name: true }
+    })
   ]);
+  const contentProfiles = normalizeContentProfiles(settings.publicContentConfig);
   const mediaAssetOptions = [
     {
       alt: "Neutral admin template hero",
@@ -72,6 +85,19 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
         settings={settings}
       />
 
+      <ContentProfileEditor
+        action={updateContentProfileAction}
+        activeProfile={params.profile}
+        packages={servicePackages.map((servicePackage) => ({
+          id: servicePackage.id,
+          itemCount: servicePackage._count.items,
+          name: servicePackage.name
+        }))}
+        profiles={contentProfiles}
+        services={services}
+        testimonials={testimonials}
+      />
+
       <TestimonialsEditor
         canUploadImage={canUploadHeroImage}
         createAction={createContentTestimonialAction}
@@ -91,5 +117,6 @@ function canUploadWithDriver(driver: MediaDriver) {
 function savedContentMessage(saved: string) {
   if (saved === "testimonial") return "Testimonial published.";
   if (saved === "testimonial-removed") return "Testimonial removed.";
+  if (saved === "profile") return "Public homepage profile saved.";
   return "Content saved.";
 }

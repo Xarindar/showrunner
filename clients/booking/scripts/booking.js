@@ -44,6 +44,7 @@
       }
     }
 
+    await loadContentProfileSafely();
     renderAll();
   }
 
@@ -118,10 +119,7 @@
       renderCategoryPills();
       renderCategories();
     });
-    els.promoCard?.addEventListener("click", () => {
-      const categoryId = config.promotion?.categoryId;
-      if (categoryId) selectCategory(categoryId);
-    });
+    els.promoCard?.addEventListener("click", handlePromotionClick);
     els.serviceSearch?.addEventListener("input", renderServices);
     els.serviceSort?.addEventListener("change", renderServices);
     els.staffSelect?.addEventListener("change", () => {
@@ -195,13 +193,44 @@
 
   function renderPromo() {
     const promo = config.promotion || {};
-    if (!els.promoCard || promo.enabled === false) return;
+    if (!els.promoCard) return;
+    if (promo.enabled === false) {
+      els.promoCard.hidden = true;
+      return;
+    }
     const image = promo.imageUrl || assets.promoImage || assets.fallbackCategoryImage || "";
     els.promoCard.hidden = false;
-    els.promoCard.style.setProperty("--promo-image", `url("${image}")`);
+    els.promoCard.style.setProperty("--promo-image", `url("${String(image).replace(/"/g, "%22")}")`);
     els.promoTitle.textContent = promo.title || "Book your next visit";
     els.promoCopy.textContent = promo.copy || "Find a time that works for you.";
     els.promoCta.textContent = promo.cta || "Book now";
+  }
+
+  function handlePromotionClick() {
+    const promo = config.promotion || {};
+    const targetType = String(promo.targetType || "").toUpperCase();
+
+    if (targetType === "SERVICE" && promo.serviceId && serviceById(promo.serviceId)) {
+      selectServiceWithCategory(promo.serviceId);
+      return;
+    }
+
+    if (targetType === "PACKAGE") {
+      const serviceIds = Array.isArray(promo.serviceIds) ? promo.serviceIds : [];
+      const bookableServices = serviceIds.map(serviceById).filter(Boolean);
+      if (bookableServices.length === 1) {
+        selectServiceWithCategory(bookableServices[0].id);
+        return;
+      }
+      const categoryId = promo.categoryId || bookableServices[0]?.categoryId;
+      if (categoryId) {
+        selectCategory(categoryId);
+        return;
+      }
+    }
+
+    const categoryId = promo.categoryId || (promo.serviceId ? serviceById(promo.serviceId)?.categoryId : "");
+    if (categoryId) selectCategory(categoryId);
   }
 
   function renderCategoryPills() {
@@ -309,6 +338,14 @@
     state.staffId = "";
     goToStep("services");
     renderAll();
+  }
+
+  function selectServiceWithCategory(serviceId) {
+    const service = serviceById(serviceId);
+    if (!service) return;
+    state.categoryId = service.categoryId;
+    state.categoryFocusId = service.categoryId;
+    selectService(service.id);
   }
 
   function renderStaffSelect() {
@@ -666,6 +703,28 @@
     };
   }
 
+  async function loadContentProfileSafely() {
+    try {
+      const profile = await loadContentProfile();
+      if (profile?.bookingPromotion) {
+        config.promotion = {
+          ...(config.promotion || {}),
+          ...profile.bookingPromotion
+        };
+      }
+    } catch (error) {
+      if (window.console?.warn) {
+        window.console.warn("Showrunner content profile could not load.", error);
+      }
+    }
+  }
+
+  async function loadContentProfile() {
+    if (!config.api?.enabled || config.content?.enabled === false) return null;
+    const profile = config.content?.profile || config.contentProfile || "cottage616";
+    return apiRequest(`/content/profile?profile=${encodeURIComponent(profile)}`);
+  }
+
   async function loadSlots(service) {
     return loadSlotsForDate(service, state.selectedDate);
   }
@@ -791,6 +850,10 @@
         sort: Number.isFinite(Number(service.sort)) ? Number(service.sort) : index + 1
       }))
       .filter((service) => service.id && service.name);
+  }
+
+  function serviceById(serviceId) {
+    return state.services.find((service) => service.id === serviceId) || null;
   }
 
   function normalizeCategories(categories, services) {

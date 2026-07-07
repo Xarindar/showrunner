@@ -6,7 +6,7 @@ export const manifest = {
   href: "/admin/modules/content",
   icon: "LayoutTemplate",
   order: 20,
-  description: "Public-site copy, canvas hero, and call-to-action presentation.",
+  description: "Public-site copy, profile headers, testimonials, and call-to-action presentation.",
   layout: "standard",
   status: "active",
   enabledByDefault: true,
@@ -19,12 +19,13 @@ export const manifest = {
   capabilities: [
     { label: "Homepage hero canvas", status: "live" },
     { label: "Hero JSON delivery", status: "live" },
+    { label: "Public homepage profiles", status: "foundation" },
     { label: "SEO/page management", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/content"],
-  publicRoutes: ["/"],
+  publicRoutes: ["/", "/api/public/v1/content/profile"],
   dependencies: ["settings", "media"],
-  dataModels: ["SiteSettings", "HeroPresentation", "HeroSlide", "HeroSlideElement"],
+  dataModels: ["SiteSettings.publicContentConfig", "HeroPresentation", "HeroSlide", "HeroSlideElement"],
   permissions: ["content:manage"],
   settingsSections: ["Content", "SEO"],
   healthChecks: ["homepage-copy", "hero-image"]

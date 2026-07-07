@@ -223,7 +223,7 @@ async function seedBookingKey(siteId: string) {
         allowedOrigins: bookingOrigins,
         enabled: true,
         revokedAt: null,
-        scopes: ["scheduling:read", "scheduling:write"]
+        scopes: ["scheduling:read", "scheduling:write", "content:read"]
       }
     });
     return updated.publicKey;
@@ -235,7 +235,7 @@ async function seedBookingKey(siteId: string) {
       name: "Cottage616 public booking",
       publicKey: publicKey(),
       allowedOrigins: bookingOrigins,
-      scopes: ["scheduling:read", "scheduling:write"]
+      scopes: ["scheduling:read", "scheduling:write", "content:read"]
     }
   });
   return created.publicKey;

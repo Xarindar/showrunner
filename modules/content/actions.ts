@@ -9,6 +9,14 @@ import { prisma } from "@/lib/prisma";
 import { getSiteSettingsForSite, resolveCurrentSite } from "@/lib/site";
 import { defaultEnabledModules } from "@/shell/modules";
 import {
+  contentProfilesToJson,
+  featuredBookingTargetTypes,
+  normalizeContentProfileKey,
+  normalizeContentProfiles,
+  type ContentProfileKey,
+  type FeaturedBookingTargetType
+} from "./content-profiles";
+import {
   defaultHeroSlideFromSettings,
   heroElementsArray,
   parseHeroPresentationPayload,
@@ -118,6 +126,57 @@ export async function updateContentAction(formData: FormData) {
   redirect("/admin/modules/content?saved=1");
 }
 
+export async function updateContentProfileAction(formData: FormData) {
+  await requireAdmin("content:manage");
+  const site = await resolveCurrentSite();
+  const settings = await getSiteSettingsForSite(site.id);
+  const profileKey = normalizeContentProfileKey(stringOrFallback(formData.get("profileKey"), "cottage616"));
+  const profiles = normalizeContentProfiles(settings.publicContentConfig);
+  const current = profiles[profileKey];
+  const targetType = normalizeFeaturedTargetType(formData.get("featuredTargetType"));
+  const serviceId = stringOrFallback(formData.get("featuredServiceId"), "").trim();
+  const packageId = stringOrFallback(formData.get("featuredPackageId"), "").trim();
+  const selectedTestimonialIds = formData
+    .getAll("testimonialIds")
+    .map(String)
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  profiles[profileKey] = {
+    ...current,
+    header: {
+      copy: stringOrFallback(formData.get("headerCopy"), current.header.copy).trim(),
+      ctaHref: stringOrFallback(formData.get("headerCtaHref"), current.header.ctaHref).trim(),
+      ctaLabel: stringOrFallback(formData.get("headerCtaLabel"), current.header.ctaLabel).trim(),
+      eyebrow: stringOrFallback(formData.get("headerEyebrow"), current.header.eyebrow).trim(),
+      headline: stringOrFallback(formData.get("headerHeadline"), current.header.headline).trim()
+    },
+    featured: {
+      categoryId: stringOrFallback(formData.get("featuredCategoryId"), current.featured.categoryId).trim(),
+      copy: stringOrFallback(formData.get("featuredCopy"), current.featured.copy).trim(),
+      cta: stringOrFallback(formData.get("featuredCta"), current.featured.cta).trim(),
+      enabled: formData.get("featuredEnabled") === "on",
+      imageUrl: stringOrFallback(formData.get("featuredImageUrl"), current.featured.imageUrl).trim(),
+      packageId: targetType === "PACKAGE" ? packageId : "",
+      serviceId: targetType === "SERVICE" ? serviceId : "",
+      targetType,
+      title: stringOrFallback(formData.get("featuredTitle"), current.featured.title).trim()
+    },
+    testimonialHeading: stringOrFallback(formData.get("testimonialHeading"), current.testimonialHeading).trim(),
+    testimonialIds: selectedTestimonialIds,
+    testimonialIntro: stringOrFallback(formData.get("testimonialIntro"), current.testimonialIntro).trim()
+  };
+
+  await prisma.siteSettings.update({
+    where: { siteId: site.id },
+    data: { publicContentConfig: contentProfilesToJson(profiles) }
+  });
+
+  revalidatePath("/");
+  revalidatePath("/admin/modules/content");
+  redirect(`/admin/modules/content?profile=${profileKey}&saved=profile`);
+}
+
 async function uploadHeroBackgroundIfPresent(
   formData: FormData,
   input: {
@@ -163,4 +222,8 @@ function clampUploadSlideIndex(value: FormDataEntryValue | null, slideCount: num
 
 function stringOrFallback(value: FormDataEntryValue | null, fallback: string) {
   return typeof value === "string" ? value : fallback;
+}
+
+function normalizeFeaturedTargetType(value: FormDataEntryValue | null): FeaturedBookingTargetType {
+  return featuredBookingTargetTypes.includes(value as FeaturedBookingTargetType) ? (value as FeaturedBookingTargetType) : "CATEGORY";
 }

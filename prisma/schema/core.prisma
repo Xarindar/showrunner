@@ -145,6 +145,7 @@ model SiteSettings {
   metaPixelId      String     @default("")
   searchConsoleVerification String @default("")
   analyticsRetentionDays Int  @default(365)
+  publicContentConfig Json    @default("{}")
   checkoutProvider PaymentProvider @default(STRIPE)
   commerceTaxEnabled Boolean @default(false)
   commerceTaxLabel String @default("Sales tax")

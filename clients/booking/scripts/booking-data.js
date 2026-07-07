@@ -20,6 +20,10 @@
       demoIntervalMinutes: 30,
       demoClosedWeekdays: [0, 1]
     },
+    content: {
+      enabled: false,
+      profile: "cottage616"
+    },
     promotion: {
       enabled: true,
       title: "Plan your next appointment",
