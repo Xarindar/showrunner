@@ -1076,7 +1076,7 @@ function LayerContentFrame({
     const content = contentRef.current;
     if (!content) return;
 
-    if (layout.type !== "HEADLINE") {
+    if (layout.type !== "HEADLINE" || editing) {
       content.style.width = "";
       return;
     }
@@ -1103,7 +1103,7 @@ function LayerContentFrame({
     const nextWidth = lineWidths.length ? Math.ceil(Math.max(...lineWidths) + horizontalInset) : null;
 
     content.style.width = nextWidth ? `${nextWidth}px` : previousWidth;
-  }, [headlineText, layout.columnSpan, layout.rowSpan, layout.type]);
+  }, [editing, headlineText, layout.columnSpan, layout.rowSpan, layout.type]);
 
   return (
     <div className="content-canvas-content" data-editing={editing} ref={setContentRef}>
@@ -1162,7 +1162,7 @@ function InlineLayerEditor({
   updateActiveSlideField: (field: "headline" | "caption" | "imageUrl" | "ctaLabel" | "ctaHref", value: string) => void;
 }) {
   return (
-    <div className="content-inline-editor" onPointerDown={(event) => event.stopPropagation()}>
+    <div className="content-inline-editor" onKeyDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
       <div className="content-inline-tools">
         <button aria-label="Remove asset" onClick={onHide} type="button">
           <Trash2 size={14} aria-hidden="true" />

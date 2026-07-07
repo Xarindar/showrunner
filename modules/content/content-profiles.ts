@@ -415,7 +415,7 @@ function absolutizeHeroConfig(config: HeroCanvasConfig): HeroCanvasConfig {
   };
 }
 
-function absolutizeHeroPayload(payload: HeroCanvasPayload): HeroCanvasPayload {
+export function absolutizeHeroPayload(payload: HeroCanvasPayload): HeroCanvasPayload {
   return {
     hero: absolutizeHeroConfig(payload.hero),
     ...(payload.slideshow

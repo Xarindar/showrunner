@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { authorizeEmbedRequest, embedError, embedJson, handleEmbedPreflight, type EmbedContext } from "@/lib/embed/gateway";
 import { getSiteSettingsForSite } from "@/lib/site";
+import { absolutizeHeroPayload } from "@/modules/content/content-profiles";
 import { getHeroPresentationForSite } from "@/modules/content/hero-presentation.server";
 import { toHeroCanvasPayload } from "@/modules/content/hero-presentation";
 
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     const settings = await getSiteSettingsForSite(context.siteId);
     const presentation = await getHeroPresentationForSite(context.siteId, settings, request.nextUrl.searchParams.get("profile"));
 
-    return embedJson(toHeroCanvasPayload(presentation), context);
+    return embedJson(absolutizeHeroPayload(toHeroCanvasPayload(presentation)), context);
   } catch (error) {
     return embedError(error, context);
   }
