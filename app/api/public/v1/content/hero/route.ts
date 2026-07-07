@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       rateLimit: { limit: 60, windowMinutes: 1 }
     });
     const settings = await getSiteSettingsForSite(context.siteId);
-    const presentation = await getHeroPresentationForSite(context.siteId, settings);
+    const presentation = await getHeroPresentationForSite(context.siteId, settings, request.nextUrl.searchParams.get("profile"));
 
     return embedJson(toHeroCanvasPayload(presentation), context);
   } catch (error) {

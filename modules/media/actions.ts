@@ -195,11 +195,13 @@ export async function setHeroImageAction(formData: FormData) {
       data: { heroImageUrl: url }
     });
 
+    // "Set as hero" targets the primary venue profile's presentation.
     const presentation = await tx.heroPresentation.upsert({
-      where: { siteId },
+      where: { siteId_profileKey: { siteId, profileKey: "cottage616" } },
       update: {},
       create: {
         siteId,
+        profileKey: "cottage616",
         mode: HeroPresentationMode.STATIC,
         autoplayIntervalMs: 6500
       }

@@ -203,22 +203,29 @@ export function fitHeroElementLayoutToContent(input: HeroElementLayout): HeroEle
   });
 }
 
-export function defaultHeroSlideFromSettings(settings: Pick<SiteSettingsWithModules, "heroHeadline" | "heroImageUrl" | "heroSubheadline">): HeroSlideEditor {
+// Site settings plus optional per-venue CTA fallbacks, so venue profiles can
+// seed new presentations with their own button copy instead of "/book".
+export type HeroFallbackContent = Pick<SiteSettingsWithModules, "heroHeadline" | "heroImageUrl" | "heroSubheadline"> & {
+  heroCtaHref?: string;
+  heroCtaLabel?: string;
+};
+
+export function defaultHeroSlideFromSettings(settings: HeroFallbackContent): HeroSlideEditor {
   return {
     clientId: "hero-slide-default",
     sortOrder: 0,
     headline: settings.heroHeadline,
     caption: settings.heroSubheadline,
     imageUrl: settings.heroImageUrl || "/hero.svg",
-    ctaLabel: "Book an appointment",
-    ctaHref: "/book",
+    ctaLabel: settings.heroCtaLabel || "Book an appointment",
+    ctaHref: normalizeCtaHref(settings.heroCtaHref || "/book"),
     elements: defaultHeroElements()
   };
 }
 
 export function normalizeHeroPresentation(
   presentation: HeroPresentationRecordLike,
-  settings: Pick<SiteSettingsWithModules, "heroHeadline" | "heroImageUrl" | "heroSubheadline">
+  settings: HeroFallbackContent
 ): HeroPresentationEditor {
   const fallback = defaultHeroSlideFromSettings(settings);
   const slides = (presentation?.slides || [])
@@ -374,7 +381,7 @@ export function createHeroSlideCopy(slide: HeroSlideEditor, index: number): Hero
   };
 }
 
-export function createBlankHeroSlide(index: number, settings: Pick<SiteSettingsWithModules, "heroHeadline" | "heroImageUrl" | "heroSubheadline">): HeroSlideEditor {
+export function createBlankHeroSlide(index: number, settings: HeroFallbackContent): HeroSlideEditor {
   const fallback = defaultHeroSlideFromSettings(settings);
 
   return {

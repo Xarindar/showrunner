@@ -1,17 +1,18 @@
-import { prisma } from "@/lib/prisma";
 import type { SiteSettingsWithModules } from "@/lib/site";
-import { normalizeHeroPresentation } from "./hero-presentation";
+import {
+  getHeroPresentationForProfilePayload,
+  normalizeContentProfileKey,
+  type ContentProfileKey
+} from "./content-profiles";
 
-export async function getHeroPresentationForSite(siteId: string, settings: SiteSettingsWithModules) {
-  const presentation = await prisma.heroPresentation.findUnique({
-    where: { siteId },
-    include: {
-      slides: {
-        include: { elements: true },
-        orderBy: { sortOrder: "asc" }
-      }
-    }
-  });
+export async function getHeroPresentationForProfile(
+  siteId: string,
+  profileKey: ContentProfileKey,
+  settings: SiteSettingsWithModules
+) {
+  return getHeroPresentationForProfilePayload(siteId, profileKey, settings);
+}
 
-  return normalizeHeroPresentation(presentation, settings);
+export async function getHeroPresentationForSite(siteId: string, settings: SiteSettingsWithModules, profileKey?: string | null) {
+  return getHeroPresentationForProfilePayload(siteId, normalizeContentProfileKey(profileKey), settings);
 }

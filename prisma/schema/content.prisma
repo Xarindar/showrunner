@@ -14,13 +14,16 @@ enum HeroSlideElementType {
 
 model HeroPresentation {
   id                 String               @id @default(cuid())
-  siteId             String               @unique
+  siteId             String
   site               Site                 @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  profileKey         String               @default("cottage616")
   mode               HeroPresentationMode @default(STATIC)
   autoplayIntervalMs Int                  @default(6500)
   slides             HeroSlide[]
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
+
+  @@unique([siteId, profileKey])
 }
 
 model HeroSlide {

@@ -2,20 +2,26 @@
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import NextImage from "next/image";
-import { ChevronLeft, ChevronRight, Image as ImageIcon, MessageSquareQuote, Plus, Save, Star, Trash2, Upload } from "lucide-react";
-import { Button, Card, Modal, Switch } from "@/components/ui";
+import { Check, ChevronLeft, ChevronRight, Image as ImageIcon, MessageSquareQuote, Plus, Save, Star, Trash2, Upload } from "lucide-react";
+import { Button, Card, Field, Input, Modal, Switch } from "@/components/ui";
 import type { HeroMediaAssetOption } from "./hero-content-editor";
 import type { ContentTestimonial } from "./testimonials-data";
 
 type TestimonialAction = (formData: FormData) => void | Promise<void>;
 
 type TestimonialsEditorProps = {
+  assignedIds: string[];
   canUploadImage: boolean;
   createAction: TestimonialAction;
+  curationAction: TestimonialAction;
+  heading: string;
+  intro: string;
   mediaAssets: HeroMediaAssetOption[];
+  profileKey: string;
   removeAction: TestimonialAction;
   testimonials: ContentTestimonial[];
   updateAction: TestimonialAction;
+  venueLabel: string;
 };
 
 type ComposeView = "compose" | "image";
@@ -43,12 +49,18 @@ const emptyDraft: TestimonialDraft = {
 const minQuoteLength = 10;
 
 export function TestimonialsEditor({
+  assignedIds,
   canUploadImage,
   createAction,
+  curationAction,
+  heading,
+  intro,
   mediaAssets,
+  profileKey,
   removeAction,
   testimonials,
-  updateAction
+  updateAction,
+  venueLabel
 }: TestimonialsEditorProps) {
   const railRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -59,6 +71,13 @@ export function TestimonialsEditor({
   const [uploadName, setUploadName] = useState("");
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [assigned, setAssigned] = useState<string[]>(() =>
+    assignedIds.filter((id) => testimonials.some((testimonial) => testimonial.id === id))
+  );
+
+  function toggleAssigned(id: string) {
+    setAssigned((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
+  }
 
   const previewImageSrc = previewUrl || draft.imageUrl;
   const isEditing = Boolean(draft.id);
@@ -172,6 +191,23 @@ export function TestimonialsEditor({
 
   return (
     <Card className="content-testimonial-shell" minHeight="none" reservedHeader={toolbar}>
+      <form action={curationAction} className="content-curation-bar">
+        <input name="profileKey" type="hidden" value={profileKey} readOnly />
+        {assigned.map((id) => (
+          <input key={id} name="testimonialIds" type="hidden" value={id} readOnly />
+        ))}
+        <Field label={`${venueLabel} section heading`}>
+          <Input defaultValue={heading} name="testimonialHeading" placeholder="Sweet words from our guests" />
+        </Field>
+        <Field label="Intro line">
+          <Input defaultValue={intro} name="testimonialIntro" placeholder="Optional intro under the heading" />
+        </Field>
+        <Button size="sm" type="submit">
+          <Save size={16} aria-hidden="true" />
+          Save curation
+        </Button>
+      </form>
+
       <div className="content-proof-rail">
         <button
           aria-label="Scroll testimonials left"
@@ -198,10 +234,22 @@ export function TestimonialsEditor({
               />
               <form action={removeAction} className="content-testimonial-remove">
                 <input name="id" type="hidden" value={testimonial.id} />
+                <input name="profileKey" type="hidden" value={profileKey} readOnly />
                 <button aria-label={`Remove ${testimonial.authorName}'s testimonial`} type="submit">
                   <Trash2 size={14} aria-hidden="true" />
                 </button>
               </form>
+              <button
+                aria-label={`${assigned.includes(testimonial.id) ? "Remove from" : "Show on"} the ${venueLabel} homepage`}
+                aria-pressed={assigned.includes(testimonial.id)}
+                className="content-testimonial-assign"
+                data-on={assigned.includes(testimonial.id)}
+                onClick={() => toggleAssigned(testimonial.id)}
+                type="button"
+              >
+                <Check size={13} aria-hidden="true" />
+                {venueLabel}
+              </button>
             </div>
           ))}
 
@@ -226,7 +274,8 @@ export function TestimonialsEditor({
         </button>
       </div>
       <p className="content-hero-hint" aria-hidden="true">
-        Approved testimonials show here and on the public site. Use the arrows to browse, select a card to edit it, or hover a card to remove it.
+        Select a card to edit it, or use the {venueLabel} toggle to curate which quotes show on this homepage — then save the curation. With no
+        toggles on, featured testimonials show by default.
       </p>
 
       <Modal
@@ -236,6 +285,7 @@ export function TestimonialsEditor({
         title={view === "image" ? "Choose a photo" : isEditing ? "Edit testimonial" : "Add testimonial"}
       >
         <form action={isEditing ? updateAction : createAction} className="content-testimonial-compose" data-view={view}>
+          <input name="profileKey" readOnly type="hidden" value={profileKey} />
           {isEditing ? <input name="id" readOnly type="hidden" value={draft.id} /> : null}
           <input name="imageUrl" readOnly type="hidden" value={draft.imageUrl} />
           <input name="rating" readOnly type="hidden" value={draft.rating} />

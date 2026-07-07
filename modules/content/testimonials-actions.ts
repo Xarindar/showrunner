@@ -13,6 +13,13 @@ import { getCurrentSiteId, getSiteSettingsForSite } from "@/lib/site";
 const contentPath = "/admin/modules/content";
 const adminPermissionText = "Permission to display this testimonial publicly was recorded by an admin.";
 
+// Keeps the active venue tab selected after the redirect.
+function contentRedirect(formData: FormData, query: string) {
+  const profileKey = String(formData.get("profileKey") || "").trim();
+  const profileParam = profileKey ? `profile=${encodeURIComponent(profileKey)}&` : "";
+  redirect(`${contentPath}?${profileParam}${query}`);
+}
+
 // Persist only site paths or public URLs picked from the media library; object
 // URLs from in-browser upload previews must never be stored (the file upload
 // below resolves them to a real asset URL instead).
@@ -84,7 +91,7 @@ export async function createContentTestimonialAction(formData: FormData) {
   });
 
   refreshTestimonials();
-  redirect(`${contentPath}?saved=testimonial`);
+  contentRedirect(formData, "saved=testimonial");
 }
 
 export async function updateContentTestimonialAction(formData: FormData) {
@@ -113,7 +120,7 @@ export async function updateContentTestimonialAction(formData: FormData) {
   });
 
   refreshTestimonials();
-  redirect(`${contentPath}?saved=testimonial-updated`);
+  contentRedirect(formData, "saved=testimonial-updated");
 }
 
 // Archive rather than delete so the entry can be restored from the moderation
@@ -129,7 +136,7 @@ export async function removeContentTestimonialAction(formData: FormData) {
   });
 
   refreshTestimonials();
-  redirect(`${contentPath}?saved=testimonial-removed`);
+  contentRedirect(formData, "saved=testimonial-removed");
 }
 
 async function uploadTestimonialImageIfPresent(

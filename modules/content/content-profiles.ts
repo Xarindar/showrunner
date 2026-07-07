@@ -6,6 +6,14 @@ import { mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettingsForSite, type SiteSettingsWithModules } from "@/lib/site";
 import { slugify } from "@/lib/slug";
+import {
+  normalizeHeroPresentation,
+  toHeroCanvasPayload,
+  type HeroCanvasConfig,
+  type HeroCanvasPayload,
+  type HeroFallbackContent,
+  type HeroPresentationEditor
+} from "./hero-presentation";
 
 export const contentProfileKeys = ["cottage616", "the-hive"] as const;
 export type ContentProfileKey = (typeof contentProfileKeys)[number];
@@ -52,6 +60,7 @@ export type PublicContentProfilePayload = {
     title: string;
   };
   header: ContentProfileDraft["header"];
+  hero: HeroCanvasPayload;
   label: string;
   profileKey: ContentProfileKey;
   testimonials: {
@@ -364,18 +373,83 @@ export function contentProfileFromSettings(settings: SiteSettingsWithModules, ke
   return normalizeContentProfiles(settings.publicContentConfig)[normalizeContentProfileKey(key)];
 }
 
+// Fallback content for a venue's hero canvas when no slides are saved yet:
+// the venue's own header copy and CTA instead of the site-wide hero text.
+export function heroFallbackForProfile(settings: SiteSettingsWithModules, key: ContentProfileKey): HeroFallbackContent {
+  const profile = contentProfileFromSettings(settings, key);
+
+  return {
+    heroHeadline: profile.header.headline || settings.heroHeadline,
+    heroSubheadline: profile.header.copy || settings.heroSubheadline,
+    heroImageUrl: settings.heroImageUrl,
+    heroCtaHref: profile.header.ctaHref,
+    heroCtaLabel: profile.header.ctaLabel
+  };
+}
+
+export async function getHeroPresentationForProfilePayload(
+  siteId: string,
+  profileKey: ContentProfileKey,
+  settings: SiteSettingsWithModules
+): Promise<HeroPresentationEditor> {
+  const presentation = await prisma.heroPresentation.findUnique({
+    where: { siteId_profileKey: { siteId, profileKey } },
+    include: {
+      slides: {
+        include: { elements: true },
+        orderBy: { sortOrder: "asc" }
+      }
+    }
+  });
+
+  return normalizeHeroPresentation(presentation, heroFallbackForProfile(settings, profileKey));
+}
+
+function absolutizeHeroConfig(config: HeroCanvasConfig): HeroCanvasConfig {
+  return {
+    ...config,
+    backgrounds: config.backgrounds.map((background) => ({
+      ...background,
+      url: publicAssetUrl(background.url) || background.url
+    }))
+  };
+}
+
+function absolutizeHeroPayload(payload: HeroCanvasPayload): HeroCanvasPayload {
+  return {
+    hero: absolutizeHeroConfig(payload.hero),
+    ...(payload.slideshow
+      ? {
+          slideshow: {
+            autoplayIntervalMs: payload.slideshow.autoplayIntervalMs,
+            screens: payload.slideshow.screens.map(absolutizeHeroConfig)
+          }
+        }
+      : {})
+  };
+}
+
 export async function getPublicContentProfilePayload(siteId: string, key: string | null | undefined): Promise<PublicContentProfilePayload> {
   const settings = await getSiteSettingsForSite(siteId);
   const profileKey = normalizeContentProfileKey(key);
   const profile = contentProfileFromSettings(settings, profileKey);
-  const [bookingPromotion, testimonials] = await Promise.all([
+  const [bookingPromotion, testimonials, heroPresentation] = await Promise.all([
     publicBookingPromotion(siteId, profile),
-    publicTestimonials(siteId, profile)
+    publicTestimonials(siteId, profile),
+    getHeroPresentationForProfilePayload(siteId, profileKey, settings)
   ]);
+  const primarySlide = heroPresentation.slides[0];
 
   return {
     bookingPromotion,
-    header: profile.header,
+    header: {
+      copy: primarySlide?.caption ?? profile.header.copy,
+      ctaHref: primarySlide?.ctaHref || profile.header.ctaHref,
+      ctaLabel: primarySlide?.ctaLabel || profile.header.ctaLabel,
+      eyebrow: profile.header.eyebrow,
+      headline: primarySlide?.headline || profile.header.headline
+    },
+    hero: absolutizeHeroPayload(toHeroCanvasPayload(heroPresentation)),
     label: profile.label,
     profileKey,
     testimonials: {

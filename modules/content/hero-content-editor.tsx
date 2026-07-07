@@ -49,6 +49,7 @@ type HeroContentEditorProps = {
   canUploadHeroImage: boolean;
   initialPresentation: HeroPresentationEditor;
   mediaAssets: HeroMediaAssetOption[];
+  profileKey?: string;
   settings: ContentSettingsDraft;
 };
 
@@ -131,7 +132,7 @@ const layerIcons: Record<HeroCanvasLayerElementType, typeof Type> = {
   CTA: MousePointerClick
 };
 
-export function HeroContentEditor({ action, canUploadHeroImage, initialPresentation, mediaAssets, settings }: HeroContentEditorProps) {
+export function HeroContentEditor({ action, canUploadHeroImage, initialPresentation, mediaAssets, profileKey, settings }: HeroContentEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const layerContentRefs = useRef<Record<HeroCanvasLayerElementType, HTMLDivElement | null>>({
     CAPTION: null,
@@ -530,6 +531,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     >
       <input name="heroPresentation" type="hidden" value={serializedPresentation} readOnly />
       <input name="activeHeroSlideIndex" type="hidden" value={activeIndex} readOnly />
+      {profileKey ? <input name="profileKey" type="hidden" value={profileKey} readOnly /> : null}
       <input
         accept="image/*"
         className="ui-hidden"
