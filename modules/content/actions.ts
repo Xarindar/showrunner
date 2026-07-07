@@ -77,6 +77,31 @@ export async function updateContentAction(formData: FormData) {
       });
     }
 
+    const profiles = normalizeContentProfiles(currentSettings.publicContentConfig);
+    const currentProfile = profiles[profileKey];
+    profiles[profileKey] = {
+      ...currentProfile,
+      header: {
+        ...currentProfile.header,
+        copy: primarySlide.caption,
+        ctaHref: primarySlide.ctaHref,
+        ctaLabel: primarySlide.ctaLabel,
+        headline: primarySlide.headline
+      }
+    };
+
+    await tx.siteSettings.upsert({
+      where: { siteId: site.id },
+      update: {
+        publicContentConfig: contentProfilesToJson(profiles)
+      },
+      create: {
+        siteId: site.id,
+        enabledModules: defaultEnabledModules,
+        publicContentConfig: contentProfilesToJson(profiles)
+      }
+    });
+
     const presentation = await tx.heroPresentation.upsert({
       where: { siteId_profileKey: { siteId: site.id, profileKey } },
       update: {

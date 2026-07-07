@@ -712,6 +712,13 @@
           ...profile.bookingPromotion
         };
       }
+      if (profile?.header?.headline) {
+        config.business = {
+          ...(config.business || {}),
+          heading: profile.header.headline
+        };
+        applyBusinessCopy();
+      }
     } catch (error) {
       if (window.console?.warn) {
         window.console.warn("Showrunner content profile could not load.", error);

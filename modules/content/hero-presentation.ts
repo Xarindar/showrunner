@@ -196,11 +196,23 @@ export function clampHeroElementLayout(input: HeroElementLayout): HeroElementLay
   };
 }
 
+// Keeps the element's anchor cell and shrinks its footprint at the grid edges
+// instead of pushing the anchor back, so assets can sit flush against the
+// right and bottom of the image even when their default footprint is wide.
 export function fitHeroElementLayoutToContent(input: HeroElementLayout): HeroElementLayout {
-  return clampHeroElementLayout({
+  const footprint = heroElementFootprints[input.type];
+  const gridColumn = clampInteger(input.gridColumn, 1, HERO_GRID_COLUMNS);
+  const gridRow = clampInteger(input.gridRow, 1, HERO_GRID_ROWS);
+
+  return {
     ...input,
-    ...heroElementFootprints[input.type]
-  });
+    gridColumn,
+    gridRow,
+    columnSpan: Math.min(footprint.columnSpan, HERO_GRID_COLUMNS - gridColumn + 1),
+    rowSpan: Math.min(footprint.rowSpan, HERO_GRID_ROWS - gridRow + 1),
+    zIndex: clampInteger(input.zIndex, 1, 20),
+    isVisible: input.isVisible !== false
+  };
 }
 
 // Site settings plus optional per-venue CTA fallbacks, so venue profiles can

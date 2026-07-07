@@ -77,8 +77,8 @@ type GridGeometry = {
 
 // Everything the drag/keyboard logic needs to place a move without touching
 // the DOM again mid-gesture: stage geometry, the moving asset's rendered size,
-// and the rendered boxes of the other visible assets (used to draw alignment
-// guides — assets are free to overlap).
+// and the rendered boxes of the other visible assets (used for alignment
+// guides and to keep assets from overlapping each other).
 type LayerDragContext = {
   colSpan: number;
   contentHeight: number;
@@ -257,8 +257,8 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     updateActiveSlide((slide) => withUpdatedHeroElement(slide, type, { gridColumn, gridRow }));
   }
 
-  // Keyboard nudges move freely (assets may overlap); they only stop at the
-  // image edge, where we flash to signal there is nowhere further to go.
+  // Keyboard nudges walk cell by cell and stop at the image edge or just
+  // before another asset's visible box, flashing when there is nowhere to go.
   function nudgeLayer(type: HeroCanvasLayerElementType, deltaColumn: number, deltaRow: number) {
     const stage = stageRef.current;
     const layout = activeSlide.elements[type];
@@ -269,16 +269,28 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
       return;
     }
 
-    const targetColumn = clampColumnToContent(context, layout.gridColumn + deltaColumn);
-    const targetRow = clampRowToContent(context, layout.gridRow + deltaRow);
+    const stepColumn = Math.sign(deltaColumn);
+    const stepRow = Math.sign(deltaRow);
+    const steps = Math.max(Math.abs(deltaColumn), Math.abs(deltaRow));
+    let gridColumn = layout.gridColumn;
+    let gridRow = layout.gridRow;
 
-    if (targetColumn === layout.gridColumn && targetRow === layout.gridRow) {
+    for (let step = 0; step < steps; step += 1) {
+      const nextColumn = clampColumnToContent(context, gridColumn + stepColumn);
+      const nextRow = clampRowToContent(context, gridRow + stepRow);
+      if (nextColumn === gridColumn && nextRow === gridRow) break;
+      if (collidesWithSiblings(context, nextColumn, nextRow)) break;
+      gridColumn = nextColumn;
+      gridRow = nextRow;
+    }
+
+    if (gridColumn === layout.gridColumn && gridRow === layout.gridRow) {
       flashBlocked(type);
       return;
     }
 
     clearBlocked();
-    commitLayerPosition(type, targetColumn, targetRow);
+    commitLayerPosition(type, gridColumn, gridRow);
   }
 
   function handleLayerPointerDown(type: HeroCanvasLayerElementType, event: PointerEvent<HTMLDivElement>) {
@@ -335,10 +347,18 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     const columnDelta = columnStride > 0 ? Math.round((event.clientX - interaction.startX) / columnStride) : 0;
     const rowDelta = rowStride > 0 ? Math.round((event.clientY - interaction.startY) / rowStride) : 0;
 
-    // Assets follow the cursor freely and may overlap each other; the only
-    // limit is the image edge, enforced by the content-aware clamps.
-    const nextColumn = clampColumnToContent(context, interaction.startGridColumn + columnDelta);
-    const nextRow = clampRowToContent(context, interaction.startGridRow + rowDelta);
+    // Assets follow the cursor but never overlap each other: the clamps stop
+    // them at the image edges and resolveDragPosition stops them (or slides
+    // them along one axis) when they meet another asset's visible box.
+    const targetColumn = clampColumnToContent(context, interaction.startGridColumn + columnDelta);
+    const targetRow = clampRowToContent(context, interaction.startGridRow + rowDelta);
+    const { gridColumn: nextColumn, gridRow: nextRow } = resolveDragPosition(
+      context,
+      interaction.committedColumn,
+      interaction.committedRow,
+      targetColumn,
+      targetRow
+    );
 
     if (nextColumn !== interaction.committedColumn || nextRow !== interaction.committedRow) {
       interaction.committedColumn = nextColumn;
@@ -585,8 +605,8 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
           ))}
         </div>
         <p className="content-hero-hint" aria-hidden="true">
-          Drag assets to position them. Use arrow keys to nudge, Shift + arrows for bigger steps. Guides snap to the center and to other
-          assets.
+          Drag assets to position them — they stop at the image edges and slide around each other instead of overlapping. Use arrow keys
+          to nudge, Shift + arrows for bigger steps.
         </p>
       </section>
 
@@ -780,29 +800,66 @@ function contentRectFromGeometry(context: LayerDragContext, gridColumn: number, 
 }
 
 // Largest column whose visible box still fits inside the stage on the right.
+// Only the rendered content limits movement — the reserved footprint shrinks
+// at the edge (see fitHeroElementLayoutToContent), so a short headline or
+// button can sit flush against the right side of the image.
 function clampColumnToContent(context: LayerDragContext, gridColumn: number) {
   const { geometry } = context;
   const stride = geometry.cellWidth + geometry.columnGap;
-  const footprintMax = HERO_GRID_COLUMNS - context.colSpan + 1;
-  if (stride <= 0) return clampInteger(gridColumn, 1, footprintMax);
+  if (stride <= 0) return clampInteger(gridColumn, 1, HERO_GRID_COLUMNS);
 
   const contentMax = Math.floor(1 + (geometry.gridWidth - context.contentWidth) / stride + 1e-3);
-  const maxColumn = Math.max(1, Math.min(footprintMax, contentMax));
-  return clampInteger(gridColumn, 1, maxColumn);
+  return clampInteger(gridColumn, 1, Math.max(1, Math.min(HERO_GRID_COLUMNS, contentMax)));
 }
 
 // Largest row whose visible box still fits inside the stage at the bottom.
-// Content is top-anchored, so row 1 always reaches the top and content taller
-// than its footprint simply grows downward until it hits the bottom edge.
+// Content is top-anchored, so row 1 always reaches the top and content grows
+// downward until it hits the bottom edge.
 function clampRowToContent(context: LayerDragContext, gridRow: number) {
   const { geometry } = context;
   const stride = geometry.cellHeight + geometry.rowGap;
-  const footprintMax = HERO_GRID_ROWS - context.rowSpan + 1;
-  if (stride <= 0) return clampInteger(gridRow, 1, footprintMax);
+  if (stride <= 0) return clampInteger(gridRow, 1, HERO_GRID_ROWS);
 
   const contentMax = Math.floor(1 + (geometry.gridHeight - context.contentHeight) / stride + 1e-3);
-  const maxRow = Math.max(1, Math.min(footprintMax, contentMax));
-  return clampInteger(gridRow, 1, maxRow);
+  return clampInteger(gridRow, 1, Math.max(1, Math.min(HERO_GRID_ROWS, contentMax)));
+}
+
+// Visible boxes may touch but never overlap; the small tolerance lets edges
+// sit flush without counting as a collision.
+function rectsOverlap(first: Rect, second: Rect) {
+  const tolerance = 2;
+  return (
+    first.left < second.right - tolerance &&
+    first.right > second.left + tolerance &&
+    first.top < second.bottom - tolerance &&
+    first.bottom > second.top + tolerance
+  );
+}
+
+function collidesWithSiblings(context: LayerDragContext, gridColumn: number, gridRow: number) {
+  const moving = contentRectFromGeometry(context, gridColumn, gridRow);
+  return context.siblings.some((sibling) => rectsOverlap(moving, sibling));
+}
+
+// Where the drag actually lands: the target cell when it is clear, otherwise
+// slide along whichever single axis stays clear, otherwise hold position.
+function resolveDragPosition(
+  context: LayerDragContext,
+  currentColumn: number,
+  currentRow: number,
+  targetColumn: number,
+  targetRow: number
+) {
+  if (!collidesWithSiblings(context, targetColumn, targetRow)) {
+    return { gridColumn: targetColumn, gridRow: targetRow };
+  }
+  if (targetColumn !== currentColumn && !collidesWithSiblings(context, targetColumn, currentRow)) {
+    return { gridColumn: targetColumn, gridRow: currentRow };
+  }
+  if (targetRow !== currentRow && !collidesWithSiblings(context, currentColumn, targetRow)) {
+    return { gridColumn: currentColumn, gridRow: targetRow };
+  }
+  return { gridColumn: currentColumn, gridRow: currentRow };
 }
 
 type SnapCandidate = { delta: number; emphasis: boolean; value: number };
