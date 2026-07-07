@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Raleway:wght@400;500;600;700;800;900&display=swap");
+
 /*
  * The semantic aliases below map to the per-tenant theme tokens (--color-*),
  * which are injected as an inline style on <body> (see app/layout.tsx). Because
@@ -6940,6 +6942,10 @@ button.button:disabled,
 }
 
 .content-hero-stage {
+  --content-site-display-font: "Libre Baskerville", Georgia, "Times New Roman", serif;
+  --content-site-sans-font: "Raleway", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --content-site-paper: #fffdf8;
+  --content-site-navy: #102d42;
   background: var(--color-admin-sidebar);
   border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
   border-radius: var(--radius-card);
@@ -7054,9 +7060,10 @@ button.button:disabled,
   align-items: center;
   background: transparent;
   border: 0;
-  color: white;
+  color: var(--content-site-paper, white);
   cursor: grab;
   display: grid;
+  font-family: var(--content-site-sans-font, inherit);
   justify-items: start;
   min-height: 0;
   min-width: 0;
@@ -7088,6 +7095,11 @@ button.button:disabled,
 
 .content-canvas-content[data-editing="true"] {
   overflow: visible;
+}
+
+.content-canvas-layer-headline .content-canvas-content[data-editing="true"],
+.content-canvas-layer-caption .content-canvas-content[data-editing="true"] {
+  width: 100%;
 }
 
 .content-editor-size-proxy {
@@ -7135,8 +7147,10 @@ button.button:disabled,
 
 .content-canvas-layer-headline strong {
   display: block;
-  font-size: 3.15rem;
-  line-height: 1;
+  font-family: var(--content-site-display-font, Georgia, serif);
+  font-size: clamp(2.45rem, 5.1vw, 4.85rem);
+  font-weight: 400;
+  line-height: 1.08;
   max-width: 100%;
   overflow-wrap: anywhere;
   text-shadow: 0 16px 44px rgba(2, 8, 7, 0.4);
@@ -7152,7 +7166,8 @@ button.button:disabled,
 .content-canvas-layer-caption span {
   color: rgba(255, 255, 255, 0.88);
   display: block;
-  font-size: 1.04rem;
+  font-family: var(--content-site-sans-font, inherit);
+  font-size: clamp(1.02rem, 1.65vw, 1.28rem);
   line-height: 1.55;
   max-height: 100%;
   max-width: 100%;
@@ -7173,15 +7188,21 @@ button.button:disabled,
 }
 
 .content-canvas-layer-cta em {
-  background: var(--color-primary);
-  border-radius: var(--radius-control);
+  align-items: center;
+  background: var(--content-site-navy, var(--color-primary));
+  border: 1px solid var(--content-site-navy, var(--color-primary));
+  border-radius: 4px;
   box-shadow: 0 14px 34px rgba(4, 14, 12, 0.28);
-  color: white;
+  color: var(--content-site-paper, white);
   display: inline-flex;
+  font-family: var(--content-site-sans-font, inherit);
   font-style: normal;
-  font-weight: 700;
-  min-height: 40px;
-  padding: 10px 14px;
+  font-weight: 800;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  min-height: 48px;
+  padding: 12px 18px;
+  text-transform: uppercase;
 }
 
 .content-asset-modal {
@@ -7245,6 +7266,7 @@ button.button:disabled,
 
 .content-canvas-content[data-editing="true"] .content-inline-editor {
   inset: 7px 9px;
+  max-width: 100%;
   min-height: 0;
   min-width: 0;
   position: absolute;
@@ -7299,6 +7321,7 @@ button.button:disabled,
   border: 1px solid rgba(255, 255, 255, 0.44);
   border-radius: var(--radius-control);
   color: white;
+  font-family: var(--content-site-sans-font, inherit);
   min-width: 0;
   outline: 0;
   width: 100%;
@@ -7312,13 +7335,14 @@ button.button:disabled,
 }
 
 .content-inline-title {
-  font-size: 3.15rem;
-  font-weight: 700;
-  line-height: 1;
+  font-family: var(--content-site-display-font, Georgia, serif);
+  font-size: clamp(2.45rem, 5.1vw, 4.85rem);
+  font-weight: 400;
+  line-height: 1.08;
 }
 
 .content-inline-caption {
-  font-size: 1.04rem;
+  font-size: clamp(1.02rem, 1.65vw, 1.28rem);
   line-height: 1.55;
 }
 
@@ -7330,11 +7354,16 @@ button.button:disabled,
 }
 
 .content-inline-cta-label {
-  background: var(--color-primary);
+  background: var(--content-site-navy, var(--color-primary));
+  border-color: var(--content-site-navy, var(--color-primary));
+  border-radius: 4px;
   box-shadow: 0 14px 34px rgba(4, 14, 12, 0.28);
-  font-weight: 700;
-  min-height: 40px;
-  padding: 10px 14px;
+  color: var(--content-site-paper, white);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  min-height: 48px;
+  padding: 12px 18px;
+  text-transform: uppercase;
 }
 
 .content-inline-cta-link {
