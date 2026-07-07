@@ -196,29 +196,48 @@ export function clampHeroElementLayout(input: HeroElementLayout): HeroElementLay
   };
 }
 
+// Keeps the element's anchor cell and shrinks its footprint at the grid edges
+// instead of pushing the anchor back, so assets can sit flush against the
+// right and bottom of the image even when their default footprint is wide.
 export function fitHeroElementLayoutToContent(input: HeroElementLayout): HeroElementLayout {
-  return clampHeroElementLayout({
+  const footprint = heroElementFootprints[input.type];
+  const gridColumn = clampInteger(input.gridColumn, 1, HERO_GRID_COLUMNS);
+  const gridRow = clampInteger(input.gridRow, 1, HERO_GRID_ROWS);
+
+  return {
     ...input,
-    ...heroElementFootprints[input.type]
-  });
+    gridColumn,
+    gridRow,
+    columnSpan: Math.min(footprint.columnSpan, HERO_GRID_COLUMNS - gridColumn + 1),
+    rowSpan: Math.min(footprint.rowSpan, HERO_GRID_ROWS - gridRow + 1),
+    zIndex: clampInteger(input.zIndex, 1, 20),
+    isVisible: input.isVisible !== false
+  };
 }
 
-export function defaultHeroSlideFromSettings(settings: Pick<SiteSettingsWithModules, "heroHeadline" | "heroImageUrl" | "heroSubheadline">): HeroSlideEditor {
+// Site settings plus optional per-venue CTA fallbacks, so venue profiles can
+// seed new presentations with their own button copy instead of "/book".
+export type HeroFallbackContent = Pick<SiteSettingsWithModules, "heroHeadline" | "heroImageUrl" | "heroSubheadline"> & {
+  heroCtaHref?: string;
+  heroCtaLabel?: string;
+};
+
+export function defaultHeroSlideFromSettings(settings: HeroFallbackContent): HeroSlideEditor {
   return {
     clientId: "hero-slide-default",
     sortOrder: 0,
     headline: settings.heroHeadline,
     caption: settings.heroSubheadline,
     imageUrl: settings.heroImageUrl || "/hero.svg",
-    ctaLabel: "Book an appointment",
-    ctaHref: "/book",
+    ctaLabel: settings.heroCtaLabel || "Book an appointment",
+    ctaHref: normalizeCtaHref(settings.heroCtaHref || "/book"),
     elements: defaultHeroElements()
   };
 }
 
 export function normalizeHeroPresentation(
   presentation: HeroPresentationRecordLike,
-  settings: Pick<SiteSettingsWithModules, "heroHeadline" | "heroImageUrl" | "heroSubheadline">
+  settings: HeroFallbackContent
 ): HeroPresentationEditor {
   const fallback = defaultHeroSlideFromSettings(settings);
   const slides = (presentation?.slides || [])
@@ -374,7 +393,7 @@ export function createHeroSlideCopy(slide: HeroSlideEditor, index: number): Hero
   };
 }
 
-export function createBlankHeroSlide(index: number, settings: Pick<SiteSettingsWithModules, "heroHeadline" | "heroImageUrl" | "heroSubheadline">): HeroSlideEditor {
+export function createBlankHeroSlide(index: number, settings: HeroFallbackContent): HeroSlideEditor {
   const fallback = defaultHeroSlideFromSettings(settings);
 
   return {

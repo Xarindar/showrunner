@@ -48,7 +48,7 @@ export function BusinessSettings({
           triggerClassName={logo ? "ui-logo-picker-trigger has-logo" : "ui-logo-picker-trigger"}
           triggerHint={logo ? "Replace logo" : "Upload logo"}
           uploadFormId={uploadFormId}
-          uploadUnavailableMessage="Uploads need Server asset folder, R2, or Cloudflare Images. You can still choose from the library.">
+          uploadUnavailableMessage="Uploads need Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images. You can still choose from the library.">
           <span className="ui-logo-preview">
             {logo ? (
               <NextImage alt={logoAlt} fill sizes="160px" src={logo.url} unoptimized />

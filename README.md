@@ -1,6 +1,6 @@
 # Showrunner
 
-Showrunner is a reusable per-client website/admin template for service businesses. It is built for the handoff model: one Railway project, one Postgres database, public pages plus a protected `/admin` area.
+Showrunner is a reusable per-client admin template for service businesses. It is built for the handoff model: one Railway project, one Postgres database, and a protected `/admin` area.
 
 ## Stack
 
@@ -8,7 +8,7 @@ Showrunner is a reusable per-client website/admin template for service businesse
 - Email/password admin auth with role-based permissions
 - Native service appointment scheduling with multi-staff support
 - SMTP email outbox with worker processing and dev console fallback
-- Repo media by default, plus server-folder, Cloudflare R2, or Cloudflare Images uploads when configured
+- Repo media by default, plus server-folder, S3-compatible bucket, Cloudflare R2, or Cloudflare Images uploads when configured
 - Hosted commerce payments on the owner's own Stripe / Square / PayPal accounts (bring-your-own-credentials, pasted in Settings → Payments), including owner-controlled Stripe payment methods
 - Request-resolved site boundary for tenant-owned data
 - Theme tokens with client-safe style presets
@@ -22,7 +22,7 @@ Showrunner is a reusable per-client website/admin template for service businesse
 5. Run `npm run seed`.
 6. Run `npm run dev`.
 
-The admin panel is available at `/admin`. Public booking is available at `/book`.
+The admin panel is available at `/admin`. The legacy public-facing pages have been removed; new client-facing surfaces start under `clients/booking`.
 
 For quick throwaway previews where you do not want to create a migration, `npx prisma db push` can sync the local database directly. Use migrations for deployable client projects.
 
@@ -75,7 +75,7 @@ Future modules such as contracts and deeper client self-service surfaces can be 
 - Communications: transactional outbox, booking template settings, visual template builder, sender/recipient controls, and suppressions.
 - Scheduling: setup for services, assigned staff, bookable resources, per-staff/resource availability, blockouts, booking rules, intake prompts, policies, and booking reminders.
 - Content: controlled public-site copy and hero image edits.
-- Media: repo assets by default; server-folder, R2, or Cloudflare Images uploads when configured; folders/tags/focal points, archive lifecycle, signed delivery, and signed Sharp image variants. Set `MEDIA_ASSET_DIR` to a Railway volume or mounted storage folder for persistent server assets.
+- Media: repo assets by default; server-folder, S3-compatible bucket, R2, or Cloudflare Images uploads when configured; folders/tags/focal points, archive lifecycle, signed delivery, and signed Sharp image variants. Set `MEDIA_ASSET_DIR` to a Railway volume or mounted storage folder for persistent server assets, or set `MEDIA_DRIVER=S3` with Railway Bucket credentials (`BUCKET`, `ENDPOINT`, `REGION`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`) for persistent object storage.
 - Portfolio: gallery admin, access-link delivery, proofing favorites/comments/approvals, public widgets/lightbox, signed image variants, and ZIP bundles.
 - Forms: reusable public forms, intake questions, and a submission inbox.
 - Testimonials: review collection, approval workflow, featured quotes, and public proof pages.
@@ -120,14 +120,7 @@ Scheduling owns the rules that create bookable time:
 
 Appointments are the day-to-day operational queue. Admins can view appointment details, see customer notes/intake answers, confirm/cancel/complete appointments, and store internal appointment notes.
 
-The public booking page uses a guided flow rather than one long form: service, time, details, review, and confirmation. Availability is loaded through `/api/availability`.
-
-Service-specific booking links use stable slugs:
-
-- `/book?service=consultation`
-- `/book/consultation`
-
-Prefer `/book/service-slug` for public CTA buttons. Database IDs should not be used in public links.
+The legacy public booking page has been removed. The next booking surface should rebuild the client-facing flow from stable service slugs. Database IDs should not be used in public links.
 
 When an admin adds a service, the service slug is generated from the service name if the slug field is blank. Duplicate slugs receive a numeric suffix, such as `consultation-2`.
 

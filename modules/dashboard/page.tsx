@@ -147,11 +147,11 @@ export default async function AdminDashboardPage({ searchParams }: DashboardPage
               <CheckCircle2 size={24} />
             </span>
             <span className="onboarding-done-body">
-              <strong>You&apos;re ready for customers</strong>
-              <small>Your booking site is fully set up. Keep the cards below tuned to the work you want visible.</small>
+              <strong>Admin setup is ready</strong>
+              <small>The new client booking surface is being rebuilt under clients/booking.</small>
             </span>
-            <ButtonLink href="/book" variant="secondary" size="sm">
-              View booking page
+            <ButtonLink href="/admin/modules/services" variant="secondary" size="sm">
+              Review services
             </ButtonLink>
           </div>
         </section>

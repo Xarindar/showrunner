@@ -2,16 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { MediaVariantType } from "@prisma/client";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import {
   availabilityFormSchema,
   blockoutFormSchema,
   csvList,
+  optionalStoredText,
   parseForm,
+  requiredText,
   serviceFormSchema,
   serviceUpdateFormSchema
 } from "@/lib/admin-validation";
+import { mediaAssetDisplayUrl, uploadMedia } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { generateUniqueServiceSlug } from "@/lib/services/service-slugs";
 import { getSiteSettings } from "@/lib/site";
@@ -81,6 +85,45 @@ const servicePackageItemDeleteSchema = z.object({
   packageId: z.string().trim().min(1)
 });
 
+const serviceCategoryFormSchema = z.object({
+  description: optionalStoredText,
+  name: requiredText,
+  slug: optionalStoredText,
+  sortOrder: z.coerce.number().int().default(0)
+});
+
+const serviceCategoryUpdateSchema = z.object({
+  description: optionalStoredText,
+  id: requiredText,
+  sortOrder: z.coerce.number().int().default(0)
+});
+
+const serviceImageUploadSchema = z.object({
+  alt: optionalStoredText,
+  serviceId: requiredText
+});
+
+const serviceImageAttachSchema = serviceImageUploadSchema.extend({
+  mediaAssetId: requiredText
+});
+
+const serviceImageRemoveSchema = z.object({
+  serviceId: requiredText
+});
+
+const serviceCategoryImageUploadSchema = z.object({
+  alt: optionalStoredText,
+  categoryId: requiredText
+});
+
+const serviceCategoryImageAttachSchema = serviceCategoryImageUploadSchema.extend({
+  mediaAssetId: requiredText
+});
+
+const serviceCategoryImageRemoveSchema = z.object({
+  categoryId: requiredText
+});
+
 function servicesAdminPath(params?: Record<string, string>) {
   const query = new URLSearchParams(params).toString();
   return `${SERVICES_ADMIN_PATH}${query ? `?${query}` : ""}`;
@@ -94,6 +137,10 @@ function serviceEditPath(serviceId: string, params?: Record<string, string>) {
 function servicePackageEditPath(packageId: string, params?: Record<string, string>) {
   const query = new URLSearchParams(params).toString();
   return `${SERVICES_ADMIN_PATH}/packages/${packageId}${query ? `?${query}` : ""}`;
+}
+
+function serviceCategoriesPath(params?: Record<string, string>) {
+  return servicesAdminPath({ tab: "categories", ...(params || {}) });
 }
 
 function appointmentRulesPath(tab: "availability" | "team" | "calendar", params?: Record<string, string>) {
@@ -129,6 +176,78 @@ async function generateUniqueServicePackageSlug(input: { exceptId?: string; name
   }
 
   return candidate;
+}
+
+async function generateUniqueServiceCategorySlug(input: { exceptId?: string; name: string; siteId: string; slug?: string }) {
+  const baseSlug = slugify(input.slug || input.name) || "category";
+  let candidate = baseSlug;
+  let suffix = 2;
+
+  while (
+    await prisma.serviceCategory.findFirst({
+      where: {
+        siteId: input.siteId,
+        slug: candidate,
+        ...(input.exceptId ? { id: { not: input.exceptId } } : {})
+      },
+      select: { id: true }
+    })
+  ) {
+    candidate = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+
+  return candidate;
+}
+
+async function ensureServiceCategory(siteId: string, name: string) {
+  const normalizedName = name.trim();
+  if (!normalizedName) return null;
+
+  const existing = await prisma.serviceCategory.findFirst({
+    where: { siteId, name: normalizedName },
+    select: { id: true }
+  });
+  if (existing) return existing;
+
+  const slug = await generateUniqueServiceCategorySlug({ name: normalizedName, siteId });
+  const sortOrder = await prisma.serviceCategory.count({ where: { siteId } });
+
+  return prisma.serviceCategory.create({
+    data: {
+      siteId,
+      slug,
+      name: normalizedName,
+      sortOrder
+    },
+    select: { id: true }
+  });
+}
+
+function hasUpload(file: FormDataEntryValue | null): file is File {
+  return file instanceof File && file.size > 0;
+}
+
+async function assertServiceForSite(serviceId: string, siteId: string) {
+  const service = await prisma.service.findFirst({
+    where: { id: serviceId, siteId },
+    select: { id: true, name: true }
+  });
+  if (!service) {
+    redirect(servicesAdminPath({ error: "Service not found." }));
+  }
+  return service;
+}
+
+async function assertServiceCategoryForSite(categoryId: string, siteId: string) {
+  const category = await prisma.serviceCategory.findFirst({
+    where: { id: categoryId, siteId },
+    select: { id: true, name: true }
+  });
+  if (!category) {
+    redirect(serviceCategoriesPath({ error: "Service category not found." }));
+  }
+  return category;
 }
 
 function selectedStaffIds(formData: FormData) {
@@ -253,6 +372,7 @@ export async function createServiceAction(formData: FormData) {
   });
   await syncServiceStaff(service.id, settings.siteId, selectedStaffIds(formData));
   await syncServiceResources(service.id, settings.siteId, selectedResourceIds(formData));
+  await ensureServiceCategory(settings.siteId, input.category);
 
   refreshScheduling();
   revalidatePath(serviceEditPath(service.id));
@@ -301,6 +421,7 @@ export async function updateServiceAction(formData: FormData) {
       isActive: input.isActive
     }
   });
+  await ensureServiceCategory(settings.siteId, input.category);
   if (formData.has("syncStaffAssignments")) {
     await syncServiceStaff(input.id, settings.siteId, selectedStaffIds(formData));
   }
@@ -311,6 +432,219 @@ export async function updateServiceAction(formData: FormData) {
   refreshScheduling();
   revalidatePath(serviceEditPath(input.id));
   redirect(serviceEditPath(input.id, { saved: "service" }));
+}
+
+export async function createServiceCategoryAction(formData: FormData) {
+  await requireAdmin("scheduling:manage");
+  const input = await parseForm(serviceCategoryFormSchema, formData, serviceCategoriesPath());
+  const settings = await getSiteSettings();
+  const slug = await generateUniqueServiceCategorySlug({
+    name: input.name,
+    siteId: settings.siteId,
+    slug: input.slug
+  });
+  const sortOrder = input.sortOrder || (await prisma.serviceCategory.count({ where: { siteId: settings.siteId } }));
+
+  await prisma.serviceCategory.create({
+    data: {
+      siteId: settings.siteId,
+      slug,
+      name: input.name,
+      description: input.description,
+      sortOrder
+    }
+  });
+
+  refreshScheduling();
+  redirect(serviceCategoriesPath({ saved: "category" }));
+}
+
+export async function updateServiceCategoryAction(formData: FormData) {
+  await requireAdmin("scheduling:manage");
+  const input = await parseForm(serviceCategoryUpdateSchema, formData, serviceCategoriesPath());
+  const settings = await getSiteSettings();
+
+  await prisma.serviceCategory.updateMany({
+    where: { id: input.id, siteId: settings.siteId },
+    data: {
+      description: input.description,
+      sortOrder: input.sortOrder
+    }
+  });
+
+  refreshScheduling();
+  redirect(serviceCategoriesPath({ saved: "category" }));
+}
+
+export async function uploadServiceImageAction(formData: FormData) {
+  await requireAdmin("scheduling:manage");
+  const input = await parseForm(serviceImageUploadSchema, formData);
+  const settings = await getSiteSettings();
+  const service = await assertServiceForSite(input.serviceId, settings.siteId);
+  const file = formData.get("file");
+  if (!hasUpload(file)) {
+    redirect(serviceEditPath(input.serviceId, { error: "Choose an image before uploading." }));
+  }
+
+  let asset: Awaited<ReturnType<typeof uploadMedia>>;
+  try {
+    asset = await uploadMedia(
+      file,
+      {
+        alt: input.alt || service.name,
+        folder: "services",
+        tags: ["service", service.name],
+        usageContext: "service booking image"
+      },
+      settings.mediaDriver,
+      settings.siteId
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Service image upload failed.";
+    redirect(serviceEditPath(input.serviceId, { error: message }));
+  }
+
+  await prisma.service.updateMany({
+    where: { id: input.serviceId, siteId: settings.siteId },
+    data: {
+      imageUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
+      mediaAssetId: asset.id
+    }
+  });
+
+  refreshScheduling();
+  revalidatePath(serviceEditPath(input.serviceId));
+  redirect(serviceEditPath(input.serviceId, { saved: "media" }));
+}
+
+export async function attachServiceImageAction(formData: FormData) {
+  await requireAdmin("scheduling:manage");
+  const input = await parseForm(serviceImageAttachSchema, formData);
+  const settings = await getSiteSettings();
+  await assertServiceForSite(input.serviceId, settings.siteId);
+
+  const asset = await prisma.mediaAsset.findFirst({
+    where: { id: input.mediaAssetId, siteId: settings.siteId, deletedAt: null, isPrivate: false },
+    select: { alt: true, driver: true, filename: true, id: true, isPrivate: true, key: true, storageProviderId: true, url: true }
+  });
+  if (!asset) {
+    redirect(serviceEditPath(input.serviceId, { error: "Choose an active public media asset." }));
+  }
+
+  await prisma.service.updateMany({
+    where: { id: input.serviceId, siteId: settings.siteId },
+    data: {
+      imageUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
+      mediaAssetId: asset.id
+    }
+  });
+
+  refreshScheduling();
+  revalidatePath(serviceEditPath(input.serviceId));
+  redirect(serviceEditPath(input.serviceId, { saved: "media" }));
+}
+
+export async function removeServiceImageAction(formData: FormData) {
+  await requireAdmin("scheduling:manage");
+  const input = await parseForm(serviceImageRemoveSchema, formData);
+  const settings = await getSiteSettings();
+  await assertServiceForSite(input.serviceId, settings.siteId);
+
+  await prisma.service.updateMany({
+    where: { id: input.serviceId, siteId: settings.siteId },
+    data: {
+      imageUrl: "",
+      mediaAssetId: null
+    }
+  });
+
+  refreshScheduling();
+  revalidatePath(serviceEditPath(input.serviceId));
+  redirect(serviceEditPath(input.serviceId, { saved: "media" }));
+}
+
+export async function uploadServiceCategoryImageAction(formData: FormData) {
+  await requireAdmin("scheduling:manage");
+  const input = await parseForm(serviceCategoryImageUploadSchema, formData, serviceCategoriesPath());
+  const settings = await getSiteSettings();
+  const category = await assertServiceCategoryForSite(input.categoryId, settings.siteId);
+  const file = formData.get("file");
+  if (!hasUpload(file)) {
+    redirect(serviceCategoriesPath({ error: "Choose an image before uploading." }));
+  }
+
+  let asset: Awaited<ReturnType<typeof uploadMedia>>;
+  try {
+    asset = await uploadMedia(
+      file,
+      {
+        alt: input.alt || category.name,
+        folder: "services/categories",
+        tags: ["service-category", category.name],
+        usageContext: "service category booking image"
+      },
+      settings.mediaDriver,
+      settings.siteId
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Category image upload failed.";
+    redirect(serviceCategoriesPath({ error: message }));
+  }
+
+  await prisma.serviceCategory.updateMany({
+    where: { id: input.categoryId, siteId: settings.siteId },
+    data: {
+      imageUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
+      mediaAssetId: asset.id
+    }
+  });
+
+  refreshScheduling();
+  redirect(serviceCategoriesPath({ saved: "category-media" }));
+}
+
+export async function attachServiceCategoryImageAction(formData: FormData) {
+  await requireAdmin("scheduling:manage");
+  const input = await parseForm(serviceCategoryImageAttachSchema, formData, serviceCategoriesPath());
+  const settings = await getSiteSettings();
+  await assertServiceCategoryForSite(input.categoryId, settings.siteId);
+
+  const asset = await prisma.mediaAsset.findFirst({
+    where: { id: input.mediaAssetId, siteId: settings.siteId, deletedAt: null, isPrivate: false },
+    select: { alt: true, driver: true, filename: true, id: true, isPrivate: true, key: true, storageProviderId: true, url: true }
+  });
+  if (!asset) {
+    redirect(serviceCategoriesPath({ error: "Choose an active public media asset." }));
+  }
+
+  await prisma.serviceCategory.updateMany({
+    where: { id: input.categoryId, siteId: settings.siteId },
+    data: {
+      imageUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
+      mediaAssetId: asset.id
+    }
+  });
+
+  refreshScheduling();
+  redirect(serviceCategoriesPath({ saved: "category-media" }));
+}
+
+export async function removeServiceCategoryImageAction(formData: FormData) {
+  await requireAdmin("scheduling:manage");
+  const input = await parseForm(serviceCategoryImageRemoveSchema, formData, serviceCategoriesPath());
+  const settings = await getSiteSettings();
+  await assertServiceCategoryForSite(input.categoryId, settings.siteId);
+
+  await prisma.serviceCategory.updateMany({
+    where: { id: input.categoryId, siteId: settings.siteId },
+    data: {
+      imageUrl: "",
+      mediaAssetId: null
+    }
+  });
+
+  refreshScheduling();
+  redirect(serviceCategoriesPath({ saved: "category-media" }));
 }
 
 export async function createServicePackageAction(formData: FormData) {

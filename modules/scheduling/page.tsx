@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import type { Prisma } from "@prisma/client";
-import { Boxes, CalendarCheck, Plus } from "lucide-react";
+import { MediaVariantType, type Prisma } from "@prisma/client";
+import { Boxes, CalendarCheck, Images, Plus } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
+import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { ButtonLink, FolderTabs, type FolderTab, type SelectMenuOption } from "@/components/ui";
+import { ButtonLink, FolderTabs, type AssetPickerAsset, type FolderTab, type SelectMenuOption } from "@/components/ui";
 import { toggleServiceAction } from "./actions";
+import { ServiceCategoryManager, type ServiceCategoryManagerCategory } from "./components/service-category-manager";
 import { ServiceCatalogTable, type ServiceCatalogTableService } from "./components/service-catalog-table";
 import { ServicePackageTable, type ServicePackageTablePackage } from "./components/service-package-table";
 
@@ -29,7 +31,7 @@ type SchedulingPageProps = {
 };
 
 type ServiceCatalogItem = Prisma.ServiceGetPayload<{
-  include: { _count: { select: { packageItems: true } } };
+  include: { _count: { select: { packageItems: true } }; mediaAsset: true };
 }>;
 
 type ServicePackageWithItems = Prisma.ServicePackageGetPayload<{
@@ -61,19 +63,28 @@ function servicePackageTags(servicePackage: { tags: Prisma.JsonValue }) {
 }
 
 function savedServiceMessage(saved?: string) {
+  if (saved === "category") return "Service category updated.";
+  if (saved === "category-media") return "Category image updated.";
+  if (saved === "media") return "Service image updated.";
   if (saved === "package") return "Package changes saved.";
   if (saved === "package-item") return "Package contents updated.";
   if (saved) return "Services catalog updated.";
   return null;
 }
 
+function serviceImageUrl(service: ServiceCatalogItem) {
+  if (service.mediaAsset) return mediaAssetDisplayUrl(service.mediaAsset, MediaVariantType.CARD);
+  return service.imageUrl || "";
+}
+
 function toServiceCatalogTableService(service: ServiceCatalogItem): ServiceCatalogTableService {
   return {
-    bookingPath: `/book/${service.slug}`,
+    bookingPath: "Client booking rebuild pending",
     category: serviceCategory(service) || "Uncategorized",
     description: service.description || "",
     durationMinutes: service.durationMinutes,
     id: service.id,
+    imageUrl: serviceImageUrl(service),
     isActive: service.isActive,
     location: service.location || "",
     name: service.name,
@@ -87,7 +98,7 @@ function toServicePackageTablePackage(servicePackage: ServicePackageWithItems): 
   const durationMinutes = servicePackage.items.reduce((total, item) => total + item.quantity * item.service.durationMinutes, 0);
 
   return {
-    bookingPath: `/book/packages/${servicePackage.slug}`,
+    bookingPath: "Client booking rebuild pending",
     categories: servicePackageCategories(servicePackage),
     description: servicePackage.description,
     durationMinutes,
@@ -117,10 +128,10 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   await requireAdmin("scheduling:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   redirectLegacyRulesTab(params);
-  const [services, servicePackages] = await Promise.all([
+  const [services, servicePackages, serviceCategories, mediaAssets] = await Promise.all([
     prisma.service.findMany({
       where: { siteId: settings.siteId },
-      include: { _count: { select: { packageItems: true } } },
+      include: { _count: { select: { packageItems: true } }, mediaAsset: true },
       orderBy: [{ isActive: "desc" }, { category: "asc" }, { updatedAt: "desc" }]
     }),
     prisma.servicePackage.findMany({
@@ -132,11 +143,21 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
         }
       },
       orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }, { name: "asc" }]
+    }),
+    prisma.serviceCategory.findMany({
+      where: { siteId: settings.siteId },
+      include: { mediaAsset: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
+    }),
+    prisma.mediaAsset.findMany({
+      where: { siteId: settings.siteId, deletedAt: null, isPrivate: false },
+      orderBy: { createdAt: "desc" },
+      take: 40
     })
   ]);
 
   const searchQuery = (params.q || "").trim().slice(0, 120);
-  const categories = uniqueSortedStrings(services.map(serviceCategory));
+  const categories = uniqueSortedStrings([...serviceCategories.map((category) => category.name), ...services.map(serviceCategory)]);
   const tags = uniqueSortedStrings(services.flatMap(serviceTags));
   const packageCategories = uniqueSortedStrings(servicePackages.flatMap(servicePackageCategories));
   const packageTags = uniqueSortedStrings(servicePackages.flatMap(servicePackageTags));
@@ -165,6 +186,27 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   ];
   const serviceRows = services.map(toServiceCatalogTableService);
   const statusActionService = serviceRows.find((service) => service.id === params.statusService) || null;
+  const categoryServiceCounts = new Map<string, number>();
+  services.forEach((service) => {
+    const category = serviceCategory(service);
+    if (!category) return;
+    categoryServiceCounts.set(category, (categoryServiceCounts.get(category) || 0) + 1);
+  });
+  const serviceCategoryRows: ServiceCategoryManagerCategory[] = serviceCategories.map((category) => ({
+    description: category.description,
+    id: category.id,
+    imageUrl: category.mediaAsset ? mediaAssetDisplayUrl(category.mediaAsset, MediaVariantType.CARD) : category.imageUrl,
+    name: category.name,
+    serviceCount: categoryServiceCounts.get(category.name) || 0,
+    slug: category.slug,
+    sortOrder: category.sortOrder
+  }));
+  const mediaAssetOptions: AssetPickerAsset[] = mediaAssets.map((asset) => ({
+    alt: asset.alt || asset.filename,
+    filename: asset.filename,
+    id: asset.id,
+    thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD)
+  }));
 
   const servicesContent = (
     <ServiceCatalogTable
@@ -198,6 +240,14 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
     />
   );
 
+  const categoriesContent = (
+    <ServiceCategoryManager
+      canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)}
+      categories={serviceCategoryRows}
+      mediaAssets={mediaAssetOptions}
+    />
+  );
+
   const tabs: FolderTab[] = [
     {
       content: servicesContent,
@@ -216,6 +266,20 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       icon: <CalendarCheck size={15} />,
       id: "services",
       label: "Services"
+    },
+    {
+      content: categoriesContent,
+      footer: (
+        <div className="catalog-table-status-strip" aria-label="Service category catalog status">
+          <span className="catalog-pill is-blue">
+            <Images size={15} />
+            {serviceCategories.length} categories
+          </span>
+        </div>
+      ),
+      icon: <Images size={15} />,
+      id: "categories",
+      label: "Categories"
     },
     {
       content: packagesContent,

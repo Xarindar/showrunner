@@ -3,6 +3,7 @@
 enum MediaDriver {
   REPO
   SERVER_ASSETS
+  S3
   R2
   CLOUDFLARE_IMAGES
 }
@@ -44,6 +45,8 @@ model MediaAsset {
   updatedAt         DateTime            @updatedAt
   clientFiles       ClientFile[]
   productMedia      ProductMedia[]
+  serviceCategories ServiceCategory[] @relation("ServiceCategoryMediaAsset")
+  services          Service[]         @relation("ServiceMediaAsset")
   variants          MediaAssetVariant[]
 
   @@index([siteId, folder])

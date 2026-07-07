@@ -1,13 +1,15 @@
+import NextImage from "next/image";
 import { notFound } from "next/navigation";
-import type { Prisma } from "@prisma/client";
-import { ArrowLeft, Boxes, CalendarCheck, Clock3, ExternalLink, FileText, Save, Tags } from "lucide-react";
+import { MediaVariantType, type Prisma } from "@prisma/client";
+import { ArrowLeft, Boxes, CalendarCheck, Clock3, FileText, ImageIcon, Save, Tags, X } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { stringArrayCsv } from "@/lib/format";
+import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Button, ButtonLink, Switch } from "@/components/ui";
+import { AssetPicker, Button, ButtonLink, Switch, type AssetPickerAsset } from "@/components/ui";
 import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
-import { createServiceAction, updateServiceAction } from "./actions";
+import { attachServiceImageAction, createServiceAction, removeServiceImageAction, updateServiceAction, uploadServiceImageAction } from "./actions";
 import { ServiceBookingRulesTable } from "./components/service-booking-rules-table";
 import { ServiceDurationField } from "./components/service-duration-field";
 import { ServicePresetField } from "./components/service-preset-field";
@@ -20,6 +22,7 @@ type ServiceEditPageProps = {
 
 type ServiceWithBuilderData = Prisma.ServiceGetPayload<{
   include: {
+    mediaAsset: true;
     packageItems: {
       include: {
         package: true;
@@ -54,9 +57,15 @@ function serviceDurationLabel(minutes: number) {
 
 function savedServiceMessage(saved?: string) {
   if (saved === "created") return "Service created. Build out the details below.";
+  if (saved === "media") return "Service image updated.";
   if (saved === "service") return "Service changes saved.";
   if (saved) return "Service updated.";
   return null;
+}
+
+function serviceMediaUrl(service: ServiceWithBuilderData) {
+  if (service.mediaAsset) return mediaAssetDisplayUrl(service.mediaAsset, MediaVariantType.CARD);
+  return service.imageUrl || "";
 }
 
 function serviceStatusClass(isActive: boolean) {
@@ -283,6 +292,11 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     where: { siteId: settings.siteId },
     select: { category: true, intakePrompt: true, location: true, policyText: true }
   });
+  const serviceCategoriesPromise = prisma.serviceCategory.findMany({
+    where: { siteId: settings.siteId },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select: { name: true }
+  });
   const intakeFormFieldsPromise = prisma.formField.findMany({
     where: {
       form: { siteId: settings.siteId },
@@ -293,8 +307,8 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   });
 
   if (serviceId === "new") {
-    const [taxonomyServices, intakeFormFields] = await Promise.all([taxonomyServicesPromise, intakeFormFieldsPromise]);
-    const categoryOptions = uniqueSortedStrings(taxonomyServices.map((service) => service.category));
+    const [taxonomyServices, intakeFormFields, serviceCategories] = await Promise.all([taxonomyServicesPromise, intakeFormFieldsPromise, serviceCategoriesPromise]);
+    const categoryOptions = uniqueSortedStrings([...serviceCategories.map((category) => category.name), ...taxonomyServices.map((service) => service.category)]);
     const intakeOptions = uniqueSortedStrings([...taxonomyServices.map((service) => service.intakePrompt), ...intakeFormFields.map((field) => field.label)]);
     const locationOptions = uniqueSortedStrings(taxonomyServices.map((service) => service.location));
     const policyOptions = uniqueSortedStrings(taxonomyServices.map((service) => service.policyText));
@@ -310,10 +324,11 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     );
   }
 
-  const [service, taxonomyServices, intakeFormFields] = await Promise.all([
+  const [service, taxonomyServices, intakeFormFields, serviceCategories, mediaAssets] = await Promise.all([
     prisma.service.findFirst({
       where: { id: serviceId, siteId: settings.siteId },
       include: {
+        mediaAsset: true,
         packageItems: {
           include: { package: true },
           orderBy: [{ package: { sortOrder: "asc" } }, { createdAt: "asc" }]
@@ -321,26 +336,45 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
       }
     }),
     taxonomyServicesPromise,
-    intakeFormFieldsPromise
+    intakeFormFieldsPromise,
+    serviceCategoriesPromise,
+    prisma.mediaAsset.findMany({
+      where: { siteId: settings.siteId, deletedAt: null, isPrivate: false },
+      orderBy: { createdAt: "desc" },
+      take: 40
+    })
   ]);
 
   if (!service) notFound();
 
-  const categoryOptions = uniqueSortedStrings(taxonomyServices.map((item: ServiceTaxonomyOption) => item.category));
+  const categoryOptions = uniqueSortedStrings([...serviceCategories.map((category) => category.name), ...taxonomyServices.map((item: ServiceTaxonomyOption) => item.category)]);
   const intakeOptions = uniqueSortedStrings([...taxonomyServices.map((item: ServiceTaxonomyOption) => item.intakePrompt), ...intakeFormFields.map((field) => field.label)]);
   const locationOptions = uniqueSortedStrings(taxonomyServices.map((item: ServiceTaxonomyOption) => item.location));
   const policyOptions = uniqueSortedStrings(taxonomyServices.map((item: ServiceTaxonomyOption) => item.policyText));
   const savedMessage = savedServiceMessage(params.saved);
   const errorMessage = params.error ? decodeURIComponent(params.error) : null;
-  const bookingPath = `/book/${service.slug}`;
+  const bookingPath = "Client booking rebuild pending";
   const tagsValue = serviceTags(service);
   const packageCount = service.packageItems.length;
+  const canUpload = isMediaUploadDriverConfigured(settings.mediaDriver);
+  const mediaAssetOptions: AssetPickerAsset[] = mediaAssets.map((asset) => ({
+    alt: asset.alt || asset.filename,
+    filename: asset.filename,
+    id: asset.id,
+    thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD)
+  }));
+  const serviceImageUrl = serviceMediaUrl(service);
+  const serviceImageAlt = `${service.name} booking image`;
+  const serviceImageUploadFormId = `service-${service.id}-image-upload`;
+  const serviceImageAttachFormId = `service-${service.id}-image-attach`;
+  const serviceImageRemoveFormId = `service-${service.id}-image-remove`;
 
   const detailsContent = (
-    <form action={updateServiceAction} className="product-studio-save-grid" id="service-core-form">
-      <input name="id" type="hidden" value={service.id} />
-      {hiddenSchedulingValues(service)}
-      <main className="product-studio-main">
+    <>
+      <form action={updateServiceAction} className="product-studio-save-grid" id="service-core-form">
+        <input name="id" type="hidden" value={service.id} />
+        {hiddenSchedulingValues(service)}
+        <main className="product-studio-main">
         <section className="studio-panel">
           <div className="studio-section-head">
             <div>
@@ -355,9 +389,9 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
               <input defaultValue={service.name} id="service-name" name="name" required />
             </div>
             <div className="ui-field">
-              <label htmlFor="service-slug">Booking page link</label>
+              <label htmlFor="service-slug">Booking slug</label>
               <input defaultValue={service.slug} id="service-slug" name="slug" />
-              <span className="ui-field-hint">Use the final part of the booking link, such as head-spa.</span>
+              <span className="ui-field-hint">Use the future client-facing booking slug, such as head-spa.</span>
             </div>
           </div>
 
@@ -415,10 +449,49 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
             policyOptions={policyOptions}
           />
         </section>
-      </main>
+        </main>
 
-      <aside className="product-studio-sidecar">
-        <section className="studio-panel">
+        <aside className="product-studio-sidecar">
+          <section className="studio-panel service-image-panel">
+            <div className="studio-section-head">
+              <div>
+                <p className="catalog-rail-label">Booking image</p>
+                <h2>Card artwork</h2>
+              </div>
+              {serviceImageUrl ? (
+                <Button aria-label="Remove service image" form={serviceImageRemoveFormId} size="sm" title="Remove image" type="submit" variant="ghost">
+                  <X size={15} />
+                </Button>
+              ) : null}
+            </div>
+            <AssetPicker
+              assets={mediaAssetOptions}
+              attachFields={{ serviceId: service.id }}
+              attachFormId={serviceImageAttachFormId}
+              canUpload={canUpload}
+              defaultAlt={serviceImageAlt}
+              emptyLibraryMessage="No reusable service images yet."
+              title="Service booking image"
+              triggerClassName={serviceImageUrl ? "service-image-trigger has-image" : "service-image-trigger"}
+              triggerHint={serviceImageUrl ? "Replace image" : "Add image"}
+              uploadFields={{ serviceId: service.id }}
+              uploadFormId={serviceImageUploadFormId}
+              uploadUnavailableMessage="Uploads need Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images. You can still choose from the library.">
+              <span className="service-image-preview">
+                {serviceImageUrl ? (
+                  <NextImage alt={serviceImageAlt} fill sizes="(max-width: 760px) 100vw, 280px" src={serviceImageUrl} unoptimized />
+                ) : (
+                  <span className="studio-media-empty">
+                    <ImageIcon size={24} />
+                    <span>No image</span>
+                  </span>
+                )}
+              </span>
+            </AssetPicker>
+            <p className="muted-text">Shown on service choices in the public booking flow.</p>
+          </section>
+
+          <section className="studio-panel">
           <p className="catalog-rail-label">Status</p>
           <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
           <Switch defaultChecked={service.isActive} label="Active" name="isActive" variant="inline" />
@@ -432,7 +505,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
               <dd>{packageCount}</dd>
             </div>
             <div>
-              <dt>Booking URL</dt>
+              <dt>Client route</dt>
               <dd>{bookingPath}</dd>
             </div>
           </dl>
@@ -444,13 +517,16 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
             <Clock3 size={16} />
             Appointment rules
           </ButtonLink>
-          <ButtonLink href={bookingPath} rel="noreferrer" target="_blank" variant="ghost">
-            <ExternalLink size={16} />
-            Preview booking
-          </ButtonLink>
-        </section>
-      </aside>
-    </form>
+          </section>
+        </aside>
+      </form>
+
+      <form action={uploadServiceImageAction} id={serviceImageUploadFormId} />
+      <form action={attachServiceImageAction} id={serviceImageAttachFormId} />
+      <form action={removeServiceImageAction} id={serviceImageRemoveFormId}>
+        <input name="serviceId" type="hidden" value={service.id} />
+      </form>
+    </>
   );
 
   const packagesContent = (

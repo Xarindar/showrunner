@@ -5,7 +5,6 @@ import { FormAttachmentTargetType } from "@prisma/client";
 import { getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/format";
-import { publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { getSiteSettings } from "@/lib/site";
 import { rescheduleBookingAction, updateBookingDetailAction, updateBookingStatusAction } from "../actions";
 import { Button, ButtonLink, Card, Table } from "@/components/ui";
@@ -177,15 +176,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
                   </td>
                   <td>{attachment._count.submissions}</td>
                   <td>
-                    <Link
-                  href={publicFormAttachmentHref({
-                    formSlug: attachment.form.slug,
-                    targetId: attachment.targetId,
-                    targetType: attachment.targetType
-                  })}>
-                  
-                      Open public form
-                    </Link>
+                    <Link href={`/admin/modules/forms?form=${attachment.formId}`}>Open form record</Link>
                   </td>
                 </tr>
             )}

@@ -5,7 +5,7 @@ import { dataScopePresets, parseDataScopeConfig, requireAdmin, scopableModules }
 import { listSiteApiKeys } from "@/lib/embed/keys";
 import { EMBED_SCOPES } from "@/lib/embed/scopes";
 import { enumLabel } from "@/lib/format";
-import { isCloudflareImagesConfigured, isR2Configured, isServerAssetStorageConfigured, mediaAssetDisplayUrl } from "@/lib/media";
+import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { isRequiredModule } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
@@ -391,8 +391,5 @@ function mediaAssetIdFromUrl(value: string) {
 }
 
 function canUploadWithDriver(driver: MediaDriver) {
-  if (driver === MediaDriver.SERVER_ASSETS) return isServerAssetStorageConfigured();
-  if (driver === MediaDriver.R2) return isR2Configured();
-  if (driver === MediaDriver.CLOUDFLARE_IMAGES) return isCloudflareImagesConfigured();
-  return false;
+  return isMediaUploadDriverConfigured(driver);
 }

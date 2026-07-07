@@ -96,11 +96,11 @@ export async function getOnboardingChecklist(settings: SiteSettingsWithModules):
   if (isEnabled("appointments")) {
     steps.push({
       id: "first-booking",
-      title: "Take your first booking",
-      description: "Share your booking link or place a test booking to see the whole flow end to end.",
+      title: "Prepare the booking rebuild",
+      description: "Review services and availability before the new client booking surface is wired up.",
       done: bookings > 0,
-      href: "/book",
-      cta: "Open booking page"
+      href: "/admin/modules/services",
+      cta: "Open services"
     });
   }
 

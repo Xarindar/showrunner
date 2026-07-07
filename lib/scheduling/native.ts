@@ -57,6 +57,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     return prisma.service.findMany({
       where: { siteId, isActive: true },
       include: {
+        mediaAsset: true,
         resourceAssignments: {
           where: { resource: { isActive: true } },
           include: { resource: true },
@@ -102,6 +103,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     const service = await prisma.service.findFirst({
       where: { id: serviceId, siteId: settings.siteId },
       include: {
+        mediaAsset: true,
         resourceAssignments: {
           where: { resource: { isActive: true } },
           include: { resource: true },
@@ -383,6 +385,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     const service = await prisma.service.findFirst({
       where: { id: input.serviceId, siteId },
       include: {
+        mediaAsset: true,
         resourceAssignments: {
           where: { resource: { isActive: true } },
           include: { resource: true }

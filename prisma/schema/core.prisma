@@ -42,12 +42,13 @@ model Site {
   updatedAt                DateTime                     @updatedAt
   domains                  SiteDomain[]
   settings                 SiteSettings?
-  heroPresentation         HeroPresentation?
+  heroPresentations        HeroPresentation[]
   schedulingSettings       SchedulingSettings?
   moduleInstallations      ModuleInstallation[]
   publicRateLimits         PublicRateLimit[]
   siteApiKeys              SiteApiKey[]
   services                 Service[]
+  serviceCategories        ServiceCategory[]
   servicePackages          ServicePackage[]
   servicePackageItems      ServicePackageItem[]
   staffMembers             StaffMember[]
@@ -144,6 +145,7 @@ model SiteSettings {
   metaPixelId      String     @default("")
   searchConsoleVerification String @default("")
   analyticsRetentionDays Int  @default(365)
+  publicContentConfig Json    @default("{}")
   checkoutProvider PaymentProvider @default(STRIPE)
   commerceTaxEnabled Boolean @default(false)
   commerceTaxLabel String @default("Sales tax")
