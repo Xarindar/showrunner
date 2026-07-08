@@ -19,6 +19,7 @@ import type { SiteSettingsWithModules } from "@/lib/site";
 import {
   HERO_GRID_COLUMNS,
   HERO_GRID_ROWS,
+  createHeroSlideCopy,
   fitHeroElementLayoutToContent,
   heroCanvasLayerElementTypes,
   heroCanvasLayerElementsArray,
@@ -212,6 +213,25 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     setSelectedLayer(type);
     setEditingLayer(null);
     setActiveModal(null);
+  }
+
+  function addSlide() {
+    const nextIndex = presentation.slides.length;
+    setPresentation((current) => {
+      const sourceSlide = current.slides[activeIndex] || current.slides[0];
+      const slide = createHeroSlideCopy(sourceSlide, current.slides.length);
+
+      return {
+        ...current,
+        mode: "SLIDESHOW",
+        slides: [...current.slides, slide]
+      };
+    });
+    setActiveIndex(nextIndex);
+    setSelectedLayer("HEADLINE");
+    setEditingLayer(null);
+    clearBlocked();
+    setActiveModal("image");
   }
 
   function hideLayer(type: HeroCanvasLayerElementType) {
@@ -634,6 +654,10 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
 
       <Modal className="content-layer-modal" onClose={() => setActiveModal(null)} open={activeModal === "add"} title="Add asset">
         <div className="content-layer-options">
+          <button className="content-layer-option" onClick={addSlide} type="button">
+            <ImageIcon size={18} aria-hidden="true" />
+            <span>Slide</span>
+          </button>
           {heroCanvasLayerElementTypes.map((type) => {
             const Icon = layerIcons[type];
             return (
@@ -1177,21 +1201,21 @@ function InlineLayerEditor({
       </div>
 
       {layout.type === "HEADLINE" ? (
-        <textarea
-          aria-label="Title text"
+        <AutoSizeTextarea
+          ariaLabel="Title text"
           autoFocus
           className="content-inline-text content-inline-title"
-          onChange={(event) => updateActiveSlideField("headline", event.target.value)}
+          onChange={(value) => updateActiveSlideField("headline", value)}
           value={slide.headline}
         />
       ) : null}
 
       {layout.type === "CAPTION" ? (
-        <textarea
-          aria-label="Caption text"
+        <AutoSizeTextarea
+          ariaLabel="Caption text"
           autoFocus
           className="content-inline-text content-inline-caption"
-          onChange={(event) => updateActiveSlideField("caption", event.target.value)}
+          onChange={(value) => updateActiveSlideField("caption", value)}
           value={slide.caption}
         />
       ) : null}
@@ -1214,6 +1238,45 @@ function InlineLayerEditor({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function AutoSizeTextarea({
+  ariaLabel,
+  autoFocus,
+  className,
+  onChange,
+  value
+}: {
+  ariaLabel: string;
+  autoFocus?: boolean;
+  className: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const textarea = ref.current;
+    if (!textarea) return;
+    const style = window.getComputedStyle(textarea);
+    const borderHeight =
+      style.boxSizing === "border-box" ? parseFloat(style.borderTopWidth || "0") + parseFloat(style.borderBottomWidth || "0") : 0;
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.ceil(textarea.scrollHeight + borderHeight)}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      aria-label={ariaLabel}
+      autoFocus={autoFocus}
+      className={className}
+      onChange={(event) => onChange(event.target.value)}
+      ref={ref}
+      rows={1}
+      value={value}
+    />
   );
 }
 
