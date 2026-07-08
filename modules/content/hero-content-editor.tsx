@@ -141,6 +141,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
   });
   const pointerInteractionRef = useRef<PointerInteraction | null>(null);
   const blockedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const layerPlaneRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [presentation, setPresentation] = useState(() => ({
     ...initialPresentation,
@@ -260,9 +261,9 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
   // Keyboard nudges walk cell by cell and stop at the image edge or just
   // before another asset's visible box, flashing when there is nowhere to go.
   function nudgeLayer(type: HeroCanvasLayerElementType, deltaColumn: number, deltaRow: number) {
-    const stage = stageRef.current;
+    const layerPlane = layerPlaneRef.current;
     const layout = activeSlide.elements[type];
-    const context = stage ? buildDragContext(stage, type, layout) : null;
+    const context = layerPlane ? buildDragContext(layerPlane, type, layout) : null;
 
     if (!context) {
       commitLayerPosition(type, layout.gridColumn + deltaColumn, layout.gridRow + deltaRow);
@@ -298,14 +299,15 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     if ((event.target as HTMLElement).closest(".content-inline-editor")) return;
 
     const stage = stageRef.current;
+    const layerPlane = layerPlaneRef.current;
     const layout = activeSlide.elements[type];
-    if (!stage || !layout) return;
+    if (!stage || !layerPlane || !layout) return;
 
-    const context = buildDragContext(stage, type, layout);
+    const context = buildDragContext(layerPlane, type, layout);
     if (!context) return;
 
     const assetCenter = heroLayoutCenter(layout);
-    const stageRect = stage.getBoundingClientRect();
+    const planeRect = layerPlane.getBoundingClientRect();
 
     event.preventDefault();
     setSelectedLayer(type);
@@ -315,8 +317,8 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
       committedColumn: layout.gridColumn,
       committedRow: layout.gridRow,
       context,
-      lastAssetX: stageRect.left + assetCenter.x * stageRect.width,
-      lastAssetY: stageRect.top + assetCenter.y * stageRect.height,
+      lastAssetX: planeRect.left + assetCenter.x * planeRect.width,
+      lastAssetY: planeRect.top + assetCenter.y * planeRect.height,
       lastTime: event.timeStamp,
       moved: false,
       pointerId: event.pointerId,
@@ -396,12 +398,12 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     event: PointerEvent<HTMLDivElement>,
     layout: { columnSpan: number; gridColumn: number; gridRow: number; rowSpan: number }
   ) {
-    const stage = stageRef.current;
-    if (!stage) return;
+    const layerPlane = layerPlaneRef.current;
+    if (!layerPlane) return;
 
     const now = event.timeStamp;
     const elapsed = Math.max(16, now - interaction.lastTime);
-    const rect = stage.getBoundingClientRect();
+    const rect = layerPlane.getBoundingClientRect();
     const assetCenter = heroLayoutCenter(layout);
     const assetX = rect.left + assetCenter.x * rect.width;
     const assetY = rect.top + assetCenter.y * rect.height;
@@ -580,29 +582,31 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
             unoptimized
           />
           <div className="content-hero-stage-scrim" aria-hidden="true" />
-          {draggedLayout && dragMotion ? <HeroDotGrid activeLayout={draggedLayout} motion={dragMotion} /> : null}
-          {draggingLayer && alignmentGuides.length ? <HeroAlignmentGuides guides={alignmentGuides} /> : null}
-          {visibleLayers.map((layout) => (
-            <HeroCanvasLayer
-              editing={editingLayer === layout.type}
-              key={layout.type}
-              layout={layout}
-              onEdit={() => setEditingLayer(layout.type)}
-              onHide={() => hideLayer(layout.type)}
-              onNudge={(deltaColumn, deltaRow) => nudgeLayer(layout.type, deltaColumn, deltaRow)}
-              onPointerDown={(event) => handleLayerPointerDown(layout.type, event)}
-              onRegisterContent={(node) => {
-                layerContentRefs.current[layout.type] = node;
-              }}
-              onSelect={() => setSelectedLayer(layout.type)}
-              onStopEditing={() => setEditingLayer(null)}
-              blocked={blockedLayer === layout.type}
-              dragging={draggingLayer === layout.type}
-              selected={selectedLayer === layout.type}
-              slide={activeSlide}
-              updateActiveSlideField={updateActiveSlideField}
-            />
-          ))}
+          <div className="content-hero-layer-plane" ref={layerPlaneRef}>
+            {draggedLayout && dragMotion ? <HeroDotGrid activeLayout={draggedLayout} motion={dragMotion} /> : null}
+            {draggingLayer && alignmentGuides.length ? <HeroAlignmentGuides guides={alignmentGuides} /> : null}
+            {visibleLayers.map((layout) => (
+              <HeroCanvasLayer
+                editing={editingLayer === layout.type}
+                key={layout.type}
+                layout={layout}
+                onEdit={() => setEditingLayer(layout.type)}
+                onHide={() => hideLayer(layout.type)}
+                onNudge={(deltaColumn, deltaRow) => nudgeLayer(layout.type, deltaColumn, deltaRow)}
+                onPointerDown={(event) => handleLayerPointerDown(layout.type, event)}
+                onRegisterContent={(node) => {
+                  layerContentRefs.current[layout.type] = node;
+                }}
+                onSelect={() => setSelectedLayer(layout.type)}
+                onStopEditing={() => setEditingLayer(null)}
+                blocked={blockedLayer === layout.type}
+                dragging={draggingLayer === layout.type}
+                selected={selectedLayer === layout.type}
+                slide={activeSlide}
+                updateActiveSlideField={updateActiveSlideField}
+              />
+            ))}
+          </div>
         </div>
         <p className="content-hero-hint" aria-hidden="true">
           Drag assets to position them — they stop at the image edges and slide around each other instead of overlapping. Use arrow keys

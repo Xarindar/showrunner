@@ -6950,15 +6950,11 @@ button.button:disabled,
   border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
   border-radius: var(--radius-card);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), var(--shadow-hairline);
-  display: grid;
-  gap: 4px;
-  grid-template-columns: repeat(30, minmax(0, 1fr));
-  grid-template-rows: repeat(18, minmax(0, 1fr));
+  container-type: inline-size;
   height: min(560px, 62svh);
   max-height: 560px;
   min-height: 430px;
   overflow: hidden;
-  padding: 12px;
   position: relative;
   touch-action: none;
   width: 100%;
@@ -6975,6 +6971,18 @@ button.button:disabled,
   z-index: 0;
 }
 
+.content-hero-layer-plane {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(30, minmax(0, 1fr));
+  grid-template-rows: repeat(18, minmax(0, 1fr));
+  inset: clamp(96px, 13cqw, 180px) clamp(18px, 5cqw, 72px) clamp(72px, 8cqw, 112px);
+  min-height: 0;
+  min-width: 0;
+  position: absolute;
+  z-index: 3;
+}
+
 .content-hero-stage-scrim {
   background:
     linear-gradient(90deg, rgba(7, 19, 17, 0.74), rgba(7, 19, 17, 0.32) 48%, rgba(7, 19, 17, 0.5)),
@@ -6987,7 +6995,7 @@ button.button:disabled,
   animation: content-dot-grid-in 180ms ease-out both;
   display: grid;
   gap: 5px;
-  inset: 14px;
+  inset: 0;
   place-items: center;
   pointer-events: none;
   position: absolute;
@@ -7148,7 +7156,7 @@ button.button:disabled,
 .content-canvas-layer-headline strong {
   display: block;
   font-family: var(--content-site-display-font, Georgia, serif);
-  font-size: clamp(2.45rem, 5.1vw, 4.85rem);
+  font-size: clamp(2.65rem, 5.8cqw, 5.2rem);
   font-weight: 400;
   line-height: 1.08;
   max-width: 100%;
@@ -7167,7 +7175,7 @@ button.button:disabled,
   color: rgba(255, 255, 255, 0.88);
   display: block;
   font-family: var(--content-site-sans-font, inherit);
-  font-size: clamp(1.02rem, 1.65vw, 1.28rem);
+  font-size: clamp(1.05rem, 2cqw, 1.35rem);
   line-height: 1.55;
   max-height: 100%;
   max-width: 100%;
@@ -7336,13 +7344,13 @@ button.button:disabled,
 
 .content-inline-title {
   font-family: var(--content-site-display-font, Georgia, serif);
-  font-size: clamp(2.45rem, 5.1vw, 4.85rem);
+  font-size: clamp(2.65rem, 5.8cqw, 5.2rem);
   font-weight: 400;
   line-height: 1.08;
 }
 
 .content-inline-caption {
-  font-size: clamp(1.02rem, 1.65vw, 1.28rem);
+  font-size: clamp(1.05rem, 2cqw, 1.35rem);
   line-height: 1.55;
 }
 
@@ -11596,15 +11604,17 @@ button.button:disabled,
     font-size: 2.35rem;
   }
 
-  .hero-presentation-stage,
-  .content-hero-stage {
+  .hero-presentation-stage {
     gap: 3px;
     grid-template-rows: repeat(18, minmax(0, 1fr));
   }
 
   .content-hero-stage {
     min-height: 410px;
-    padding: 8px;
+  }
+
+  .content-hero-layer-plane {
+    gap: 3px;
   }
 
   .content-canvas-content {
