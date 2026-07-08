@@ -13,7 +13,7 @@ import {
   type Ref
 } from "react";
 import NextImage from "next/image";
-import { Check, Image as ImageIcon, MousePointerClick, PanelTop, Plus, Save, Trash2, Type, Upload } from "lucide-react";
+import { Check, Image as ImageIcon, MousePointerClick, PanelTop, Plus, Save, Timer, Trash2, Type, Upload } from "lucide-react";
 import { Button, Card, Modal, Tab, Tabs } from "@/components/ui";
 import type { SiteSettingsWithModules } from "@/lib/site";
 import {
@@ -126,12 +126,18 @@ const coarseNudgeCells = 3;
 const alignmentTolerancePx = 4;
 const dotGridColumns = HERO_GRID_COLUMNS;
 const dotGridRows = HERO_GRID_ROWS;
+const minAutoplaySeconds = 2.5;
+const maxAutoplaySeconds = 20;
 
 const layerIcons: Record<HeroCanvasLayerElementType, typeof Type> = {
   HEADLINE: Type,
   CAPTION: PanelTop,
   CTA: MousePointerClick
 };
+
+function formatAutoplaySeconds(milliseconds: number) {
+  return String(Math.round((milliseconds / 1000) * 10) / 10);
+}
 
 export function HeroContentEditor({ action, canUploadHeroImage, initialPresentation, mediaAssets, profileKey, settings }: HeroContentEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -155,6 +161,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
   const [blockedLayer, setBlockedLayer] = useState<HeroCanvasLayerElementType | null>(null);
   const [draggingLayer, setDraggingLayer] = useState<HeroCanvasLayerElementType | null>(null);
   const [editingLayer, setEditingLayer] = useState<HeroCanvasLayerElementType | null>(null);
+  const [autoplaySecondsDraft, setAutoplaySecondsDraft] = useState(() => formatAutoplaySeconds(initialPresentation.autoplayIntervalMs));
   const [pendingUploadName, setPendingUploadName] = useState("");
   const [previewImageUrl, setPreviewImageUrl] = useState("");
   const [selectedLayer, setSelectedLayer] = useState<HeroCanvasLayerElementType>("HEADLINE");
@@ -195,6 +202,28 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     updateActiveSlide((slide) => ({
       ...slide,
       [field]: value
+    }));
+  }
+
+  function updateAutoplaySeconds(value: string) {
+    setAutoplaySecondsDraft(value);
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds < minAutoplaySeconds || seconds > maxAutoplaySeconds) return;
+
+    setPresentation((current) => ({
+      ...current,
+      autoplayIntervalMs: Math.round(seconds * 1000)
+    }));
+  }
+
+  function commitAutoplaySeconds() {
+    const seconds = Number(autoplaySecondsDraft);
+    const clampedSeconds = Number.isFinite(seconds) ? clampValue(seconds, minAutoplaySeconds, maxAutoplaySeconds) : 6.5;
+
+    setAutoplaySecondsDraft(String(clampedSeconds));
+    setPresentation((current) => ({
+      ...current,
+      autoplayIntervalMs: Math.round(clampedSeconds * 1000)
     }));
   }
 
@@ -545,6 +574,23 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
         {pendingUploadName ? <span className="ui-badge">{pendingUploadName}</span> : null}
       </div>
       <div className="content-hero-toolbar-actions">
+        {showScreenTabs ? (
+          <label className="content-slide-timing">
+            <Timer size={15} aria-hidden="true" />
+            <span>Slide time</span>
+            <input
+              aria-label="Slide time in seconds"
+              max={20}
+              min={2.5}
+              onBlur={commitAutoplaySeconds}
+              onChange={(event) => updateAutoplaySeconds(event.target.value)}
+              step={0.5}
+              type="number"
+              value={autoplaySecondsDraft}
+            />
+            <span>s</span>
+          </label>
+        ) : null}
         <Button aria-label="Choose hero image" onClick={() => setActiveModal("image")} size="sm" type="button" variant="secondary">
           <ImageIcon size={16} aria-hidden="true" />
           Image
