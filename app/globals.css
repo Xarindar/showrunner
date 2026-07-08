@@ -6976,7 +6976,7 @@ button.button:disabled,
   gap: 4px;
   grid-template-columns: repeat(30, minmax(0, 1fr));
   grid-template-rows: repeat(18, minmax(0, 1fr));
-  inset: clamp(96px, 13cqw, 180px) clamp(18px, 5cqw, 72px) clamp(72px, 8cqw, 112px);
+  inset: 0 clamp(18px, 5cqw, 72px);
   min-height: 0;
   min-width: 0;
   position: absolute;
