@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import NextImage from "next/image";
 import { Image as ImageIcon, Save, Upload } from "lucide-react";
-import { Button, Card, Field, Input, Modal, Select, Switch, Textarea } from "@/components/ui";
+import { Button, Card, Field, Modal, Select, Switch } from "@/components/ui";
 import type { ContentProfileDraft, ContentProfileKey, FeaturedBookingTargetType } from "./content-profiles";
 import type { HeroMediaAssetOption } from "./hero-content-editor";
 
@@ -168,17 +168,43 @@ export function FeaturedCardEditor({
       />
 
       <div className="content-featured-preview-panel">
-        <span className="content-compose-label">Booking page preview</span>
+        <div className="content-featured-preview-heading">
+          <span className="content-compose-label">Booking page preview</span>
+          <span className="muted-text">Edit the words directly on the card.</span>
+        </div>
         <div
           className="content-promo-preview"
           data-hidden={hidden}
           style={previewImage ? { ["--promo-image" as string]: `url("${previewImage.replace(/"/g, "%22")}")` } : undefined}
         >
-          <span>
-            <strong>{previewTitle}</strong>
-            <small>{previewCopy}</small>
-          </span>
-          <em>{previewCta}</em>
+          <div className="content-promo-preview-copy">
+            <textarea
+              aria-label="Featured card title"
+              className="content-promo-inline-title"
+              name="featuredTitle"
+              onChange={(event) => update("title", event.target.value)}
+              placeholder={previewTitle}
+              rows={1}
+              value={draft.title}
+            />
+            <textarea
+              aria-label="Featured card copy"
+              className="content-promo-inline-copy"
+              name="featuredCopy"
+              onChange={(event) => update("copy", event.target.value)}
+              placeholder={previewCopy}
+              rows={2}
+              value={draft.copy}
+            />
+          </div>
+          <input
+            aria-label="Featured card button label"
+            className="content-promo-inline-cta"
+            name="featuredCta"
+            onChange={(event) => update("cta", event.target.value)}
+            placeholder={previewCta}
+            value={draft.cta}
+          />
         </div>
         <p className="content-hero-hint" aria-hidden="true">
           {hidden
@@ -187,7 +213,7 @@ export function FeaturedCardEditor({
         </p>
       </div>
 
-      <div className="content-featured-fields">
+      <div className="content-featured-settings">
         <Switch
           checked={draft.enabled}
           description="Show the promo card on the booking page."
@@ -196,101 +222,84 @@ export function FeaturedCardEditor({
           onChange={(event) => update("enabled", event.target.checked)}
         />
 
-        <div className="content-featured-target-row" role="group" aria-label="Promo target type">
-          {targetTypeOptions.map((option) => (
-            <button
-              aria-pressed={draft.targetType === option.value}
-              className="content-featured-target-pill"
-              data-on={draft.targetType === option.value}
-              key={option.value}
-              onClick={() => update("targetType", option.value)}
-              type="button"
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="content-featured-target-settings">
+          <div className="content-featured-target-copy">
+            <span className="content-section-eyebrow">Button destination</span>
+            <span className="muted-text">Choose what opens when a guest selects this card.</span>
+          </div>
+
+          <div className="content-featured-target-row" role="group" aria-label="Promo target type">
+            {targetTypeOptions.map((option) => (
+              <button
+                aria-pressed={draft.targetType === option.value}
+                className="content-featured-target-pill"
+                data-on={draft.targetType === option.value}
+                key={option.value}
+                onClick={() => update("targetType", option.value)}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="content-featured-target-select">
+            {draft.targetType === "CATEGORY" ? (
+              <Field label="Category">
+                <Select
+                  name="featuredCategoryId"
+                  onChange={(event) => update("categoryId", event.target.value)}
+                  value={draft.categoryId}
+                >
+                  <option value="">Choose a category</option>
+                  {categories.map((category) => (
+                    <option key={category.slug} value={category.slug}>
+                      {category.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            ) : (
+              <input name="featuredCategoryId" type="hidden" value={draft.categoryId} readOnly />
+            )}
+
+            {draft.targetType === "SERVICE" ? (
+              <Field label="Service">
+                <Select
+                  name="featuredServiceId"
+                  onChange={(event) => update("serviceId", event.target.value)}
+                  value={draft.serviceId}
+                >
+                  <option value="">Choose a service</option>
+                  {services.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name}
+                      {service.category ? ` - ${service.category}` : ""}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            ) : null}
+
+            {draft.targetType === "PACKAGE" ? (
+              <Field label="Package">
+                <Select
+                  name="featuredPackageId"
+                  onChange={(event) => update("packageId", event.target.value)}
+                  value={draft.packageId}
+                >
+                  <option value="">Choose a package</option>
+                  {packages.map((servicePackage) => (
+                    <option key={servicePackage.id} value={servicePackage.id}>
+                      {servicePackage.name}
+                      {servicePackage.itemCount ? ` - ${servicePackage.itemCount} services` : ""}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            ) : null}
+          </div>
         </div>
-
-        {draft.targetType === "CATEGORY" ? (
-          <Field label="Category">
-            <Select
-              name="featuredCategoryId"
-              onChange={(event) => update("categoryId", event.target.value)}
-              value={draft.categoryId}
-            >
-              <option value="">Choose a category</option>
-              {categories.map((category) => (
-                <option key={category.slug} value={category.slug}>
-                  {category.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        ) : (
-          <input name="featuredCategoryId" type="hidden" value={draft.categoryId} readOnly />
-        )}
-
-        {draft.targetType === "SERVICE" ? (
-          <Field label="Service">
-            <Select
-              name="featuredServiceId"
-              onChange={(event) => update("serviceId", event.target.value)}
-              value={draft.serviceId}
-            >
-              <option value="">Choose a service</option>
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name}
-                  {service.category ? ` - ${service.category}` : ""}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        ) : null}
-
-        {draft.targetType === "PACKAGE" ? (
-          <Field label="Package">
-            <Select
-              name="featuredPackageId"
-              onChange={(event) => update("packageId", event.target.value)}
-              value={draft.packageId}
-            >
-              <option value="">Choose a package</option>
-              {packages.map((servicePackage) => (
-                <option key={servicePackage.id} value={servicePackage.id}>
-                  {servicePackage.name}
-                  {servicePackage.itemCount ? ` - ${servicePackage.itemCount} services` : ""}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        ) : null}
-
-        <Field label="Title">
-          <Input
-            name="featuredTitle"
-            onChange={(event) => update("title", event.target.value)}
-            placeholder={target?.name || "Let's get this party started"}
-            value={draft.title}
-          />
-        </Field>
-        <Field label="Copy">
-          <Textarea
-            name="featuredCopy"
-            onChange={(event) => update("copy", event.target.value)}
-            placeholder={target?.copy || "Find a time that works for you."}
-            rows={2}
-            value={draft.copy}
-          />
-        </Field>
-        <Field label="Button label">
-          <Input
-            name="featuredCta"
-            onChange={(event) => update("cta", event.target.value)}
-            placeholder="Book now"
-            value={draft.cta}
-          />
-        </Field>
       </div>
 
       <Modal className="content-asset-modal" onClose={() => setImageModalOpen(false)} open={imageModalOpen} title="Card image">
