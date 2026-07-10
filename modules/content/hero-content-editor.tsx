@@ -1145,7 +1145,9 @@ function LayerContentFrame({
 
   // Size the headline box to its longest natural line so the selection outline
   // hugs the text, while max-width:100% (CSS) still forces wrapping before it
-  // can run past the stage edge.
+  // can run past the stage edge. Re-measure after web fonts load and whenever
+  // the layer width changes; otherwise the fallback-font width can be frozen
+  // into the inline style and make the final font wrap until editing begins.
   useLayoutEffect(() => {
     const content = contentRef.current;
     if (!content) return;
@@ -1157,26 +1159,55 @@ function LayerContentFrame({
 
     const headline = headlineRef.current;
     if (!headline) return;
+    const contentElement = content;
+    const headlineElement = headline;
 
-    const previousWidth = content.style.width;
-    content.style.width = "fit-content";
+    let cancelled = false;
+    let animationFrame = 0;
 
-    const range = document.createRange();
-    range.selectNodeContents(headline);
-    const lineWidths = Array.from(range.getClientRects())
-      .map((rect) => rect.width)
-      .filter((width) => width > 0);
-    range.detach();
+    function measureHeadline() {
+      if (cancelled) return;
 
-    const styles = window.getComputedStyle(content);
-    const horizontalInset =
-      parseFloat(styles.paddingLeft) +
-      parseFloat(styles.paddingRight) +
-      parseFloat(styles.borderLeftWidth) +
-      parseFloat(styles.borderRightWidth);
-    const nextWidth = lineWidths.length ? Math.ceil(Math.max(...lineWidths) + horizontalInset) : null;
+      const previousWidth = contentElement.style.width;
+      contentElement.style.width = "fit-content";
 
-    content.style.width = nextWidth ? `${nextWidth}px` : previousWidth;
+      const range = document.createRange();
+      range.selectNodeContents(headlineElement);
+      const lineWidths = Array.from(range.getClientRects())
+        .map((rect) => rect.width)
+        .filter((width) => width > 0);
+      range.detach();
+
+      const styles = window.getComputedStyle(contentElement);
+      const horizontalInset =
+        parseFloat(styles.paddingLeft) +
+        parseFloat(styles.paddingRight) +
+        parseFloat(styles.borderLeftWidth) +
+        parseFloat(styles.borderRightWidth);
+      const nextWidth = lineWidths.length ? Math.ceil(Math.max(...lineWidths) + horizontalInset) : null;
+
+      contentElement.style.width = nextWidth ? `${nextWidth}px` : previousWidth;
+    }
+
+    function scheduleMeasurement() {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = requestAnimationFrame(measureHeadline);
+    }
+
+    measureHeadline();
+
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleMeasurement);
+    if (contentElement.parentElement) resizeObserver?.observe(contentElement.parentElement);
+
+    void document.fonts.ready.then(scheduleMeasurement);
+    document.fonts.addEventListener("loadingdone", scheduleMeasurement);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(animationFrame);
+      resizeObserver?.disconnect();
+      document.fonts.removeEventListener("loadingdone", scheduleMeasurement);
+    };
   }, [editing, headlineText, layout.columnSpan, layout.rowSpan, layout.type]);
 
   return (
