@@ -267,6 +267,18 @@ async function detectUploadMimeType(file: File) {
   return "";
 }
 
+export function mediaAssetIdFromUrl(value: string) {
+  if (!value) return "";
+  try {
+    const url = new URL(value, "http://localhost");
+    const match = url.pathname.match(/^\/api\/media\/assets\/([^/]+)$/);
+    return match?.[1] ? decodeURIComponent(match[1]) : "";
+  } catch {
+    const match = value.match(/^\/api\/media\/assets\/([^?]+)/);
+    return match?.[1] ? decodeURIComponent(match[1]) : "";
+  }
+}
+
 async function sanitizeSvgUpload(file: File) {
   if (file.type.toLowerCase() !== "image/svg+xml") return file;
 

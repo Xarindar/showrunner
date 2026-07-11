@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft, LogOut, Menu, Settings, UserRound, X } from "lucide-react";
 import type { AdminRole } from "@prisma/client";
 import { usePathname } from "next/navigation";
@@ -15,6 +16,7 @@ import { useState } from "react";
 type AdminSidebarProps = {
   businessName: string;
   enabledModules: ModuleId[];
+  logoUrl: string;
   userEmail: string;
   userRole: AdminRole;
 };
@@ -23,7 +25,16 @@ function roleLabel(role: AdminRole) {
   return role.toLowerCase().split("_").join(" ");
 }
 
-export function AdminSidebar({ businessName, enabledModules, userEmail, userRole }: AdminSidebarProps) {
+function SidebarBrand({ businessName, logoUrl }: Pick<AdminSidebarProps, "businessName" | "logoUrl">) {
+  return (
+    <>
+      {logoUrl ? <Image alt="" className="brand-logo" height={36} src={logoUrl} unoptimized width={120} /> : <span className="brand-mark" />}
+      <span>{businessName}</span>
+    </>
+  );
+}
+
+export function AdminSidebar({ businessName, enabledModules, logoUrl, userEmail, userRole }: AdminSidebarProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const mobileHeaderContext = useAdminMobileHeaderContext();
@@ -35,8 +46,7 @@ export function AdminSidebar({ businessName, enabledModules, userEmail, userRole
     <>
       <header className={`admin-mobile-bar ${mobileHeaderContext ? "is-contextual" : ""}`}>
         <Link href="/admin" className="brand" onClick={closeMenu}>
-          <span className="brand-mark" />
-          <span>{businessName}</span>
+          <SidebarBrand businessName={businessName} logoUrl={logoUrl} />
         </Link>
         {mobileHeaderContext ? (
           <>
@@ -69,8 +79,7 @@ export function AdminSidebar({ businessName, enabledModules, userEmail, userRole
       <aside className={`admin-sidebar ${menuOpen ? "open" : ""}`} id="admin-sidebar">
         <div className="admin-sidebar-header">
           <Link href="/admin" className="brand" onClick={closeMenu}>
-            <span className="brand-mark" />
-            <span>{businessName}</span>
+            <SidebarBrand businessName={businessName} logoUrl={logoUrl} />
           </Link>
           <button aria-label="Close admin menu" className="admin-sidebar-close" onClick={closeMenu} type="button">
             <X size={20} />

@@ -5,7 +5,7 @@ import { dataScopePresets, parseDataScopeConfig, requireAdmin, scopableModules }
 import { listSiteApiKeys } from "@/lib/embed/keys";
 import { EMBED_SCOPES } from "@/lib/embed/scopes";
 import { enumLabel } from "@/lib/format";
-import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
+import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl, mediaAssetIdFromUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { isRequiredModule } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
@@ -376,18 +376,6 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       </Card>
     </div>);
 
-}
-
-function mediaAssetIdFromUrl(value: string) {
-  if (!value) return "";
-  try {
-    const url = new URL(value, "http://localhost");
-    const match = url.pathname.match(/^\/api\/media\/assets\/([^/]+)$/);
-    return match?.[1] ? decodeURIComponent(match[1]) : "";
-  } catch {
-    const match = value.match(/^\/api\/media\/assets\/([^?]+)/);
-    return match?.[1] ? decodeURIComponent(match[1]) : "";
-  }
 }
 
 function canUploadWithDriver(driver: MediaDriver) {
