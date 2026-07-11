@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import NextImage from "next/image";
-import { Check, ChevronLeft, ChevronRight, Image as ImageIcon, Plus, Save, Star, Trash2, Upload } from "lucide-react";
-import { Button, Card, Field, Input, Modal, Switch } from "@/components/ui";
-import type { HeroMediaAssetOption } from "./hero-content-editor";
+import { Check, ChevronLeft, ChevronRight, Image as ImageIcon, Plus, Save, Star, Trash2 } from "lucide-react";
+import { AssetPicker, Button, Card, Field, Input, Modal, Switch, type AssetPickerAsset } from "@/components/ui";
 import type { ContentTestimonial } from "./testimonials-data";
 
 type TestimonialAction = (formData: FormData) => void | Promise<void>;
@@ -16,15 +15,13 @@ type TestimonialsEditorProps = {
   curationAction: TestimonialAction;
   heading: string;
   intro: string;
-  mediaAssets: HeroMediaAssetOption[];
+  mediaAssets: AssetPickerAsset[];
   profileKey: string;
   removeAction: TestimonialAction;
   testimonials: ContentTestimonial[];
   updateAction: TestimonialAction;
   venueLabel: string;
 };
-
-type ComposeView = "compose" | "image";
 
 type TestimonialDraft = {
   featured: boolean;
@@ -65,7 +62,6 @@ export function TestimonialsEditor({
   const railRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<ComposeView>("compose");
   const [draft, setDraft] = useState<TestimonialDraft>(emptyDraft);
   const [previewUrl, setPreviewUrl] = useState("");
   const [uploadName, setUploadName] = useState("");
@@ -122,7 +118,6 @@ export function TestimonialsEditor({
     setPreviewUrl("");
     setUploadName("");
     setDraft(emptyDraft);
-    setView("compose");
   }
 
   function openAdd() {
@@ -144,7 +139,6 @@ export function TestimonialsEditor({
       rating: testimonial.rating,
       role: testimonial.authorRole || testimonial.serviceName
     });
-    setView("compose");
     setOpen(true);
   }
 
@@ -153,13 +147,12 @@ export function TestimonialsEditor({
     resetDraft();
   }
 
-  function selectImage(asset: HeroMediaAssetOption) {
+  function selectImage(asset: AssetPickerAsset) {
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl("");
     setUploadName("");
-    setDraft((current) => ({ ...current, imageUrl: asset.url }));
-    setView("compose");
+    setDraft((current) => ({ ...current, imageUrl: asset.url || asset.thumbnailUrl }));
   }
 
   function handleUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -171,7 +164,6 @@ export function TestimonialsEditor({
     setUploadName(file.name);
     // Clear any picked media URL so the server uses the freshly uploaded file.
     setDraft((current) => ({ ...current, imageUrl: "" }));
-    setView("compose");
   }
 
   const toolbar = (
@@ -278,9 +270,9 @@ export function TestimonialsEditor({
         className="content-testimonial-modal"
         onClose={closeModal}
         open={open}
-        title={view === "image" ? "Choose a photo" : isEditing ? "Edit testimonial" : "Add testimonial"}
+        title={isEditing ? "Edit testimonial" : "Add testimonial"}
       >
-        <form action={isEditing ? updateAction : createAction} className="content-testimonial-compose" data-view={view}>
+        <form action={isEditing ? updateAction : createAction} className="content-testimonial-compose" data-view="compose">
           <input name="profileKey" readOnly type="hidden" value={profileKey} />
           {isEditing ? <input name="id" readOnly type="hidden" value={draft.id} /> : null}
           <input name="imageUrl" readOnly type="hidden" value={draft.imageUrl} />
@@ -294,8 +286,7 @@ export function TestimonialsEditor({
             type="file"
           />
 
-          {view === "compose" ? (
-            <>
+          <>
               <div className="content-testimonial-compose-preview">
                 <span className="content-compose-label">Live preview</span>
                 <TestimonialPreviewCard
@@ -311,10 +302,17 @@ export function TestimonialsEditor({
 
               <div className="content-testimonial-compose-fields">
                 <div className="content-testimonial-image-row">
-                  <Button onClick={() => setView("image")} size="sm" type="button" variant="secondary">
+                  <AssetPicker
+                    assets={mediaAssets}
+                    canUpload={canUploadImage}
+                    confirmLabel="Use photo"
+                    onSelectAsset={selectImage}
+                    onUploadRequest={() => fileInputRef.current?.click()}
+                    title="Choose a photo"
+                    triggerClassName="ui-button ui-button-secondary ui-button-sm">
                     <ImageIcon size={16} aria-hidden="true" />
                     {previewImageSrc ? "Change photo" : "Choose photo"}
-                  </Button>
+                  </AssetPicker>
                   {uploadName ? <span className="ui-badge">{uploadName}</span> : null}
                 </div>
 
@@ -396,30 +394,7 @@ export function TestimonialsEditor({
                   </Button>
                 </div>
               </div>
-            </>
-          ) : (
-            <div className="content-testimonial-image-view">
-              <div className="content-modal-actions content-modal-actions-spread">
-                <Button onClick={() => setView("compose")} size="sm" type="button" variant="secondary">
-                  <ChevronLeft size={16} aria-hidden="true" />
-                  Back
-                </Button>
-                <Button disabled={!canUploadImage} onClick={() => fileInputRef.current?.click()} size="sm" type="button">
-                  <Upload size={16} aria-hidden="true" />
-                  Upload
-                </Button>
-              </div>
-              {!canUploadImage ? <span className="muted-text">Uploads need Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images. You can still pick from the library.</span> : null}
-              <div className="content-asset-grid">
-                {mediaAssets.map((asset) => (
-                  <button className="content-asset-option" key={asset.id} onClick={() => selectImage(asset)} type="button">
-                    <NextImage alt={asset.alt} height={220} src={asset.thumbnailUrl} unoptimized width={320} />
-                    <span>{asset.filename}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          </>
         </form>
       </Modal>
     </Card>

@@ -16,8 +16,10 @@ export type AssetPickerAsset = {
   filename: string;
   folder?: string;
   id: string;
+  source?: "global" | "library";
   tags?: string[];
   thumbnailUrl: string;
+  url?: string;
 };
 
 type LibraryFilter = "all" | "recent" | "tags";
@@ -32,25 +34,44 @@ type AssetLibraryResponse = {
 
 type AssetPickerFieldMap = Record<string, string>;
 
-type AssetPickerProps = {
+type AssetPickerCommonProps = {
   assets: AssetPickerAsset[];
-  attachFields?: AssetPickerFieldMap;
-  attachFormId: string;
   canUpload: boolean;
   children: ReactNode;
   confirmLabel?: string;
-  defaultAlt: string;
   emptyLibraryMessage?: string;
   loadFromServer?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  open?: boolean;
   title: string;
   triggerClassName?: string;
-  triggerHint: string;
-  uploadFields?: AssetPickerFieldMap;
-  uploadFormId: string;
+  triggerHint?: string;
   uploadUnavailableMessage?: string;
 };
 
-function HiddenFields({ fields, formId }: { fields?: AssetPickerFieldMap; formId: string }) {
+type AssetPickerProps = AssetPickerCommonProps & (
+  | {
+      attachFields?: never;
+      attachFormId?: never;
+      defaultAlt?: string;
+      onSelectAsset: (asset: AssetPickerAsset) => void;
+      onUploadRequest?: () => void;
+      uploadFields?: never;
+      uploadFormId?: never;
+    }
+  | {
+      attachFields?: AssetPickerFieldMap;
+      attachFormId: string;
+      defaultAlt: string;
+      onSelectAsset?: never;
+      onUploadRequest?: never;
+      uploadFields?: AssetPickerFieldMap;
+      uploadFormId: string;
+    }
+);
+
+function HiddenFields({ fields, formId }: { fields?: AssetPickerFieldMap; formId?: string }) {
+  if (!formId) return null;
   return (
     <>
       {Object.entries(fields || {}).map(([name, value]) => (
@@ -58,6 +79,16 @@ function HiddenFields({ fields, formId }: { fields?: AssetPickerFieldMap; formId
       ))}
     </>
   );
+}
+
+function mergeTagSummaries(primary: MediaTagSummary[], supplemental: MediaTagSummary[]) {
+  const merged = new Map(primary.map((tag) => [tag.name.toLocaleLowerCase(), { ...tag }]));
+  supplemental.forEach((tag) => {
+    const key = tag.name.toLocaleLowerCase();
+    const current = merged.get(key);
+    merged.set(key, { count: (current?.count || 0) + tag.count, name: current?.name || tag.name });
+  });
+  return [...merged.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
 function normalizedSearchValue(value: string) {
@@ -77,17 +108,21 @@ export function AssetPicker({
   canUpload,
   children,
   confirmLabel = "Use image",
-  defaultAlt,
+  defaultAlt = "",
   emptyLibraryMessage = "No reusable assets yet.",
   loadFromServer = true,
+  onOpenChange,
+  onSelectAsset,
+  onUploadRequest,
+  open: controlledOpen,
   title,
   triggerClassName,
-  triggerHint,
+  triggerHint = "",
   uploadFields,
   uploadFormId,
   uploadUnavailableMessage = "Uploads need Server asset folder, S3, R2, or Cloudflare Images."
 }: AssetPickerProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [mode, setMode] = useState<"library" | "upload">("library");
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>("recent");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -99,6 +134,11 @@ export function AssetPicker({
   const [libraryPageCount, setLibraryPageCount] = useState(1);
   const [libraryTotal, setLibraryTotal] = useState(assets.length);
   const initialTagSummaries = useMemo(() => summarizeMediaTags(assets), [assets]);
+  const supplementalAssets = useMemo(
+    () => (onSelectAsset ? assets.filter((asset) => asset.source === "global") : []),
+    [assets, onSelectAsset]
+  );
+  const supplementalTagSummaries = useMemo(() => summarizeMediaTags(supplementalAssets), [supplementalAssets]);
   const [tagSummaries, setTagSummaries] = useState<MediaTagSummary[]>(initialTagSummaries);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [libraryError, setLibraryError] = useState(false);
@@ -127,6 +167,23 @@ export function AssetPicker({
   const selectedAsset = libraryAssets.find((asset) => asset.id === selectedId) || null;
   const browsingTags = libraryFilter === "tags" && !selectedTag;
   const visibleTotal = loadFromServer ? libraryTotal : visibleAssets.length;
+  const open = controlledOpen ?? internalOpen;
+
+  function setPickerOpen(nextOpen: boolean) {
+    setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  }
+
+  function matchingSupplementalAssets(filter: LibraryFilter, tag: string | null, search: string) {
+    if (filter === "recent") return [];
+    const normalizedSearch = normalizedSearchValue(search);
+    return supplementalAssets.filter((asset) => {
+      if (filter === "tags" && tag && !(asset.tags || []).includes(tag)) return false;
+      if (!normalizedSearch) return true;
+      return [asset.filename, asset.alt, asset.folder || "", ...(asset.tags || [])]
+        .some((value) => normalizedSearchValue(value).includes(normalizedSearch));
+    });
+  }
 
   useEffect(() => () => {
     requestIdRef.current += 1;
@@ -154,15 +211,18 @@ export function AssetPicker({
       if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) throw new Error("Asset library unavailable");
       const payload = (await response.json()) as AssetLibraryResponse;
       if (requestId !== requestIdRef.current || !Array.isArray(payload.assets)) return;
+      const supplemental = matchingSupplementalAssets(filter, tag, search);
 
       setLibraryAssets((current) => {
-        const combined = append ? [...current, ...payload.assets!] : payload.assets!;
+        const combined = append ? [...current, ...payload.assets!, ...supplemental] : [...payload.assets!, ...supplemental];
         return Array.from(new Map(combined.map((asset) => [asset.id, asset])).values());
       });
       setLibraryPage(typeof payload.page === "number" ? payload.page : page);
       setLibraryPageCount(typeof payload.pageCount === "number" ? payload.pageCount : 1);
-      setLibraryTotal(typeof payload.total === "number" ? payload.total : payload.assets.length);
-      if (Array.isArray(payload.tagSummaries)) setTagSummaries(payload.tagSummaries);
+      setLibraryTotal((typeof payload.total === "number" ? payload.total : payload.assets.length) + supplemental.length);
+      if (Array.isArray(payload.tagSummaries)) {
+        setTagSummaries(mergeTagSummaries(payload.tagSummaries, supplementalTagSummaries));
+      }
     } catch {
       if (requestId === requestIdRef.current) setLibraryError(true);
     } finally {
@@ -218,17 +278,18 @@ export function AssetPicker({
     setSelectedTag(null);
     setSelectedId(null);
     setQuery("");
-    setLibraryAssets(assets);
+    const initialAssets = loadFromServer ? matchingSupplementalAssets("recent", null, "") : assets;
+    setLibraryAssets(initialAssets);
     setLibraryPage(1);
     setLibraryPageCount(1);
-    setLibraryTotal(assets.length);
+    setLibraryTotal(initialAssets.length);
     setTagSummaries(initialTagSummaries);
-    setOpen(true);
+    setPickerOpen(true);
     void loadLibrary("", 1, false, "recent", null);
   }
 
   function closePicker() {
-    setOpen(false);
+    setPickerOpen(false);
     setFileName("");
     setQuery("");
     setSelectedId(null);
@@ -236,6 +297,23 @@ export function AssetPicker({
     setLibraryFilter("recent");
     requestIdRef.current += 1;
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+  }
+
+  function startUpload() {
+    if (!canUpload) return;
+    if (onUploadRequest) {
+      closePicker();
+      onUploadRequest();
+      return;
+    }
+    if (uploadFormId) setMode("upload");
+  }
+
+  function confirmSelection() {
+    if (!selectedAsset || !onSelectAsset) return;
+    const asset = selectedAsset;
+    closePicker();
+    onSelectAsset(asset);
   }
 
   return (
@@ -264,7 +342,13 @@ export function AssetPicker({
                 <span className={styles.kicker}>Choose from your library</span>
                 <p>Find the right image without leaving your work.</p>
               </div>
-              <Button className={styles.uploadAction} disabled={!canUpload} onClick={() => setMode("upload")} size="sm" type="button" variant="secondary">
+              <Button
+                className={styles.uploadAction}
+                disabled={!canUpload || (!onUploadRequest && !uploadFormId)}
+                onClick={startUpload}
+                size="sm"
+                type="button"
+                variant="secondary">
                 <Upload aria-hidden="true" size={15} />
                 Add new image
               </Button>
@@ -450,7 +534,9 @@ export function AssetPicker({
                           ? "Choose another tag or add this tag to an image in Media."
                           : libraryFilter === "recent"
                             ? "Switch to All to browse the full library."
-                            : "Upload an image now and it will be available everywhere you choose assets."}
+                            : canUpload
+                              ? "Upload an image now and it will be available everywhere you choose assets."
+                              : uploadUnavailableMessage}
                     </p>
                     {query ? (
                       <Button onClick={clearQuery} size="sm" type="button" variant="secondary">Clear search</Button>
@@ -459,7 +545,7 @@ export function AssetPicker({
                     ) : libraryFilter === "recent" ? (
                       <Button onClick={() => changeLibraryFilter("all")} size="sm" type="button" variant="secondary">View all assets</Button>
                     ) : canUpload ? (
-                      <Button onClick={() => setMode("upload")} size="sm" type="button">
+                      <Button onClick={startUpload} size="sm" type="button">
                         <Upload aria-hidden="true" size={15} />
                         Upload an asset
                       </Button>
@@ -519,12 +605,21 @@ export function AssetPicker({
               </p>
               <div>
                 <Button onClick={closePicker} size="sm" type="button" variant="ghost">Cancel</Button>
-                <HiddenFields fields={attachFields} formId={attachFormId} />
-                <input form={attachFormId} name="alt" type="hidden" value={defaultAlt} />
-                <Button disabled={!selectedAsset} form={attachFormId} name="mediaAssetId" size="sm" type="submit" value={selectedAsset?.id || ""}>
-                  <Check aria-hidden="true" size={15} />
-                  {confirmLabel}
-                </Button>
+                {onSelectAsset ? (
+                  <Button disabled={!selectedAsset} onClick={confirmSelection} size="sm" type="button">
+                    <Check aria-hidden="true" size={15} />
+                    {confirmLabel}
+                  </Button>
+                ) : (
+                  <>
+                    <HiddenFields fields={attachFields} formId={attachFormId} />
+                    {attachFormId ? <input form={attachFormId} name="alt" type="hidden" value={defaultAlt} /> : null}
+                    <Button disabled={!selectedAsset || !attachFormId} form={attachFormId} name="mediaAssetId" size="sm" type="submit" value={selectedAsset?.id || ""}>
+                      <Check aria-hidden="true" size={15} />
+                      {confirmLabel}
+                    </Button>
+                  </>
+                )}
               </div>
             </footer>
           </div>
@@ -543,7 +638,7 @@ export function AssetPicker({
 
             <div className={styles.uploadCanvas}>
               <HiddenFields fields={uploadFields} formId={uploadFormId} />
-              <input form={uploadFormId} name="alt" type="hidden" value={defaultAlt} />
+              {uploadFormId ? <input form={uploadFormId} name="alt" type="hidden" value={defaultAlt} /> : null}
               <UploadField
                 accept="image/*"
                 description="JPG, PNG, WebP, GIF, or SVG · up to 8 MB"

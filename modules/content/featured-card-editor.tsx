@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import NextImage from "next/image";
-import { Image as ImageIcon, Save, Upload } from "lucide-react";
-import { Button, Card, Field, Modal, Select, Switch } from "@/components/ui";
+import { Image as ImageIcon, Save } from "lucide-react";
+import { AssetPicker, Button, Card, Field, Select, Switch, type AssetPickerAsset } from "@/components/ui";
 import type { ContentProfileDraft, ContentProfileKey, FeaturedBookingTargetType } from "./content-profiles";
-import type { HeroMediaAssetOption } from "./hero-content-editor";
 
 type FeaturedAction = (formData: FormData) => void | Promise<void>;
 
@@ -37,7 +35,7 @@ type FeaturedCardEditorProps = {
   canUploadImage: boolean;
   categories: FeaturedCategoryOption[];
   featured: ContentProfileDraft["featured"];
-  mediaAssets: HeroMediaAssetOption[];
+  mediaAssets: AssetPickerAsset[];
   packages: FeaturedPackageOption[];
   profileKey: ContentProfileKey;
   services: FeaturedServiceOption[];
@@ -64,7 +62,6 @@ export function FeaturedCardEditor({
 }: FeaturedCardEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(featured);
-  const [imageModalOpen, setImageModalOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [uploadName, setUploadName] = useState("");
 
@@ -97,13 +94,12 @@ export function FeaturedCardEditor({
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  function selectImage(asset: HeroMediaAssetOption) {
+  function selectImage(asset: AssetPickerAsset) {
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl("");
     setUploadName("");
-    update("imageUrl", asset.url);
-    setImageModalOpen(false);
+    update("imageUrl", asset.url || asset.thumbnailUrl);
   }
 
   function clearImage() {
@@ -112,7 +108,6 @@ export function FeaturedCardEditor({
     setPreviewUrl("");
     setUploadName("");
     update("imageUrl", "");
-    setImageModalOpen(false);
   }
 
   function handleUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -123,7 +118,6 @@ export function FeaturedCardEditor({
     setUploadName(file.name);
     // Clear the picked media URL so the server stores the uploaded file.
     update("imageUrl", "");
-    setImageModalOpen(false);
   }
 
   const toolbar = (
@@ -133,10 +127,18 @@ export function FeaturedCardEditor({
         {uploadName ? <span className="ui-badge">{uploadName}</span> : null}
       </div>
       <div className="content-hero-toolbar-actions">
-        <Button aria-label="Choose card image" onClick={() => setImageModalOpen(true)} size="sm" type="button" variant="secondary">
+        <AssetPicker
+          assets={mediaAssets}
+          canUpload={canUploadImage}
+          confirmLabel="Use card image"
+          onSelectAsset={selectImage}
+          onUploadRequest={() => fileInputRef.current?.click()}
+          title="Card image"
+          triggerClassName="ui-button ui-button-secondary ui-button-sm">
           <ImageIcon size={16} aria-hidden="true" />
           Image
-        </Button>
+        </AssetPicker>
+        <Button onClick={clearImage} size="sm" type="button" variant="ghost">Use target image</Button>
         <Button size="sm" type="submit">
           <Save size={16} aria-hidden="true" />
           Save
@@ -151,7 +153,6 @@ export function FeaturedCardEditor({
       as="form"
       bodyClassName="content-featured-editor"
       className="content-featured-editor-card"
-      encType="multipart/form-data"
       minHeight="none"
       reservedHeader={toolbar}
     >
@@ -302,26 +303,6 @@ export function FeaturedCardEditor({
         </div>
       </div>
 
-      <Modal className="content-asset-modal" onClose={() => setImageModalOpen(false)} open={imageModalOpen} title="Card image">
-        <div className="content-modal-actions">
-          <Button disabled={!canUploadImage} onClick={() => fileInputRef.current?.click()} type="button">
-            <Upload size={18} aria-hidden="true" />
-            Upload image
-          </Button>
-          <Button onClick={clearImage} type="button" variant="ghost">
-            Use target image
-          </Button>
-          {!canUploadImage ? <span className="muted-text">Uploads need Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images.</span> : null}
-        </div>
-        <div className="content-asset-grid">
-          {mediaAssets.map((asset) => (
-            <button className="content-asset-option" key={asset.id} onClick={() => selectImage(asset)} type="button">
-              <NextImage src={asset.thumbnailUrl} alt={asset.alt} width={320} height={220} unoptimized />
-              <span>{asset.filename}</span>
-            </button>
-          ))}
-        </div>
-      </Modal>
     </Card>
   );
 }

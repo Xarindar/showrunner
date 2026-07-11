@@ -13,8 +13,8 @@ import {
   type Ref
 } from "react";
 import NextImage from "next/image";
-import { Check, Image as ImageIcon, MousePointerClick, PanelTop, Plus, Save, Timer, Trash2, Type, Upload } from "lucide-react";
-import { Button, Card, Modal, Tab, Tabs } from "@/components/ui";
+import { Check, Image as ImageIcon, MousePointerClick, PanelTop, Plus, Save, Timer, Trash2, Type } from "lucide-react";
+import { AssetPicker, Button, Card, Modal, Tab, Tabs, type AssetPickerAsset } from "@/components/ui";
 import type { SiteSettingsWithModules } from "@/lib/site";
 import {
   HERO_GRID_COLUMNS,
@@ -37,24 +37,16 @@ import {
 type ContentAction = (formData: FormData) => void | Promise<void>;
 type ContentSettingsDraft = Pick<SiteSettingsWithModules, "heroHeadline" | "heroSubheadline">;
 
-export type HeroMediaAssetOption = {
-  alt: string;
-  filename: string;
-  id: string;
-  thumbnailUrl: string;
-  url: string;
-};
-
 type HeroContentEditorProps = {
   action: ContentAction;
   canUploadHeroImage: boolean;
   initialPresentation: HeroPresentationEditor;
-  mediaAssets: HeroMediaAssetOption[];
+  mediaAssets: AssetPickerAsset[];
   profileKey?: string;
   settings: ContentSettingsDraft;
 };
 
-type ActiveModal = "add" | "image" | null;
+type ActiveModal = "add" | null;
 
 type Rect = {
   bottom: number;
@@ -156,6 +148,7 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
   }));
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [dragMotion, setDragMotion] = useState<DragMotion | null>(null);
   const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
   const [blockedLayer, setBlockedLayer] = useState<HeroCanvasLayerElementType | null>(null);
@@ -260,7 +253,8 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     setSelectedLayer("HEADLINE");
     setEditingLayer(null);
     clearBlocked();
-    setActiveModal("image");
+    setActiveModal(null);
+    setAssetPickerOpen(true);
   }
 
   function hideLayer(type: HeroCanvasLayerElementType) {
@@ -268,12 +262,11 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
     setEditingLayer(null);
   }
 
-  function selectExistingImage(asset: HeroMediaAssetOption) {
+  function selectExistingImage(asset: AssetPickerAsset) {
     if (fileInputRef.current) fileInputRef.current.value = "";
     setPendingUploadName("");
     setPreviewImageUrl("");
-    updateActiveSlideField("imageUrl", asset.url);
-    setActiveModal(null);
+    updateActiveSlideField("imageUrl", asset.url || asset.thumbnailUrl);
   }
 
   function triggerUploadPicker() {
@@ -591,10 +584,19 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
             <span>s</span>
           </label>
         ) : null}
-        <Button aria-label="Choose hero image" onClick={() => setActiveModal("image")} size="sm" type="button" variant="secondary">
+        <AssetPicker
+          assets={mediaAssets}
+          canUpload={canUploadHeroImage}
+          confirmLabel="Use hero image"
+          onOpenChange={setAssetPickerOpen}
+          onSelectAsset={selectExistingImage}
+          onUploadRequest={triggerUploadPicker}
+          open={assetPickerOpen}
+          title="Hero image"
+          triggerClassName="ui-button ui-button-secondary ui-button-sm">
           <ImageIcon size={16} aria-hidden="true" />
           Image
-        </Button>
+        </AssetPicker>
         <Button aria-label="Add hero asset" onClick={() => setActiveModal("add")} size="sm" type="button" variant="secondary">
           <Plus size={16} aria-hidden="true" />
           Add
@@ -613,7 +615,6 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
       as="form"
       bodyClassName="content-hero-editor"
       className="content-hero-editor-card"
-      encType="multipart/form-data"
       minHeight="none"
       reservedHeader={editorToolbar}
     >
@@ -679,24 +680,6 @@ export function HeroContentEditor({ action, canUploadHeroImage, initialPresentat
           to nudge, Shift + arrows for bigger steps.
         </p>
       </section>
-
-      <Modal className="content-asset-modal" onClose={() => setActiveModal(null)} open={activeModal === "image"} title="Hero image">
-        <div className="content-modal-actions">
-          <Button disabled={!canUploadHeroImage} onClick={triggerUploadPicker} type="button">
-            <Upload size={18} aria-hidden="true" />
-            Upload image
-          </Button>
-          {!canUploadHeroImage ? <span className="muted-text">Uploads need Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images.</span> : null}
-        </div>
-        <div className="content-asset-grid">
-          {mediaAssets.map((asset) => (
-            <button className="content-asset-option" key={asset.id} onClick={() => selectExistingImage(asset)} type="button">
-              <NextImage src={asset.thumbnailUrl} alt={asset.alt} width={320} height={220} unoptimized />
-              <span>{asset.filename}</span>
-            </button>
-          ))}
-        </div>
-      </Modal>
 
       <Modal className="content-layer-modal" onClose={() => setActiveModal(null)} open={activeModal === "add"} title="Add asset">
         <div className="content-layer-options">

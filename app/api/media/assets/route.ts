@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { MediaVariantType, type Prisma } from "@prisma/client";
-import { requireAuthenticatedAdmin } from "@/lib/auth";
+import { getAccessibleMediaWhere, requireAuthenticatedAdmin } from "@/lib/auth";
 import { nonEmptyStringArrayFromUnknown } from "@/lib/format";
 import { mediaAssetDisplayUrl } from "@/lib/media";
 import { summarizeMediaTags } from "@/lib/media-tags";
@@ -16,19 +16,18 @@ function positivePage(value: string | null) {
 }
 
 export async function GET(request: NextRequest) {
-  await requireAuthenticatedAdmin();
+  const user = await requireAuthenticatedAdmin();
   const settings = await getSiteSettings();
   const query = (request.nextUrl.searchParams.get("q") || "").trim().slice(0, 180);
   const requestedScope = request.nextUrl.searchParams.get("scope");
   const scope = requestedScope === "recent" ? "recent" : "all";
   const tag = (request.nextUrl.searchParams.get("tag") || "").trim().slice(0, 120);
   const page = positivePage(request.nextUrl.searchParams.get("page"));
-  const baseWhere: Prisma.MediaAssetWhereInput = {
-    siteId: settings.siteId,
+  const baseWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, {
     deletedAt: null,
     isPrivate: false,
     mimeType: { startsWith: "image/", mode: "insensitive" }
-  };
+  });
   const tagRows = await prisma.mediaAsset.findMany({ where: baseWhere, select: { tags: true }, take: 5000 });
   const clauses: Prisma.MediaAssetWhereInput[] = [baseWhere];
 
@@ -89,8 +88,10 @@ export async function GET(request: NextRequest) {
         filename: asset.filename,
         folder: asset.folder,
         id: asset.id,
+        source: "library",
         tags: nonEmptyStringArrayFromUnknown(asset.tags),
-        thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD)
+        thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
+        url: mediaAssetDisplayUrl(asset, MediaVariantType.HERO)
       })),
       page,
       pageCount: Math.max(1, Math.ceil(total / pageSize)),

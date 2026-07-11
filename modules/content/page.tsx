@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { MediaDriver, MediaVariantType, type Prisma } from "@prisma/client";
-import { getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
+import { MediaDriver, MediaVariantType } from "@prisma/client";
+import { requireAdmin } from "@/lib/auth";
+import { globalMediaAssets } from "@/lib/global-media-assets";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -25,22 +26,13 @@ type ContentPageProps = {
 };
 
 export default async function ContentPage({ searchParams }: ContentPageProps) {
-  const user = await requireAdmin("content:manage");
+  await requireAdmin("content:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const profileKey = normalizeContentProfileKey(params.profile);
   const contentProfiles = normalizeContentProfiles(settings.publicContentConfig);
   const profile = contentProfiles[profileKey];
-  const activeMediaWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, {
-    deletedAt: null,
-    isPrivate: false
-  });
-  const [heroPresentation, mediaAssets, testimonials, services, servicePackages, categories] = await Promise.all([
+  const [heroPresentation, testimonials, services, servicePackages, categories] = await Promise.all([
     getHeroPresentationForProfilePayload(settings.siteId, profileKey, settings),
-    prisma.mediaAsset.findMany({
-      where: activeMediaWhere,
-      orderBy: { createdAt: "desc" },
-      take: 24
-    }),
     getContentTestimonials(settings.siteId),
     prisma.service.findMany({
       where: { siteId: settings.siteId, isActive: true },
@@ -63,22 +55,15 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
       include: { mediaAsset: true }
     })
   ]);
-  const mediaAssetOptions = [
-    {
-      alt: "Neutral admin template hero",
-      filename: "hero.svg",
-      id: "repo-hero-svg",
-      thumbnailUrl: "/hero.svg",
-      url: "/hero.svg"
-    },
-    ...mediaAssets.map((asset) => ({
-      alt: asset.isDecorative ? "" : asset.alt || asset.filename,
-      filename: asset.filename,
-      id: asset.id,
-      thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
-      url: mediaAssetDisplayUrl(asset, MediaVariantType.HERO)
-    }))
-  ];
+  const mediaAssetOptions = globalMediaAssets.map((asset) => ({
+    alt: asset.alt,
+    filename: asset.filename,
+    id: asset.id,
+    source: "global" as const,
+    tags: asset.tags,
+    thumbnailUrl: asset.thumbnailUrl,
+    url: asset.url
+  }));
   const canUpload = canUploadWithDriver(settings.mediaDriver);
 
   return (

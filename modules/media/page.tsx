@@ -1,6 +1,7 @@
 import { MediaVariantType, type Prisma } from "@prisma/client";
 import { getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
 import { nonEmptyStringArrayFromUnknown } from "@/lib/format";
+import { globalMediaAssets } from "@/lib/global-media-assets";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl, mediaAssetIdFromUrl } from "@/lib/media";
 import { summarizeMediaTags } from "@/lib/media-tags";
 import { prisma } from "@/lib/prisma";
@@ -16,16 +17,6 @@ export const dynamic = "force-dynamic";
 const pageSize = 24;
 const homeRecentSize = 8;
 const recentWindowDays = 30;
-const builtInAssets = [
-  {
-    alt: "Neutral admin template hero",
-    filename: "hero.svg",
-    height: 1000,
-    url: "/hero.svg",
-    width: 1400
-  }
-];
-
 type MediaPageProps = {
   searchParams: Promise<Record<string, string | undefined>>;
 };
@@ -97,7 +88,7 @@ function formatFromMime(mimeType: string) {
 export default async function MediaPage({ searchParams }: MediaPageProps) {
   const [user, params, settings] = await Promise.all([requireAdmin("media:manage"), searchParams, getSiteSettings()]);
   const filters = filtersFromParams(params);
-  const matchingBuiltInAssets = builtInAssets.filter((asset) => {
+  const matchingBuiltInAssets = globalMediaAssets.filter((asset) => {
     if (filters.kind === "other") return false;
     if (!filters.q) return true;
     const query = filters.q.toLocaleLowerCase();
@@ -196,9 +187,9 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
     ? matchingBuiltInAssets.map((asset) => ({
         alt: asset.alt,
         builtIn: true,
-        caption: "A reusable neutral hero illustration included with Showrunner.",
+        caption: asset.caption,
         createdAt: "",
-        credit: "Showrunner",
+        credit: asset.credit,
         displayUrl: asset.url,
         driver: "REPO",
         filename: asset.filename,
@@ -209,14 +200,14 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
         fullUrl: asset.url,
         height: asset.height,
         heroUrl: asset.url,
-        id: `built-in:${asset.filename}`,
+        id: asset.id,
         isDecorative: false,
         isHero: settings.heroImageUrl === asset.url,
         isLogo: settings.logoImageUrl === asset.url,
         isPrivate: false,
-        mimeType: "image/svg+xml",
+        mimeType: asset.mimeType,
         sizeBytes: 0,
-        tags: ["built-in", "hero"],
+        tags: asset.tags,
         updatedAt: "",
         usageContext: "hero",
         usageCount: 0,
@@ -267,7 +258,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       activeCount={activeCount}
       archivedCount={archivedCount}
       assets={assets}
-      builtInCount={builtInAssets.length}
+      builtInCount={globalMediaAssets.length}
       canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)}
       errorMessage={params.error === "missing-file" ? "Choose a file before uploading." : safeDecodedMessage(params.error)}
       filters={normalizedFilters}
