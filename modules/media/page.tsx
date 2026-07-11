@@ -12,7 +12,7 @@ import {
   setHeroImageAction,
   updateMediaAssetAction,
   uploadMediaAction } from "./actions";
-import { Button, Card, EqualGrid, Pagination, Switch, Table } from "@/components/ui";
+import { Button, Card, EqualGrid, Pagination, Switch, Table, UploadField } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -79,10 +79,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       <p className="lead lead-compact">
         Current media mode: <strong>{settings.mediaDriver}</strong>. Server asset folders work on a mounted volume; cloud modes require matching storage env vars.
       </p>
-      <div className="ui-field">
-        <label htmlFor="media-file">Image file</label>
-        <input id="media-file" name="file" type="file" accept="image/*" disabled={!canUpload} />
-      </div>
+      <UploadField id="media-file" name="file" accept="image/*" disabled={!canUpload} label="Choose an image or drop it here" />
       <div className="ui-field">
         <label htmlFor="media-alt">Alt text</label>
         <input id="media-alt" name="alt" disabled={!canUpload} />

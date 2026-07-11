@@ -7,6 +7,7 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } fro
 import { MediaDriver, MediaVariantType, type MediaAsset } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import sharp from "sharp";
+import sanitizeHtml from "sanitize-html";
 import { prisma } from "@/lib/prisma";
 import { isSafeExternalHttpsUrl } from "@/lib/security/urls";
 import { getCurrentSiteId } from "@/lib/site";
@@ -16,7 +17,8 @@ const allowedImageTypes = new Map([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
   ["image/webp", "webp"],
-  ["image/gif", "gif"]
+  ["image/gif", "gif"],
+  ["image/svg+xml", "svg"]
 ]);
 const allowedPrivateFileTypes = new Map([...allowedImageTypes, ["application/pdf", "pdf"]]);
 const maxUploadBytes = 12 * 1024 * 1024;
@@ -250,7 +252,7 @@ async function runVirusScanHook(file: File) {
 }
 
 async function detectUploadMimeType(file: File) {
-  const bytes = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const bytes = new Uint8Array(await file.slice(0, 512).arrayBuffer());
   const ascii = String.fromCharCode(...bytes);
 
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
@@ -260,8 +262,36 @@ async function detectUploadMimeType(file: File) {
   if (ascii.startsWith("GIF87a") || ascii.startsWith("GIF89a")) return "image/gif";
   if (ascii.startsWith("RIFF") && ascii.slice(8, 12) === "WEBP") return "image/webp";
   if (ascii.startsWith("%PDF-")) return "application/pdf";
+  if (/<svg(?:\s|>)/i.test(ascii.replace(/^\uFEFF/, "").replace(/^\s*<\?xml[^>]*>\s*/i, ""))) return "image/svg+xml";
 
   return "";
+}
+
+async function sanitizeSvgUpload(file: File) {
+  if (file.type.toLowerCase() !== "image/svg+xml") return file;
+
+  const source = await file.text();
+  const sanitized = sanitizeHtml(source, {
+    allowedTags: [
+      "svg", "g", "defs", "symbol", "use", "title", "desc", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon",
+      "text", "tspan", "linearGradient", "radialGradient", "stop", "clipPath", "mask", "pattern", "filter", "feGaussianBlur",
+      "feOffset", "feColorMatrix", "feBlend", "feComposite", "image"
+    ],
+    allowedAttributes: {
+      "*": ["id", "class", "transform", "opacity", "fill", "fill-opacity", "fill-rule", "stroke", "stroke-width", "stroke-opacity", "stroke-linecap", "stroke-linejoin", "clip-path", "mask", "filter"],
+      svg: ["xmlns", "width", "height", "viewBox", "preserveAspectRatio", "role", "aria-label"],
+      path: ["d"], rect: ["x", "y", "width", "height", "rx", "ry"], circle: ["cx", "cy", "r"], ellipse: ["cx", "cy", "rx", "ry"],
+      line: ["x1", "y1", "x2", "y2"], polyline: ["points"], polygon: ["points"], text: ["x", "y", "dx", "dy", "text-anchor"],
+      tspan: ["x", "y", "dx", "dy"], linearGradient: ["x1", "y1", "x2", "y2", "gradientUnits", "gradientTransform"],
+      radialGradient: ["cx", "cy", "r", "fx", "fy", "gradientUnits", "gradientTransform"], stop: ["offset", "stop-color", "stop-opacity"],
+      use: ["href", "xlink:href", "x", "y", "width", "height"], image: ["href", "xlink:href", "x", "y", "width", "height", "preserveAspectRatio"]
+    },
+    allowedSchemes: ["data"],
+    parser: { lowerCaseAttributeNames: false, lowerCaseTags: false }
+  }).trim();
+
+  if (!/<svg(?:\s|>)/i.test(sanitized)) throw new Error("That SVG does not contain a valid image.");
+  return new File([sanitized], file.name, { type: "image/svg+xml", lastModified: file.lastModified });
 }
 
 async function assertUploadFile(file: File, metadata: MediaUploadMetadata, validation: MediaUploadValidationOptions = {}) {
@@ -275,7 +305,7 @@ async function assertUploadFile(file: File, metadata: MediaUploadMetadata, valid
   if (!allowedMimeTypes.has(file.type.toLowerCase())) {
     throw new Error(
       requireImage
-        ? "Upload a JPG, PNG, WebP, or GIF image. SVG uploads need a sanitizer before they can be enabled."
+        ? "Upload a JPG, PNG, WebP, GIF, or SVG image."
         : "Upload a supported file type."
     );
   }
@@ -575,15 +605,16 @@ export async function uploadMedia(
   validation: MediaUploadValidationOptions = {}
 ) {
   const currentSiteId = siteId || (await getCurrentSiteId());
+  const uploadFile = await sanitizeSvgUpload(file);
 
   if (metadata.isPrivate && driver !== MediaDriver.S3 && driver !== MediaDriver.R2 && driver !== MediaDriver.SERVER_ASSETS) {
     throw new Error("Private media delivery is currently supported only for server assets, S3, or R2 assets.");
   }
 
-  const safeAlt = await assertUploadFile(file, metadata, validation);
-  const scanResult = await runVirusScanHook(file);
+  const safeAlt = await assertUploadFile(uploadFile, metadata, validation);
+  const scanResult = await runVirusScanHook(uploadFile);
   const adapter = getMediaAdapter(driver);
-  const stored = await adapter.upload(file, { ...metadata, siteId: currentSiteId });
+  const stored = await adapter.upload(uploadFile, { ...metadata, siteId: currentSiteId });
   const folder = normalizeMediaFolder(metadata.folder);
   const assetId = randomUUID();
   const isPrivate = Boolean(metadata.isPrivate);
@@ -599,8 +630,8 @@ export async function uploadMedia(
         storageProviderId: stored.storageProviderId || "",
         url: isPrivate ? assetRoute : stored.url || assetRoute,
         filename: file.name,
-        mimeType: file.type || "application/octet-stream",
-        sizeBytes: file.size,
+        mimeType: uploadFile.type || "application/octet-stream",
+        sizeBytes: uploadFile.size,
         folder,
         tags: mediaTagsFromInput(metadata.tags),
         caption: metadata.caption?.trim() || "",

@@ -2,11 +2,12 @@
 
 import NextImage from "next/image";
 import { useId, useState, type ReactNode } from "react";
-import { ImageIcon, Images, Upload } from "lucide-react";
+import { Images, Upload } from "lucide-react";
 import { Button } from "./button";
 import { Modal } from "./modal";
 import { Tab, Tabs } from "./tabs";
 import { cx } from "./utils";
+import { UploadField } from "./upload-field";
 
 export type AssetPickerAsset = {
   alt: string;
@@ -86,25 +87,21 @@ export function AssetPicker({
           <div className="asset-picker-panel">
             <HiddenFields fields={uploadFields} formId={uploadFormId} />
             <input form={uploadFormId} name="alt" type="hidden" value={defaultAlt} />
-            <input
+            <UploadField
               accept="image/*"
-              className="ui-sr-only"
+              description="JPG, PNG, WebP, GIF, or SVG · saved to your reusable asset library"
               disabled={!canUpload}
               form={uploadFormId}
               id={fileInputId}
+              label="Choose an image or drop it here"
               name="file"
               onChange={(event) => setFileName(event.currentTarget.files?.[0]?.name || "")}
               required
-              type="file"
             />
-            <label className={canUpload ? "asset-picker-upload-zone" : "asset-picker-upload-zone is-disabled"} htmlFor={fileInputId}>
-              <ImageIcon size={24} />
-              <strong>{fileName || "Choose image file"}</strong>
-              <span>{canUpload ? "Upload a new asset for this placement." : uploadUnavailableMessage}</span>
-            </label>
+            {!canUpload ? <p className="muted-text ui-zero">{uploadUnavailableMessage}</p> : null}
             <Button disabled={!canUpload} form={uploadFormId} type="submit">
               <Upload size={16} />
-              Upload image
+              {fileName ? `Upload ${fileName}` : "Upload to asset library"}
             </Button>
           </div>
         ) : (

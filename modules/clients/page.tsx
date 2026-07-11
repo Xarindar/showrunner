@@ -20,7 +20,7 @@ import { enumLabel, formatDateTime, stringArrayFromUnknown } from "@/lib/format"
 import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Button, ButtonLink, EqualGrid, Pagination, Switch, Table, Tooltip } from "@/components/ui";
+import { Button, ButtonLink, EqualGrid, Pagination, Switch, Table, Tooltip, UploadField } from "@/components/ui";
 import {
   createClientAction,
   createClientSegmentAction,
@@ -442,10 +442,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
   const dataToolsModal = (
     <div className="form-grid">
       <form action={importClientsCsvAction} className="form-grid" encType="multipart/form-data">
-        <div className="ui-field">
-          <label htmlFor="client-csv">CSV file</label>
-          <input id="client-csv" name="file" type="file" accept=".csv,text/csv" required />
-        </div>
+        <UploadField id="client-csv" name="file" accept=".csv,text/csv" required label="Choose a client CSV or drop it here" variant="data" />
         <div className="clients-modal-actions">
           <Button type="submit" variant="secondary">
             <Upload size={16} />

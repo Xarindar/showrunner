@@ -17,7 +17,7 @@ import {
   deleteClientNoteAction,
   mergeClientsAction,
   updateClientAction } from "../actions";
-import { Button, ButtonLink, Card, EqualGrid, Pagination, Switch, Table } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid, Pagination, Switch, Table, UploadField } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 import { ClientNotesDocumentsCard } from "./client-notes-documents-card";
 import { ClientProfileCard } from "./client-profile-card";
@@ -708,17 +708,15 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           <input id="client-document-category" name="category" placeholder="contract, release, gallery" />
         </div>
       </EqualGrid>
-      <div className="ui-field">
-        <label htmlFor="client-document-file">Document file</label>
-        <input
-          id="client-document-file"
-          name="file"
-          type="file"
-          accept={clientDocumentAccept}
-          required
-          disabled={!clientDocumentUploadEnabled}
-        />
-      </div>
+      <UploadField
+        id="client-document-file"
+        name="file"
+        accept={clientDocumentAccept}
+        required
+        disabled={!clientDocumentUploadEnabled}
+        label="Choose a document or drop it here"
+        variant="document"
+      />
       {!clientDocumentUploadEnabled ? (
         <p className="muted-text ui-zero">Document uploads need Server asset folder, S3, or R2 media storage configured.</p>
       ) : null}
