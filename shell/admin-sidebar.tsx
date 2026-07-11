@@ -38,23 +38,27 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, userEmail,
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const mobileHeaderContext = useAdminMobileHeaderContext();
+  const activeModule = moduleRegistry.find((item) => item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href));
+  const resolvedMobileHeader = mobileHeaderContext ?? (activeModule ? { title: activeModule.label } : null);
   const canUpdateSettings = hasAdminPermission({ role: userRole }, "settings:update");
 
   const closeMenu = () => setMenuOpen(false);
 
   return (
     <>
-      <header className={`admin-mobile-bar ${mobileHeaderContext ? "is-contextual" : ""}`}>
+      <header className={`admin-mobile-bar ${resolvedMobileHeader ? "is-contextual" : ""}`}>
         <Link href="/admin" className="brand" onClick={closeMenu}>
           <SidebarBrand businessName={businessName} logoUrl={logoUrl} />
         </Link>
-        {mobileHeaderContext ? (
+        {resolvedMobileHeader ? (
           <>
-            <Link className="admin-mobile-context-back" href={mobileHeaderContext.backHref} onClick={closeMenu}>
-              <ArrowLeft size={17} />
-              <span>Back</span>
-            </Link>
-            <strong className="admin-mobile-context-title">{mobileHeaderContext.title}</strong>
+            {mobileHeaderContext ? (
+              <Link className="admin-mobile-context-back" href={mobileHeaderContext.backHref} onClick={closeMenu}>
+                <ArrowLeft size={17} />
+                <span>Back</span>
+              </Link>
+            ) : <span aria-hidden="true" />}
+            <strong className="admin-mobile-context-title">{resolvedMobileHeader.title}</strong>
           </>
         ) : null}
         <button

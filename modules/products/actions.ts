@@ -203,8 +203,8 @@ function productMediaReturnPath(input: { previewMedia?: string; productId: strin
 }
 
 function productBundlePath(productId: string, params?: Record<string, string>) {
-  // Bundle editing now lives inside the product editor's Bundle tab.
-  return productEditPath(productId, { ...params, tab: "bundle" });
+  const query = new URLSearchParams(params).toString();
+  return `/admin/modules/products/${productId}/bundles${query ? `?${query}` : ""}`;
 }
 
 function hasUpload(file: FormDataEntryValue | null): file is File {

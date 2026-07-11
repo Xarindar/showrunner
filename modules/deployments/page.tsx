@@ -91,7 +91,7 @@ export default async function DeploymentsPage({ searchParams }: DeploymentsPageP
       <header className="page-header">
         <div>
           <p className="eyebrow">Internal</p>
-          <h1>Client deployments</h1>
+          <h1>Deployments</h1>
           <p>Build a client-specific Showrunner handoff with selected modules, an expiring claim link, and a GitHub repository target.</p>
         </div>
       </header>

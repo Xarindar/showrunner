@@ -284,7 +284,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       <header className="page-header">
         <div>
           <p className="eyebrow">Billing</p>
-          <h1>Quotes, invoices, and documents</h1>
+          <h1>Billing</h1>
           <p>Create billing records, compute totals server-side, attach documents, and track status through paid or accepted.</p>
         </div>
       </header>

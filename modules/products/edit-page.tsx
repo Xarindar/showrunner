@@ -25,11 +25,9 @@ import { AssetPicker, Button, ButtonLink, Switch, SwitchReveal, type AssetPicker
 import {
   assignProductCategoryAction,
   attachProductMediaAction,
-  createBundleComponentAction,
   createProductOptionAction,
   createProductVariantAction,
   generateProductVariantsFromOptionsAction,
-  removeBundleComponentAction,
   removeProductCategoryAction,
   removeProductMediaAction,
   setPrimaryProductMediaAction,
@@ -91,6 +89,10 @@ function productMediaPreviewHref(productId: string, mediaId: string) {
   return `/admin/modules/products/${productId}?${query.toString()}`;
 }
 
+function productBundleHref(productId: string) {
+  return `/admin/modules/products/${productId}/bundles`;
+}
+
 function variantOptionLabel(variant: ProductWithEditorData["variants"][number]) {
   const optionValues = variant.optionValues
     .map(({ optionValue }) => `${optionValue.option.name}: ${optionValue.value}`)
@@ -122,7 +124,7 @@ function seoSummary(product: { seoTitle: string | null; seoDescription: string |
 export default async function ProductEditPage({ productId, searchParams }: ProductEditPageProps) {
   await requireAdmin("products:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [product, categories, mediaAssets, bundleProducts] = await Promise.all([
+  const [product, categories, mediaAssets] = await Promise.all([
     prisma.product.findFirst({
       where: { id: productId, siteId: settings.siteId },
       include: {
@@ -164,17 +166,6 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
       where: { siteId: settings.siteId, deletedAt: null, isPrivate: false },
       orderBy: { createdAt: "desc" },
       take: 40
-    }),
-    prisma.product.findMany({
-      where: { id: { not: productId }, siteId: settings.siteId, status: { not: ProductStatus.ARCHIVED } },
-      include: {
-        variants: {
-          where: { isActive: true },
-          orderBy: [{ isDefault: "desc" }, { sortOrder: "asc" }, { name: "asc" }]
-        }
-      },
-      orderBy: { name: "asc" },
-      take: 200
     })
   ]);
 
@@ -192,7 +183,7 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
   const selectedMediaUrl = selectedMedia ? productMediaUrl(selectedMedia) : "";
   const selectedMediaIsPrimary = selectedMedia?.role === ProductMediaRole.PRIMARY;
   const isBundle = product.type === ProductType.BUNDLE;
-  const showBundleTab = isBundle || product.bundleComponents.length > 0;
+  const hasBundleContents = product.bundleComponents.length > 0;
   const priceIsZero = product.basePriceCents === 0;
   const showZeroPriceWarning = priceIsZero && product.status !== ProductStatus.ARCHIVED;
   const taxRuleSummary = settings.commerceTaxEnabled
@@ -473,8 +464,15 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
                     </option>
                   ))}
                 </select>
-                {!showBundleTab ? <small className="muted-text">Choose Bundle and save to compose this from other products.</small> : null}
-                {isBundle && product.bundleComponents.length ? (
+                {isBundle || hasBundleContents ? (
+                  <ButtonLink href={productBundleHref(product.id)} size="sm" variant="secondary">
+                    <Boxes size={15} />
+                    Open bundle builder
+                  </ButtonLink>
+                ) : (
+                  <small className="muted-text">Choose Bundle and save to compose this from other products.</small>
+                )}
+                {isBundle && hasBundleContents ? (
                   <small className="muted-text">Changing away from Bundle keeps components but stops selling them together.</small>
                 ) : null}
               </div>
@@ -747,127 +745,12 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
     </section>
   );
 
-  const bundleContent = (
-    <section className="studio-panel">
-      <div className="studio-section-head">
-        <div>
-          <p className="catalog-rail-label">Bundle</p>
-          <h2>Included products</h2>
-        </div>
-        <Boxes size={20} />
-      </div>
-
-      {product.bundleComponents.length ? (
-        <div className="catalog-table-scroll">
-          <table className="catalog-product-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Variant</th>
-                <th>Qty</th>
-                <th>Optional</th>
-                <th aria-label="Remove" />
-              </tr>
-            </thead>
-            <tbody>
-              {product.bundleComponents.map((component) => (
-                <tr key={component.id}>
-                  <td>
-                    <span className="catalog-cell-text" title={component.componentProduct.name}>{component.componentProduct.name}</span>
-                    <small className="muted-text">{component.componentProduct.sku || component.notes || "No SKU"}</small>
-                  </td>
-                  <td>
-                    <span className="catalog-cell-text">{component.componentVariant?.name || "Default"}</span>
-                  </td>
-                  <td>{component.quantity}</td>
-                  <td>{component.isOptional ? "Yes" : "No"}</td>
-                  <td>
-                    <form action={removeBundleComponentAction}>
-                      <input name="id" type="hidden" value={component.id} />
-                      <input name="productId" type="hidden" value={product.id} />
-                      <Button aria-label="Remove component" size="sm" type="submit" variant="ghost">
-                        <Trash2 size={14} />
-                      </Button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="catalog-empty-state">
-          <Boxes size={28} />
-          <h3>No bundle items</h3>
-          <p>Add products and quantities to sell them together as a bundle.</p>
-        </div>
-      )}
-
-      <details className="product-editor-advanced" open={!product.bundleComponents.length}>
-        <summary>
-          <span>Add a bundle component</span>
-          <small>{bundleProducts.length ? `${bundleProducts.length} products available` : "No other products"}</small>
-        </summary>
-        <form action={createBundleComponentAction} className="studio-action-form">
-          <input name="productId" type="hidden" value={product.id} />
-          <div className="catalog-form-grid is-two">
-            <div className="ui-field">
-              <label htmlFor="componentProductId">Product</label>
-              <select id="componentProductId" name="componentProductId">
-                {bundleProducts.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="ui-field">
-              <label htmlFor="componentVariantId">Variant</label>
-              <select defaultValue="" id="componentVariantId" name="componentVariantId">
-                <option value="">Default / any active variant</option>
-                {bundleProducts.flatMap((item) =>
-                  item.variants.map((variant) => (
-                    <option key={variant.id} value={variant.id}>
-                      {item.name} - {variant.name}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-          </div>
-          <div className="catalog-form-grid is-three">
-            <div className="ui-field">
-              <label htmlFor="bundleQuantity">Quantity</label>
-              <input defaultValue="1" id="bundleQuantity" max="999" min="1" name="quantity" type="number" />
-            </div>
-            <div className="ui-field">
-              <label htmlFor="bundleSort">Sort</label>
-              <input defaultValue={product.bundleComponents.length} id="bundleSort" name="sortOrder" type="number" />
-            </div>
-            <Switch label="Optional component" name="isOptional" variant="inline" />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="bundleNotes">Notes</label>
-            <input id="bundleNotes" name="notes" />
-          </div>
-          <Button disabled={!bundleProducts.length} type="submit" variant="secondary">
-            <Plus size={16} />
-            Add bundle item
-          </Button>
-        </form>
-      </details>
-    </section>
-  );
-
   const tabs: ProductEditorTab[] = [
     { content: detailsContent, icon: <FileText size={15} />, id: "details", label: "Details" },
     { content: variantsContent, icon: <Layers3 size={15} />, id: "variants", label: "Variants" },
     { content: mediaContent, icon: <Images size={15} />, id: "media", label: "Media" },
     { content: organizationContent, icon: <Tags size={15} />, id: "organization", label: "Organization" }
   ];
-  if (showBundleTab) {
-    tabs.push({ content: bundleContent, icon: <Boxes size={15} />, id: "bundle", label: "Bundle" });
-  }
 
   return (
     <div className="product-studio-page product-editor-page">

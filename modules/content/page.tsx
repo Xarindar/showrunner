@@ -85,12 +85,13 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
     <div className="stack content-studio">
       <header className="page-header content-studio-header">
         <div>
-          <p className="eyebrow">Content</p>
-          <h1>Content studio</h1>
-          <p>Everything below is what visitors see for the selected venue: hero, featured booking card, and testimonials.</p>
+          <h1>Content</h1>
         </div>
-        <VenueTabs active={profileKey} />
       </header>
+
+      <div className="content-studio-profile-bar">
+        <VenueTabs active={profileKey} />
+      </div>
 
       {params.saved ? <div className="success-message">{savedContentMessage(params.saved, profile.label)}</div> : null}
       {params.error ? <div className="error">{decodeURIComponent(params.error)}</div> : null}

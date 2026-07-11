@@ -64,7 +64,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       <header className="page-header">
         <div>
           <p className="eyebrow">Users</p>
-          <h1>Admin access</h1>
+          <h1>Users</h1>
           <p>Owner-managed admin accounts, role assignment, and access changes.</p>
         </div>
       </header>

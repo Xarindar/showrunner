@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import NextImage from "next/image";
-import { Check, ChevronLeft, ChevronRight, Image as ImageIcon, MessageSquareQuote, Plus, Save, Star, Trash2, Upload } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Image as ImageIcon, Plus, Save, Star, Trash2, Upload } from "lucide-react";
 import { Button, Card, Field, Input, Modal, Switch } from "@/components/ui";
 import type { HeroMediaAssetOption } from "./hero-content-editor";
 import type { ContentTestimonial } from "./testimonials-data";
@@ -181,10 +181,7 @@ export function TestimonialsEditor({
         <span className="ui-badge">{testimonials.length}</span>
       </div>
       <div className="content-hero-toolbar-actions">
-        <Button onClick={openAdd} size="sm" type="button">
-          <Plus size={16} aria-hidden="true" />
-          Add testimonial
-        </Button>
+        <span className="content-testimonial-toolbar-note">Review card strip</span>
       </div>
     </div>
   );
@@ -221,6 +218,12 @@ export function TestimonialsEditor({
         </button>
 
         <div className="content-proof-rail-viewport" ref={railRef}>
+          <button className="content-testimonial-add-card" onClick={openAdd} type="button">
+            <span className="content-testimonial-add-icon"><Plus size={20} aria-hidden="true" /></span>
+            <strong>Add review</strong>
+            <span>Create a card with a quote, rating, and photo.</span>
+          </button>
+
           {testimonials.map((testimonial) => (
             <div className="content-testimonial-rail-item" key={testimonial.id}>
               <TestimonialPreviewCard
@@ -253,13 +256,6 @@ export function TestimonialsEditor({
             </div>
           ))}
 
-          {testimonials.length === 0 ? (
-            <button className="content-testimonial-empty" onClick={openAdd} type="button">
-              <MessageSquareQuote size={26} aria-hidden="true" />
-              <strong>Add your first testimonial</strong>
-              <span>Pick a photo, write the quote, and preview the card before it goes live.</span>
-            </button>
-          ) : null}
         </div>
 
         <button

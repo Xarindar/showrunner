@@ -189,7 +189,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       <header className="page-header">
         <div>
           <p className="eyebrow">Analytics</p>
-          <h1>Events, attribution, and reporting</h1>
+          <h1>Analytics</h1>
           <p>Track standard events, summarize module performance, and define conversion goals for future widgets and automations.</p>
         </div>
         <ButtonLink variant="secondary" href="/admin/modules/analytics/export">

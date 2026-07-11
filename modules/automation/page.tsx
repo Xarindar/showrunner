@@ -295,7 +295,7 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
       <header className="page-header">
         <div>
           <p className="eyebrow">Automation</p>
-          <h1>Rules, runs, and webhooks</h1>
+          <h1>Automation</h1>
           <p>Define trigger-action rules, keep run records, and prepare signed outbound webhooks for integrations.</p>
         </div>
       </header>

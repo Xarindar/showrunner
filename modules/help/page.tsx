@@ -63,7 +63,7 @@ export default async function HelpPage() {
       <header className="page-header">
         <div>
           <p className="eyebrow">Help</p>
-          <h1>Admin user guide</h1>
+          <h1>Help</h1>
           <p>Setup status, active warnings, and common workflows for the modules enabled in this admin.</p>
         </div>
         <ButtonLink href="/admin/modules/settings" variant="secondary">

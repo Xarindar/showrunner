@@ -169,7 +169,7 @@ export function PaymentsWorkspace({
       <header className="page-header">
         <div>
           <p className="eyebrow">Payments</p>
-          <h1>Get paid</h1>
+          <h1>Payments</h1>
           <p>
             {oneClickAvailable
               ? "Connect your own payment accounts with one click and choose how customers pay. Tokens are stored encrypted, and charges settle directly to your own account."

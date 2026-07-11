@@ -233,7 +233,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
       <header className="page-header">
         <div>
           <p className="eyebrow">Portfolio</p>
-          <h1>Photography galleries and proofing</h1>
+          <h1>Portfolio</h1>
           <p>Create galleries, organize image records, issue access records, and prepare proofing workflows.</p>
         </div>
       </header>

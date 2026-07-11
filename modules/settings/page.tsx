@@ -78,7 +78,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       <header className="page-header">
         <div>
           <p className="eyebrow">Settings</p>
-          <h1>Settings dashboard</h1>
+          <h1>Settings</h1>
           <p>Business details, visual basics, media mode, module state, and platform foundations for multi-site, roles, audit, and policy controls.</p>
         </div>
       </header>

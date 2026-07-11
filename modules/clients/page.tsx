@@ -462,7 +462,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
       <header className="page-header">
         <div>
           <p className="eyebrow">Clients</p>
-          <h1>Client book</h1>
+          <h1>Clients</h1>
           <p>Track long-term relationships, appointment history, and private notes.</p>
         </div>
       </header>

@@ -440,7 +440,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
       <header className="page-header">
         <div>
           <p className="eyebrow">Communications</p>
-          <h1>Messages and delivery records</h1>
+          <h1>Communications</h1>
           <p>Email templates, manual delivery logs, and suppression controls for transactional and marketing guardrails.</p>
         </div>
       </header>

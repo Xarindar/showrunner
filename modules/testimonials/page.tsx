@@ -128,7 +128,7 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
       <header className="page-header">
         <div>
           <p className="eyebrow">Testimonials</p>
-          <h1>Reviews and social proof</h1>
+          <h1>Testimonials</h1>
           <p>Collect first-party quotes, moderate submissions, and prepare approved testimonials for the rebuilt client surface.</p>
         </div>
       </header>

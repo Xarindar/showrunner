@@ -6149,9 +6149,9 @@ button.button:disabled,
 }
 
 .admin-main > .stack > .page-header {
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
-  margin-bottom: var(--space-3);
-  padding-bottom: var(--space-4);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 62%, transparent);
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-3);
 }
 
 .admin-main > .stack > .page-header,
@@ -6165,7 +6165,19 @@ button.button:disabled,
 }
 
 .admin-main > .stack > .page-header {
-  background: color-mix(in srgb, var(--color-surface-sunken) 42%, var(--color-page));
+  background: color-mix(in srgb, var(--color-surface-sunken) 20%, var(--color-page));
+}
+
+/* Module mastheads are intentionally quiet: module name only. */
+.admin-main > .stack > .page-header > div > .eyebrow,
+.admin-main > .stack > .page-header > div > h1 + p {
+  display: none;
+}
+
+.admin-main > .stack > .page-header h1 {
+  font-size: 1.18rem !important;
+  font-weight: 650;
+  margin: 0;
 }
 
 .admin-main > .stack > section.form-grid:not(.subpanel) {
@@ -7501,6 +7513,7 @@ button.button:disabled,
   display: grid;
   gap: var(--space-2);
   grid-template-columns: auto minmax(0, 1fr) auto;
+  order: 1;
 }
 
 .content-proof-rail-viewport {
@@ -7560,17 +7573,17 @@ button.button:disabled,
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hairline);
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
   grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: 100%;
-  padding: var(--space-4);
+  height: 184px;
+  padding: var(--space-3);
   position: relative;
   text-align: left;
   transition:
     background-color var(--motion-fast) ease,
     border-color var(--motion-fast) ease,
     box-shadow var(--motion-fast) ease;
-  width: 300px;
+  width: 272px;
 }
 
 .content-testimonial-card[data-clickable="true"] {
@@ -7602,10 +7615,14 @@ button.button:disabled,
 
 .content-testimonial-quote {
   color: var(--color-text);
+  display: -webkit-box;
   font-size: 1.02rem;
   line-height: var(--leading-relaxed);
   margin: 0;
+  overflow: hidden;
   overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .content-testimonial-card[data-placeholder="true"] .content-testimonial-quote {
@@ -7718,32 +7735,84 @@ button.button:disabled,
   border-color: var(--color-brand);
 }
 
+.content-testimonial-add-card {
+  align-content: center;
+  background: color-mix(in srgb, var(--color-brand) 5%, var(--color-surface));
+  border: 1px dashed color-mix(in srgb, var(--color-brand-border) 74%, var(--color-border));
+  border-radius: var(--radius-card);
+  color: var(--color-text);
+  cursor: pointer;
+  display: grid;
+  flex: 0 0 210px;
+  gap: 5px;
+  height: 184px;
+  justify-items: center;
+  padding: var(--space-4);
+  scroll-snap-align: start;
+  text-align: center;
+}
+
+.content-testimonial-add-card:hover {
+  background: color-mix(in srgb, var(--color-brand) 9%, var(--color-surface));
+  border-color: var(--color-brand);
+}
+
+.content-testimonial-add-icon {
+  align-items: center;
+  background: var(--color-brand);
+  border-radius: 999px;
+  color: white;
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  margin-bottom: 3px;
+  width: 38px;
+}
+
+.content-testimonial-add-card > span:last-child,
+.content-testimonial-toolbar-note {
+  color: var(--color-muted);
+  font-size: var(--type-caption);
+}
+
 .content-studio-header {
-  align-items: end;
+  align-items: center;
+  min-height: 52px;
+}
+
+.admin-main > .stack > .content-studio-header {
+  padding-bottom: 0;
+}
+
+.content-studio-header h1 {
+  margin-bottom: 0;
+}
+
+.content-studio-profile-bar {
+  align-items: center;
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  justify-content: space-between;
+  justify-content: flex-end;
 }
 
 .content-venue-tabs {
-  background: color-mix(in srgb, var(--color-border) 26%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
-  border-radius: 999px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
   display: inline-flex;
-  gap: 4px;
-  padding: 4px;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
 }
 
 .content-venue-tab {
   align-items: center;
-  border-radius: 999px;
+  border-radius: 0;
   color: var(--color-muted);
   display: inline-flex;
-  font-size: 1rem;
-  font-weight: 780;
-  min-height: 40px;
-  padding: 0 var(--space-4);
+  font-size: var(--type-small);
+  font-weight: 680;
+  min-height: 36px;
+  padding: 0 var(--space-3);
   text-decoration: none;
   transition:
     background-color var(--motion-fast) ease,
@@ -7755,9 +7824,13 @@ button.button:disabled,
 }
 
 .content-venue-tab[data-active="true"] {
-  background: var(--color-surface);
-  box-shadow: var(--shadow-raised);
+  background: var(--color-surface-sunken);
+  box-shadow: inset 0 -2px 0 var(--color-brand);
   color: var(--color-text);
+}
+
+.content-venue-tab + .content-venue-tab {
+  border-left: 1px solid var(--color-border);
 }
 
 .content-featured-editor-card {
@@ -7994,10 +8067,18 @@ button.button:disabled,
 
 .content-curation-bar {
   align-items: end;
+  background: color-mix(in srgb, var(--color-surface-sunken) 36%, transparent);
+  border-radius: var(--radius-control);
   display: grid;
   gap: var(--space-3);
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  margin-bottom: var(--space-4);
+  margin-top: var(--space-3);
+  order: 2;
+  padding: var(--space-3);
+}
+
+.content-testimonial-shell > .content-hero-hint {
+  order: 3;
 }
 
 .content-curation-bar .ui-button {
@@ -8050,8 +8131,8 @@ button.button:disabled,
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .content-studio-header {
-    align-items: start;
+  .content-studio-profile-bar {
+    justify-content: flex-start;
   }
 }
 
@@ -8065,7 +8146,12 @@ button.button:disabled,
 }
 
 .content-testimonial-compose[data-view="compose"] {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-raised);
   grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+  padding: var(--space-4);
 }
 
 .content-testimonial-compose-preview {

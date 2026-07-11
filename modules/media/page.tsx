@@ -1,369 +1,268 @@
-import NextImage from "next/image";
-import { Archive, Folder, ImagePlus, RotateCcw, Star, Tag } from "lucide-react";
-import { MediaDriver, MediaVariantType, type Prisma } from "@prisma/client";
+import { MediaVariantType, type Prisma } from "@prisma/client";
 import { getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
-import { nonEmptyStringArrayFromUnknown, stringArrayCsv } from "@/lib/format";
-import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
+import { nonEmptyStringArrayFromUnknown } from "@/lib/format";
+import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl, mediaAssetIdFromUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
-  archiveMediaAssetAction,
-  restoreMediaAssetAction,
-  setHeroImageAction,
-  updateMediaAssetAction,
-  uploadMediaAction } from "./actions";
-import { Button, Card, EqualGrid, Pagination, Switch, Table, UploadField } from "@/components/ui";
-import { ModuleActionModals } from "@/components/ui/module-action-modals";
+  MediaLibraryWorkspace,
+  type MediaLibraryAsset,
+  type MediaLibraryFilters
+} from "./media-library-workspace";
 
 export const dynamic = "force-dynamic";
 
-const repoAssets = [
-{
-  filename: "hero.svg",
-  url: "/hero.svg",
-  alt: "Neutral admin template hero"
-}];
-
-const pageSize = 24;
+const pageSize = 48;
+const recentWindowDays = 30;
+const builtInAssets = [
+  {
+    alt: "Neutral admin template hero",
+    filename: "hero.svg",
+    height: 1000,
+    url: "/hero.svg",
+    width: 1400
+  }
+];
 
 type MediaPageProps = {
-  searchParams: Promise<{saved?: string;error?: string;page?: string;}>;
+  searchParams: Promise<Record<string, string | undefined>>;
 };
 
-function fileSizeLabel(bytes: number) {
-  if (!bytes) return "Unknown size";
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+function recentCutoffDate() {
+  return new Date(Date.now() - recentWindowDays * 24 * 60 * 60 * 1000);
 }
 
-function canUploadWithDriver(driver: MediaDriver) {
-  return isMediaUploadDriverConfigured(driver);
+function oneOf<T extends string>(value: string | undefined, values: readonly T[], fallback: T): T {
+  return values.includes(value as T) ? (value as T) : fallback;
+}
+
+function positiveInteger(value: string | undefined, fallback = 1) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function safeDecodedMessage(value: string | undefined) {
+  if (!value) return "";
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function savedMessage(value: string | undefined) {
+  const messages: Record<string, string> = {
+    archive: "Asset moved to the archive.",
+    hero: "Homepage hero updated.",
+    metadata: "Asset details saved.",
+    restore: "Asset restored to the active library.",
+    upload: "Asset uploaded and added to your library."
+  };
+  return value ? messages[value] || "Media changes saved." : "";
+}
+
+function filtersFromParams(params: Record<string, string | undefined>): MediaLibraryFilters {
+  return {
+    folder: (params.folder || "").trim().slice(0, 200),
+    kind: oneOf(params.kind, ["all", "image", "other"] as const, "all"),
+    page: positiveInteger(params.page),
+    q: (params.q || "").trim().slice(0, 180),
+    scope: oneOf(params.scope, ["all", "recent", "private", "needs-alt", "archived", "built-in"] as const, "all"),
+    sort: oneOf(params.sort, ["newest", "oldest", "name", "largest"] as const, "newest")
+  };
+}
+
+function orderByFor(sort: MediaLibraryFilters["sort"]): Prisma.MediaAssetOrderByWithRelationInput {
+  if (sort === "oldest") return { createdAt: "asc" };
+  if (sort === "name") return { filename: "asc" };
+  if (sort === "largest") return { sizeBytes: "desc" };
+  return { createdAt: "desc" };
+}
+
+function formatFromMime(mimeType: string) {
+  const subtype = mimeType.split("/")[1] || "";
+  return subtype.replace("svg+xml", "svg").toLocaleUpperCase();
 }
 
 export default async function MediaPage({ searchParams }: MediaPageProps) {
-  const user = await requireAdmin("media:manage");
-  const params = await searchParams;
-  const settings = await getSiteSettings();
-  const page = Math.max(1, Number(params.page || 1) || 1);
-  const activeMediaWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: null });
-  const archivedMediaWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: { not: null } });
-  const [mediaAssets, assetCount, archivedAssets, archivedCount, folderGroups] = await Promise.all([
-  prisma.mediaAsset.findMany({
-    where: activeMediaWhere,
-    include: { variants: { orderBy: { type: "asc" } } },
-    orderBy: { createdAt: "desc" },
-    skip: (page - 1) * pageSize,
-    take: pageSize
-  }),
-  prisma.mediaAsset.count({ where: activeMediaWhere }),
-  prisma.mediaAsset.findMany({
-    where: archivedMediaWhere,
-    orderBy: { deletedAt: "desc" },
-    take: 8
-  }),
-  prisma.mediaAsset.count({ where: archivedMediaWhere }),
-  prisma.mediaAsset.groupBy({
-    by: ["folder"],
-    where: activeMediaWhere,
-    _count: { _all: true },
-    orderBy: { folder: "asc" },
-    take: 8
-  })]
-  );
-  const pageCount = Math.max(1, Math.ceil(assetCount / pageSize));
-  const errorMessage = params.error === "missing-file" ? "Choose a file before uploading." : params.error;
+  const [user, params, settings] = await Promise.all([requireAdmin("media:manage"), searchParams, getSiteSettings()]);
+  const filters = filtersFromParams(params);
+  const matchingBuiltInAssets = builtInAssets.filter((asset) => {
+    if (filters.kind === "other") return false;
+    if (!filters.q) return true;
+    const query = filters.q.toLocaleLowerCase();
+    return asset.filename.toLocaleLowerCase().includes(query) || asset.alt.toLocaleLowerCase().includes(query);
+  });
+  const recentSince = recentCutoffDate();
+  const activeAccess = await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: null });
+  const archivedAccess = await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: { not: null } });
+  const baseAccess = filters.scope === "archived" ? archivedAccess : activeAccess;
+  const clauses: Prisma.MediaAssetWhereInput[] = [baseAccess];
 
-  const canUpload = canUploadWithDriver(settings.mediaDriver);
-  const uploadForm = (
-    <form action={uploadMediaAction} className="form-grid">
-      <p className="lead lead-compact">
-        Current media mode: <strong>{settings.mediaDriver}</strong>. Server asset folders work on a mounted volume; cloud modes require matching storage env vars.
-      </p>
-      <UploadField id="media-file" name="file" accept="image/*" disabled={!canUpload} label="Choose an image or drop it here" />
-      <div className="ui-field">
-        <label htmlFor="media-alt">Alt text</label>
-        <input id="media-alt" name="alt" disabled={!canUpload} />
-      </div>
-      <Switch disabled={!canUpload} label="Decorative image" name="isDecorative" variant="inline" />
-      <EqualGrid>
-        <div className="ui-field">
-          <label htmlFor="media-folder">Folder</label>
-          <input id="media-folder" name="folder" placeholder="portraits/spring" disabled={!canUpload} />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="media-tags">Tags</label>
-          <input id="media-tags" name="tags" placeholder="hero, portrait, proofing" disabled={!canUpload} />
-        </div>
-      </EqualGrid>
-      <EqualGrid>
-        <div className="ui-field">
-          <label htmlFor="media-caption">Caption</label>
-          <input id="media-caption" name="caption" disabled={!canUpload} />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="media-credit">Credit</label>
-          <input id="media-credit" name="credit" disabled={!canUpload} />
-        </div>
-      </EqualGrid>
-      <div className="ui-field">
-        <label htmlFor="media-usageContext">Usage context</label>
-        <input id="media-usageContext" name="usageContext" placeholder="homepage, proofing, product" disabled={!canUpload} />
-      </div>
-      <EqualGrid>
-        <div className="ui-field">
-          <label htmlFor="media-focalPointX">Focal X</label>
-          <input id="media-focalPointX" name="focalPointX" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="media-focalPointY">Focal Y</label>
-          <input id="media-focalPointY" name="focalPointY" defaultValue="0.5" inputMode="decimal" disabled={!canUpload} />
-        </div>
-      </EqualGrid>
-      <Switch disabled={!canUpload} label="Private delivery asset" name="isPrivate" variant="inline" />
-      <div className="module-modal-actions">
-        <Button type="submit" disabled={!canUpload}>
-          <ImagePlus size={18} />
-          Upload image
-        </Button>
-      </div>
-      {!canUpload ? (
-        <p className="lead lead-compact">
-          Switch media mode to Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images in Settings to enable uploads.
-        </p>
-      ) : null}
-    </form>
-  );
-  const repoAssetsPanel = (
-    <div className="stack">
-      {repoAssets.map((asset) => (
-        <div key={asset.url} className="asset-tile">
-          <NextImage src={asset.url} alt={asset.alt} width={500} height={375} unoptimized />
-          <div className="page-header ui-zero">
-            <span>{asset.filename}</span>
-            <form action={setHeroImageAction}>
-              <input type="hidden" name="url" value={asset.url} />
-              <Button type="submit" variant="secondary">
-                <Star size={16} />
-                Use hero
-              </Button>
-            </form>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  if (filters.scope === "recent") clauses.push({ createdAt: { gte: recentSince } });
+  if (filters.scope === "private") clauses.push({ isPrivate: true });
+  if (filters.scope === "needs-alt") {
+    clauses.push({
+      isDecorative: false,
+      OR: [{ alt: null }, { alt: "" }]
+    });
+  }
+  if (filters.scope === "built-in") clauses.push({ id: "__built_in_asset__" });
+  if (filters.folder) clauses.push({ folder: filters.folder });
+  if (filters.kind === "image") clauses.push({ mimeType: { startsWith: "image/", mode: "insensitive" } });
+  if (filters.kind === "other") clauses.push({ NOT: { mimeType: { startsWith: "image/", mode: "insensitive" } } });
+  if (filters.q) {
+    clauses.push({
+      OR: [
+        { filename: { contains: filters.q, mode: "insensitive" } },
+        { alt: { contains: filters.q, mode: "insensitive" } },
+        { caption: { contains: filters.q, mode: "insensitive" } },
+        { credit: { contains: filters.q, mode: "insensitive" } },
+        { folder: { contains: filters.q, mode: "insensitive" } },
+        { usageContext: { contains: filters.q, mode: "insensitive" } }
+      ]
+    });
+  }
+
+  const visibleWhere: Prisma.MediaAssetWhereInput = { AND: clauses };
+  const needsAltWhere: Prisma.MediaAssetWhereInput = {
+    AND: [activeAccess, { isDecorative: false, OR: [{ alt: null }, { alt: "" }] }]
+  };
+  const recentWhere: Prisma.MediaAssetWhereInput = { AND: [activeAccess, { createdAt: { gte: recentSince } }] };
+  const privateWhere: Prisma.MediaAssetWhereInput = { AND: [activeAccess, { isPrivate: true }] };
+
+  const [activeCount, archivedCount, recentCount, privateCount, needsAltCount, folderGroups, databaseResultCount] = await Promise.all([
+    prisma.mediaAsset.count({ where: activeAccess }),
+    prisma.mediaAsset.count({ where: archivedAccess }),
+    prisma.mediaAsset.count({ where: recentWhere }),
+    prisma.mediaAsset.count({ where: privateWhere }),
+    prisma.mediaAsset.count({ where: needsAltWhere }),
+    prisma.mediaAsset.groupBy({
+      by: ["folder"],
+      where: activeAccess,
+      _count: { _all: true },
+      orderBy: { folder: "asc" },
+      take: 24
+    }),
+    filters.scope === "built-in" ? Promise.resolve(matchingBuiltInAssets.length) : prisma.mediaAsset.count({ where: visibleWhere })
+  ]);
+
+  const resultCount = filters.scope === "built-in" ? matchingBuiltInAssets.length : databaseResultCount;
+  const pageCount = Math.max(1, Math.ceil(resultCount / pageSize));
+  const page = Math.min(filters.page, pageCount);
+  const normalizedFilters = { ...filters, page };
+  const heroAssetId = mediaAssetIdFromUrl(settings.heroImageUrl);
+  const logoAssetId = mediaAssetIdFromUrl(settings.logoImageUrl);
+
+  const databaseAssets = filters.scope === "built-in"
+    ? []
+    : await prisma.mediaAsset.findMany({
+        where: visibleWhere,
+        include: {
+          _count: {
+            select: {
+              clientFiles: true,
+              productMedia: true,
+              serviceCategories: true,
+              services: true
+            }
+          },
+          variants: {
+            select: { format: true, height: true, sizeBytes: true, type: true, width: true }
+          }
+        },
+        orderBy: orderByFor(filters.sort),
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      });
+
+  const assets: MediaLibraryAsset[] = filters.scope === "built-in"
+    ? matchingBuiltInAssets.map((asset) => ({
+        alt: asset.alt,
+        builtIn: true,
+        caption: "A reusable neutral hero illustration included with Showrunner.",
+        createdAt: "",
+        credit: "Showrunner",
+        displayUrl: asset.url,
+        driver: "REPO",
+        filename: asset.filename,
+        focalPointX: 0.5,
+        focalPointY: 0.5,
+        folder: "Built-in",
+        format: "SVG",
+        fullUrl: asset.url,
+        height: asset.height,
+        heroUrl: asset.url,
+        id: `built-in:${asset.filename}`,
+        isDecorative: false,
+        isHero: settings.heroImageUrl === asset.url,
+        isLogo: settings.logoImageUrl === asset.url,
+        isPrivate: false,
+        mimeType: "image/svg+xml",
+        sizeBytes: 0,
+        tags: ["built-in", "hero"],
+        updatedAt: "",
+        usageContext: "hero",
+        usageCount: 0,
+        variantCount: 0,
+        width: asset.width
+      }))
+    : databaseAssets.map((asset) => {
+        const preferredVariant =
+          asset.variants.find((variant) => variant.type === MediaVariantType.FULL) ||
+          asset.variants.find((variant) => variant.type === MediaVariantType.HERO) ||
+          asset.variants.find((variant) => variant.type === MediaVariantType.CARD) ||
+          asset.variants[0];
+        const usageCount = asset._count.clientFiles + asset._count.productMedia + asset._count.serviceCategories + asset._count.services;
+        return {
+          alt: asset.alt || "",
+          caption: asset.caption,
+          createdAt: asset.createdAt.toISOString(),
+          credit: asset.credit,
+          displayUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
+          driver: asset.driver,
+          filename: asset.filename,
+          focalPointX: asset.focalPointX,
+          focalPointY: asset.focalPointY,
+          folder: asset.folder,
+          format: preferredVariant?.format?.toLocaleUpperCase() || formatFromMime(asset.mimeType),
+          fullUrl: mediaAssetDisplayUrl(asset, MediaVariantType.FULL),
+          height: preferredVariant?.height || 0,
+          heroUrl: mediaAssetDisplayUrl(asset, MediaVariantType.HERO),
+          id: asset.id,
+          isDecorative: asset.isDecorative,
+          isHero: heroAssetId === asset.id,
+          isLogo: logoAssetId === asset.id,
+          isPrivate: asset.isPrivate,
+          mimeType: asset.mimeType,
+          sizeBytes: asset.sizeBytes || preferredVariant?.sizeBytes || 0,
+          tags: nonEmptyStringArrayFromUnknown(asset.tags),
+          updatedAt: asset.updatedAt.toISOString(),
+          usageContext: asset.usageContext,
+          usageCount,
+          variantCount: asset.variants.length,
+          width: preferredVariant?.width || 0
+        };
+      });
 
   return (
-    <div className="stack">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Media</p>
-          <h1>Images and assets</h1>
-          <p>Use repo references for static assets, or upload into a server folder, Railway/S3 bucket, R2, or Cloudflare Images for editable media.</p>
-        </div>
-      </header>
-
-      {params.saved ? <div className="success-message">Media changes saved.</div> : null}
-      {errorMessage ? <div className="error">{decodeURIComponent(errorMessage)}</div> : null}
-
-      <Card as="section">
-        <div className="page-header compact-header">
-          <div>
-            <h2 className="section-title">Uploaded assets</h2>
-            <p className="ui-zero">
-              {assetCount} active assets {archivedCount ? `- ${archivedCount} archived` : ""}
-            </p>
-          </div>
-          <ModuleActionModals
-            items={[
-              {
-                content: uploadForm,
-                icon: "upload",
-                id: "upload",
-                label: "Upload",
-                title: "Upload image",
-                variant: "primary"
-              },
-              {
-                content: repoAssetsPanel,
-                icon: "image",
-                id: "repo",
-                label: "Repo assets",
-                title: "Repo assets"
-              }
-            ]}
-            toolbarLabel="Media tools"
-          />
-        </div>
-        {folderGroups.length ?
-        <div className="ui-zero">
-            {folderGroups.map((folder) =>
-          <span className="ui-badge" key={folder.folder || "root"}>
-                <Folder size={14} />
-                {folder.folder || "root"} ({folder._count._all})
-              </span>
-          )}
-          </div> :
-        null}
-        <EqualGrid min="220px">
-          {mediaAssets.map((asset) =>
-          <div key={asset.id} className="asset-tile">
-              <NextImage
-              src={mediaAssetDisplayUrl(asset, MediaVariantType.CARD)}
-              alt={asset.isDecorative ? "" : asset.alt || asset.filename}
-              width={500}
-              height={375}
-              unoptimized />
-            
-              <div className="ui-zero">
-                <strong>{asset.filename}</strong>
-                <span className="muted-text">
-                  {asset.mimeType || "image"} - {fileSizeLabel(asset.sizeBytes)} - {asset.driver}
-                </span>
-                <div className="ui-zero">
-                  {asset.folder ?
-                <span className="ui-badge">
-                      <Folder size={14} />
-                      {asset.folder}
-                    </span> :
-                null}
-                  {asset.isPrivate ? <span className="ui-badge ui-badge-danger">private</span> : null}
-                  {asset.isDecorative ? <span className="ui-badge">decorative</span> : null}
-                  {asset.usageContext ? <span className="ui-badge">{asset.usageContext}</span> : null}
-                  {nonEmptyStringArrayFromUnknown(asset.tags).map((tag) =>
-                <span className="ui-badge" key={tag}>
-                      <Tag size={14} />
-                      {tag}
-                    </span>
-                )}
-                </div>
-                {asset.caption || asset.credit ?
-              <p className="ui-zero">
-                    {asset.caption}
-                    {asset.caption && asset.credit ? " - " : ""}
-                    {asset.credit}
-                  </p> :
-              null}
-                <span className="muted-text">
-                  Focal point {asset.focalPointX.toFixed(2)}, {asset.focalPointY.toFixed(2)} - {asset.variants.length} variants
-                </span>
-              </div>
-              {!asset.isPrivate ?
-            <div className="page-header ui-zero">
-                <form action={setHeroImageAction}>
-                  <input type="hidden" name="url" value={mediaAssetDisplayUrl(asset, MediaVariantType.HERO)} />
-                  <Button type="submit" variant="secondary">
-                    <Star size={16} />
-                    Use hero
-                  </Button>
-                </form>
-                </div> :
-            null}
-              <details className="subpanel">
-                <summary>Edit metadata</summary>
-                <form action={updateMediaAssetAction} className="form-grid ui-zero">
-                  <input type="hidden" name="id" value={asset.id} />
-                  <div className="ui-field">
-                    <label htmlFor={`asset-${asset.id}-alt`}>Alt text</label>
-                    <input id={`asset-${asset.id}-alt`} name="alt" defaultValue={asset.alt || ""} />
-                  </div>
-                  <EqualGrid>
-                    <div className="ui-field">
-                      <label htmlFor={`asset-${asset.id}-folder`}>Folder</label>
-                      <input id={`asset-${asset.id}-folder`} name="folder" defaultValue={asset.folder} />
-                    </div>
-                    <div className="ui-field">
-                      <label htmlFor={`asset-${asset.id}-tags`}>Tags</label>
-                      <input id={`asset-${asset.id}-tags`} name="tags" defaultValue={stringArrayCsv(asset.tags)} />
-                    </div>
-                  </EqualGrid>
-                  <div className="ui-field">
-                    <label htmlFor={`asset-${asset.id}-caption`}>Caption</label>
-                    <input id={`asset-${asset.id}-caption`} name="caption" defaultValue={asset.caption} />
-                  </div>
-                  <div className="ui-field">
-                    <label htmlFor={`asset-${asset.id}-credit`}>Credit</label>
-                    <input id={`asset-${asset.id}-credit`} name="credit" defaultValue={asset.credit} />
-                  </div>
-                  <div className="ui-field">
-                    <label htmlFor={`asset-${asset.id}-usageContext`}>Usage context</label>
-                    <input id={`asset-${asset.id}-usageContext`} name="usageContext" defaultValue={asset.usageContext} />
-                  </div>
-                  <EqualGrid>
-                    <div className="ui-field">
-                      <label htmlFor={`asset-${asset.id}-focalPointX`}>Focal X</label>
-                      <input id={`asset-${asset.id}-focalPointX`} name="focalPointX" defaultValue={asset.focalPointX} inputMode="decimal" />
-                    </div>
-                    <div className="ui-field">
-                      <label htmlFor={`asset-${asset.id}-focalPointY`}>Focal Y</label>
-                      <input id={`asset-${asset.id}-focalPointY`} name="focalPointY" defaultValue={asset.focalPointY} inputMode="decimal" />
-                    </div>
-                  </EqualGrid>
-                  <EqualGrid>
-                    <Switch defaultChecked={asset.isDecorative} label="Decorative" name="isDecorative" variant="inline" />
-                    <Switch defaultChecked={asset.isPrivate} label="Private" name="isPrivate" variant="inline" />
-                  </EqualGrid>
-                  <Button type="submit" variant="secondary">
-                    Save metadata
-                  </Button>
-                </form>
-                <form action={archiveMediaAssetAction} className="form-grid ui-zero">
-                  <input type="hidden" name="id" value={asset.id} />
-                  <Switch label="Archive this asset." name="confirmArchive" required variant="inline" />
-                  <Button type="submit" variant="danger">
-                    <Archive size={16} />
-                    Archive asset
-                  </Button>
-                </form>
-              </details>
-            </div>
-          )}
-          {!mediaAssets.length ? <p>No uploaded media yet.</p> : null}
-        </EqualGrid>
-        <Pagination
-          label="Media pages"
-          nextHref={`/admin/modules/media?page=${Math.min(pageCount, page + 1)}`}
-          page={page}
-          pageCount={pageCount}
-          previousHref={`/admin/modules/media?page=${Math.max(1, page - 1)}`}
-        />
-      </Card>
-
-      {archivedAssets.length ?
-      <Card as="section" bodyClassName="ui-stack">
-          <h2 className="section-title">Archived assets</h2>
-          <Table>
-            <thead>
-              <tr>
-                <th>Asset</th>
-                <th>Folder</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {archivedAssets.map((asset) =>
-            <tr key={asset.id}>
-                  <td>
-                    <strong>{asset.filename}</strong>
-                    <br />
-                    <span className="muted-text">{asset.caption || asset.url}</span>
-                  </td>
-                  <td>{asset.folder || "root"}</td>
-                  <td>
-                    <form action={restoreMediaAssetAction}>
-                      <input type="hidden" name="id" value={asset.id} />
-                      <Button type="submit" variant="secondary">
-                        <RotateCcw size={16} />
-                        Restore
-                      </Button>
-                    </form>
-                  </td>
-                </tr>
-            )}
-            </tbody>
-          </Table>
-        </Card> :
-      null}
-    </div>);
-
+    <MediaLibraryWorkspace
+      key={`${normalizedFilters.scope}:${normalizedFilters.folder}:${normalizedFilters.kind}:${normalizedFilters.sort}:${normalizedFilters.q}:${normalizedFilters.page}`}
+      activeCount={activeCount}
+      archivedCount={archivedCount}
+      assets={assets}
+      builtInCount={builtInAssets.length}
+      canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)}
+      errorMessage={params.error === "missing-file" ? "Choose a file before uploading." : safeDecodedMessage(params.error)}
+      filters={normalizedFilters}
+      folders={folderGroups.filter((group) => Boolean(group.folder)).map((group) => ({ count: group._count._all, name: group.folder }))}
+      mediaDriver={settings.mediaDriver}
+      needsAltCount={needsAltCount}
+      pageCount={pageCount}
+      privateCount={privateCount}
+      recentCount={recentCount}
+      resultCount={resultCount}
+      savedMessage={savedMessage(params.saved)}
+    />
+  );
 }

@@ -540,7 +540,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
       <header className="page-header">
         <div>
           <p className="eyebrow">Forms</p>
-          <h1>Intake forms</h1>
+          <h1>Forms</h1>
           <p>Build lead, intake, inquiry, and attachment-ready forms with a submission inbox.</p>
         </div>
       </header>
