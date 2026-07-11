@@ -1,10 +1,12 @@
 "use client";
 
 import NextImage from "next/image";
+import Link from "next/link";
 import { useId, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   Archive,
+  ArrowRight,
   ArrowDownAZ,
   Check,
   ChevronLeft,
@@ -16,6 +18,7 @@ import {
   FolderOpen,
   Grid2X2,
   HardDrive,
+  House,
   ImageIcon,
   Images,
   Info,
@@ -26,11 +29,13 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  Tags,
   Trash2,
   Upload,
   X
 } from "lucide-react";
 import { Button, ButtonLink, Modal, UploadField } from "@/components/ui";
+import type { MediaTagSummary } from "@/lib/media-tags";
 import {
   archiveMediaAssetAction,
   restoreMediaAssetAction,
@@ -76,8 +81,9 @@ export type MediaLibraryFilters = {
   kind: "all" | "image" | "other";
   page: number;
   q: string;
-  scope: "all" | "recent" | "private" | "needs-alt" | "archived" | "built-in";
+  scope: "home" | "all" | "recent" | "private" | "needs-alt" | "archived" | "built-in";
   sort: "newest" | "oldest" | "name" | "largest";
+  tag: string;
 };
 
 type FolderSummary = { count: number; name: string };
@@ -98,11 +104,13 @@ type MediaLibraryWorkspaceProps = {
   recentCount: number;
   resultCount: number;
   savedMessage: string;
+  tags: MediaTagSummary[];
 };
 
 type ViewMode = "grid" | "list";
 
 const scopeCopy: Record<MediaLibraryFilters["scope"], { eyebrow: string; title: string }> = {
+  home: { eyebrow: "Library home", title: "Your media" },
   all: { eyebrow: "Library", title: "All assets" },
   recent: { eyebrow: "Saved view", title: "Recently added" },
   private: { eyebrow: "Saved view", title: "Private assets" },
@@ -133,18 +141,21 @@ function driverLabel(value: string) {
 }
 
 function hrefWithParams(changes: Record<string, string | number | null>, filters: MediaLibraryFilters) {
-  const params = new URLSearchParams();
-  if (filters.q) params.set("q", filters.q);
-  if (filters.scope !== "all") params.set("scope", filters.scope);
-  if (filters.folder) params.set("folder", filters.folder);
-  if (filters.kind !== "all") params.set("kind", filters.kind);
-  if (filters.sort !== "newest") params.set("sort", filters.sort);
-  if (filters.page > 1) params.set("page", String(filters.page));
-
+  const next = { ...filters } as MediaLibraryFilters;
   Object.entries(changes).forEach(([key, value]) => {
-    if (value === null || value === "" || value === "all" || value === "newest" || value === 1) params.delete(key);
-    else params.set(key, String(value));
+    if (!(key in next)) return;
+    if (key === "page") next.page = typeof value === "number" ? value : 1;
+    else (next as unknown as Record<string, string>)[key] = value === null ? "" : String(value);
   });
+
+  const params = new URLSearchParams();
+  if (next.q) params.set("q", next.q);
+  if (next.scope && next.scope !== "home") params.set("scope", next.scope);
+  if (next.folder) params.set("folder", next.folder);
+  if (next.tag) params.set("tag", next.tag);
+  if (next.kind && next.kind !== "all") params.set("kind", next.kind);
+  if (next.sort && next.sort !== "newest") params.set("sort", next.sort);
+  if (next.page > 1) params.set("page", String(next.page));
 
   const query = params.toString();
   return `/admin/modules/media${query ? `?${query}` : ""}`;
@@ -518,6 +529,158 @@ function UploadAssetsModal({ canUpload, mediaDriver, onClose, open }: { canUploa
   );
 }
 
+function LibraryHome({
+  activeCount,
+  assets,
+  builtInCount,
+  canUpload,
+  folders,
+  needsAltCount,
+  onNavigate,
+  onOpenUpload,
+  onSearch,
+  onSearchValueChange,
+  onSelect,
+  searchValue,
+  selectedId,
+  tags
+}: {
+  activeCount: number;
+  assets: MediaLibraryAsset[];
+  builtInCount: number;
+  canUpload: boolean;
+  folders: FolderSummary[];
+  needsAltCount: number;
+  onNavigate: (changes: Record<string, string | number | null>) => void;
+  onOpenUpload: () => void;
+  onSearch: (event: FormEvent<HTMLFormElement>) => void;
+  onSearchValueChange: (value: string) => void;
+  onSelect: (id: string) => void;
+  searchValue: string;
+  selectedId: string | null;
+  tags: MediaTagSummary[];
+}) {
+  return (
+    <div className={styles.home}>
+      <section className={styles.homeHero}>
+        <div className={styles.homeHeroCopy}>
+          <span>Asset library</span>
+          <h2>Find the right image without digging.</h2>
+          <p>Search everything, return to recent work, or jump directly into a tag or folder.</p>
+        </div>
+        <form className={styles.homeSearch} onSubmit={onSearch} role="search">
+          <Search aria-hidden="true" size={20} />
+          <label className="ui-sr-only" htmlFor="media-home-search">Search your asset library</label>
+          <input
+            id="media-home-search"
+            onChange={(event) => onSearchValueChange(event.currentTarget.value)}
+            placeholder="Search filename, alt text, caption, or folder…"
+            type="search"
+            value={searchValue}
+          />
+          <button aria-label="Search asset library" type="submit"><ArrowRight aria-hidden="true" size={18} /></button>
+        </form>
+      </section>
+
+      <section aria-label="Library actions" className={styles.homeActions}>
+        {canUpload ? (
+          <button className={styles.uploadLaunch} onClick={onOpenUpload} type="button">
+            <span className={styles.uploadLaunchIcon}><Upload aria-hidden="true" size={25} /></span>
+            <span className={styles.uploadLaunchCopy}>
+              <small>Add to the library</small>
+              <strong>Drop in a new image</strong>
+              <span>Upload once, add alt text and tags, then reuse it anywhere.</span>
+            </span>
+            <span className={styles.uploadLaunchAction}>Add asset <ArrowRight aria-hidden="true" size={16} /></span>
+          </button>
+        ) : (
+          <Link className={styles.uploadLaunch} href="/admin/modules/settings">
+            <span className={styles.uploadLaunchIcon}><HardDrive aria-hidden="true" size={25} /></span>
+            <span className={styles.uploadLaunchCopy}>
+              <small>Storage is read-only</small>
+              <strong>Connect an upload destination</strong>
+              <span>Choose a server folder, S3, R2, or Cloudflare Images in Settings.</span>
+            </span>
+            <span className={styles.uploadLaunchAction}>Open settings <ArrowRight aria-hidden="true" size={16} /></span>
+          </Link>
+        )}
+
+        <div className={styles.quickViews}>
+          <button onClick={() => onNavigate({ scope: "all" })} type="button">
+            <span><Images aria-hidden="true" size={17} /> All assets</span>
+            <strong>{activeCount}</strong>
+          </button>
+          <button onClick={() => onNavigate({ scope: "needs-alt" })} type="button">
+            <span><ShieldCheck aria-hidden="true" size={17} /> Needs alt text</span>
+            <strong>{needsAltCount}</strong>
+          </button>
+          <button onClick={() => onNavigate({ scope: "built-in" })} type="button">
+            <span><Sparkles aria-hidden="true" size={17} /> Built-in</span>
+            <strong>{builtInCount}</strong>
+          </button>
+        </div>
+      </section>
+
+      <section className={styles.homeSection}>
+        <div className={styles.homeSectionHead}>
+          <div><span>Pick up where you left off</span><h3>Recently added</h3></div>
+          <button onClick={() => onNavigate({ scope: "recent" })} type="button">View recent <ArrowRight aria-hidden="true" size={14} /></button>
+        </div>
+        {assets.length ? (
+          <div className={styles.homeRecentGrid}>
+            {assets.map((asset, index) => (
+              <AssetCard asset={asset} index={index} key={asset.id} onSelect={() => onSelect(asset.id)} selected={asset.id === selectedId} view="grid" />
+            ))}
+          </div>
+        ) : (
+          <div className={styles.homeRecentEmpty}>
+            <span><Clock3 aria-hidden="true" size={21} /></span>
+            <div><strong>No uploaded assets yet</strong><p>Your latest uploads will stay within easy reach here—never the entire library at once.</p></div>
+          </div>
+        )}
+      </section>
+
+      <div className={styles.homeCollections}>
+        <section className={styles.collectionPanel}>
+          <div className={styles.homeSectionHead}>
+            <div><span>Flexible collections</span><h3>Browse by tag</h3></div>
+            <Tags aria-hidden="true" size={18} />
+          </div>
+          {tags.length ? (
+            <div className={styles.tagCloud}>
+              {tags.map((tag) => (
+                <button key={tag.name} onClick={() => onNavigate({ scope: "all", tag: tag.name })} type="button">
+                  <span>#{tag.name}</span><small>{tag.count}</small>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.collectionEmpty}><strong>Tags make the library faster.</strong><p>Add tags during upload or from an asset’s details. They become instant filters here and in every image chooser.</p></div>
+          )}
+        </section>
+
+        <section className={styles.collectionPanel}>
+          <div className={styles.homeSectionHead}>
+            <div><span>Stable structure</span><h3>Browse folders</h3></div>
+            <Folder aria-hidden="true" size={18} />
+          </div>
+          {folders.length ? (
+            <div className={styles.folderCards}>
+              {folders.slice(0, 8).map((folder) => (
+                <button key={folder.name} onClick={() => onNavigate({ folder: folder.name, scope: "all" })} type="button">
+                  <span><Folder aria-hidden="true" size={16} /> {folder.name}</span><small>{folder.count} {folder.count === 1 ? "asset" : "assets"}</small>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.collectionEmpty}><strong>Folders are ready when you need them.</strong><p>Use folders for durable structure, and tags for flexible cross-library groupings.</p></div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
 export function MediaLibraryWorkspace({
   activeCount,
   archivedCount,
@@ -533,7 +696,8 @@ export function MediaLibraryWorkspace({
   privateCount,
   recentCount,
   resultCount,
-  savedMessage
+  savedMessage,
+  tags
 }: MediaLibraryWorkspaceProps) {
   const router = useRouter();
   const [searchValue, setSearchValue] = useState(filters.q);
@@ -542,6 +706,7 @@ export function MediaLibraryWorkspace({
   const [view, setView] = useState<ViewMode>("grid");
   const selectedAsset = assets.find((asset) => asset.id === selectedId) || null;
   const currentScope = scopeCopy[filters.scope];
+  const isHome = filters.scope === "home";
 
   const folderLabel = useMemo(() => folders.find((folder) => folder.name === filters.folder)?.name || filters.folder, [filters.folder, folders]);
 
@@ -552,7 +717,7 @@ export function MediaLibraryWorkspace({
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    navigate({ q: searchValue.trim() || null });
+    navigate({ q: searchValue.trim() || null, scope: "all" });
   }
 
   return (
@@ -563,23 +728,23 @@ export function MediaLibraryWorkspace({
           <h1>Media</h1>
           <p>A calm, searchable home for every reusable image and asset.</p>
         </div>
-        <div className={styles.pageActions}>
+        {!isHome ? <div className={styles.pageActions}>
           {canUpload ? (
             <Button onClick={() => setUploadOpen(true)} type="button">
-              <Upload aria-hidden="true" size={16} /> Upload assets
+              <Upload aria-hidden="true" size={16} /> Add asset
             </Button>
           ) : (
             <ButtonLink href="/admin/modules/settings" variant="secondary">
               <HardDrive aria-hidden="true" size={16} /> Set up uploads
             </ButtonLink>
           )}
-        </div>
+        </div> : null}
       </header>
 
       {savedMessage ? <div className={styles.feedbackSuccess} role="status"><Check aria-hidden="true" size={17} /> {savedMessage}</div> : null}
       {errorMessage ? <div className={styles.feedbackError} role="alert"><Info aria-hidden="true" size={17} /> {errorMessage}</div> : null}
 
-      <div className={styles.workspace}>
+      <div className={`${styles.workspace} ${isHome ? styles.workspaceHome : ""} ${isHome && selectedAsset ? styles.workspaceHomeInspector : ""}`}>
         <nav aria-label="Asset library views" className={styles.sidebar}>
           <div className={styles.libraryIdentity}>
             <span><Images aria-hidden="true" size={18} /></span>
@@ -588,10 +753,11 @@ export function MediaLibraryWorkspace({
 
           <div className={styles.navGroup}>
             <span className={styles.navLabel}>Library</span>
-            <ScopeButton active={filters.scope === "all" && !filters.folder} count={activeCount} icon={<Grid2X2 aria-hidden="true" size={15} />} label="All assets" onClick={() => navigate({ folder: null, scope: null })} />
-            <ScopeButton active={filters.scope === "recent"} count={recentCount} icon={<Clock3 aria-hidden="true" size={15} />} label="Recently added" onClick={() => navigate({ folder: null, scope: "recent" })} />
-            <ScopeButton active={filters.scope === "needs-alt"} count={needsAltCount} icon={<ShieldCheck aria-hidden="true" size={15} />} label="Needs alt text" onClick={() => navigate({ folder: null, scope: "needs-alt" })} />
-            <ScopeButton active={filters.scope === "private"} count={privateCount} icon={<Lock aria-hidden="true" size={15} />} label="Private" onClick={() => navigate({ folder: null, scope: "private" })} />
+            <ScopeButton active={isHome} count={activeCount} icon={<House aria-hidden="true" size={15} />} label="Library home" onClick={() => navigate({ folder: null, kind: null, q: null, scope: "home", sort: null, tag: null })} />
+            <ScopeButton active={filters.scope === "all" && !filters.folder && !filters.tag} count={activeCount} icon={<Grid2X2 aria-hidden="true" size={15} />} label="All assets" onClick={() => navigate({ folder: null, scope: "all", tag: null })} />
+            <ScopeButton active={filters.scope === "recent"} count={recentCount} icon={<Clock3 aria-hidden="true" size={15} />} label="Recently added" onClick={() => navigate({ folder: null, scope: "recent", tag: null })} />
+            <ScopeButton active={filters.scope === "needs-alt"} count={needsAltCount} icon={<ShieldCheck aria-hidden="true" size={15} />} label="Needs alt text" onClick={() => navigate({ folder: null, scope: "needs-alt", tag: null })} />
+            <ScopeButton active={filters.scope === "private"} count={privateCount} icon={<Lock aria-hidden="true" size={15} />} label="Private" onClick={() => navigate({ folder: null, scope: "private", tag: null })} />
           </div>
 
           {folders.length ? (
@@ -602,7 +768,7 @@ export function MediaLibraryWorkspace({
                   aria-current={filters.folder === folder.name ? "page" : undefined}
                   className={filters.folder === folder.name ? styles.navItemActive : styles.navItem}
                   key={folder.name || "root"}
-                  onClick={() => navigate({ folder: folder.name || null, scope: null })}
+                  onClick={() => navigate({ folder: folder.name || null, scope: "all", tag: null })}
                   type="button">
                   <span><Folder aria-hidden="true" size={15} />{folder.name || "Unfiled"}</span><small>{folder.count}</small>
                 </button>
@@ -610,10 +776,26 @@ export function MediaLibraryWorkspace({
             </div>
           ) : null}
 
+          {tags.length ? (
+            <div className={styles.navGroup}>
+              <span className={styles.navLabel}>Tags</span>
+              {tags.slice(0, 6).map((tag) => (
+                <button
+                  aria-current={filters.tag === tag.name ? "page" : undefined}
+                  className={filters.tag === tag.name ? styles.navItemActive : styles.navItem}
+                  key={tag.name}
+                  onClick={() => navigate({ folder: null, scope: "all", tag: tag.name })}
+                  type="button">
+                  <span><Tags aria-hidden="true" size={15} />{tag.name}</span><small>{tag.count}</small>
+                </button>
+              ))}
+            </div>
+          ) : null}
+
           <div className={styles.navGroup}>
             <span className={styles.navLabel}>System</span>
-            <ScopeButton active={filters.scope === "built-in"} count={builtInCount} icon={<Sparkles aria-hidden="true" size={15} />} label="Built-in" onClick={() => navigate({ folder: null, scope: "built-in" })} />
-            <ScopeButton active={filters.scope === "archived"} count={archivedCount} icon={<Archive aria-hidden="true" size={15} />} label="Archived" onClick={() => navigate({ folder: null, scope: "archived" })} />
+            <ScopeButton active={filters.scope === "built-in"} count={builtInCount} icon={<Sparkles aria-hidden="true" size={15} />} label="Built-in" onClick={() => navigate({ folder: null, scope: "built-in", tag: null })} />
+            <ScopeButton active={filters.scope === "archived"} count={archivedCount} icon={<Archive aria-hidden="true" size={15} />} label="Archived" onClick={() => navigate({ folder: null, scope: "archived", tag: null })} />
           </div>
 
           <div className={styles.storageCard}>
@@ -624,10 +806,29 @@ export function MediaLibraryWorkspace({
         </nav>
 
         <main className={styles.libraryMain}>
+          {isHome ? (
+            <LibraryHome
+              activeCount={activeCount}
+              assets={assets}
+              builtInCount={builtInCount}
+              canUpload={canUpload}
+              folders={folders}
+              needsAltCount={needsAltCount}
+              onNavigate={navigate}
+              onOpenUpload={() => setUploadOpen(true)}
+              onSearch={submitSearch}
+              onSearchValueChange={setSearchValue}
+              onSelect={setSelectedId}
+              searchValue={searchValue}
+              selectedId={selectedId}
+              tags={tags}
+            />
+          ) : (
+          <>
           <div className={styles.libraryHeader}>
             <div>
               <span>{currentScope.eyebrow}</span>
-              <h2>{folderLabel || currentScope.title}</h2>
+              <h2>{folderLabel || (filters.tag ? `#${filters.tag}` : currentScope.title)}</h2>
               <p>{resultCount} {resultCount === 1 ? "asset" : "assets"}{filters.q ? ` matching “${filters.q}”` : ""}</p>
             </div>
             <div className={styles.viewToggle} aria-label="Asset view">
@@ -654,6 +855,17 @@ export function MediaLibraryWorkspace({
               </select>
             </label>
 
+            {tags.length ? (
+              <label className={styles.selectControl}>
+                <span className="ui-sr-only">Filter by tag</span>
+                <Tags aria-hidden="true" size={15} />
+                <select onChange={(event) => navigate({ tag: event.currentTarget.value || null })} value={filters.tag}>
+                  <option value="">All tags</option>
+                  {tags.map((tag) => <option key={tag.name} value={tag.name}>#{tag.name} ({tag.count})</option>)}
+                </select>
+              </label>
+            ) : null}
+
             <label className={styles.selectControl}>
               <span className="ui-sr-only">Sort assets</span>
               <ArrowDownAZ aria-hidden="true" size={15} />
@@ -667,13 +879,14 @@ export function MediaLibraryWorkspace({
 
           </div>
 
-          {filters.q || filters.folder || filters.kind !== "all" ? (
+          {filters.q || filters.folder || filters.tag || filters.kind !== "all" ? (
             <div className={styles.activeFilters}>
               <span>Filtered by</span>
               {filters.q ? <button onClick={() => navigate({ q: null })} type="button">Search: {filters.q}<X size={12} /></button> : null}
               {filters.folder ? <button onClick={() => navigate({ folder: null })} type="button">Folder: {filters.folder}<X size={12} /></button> : null}
+              {filters.tag ? <button onClick={() => navigate({ tag: null })} type="button">Tag: {filters.tag}<X size={12} /></button> : null}
               {filters.kind !== "all" ? <button onClick={() => navigate({ kind: null })} type="button">Type: {filters.kind}<X size={12} /></button> : null}
-              <button className={styles.clearFilters} onClick={() => navigate({ folder: null, kind: null, q: null })} type="button">Clear all</button>
+              <button className={styles.clearFilters} onClick={() => navigate({ folder: null, kind: null, q: null, tag: null })} type="button">Clear all</button>
             </div>
           ) : null}
 
@@ -681,16 +894,16 @@ export function MediaLibraryWorkspace({
             {assets.length ? (
               <div className={view === "grid" ? styles.assetGrid : styles.assetList}>
                 {assets.map((asset, index) => (
-                  <AssetCard asset={asset} index={index + (filters.page - 1) * 48} key={asset.id} onSelect={() => setSelectedId(asset.id)} selected={asset.id === selectedId} view={view} />
+                  <AssetCard asset={asset} index={index + (filters.page - 1) * 24} key={asset.id} onSelect={() => setSelectedId(asset.id)} selected={asset.id === selectedId} view={view} />
                 ))}
               </div>
             ) : (
               <div className={styles.emptyState}>
                 <span><FolderOpen aria-hidden="true" size={25} /></span>
-                <h3>{filters.q || filters.folder || filters.kind !== "all" ? "No assets match this view" : filters.scope === "archived" ? "Your archive is empty" : canUpload ? "Your library is ready" : "No uploaded assets yet"}</h3>
-                <p>{filters.q || filters.folder || filters.kind !== "all" ? "Keep your filters visible and adjust them, or clear the view to see everything." : filters.scope === "archived" ? "Assets you archive will stay recoverable here." : canUpload ? "Upload the first asset and reuse it across every part of the product." : "Storage is currently read-only. Browse the built-in collection, or choose an upload-capable storage mode in Settings."}</p>
-                {filters.q || filters.folder || filters.kind !== "all" ? (
-                  <Button onClick={() => navigate({ folder: null, kind: null, q: null })} size="sm" type="button" variant="secondary">Clear filters</Button>
+                <h3>{filters.q || filters.folder || filters.tag || filters.kind !== "all" ? "No assets match this view" : filters.scope === "archived" ? "Your archive is empty" : canUpload ? "Your library is ready" : "No uploaded assets yet"}</h3>
+                <p>{filters.q || filters.folder || filters.tag || filters.kind !== "all" ? "Keep your filters visible and adjust them, or clear the view to see everything." : filters.scope === "archived" ? "Assets you archive will stay recoverable here." : canUpload ? "Upload the first asset and reuse it across every part of the product." : "Storage is currently read-only. Browse the built-in collection, or choose an upload-capable storage mode in Settings."}</p>
+                {filters.q || filters.folder || filters.tag || filters.kind !== "all" ? (
+                  <Button onClick={() => navigate({ folder: null, kind: null, q: null, tag: null })} size="sm" type="button" variant="secondary">Clear filters</Button>
                 ) : filters.scope !== "archived" && canUpload ? (
                   <Button onClick={() => setUploadOpen(true)} size="sm" type="button"><Upload size={15} /> Upload an asset</Button>
                 ) : filters.scope !== "archived" ? (
@@ -707,9 +920,11 @@ export function MediaLibraryWorkspace({
               <Button disabled={filters.page >= pageCount} onClick={() => router.push(hrefWithParams({ page: Math.min(pageCount, filters.page + 1) }, filters))} size="sm" type="button" variant="ghost">Next <ChevronRight size={15} /></Button>
             </nav>
           ) : null}
+          </>
+          )}
         </main>
 
-        <AssetInspector archived={filters.scope === "archived"} asset={selectedAsset} key={selectedAsset?.id || filters.scope} onClose={() => setSelectedId(null)} />
+        {!isHome || selectedAsset ? <AssetInspector archived={filters.scope === "archived"} asset={selectedAsset} key={selectedAsset?.id || filters.scope} onClose={() => setSelectedId(null)} /> : null}
       </div>
 
       <UploadAssetsModal canUpload={canUpload} mediaDriver={mediaDriver} onClose={() => setUploadOpen(false)} open={uploadOpen} />

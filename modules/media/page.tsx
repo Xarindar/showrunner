@@ -2,6 +2,7 @@ import { MediaVariantType, type Prisma } from "@prisma/client";
 import { getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
 import { nonEmptyStringArrayFromUnknown } from "@/lib/format";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl, mediaAssetIdFromUrl } from "@/lib/media";
+import { summarizeMediaTags } from "@/lib/media-tags";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
@@ -12,7 +13,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const pageSize = 48;
+const pageSize = 24;
+const homeRecentSize = 8;
 const recentWindowDays = 30;
 const builtInAssets = [
   {
@@ -62,13 +64,21 @@ function savedMessage(value: string | undefined) {
 }
 
 function filtersFromParams(params: Record<string, string | undefined>): MediaLibraryFilters {
+  const requestedScope = oneOf(
+    params.scope,
+    ["home", "all", "recent", "private", "needs-alt", "archived", "built-in"] as const,
+    "home"
+  );
+  const hasBrowseFilter = Boolean(params.q || params.folder || params.tag || (params.kind && params.kind !== "all"));
+
   return {
     folder: (params.folder || "").trim().slice(0, 200),
     kind: oneOf(params.kind, ["all", "image", "other"] as const, "all"),
     page: positiveInteger(params.page),
     q: (params.q || "").trim().slice(0, 180),
-    scope: oneOf(params.scope, ["all", "recent", "private", "needs-alt", "archived", "built-in"] as const, "all"),
-    sort: oneOf(params.sort, ["newest", "oldest", "name", "largest"] as const, "newest")
+    scope: requestedScope === "home" && hasBrowseFilter ? "all" : requestedScope,
+    sort: oneOf(params.sort, ["newest", "oldest", "name", "largest"] as const, "newest"),
+    tag: (params.tag || "").trim().slice(0, 120)
   };
 }
 
@@ -109,6 +119,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
   }
   if (filters.scope === "built-in") clauses.push({ id: "__built_in_asset__" });
   if (filters.folder) clauses.push({ folder: filters.folder });
+  if (filters.tag) clauses.push({ tags: { array_contains: [filters.tag] } });
   if (filters.kind === "image") clauses.push({ mimeType: { startsWith: "image/", mode: "insensitive" } });
   if (filters.kind === "other") clauses.push({ NOT: { mimeType: { startsWith: "image/", mode: "insensitive" } } });
   if (filters.q) {
@@ -131,7 +142,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
   const recentWhere: Prisma.MediaAssetWhereInput = { AND: [activeAccess, { createdAt: { gte: recentSince } }] };
   const privateWhere: Prisma.MediaAssetWhereInput = { AND: [activeAccess, { isPrivate: true }] };
 
-  const [activeCount, archivedCount, recentCount, privateCount, needsAltCount, folderGroups, databaseResultCount] = await Promise.all([
+  const [activeCount, archivedCount, recentCount, privateCount, needsAltCount, folderGroups, tagRows, databaseResultCount] = await Promise.all([
     prisma.mediaAsset.count({ where: activeAccess }),
     prisma.mediaAsset.count({ where: archivedAccess }),
     prisma.mediaAsset.count({ where: recentWhere }),
@@ -144,11 +155,16 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       orderBy: { folder: "asc" },
       take: 24
     }),
+    prisma.mediaAsset.findMany({
+      where: activeAccess,
+      select: { tags: true },
+      take: 5000
+    }),
     filters.scope === "built-in" ? Promise.resolve(matchingBuiltInAssets.length) : prisma.mediaAsset.count({ where: visibleWhere })
   ]);
 
   const resultCount = filters.scope === "built-in" ? matchingBuiltInAssets.length : databaseResultCount;
-  const pageCount = Math.max(1, Math.ceil(resultCount / pageSize));
+  const pageCount = filters.scope === "home" ? 1 : Math.max(1, Math.ceil(resultCount / pageSize));
   const page = Math.min(filters.page, pageCount);
   const normalizedFilters = { ...filters, page };
   const heroAssetId = mediaAssetIdFromUrl(settings.heroImageUrl);
@@ -172,8 +188,8 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
           }
         },
         orderBy: orderByFor(filters.sort),
-        skip: (page - 1) * pageSize,
-        take: pageSize
+        skip: filters.scope === "home" ? 0 : (page - 1) * pageSize,
+        take: filters.scope === "home" ? homeRecentSize : pageSize
       });
 
   const assets: MediaLibraryAsset[] = filters.scope === "built-in"
@@ -247,7 +263,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
 
   return (
     <MediaLibraryWorkspace
-      key={`${normalizedFilters.scope}:${normalizedFilters.folder}:${normalizedFilters.kind}:${normalizedFilters.sort}:${normalizedFilters.q}:${normalizedFilters.page}`}
+      key={`${normalizedFilters.scope}:${normalizedFilters.folder}:${normalizedFilters.tag}:${normalizedFilters.kind}:${normalizedFilters.sort}:${normalizedFilters.q}:${normalizedFilters.page}`}
       activeCount={activeCount}
       archivedCount={archivedCount}
       assets={assets}
@@ -263,6 +279,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       recentCount={recentCount}
       resultCount={resultCount}
       savedMessage={savedMessage(params.saved)}
+      tags={summarizeMediaTags(tagRows)}
     />
   );
 }

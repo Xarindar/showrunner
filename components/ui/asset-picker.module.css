@@ -66,6 +66,10 @@
   font-weight: 720;
 }
 
+.uploadAction {
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 8%, transparent);
+}
+
 .browser {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
@@ -73,11 +77,55 @@
 }
 
 .results {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   min-width: 0;
   padding: var(--space-4) var(--space-5);
+}
+
+.filterTabs {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-surface-sunken) 74%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
+  border-radius: var(--radius-control);
+  display: grid;
+  gap: 3px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: var(--space-3);
+  padding: 3px;
+}
+
+.filterTab {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: calc(var(--radius-control) - 3px);
+  color: var(--color-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--type-small);
+  font-weight: 670;
+  gap: 7px;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  transition: background-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.filterTab:hover {
+  color: var(--color-text);
+}
+
+.filterTab:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.filterTabActive {
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--color-text) 10%, transparent);
+  color: var(--color-text);
 }
 
 .searchField {
@@ -142,6 +190,108 @@
   min-height: 40px;
 }
 
+.tagRail {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) 0 var(--space-2);
+}
+
+.tagRailHeading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.tagRailHeading > span {
+  align-items: center;
+  color: var(--color-muted);
+  display: inline-flex;
+  font-size: var(--type-caption);
+  font-weight: 700;
+  gap: 6px;
+}
+
+.tagRailHeading > button {
+  background: transparent;
+  border: 0;
+  color: var(--color-brand);
+  cursor: pointer;
+  font-size: var(--type-caption);
+  font-weight: 680;
+  padding: 3px 0;
+}
+
+.tagRailHeading > button:hover {
+  text-decoration: underline;
+}
+
+.tagRailHeading > button:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.tagChips {
+  display: flex;
+  gap: 7px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 2px 2px 5px;
+  scrollbar-width: thin;
+}
+
+.tagChip {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  cursor: pointer;
+  display: inline-flex;
+  flex: none;
+  font-size: var(--type-caption);
+  font-weight: 650;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 6px 0 11px;
+  transition: background-color var(--motion-fast) ease, border-color var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.tagChip:hover {
+  background: var(--color-hover);
+  border-color: color-mix(in srgb, var(--color-brand) 36%, var(--color-border));
+}
+
+.tagChip:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.tagChip small {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-border) 58%, transparent);
+  border-radius: var(--radius-pill);
+  color: var(--color-muted);
+  display: inline-flex;
+  font-size: 0.67rem;
+  height: 20px;
+  justify-content: center;
+  min-width: 20px;
+  padding: 0 5px;
+}
+
+.tagChipActive {
+  background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-brand) 54%, var(--color-border));
+  color: var(--color-brand);
+}
+
+.tagChipActive small {
+  background: color-mix(in srgb, var(--color-brand) 15%, transparent);
+  color: var(--color-brand);
+}
+
 .grid {
   align-content: start;
   display: grid;
@@ -151,6 +301,7 @@
   overflow: auto;
   padding: 2px 3px var(--space-3) 2px;
   scrollbar-gutter: stable;
+  flex: 1;
 }
 
 .loadMore {
@@ -334,6 +485,22 @@
   overflow-wrap: anywhere;
 }
 
+.previewTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.previewTags span {
+  background: color-mix(in srgb, var(--color-brand) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-brand) 17%, var(--color-border));
+  border-radius: var(--radius-pill);
+  color: var(--color-brand);
+  font-size: var(--type-caption);
+  line-height: 1;
+  padding: 5px 8px;
+}
+
 .inspectorEmpty,
 .empty {
   align-content: center;
@@ -374,7 +541,45 @@
 }
 
 .empty {
+  flex: 1;
   min-height: 320px;
+}
+
+.tagLanding {
+  align-content: center;
+  color: var(--color-muted);
+  display: grid;
+  flex: 1;
+  gap: var(--space-2);
+  justify-items: center;
+  min-height: 260px;
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.tagLandingIcon {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-brand) 9%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-brand) 20%, var(--color-border));
+  border-radius: var(--radius-card);
+  color: var(--color-brand);
+  display: inline-flex;
+  height: 50px;
+  justify-content: center;
+  transform: rotate(-4deg);
+  width: 50px;
+}
+
+.tagLanding strong {
+  color: var(--color-text);
+  font-size: var(--type-small);
+}
+
+.tagLanding p {
+  font-size: var(--type-small);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 420px;
 }
 
 .footer {
@@ -522,6 +727,19 @@
   .viewHeader > :global(.ui-button) {
     align-self: flex-start;
     min-width: 0;
+  }
+
+  .filterTab {
+    padding: 0 var(--space-2);
+  }
+
+  .resultMeta span:last-child {
+    display: none;
+  }
+
+  .tagRail {
+    margin-left: calc(var(--space-3) * -0.25);
+    margin-right: calc(var(--space-3) * -0.25);
   }
 
   .grid {
