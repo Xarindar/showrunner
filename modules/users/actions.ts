@@ -13,8 +13,8 @@ function refreshUsers() {
   revalidatePath("/admin/modules/users");
 }
 
-async function ownerCount() {
-  return prisma.adminUser.count({ where: { role: AdminRole.OWNER } });
+async function ownerCount(tenantId: string) {
+  return prisma.adminUser.count({ where: { tenantId, role: AdminRole.OWNER } });
 }
 
 export async function createAdminUserAction(formData: FormData) {
@@ -26,6 +26,7 @@ export async function createAdminUserAction(formData: FormData) {
     const user = await prisma.adminUser.create({
       data: {
         email: input.email,
+        tenantId: actor.tenantId,
         passwordHash,
         role: input.role
       },
@@ -55,7 +56,7 @@ export async function updateAdminUserRoleAction(formData: FormData) {
   const actor = await requireAdmin("users:manage");
   const input = await parseForm(adminUserRoleFormSchema, formData, "/admin/modules/users");
   const user = await prisma.adminUser.findUnique({
-    where: { id: input.id },
+    where: { id: input.id, tenantId: actor.tenantId },
     select: { id: true, email: true, role: true }
   });
 
@@ -67,7 +68,7 @@ export async function updateAdminUserRoleAction(formData: FormData) {
     redirect(`/admin/modules/users?error=${encodeURIComponent("You cannot remove your own owner role.")}`);
   }
 
-  if (user.role === AdminRole.OWNER && input.role !== AdminRole.OWNER && (await ownerCount()) <= 1) {
+  if (user.role === AdminRole.OWNER && input.role !== AdminRole.OWNER && (await ownerCount(actor.tenantId)) <= 1) {
     redirect(`/admin/modules/users?error=${encodeURIComponent("Keep at least one owner account.")}`);
   }
 
@@ -104,7 +105,7 @@ export async function deleteAdminUserAction(formData: FormData) {
   }
 
   const user = await prisma.adminUser.findUnique({
-    where: { id: input.id },
+    where: { id: input.id, tenantId: actor.tenantId },
     select: { id: true, email: true, role: true }
   });
 
@@ -112,7 +113,7 @@ export async function deleteAdminUserAction(formData: FormData) {
     redirect(`/admin/modules/users?error=${encodeURIComponent("Admin user not found.")}`);
   }
 
-  if (user.role === AdminRole.OWNER && (await ownerCount()) <= 1) {
+  if (user.role === AdminRole.OWNER && (await ownerCount(actor.tenantId)) <= 1) {
     redirect(`/admin/modules/users?error=${encodeURIComponent("Keep at least one owner account.")}`);
   }
 

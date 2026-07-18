@@ -5,6 +5,9 @@ import crypto from "node:crypto";
 // them — lib/payments/credentials.ts re-exports these for app code.
 
 const algorithm = "aes-256-gcm";
+const currentVersion = "v2";
+const hkdfSalt = Buffer.from("admitone-showrunner-payment-credentials-v2", "utf8");
+const hkdfInfo = Buffer.from("gateway-credential-encryption", "utf8");
 
 function isWeakProductionSecret(value: string) {
   const normalized = value.trim().toLowerCase();
@@ -12,7 +15,7 @@ function isWeakProductionSecret(value: string) {
 }
 
 function credentialSecret() {
-  const secret = process.env.PAYMENT_CREDENTIAL_ENCRYPTION_KEY || process.env.AUTH_SECRET || "";
+  const secret = process.env.PAYMENT_CREDENTIAL_ENCRYPTION_KEY || "";
   if (process.env.NODE_ENV === "production" && (!secret || isWeakProductionSecret(secret))) {
     throw new Error("PAYMENT_CREDENTIAL_ENCRYPTION_KEY must be set before storing payment gateway credentials.");
   }
@@ -20,8 +23,12 @@ function credentialSecret() {
   return secret || "local-dev-payment-credential-secret";
 }
 
-function encryptionKey() {
+function legacyEncryptionKey() {
   return crypto.createHash("sha256").update(credentialSecret()).digest();
+}
+
+function encryptionKey() {
+  return Buffer.from(crypto.hkdfSync("sha256", credentialSecret(), hkdfSalt, hkdfInfo, 32));
 }
 
 export function encryptGatewaySecret(value: string) {
@@ -33,17 +40,18 @@ export function encryptGatewaySecret(value: string) {
   const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
 
-  return ["v1", iv.toString("base64url"), tag.toString("base64url"), encrypted.toString("base64url")].join(":");
+  return [currentVersion, iv.toString("base64url"), tag.toString("base64url"), encrypted.toString("base64url")].join(":");
 }
 
 export function decryptGatewaySecret(value: string) {
   if (!value) return "";
   const [version, ivText, tagText, encryptedText] = value.split(":");
-  if (version !== "v1" || !ivText || !tagText || !encryptedText) {
+  if (!["v1", currentVersion].includes(version) || !ivText || !tagText || !encryptedText) {
     throw new Error("Payment gateway credential payload is not recognized.");
   }
 
-  const decipher = crypto.createDecipheriv(algorithm, encryptionKey(), Buffer.from(ivText, "base64url"));
+  const key = version === "v1" ? legacyEncryptionKey() : encryptionKey();
+  const decipher = crypto.createDecipheriv(algorithm, key, Buffer.from(ivText, "base64url"));
   decipher.setAuthTag(Buffer.from(tagText, "base64url"));
   const decrypted = Buffer.concat([
     decipher.update(Buffer.from(encryptedText, "base64url")),

@@ -841,7 +841,7 @@ const staffAdminLinkFormSchema = z.object({
 });
 
 export async function linkStaffMemberAdminUserAction(formData: FormData) {
-  await requireAdmin("users:manage");
+  const actor = await requireAdmin("users:manage");
   const parsed = staffAdminLinkFormSchema.safeParse({
     staffId: formData.get("staffId"),
     adminUserId: formData.get("adminUserId") || ""
@@ -861,7 +861,10 @@ export async function linkStaffMemberAdminUserAction(formData: FormData) {
   }
 
   if (adminUserId) {
-    const adminUser = await prisma.adminUser.findUnique({ where: { id: adminUserId }, select: { id: true } });
+    const adminUser = await prisma.adminUser.findUnique({
+      where: { id: adminUserId, tenantId: actor.tenantId },
+      select: { id: true }
+    });
     if (!adminUser) {
       redirect(appointmentRulesPath("team", { error: "Admin user not found." }));
     }

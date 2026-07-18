@@ -20,7 +20,7 @@ export async function brokerRequest<T>(input: {
     provider: input.provider,
     iat,
     exp: iat + 5 * 60,
-    request_id: crypto.randomBytes(24).toString("base64url")
+    request_id: crypto.randomBytes(32).toString("base64url")
   };
   const body = JSON.stringify({ ...envelope, ...input.fields });
   const response = await fetch(`${broker.baseUrl}${input.path}`, {

@@ -87,7 +87,11 @@ export async function resolveCurrentSite() {
     include: { site: true }
   });
 
-  return domain?.site || defaultSite;
+  if (domain?.site) return domain.site;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Request hostname is not registered to a site.");
+  }
+  return defaultSite;
 }
 
 export async function getCurrentSiteId() {

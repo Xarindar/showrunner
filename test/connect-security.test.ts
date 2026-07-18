@@ -8,6 +8,8 @@ import {
   signServiceRequest,
   verifyConnectToken
 } from "../lib/payments/connect/tokens";
+import { brokerRequest } from "../lib/payments/connect/broker-client";
+import { decryptGatewaySecret, encryptGatewaySecret } from "../lib/payments/credential-crypto";
 
 const secret = "test-shared-secret-with-sufficient-entropy";
 
@@ -56,3 +58,85 @@ test("service signatures bind method, path, tenant envelope, time, nonce, and bo
   const independent = `v1=${base64urlEncode(crypto.createHmac("sha256", secret).update(canonical, "utf8").digest())}`;
   assert.equal(signature, independent);
 });
+
+test("payment credentials use a dedicated HKDF key while retaining v1 decrypt compatibility", () => {
+  const previous = {
+    authSecret: process.env.AUTH_SECRET,
+    credentialSecret: process.env.PAYMENT_CREDENTIAL_ENCRYPTION_KEY,
+    nodeEnv: process.env.NODE_ENV
+  };
+  const credentialSecret = "dedicated-payment-credential-key-with-enough-entropy";
+
+  try {
+    Reflect.set(process.env, "NODE_ENV", "test");
+    process.env.PAYMENT_CREDENTIAL_ENCRYPTION_KEY = credentialSecret;
+    process.env.AUTH_SECRET = "different-auth-secret-with-enough-entropy";
+
+    const encrypted = encryptGatewaySecret("merchant-secret");
+    assert.match(encrypted, /^v2:/);
+    assert.equal(decryptGatewaySecret(encrypted), "merchant-secret");
+    assert.equal(decryptGatewaySecret(legacyEncryptedValue("legacy-secret", credentialSecret)), "legacy-secret");
+
+    Reflect.set(process.env, "NODE_ENV", "production");
+    delete process.env.PAYMENT_CREDENTIAL_ENCRYPTION_KEY;
+    assert.throws(
+      () => encryptGatewaySecret("must-not-use-auth-secret"),
+      /PAYMENT_CREDENTIAL_ENCRYPTION_KEY/
+    );
+  } finally {
+    restoreEnv("AUTH_SECRET", previous.authSecret);
+    restoreEnv("PAYMENT_CREDENTIAL_ENCRYPTION_KEY", previous.credentialSecret);
+    restoreEnv("NODE_ENV", previous.nodeEnv);
+  }
+});
+
+test("broker requests use at least 256 bits of request-id entropy", async () => {
+  const previous = {
+    baseUrl: process.env.ADMITONE_CONNECT_BASE_URL,
+    clientId: process.env.ADMITONE_CONNECT_CLIENT_ID,
+    sharedSecret: process.env.ADMITONE_CONNECT_SHARED_SECRET
+  };
+  const originalFetch = globalThis.fetch;
+  let requestId = "";
+
+  try {
+    process.env.ADMITONE_CONNECT_BASE_URL = "https://connect.example.com";
+    process.env.ADMITONE_CONNECT_CLIENT_ID = "client-1";
+    process.env.ADMITONE_CONNECT_SHARED_SECRET = secret;
+    globalThis.fetch = async (_input, init) => {
+      requestId = String((JSON.parse(String(init?.body)) as { request_id?: string }).request_id || "");
+      return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    await brokerRequest({
+      path: "/connect/stripe/revoke",
+      provider: "stripe",
+      siteId: "site-1",
+      fields: { externalAccountId: "acct_test" }
+    });
+    assert.match(requestId, /^[A-Za-z0-9_-]{43}$/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv("ADMITONE_CONNECT_BASE_URL", previous.baseUrl);
+    restoreEnv("ADMITONE_CONNECT_CLIENT_ID", previous.clientId);
+    restoreEnv("ADMITONE_CONNECT_SHARED_SECRET", previous.sharedSecret);
+  }
+});
+
+function legacyEncryptedValue(value: string, secretValue: string) {
+  const iv = crypto.randomBytes(12);
+  const key = crypto.createHash("sha256").update(secretValue).digest();
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  return [
+    "v1",
+    iv.toString("base64url"),
+    cipher.getAuthTag().toString("base64url"),
+    encrypted.toString("base64url")
+  ].join(":");
+}
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}

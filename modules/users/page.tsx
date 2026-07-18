@@ -15,11 +15,12 @@ type UsersPageProps = {
 };
 
 export default async function UsersPage({ searchParams }: UsersPageProps) {
-  const [actor, settings, params, users] = await Promise.all([
-    requireAdmin("users:manage"),
+  const actor = await requireAdmin("users:manage");
+  const [settings, params, users] = await Promise.all([
     getSiteSettings(),
     searchParams,
     prisma.adminUser.findMany({
+      where: { tenantId: actor.tenantId },
       orderBy: [{ role: "asc" }, { email: "asc" }],
       select: {
         id: true,

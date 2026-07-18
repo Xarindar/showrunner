@@ -8,7 +8,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { hasAdminPermission as userHasAdminPermission, type AdminPermission } from "@/lib/admin-permissions";
 import { prisma } from "@/lib/prisma";
-import { getCurrentSiteId } from "@/lib/site";
+import { resolveCurrentSite } from "@/lib/site";
 
 const cookieName = "admin_session";
 const devSecret = "dev-secret-change-before-deploying";
@@ -19,6 +19,7 @@ const loginAttemptScope = "admin_login";
 
 export type AdminSessionUser = {
   id: string;
+  tenantId: string;
   email: string;
   role: AdminRole;
 };
@@ -140,7 +141,13 @@ async function clearLoginFailures(identifier: string, siteId: string) {
 }
 
 export async function createSession(userId: string) {
-  const token = await new SignJWT({ userId })
+  const user = await prisma.adminUser.findUnique({
+    where: { id: userId },
+    select: { tenantId: true }
+  });
+  if (!user) throw new Error("Cannot create a session for an unknown admin user.");
+
+  const token = await new SignJWT({ userId, tenantId: user.tenantId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
@@ -169,11 +176,14 @@ export async function getAdminUser() {
   try {
     const verified = await jwtVerify(token, getSecret());
     const userId = verified.payload.userId;
-    if (typeof userId !== "string") return null;
+    const tenantId = verified.payload.tenantId;
+    if (typeof userId !== "string" || typeof tenantId !== "string") return null;
+    const site = await resolveCurrentSite();
+    if (site.tenantId !== tenantId) return null;
 
-    return prisma.adminUser.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, role: true }
+    return prisma.adminUser.findFirst({
+      where: { id: userId, tenantId },
+      select: { id: true, tenantId: true, email: true, role: true }
     });
   } catch {
     return null;
@@ -193,11 +203,14 @@ export async function requireAdmin(permission: AdminPermission) {
 }
 
 export async function verifyAdminLogin(email: string, password: string) {
-  const siteId = await getCurrentSiteId();
+  const site = await resolveCurrentSite();
+  const siteId = site.id;
   const attemptIdentifier = await loginAttemptIdentifier(email);
   if (await isLockedOut(attemptIdentifier, siteId)) return null;
 
-  const user = await prisma.adminUser.findUnique({ where: { email } });
+  const user = await prisma.adminUser.findFirst({
+    where: { email, tenantId: site.tenantId }
+  });
   const passwordHash = user?.passwordHash || dummyPasswordHash;
   const valid = await bcrypt.compare(password, passwordHash);
 

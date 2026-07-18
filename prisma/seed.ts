@@ -448,9 +448,12 @@ async function main() {
 
   await prisma.adminUser.upsert({
     where: { email },
-    update: resetAdminPassword ? { passwordHash, role: AdminRole.OWNER } : { role: AdminRole.OWNER },
+    update: resetAdminPassword
+      ? { tenantId: DEFAULT_TENANT_ID, passwordHash, role: AdminRole.OWNER }
+      : { tenantId: DEFAULT_TENANT_ID, role: AdminRole.OWNER },
     create: {
       email,
+      tenantId: DEFAULT_TENANT_ID,
       passwordHash,
       role: AdminRole.OWNER
     }

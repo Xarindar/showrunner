@@ -358,7 +358,11 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
   prisma.schedulingSettings.findUnique({ where: { siteId: settings.siteId } }),
   getGoogleCalendarConnections(settings.siteId),
   canLinkStaffAccounts
-    ? prisma.adminUser.findMany({ select: { id: true, email: true, role: true }, orderBy: { email: "asc" } })
+    ? prisma.adminUser.findMany({
+        where: { tenantId: user.tenantId },
+        select: { id: true, email: true, role: true },
+        orderBy: { email: "asc" }
+      })
     : Promise.resolve([])]
   );
   const pageCount = Math.max(1, Math.ceil(bookingCount / pageSize));
