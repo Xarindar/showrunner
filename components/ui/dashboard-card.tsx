@@ -77,6 +77,205 @@ export function DashboardMetric({ detail, label, value }: DashboardMetricProps) 
   );
 }
 
+type DashboardRingProps = {
+  detail?: string;
+  label: string;
+  max?: number;
+  tone?: "neutral" | "positive" | "attention" | "danger";
+  value: number;
+};
+
+export function DashboardRing({ detail, label, max = 100, tone = "neutral", value }: DashboardRingProps) {
+  const progress = Math.max(0, Math.min(100, max > 0 ? (value / max) * 100 : 0));
+
+  return (
+    <div className="dashboard-widget-ring-composition">
+      <div
+        aria-label={`${label}: ${value} of ${max}`}
+        className={`dashboard-widget-ring dashboard-widget-tone-${tone}`}
+        role="img"
+        style={{ "--dashboard-ring-progress": `${progress * 3.6}deg` } as CSSProperties}
+      >
+        <span>
+          <strong>{value}</strong>
+          <small>{max === 100 ? "%" : `of ${max}`}</small>
+        </span>
+      </div>
+      <div className="dashboard-widget-ring-copy">
+        <strong>{label}</strong>
+        {detail ? <small>{detail}</small> : null}
+      </div>
+    </div>
+  );
+}
+
+type DashboardSegment = {
+  label: string;
+  tone?: "neutral" | "positive" | "attention" | "danger";
+  value: number;
+};
+
+export function DashboardSegmentBar({ items }: { items: DashboardSegment[] }) {
+  const total = Math.max(1, items.reduce((sum, item) => sum + item.value, 0));
+
+  return (
+    <div className="dashboard-widget-segments">
+      <div aria-label={items.map((item) => `${item.label}: ${item.value}`).join(", ")} className="dashboard-widget-segment-track" role="img">
+        {items.map((item) =>
+          item.value > 0 ? (
+            <span
+              className={`dashboard-widget-tone-${item.tone || "neutral"}`}
+              key={item.label}
+              style={{ "--dashboard-segment-width": `${(item.value / total) * 100}%` } as CSSProperties}
+            />
+          ) : null
+        )}
+      </div>
+      <div className="dashboard-widget-segment-legend">
+        {items.map((item) => (
+          <span key={item.label}>
+            <i className={`dashboard-widget-tone-${item.tone || "neutral"}`} />
+            <small>{item.label}</small>
+            <strong>{item.value}</strong>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type DashboardTimelineItem = {
+  detail?: ReactNode;
+  href?: string;
+  id: string;
+  time: ReactNode;
+  title: ReactNode;
+};
+
+export function DashboardTimeline({ empty, items }: { empty: string; items: DashboardTimelineItem[] }) {
+  if (!items.length) return <p className="dashboard-card-empty">{empty}</p>;
+
+  return (
+    <ol className="dashboard-widget-timeline">
+      {items.map((item) => {
+        const copy = (
+          <>
+            <span className="dashboard-widget-timeline-time">{item.time}</span>
+            <span className="dashboard-widget-timeline-marker" aria-hidden="true" />
+            <span className="dashboard-widget-timeline-copy">
+              <strong>{item.title}</strong>
+              {item.detail ? <small>{item.detail}</small> : null}
+            </span>
+          </>
+        );
+
+        return <li key={item.id}>{item.href ? <Link href={item.href}>{copy}</Link> : <span>{copy}</span>}</li>;
+      })}
+    </ol>
+  );
+}
+
+type DashboardIdentityItem = {
+  detail?: ReactNode;
+  href?: string;
+  id: string;
+  meta?: ReactNode;
+  title: string;
+};
+
+function initials(value: string) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "—";
+}
+
+export function DashboardIdentityList({ empty, items }: { empty: string; items: DashboardIdentityItem[] }) {
+  if (!items.length) return <p className="dashboard-card-empty">{empty}</p>;
+
+  return (
+    <ul className="dashboard-widget-identity-list">
+      {items.map((item) => {
+        const copy = (
+          <>
+            <span className="dashboard-widget-avatar" aria-hidden="true">{initials(item.title)}</span>
+            <span className="dashboard-card-list-copy">
+              <strong>{item.title}</strong>
+              {item.detail ? <small>{item.detail}</small> : null}
+            </span>
+            {item.meta ? <em>{item.meta}</em> : null}
+          </>
+        );
+
+        return <li key={item.id}>{item.href ? <Link href={item.href}>{copy}</Link> : <span>{copy}</span>}</li>;
+      })}
+    </ul>
+  );
+}
+
+type DashboardSparklineProps = {
+  ariaLabel: string;
+  labels?: string[];
+  points: number[];
+};
+
+export function DashboardSparkline({ ariaLabel, labels = [], points }: DashboardSparklineProps) {
+  const safePoints = points.length ? points : [0];
+  const max = Math.max(1, ...safePoints);
+  const min = Math.min(0, ...safePoints);
+  const range = Math.max(1, max - min);
+  const coordinates = safePoints
+    .map((point, index) => {
+      const x = safePoints.length === 1 ? 50 : (index / (safePoints.length - 1)) * 100;
+      const y = 42 - ((point - min) / range) * 34;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  const areaCoordinates = `0,46 ${coordinates} 100,46`;
+
+  return (
+    <div className="dashboard-widget-sparkline">
+      <svg aria-label={ariaLabel} preserveAspectRatio="none" role="img" viewBox="0 0 100 48">
+        <line className="dashboard-widget-chart-guide" x1="0" x2="100" y1="45.5" y2="45.5" />
+        <polygon className="dashboard-widget-chart-area" points={areaCoordinates} />
+        <polyline fill="none" points={coordinates} vectorEffect="non-scaling-stroke" />
+      </svg>
+      {labels.length ? (
+        <div className="dashboard-widget-chart-labels">
+          {labels.map((label) => <small key={label}>{label}</small>)}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+type DashboardStatItem = {
+  detail?: ReactNode;
+  icon?: ReactNode;
+  label: string;
+  tone?: "neutral" | "positive" | "attention" | "danger";
+  value: ReactNode;
+};
+
+export function DashboardStatStack({ items }: { items: DashboardStatItem[] }) {
+  return (
+    <div className="dashboard-widget-stat-stack">
+      {items.map((item) => (
+        <span key={item.label}>
+          {item.icon ? <i className={`dashboard-widget-stat-icon dashboard-widget-tone-${item.tone || "neutral"}`}>{item.icon}</i> : null}
+          <span>
+            <small>{item.label}</small>
+            {item.detail ? <em>{item.detail}</em> : null}
+          </span>
+          <strong>{item.value}</strong>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 type DashboardKpi = {
   label: string;
   value: ReactNode;

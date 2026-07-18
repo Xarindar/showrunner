@@ -39,7 +39,7 @@ Saved dashboards continue to use the established `dashboard.cards.*` setting key
 5. Verify small, medium, and large sizes in the dashboard.
 
 ```tsx
-import { DashboardCardList, DashboardMetric } from "@/components/ui";
+import { DashboardIdentityList, DashboardMetric } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
 import { widgetItemLimit } from "@/shell/dashboard-widget-utils";
@@ -62,7 +62,7 @@ export const recentExamplesWidget = {
       <>
         <DashboardMetric label="Example records" value={count} />
         {size !== "sm" ? (
-          <DashboardCardList
+          <DashboardIdentityList
             empty="No examples yet."
             items={examples.map((example) => ({ id: example.id, title: example.name }))}
           />
@@ -89,7 +89,15 @@ Use `widgetItemLimit(size)` for repeatable records. The layout converts short re
 
 ## Visual Contract
 
-- Use `DashboardMetric`, `DashboardCardList`, `DashboardKpiRow`, and `DashboardTrendBars` before inventing widget-specific markup.
+- Choose a composition that reflects the domain instead of defaulting every widget to a metric followed by rows:
+  - `DashboardTimeline` for schedules and queues ordered by time.
+  - `DashboardRing` for readiness, coverage, or completion against a real denominator.
+  - `DashboardSegmentBar` for mutually meaningful states such as sent, queued, and failed.
+  - `DashboardSparkline` for a time series.
+  - `DashboardIdentityList` for people-centered records.
+  - `DashboardCardList` for documents, transactions, and other ledger-like records.
+  - `DashboardKpiRow` or `DashboardStatStack` for a small set of genuinely distinct measures.
+- The shared frame supplies the title, module identity, navigation, and options. Descriptions belong in the widget catalog, not inside every dashboard card.
 - Keep one dominant value or task per widget.
 - Use divider-based rows. Do not nest bordered cards inside a widget.
 - Use neutral surfaces and text. Reserve semantic color for status, warning, success, and error meaning.
@@ -99,7 +107,7 @@ Use `widgetItemLimit(size)` for repeatable records. The layout converts short re
 - Empty states must fit the same size contract as populated states.
 - Widget bodies must not set fixed heights, `overflow: auto`, or viewport-dependent dimensions.
 
-The direction follows the same principles emphasized in Shopify's admin guidance: shared patterns create familiarity, neutral color carries most content, and icons should be used consistently rather than decoratively.
+The direction combines Shopify-style dashboard restraint with the authored composition found in Wigggle UI. The frame stays consistent and neutral; personality comes from the information design inside it, not gradients, arbitrary palettes, or decorative copy. Do not repeat the same internal composition across every module simply because it is available.
 
 ## Ownership Rules
 
@@ -129,3 +137,4 @@ If a widget starts needing complex filters or actions, keep the widget a summary
 - Shopify app visual design: https://shopify.dev/docs/apps/design/visual-design
 - Shopify App Home patterns: https://shopify.dev/docs/apps/build/app-home
 - shadcn/ui blocks: https://ui.shadcn.com/blocks
+- Wigggle UI widget collection: https://github.com/wigggle-ui/ui

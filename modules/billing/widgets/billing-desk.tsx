@@ -1,4 +1,4 @@
-import { Badge, DashboardCardList, DashboardMetric } from "@/components/ui";
+import { Badge, DashboardCardList, DashboardMetric, DashboardSegmentBar } from "@/components/ui";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
@@ -12,7 +12,7 @@ export const billingDeskWidget = {
   sizes: ["sm", "md", "lg"],
   title: "Billing desk",
   async render({ siteId, size, timezone }) {
-    const limit = widgetItemLimit(size);
+    const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [sentCount, overdueCount, openTotal, documents] = await Promise.all([
       prisma.billingDocument.count({ where: { siteId, type: "INVOICE", status: "SENT" } }),
       prisma.billingDocument.count({ where: { siteId, type: "INVOICE", status: "OVERDUE" } }),
@@ -34,7 +34,13 @@ export const billingDeskWidget = {
           label="Open invoice total"
           value={formatMoney(openTotal._sum.totalCents || 0)}
         />
-        {size !== "sm" ? (
+        <DashboardSegmentBar
+          items={[
+            { label: "Sent", value: sentCount },
+            { label: "Overdue", tone: "danger", value: overdueCount }
+          ]}
+        />
+        {size === "lg" ? (
           <DashboardCardList
             empty="No invoices are currently open."
             items={documents.map((document) => ({

@@ -1,4 +1,4 @@
-import { DashboardCardList, DashboardMetric } from "@/components/ui";
+import { DashboardCardList, DashboardMetric, DashboardSegmentBar } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
 import { widgetItemLimit, widgetShortDateLabel } from "@/shell/dashboard-widget-utils";
@@ -11,7 +11,7 @@ export const communicationsOutboxWidget = {
   sizes: ["sm", "md", "lg"],
   title: "Communications outbox",
   async render({ siteId, size, timezone }) {
-    const limit = widgetItemLimit(size);
+    const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [queuedCount, failedCount, sentCount, outbox] = await Promise.all([
       prisma.emailOutbox.count({ where: { siteId, status: "QUEUED" } }),
       prisma.emailOutbox.count({ where: { siteId, status: "FAILED" } }),
@@ -26,7 +26,14 @@ export const communicationsOutboxWidget = {
     return (
       <>
         <DashboardMetric detail={`${failedCount} failed, ${sentCount} sent total`} label="Queued messages" value={queuedCount} />
-        {size !== "sm" ? (
+        <DashboardSegmentBar
+          items={[
+            { label: "Sent", tone: "positive", value: sentCount },
+            { label: "Queued", tone: "attention", value: queuedCount },
+            { label: "Failed", tone: "danger", value: failedCount }
+          ]}
+        />
+        {size === "lg" ? (
           <DashboardCardList
             empty="No email outbox activity yet."
             items={outbox.map((message) => ({

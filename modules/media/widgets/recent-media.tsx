@@ -1,7 +1,7 @@
 import { DashboardCardList, DashboardMetric } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
-import { widgetItemLimit, widgetShortDateLabel } from "@/shell/dashboard-widget-utils";
+import { widgetItemLimit } from "@/shell/dashboard-widget-utils";
 
 export const recentMediaWidget = {
   defaultSize: "md",
@@ -10,7 +10,7 @@ export const recentMediaWidget = {
   moduleId: "media",
   sizes: ["sm", "md", "lg"],
   title: "Recent media",
-  async render({ siteId, size, timezone }) {
+  async render({ siteId, size }) {
     const limit = widgetItemLimit(size);
     const [count, privateCount, assets] = await Promise.all([
       prisma.mediaAsset.count({ where: { siteId, deletedAt: null } }),
@@ -26,7 +26,7 @@ export const recentMediaWidget = {
     return (
       <>
         <DashboardMetric detail={`${privateCount} private`} label="Media assets" value={count} />
-        {size === "lg" && assets.length ? (
+        {size !== "sm" && assets.length ? (
           <div className="dashboard-card-media-grid">
             {assets.map((asset) => {
               const thumbnailUrl = asset.variants[0]?.url || asset.url;
@@ -47,7 +47,6 @@ export const recentMediaWidget = {
             items={assets.map((asset) => ({
               detail: asset.folder || asset.mimeType || "Media asset",
               id: asset.id,
-              meta: widgetShortDateLabel(asset.createdAt, timezone),
               title: asset.filename
             }))}
           />

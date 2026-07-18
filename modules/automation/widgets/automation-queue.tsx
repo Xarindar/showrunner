@@ -1,4 +1,4 @@
-import { DashboardCardList, DashboardMetric } from "@/components/ui";
+import { DashboardCardList, DashboardMetric, DashboardSegmentBar } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
 import { widgetItemLimit, widgetShortDateLabel } from "@/shell/dashboard-widget-utils";
@@ -11,7 +11,7 @@ export const automationQueueWidget = {
   sizes: ["sm", "md", "lg"],
   title: "Automation queue",
   async render({ siteId, size, timezone }) {
-    const limit = widgetItemLimit(size);
+    const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [activeAutomations, openTasks, failedRuns, runs] = await Promise.all([
       prisma.automation.count({ where: { siteId, status: "ACTIVE" } }),
       prisma.automationTask.count({ where: { siteId, status: "OPEN" } }),
@@ -27,7 +27,14 @@ export const automationQueueWidget = {
     return (
       <>
         <DashboardMetric detail={`${openTasks} open tasks, ${failedRuns} failed runs`} label="Active automations" value={activeAutomations} />
-        {size !== "sm" ? (
+        <DashboardSegmentBar
+          items={[
+            { label: "Active", tone: "positive", value: activeAutomations },
+            { label: "Open tasks", tone: "attention", value: openTasks },
+            { label: "Failed", tone: "danger", value: failedRuns }
+          ]}
+        />
+        {size === "lg" ? (
           <DashboardCardList
             empty="No automation runs have happened yet."
             items={runs.map((run) => ({

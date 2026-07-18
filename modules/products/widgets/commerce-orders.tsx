@@ -1,4 +1,4 @@
-import { Badge, DashboardCardList, DashboardMetric } from "@/components/ui";
+import { Badge, DashboardCardList, DashboardMetric, DashboardSegmentBar } from "@/components/ui";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
@@ -12,7 +12,7 @@ export const commerceOrdersWidget = {
   sizes: ["sm", "md", "lg"],
   title: "Commerce orders",
   async render({ siteId, size }) {
-    const limit = widgetItemLimit(size);
+    const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [activeProducts, pendingOrders, paidRevenue, orders] = await Promise.all([
       prisma.product.count({ where: { siteId, status: "ACTIVE" } }),
       prisma.order.count({ where: { siteId, status: "PENDING" } }),
@@ -34,7 +34,13 @@ export const commerceOrdersWidget = {
           label="Paid revenue"
           value={formatMoney(paidRevenue._sum.totalCents || 0)}
         />
-        {size !== "sm" ? (
+        <DashboardSegmentBar
+          items={[
+            { label: "Products", tone: "positive", value: activeProducts },
+            { label: "Orders to review", tone: "attention", value: pendingOrders }
+          ]}
+        />
+        {size === "lg" ? (
           <DashboardCardList
             empty="No orders have been created yet."
             items={orders.map((order) => ({

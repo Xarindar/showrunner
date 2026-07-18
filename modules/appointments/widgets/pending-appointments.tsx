@@ -1,4 +1,4 @@
-import { DashboardCardList, DashboardMetric } from "@/components/ui";
+import { DashboardIdentityList, DashboardMetric } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
 import { widgetItemLimit, widgetShortDateLabel } from "@/shell/dashboard-widget-utils";
@@ -26,7 +26,7 @@ export const pendingAppointmentsWidget = {
       <>
         <DashboardMetric detail="requests waiting for confirmation" label="Needs review" value={count} />
         {size !== "sm" ? (
-          <DashboardCardList
+          <DashboardIdentityList
             empty="No appointment requests need review."
             items={bookings.map((booking) => ({
               detail: booking.service.name,

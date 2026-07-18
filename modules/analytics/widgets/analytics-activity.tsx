@@ -1,4 +1,4 @@
-import { DashboardKpiRow, DashboardMetric, DashboardTrendBars } from "@/components/ui";
+import { DashboardKpiRow, DashboardMetric, DashboardSparkline } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import { addDaysToDateKey, getTodayDateKey, parseZonedDateKey } from "@/lib/timezone";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
@@ -40,11 +40,10 @@ export const analyticsActivityWidget = {
       <>
         <DashboardMetric detail={`${bookingCount} bookings, ${leadCount} leads`} label="Events this week" value={eventCount} />
         {size === "lg" ? (
-          <DashboardTrendBars
-            bars={windows.map((window, index) => ({
-              label: widgetWeekdayLabel(window.start, timezone),
-              value: dayCounts[index] || 0
-            }))}
+          <DashboardSparkline
+            ariaLabel="Analytics events over the last seven days"
+            labels={windows.map((window) => widgetWeekdayLabel(window.start, timezone))}
+            points={dayCounts}
           />
         ) : size === "md" ? (
           <DashboardKpiRow

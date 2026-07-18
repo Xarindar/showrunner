@@ -1,4 +1,4 @@
-import { DashboardCardList, DashboardMetric } from "@/components/ui";
+import { DashboardCardList, DashboardMetric, DashboardSegmentBar } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
 import { widgetItemLimit, widgetShortDateLabel } from "@/shell/dashboard-widget-utils";
@@ -11,7 +11,7 @@ export const portfolioProofingWidget = {
   sizes: ["sm", "md", "lg"],
   title: "Portfolio proofing",
   async render({ siteId, size, timezone }) {
-    const limit = widgetItemLimit(size);
+    const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [publishedGalleries, openRounds, recentRounds] = await Promise.all([
       prisma.portfolioGallery.count({ where: { siteId, status: "PUBLISHED" } }),
       prisma.portfolioProofRound.count({ where: { siteId, status: { in: ["OPEN", "CHANGES_REQUESTED"] } } }),
@@ -26,7 +26,13 @@ export const portfolioProofingWidget = {
     return (
       <>
         <DashboardMetric detail={`${publishedGalleries} published galleries`} label="Open proof rounds" value={openRounds} />
-        {size !== "sm" ? (
+        <DashboardSegmentBar
+          items={[
+            { label: "Published", tone: "positive", value: publishedGalleries },
+            { label: "In proofing", tone: "attention", value: openRounds }
+          ]}
+        />
+        {size === "lg" ? (
           <DashboardCardList
             empty="No proof rounds are open."
             items={recentRounds.map((round) => ({

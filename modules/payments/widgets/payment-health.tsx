@@ -1,4 +1,4 @@
-import { DashboardCardList, DashboardMetric } from "@/components/ui";
+import { DashboardCardList, DashboardRing } from "@/components/ui";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
@@ -12,7 +12,7 @@ export const paymentHealthWidget = {
   sizes: ["sm", "md", "lg"],
   title: "Payment health",
   async render({ siteId, size, timezone }) {
-    const limit = widgetItemLimit(size);
+    const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [connectedCount, erroredCount, payments] = await Promise.all([
       prisma.paymentGatewayCredential.count({ where: { siteId, status: "CONNECTED" } }),
       prisma.paymentGatewayCredential.count({ where: { siteId, status: "ERROR" } }),
@@ -26,8 +26,14 @@ export const paymentHealthWidget = {
 
     return (
       <>
-        <DashboardMetric detail={`${erroredCount} connections need attention`} label="Connected gateways" value={connectedCount} />
-        {size !== "sm" ? (
+        <DashboardRing
+          detail={erroredCount ? `${erroredCount} connection${erroredCount === 1 ? "" : "s"} need attention` : "All configured gateways are healthy"}
+          label="Gateway health"
+          max={Math.max(1, connectedCount + erroredCount)}
+          tone={erroredCount ? "attention" : "positive"}
+          value={connectedCount}
+        />
+        {size === "lg" ? (
           <DashboardCardList
             empty="No payments have been recorded yet."
             items={payments.map((payment) => ({

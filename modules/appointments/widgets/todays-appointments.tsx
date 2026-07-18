@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { DashboardCardList, DashboardMetric } from "@/components/ui";
+import { DashboardMetric, DashboardTimeline } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import { getZonedDayBounds } from "@/lib/timezone";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
@@ -54,13 +54,13 @@ export const todaysAppointmentsWidget = {
             <small>No appointments are scheduled.</small>
           </div>
         ) : size !== "sm" ? (
-          <DashboardCardList
+          <DashboardTimeline
             empty="No appointments are scheduled for today."
             items={bookings.map((booking) => ({
               detail: booking.service.name,
               href: `/admin/appointments/${booking.id}`,
               id: booking.id,
-              meta: widgetTimeLabel(booking.startsAt, timezone),
+              time: widgetTimeLabel(booking.startsAt, timezone),
               title: booking.customerName
             }))}
           />

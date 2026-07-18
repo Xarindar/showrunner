@@ -303,7 +303,6 @@ export function DashboardWidgetsBoard({ cards, catalogGroups }: DashboardWidgets
                       </div>
                     </details>
                   }
-                  description={item.description}
                   href={item.moduleHref}
                   icon={<Icon size={18} />}
                   size={item.size}

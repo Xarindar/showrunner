@@ -1,4 +1,4 @@
-import { DashboardCardList, DashboardMetric } from "@/components/ui";
+import { DashboardIdentityList, DashboardMetric } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
 import { widgetItemLimit, widgetShortDateLabel } from "@/shell/dashboard-widget-utils";
@@ -11,7 +11,7 @@ export const recentClientsWidget = {
   sizes: ["sm", "md", "lg"],
   title: "Recent clients",
   async render({ siteId, size, timezone }) {
-    const limit = widgetItemLimit(size);
+    const limit = size === "md" ? 2 : size === "lg" ? 4 : widgetItemLimit(size);
     const [count, activeCount, recentClients] = await Promise.all([
       prisma.client.count({ where: { siteId } }),
       prisma.client.count({ where: { siteId, status: "active" } }),
@@ -26,7 +26,7 @@ export const recentClientsWidget = {
       <>
         <DashboardMetric detail={`${activeCount} active`} label="Client records" value={count} />
         {size !== "sm" ? (
-          <DashboardCardList
+          <DashboardIdentityList
             empty="No clients have been added yet."
             items={recentClients.map((client) => ({
               detail: client.email,
