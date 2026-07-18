@@ -59,7 +59,7 @@ export async function addDashboardCardAction(formData: FormData) {
   const availableCards = new Set(getAvailableDashboardCards(settings.enabledModuleIds).map((item) => item.id));
 
   if (!card || !availableCards.has(card.id)) {
-    redirectWithStatus(returnTo, "error", "That dashboard card is not available for this site.");
+    redirectWithStatus(returnTo, "error", "That widget is not available for this site.");
   }
 
   if (placements.some((placement) => placement.cardId === card.id)) {
@@ -102,7 +102,7 @@ export async function removeDashboardCardAction(formData: FormData) {
   const removed = placements.find((placement) => placement.instanceId === instanceId);
 
   if (!removed) {
-    redirectWithStatus(returnTo, "error", "That dashboard card was not found.");
+    redirectWithStatus(returnTo, "error", "That widget was not found.");
   }
 
   const nextPlacements = orderedPlacements(placements.filter((placement) => placement.instanceId !== instanceId));
@@ -173,7 +173,7 @@ export async function saveDashboardCardLayoutAction(items: DashboardLayoutItemIn
     },
     siteId: settings.siteId,
     targetId: settings.siteId,
-    targetLabel: "Dashboard QuickCards",
+    targetLabel: "Dashboard widgets",
     targetType: "dashboard"
   });
 

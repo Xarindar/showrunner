@@ -6,7 +6,7 @@ export const dashboardCardMinColumns = 3;
 export const dashboardCardMaxColumns = dashboardLayoutColumns;
 export const dashboardCardMinRows = 4;
 export const dashboardCardMaxRows = 14;
-export const dashboardCardGridRowHeight = 32;
+export const dashboardCardGridRowHeight = 40;
 
 export type DashboardCardLayout = {
   columns: number;
@@ -14,7 +14,7 @@ export type DashboardCardLayout = {
 };
 
 export const dashboardCardLayoutDefaults = {
-  sm: { columns: 4, rows: 5 },
+  sm: { columns: 4, rows: 4 },
   md: { columns: 6, rows: 6 },
   lg: { columns: 12, rows: 8 }
 } satisfies Record<DashboardCardSize, DashboardCardLayout>;
@@ -42,7 +42,7 @@ export function getDashboardCardLayoutDefaults(size: DashboardCardSize): Dashboa
 }
 
 export function dashboardCardSizeFromLayout(columns: number, rows: number): DashboardCardSize {
-  if (columns >= 9 || rows >= 8) return "lg";
-  if (columns <= 4 && rows <= 5) return "sm";
+  if (rows <= 5) return "sm";
+  if (columns >= 9 && rows >= 8) return "lg";
   return "md";
 }

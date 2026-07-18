@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { Card } from "./card";
 import { cx } from "./utils";
 
@@ -39,21 +39,22 @@ export function DashboardCardFrame({
             {icon ? <span className="dashboard-card-icon" aria-hidden="true">{icon}</span> : null}
             <span>
               <strong>{title}</strong>
-              {description ? <small>{description}</small> : null}
+              {description ? <small className="dashboard-card-description">{description}</small> : null}
             </span>
           </span>
-          {actions ? <span className="dashboard-card-actions">{actions}</span> : null}
+          <span className="dashboard-card-actions">
+            {href ? (
+              <Link aria-label={`Open ${title}`} className="dashboard-card-open" href={href} title={`Open ${title}`}>
+                <ArrowUpRight size={16} />
+              </Link>
+            ) : null}
+            {actions}
+          </span>
         </div>
       }
       {...props}
     >
       <div className="dashboard-card-content">{children}</div>
-      {href ? (
-        <Link className="dashboard-card-link" href={href}>
-          Open module
-          <ArrowRight size={15} />
-        </Link>
-      ) : null}
     </Card>
   );
 }
@@ -67,9 +68,11 @@ type DashboardMetricProps = {
 export function DashboardMetric({ detail, label, value }: DashboardMetricProps) {
   return (
     <div className="dashboard-card-metric">
-      <span>{label}</span>
       <strong>{value}</strong>
-      {detail ? <small>{detail}</small> : null}
+      <span>
+        {label}
+        {detail ? <small>{detail}</small> : null}
+      </span>
     </div>
   );
 }
@@ -95,6 +98,7 @@ export function DashboardKpiRow({ items }: { items: DashboardKpi[] }) {
 type DashboardListItem = {
   detail?: ReactNode;
   href?: string;
+  id: string;
   meta?: ReactNode;
   title: ReactNode;
 };
@@ -104,10 +108,10 @@ export function DashboardCardList({ empty, items }: { empty: string; items: Dash
 
   return (
     <ul className="dashboard-card-list">
-      {items.map((item, index) => {
+      {items.map((item) => {
         const body = (
           <>
-            <span>
+            <span className="dashboard-card-list-copy">
               <strong>{item.title}</strong>
               {item.detail ? <small>{item.detail}</small> : null}
             </span>
@@ -116,7 +120,7 @@ export function DashboardCardList({ empty, items }: { empty: string; items: Dash
         );
 
         return (
-          <li key={index}>
+          <li key={item.id}>
             {item.href ? <Link href={item.href}>{body}</Link> : <span>{body}</span>}
           </li>
         );

@@ -10,7 +10,7 @@ import {
   type DashboardCardPlacement
 } from "@/shell/dashboard-cards";
 import { ButtonLink, EmptyState, Feedback } from "@/components/ui";
-import { DashboardQuickCardsBoard } from "./dashboard-board";
+import { DashboardWidgetsBoard } from "./dashboard-board";
 import { getOnboardingChecklist } from "./onboarding";
 
 export const dynamic = "force-dynamic";
@@ -157,7 +157,7 @@ export default async function AdminDashboardPage({ searchParams }: DashboardPage
         </section>
       ) : null}
 
-      <DashboardQuickCardsBoard
+      <DashboardWidgetsBoard
         cards={renderedCards.map((card) => ({ ...card, body: card.body as ReactNode }))}
         catalogGroups={catalogGroups}
         key={quickCardsKey}

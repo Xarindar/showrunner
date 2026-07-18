@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Grip, Maximize2, Plus, Trash2 } from "lucide-react";
+import { Grip, Maximize2, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { Button, DashboardCardFrame, EmptyState, Modal } from "@/components/ui";
 import { moduleIcons } from "@/shell/module-icons";
 import {
@@ -45,7 +45,7 @@ type DashboardCatalogGroup = {
   };
 };
 
-type DashboardQuickCardsBoardProps = {
+type DashboardWidgetsBoardProps = {
   cards: DashboardBoardCard[];
   catalogGroups: DashboardCatalogGroup[];
 };
@@ -88,7 +88,7 @@ function lockDocumentInteraction(cursor: string) {
   };
 }
 
-export function DashboardQuickCardsBoard({ cards, catalogGroups }: DashboardQuickCardsBoardProps) {
+export function DashboardWidgetsBoard({ cards, catalogGroups }: DashboardWidgetsBoardProps) {
   const router = useRouter();
   const gridRef = useRef<HTMLDivElement>(null);
   const initialLayout = useMemo(() => getLayoutFromCards(cards), [cards]);
@@ -239,11 +239,11 @@ export function DashboardQuickCardsBoard({ cards, catalogGroups }: DashboardQuic
     saveState === "saving" ? "Saving layout" : saveState === "saved" ? "Layout saved" : saveState === "error" ? "Layout could not be saved" : "";
 
   return (
-    <section className="dashboard-quickcards" aria-label="Dashboard QuickCards">
+    <section className="dashboard-quickcards" aria-label="Dashboard widgets">
       <div className="dashboard-quickcards-toolbar">
         <div>
-          <p className="eyebrow">QuickCards</p>
-          <h2>Dashboard cards</h2>
+          <h2>Widgets</h2>
+          <p>Arrange the information you want close at hand.</p>
         </div>
         <div className="dashboard-quickcards-actions">
           {saveStatus ? (
@@ -252,8 +252,8 @@ export function DashboardQuickCardsBoard({ cards, catalogGroups }: DashboardQuic
             </span>
           ) : null}
           <Button onClick={() => setModalOpen(true)} type="button" variant="secondary">
-            <Plus size={18} />
-            Add QuickCard
+            <Plus size={16} />
+            Add widget
           </Button>
         </div>
       </div>
@@ -287,13 +287,21 @@ export function DashboardQuickCardsBoard({ cards, catalogGroups }: DashboardQuic
               >
                 <DashboardCardFrame
                   actions={
-                    <form action={removeDashboardCardAction} className="dashboard-card-remove-form">
-                      <input name="instanceId" type="hidden" value={item.instanceId} />
-                      <input name="returnTo" type="hidden" value="/admin" />
-                      <button aria-label={`Remove ${item.title}`} className="dashboard-card-action-button" title="Remove QuickCard" type="submit">
-                        <Trash2 size={15} />
-                      </button>
-                    </form>
+                    <details className="dashboard-card-menu">
+                      <summary aria-label={`More options for ${item.title}`} className="dashboard-card-action-button" title="Widget options">
+                        <MoreHorizontal size={17} />
+                      </summary>
+                      <div className="dashboard-card-menu-popover">
+                        <form action={removeDashboardCardAction} className="dashboard-card-remove-form">
+                          <input name="instanceId" type="hidden" value={item.instanceId} />
+                          <input name="returnTo" type="hidden" value="/admin" />
+                          <button type="submit">
+                            <Trash2 size={15} />
+                            Remove widget
+                          </button>
+                        </form>
+                      </div>
+                    </details>
                   }
                   description={item.description}
                   href={item.moduleHref}
@@ -307,7 +315,7 @@ export function DashboardQuickCardsBoard({ cards, catalogGroups }: DashboardQuic
                   aria-label={`Move ${item.title}`}
                   className="dashboard-card-corner-handle dashboard-card-move-handle"
                   onPointerDown={(event) => beginMove(item.instanceId, event)}
-                  title="Move QuickCard"
+                  title="Move widget"
                   type="button"
                 >
                   <Grip size={16} />
@@ -316,7 +324,7 @@ export function DashboardQuickCardsBoard({ cards, catalogGroups }: DashboardQuic
                   aria-label={`Resize ${item.title}`}
                   className="dashboard-card-corner-handle dashboard-card-resize-handle"
                   onPointerDown={(event) => beginResize(item, event)}
-                  title="Resize QuickCard"
+                  title="Resize widget"
                   type="button"
                 >
                   <Maximize2 size={15} />
@@ -327,10 +335,10 @@ export function DashboardQuickCardsBoard({ cards, catalogGroups }: DashboardQuic
         </div>
       ) : (
         <div className="dashboard-empty-panel">
-          <EmptyState title="No QuickCards yet" description="Add cards from your enabled modules to build this workspace.">
+          <EmptyState title="No widgets yet" description="Add a widget from one of your enabled modules to build this workspace.">
             <Button onClick={() => setModalOpen(true)} type="button" variant="secondary">
-              <Plus size={18} />
-              Add QuickCard
+              <Plus size={16} />
+              Add widget
             </Button>
           </EmptyState>
         </div>
@@ -341,7 +349,7 @@ export function DashboardQuickCardsBoard({ cards, catalogGroups }: DashboardQuic
         className="dashboard-quickcard-dialog"
         onClose={() => setModalOpen(false)}
         open={modalOpen}
-        title="Add QuickCard"
+        title="Add widget"
       >
         {availableCardCount ? (
           <div className="dashboard-catalog-groups">
@@ -376,7 +384,7 @@ export function DashboardQuickCardsBoard({ cards, catalogGroups }: DashboardQuic
             })}
           </div>
         ) : (
-          <EmptyState title="All QuickCards are added" description="Remove a card if you want to swap in another module view." />
+          <EmptyState title="All widgets are added" description="Remove a widget if you want to swap in another module view." />
         )}
       </Modal>
     </section>

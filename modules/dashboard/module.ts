@@ -14,14 +14,14 @@ export const manifest = {
   readiness: {
     level: "live",
     mode: "live",
-    summary: "Guided setup checklist plus user-configurable QuickCards with saved drag and resize layout.",
+    summary: "Guided setup checklist plus user-configurable widgets with saved drag and resize layout.",
     primaryGap: "Role-aware queue summaries can be expanded as module ownership rules mature."
   },
   capabilities: [
     { label: "Setup checklist", status: "live" },
-    { label: "QuickCard modal catalog", status: "live" },
+    { label: "Widget catalog", status: "live" },
     { label: "Per-user dashboard layout", status: "live" },
-    { label: "Drag-resizable widget cards", status: "live" }
+    { label: "Drag-resizable widgets", status: "live" }
   ],
   adminRoutes: ["/admin"],
   dependencies: ["settings"],
