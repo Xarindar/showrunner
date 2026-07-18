@@ -47,7 +47,7 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  background: var(--bg);
+  background: #ffffff;
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 15px;
@@ -56,11 +56,7 @@ body {
 }
 
 body {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--line) 30%, transparent) 1px, transparent 1px),
-    linear-gradient(180deg, color-mix(in srgb, var(--line) 26%, transparent) 1px, transparent 1px),
-    var(--bg);
-  background-size: 32px 32px;
+  background: #ffffff;
 }
 
 a {
@@ -626,11 +622,7 @@ button.button:disabled,
 }
 
 .email-playground-stage {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--color-border) 32%, transparent) 1px, transparent 1px),
-    linear-gradient(180deg, color-mix(in srgb, var(--color-border) 26%, transparent) 1px, transparent 1px),
-    color-mix(in srgb, var(--color-page) 58%, var(--color-surface));
-  background-size: 28px 28px;
+  background: #ffffff;
   display: grid;
   min-height: 0;
   min-width: 0;
@@ -5721,7 +5713,7 @@ button.button:disabled,
 }
 
 .admin-root {
-  --admin-canvas: #f4f4f2;
+  --admin-canvas: #ffffff;
   --admin-surface: #ffffff;
   --admin-surface-raised: #ffffff;
   --admin-surface-sunken: #ecece9;
