@@ -1,8 +1,7 @@
 import type { PaymentGatewayCredential, Prisma } from "@prisma/client";
 import { decryptGatewaySecret, encryptGatewaySecret } from "@/lib/payments/credential-crypto";
 import { prisma } from "@/lib/prisma";
-import { getConnectBrokerConfig } from "./config";
-import { signRawBody } from "./tokens";
+import { brokerRequest } from "./broker-client";
 
 // Square OAuth tokens expire (~30 days). Refresh goes through the AdmitOne Connect
 // broker (which holds the Square app secret), but it sits OFF the payment path: the
@@ -25,33 +24,17 @@ export function isOAuthSquareCredential(credential: Pick<PaymentGatewayCredentia
 // Exchange the stored refresh token for fresh Square tokens via the broker, then
 // persist them encrypted. Throws when the broker is unreachable or rejects the call.
 export async function refreshSquareCredentialViaBroker(credential: PaymentGatewayCredential) {
-  const broker = getConnectBrokerConfig();
-  if (!broker) {
-    throw new Error("Square token refresh needs the AdmitOne Connect broker vars (ADMITONE_CONNECT_BASE_URL / _CLIENT_ID / _SHARED_SECRET).");
-  }
-
   const refreshToken = credential.encryptedRefreshToken ? decryptGatewaySecret(credential.encryptedRefreshToken) : "";
   if (!refreshToken) throw new Error("No stored Square refresh token. Reconnect Square to refresh it.");
 
-  const body = JSON.stringify({ client_id: broker.clientId, refreshToken });
-  const response = await fetch(`${broker.baseUrl}/connect/square/refresh`, {
-    body,
-    headers: {
-      "Content-Type": "application/json",
-      "X-AdmitOne-Signature": signRawBody(body, broker.sharedSecret)
-    },
-    method: "POST"
+  const parsed = await brokerRequest<{ accessToken?: string; expiresAt?: string; refreshToken?: string }>({
+    path: "/connect/square/refresh",
+    provider: "square",
+    siteId: credential.siteId,
+    fields: { refreshToken }
   });
-
-  const text = await response.text();
-  let parsed: { accessToken?: string; expiresAt?: string; message?: string; refreshToken?: string } = {};
-  try {
-    parsed = text ? JSON.parse(text) : {};
-  } catch {
-    // fall through to the status check below with an empty body
-  }
-  if (!response.ok || !parsed.accessToken || !parsed.refreshToken || !parsed.expiresAt) {
-    throw new Error(parsed.message || `Square token refresh failed (broker status ${response.status}).`);
+  if (!parsed.accessToken || !parsed.refreshToken || !parsed.expiresAt) {
+    throw new Error("Square token refresh returned an incomplete response.");
   }
 
   const expiresAt = new Date(parsed.expiresAt);

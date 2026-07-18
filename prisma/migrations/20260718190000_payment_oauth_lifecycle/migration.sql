@@ -1,0 +1,2 @@
+ALTER TYPE "PaymentGatewayConnectionStatus" ADD VALUE IF NOT EXISTS 'DISCONNECTING';
+ALTER TYPE "PaymentGatewayConnectionStatus" ADD VALUE IF NOT EXISTS 'REVOKED';

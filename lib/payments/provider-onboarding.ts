@@ -2,6 +2,8 @@ import "server-only";
 
 import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
 import Stripe from "stripe";
+import { publicAppBaseUrl } from "@/lib/env";
+import { revokeOAuthProvider } from "@/lib/payments/connect/broker-client";
 import { decryptGatewaySecret, encryptGatewaySecret, getConnectedGatewayCredential, upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { prisma } from "@/lib/prisma";
 
@@ -105,7 +107,8 @@ export async function squareVerify(environment: SquareEnvironment, accessToken: 
       Accept: "application/json",
       Authorization: `Bearer ${accessToken}`,
       "Square-Version": squareApiVersion
-    }
+    },
+    signal: AbortSignal.timeout(10_000)
   });
   const text = await response.text();
   const body = text ? (JSON.parse(text) as { errors?: { detail?: string }[]; locations?: SquareLocation[] }) : {};
@@ -188,7 +191,8 @@ async function paypalVerify(environment: PayPalEnvironment, clientId: string, cl
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/x-www-form-urlencoded"
     },
-    method: "POST"
+    method: "POST",
+    signal: AbortSignal.timeout(10_000)
   });
   const text = await response.text();
   const body = text ? (JSON.parse(text) as { access_token?: string; error_description?: string }) : {};
@@ -236,8 +240,53 @@ export async function savePayPalCredentials(input: {
 // ---------------------------------------------------------------------------
 
 export async function disconnectPaymentProvider(input: { provider: PaymentProvider; siteId: string }) {
-  await prisma.paymentGatewayCredential.updateMany({
-    where: { provider: input.provider, siteId: input.siteId },
+  const credential = await getConnectedGatewayCredential(input.siteId, input.provider);
+  if (!credential) return;
+  const metadata = metadataObject(credential.metadata);
+  const isOAuth = metadata.onboarding === "oauth";
+
+  if (isOAuth && (input.provider === PaymentProvider.STRIPE || input.provider === PaymentProvider.SQUARE)) {
+    await prisma.paymentGatewayCredential.update({
+      where: { id: credential.id },
+      data: { status: PaymentGatewayConnectionStatus.DISCONNECTING }
+    });
+    try {
+      if (input.provider === PaymentProvider.STRIPE) {
+        const accessToken = credential.encryptedSecretKey ? decryptGatewaySecret(credential.encryptedSecretKey) : "";
+        if (!accessToken || !credential.externalAccountId) throw new Error("Stripe OAuth credentials are incomplete.");
+        const stripe = new Stripe(accessToken, { maxNetworkRetries: 2, timeout: 10_000 });
+        const webhookUrl = `${publicAppBaseUrl()}/api/webhooks/stripe`;
+        const endpoints = await stripe.webhookEndpoints.list({ limit: 100 });
+        for (const endpoint of endpoints.data) {
+          if (endpoint.url === webhookUrl) await stripe.webhookEndpoints.del(endpoint.id);
+        }
+        await revokeOAuthProvider({
+          provider: "stripe",
+          siteId: input.siteId,
+          externalAccountId: credential.externalAccountId
+        });
+      } else {
+        if (!credential.merchantId) throw new Error("Square OAuth credentials are incomplete.");
+        await revokeOAuthProvider({
+          provider: "square",
+          siteId: input.siteId,
+          externalAccountId: credential.merchantId
+        });
+      }
+    } catch (error) {
+      await prisma.paymentGatewayCredential.update({
+        where: { id: credential.id },
+        data: {
+          metadata: { ...metadata, disconnectFailure: error instanceof Error ? error.name : "UnknownError" },
+          status: PaymentGatewayConnectionStatus.ERROR
+        }
+      });
+      throw new Error(`Could not revoke ${input.provider} access. Credentials were retained so the disconnect can be retried safely.`);
+    }
+  }
+
+  await prisma.paymentGatewayCredential.update({
+    where: { id: credential.id },
     data: {
       connectedAt: null,
       encryptedAccessToken: "",
@@ -247,7 +296,7 @@ export async function disconnectPaymentProvider(input: { provider: PaymentProvid
       externalAccountId: "",
       lastVerifiedAt: null,
       merchantId: "",
-      status: PaymentGatewayConnectionStatus.DISCONNECTED,
+      status: isOAuth ? PaymentGatewayConnectionStatus.REVOKED : PaymentGatewayConnectionStatus.DISCONNECTED,
       webhookSecretHint: ""
     }
   });

@@ -164,7 +164,9 @@ function toPayPalSiteCredentials(credential: {
 // every charge/refund/webhook caller gets a token with runway without knowing about OAuth.
 export async function getSquareAccessToken(siteId: string) {
   const credential = await getConnectedGatewayCredential(siteId, PaymentProvider.SQUARE);
-  if (!credential?.encryptedAccessToken) throw new Error("Connect Square before using Square checkout.");
+  if (credential?.status !== PaymentGatewayConnectionStatus.CONNECTED || !credential.encryptedAccessToken) {
+    throw new Error("Connect Square and confirm its location before using Square checkout.");
+  }
   const metadata = credentialMetadata(credential.metadata);
   const environment = metadataString(metadata, "environment") === "sandbox" ? "sandbox" : "production";
   const refreshedToken = await maybeRefreshSquareAccessToken(credential);

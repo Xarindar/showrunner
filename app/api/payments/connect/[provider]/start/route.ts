@@ -12,7 +12,11 @@ type ConnectRouteProps = { params: Promise<{ provider: string }> };
 function paymentsRedirect(key: "connectError" | "connected", value: string) {
   const url = new URL("/admin/modules/payments", publicAppBaseUrl());
   url.searchParams.set(key, value);
-  return NextResponse.redirect(url);
+  const response = NextResponse.redirect(url);
+  response.headers.set("Cache-Control", "no-store, max-age=0");
+  response.headers.set("Pragma", "no-cache");
+  response.headers.set("Referrer-Policy", "no-referrer");
+  return response;
 }
 
 export async function GET(_request: NextRequest, { params }: ConnectRouteProps) {
@@ -34,6 +38,10 @@ export async function GET(_request: NextRequest, { params }: ConnectRouteProps) 
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production"
     });
+    response.headers.set("Cache-Control", "no-store, max-age=0");
+    response.headers.set("Pragma", "no-cache");
+    response.headers.set("Referrer-Policy", "no-referrer");
+    response.headers.set("X-Content-Type-Options", "nosniff");
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "One-click connect could not start.";

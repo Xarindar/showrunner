@@ -10,12 +10,16 @@ export const runtime = "nodejs";
 
 type ConnectRouteProps = { params: Promise<{ provider: string }> };
 
-function paymentsRedirect(key: "connectError" | "connected", value: string) {
+function paymentsRedirect(key: "connectError" | "connected" | "selectSquareLocation", value: string) {
   const url = new URL("/admin/modules/payments", publicAppBaseUrl());
   url.searchParams.set(key, value);
   const response = NextResponse.redirect(url);
   // The nonce is single-use: clear it whether the handoff succeeded or failed.
   response.cookies.set(CONNECT_NONCE_COOKIE, "", { maxAge: 0, path: "/api/payments/connect" });
+  response.headers.set("Cache-Control", "no-store, max-age=0");
+  response.headers.set("Pragma", "no-cache");
+  response.headers.set("Referrer-Policy", "no-referrer");
+  response.headers.set("X-Content-Type-Options", "nosniff");
   return response;
 }
 
@@ -36,15 +40,15 @@ export async function GET(request: NextRequest, { params }: ConnectRouteProps) {
     return paymentsRedirect("connectError", message);
   }
 
-  const handoffToken = request.nextUrl.searchParams.get("handoff") || "";
-  if (!handoffToken) {
+  const handoffCode = request.nextUrl.searchParams.get("code") || "";
+  if (!handoffCode) {
     return paymentsRedirect("connectError", "The connect handoff was incomplete. Try connecting again.");
   }
 
   try {
     const site = await resolveCurrentSite();
     const result = await completeConnectHandoff({
-      handoffToken,
+      handoffCode,
       nonceCookie: request.cookies.get(CONNECT_NONCE_COOKIE)?.value,
       provider,
       siteId: site.id
@@ -60,7 +64,7 @@ export async function GET(request: NextRequest, { params }: ConnectRouteProps) {
       targetType: "payment_gateway"
     });
 
-    return paymentsRedirect("connected", provider);
+    return paymentsRedirect(result.pendingLocationSelection ? "selectSquareLocation" : "connected", provider);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Connect could not be completed.";
     return paymentsRedirect("connectError", message);

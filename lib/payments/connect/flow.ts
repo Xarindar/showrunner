@@ -1,11 +1,13 @@
 import "server-only";
 
 import crypto from "node:crypto";
-import { PaymentProvider, type Prisma } from "@prisma/client";
+import { PaymentGatewayConnectionStatus, PaymentProvider, type Prisma } from "@prisma/client";
 import Stripe from "stripe";
 import { publicAppBaseUrl } from "@/lib/env";
-import { upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
+import { encryptGatewaySecret, upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { secretHint, squareApiVersion, squareVerify, type SquareEnvironment } from "@/lib/payments/provider-onboarding";
+import { prisma } from "@/lib/prisma";
+import { brokerRequest, revokeOAuthProvider } from "./broker-client";
 import { getConnectBrokerConfig } from "./config";
 import { ConnectTokenError, signConnectToken, verifyConnectToken } from "./tokens";
 
@@ -13,14 +15,17 @@ import { ConnectTokenError, signConnectToken, verifyConnectToken } from "./token
 // - start:   redirect the admin's browser to {broker}/connect/{provider}/start?client_id&state
 //            where `state` is signed with this deployment's shared secret and a nonce is bound
 //            to the browser via a signed httpOnly cookie.
-// - handoff: the broker returns to /api/payments/connect/{provider}/callback?handoff={token},
-//            signed with the same shared secret; we verify signature + expiry + nonce, then
-//            store the merchant tokens encrypted and charge the provider directly from then on.
+// - handoff: the broker returns an opaque one-time code in the browser. This server redeems
+//            it over an authenticated back channel, verifies provider/site/browser binding,
+//            then stores merchant tokens encrypted.
 
 export type OAuthConnectProvider = "stripe" | "square";
 
 export const CONNECT_NONCE_COOKIE = "connect_nonce";
 const STATE_TTL_SECONDS = 10 * 60;
+const CLIENT_STATE_TYPE = "admitone.client_state";
+const NONCE_COOKIE_TYPE = "admitone.nonce";
+const HANDOFF_TYPE = "admitone.handoff";
 
 const stripeWallets = ["APPLE_PAY", "GOOGLE_PAY", "CASH_APP_PAY"];
 
@@ -59,6 +64,7 @@ export function createConnectStart(input: { provider: OAuthConnectProvider; site
   const iat = nowSeconds();
   const state = signConnectToken(
     {
+      typ: CLIENT_STATE_TYPE,
       v: 1,
       siteId: input.siteId,
       provider: input.provider,
@@ -75,7 +81,7 @@ export function createConnectStart(input: { provider: OAuthConnectProvider; site
   redirectUrl.searchParams.set("state", state);
 
   return {
-    nonceCookie: signConnectToken({ v: 1, nonce, iat, exp: iat + STATE_TTL_SECONDS }, broker.sharedSecret),
+    nonceCookie: signConnectToken({ typ: NONCE_COOKIE_TYPE, v: 1, nonce, iat, exp: iat + STATE_TTL_SECONDS }, broker.sharedSecret),
     nonceCookieMaxAge: STATE_TTL_SECONDS,
     redirectUrl: redirectUrl.toString()
   };
@@ -86,7 +92,9 @@ export function createConnectStart(input: { provider: OAuthConnectProvider; site
 // ---------------------------------------------------------------------------
 
 type HandoffPayload = {
+  typ: string;
   v: number;
+  clientId: string;
   provider: string;
   siteId: string;
   nonce: string;
@@ -108,7 +116,7 @@ function requireString(data: Record<string, unknown>, field: string) {
 }
 
 export async function completeConnectHandoff(input: {
-  handoffToken: string;
+  handoffCode: string;
   nonceCookie: string | undefined;
   provider: OAuthConnectProvider;
   siteId: string;
@@ -116,12 +124,10 @@ export async function completeConnectHandoff(input: {
   const broker = getConnectBrokerConfig();
   if (!broker) throw new Error("One-click connect is not configured for this deployment.");
 
-  let handoff: HandoffPayload;
   let cookie: { nonce?: unknown };
   try {
-    handoff = verifyConnectToken<HandoffPayload>(input.handoffToken, broker.sharedSecret);
     if (!input.nonceCookie) throw new ConnectTokenError("missing nonce cookie");
-    cookie = verifyConnectToken<{ nonce?: unknown }>(input.nonceCookie, broker.sharedSecret);
+    cookie = verifyConnectToken<{ nonce?: unknown }>(input.nonceCookie, broker.sharedSecret, NONCE_COOKIE_TYPE);
   } catch (error) {
     if (error instanceof ConnectTokenError) {
       throw new Error("The connect handoff could not be verified (it may have expired). Try connecting again.");
@@ -129,13 +135,26 @@ export async function completeConnectHandoff(input: {
     throw error;
   }
 
-  if (handoff.v !== 1 || handoff.provider !== input.provider) {
+  if (typeof cookie.nonce !== "string" || cookie.nonce.trim() === "") {
+    throw new Error("The connect handoff did not come from this browser session. Try connecting again.");
+  }
+
+  const redeemed = await brokerRequest<{ handoff?: HandoffPayload }>({
+    path: "/connect/handoff/redeem",
+    provider: input.provider,
+    siteId: input.siteId,
+    fields: { code: input.handoffCode, nonce: cookie.nonce }
+  });
+  const handoff = redeemed.handoff;
+  if (!handoff) throw new Error("The connect handoff is invalid, expired, or already used. Try connecting again.");
+
+  if (handoff.typ !== HANDOFF_TYPE || handoff.v !== 1 || handoff.clientId !== broker.clientId || handoff.provider !== input.provider) {
     throw new Error("The connect handoff does not match this provider. Try connecting again.");
   }
   if (handoff.siteId !== input.siteId) {
     throw new Error("The connect handoff belongs to a different site. Try connecting again.");
   }
-  if (typeof cookie.nonce !== "string" || !handoff.nonce || cookie.nonce !== handoff.nonce) {
+  if (!handoff.nonce || cookie.nonce !== handoff.nonce) {
     throw new Error("The connect handoff did not come from this browser session. Try connecting again.");
   }
   if (!isRecord(handoff.data)) {
@@ -172,7 +191,7 @@ async function provisionStripeWebhook(stripe: Stripe) {
     url
   });
   if (!endpoint.secret) throw new Error("Stripe did not return a webhook signing secret.");
-  return endpoint.secret;
+  return { id: endpoint.id, secret: endpoint.secret };
 }
 
 async function completeStripeHandoff(siteId: string, data: Record<string, unknown>) {
@@ -182,53 +201,55 @@ async function completeStripeHandoff(siteId: string, data: Record<string, unknow
   const scope = typeof data.scope === "string" ? data.scope : "";
   const livemode = data.livemode === true;
 
-  const stripe = new Stripe(accessToken);
-  let account: Stripe.Account;
+  const stripe = new Stripe(accessToken, { maxNetworkRetries: 2, timeout: 10_000 });
+  let webhookEndpointId = "";
   try {
-    account = await stripe.accounts.retrieveCurrent();
+    const account = await stripe.accounts.retrieveCurrent();
+    if (!account.charges_enabled) {
+      throw new Error("This Stripe account cannot accept charges yet. Finish Stripe's account activation, then connect again.");
+    }
+
+    const webhook = await provisionStripeWebhook(stripe);
+    webhookEndpointId = webhook.id;
+    const displayName = account.business_profile?.name || account.settings?.dashboard?.display_name || account.email || stripeUserId;
+
+    await upsertConnectedGatewayCredential({
+      accessToken,
+      displayName,
+      encryptedMetadata: {
+        chargesEnabled: account.charges_enabled,
+        country: account.country || "",
+        defaultCurrency: account.default_currency || "",
+        keyMode: livemode ? "live" : "test",
+        onboarding: "oauth",
+        scope,
+        webhookAutoCreated: true,
+        webhookEndpointId
+      } satisfies Prisma.InputJsonObject,
+      externalAccountId: stripeUserId,
+      provider: PaymentProvider.STRIPE,
+      refreshToken,
+      secretKey: accessToken,
+      siteId,
+      supportedWallets: stripeWallets,
+      webhookSecret: webhook.secret,
+      webhookSecretHint: secretHint(webhook.secret)
+    });
+
+    return { displayName, provider: PaymentProvider.STRIPE, webhookAutoCreated: true, pendingLocationSelection: false };
   } catch (error) {
-    const message = error instanceof Stripe.errors.StripeError ? error.message : "Stripe rejected the connected account token.";
-    throw new Error(`Stripe connect finished but the account could not be verified: ${message}`);
+    if (webhookEndpointId) {
+      await stripe.webhookEndpoints.del(webhookEndpointId).catch(() => undefined);
+    }
+    await revokeOAuthProvider({ provider: "stripe", siteId, externalAccountId: stripeUserId }).catch((revokeError) => {
+      console.error("[payments:connect] Stripe compensation failed", {
+        name: revokeError instanceof Error ? revokeError.name : "UnknownError",
+        siteId
+      });
+    });
+    const message = error instanceof Stripe.errors.StripeError ? error.message : error instanceof Error ? error.message : "Stripe setup failed.";
+    throw new Error(`Stripe connect could not be completed and was rolled back: ${message}`);
   }
-  if (!account.charges_enabled) {
-    throw new Error("This Stripe account cannot accept charges yet. Finish Stripe's account activation, then connect again.");
-  }
-
-  let webhookSecret = "";
-  let webhookError = "";
-  try {
-    webhookSecret = await provisionStripeWebhook(stripe);
-  } catch (error) {
-    webhookError = error instanceof Error ? error.message : "Stripe webhook setup failed.";
-    console.warn("[payments:connect] Stripe webhook auto-setup failed", { siteId, webhookError });
-  }
-
-  const displayName = account.business_profile?.name || account.settings?.dashboard?.display_name || account.email || stripeUserId;
-
-  await upsertConnectedGatewayCredential({
-    accessToken,
-    displayName,
-    encryptedMetadata: {
-      chargesEnabled: account.charges_enabled,
-      country: account.country || "",
-      defaultCurrency: account.default_currency || "",
-      keyMode: livemode ? "live" : "test",
-      onboarding: "oauth",
-      scope,
-      webhookAutoCreated: Boolean(webhookSecret),
-      ...(webhookError ? { webhookError } : {})
-    } satisfies Prisma.InputJsonObject,
-    externalAccountId: stripeUserId,
-    provider: PaymentProvider.STRIPE,
-    refreshToken,
-    secretKey: accessToken,
-    siteId,
-    supportedWallets: stripeWallets,
-    webhookSecret: webhookSecret || undefined,
-    webhookSecretHint: webhookSecret ? secretHint(webhookSecret) : undefined
-  });
-
-  return { displayName, provider: PaymentProvider.STRIPE, webhookAutoCreated: Boolean(webhookSecret) };
 }
 
 // ---------------------------------------------------------------------------
@@ -250,29 +271,86 @@ async function completeSquareHandoff(siteId: string, data: Record<string, unknow
     throw new Error("Square connect finished but returned an unreadable token expiry. Try connecting again.");
   }
 
-  const locations = await squareVerify(environment, accessToken);
-  const usable = locations.filter((location) => location.id && location.status !== "INACTIVE");
-  const location = usable[0] || locations.find((item) => item.id);
-  if (!location?.id) throw new Error("Square did not return an active location for the connected account.");
+  try {
+    const locations = await squareVerify(environment, accessToken);
+    const usable = locations.filter((location): location is { id: string; name?: string; status?: string } =>
+      Boolean(location.id) && location.status !== "INACTIVE"
+    );
+    if (!usable.length) throw new Error("Square did not return an active location for the connected account.");
+    const pendingLocations = usable.map((location) => ({ id: location.id, name: location.name || location.id }));
 
-  await upsertConnectedGatewayCredential({
-    accessToken,
-    displayName: location.name || merchantId || "Square",
-    encryptedMetadata: {
-      environment,
-      locationId: location.id,
-      onboarding: "oauth",
-      squareVersion: squareApiVersion
-    } satisfies Prisma.InputJsonObject,
-    expiresAt,
-    externalAccountId: merchantId,
-    merchantId,
-    provider: PaymentProvider.SQUARE,
-    refreshToken,
-    siteId,
-    supportedWallets: stripeWallets
-    // webhookSecret intentionally omitted so a previously pasted signature key survives re-connects.
+    await prisma.paymentGatewayCredential.upsert({
+      where: { siteId_provider: { siteId, provider: PaymentProvider.SQUARE } },
+      update: {
+        connectedAt: null,
+        displayName: merchantId,
+        encryptedAccessToken: encryptGatewaySecret(accessToken),
+        encryptedRefreshToken: encryptGatewaySecret(refreshToken),
+        expiresAt,
+        externalAccountId: merchantId,
+        lastVerifiedAt: new Date(),
+        merchantId,
+        metadata: { environment, onboarding: "oauth", pendingLocations, squareVersion: squareApiVersion },
+        status: PaymentGatewayConnectionStatus.PENDING,
+        supportedWallets: stripeWallets
+      },
+      create: {
+        displayName: merchantId,
+        encryptedAccessToken: encryptGatewaySecret(accessToken),
+        encryptedRefreshToken: encryptGatewaySecret(refreshToken),
+        expiresAt,
+        externalAccountId: merchantId,
+        lastVerifiedAt: new Date(),
+        merchantId,
+        metadata: { environment, onboarding: "oauth", pendingLocations, squareVersion: squareApiVersion },
+        provider: PaymentProvider.SQUARE,
+        siteId,
+        status: PaymentGatewayConnectionStatus.PENDING,
+        supportedWallets: stripeWallets
+      }
+    });
+
+    return {
+      displayName: merchantId,
+      provider: PaymentProvider.SQUARE,
+      webhookAutoCreated: false,
+      pendingLocationSelection: true
+    };
+  } catch (error) {
+    await revokeOAuthProvider({ provider: "square", siteId, externalAccountId: merchantId }).catch((revokeError) => {
+      console.error("[payments:connect] Square compensation failed", {
+        name: revokeError instanceof Error ? revokeError.name : "UnknownError",
+        siteId
+      });
+    });
+    throw error;
+  }
+}
+
+export async function completeSquareLocationSelection(input: { siteId: string; locationId: string }) {
+  const credential = await prisma.paymentGatewayCredential.findUnique({
+    where: { siteId_provider: { siteId: input.siteId, provider: PaymentProvider.SQUARE } }
   });
-
-  return { displayName: location.name || merchantId || "Square", provider: PaymentProvider.SQUARE, webhookAutoCreated: false };
+  if (!credential || credential.status !== PaymentGatewayConnectionStatus.PENDING) {
+    throw new Error("There is no pending Square connection to finish.");
+  }
+  const metadata = isRecord(credential.metadata) ? credential.metadata : {};
+  const locations = Array.isArray(metadata.pendingLocations) ? metadata.pendingLocations : [];
+  const selected = locations.find((value) => isRecord(value) && value.id === input.locationId);
+  if (!isRecord(selected) || typeof selected.id !== "string" || typeof selected.name !== "string") {
+    throw new Error("Choose one of the active Square locations returned for this account.");
+  }
+  const completedMetadata = { ...metadata };
+  delete completedMetadata.pendingLocations;
+  await prisma.paymentGatewayCredential.update({
+    where: { id: credential.id },
+    data: {
+      connectedAt: new Date(),
+      displayName: selected.name,
+      lastVerifiedAt: new Date(),
+      metadata: { ...completedMetadata, locationId: selected.id } as Prisma.InputJsonObject,
+      status: PaymentGatewayConnectionStatus.CONNECTED
+    }
+  });
+  return { displayName: selected.name };
 }

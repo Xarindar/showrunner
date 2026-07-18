@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { couponFormSchema, formObject, optionalMoneyCents, requiredText, zeroableMoneyCents } from "@/lib/admin-validation";
 import { recordAuditLog } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
+import { completeSquareLocationSelection } from "@/lib/payments/connect/flow";
 import { updateStripePaymentMethodSettings } from "@/lib/payments/methods";
 import {
   disconnectPaymentProvider,
@@ -394,6 +396,33 @@ export async function disconnectProviderAction(
   await auditPaymentProvider(user, site.id, site.name, "settings.payment_provider.disconnected", provider);
   revalidatePath("/", "layout");
   return { status: "success" };
+}
+
+export async function selectSquareOAuthLocationAction(formData: FormData): Promise<never> {
+  const user = await requireAdmin("settings:update");
+  const site = await resolveCurrentSite();
+  const locationId = String(formData.get("locationId") || "").trim();
+  let errorMessage = "";
+  try {
+    const result = await completeSquareLocationSelection({ siteId: site.id, locationId });
+    await recordAuditLog({
+      action: "settings.payment_provider.square_location_selected",
+      actor: user,
+      metadata: { locationId },
+      siteId: site.id,
+      targetId: site.id,
+      targetLabel: `${site.name}: ${result.displayName}`,
+      targetType: "payment_gateway"
+    });
+    revalidatePath("/", "layout");
+  } catch (error) {
+    errorMessage = error instanceof Error ? error.message : "Could not select that Square location.";
+  }
+  redirect(
+    errorMessage
+      ? `/admin/modules/payments?connectError=${encodeURIComponent(errorMessage)}`
+      : "/admin/modules/payments?connected=square"
+  );
 }
 
 export async function reverifyProviderAction(

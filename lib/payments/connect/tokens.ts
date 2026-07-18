@@ -30,16 +30,14 @@ export class ConnectTokenError extends Error {}
 
 // Verify signature (timing-safe) and `exp`, returning the payload. Throws
 // ConnectTokenError on any malformed token, bad signature, or expired payload.
-export function verifyConnectToken<T = Record<string, unknown>>(token: string, secret: string): T {
+export function verifyConnectToken<T = Record<string, unknown>>(token: string, secret: string, expectedType?: string): T {
   if (typeof token !== "string" || token.length === 0) throw new ConnectTokenError("missing token");
   const parts = token.split(".");
   if (parts.length !== 2 || !parts[0] || !parts[1]) throw new ConnectTokenError("malformed token");
   const [enc, sig] = parts;
 
   const expected = base64urlEncode(hmac(secret, enc));
-  const sigBuf = Buffer.from(sig, "utf8");
-  const expectedBuf = Buffer.from(expected, "utf8");
-  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+  if (!timingSafeEqualText(sig, expected)) {
     throw new ConnectTokenError("bad signature");
   }
 
@@ -50,8 +48,15 @@ export function verifyConnectToken<T = Record<string, unknown>>(token: string, s
     throw new ConnectTokenError("invalid payload");
   }
 
-  const exp = (payload as { exp?: unknown }).exp;
-  if (typeof exp === "number" && exp <= Math.floor(Date.now() / 1000)) {
+  const record = payload as { typ?: unknown; exp?: unknown };
+  if (expectedType && record.typ !== expectedType) {
+    throw new ConnectTokenError("token type mismatch");
+  }
+  const exp = record.exp;
+  if (typeof exp !== "number" || !Number.isInteger(exp)) {
+    throw new ConnectTokenError("token missing expiry");
+  }
+  if (exp <= Math.floor(Date.now() / 1000)) {
     throw new ConnectTokenError("token expired");
   }
 
@@ -60,4 +65,43 @@ export function verifyConnectToken<T = Record<string, unknown>>(token: string, s
 
 export function signRawBody(rawBody: string, secret: string): string {
   return base64urlEncode(crypto.createHmac("sha256", secret).update(rawBody, "utf8").digest());
+}
+
+export type ServiceRequestEnvelope = {
+  client_id: string;
+  site_id: string;
+  provider: string;
+  iat: number;
+  exp: number;
+  request_id: string;
+};
+
+export function signServiceRequest(
+  method: string,
+  path: string,
+  rawBody: string,
+  envelope: ServiceRequestEnvelope,
+  secret: string
+) {
+  const bodyDigest = crypto.createHash("sha256").update(rawBody, "utf8").digest("hex");
+  const canonical = [
+    "admitone-service-request-v1",
+    method.toUpperCase(),
+    path,
+    envelope.client_id,
+    envelope.site_id,
+    envelope.provider,
+    String(envelope.iat),
+    String(envelope.exp),
+    envelope.request_id,
+    bodyDigest
+  ].join("\n");
+  return `v1=${base64urlEncode(crypto.createHmac("sha256", secret).update(canonical, "utf8").digest())}`;
+}
+
+function timingSafeEqualText(candidate: string, expected: string) {
+  const candidateBuffer = Buffer.from(candidate, "utf8");
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const comparable = candidateBuffer.length === expectedBuffer.length ? candidateBuffer : Buffer.alloc(expectedBuffer.length);
+  return crypto.timingSafeEqual(comparable, expectedBuffer) && candidateBuffer.length === expectedBuffer.length;
 }

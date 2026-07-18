@@ -7,6 +7,7 @@ import { getStripePaymentMethodSettings } from "@/lib/payments/methods";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { PaymentsWorkspace, type ConnectNotice, type ProviderCard } from "./components/payments-workspace";
+import { selectSquareOAuthLocationAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,20 @@ function metadataString(credential: Credential, key: string) {
 
 function lastChecked(credential: Credential) {
   return credential?.lastVerifiedAt ? ` Last checked ${credential.lastVerifiedAt.toISOString().slice(0, 10)}.` : "";
+}
+
+function pendingSquareLocations(credential: Credential) {
+  if (credential?.status !== PaymentGatewayConnectionStatus.PENDING) return [];
+  const metadata = credential.metadata;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return [];
+  const locations = (metadata as Prisma.JsonObject).pendingLocations;
+  if (!Array.isArray(locations)) return [];
+  return locations.flatMap((location) => {
+    if (!location || typeof location !== "object" || Array.isArray(location)) return [];
+    const id = (location as Prisma.JsonObject).id;
+    const name = (location as Prisma.JsonObject).name;
+    return typeof id === "string" && typeof name === "string" ? [{ id, name }] : [];
+  });
 }
 
 export default async function PaymentsPage({ searchParams }: PaymentsPageProps) {
@@ -72,6 +87,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
   const paypalEnv = metadataString(paypalCredential, "environment") === "live" ? "Live" : "Sandbox";
 
   const squareOAuth = metadataString(squareCredential, "onboarding") === "oauth";
+  const squareLocations = pendingSquareLocations(squareCredential);
   const squareWebhookMissing = squareConnected && !squareCredential?.webhookSecretHint;
   // Paste-flow Stripe always has a webhook secret; this only trips when one-click connect
   // could not create the webhook endpoint automatically (the admin retries via Reconnect).
@@ -149,7 +165,28 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
   const baseUrl = publicAppBaseUrl().replace(/\/$/, "");
 
   return (
-    <PaymentsWorkspace
+    <>
+      {squareLocations.length ? (
+        <section className="module-panel form-grid" aria-labelledby="square-location-heading">
+          <div>
+            <h2 id="square-location-heading">Choose the Square location for this site</h2>
+            <p>Square authorized the merchant account. Confirm which active location should own this site&apos;s orders, payments, and refunds.</p>
+          </div>
+          <form action={selectSquareOAuthLocationAction} className="form-grid">
+            <label>
+              <span>Square location</span>
+              <select name="locationId" required defaultValue="">
+                <option disabled value="">Select a location</option>
+                {squareLocations.map((location) => (
+                  <option key={location.id} value={location.id}>{location.name}</option>
+                ))}
+              </select>
+            </label>
+            <button className="ui-button" type="submit">Confirm Square location</button>
+          </form>
+        </section>
+      ) : null}
+      <PaymentsWorkspace
       checkout={{
         active: activeCheckoutProvider,
         anyConnected,
@@ -197,5 +234,6 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
         square: `${baseUrl}/api/webhooks/square`,
         stripe: `${baseUrl}/api/webhooks/stripe`
       }} />
+    </>
   );
 }

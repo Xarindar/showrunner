@@ -60,6 +60,8 @@ enum PaymentGatewayConnectionStatus {
   DISCONNECTED
   PENDING
   CONNECTED
+  DISCONNECTING
+  REVOKED
   ERROR
 }
 
