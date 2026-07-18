@@ -10,6 +10,7 @@ import {
   getAvailableDashboardCards,
   getDashboardCardDefinition,
   getDashboardCardPlacements,
+  normalizeDashboardCardSettings,
   normalizeDashboardCardSize,
   saveDashboardCardPlacements,
   type DashboardCardPlacement
@@ -76,6 +77,7 @@ export async function addDashboardCardAction(formData: FormData) {
       instanceId: randomUUID(),
       order: placements.length,
       rows: defaultLayout.rows,
+      settings: normalizeDashboardCardSettings(card.id, undefined),
       size: defaultSize
     }
   ]);
@@ -93,6 +95,38 @@ export async function addDashboardCardAction(formData: FormData) {
 
   revalidateDashboard(returnTo);
   redirectWithStatus(returnTo, "saved", "dashboard-card-added");
+}
+
+export async function updateDashboardCardSettingsAction(formData: FormData) {
+  const returnTo = safeReturnTo(formData.get("returnTo"));
+  const instanceId = String(formData.get("instanceId") || "");
+  const { placements, settings, user } = await loadState();
+  const placement = placements.find((item) => item.instanceId === instanceId);
+  const card = placement ? getDashboardCardDefinition(placement.cardId) : null;
+
+  if (!placement || !card) {
+    redirectWithStatus(returnTo, "error", "That widget was not found.");
+  }
+
+  const nextSettings = normalizeDashboardCardSettings(
+    card.id,
+    Object.fromEntries((card.settings || []).map((setting) => [setting.id, formData.get(`setting.${setting.id}`) === "on"]))
+  );
+  const nextPlacements = placements.map((item) => (item.instanceId === instanceId ? { ...item, settings: nextSettings } : item));
+
+  await saveDashboardCardPlacements(settings.siteId, user.id, nextPlacements);
+  await recordAuditLog({
+    action: "dashboard.card.settings_updated",
+    actor: user,
+    metadata: { cardId: card.id, settings: nextSettings },
+    siteId: settings.siteId,
+    targetId: instanceId,
+    targetLabel: card.title,
+    targetType: "dashboard_card"
+  });
+
+  revalidateDashboard(returnTo);
+  redirectWithStatus(returnTo, "saved", "dashboard-card-settings-saved");
 }
 
 export async function removeDashboardCardAction(formData: FormData) {

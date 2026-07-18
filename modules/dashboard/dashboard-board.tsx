@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Grip, Maximize2, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Pencil, Plus, Search, Settings, Smartphone, Trash2 } from "lucide-react";
 import { Button, DashboardCardFrame, EmptyState, Modal } from "@/components/ui";
 import { moduleIcons } from "@/shell/module-icons";
 import {
@@ -14,7 +15,12 @@ import {
   dashboardLayoutColumns,
   type DashboardCardSize
 } from "@/shell/dashboard-layout";
-import { addDashboardCardAction, removeDashboardCardAction, saveDashboardCardLayoutAction } from "./actions";
+import {
+  addDashboardCardAction,
+  removeDashboardCardAction,
+  saveDashboardCardLayoutAction,
+  updateDashboardCardSettingsAction
+} from "./actions";
 
 type DashboardBoardCard = {
   body: ReactNode;
@@ -25,11 +31,19 @@ type DashboardBoardCard = {
   moduleHref: string;
   moduleIcon: keyof typeof moduleIcons;
   rows: number;
+  settingsDefinition: {
+    defaultValue: boolean;
+    description?: string;
+    id: string;
+    label: string;
+  }[];
+  settingsValues: Record<string, boolean>;
   size: DashboardCardSize;
   title: string;
 };
 
 type DashboardCatalogCard = {
+  body: ReactNode;
   defaultSize: DashboardCardSize;
   description: string;
   id: string;
@@ -52,6 +66,7 @@ type DashboardWidgetsBoardProps = {
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 type DashboardBoardLayoutItem = Pick<DashboardBoardCard, "columns" | "instanceId" | "rows">;
+const dashboardDesktopLayoutMedia = "(min-width: 861px)";
 
 function getLayoutFromCards(cards: DashboardBoardCard[]): DashboardBoardLayoutItem[] {
   return cards.map((card) => ({
@@ -97,7 +112,11 @@ export function DashboardWidgetsBoard({ cards, catalogGroups }: DashboardWidgets
   const [layoutItems, setLayoutItems] = useState(initialLayout);
   const [activeInstanceId, setActiveInstanceId] = useState<string | null>(null);
   const [interaction, setInteraction] = useState<"move" | "resize" | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [settingsInstanceId, setSettingsInstanceId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [removeTarget, setRemoveTarget] = useState<{ instanceId: string; title: string } | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [, startTransition] = useTransition();
   const cardsByInstanceId = useMemo(() => new Map(cards.map((card) => [card.instanceId, card])), [cards]);
@@ -112,6 +131,17 @@ export function DashboardWidgetsBoard({ cards, catalogGroups }: DashboardWidgets
     return () => {
       if (resetSaveStateRef.current) window.clearTimeout(resetSaveStateRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    const desktopLayout = window.matchMedia(dashboardDesktopLayoutMedia);
+    const exitEditModeOnNarrowScreens = () => {
+      if (!desktopLayout.matches) setEditMode(false);
+    };
+
+    exitEditModeOnNarrowScreens();
+    desktopLayout.addEventListener("change", exitEditModeOnNarrowScreens);
+    return () => desktopLayout.removeEventListener("change", exitEditModeOnNarrowScreens);
   }, []);
 
   function updateLayout(updater: (current: DashboardBoardLayoutItem[]) => DashboardBoardLayoutItem[]) {
@@ -146,7 +176,7 @@ export function DashboardWidgetsBoard({ cards, catalogGroups }: DashboardWidgets
   }
 
   function beginMove(instanceId: string, event: PointerEvent<HTMLButtonElement>) {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || !window.matchMedia(dashboardDesktopLayoutMedia).matches) return;
     event.preventDefault();
     event.stopPropagation();
     setActiveInstanceId(instanceId);
@@ -178,7 +208,7 @@ export function DashboardWidgetsBoard({ cards, catalogGroups }: DashboardWidgets
   }
 
   function beginResize(card: DashboardBoardCard, event: PointerEvent<HTMLButtonElement>) {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || !window.matchMedia(dashboardDesktopLayoutMedia).matches) return;
     event.preventDefault();
     event.stopPropagation();
 
@@ -235,11 +265,25 @@ export function DashboardWidgetsBoard({ cards, catalogGroups }: DashboardWidgets
   }
 
   const availableCardCount = catalogGroups.reduce((total, group) => total + group.cards.length, 0);
+  const filteredCatalogGroups = useMemo(() => {
+    const query = catalogQuery.trim().toLocaleLowerCase();
+    if (!query) return catalogGroups;
+
+    return catalogGroups
+      .map((group) => ({
+        ...group,
+        cards: group.cards.filter((card) =>
+          [group.module.label, card.title, card.description].some((value) => value.toLocaleLowerCase().includes(query))
+        )
+      }))
+      .filter((group) => group.cards.length);
+  }, [catalogGroups, catalogQuery]);
+  const visibleCardCount = filteredCatalogGroups.reduce((total, group) => total + group.cards.length, 0);
   const saveStatus =
     saveState === "saving" ? "Saving layout" : saveState === "saved" ? "Layout saved" : saveState === "error" ? "Layout could not be saved" : "";
 
   return (
-    <section className="dashboard-quickcards" aria-label="Dashboard widgets">
+    <section className={`dashboard-quickcards${editMode ? " is-editing" : ""}`} aria-label="Dashboard widgets">
       <div className="dashboard-quickcards-toolbar">
         <div>
           <h2>Widgets</h2>
@@ -255,6 +299,24 @@ export function DashboardWidgetsBoard({ cards, catalogGroups }: DashboardWidgets
             <Plus size={16} />
             Add widget
           </Button>
+          <Button
+            aria-pressed={editMode}
+            className="dashboard-desktop-edit-control"
+            onClick={() => {
+              if (!window.matchMedia(dashboardDesktopLayoutMedia).matches) return;
+              setSettingsInstanceId(null);
+              setEditMode((current) => !current);
+            }}
+            type="button"
+            variant={editMode ? "primary" : "secondary"}
+          >
+            {editMode ? <Check size={16} /> : <Pencil size={15} />}
+            {editMode ? "Done editing" : "Edit dashboard"}
+          </Button>
+          <span className="dashboard-mobile-layout-note">
+            <Smartphone aria-hidden="true" size={15} />
+            Mobile layout adjusts automatically
+          </span>
         </div>
       </div>
 
@@ -272,62 +334,115 @@ export function DashboardWidgetsBoard({ cards, catalogGroups }: DashboardWidgets
           {items.map((item) => {
             const Icon = moduleIcons[item.moduleIcon];
             const isActive = activeInstanceId === item.instanceId;
+            const settingsOpen = settingsInstanceId === item.instanceId;
 
             return (
               <div
-                className={`dashboard-layout-card${isActive ? ` dashboard-layout-card-${interaction}` : ""}`}
+                className={`dashboard-layout-card${isActive ? ` dashboard-layout-card-${interaction}` : ""}${
+                  settingsOpen ? " dashboard-layout-card-settings-open" : ""
+                }`}
                 data-dashboard-instance-id={item.instanceId}
                 key={item.instanceId}
                 style={
                   {
-                    "--dashboard-card-columns": item.columns,
-                    "--dashboard-card-rows": item.rows
+                     "--dashboard-card-columns": item.columns,
+                    "--dashboard-card-tablet-columns": item.columns <= 6 ? 1 : 2,
+                     "--dashboard-card-rows": item.rows
                   } as CSSProperties
                 }
               >
                 <DashboardCardFrame
                   actions={
-                    <details className="dashboard-card-menu">
-                      <summary aria-label={`More options for ${item.title}`} className="dashboard-card-action-button" title="Widget options">
-                        <MoreHorizontal size={17} />
-                      </summary>
-                      <div className="dashboard-card-menu-popover">
-                        <form action={removeDashboardCardAction} className="dashboard-card-remove-form">
-                          <input name="instanceId" type="hidden" value={item.instanceId} />
-                          <input name="returnTo" type="hidden" value="/admin" />
-                          <button type="submit">
-                            <Trash2 size={15} />
-                            Remove widget
-                          </button>
-                        </form>
-                      </div>
-                    </details>
+                    <button
+                      aria-label={settingsOpen ? `Back to ${item.title}` : `Settings for ${item.title}`}
+                      className="dashboard-card-action-button"
+                      onClick={() => setSettingsInstanceId(settingsOpen ? null : item.instanceId)}
+                      title={settingsOpen ? "Back to widget" : "Widget settings"}
+                      type="button"
+                    >
+                      {settingsOpen ? <ArrowLeft size={16} /> : <Settings size={16} />}
+                    </button>
                   }
-                  href={item.moduleHref}
                   icon={<Icon size={18} />}
+                  overlay={
+                    settingsOpen ? (
+                      <div aria-label={`${item.title} settings`} className="dashboard-card-settings-panel">
+                        <div className="dashboard-card-settings-panel-heading">
+                          <strong>Widget settings</strong>
+                          <small>Choose what appears on this dashboard.</small>
+                        </div>
+                        {item.settingsDefinition.length ? (
+                          <form action={updateDashboardCardSettingsAction} className="dashboard-card-settings-form">
+                            <input name="instanceId" type="hidden" value={item.instanceId} />
+                            <input name="returnTo" type="hidden" value="/admin" />
+                            <fieldset>
+                              <legend>Visible details</legend>
+                              {item.settingsDefinition.map((setting) => (
+                                <label key={setting.id}>
+                                  <input
+                                    defaultChecked={item.settingsValues[setting.id] ?? setting.defaultValue}
+                                    name={`setting.${setting.id}`}
+                                    type="checkbox"
+                                  />
+                                  <span>
+                                    <strong>{setting.label}</strong>
+                                    {setting.description ? <small>{setting.description}</small> : null}
+                                  </span>
+                                </label>
+                              ))}
+                            </fieldset>
+                            <Button size="sm" type="submit" variant="secondary">
+                              Save settings
+                            </Button>
+                          </form>
+                        ) : (
+                          <p className="dashboard-card-settings-empty">This widget has no configurable details yet.</p>
+                        )}
+                      </div>
+                    ) : null
+                  }
                   size={item.size}
                   title={item.title}
                 >
                   {item.body}
                 </DashboardCardFrame>
-                <button
-                  aria-label={`Move ${item.title}`}
-                  className="dashboard-card-corner-handle dashboard-card-move-handle"
-                  onPointerDown={(event) => beginMove(item.instanceId, event)}
-                  title="Move widget"
-                  type="button"
-                >
-                  <Grip size={16} />
-                </button>
-                <button
-                  aria-label={`Resize ${item.title}`}
-                  className="dashboard-card-corner-handle dashboard-card-resize-handle"
-                  onPointerDown={(event) => beginResize(item, event)}
-                  title="Resize widget"
-                  type="button"
-                >
-                  <Maximize2 size={15} />
-                </button>
+                {settingsOpen ? (
+                  <button
+                    aria-label={`Remove ${item.title} widget`}
+                    className="dashboard-card-delete-widget"
+                    onClick={() => setRemoveTarget({ instanceId: item.instanceId, title: item.title })}
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" size={17} />
+                    <span role="tooltip">Remove widget</span>
+                  </button>
+                ) : editMode ? (
+                  <>
+                    <button
+                      aria-label={`Move ${item.title}`}
+                      className="dashboard-card-move-handle"
+                      onPointerDown={(event) => beginMove(item.instanceId, event)}
+                      title="Move widget"
+                      type="button"
+                    />
+                    <button
+                      aria-label={`Resize ${item.title}`}
+                      className="dashboard-card-corner-handle dashboard-card-resize-handle"
+                      onPointerDown={(event) => beginResize(item, event)}
+                      title="Resize widget"
+                      type="button"
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 20 20">
+                        <path d="M3 18.5 18.5 3M9 18.5l9.5-9.5M15 18.5l3.5-3.5" />
+                      </svg>
+                    </button>
+                  </>
+                ) : (
+                  <Link aria-label={`View ${item.title} module`} className="dashboard-card-open-module" href={item.moduleHref}>
+                    <span>View module</span>
+                    <ArrowRight aria-hidden="true" size={18} />
+                  </Link>
+                )}
               </div>
             );
           })}
@@ -346,45 +461,109 @@ export function DashboardWidgetsBoard({ cards, catalogGroups }: DashboardWidgets
       <Modal
         bodyClassName="dashboard-quickcard-dialog-body"
         className="dashboard-quickcard-dialog"
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setCatalogQuery("");
+          setModalOpen(false);
+        }}
         open={modalOpen}
         title="Add widget"
       >
         {availableCardCount ? (
-          <div className="dashboard-catalog-groups">
-            {catalogGroups.map(({ cards: moduleCards, module }) => {
-              const Icon = moduleIcons[module.icon];
+          <div className="dashboard-catalog">
+            <div className="dashboard-catalog-intro">
+              <label className="dashboard-catalog-search">
+                <Search aria-hidden="true" size={16} />
+                <span className="ui-sr-only">Search widgets</span>
+                <input
+                  onChange={(event) => setCatalogQuery(event.target.value)}
+                  placeholder="Search widgets or modules"
+                  type="search"
+                  value={catalogQuery}
+                />
+              </label>
+              <span>{catalogQuery ? `${visibleCardCount} found` : `${availableCardCount} available`}</span>
+            </div>
+            {filteredCatalogGroups.length ? (
+              <div className="dashboard-catalog-groups">
+                {filteredCatalogGroups.map(({ cards: moduleCards, module }) => {
+                  const Icon = moduleIcons[module.icon];
 
-              return (
-                <section className="dashboard-catalog-group" key={module.id}>
-                  <h3>
-                    <Icon size={18} />
-                    {module.label}
-                  </h3>
-                  <div className="dashboard-catalog-list">
-                    {moduleCards.map((card) => (
-                      <form action={addDashboardCardAction} className="dashboard-catalog-row" key={card.id}>
-                        <input name="cardId" type="hidden" value={card.id} />
-                        <input name="returnTo" type="hidden" value="/admin" />
-                        <input name="size" type="hidden" value={card.defaultSize} />
-                        <span>
-                          <strong>{card.title}</strong>
-                          <small>{card.description}</small>
-                        </span>
-                        <Button size="sm" type="submit" variant="secondary">
-                          <Plus size={15} />
-                          Add
-                        </Button>
-                      </form>
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
+                  return (
+                    <section className="dashboard-catalog-group" key={module.id}>
+                      <h3>
+                        <Icon size={15} />
+                        {module.label}
+                        <span>{moduleCards.length}</span>
+                      </h3>
+                      <div className="dashboard-catalog-gallery">
+                        {moduleCards.map((card) => (
+                          <form
+                            action={addDashboardCardAction}
+                            className={`dashboard-catalog-preview dashboard-catalog-preview-${card.defaultSize}`}
+                            key={card.id}
+                          >
+                            <input name="cardId" type="hidden" value={card.id} />
+                            <input name="returnTo" type="hidden" value="/admin" />
+                            <input name="size" type="hidden" value={card.defaultSize} />
+                            <div className="dashboard-catalog-preview-title">
+                              <strong>{card.title}</strong>
+                            </div>
+                            <div className="dashboard-catalog-widget-shell">
+                              <div aria-hidden="true" className="dashboard-catalog-widget" inert>
+                                <div className="dashboard-catalog-widget-canvas">
+                                  <DashboardCardFrame icon={<Icon size={18} />} size={card.defaultSize} title={card.title}>
+                                    {card.body}
+                                  </DashboardCardFrame>
+                                </div>
+                              </div>
+                              <button aria-label={`Add ${card.title}`} className="dashboard-catalog-add-overlay" type="submit">
+                                <span aria-hidden="true">
+                                  <Plus size={24} />
+                                </span>
+                              </button>
+                            </div>
+                          </form>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="dashboard-catalog-no-results">
+                <Search aria-hidden="true" size={20} />
+                <strong>No matching widgets</strong>
+                <small>Try a module name such as “Payments” or a task such as “appointments.”</small>
+              </div>
+            )}
           </div>
         ) : (
           <EmptyState title="All widgets are added" description="Remove a widget if you want to swap in another module view." />
         )}
+      </Modal>
+
+      <Modal
+        className="dashboard-remove-dialog"
+        onClose={() => setRemoveTarget(null)}
+        open={Boolean(removeTarget)}
+        title="Remove widget?"
+      >
+        <p>
+          Remove <strong>{removeTarget?.title}</strong> from this dashboard? You can add it again later.
+        </p>
+        <div className="dashboard-remove-dialog-actions">
+          <Button onClick={() => setRemoveTarget(null)} type="button" variant="secondary">
+            Cancel
+          </Button>
+          <form action={removeDashboardCardAction}>
+            <input name="instanceId" type="hidden" value={removeTarget?.instanceId || ""} />
+            <input name="returnTo" type="hidden" value="/admin" />
+            <Button type="submit" variant="danger">
+              <Trash2 size={16} />
+              Remove widget
+            </Button>
+          </form>
+        </div>
       </Modal>
     </section>
   );

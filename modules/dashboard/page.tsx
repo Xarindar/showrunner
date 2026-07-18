@@ -5,6 +5,7 @@ import { getSiteSettings } from "@/lib/site";
 import {
   dashboardCardCatalogGroups,
   getDashboardCardPlacements,
+  normalizeDashboardCardSettings,
   placedDashboardCards,
   type DashboardCardDefinition,
   type DashboardCardPlacement
@@ -25,7 +26,8 @@ type DashboardPageProps = {
 const savedMessages: Record<string, string> = {
   "dashboard-card-added": "Dashboard card added.",
   "dashboard-card-exists": "That card is already on your dashboard.",
-  "dashboard-card-removed": "Dashboard card removed."
+  "dashboard-card-removed": "Dashboard card removed.",
+  "dashboard-card-settings-saved": "Widget settings saved."
 };
 
 function DashboardStatusMessage({ error, saved }: { error?: string; saved?: string }) {
@@ -34,9 +36,16 @@ function DashboardStatusMessage({ error, saved }: { error?: string; saved?: stri
   return null;
 }
 
-async function renderCardBody(card: DashboardCardDefinition, placement: DashboardCardPlacement, siteId: string, timezone: string) {
+async function renderCardBody(
+  card: DashboardCardDefinition,
+  size: DashboardCardPlacement["size"],
+  siteId: string,
+  timezone: string,
+  widgetSettings: Record<string, boolean>,
+  preview = false
+) {
   try {
-    return await card.render({ siteId, size: placement.size, timezone });
+    return await card.render({ preview, settings: widgetSettings, siteId, size, timezone });
   } catch (error) {
     console.error("[dashboard-card-render-failed]", card.id, error);
     return <EmptyState title="Card unavailable" description="This card could not load its data." />;
@@ -55,7 +64,7 @@ export default async function AdminDashboardPage({ searchParams }: DashboardPage
   const placedCards = placedDashboardCards(placements);
   const renderedCards = await Promise.all(
     placedCards.map(async ({ card, module: shellModule, placement }) => ({
-      body: await renderCardBody(card, placement, settings.siteId, settings.timezone),
+      body: await renderCardBody(card, placement.size, settings.siteId, settings.timezone, placement.settings),
       cardId: card.id,
       columns: placement.columns,
       description: card.description,
@@ -63,25 +72,39 @@ export default async function AdminDashboardPage({ searchParams }: DashboardPage
       moduleHref: shellModule.href,
       moduleIcon: shellModule.icon,
       rows: placement.rows,
+      settingsDefinition: card.settings || [],
+      settingsValues: placement.settings,
       size: placement.size,
       title: card.title
     }))
   );
-  const catalogGroups = dashboardCardCatalogGroups(settings.enabledModuleIds, placements).map(({ cards, module }) => ({
-    cards: cards.map((card) => ({
-      defaultSize: card.defaultSize,
-      description: card.description,
-      id: card.id,
-      title: card.title
-    })),
-    module: {
-      icon: module.icon,
-      id: module.id,
-      label: module.label
-    }
-  }));
+  const catalogGroups = await Promise.all(
+    dashboardCardCatalogGroups(settings.enabledModuleIds, placements).map(async ({ cards, module }) => ({
+      cards: await Promise.all(
+        cards.map(async (card) => ({
+          body: await renderCardBody(
+            card,
+            card.defaultSize,
+            settings.siteId,
+            settings.timezone,
+            normalizeDashboardCardSettings(card.id, undefined),
+            true
+          ),
+          defaultSize: card.defaultSize,
+          description: card.description,
+          id: card.id,
+          title: card.title
+        }))
+      ),
+      module: {
+        icon: module.icon,
+        id: module.id,
+        label: module.label
+      }
+    }))
+  );
   const quickCardsKey = renderedCards
-    .map((card) => `${card.instanceId}:${card.columns}:${card.rows}:${card.size}`)
+    .map((card) => `${card.instanceId}:${card.columns}:${card.rows}:${card.size}:${JSON.stringify(card.settingsValues)}`)
     .join("|");
 
   return (

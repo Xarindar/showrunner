@@ -11,7 +11,11 @@ export const paymentHealthWidget = {
   moduleId: "payments",
   sizes: ["sm", "md", "lg"],
   title: "Payment health",
-  async render({ siteId, size, timezone }) {
+  async render({ preview, siteId, size, timezone }) {
+    if (preview) {
+      return <DashboardRing detail="All configured gateways are healthy" label="Gateway health" max={2} tone="positive" value={2} />;
+    }
+
     const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [connectedCount, erroredCount, payments] = await Promise.all([
       prisma.paymentGatewayCredential.count({ where: { siteId, status: "CONNECTED" } }),

@@ -11,7 +11,21 @@ export const commerceOrdersWidget = {
   moduleId: "products",
   sizes: ["sm", "md", "lg"],
   title: "Commerce orders",
-  async render({ siteId, size }) {
+  async render({ preview, siteId, size }) {
+    if (preview) {
+      return (
+        <>
+          <DashboardMetric detail="12 active products, 3 pending orders" label="Paid revenue" value="$8,420.00" />
+          <DashboardSegmentBar
+            items={[
+              { label: "Products", tone: "positive", value: 12 },
+              { label: "Orders to review", tone: "attention", value: 3 }
+            ]}
+          />
+        </>
+      );
+    }
+
     const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [activeProducts, pendingOrders, paidRevenue, orders] = await Promise.all([
       prisma.product.count({ where: { siteId, status: "ACTIVE" } }),

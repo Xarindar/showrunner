@@ -10,7 +10,24 @@ export const pendingAppointmentsWidget = {
   moduleId: "appointments",
   sizes: ["sm", "md", "lg"],
   title: "Pending appointments",
-  async render({ siteId, size, timezone }) {
+  async render({ preview, siteId, size, timezone }) {
+    if (preview) {
+      return (
+        <>
+          <DashboardMetric detail="requests waiting for confirmation" label="Needs review" value={3} />
+          {size !== "sm" ? (
+            <DashboardIdentityList
+              empty=""
+              items={[
+                { detail: "Brand session", id: "preview-1", meta: "Today", title: "Avery Stone" },
+                { detail: "Consultation", id: "preview-2", meta: "Jul 24", title: "Noah Williams" }
+              ]}
+            />
+          ) : null}
+        </>
+      );
+    }
+
     const limit = widgetItemLimit(size);
     const [count, bookings] = await Promise.all([
       prisma.booking.count({ where: { siteId, status: "PENDING" } }),

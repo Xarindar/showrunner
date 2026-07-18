@@ -10,7 +10,11 @@ export const servicesSetupWidget = {
   moduleId: "scheduling",
   sizes: ["sm", "md", "lg"],
   title: "Services setup",
-  async render({ siteId, size }) {
+  async render({ preview, siteId, size }) {
+    if (preview) {
+      return <DashboardRing detail="4 staff · 3 resources" label="Services active" max={6} tone="positive" value={5} />;
+    }
+
     const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [activeCount, totalCount, staffCount, resourceCount, services] = await Promise.all([
       prisma.service.count({ where: { siteId, isActive: true } }),

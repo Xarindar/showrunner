@@ -10,7 +10,24 @@ export const recentClientsWidget = {
   moduleId: "clients",
   sizes: ["sm", "md", "lg"],
   title: "Recent clients",
-  async render({ siteId, size, timezone }) {
+  async render({ preview, siteId, size, timezone }) {
+    if (preview) {
+      return (
+        <>
+          <DashboardMetric detail="38 active" label="Client records" value={42} />
+          {size !== "sm" ? (
+            <DashboardIdentityList
+              empty=""
+              items={[
+                { detail: "maya@example.com", id: "preview-1", meta: "Today", title: "Maya Chen" },
+                { detail: "sam@example.com", id: "preview-2", meta: "Jul 16", title: "Sam Rivera" }
+              ]}
+            />
+          ) : null}
+        </>
+      );
+    }
+
     const limit = size === "md" ? 2 : size === "lg" ? 4 : widgetItemLimit(size);
     const [count, activeCount, recentClients] = await Promise.all([
       prisma.client.count({ where: { siteId } }),

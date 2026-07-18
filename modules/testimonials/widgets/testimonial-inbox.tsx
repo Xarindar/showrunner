@@ -10,7 +10,21 @@ export const testimonialInboxWidget = {
   moduleId: "testimonials",
   sizes: ["sm", "md", "lg"],
   title: "Testimonial inbox",
-  async render({ siteId, size }) {
+  async render({ preview, siteId, size }) {
+    if (preview) {
+      return (
+        <>
+          <DashboardMetric detail="28 approved" label="Pending testimonials" value={4} />
+          <DashboardSegmentBar
+            items={[
+              { label: "Waiting", tone: "attention", value: 4 },
+              { label: "Approved", tone: "positive", value: 28 }
+            ]}
+          />
+        </>
+      );
+    }
+
     const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [pendingCount, approvedCount, testimonials] = await Promise.all([
       prisma.testimonial.count({ where: { siteId, status: "PENDING" } }),

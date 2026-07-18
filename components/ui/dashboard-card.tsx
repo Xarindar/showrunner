@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { Card } from "./card";
 import { cx } from "./utils";
 
@@ -10,6 +10,7 @@ type DashboardCardFrameProps = HTMLAttributes<HTMLElement> & {
   footer?: ReactNode;
   href?: string;
   icon?: ReactNode;
+  overlay?: ReactNode;
   size?: "sm" | "md" | "lg";
   title: string;
 };
@@ -22,6 +23,7 @@ export function DashboardCardFrame({
   footer,
   href,
   icon,
+  overlay,
   size = "md",
   title,
   ...props
@@ -54,7 +56,12 @@ export function DashboardCardFrame({
       }
       {...props}
     >
-      <div className="dashboard-card-content">{children}</div>
+      <div className="dashboard-card-body-stage">
+        <div aria-hidden={overlay ? true : undefined} className="dashboard-card-content" inert={overlay ? true : undefined}>
+          {children}
+        </div>
+        {overlay ? <div className="dashboard-card-settings-surface">{overlay}</div> : null}
+      </div>
     </Card>
   );
 }
@@ -162,9 +169,10 @@ export function DashboardTimeline({ empty, items }: { empty: string; items: Dash
           <>
             <span className="dashboard-widget-timeline-time">{item.time}</span>
             <span className="dashboard-widget-timeline-marker" aria-hidden="true" />
-            <span className="dashboard-widget-timeline-copy">
-              <strong>{item.title}</strong>
-              {item.detail ? <small>{item.detail}</small> : null}
+            <strong className="dashboard-widget-row-title">{item.title}</strong>
+            <small className="dashboard-widget-row-detail">{item.detail || null}</small>
+            <span className="dashboard-widget-row-arrow" aria-hidden="true">
+              {item.href ? <ArrowRight size={14} /> : null}
             </span>
           </>
         );
@@ -201,11 +209,12 @@ export function DashboardIdentityList({ empty, items }: { empty: string; items: 
         const copy = (
           <>
             <span className="dashboard-widget-avatar" aria-hidden="true">{initials(item.title)}</span>
-            <span className="dashboard-card-list-copy">
-              <strong>{item.title}</strong>
-              {item.detail ? <small>{item.detail}</small> : null}
+            <strong className="dashboard-widget-row-title">{item.title}</strong>
+            <small className="dashboard-widget-row-detail">{item.detail || null}</small>
+            <em>{item.meta || null}</em>
+            <span className="dashboard-widget-row-arrow" aria-hidden="true">
+              {item.href ? <ArrowRight size={14} /> : null}
             </span>
-            {item.meta ? <em>{item.meta}</em> : null}
           </>
         );
 
@@ -310,11 +319,12 @@ export function DashboardCardList({ empty, items }: { empty: string; items: Dash
       {items.map((item) => {
         const body = (
           <>
-            <span className="dashboard-card-list-copy">
-              <strong>{item.title}</strong>
-              {item.detail ? <small>{item.detail}</small> : null}
+            <strong className="dashboard-widget-row-title">{item.title}</strong>
+            <small className="dashboard-widget-row-detail">{item.detail || null}</small>
+            <em>{item.meta || null}</em>
+            <span className="dashboard-widget-row-arrow" aria-hidden="true">
+              {item.href ? <ArrowRight size={14} /> : null}
             </span>
-            {item.meta ? <em>{item.meta}</em> : null}
           </>
         );
 

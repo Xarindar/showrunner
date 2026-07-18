@@ -12,7 +12,25 @@ export const todaysAppointmentsWidget = {
   moduleId: "appointments",
   sizes: ["sm", "md", "lg"],
   title: "Today's appointments",
-  async render({ siteId, size, timezone }) {
+  async render({ preview, siteId, size, timezone }) {
+    if (preview) {
+      return (
+        <>
+          <DashboardMetric detail="1 pending" label="Appointments today" value={4} />
+          {size !== "sm" ? (
+            <DashboardTimeline
+              empty=""
+              items={[
+                { detail: "Portrait session", id: "preview-1", time: "9:00", title: "Maya Chen" },
+                { detail: "Consultation", id: "preview-2", time: "11:30", title: "Jordan Lee" },
+                { detail: "Family session", id: "preview-3", time: "2:00", title: "The Martins" }
+              ]}
+            />
+          ) : null}
+        </>
+      );
+    }
+
     const { start, end } = getZonedDayBounds(new Date(), timezone);
     const limit = widgetItemLimit(size);
     const [count, pendingCount, bookings] = await Promise.all([

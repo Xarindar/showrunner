@@ -10,7 +10,22 @@ export const recentMediaWidget = {
   moduleId: "media",
   sizes: ["sm", "md", "lg"],
   title: "Recent media",
-  async render({ siteId, size }) {
+  async render({ preview, siteId, size }) {
+    if (preview) {
+      return (
+        <>
+          <DashboardMetric detail="6 private" label="Media assets" value={84} />
+          {size !== "sm" ? (
+            <div className="dashboard-card-media-grid dashboard-card-media-grid-sample" aria-label="Sample recent media">
+              {["Studio portrait", "Wedding detail", "Family session", "Product image", "Outdoor portrait"].map((label) => (
+                <span aria-label={label} key={label} role="img" />
+              ))}
+            </div>
+          ) : null}
+        </>
+      );
+    }
+
     const limit = widgetItemLimit(size);
     const [count, privateCount, assets] = await Promise.all([
       prisma.mediaAsset.count({ where: { siteId, deletedAt: null } }),

@@ -10,7 +10,24 @@ export const formSubmissionsWidget = {
   moduleId: "forms",
   sizes: ["sm", "md", "lg"],
   title: "Form submissions",
-  async render({ siteId, size, timezone }) {
+  async render({ preview, siteId, size, timezone }) {
+    if (preview) {
+      return (
+        <>
+          <DashboardMetric detail="4 active forms" label="Submissions this week" value={18} />
+          {size !== "sm" ? (
+            <DashboardIdentityList
+              empty=""
+              items={[
+                { detail: "Wedding inquiry", id: "preview-1", meta: "Today", title: "Emma Brooks" },
+                { detail: "Contact form", id: "preview-2", meta: "Jul 17", title: "Chris Park" }
+              ]}
+            />
+          ) : null}
+        </>
+      );
+    }
+
     const limit = size === "md" ? 2 : size === "lg" ? 4 : widgetItemLimit(size);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const [activeForms, recentCount, submissions] = await Promise.all([

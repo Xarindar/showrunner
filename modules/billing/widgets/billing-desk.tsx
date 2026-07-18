@@ -11,7 +11,21 @@ export const billingDeskWidget = {
   moduleId: "billing",
   sizes: ["sm", "md", "lg"],
   title: "Billing desk",
-  async render({ siteId, size, timezone }) {
+  async render({ preview, siteId, size, timezone }) {
+    if (preview) {
+      return (
+        <>
+          <DashboardMetric detail="6 sent, 2 overdue" label="Open invoice total" value="$12,840.00" />
+          <DashboardSegmentBar
+            items={[
+              { label: "Sent", value: 6 },
+              { label: "Overdue", tone: "danger", value: 2 }
+            ]}
+          />
+        </>
+      );
+    }
+
     const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [sentCount, overdueCount, openTotal, documents] = await Promise.all([
       prisma.billingDocument.count({ where: { siteId, type: "INVOICE", status: "SENT" } }),

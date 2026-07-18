@@ -10,7 +10,21 @@ export const portfolioProofingWidget = {
   moduleId: "portfolio",
   sizes: ["sm", "md", "lg"],
   title: "Portfolio proofing",
-  async render({ siteId, size, timezone }) {
+  async render({ preview, siteId, size, timezone }) {
+    if (preview) {
+      return (
+        <>
+          <DashboardMetric detail="14 published galleries" label="Open proof rounds" value={3} />
+          <DashboardSegmentBar
+            items={[
+              { label: "Published", tone: "positive", value: 14 },
+              { label: "In proofing", tone: "attention", value: 3 }
+            ]}
+          />
+        </>
+      );
+    }
+
     const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [publishedGalleries, openRounds, recentRounds] = await Promise.all([
       prisma.portfolioGallery.count({ where: { siteId, status: "PUBLISHED" } }),

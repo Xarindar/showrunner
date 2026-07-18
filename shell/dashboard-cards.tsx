@@ -22,6 +22,7 @@ export type DashboardCardPlacement = {
   instanceId: string;
   order: number;
   rows: number;
+  settings: Record<string, boolean>;
   size: DashboardCardSize;
 };
 
@@ -68,6 +69,17 @@ export function normalizeDashboardCardSize(cardId: string, value: unknown) {
   return card?.sizes.includes(requested) ? requested : card?.defaultSize || "md";
 }
 
+export function normalizeDashboardCardSettings(cardId: string, value: unknown): Record<string, boolean> {
+  const card = getDashboardCardDefinition(cardId);
+  const source = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+  return (card?.settings || []).reduce<Record<string, boolean>>((settings, setting) => {
+    const savedValue = source[setting.id];
+    settings[setting.id] = typeof savedValue === "boolean" ? savedValue : setting.defaultValue;
+    return settings;
+  }, {});
+}
+
 export function normalizeDashboardCardPlacements(
   value: unknown,
   enabledModuleIds: ModuleId[],
@@ -96,6 +108,7 @@ export function normalizeDashboardCardPlacements(
       instanceId,
       order: normalized.length,
       rows,
+      settings: normalizeDashboardCardSettings(cardId, record.settings),
       size: normalizeDashboardCardSize(cardId, dashboardCardSizeFromLayout(columns, rows))
     });
     seenCards.add(cardId);
@@ -114,6 +127,7 @@ export function normalizeDashboardCardPlacements(
           instanceId: cardId,
           order,
           rows: defaultLayout.rows,
+          settings: normalizeDashboardCardSettings(cardId, undefined),
           size: defaultSize
         };
       });

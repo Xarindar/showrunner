@@ -10,7 +10,22 @@ export const communicationsOutboxWidget = {
   moduleId: "communications",
   sizes: ["sm", "md", "lg"],
   title: "Communications outbox",
-  async render({ siteId, size, timezone }) {
+  async render({ preview, siteId, size, timezone }) {
+    if (preview) {
+      return (
+        <>
+          <DashboardMetric detail="1 failed, 186 sent total" label="Queued messages" value={4} />
+          <DashboardSegmentBar
+            items={[
+              { label: "Sent", tone: "positive", value: 186 },
+              { label: "Queued", tone: "attention", value: 4 },
+              { label: "Failed", tone: "danger", value: 1 }
+            ]}
+          />
+        </>
+      );
+    }
+
     const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [queuedCount, failedCount, sentCount, outbox] = await Promise.all([
       prisma.emailOutbox.count({ where: { siteId, status: "QUEUED" } }),

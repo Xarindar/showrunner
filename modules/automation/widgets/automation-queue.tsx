@@ -10,7 +10,22 @@ export const automationQueueWidget = {
   moduleId: "automation",
   sizes: ["sm", "md", "lg"],
   title: "Automation queue",
-  async render({ siteId, size, timezone }) {
+  async render({ preview, siteId, size, timezone }) {
+    if (preview) {
+      return (
+        <>
+          <DashboardMetric detail="5 open tasks, 1 failed run" label="Active automations" value={8} />
+          <DashboardSegmentBar
+            items={[
+              { label: "Active", tone: "positive", value: 8 },
+              { label: "Open tasks", tone: "attention", value: 5 },
+              { label: "Failed", tone: "danger", value: 1 }
+            ]}
+          />
+        </>
+      );
+    }
+
     const limit = size === "lg" ? 2 : widgetItemLimit(size);
     const [activeAutomations, openTasks, failedRuns, runs] = await Promise.all([
       prisma.automation.count({ where: { siteId, status: "ACTIVE" } }),
