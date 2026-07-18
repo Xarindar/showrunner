@@ -1,7 +1,6 @@
 import { AdminSidebar } from "@/shell/admin-sidebar";
 import { requireAuthenticatedAdmin } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site";
-import { themeToCssVars } from "@/lib/theme/tokens";
 import { mediaAssetDisplayUrl, mediaAssetIdFromUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { MediaVariantType } from "@prisma/client";
@@ -25,7 +24,7 @@ export default async function AdminLayout({
   const logoUrl = logoAsset ? mediaAssetDisplayUrl(logoAsset, MediaVariantType.FULL) : settings.logoImageUrl;
 
   return (
-    <div className="admin-root" style={themeToCssVars(settings)}>
+    <div className="admin-root">
       <AdminSidebar businessName={settings.businessName} logoUrl={logoUrl} enabledModules={settings.enabledModuleIds} userEmail={user.email} userRole={user.role} />
       <main className="admin-main">{children}</main>
     </div>

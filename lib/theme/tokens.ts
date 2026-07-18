@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import { parseStoredThemePalette, type ParsedThemePalette } from "./palette-url";
 
 type ThemePreset = {
   label: string;
@@ -258,6 +257,10 @@ export function normalizeThemePreset(value: unknown): ThemePresetId {
   return typeof value === "string" && value in themePresets ? (value as ThemePresetId) : "clean";
 }
 
+export function normalizeThemePrimary(value: unknown, fallback = "#116466") {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value.trim()) ? value.trim().toLowerCase() : fallback;
+}
+
 function withBrandOverride(preset: ThemePreset, primary?: string | null): ThemePreset {
   if (!primary || !/^#[0-9a-fA-F]{6}$/.test(primary)) return preset;
   const brandDark = mixHex(primary, "#000000", 0.32);
@@ -267,34 +270,6 @@ function withBrandOverride(preset: ThemePreset, primary?: string | null): ThemeP
     ...preset,
     colors: {
       ...preset.colors,
-      brand: primary,
-      brandDark,
-      accent
-    }
-  };
-}
-
-function withPaletteOverride(preset: ThemePreset, palette: ParsedThemePalette): ThemePreset {
-  const [primary, accent = preset.colors.accent, neutral = preset.colors.surfaceSunken, text = preset.colors.text, background = preset.colors.page] =
-    palette.colors;
-  const surfaceSunken = mixHex(neutral, background, 0.22);
-  const surface = mixHex(background, "#ffffff", 0.62);
-  const surfaceRaised = mixHex(background, "#ffffff", 0.78);
-  const border = mixHex(neutral, text, 0.14);
-  const mutedText = ensureContrast(mixHex(text, background, 0.34), background, 4.5);
-  const brandDark = ensureContrast(mixHex(primary, text, 0.32), surface, 4.5);
-
-  return {
-    ...preset,
-    colors: {
-      ...preset.colors,
-      page: background,
-      surface,
-      surfaceRaised,
-      surfaceSunken,
-      text,
-      muted: mutedText,
-      border,
       brand: primary,
       brandDark,
       accent
@@ -409,8 +384,10 @@ function rotateHue(hex: string, degrees: number) {
 
 export function themeToCssVars(input: { themePreset?: string | null; themePrimary?: string | null }): CSSProperties {
   const basePreset = themePresets[normalizeThemePreset(input.themePreset)];
-  const storedPalette = parseStoredThemePalette(input.themePrimary);
-  const preset = storedPalette ? withPaletteOverride(basePreset, storedPalette) : withBrandOverride(basePreset, input.themePrimary);
+  const preset = withBrandOverride(basePreset, normalizeThemePrimary(input.themePrimary, basePreset.colors.brand));
+  const brandContrast = contrastRatio("#ffffff", preset.colors.brand) >= 4.5
+    ? "#ffffff"
+    : ensureContrast(preset.colors.text, preset.colors.brand, 4.5);
   const accentContrast = contrastRatio("#ffffff", preset.colors.accent) >= 4.5
     ? "#ffffff"
     : ensureContrast(preset.colors.text, preset.colors.accent, 4.5);
@@ -425,6 +402,7 @@ export function themeToCssVars(input: { themePreset?: string | null; themePrimar
     "--color-border": preset.colors.border,
     "--color-brand": preset.colors.brand,
     "--color-brand-dark": preset.colors.brandDark,
+    "--color-brand-contrast": brandContrast,
     "--color-brand-soft": `color-mix(in srgb, ${preset.colors.brand} 12%, ${preset.colors.surface})`,
     "--color-brand-border": `color-mix(in srgb, ${preset.colors.brand} 22%, transparent)`,
     "--color-admin-sidebar": `color-mix(in srgb, ${preset.colors.brandDark} 82%, ${preset.colors.text})`,

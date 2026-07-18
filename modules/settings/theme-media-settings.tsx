@@ -1,4 +1,4 @@
-import { ColorPaletteInput, EqualGrid } from "@/components/ui";
+import { BrandColorInput, EqualGrid } from "@/components/ui";
 import { normalizeThemePreset, themePresetOptions } from "@/lib/theme/tokens";
 
 type ThemeMediaSettingsProps = {
@@ -22,18 +22,11 @@ export function ThemeMediaSettings({ settings }: ThemeMediaSettingsProps) {
     <section className="subpanel form-grid">
       <div>
         <h2 className="compact-title">Theme and media</h2>
-        <p>Admit One palette roles map to primary, accent, muted, text, and background.</p>
+        <p>Choose one brand color. Showrunner owns the neutral surfaces and status colors so the interface stays clear and consistent.</p>
       </div>
 
-      <ColorPaletteInput
-        colorInputId="themePrimary"
-        colorInputName="themePrimary"
-        defaultValue={settings.themePrimary || "#116466"}
-        paletteInputId="themePaletteUrl"
-        paletteInputName="themePaletteUrl"
-      />
-
       <EqualGrid min="220px">
+        <BrandColorInput defaultValue={settings.themePrimary || "#116466"} id="themePrimary" name="themePrimary" />
         <div className="ui-field">
           <label htmlFor="themePreset">Style preset</label>
           <select id="themePreset" name="themePreset" defaultValue={normalizeThemePreset(settings.themePreset)}>

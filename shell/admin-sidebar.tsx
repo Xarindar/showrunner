@@ -2,12 +2,25 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, LogOut, Menu, Settings, UserRound, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  Ellipsis,
+  Globe2,
+  LogOut,
+  Megaphone,
+  Menu,
+  Settings,
+  UserRound,
+  WalletCards,
+  X,
+  type LucideIcon
+} from "lucide-react";
 import type { AdminRole } from "@prisma/client";
 import { usePathname } from "next/navigation";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import { moduleIcons, moduleRegistry, type ModuleId } from "@/shell/modules";
-import type { ModuleStatus } from "@/shell/module-types";
+import type { ModuleStatus, ShellModule } from "@/shell/module-types";
 import { useAdminMobileHeaderContext } from "@/shell/admin-mobile-header";
 import { logoutAction } from "@/app/admin/(protected)/actions";
 import { Button } from "@/components/ui";
@@ -21,16 +34,146 @@ type AdminSidebarProps = {
   userRole: AdminRole;
 };
 
+type SidebarNavigationGroup = {
+  icon: LucideIcon;
+  id: string;
+  label: string;
+  moduleIds: readonly ModuleId[];
+};
+
+const primaryNavigationIds = ["dashboard", "appointments", "clients", "scheduling", "products"] as const satisfies readonly ModuleId[];
+
+const navigationGroups = [
+  {
+    id: "website",
+    label: "Website",
+    icon: Globe2,
+    moduleIds: ["content", "media", "forms", "testimonials", "portfolio"]
+  },
+  {
+    id: "marketing",
+    label: "Marketing",
+    icon: Megaphone,
+    moduleIds: ["communications", "automation", "analytics"]
+  },
+  {
+    id: "finance",
+    label: "Finance",
+    icon: WalletCards,
+    moduleIds: ["payments", "billing"]
+  },
+  {
+    id: "system",
+    label: "More",
+    icon: Ellipsis,
+    moduleIds: ["users", "deployments", "help"]
+  }
+] as const satisfies readonly SidebarNavigationGroup[];
+
 function roleLabel(role: AdminRole) {
   return role.toLowerCase().split("_").join(" ");
+}
+
+function moduleIsActive(pathname: string, item: ShellModule) {
+  return item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
 }
 
 function SidebarBrand({ businessName, logoUrl }: Pick<AdminSidebarProps, "businessName" | "logoUrl">) {
   return (
     <>
-      {logoUrl ? <Image alt="" className="brand-logo" height={36} src={logoUrl} unoptimized width={120} /> : <span className="brand-mark" />}
+      {logoUrl ? (
+        <Image alt="" className="brand-logo" height={36} src={logoUrl} unoptimized width={120} />
+      ) : (
+        <span className="brand-mark admin-brand-mark" />
+      )}
       <span>{businessName}</span>
     </>
+  );
+}
+
+function SidebarModuleLink({
+  closeMenu,
+  enabledModules,
+  item,
+  pathname,
+  showIcon = true
+}: {
+  closeMenu: () => void;
+  enabledModules: ModuleId[];
+  item: ShellModule;
+  pathname: string;
+  showIcon?: boolean;
+}) {
+  const Icon = moduleIcons[item.icon];
+  const enabled = enabledModules.includes(item.id as ModuleId);
+  const isFuture = (item.status as ModuleStatus) === "future";
+  const isActive = moduleIsActive(pathname, item);
+  const label = item.id === "dashboard" ? "Home" : item.label;
+
+  if (!enabled || isFuture) {
+    return (
+      <span className="disabled-link" title={isFuture ? "Future module" : "Disabled"}>
+        {showIcon ? <Icon size={17} /> : null}
+        {label}
+      </span>
+    );
+  }
+
+  return (
+    <Link aria-current={isActive ? "page" : undefined} className={isActive ? "active" : undefined} href={item.href} onClick={closeMenu}>
+      {showIcon ? <Icon size={17} /> : null}
+      {label}
+    </Link>
+  );
+}
+
+function SidebarNavGroup({
+  closeMenu,
+  enabledModules,
+  group,
+  items,
+  pathname
+}: {
+  closeMenu: () => void;
+  enabledModules: ModuleId[];
+  group: SidebarNavigationGroup;
+  items: ShellModule[];
+  pathname: string;
+}) {
+  const isActive = items.some((item) => moduleIsActive(pathname, item));
+  const [expanded, setExpanded] = useState(isActive);
+  const GroupIcon = group.icon;
+
+  if (!items.length) return null;
+
+  return (
+    <div className="admin-nav-group">
+      <button
+        aria-controls={`admin-nav-${group.id}`}
+        aria-expanded={expanded}
+        className={isActive ? "active" : undefined}
+        onClick={() => setExpanded((current) => !current)}
+        type="button"
+      >
+        <GroupIcon size={17} />
+        <span>{group.label}</span>
+        <ChevronDown className="admin-nav-chevron" size={15} />
+      </button>
+      {expanded ? (
+        <div className="admin-subnav" id={`admin-nav-${group.id}`}>
+          {items.map((item) => (
+            <SidebarModuleLink
+              closeMenu={closeMenu}
+              enabledModules={enabledModules}
+              item={item}
+              key={item.id}
+              pathname={pathname}
+              showIcon={false}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -38,9 +181,18 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, userEmail,
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const mobileHeaderContext = useAdminMobileHeaderContext();
-  const activeModule = moduleRegistry.find((item) => item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href));
+  const activeModule = moduleRegistry.find((item) => moduleIsActive(pathname, item));
   const resolvedMobileHeader = mobileHeaderContext ?? (activeModule ? { title: activeModule.label } : null);
   const canUpdateSettings = hasAdminPermission({ role: userRole }, "settings:update");
+  const visibleModules = moduleRegistry.filter(
+    (item) =>
+      item.id !== "settings" &&
+      (!item.permissions?.length || item.permissions.some((permission) => hasAdminPermission({ role: userRole }, permission)))
+  );
+  const visibleModulesById = new Map(visibleModules.map((item) => [item.id, item]));
+  const primaryModules = primaryNavigationIds
+    .map((moduleId) => visibleModulesById.get(moduleId))
+    .filter((item): item is ShellModule => Boolean(item));
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -92,33 +244,25 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, userEmail,
 
         <div className="admin-sidebar-nav-scroll">
           <nav className="admin-nav" aria-label="Admin modules">
-            {moduleRegistry.map((item) => {
-              const Icon = moduleIcons[item.icon];
-              const enabled = enabledModules.includes(item.id);
-              const status = item.status as ModuleStatus;
-              const isFuture = status === "future";
-              const isActive = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
-              const visible = !item.permissions?.length || item.permissions.some((permission) => hasAdminPermission({ role: userRole }, permission));
-
-              if (!visible) return null;
-              if (item.id === "settings") return null;
-
-              if (!enabled || isFuture) {
-                return (
-                  <span className="disabled-link" key={item.id} title={isFuture ? "Future module" : "Disabled"}>
-                    <Icon size={18} />
-                    {item.label}
-                  </span>
-                );
-              }
-
-              return (
-                <Link className={isActive ? "active" : undefined} key={item.id} href={item.href} onClick={closeMenu}>
-                  <Icon size={18} />
-                  {item.label}
-                </Link>
-              );
-            })}
+            <div className="admin-nav-primary">
+              {primaryModules.map((item) => (
+                <SidebarModuleLink closeMenu={closeMenu} enabledModules={enabledModules} item={item} key={item.id} pathname={pathname} />
+              ))}
+            </div>
+            <div className="admin-nav-secondary">
+              {navigationGroups.map((group) => (
+                <SidebarNavGroup
+                  closeMenu={closeMenu}
+                  enabledModules={enabledModules}
+                  group={group}
+                  items={group.moduleIds
+                    .map((moduleId) => visibleModulesById.get(moduleId))
+                    .filter((item): item is ShellModule => Boolean(item))}
+                  key={`${group.id}:${pathname}`}
+                  pathname={pathname}
+                />
+              ))}
+            </div>
           </nav>
         </div>
 

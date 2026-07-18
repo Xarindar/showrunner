@@ -23,7 +23,6 @@ import { normalizeScopes } from "@/lib/embed/scopes";
 import { normalizeModules } from "@/shell/modules";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings, resolveCurrentSite } from "@/lib/site";
-import { parseStoredThemePalette, parseThemePaletteInput, serializeThemePalette } from "@/lib/theme/palette-url";
 import { normalizeThemePreset } from "@/lib/theme/tokens";
 
 function refreshSettings() {
@@ -52,13 +51,6 @@ export async function updateSettingsAction(formData: FormData) {
   const safeModules = normalizeModules(enabledModules);
   const themePreset = normalizeThemePreset(input.themePreset);
   const site = await resolveCurrentSite();
-  const paletteInput = String(formData.get("themePaletteUrl") || "").trim();
-  const importedPalette = parseThemePaletteInput(paletteInput);
-  if (paletteInput && !importedPalette) {
-    redirect(`/admin/modules/settings?error=${encodeURIComponent("Use a valid Admit One palette URL.")}`);
-  }
-  const themePrimary =
-    importedPalette && !parseStoredThemePalette(input.themePrimary) ? serializeThemePalette(importedPalette.colors) : input.themePrimary;
   const dataScopePreset = String(formData.get("dataScopePreset") || "custom");
   const dataScopeConfig = dataScopePresets.includes(dataScopePreset as DataScopePreset)
     ? applyDataScopePreset(dataScopePreset as DataScopePreset)
@@ -71,7 +63,7 @@ export async function updateSettingsAction(formData: FormData) {
       contactEmail: input.contactEmail,
       timezone: input.timezone,
       themePreset,
-      themePrimary,
+      themePrimary: input.themePrimary,
       mediaDriver: input.mediaDriver,
       ga4MeasurementId: input.ga4MeasurementId,
       googleAdsTagId: input.googleAdsTagId,
@@ -87,7 +79,7 @@ export async function updateSettingsAction(formData: FormData) {
       contactEmail: input.contactEmail,
       timezone: input.timezone,
       themePreset,
-      themePrimary,
+      themePrimary: input.themePrimary,
       mediaDriver: input.mediaDriver,
       ga4MeasurementId: input.ga4MeasurementId,
       googleAdsTagId: input.googleAdsTagId,
@@ -114,7 +106,7 @@ export async function updateSettingsAction(formData: FormData) {
       googleAdsTagId: input.googleAdsTagId,
       metaPixelId: input.metaPixelId,
       mediaDriver: input.mediaDriver,
-      themePaletteColors: importedPalette?.colors.length || parseStoredThemePalette(themePrimary)?.colors.length || 0,
+      themePrimary: input.themePrimary,
       analyticsRetentionDays: input.analyticsRetentionDays,
       searchConsoleVerification: input.searchConsoleVerification,
       dataScopePreset,
