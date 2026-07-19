@@ -771,17 +771,23 @@ function ImageSetting({
 }) {
   return (
     <section className="blog-image-setting">
-      <div><span>{label}</span><small>{description}</small></div>
-      <div className="blog-image-setting-preview" data-ratio={ratio}>
-        {assetUrl ? <Image alt="" fill sizes="300px" src={assetUrl} unoptimized /> : <span><ImageIcon aria-hidden="true" size={22} />No image selected</span>}
-        {assetUrl ? <button aria-label={`Remove ${label.toLowerCase()}`} onClick={onRemove} type="button"><X aria-hidden="true" size={14} /></button> : null}
+      <div className="blog-image-setting-head">
+        <div><span>{label}</span><small>{description}</small></div>
+        {assetUrl ? <button aria-label={`Remove ${label.toLowerCase()}`} onClick={onRemove} title="Remove image" type="button"><X aria-hidden="true" size={14} /></button> : null}
       </div>
-      <div className="blog-image-setting-actions">
-        <AssetPicker assets={mediaAssets} canUpload={canUpload} confirmLabel={`Use as ${label.toLowerCase()}`} onSelectAsset={onChoose} onUploadRequest={onUpload} title={`Choose ${label.toLowerCase()}`} triggerClassName="blog-image-choose">
-          <ImageIcon aria-hidden="true" size={14} />Library
-        </AssetPicker>
-        <button disabled={!canUpload} onClick={onUpload} type="button"><Upload aria-hidden="true" size={14} />Upload</button>
-      </div>
+      <AssetPicker
+        assets={mediaAssets}
+        canUpload={canUpload}
+        confirmLabel={`Use as ${label.toLowerCase()}`}
+        onSelectAsset={onChoose}
+        onUploadRequest={onUpload}
+        title={`Choose ${label.toLowerCase()}`}
+        triggerClassName={`blog-image-setting-trigger${assetUrl ? " has-image" : ""}`}
+        triggerHint={assetUrl ? "Replace image" : "Add image"}>
+        <span className="blog-image-setting-preview" data-ratio={ratio}>
+          {assetUrl ? <Image alt="" fill sizes="300px" src={assetUrl} unoptimized /> : <span><ImageIcon aria-hidden="true" size={22} />No image selected</span>}
+        </span>
+      </AssetPicker>
     </section>
   );
 }
