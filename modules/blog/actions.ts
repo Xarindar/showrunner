@@ -15,10 +15,10 @@ export async function saveBlogPostAction(formData: FormData) {
   const settings = await getSiteSettings();
   const id = text(formData.get("id"));
   const title = text(formData.get("title")).slice(0, 180);
-  const requestedSlug = slugify(text(formData.get("slug")) || title);
   const excerpt = text(formData.get("excerpt")).slice(0, 320);
   const authorName = text(formData.get("authorName")).slice(0, 120);
-  const category = text(formData.get("category")).slice(0, 80);
+  const requestedCategoryId = text(formData.get("categoryId"));
+  const newCategoryName = text(formData.get("newCategoryName")).slice(0, 80);
   const tags = uniqueTags(text(formData.get("tags")));
   const contentHtml = sanitizeBlogHtml(text(formData.get("contentHtml")));
   const intent = text(formData.get("intent"));
@@ -31,7 +31,7 @@ export async function saveBlogPostAction(formData: FormData) {
       ? BlogPostStatus.DRAFT
       : currentStatus;
 
-  if (!title || !requestedSlug) fail(id, "Add a story title before saving.");
+  if (!title) fail(id, "Add a story title before saving.");
   if (status === BlogPostStatus.PUBLISHED && plainText(contentHtml).length < 40) {
     fail(id, "Add at least a short paragraph before publishing.");
   }
@@ -40,6 +40,8 @@ export async function saveBlogPostAction(formData: FormData) {
     ? await prisma.blogPost.findFirst({ where: { id, siteId: settings.siteId } })
     : null;
   if (id && !existing) fail("", "That story could not be found.");
+  const slug = existing?.slug || await availableBlogSlug(settings.siteId, title);
+  const categoryId = await resolveBlogCategory(settings.siteId, requestedCategoryId, newCategoryName);
 
   const thumbnailUploadUrl = await uploadBlogImage(formData.get("thumbnailUpload"), {
     folder: "blog/thumbnails",
@@ -69,12 +71,12 @@ export async function saveBlogPostAction(formData: FormData) {
         where: { id: existing.id },
         data: {
           authorName,
-          category,
+          categoryId,
           contentHtml,
           excerpt,
           headerImageUrl,
           publishedAt,
-          slug: requestedSlug,
+          slug,
           status,
           tags,
           thumbnailUrl,
@@ -85,13 +87,13 @@ export async function saveBlogPostAction(formData: FormData) {
       await prisma.blogPost.create({
         data: {
           authorName,
-          category,
+          categoryId,
           contentHtml,
           excerpt,
           headerImageUrl,
           publishedAt,
           siteId: settings.siteId,
-          slug: requestedSlug,
+          slug,
           status,
           tags,
           thumbnailUrl,
@@ -101,7 +103,7 @@ export async function saveBlogPostAction(formData: FormData) {
     }
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      fail(id, "That URL slug is already in use. Choose a different one.");
+      fail(id, "A unique story URL could not be generated. Save again to retry.");
     }
     throw error;
   }
@@ -172,6 +174,44 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 180);
+}
+
+async function availableBlogSlug(siteId: string, title: string) {
+  const base = slugify(title) || "story";
+  const matches = await prisma.blogPost.findMany({
+    where: { siteId, slug: { startsWith: base } },
+    select: { slug: true }
+  });
+  const used = new Set(matches.map((post) => post.slug));
+  if (!used.has(base)) return base;
+  for (let suffix = 2; suffix < 10_000; suffix += 1) {
+    const candidate = `${base.slice(0, 180 - String(suffix).length - 1)}-${suffix}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  return `${base.slice(0, 164)}-${Date.now()}`;
+}
+
+async function resolveBlogCategory(siteId: string, requestedId: string, newName: string) {
+  if (newName) {
+    const slug = slugify(newName) || "category";
+    const existing = await prisma.blogCategory.findUnique({
+      where: { siteId_slug: { siteId, slug } },
+      select: { id: true }
+    });
+    if (existing) return existing.id;
+    const sortOrder = await prisma.blogCategory.count({ where: { siteId } });
+    const category = await prisma.blogCategory.create({
+      data: { name: newName, siteId, slug, sortOrder },
+      select: { id: true }
+    });
+    return category.id;
+  }
+  if (!requestedId) return null;
+  const category = await prisma.blogCategory.findFirst({
+    where: { id: requestedId, siteId },
+    select: { id: true }
+  });
+  return category?.id || null;
 }
 
 function uniqueTags(value: string) {

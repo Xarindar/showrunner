@@ -2,6 +2,7 @@ import { MediaDriver } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { globalMediaAssets } from "@/lib/global-media-assets";
 import { isMediaUploadDriverConfigured } from "@/lib/media";
+import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { deleteBlogPostAction, saveBlogPostAction } from "./actions";
 import { BlogEditor } from "./blog-editor";
@@ -16,7 +17,14 @@ type BlogPageProps = {
 export default async function BlogPage({ searchParams }: BlogPageProps) {
   await requireAdmin("blog:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const posts = await getBlogPosts(settings.siteId);
+  const [posts, categories] = await Promise.all([
+    getBlogPosts(settings.siteId),
+    prisma.blogCategory.findMany({
+      where: { siteId: settings.siteId },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: { id: true, name: true }
+    })
+  ]);
   const selected = params.post ? posts.find((post) => post.id === params.post) : null;
   const editing = Boolean(params.new || selected);
   const mediaAssets = globalMediaAssets.map((asset) => ({
@@ -42,6 +50,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 
       <BlogEditor
         canUpload={canUploadWithDriver(settings.mediaDriver)}
+        categories={categories}
         deleteAction={deleteBlogPostAction}
         editing={editing}
         mediaAssets={mediaAssets}

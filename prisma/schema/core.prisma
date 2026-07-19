@@ -48,6 +48,7 @@ model Site {
   domains                  SiteDomain[]
   settings                 SiteSettings?
   heroPresentations        HeroPresentation[]
+  blogCategories           BlogCategory[]
   blogPosts                BlogPost[]
   schedulingSettings       SchedulingSettings?
   moduleInstallations      ModuleInstallation[]

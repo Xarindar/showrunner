@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       take: 100,
       select: {
         authorName: true,
-        category: true,
+        category: { select: { name: true, slug: true } },
         excerpt: true,
         publishedAt: true,
         slug: true,
@@ -39,8 +39,10 @@ export async function GET(request: NextRequest) {
     });
 
     return embedJson({
-      posts: posts.map((post) => ({
+      posts: posts.map(({ category, ...post }) => ({
         ...post,
+        category: category?.name || "",
+        categorySlug: category?.slug || "",
         publishedAt: post.publishedAt?.toISOString() || null,
         tags: Array.isArray(post.tags) ? post.tags : [],
         updatedAt: post.updatedAt.toISOString()
