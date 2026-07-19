@@ -4,7 +4,6 @@ import crypto from "node:crypto";
 import {
   BillingDocumentStatus,
   OrderStatus,
-  PaymentGatewayConnectionStatus,
   PaymentProvider,
   PaymentStatus,
   Prisma,
@@ -13,6 +12,7 @@ import {
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
 import { getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
 import { publicAppBaseUrl } from "@/lib/env";
+import { isSquareCredentialUsable } from "@/lib/payments/connect/square-refresh";
 import { getConnectedGatewayCredential, getConnectedSquareWebhookSignatureKeys, getSquareAccessToken } from "@/lib/payments/credentials";
 import { squareApiBaseUrl } from "@/lib/payments/provider-onboarding";
 import type { PaymentGateway, PaymentGatewayCheckoutInput, PaymentWallet } from "@/lib/payments/types";
@@ -190,7 +190,7 @@ function squarePaymentNote(metadata: Record<string, string>) {
 export async function createSquareCheckoutSessionForOrder(orderId: string, siteId?: string) {
   const currentSiteId = siteId || (await getCurrentSiteId());
   const credential = await getConnectedGatewayCredential(currentSiteId, PaymentProvider.SQUARE);
-  if (credential?.status !== PaymentGatewayConnectionStatus.CONNECTED) throw new Error("Connect Square before creating Square checkout.");
+  if (!isSquareCredentialUsable(credential)) throw new Error("Connect Square before creating Square checkout.");
 
   const order = await prisma.order.findFirst({
     where: {
@@ -299,7 +299,7 @@ export async function createSquareCheckoutSessionForBillingDocument(input: {
 }) {
   const currentSiteId = input.siteId || (await getCurrentSiteId());
   const credential = await getConnectedGatewayCredential(currentSiteId, PaymentProvider.SQUARE);
-  if (credential?.status !== PaymentGatewayConnectionStatus.CONNECTED) throw new Error("Connect Square before creating Square checkout.");
+  if (!isSquareCredentialUsable(credential)) throw new Error("Connect Square before creating Square checkout.");
 
   const result = await prisma.$transaction(async (tx) => {
     const document = await tx.billingDocument.findFirst({

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import test from "node:test";
+import { PaymentGatewayConnectionStatus } from "@prisma/client";
 import {
   base64urlEncode,
   ConnectTokenError,
@@ -14,7 +15,10 @@ import { decryptGatewaySecret, encryptGatewaySecret } from "../lib/payments/cred
 import {
   createSquarePkcePair,
   exchangeSquarePkceCode,
-  refreshSquarePkceToken
+  isSquareCredentialUsable,
+  isSquareRefreshTokenRejected,
+  refreshSquarePkceToken,
+  squareRefreshRequiresReconnect
 } from "../lib/payments/connect/square-refresh";
 
 const secret = "test-shared-secret-with-sufficient-entropy";
@@ -186,6 +190,71 @@ test("Square PKCE exchange and refresh happen directly without an application se
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("Square refresh token rejection is distinguishable from transient provider failures", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      errors: [{
+        category: "AUTHENTICATION_ERROR",
+        code: "UNAUTHORIZED",
+        detail: "The refresh token is invalid or has already been used."
+      }]
+    }), { status: 401, headers: { "content-type": "application/json" } });
+
+    await assert.rejects(
+      refreshSquarePkceToken({
+        clientId: "sandbox-sq0idb-public",
+        environment: "sandbox",
+        refreshToken: "consumed-refresh-token"
+      }),
+      (error) => {
+        assert.equal(isSquareRefreshTokenRejected(error), true);
+        assert.doesNotMatch(error instanceof Error ? error.message : String(error), /consumed-refresh-token/);
+        return true;
+      }
+    );
+
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      errors: [{ category: "API_ERROR", code: "INTERNAL_SERVER_ERROR", detail: "Try again later." }]
+    }), { status: 500, headers: { "content-type": "application/json" } });
+
+    await assert.rejects(
+      refreshSquarePkceToken({
+        clientId: "sandbox-sq0idb-public",
+        environment: "sandbox",
+        refreshToken: "still-valid-refresh-token"
+      }),
+      (error) => {
+        assert.equal(isSquareRefreshTokenRejected(error), false);
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Square keeps an unexpired access token usable while requiring refresh reconnection", () => {
+  const reconnectCredential = {
+    encryptedAccessToken: "encrypted-access-token",
+    expiresAt: new Date(Date.now() + 60_000),
+    metadata: { squareRefreshFailure: "refresh_token_rejected" },
+    status: PaymentGatewayConnectionStatus.ERROR
+  };
+
+  assert.equal(squareRefreshRequiresReconnect(reconnectCredential), true);
+  assert.equal(isSquareCredentialUsable(reconnectCredential), true);
+  assert.equal(isSquareCredentialUsable({
+    ...reconnectCredential,
+    expiresAt: new Date(Date.now() - 1)
+  }), false);
+  assert.equal(isSquareCredentialUsable({
+    ...reconnectCredential,
+    metadata: {},
+    status: PaymentGatewayConnectionStatus.CONNECTED
+  }), true);
 });
 
 test("payment runtime has no Connect broker dependency and Stripe OAuth is stored once", () => {

@@ -2,6 +2,7 @@ import { PaymentGatewayConnectionStatus, PaymentProvider } from "@prisma/client"
 import { paypalPaymentGateway } from "@/lib/commerce/paypal";
 import { stripePaymentGateway } from "@/lib/commerce/stripe";
 import { squarePaymentGateway } from "@/lib/commerce/square";
+import { isSquareCredentialUsable } from "@/lib/payments/connect/square-refresh";
 import { prisma } from "@/lib/prisma";
 import type { PaymentGateway } from "./types";
 
@@ -32,30 +33,48 @@ export async function resolvePaymentProviderForSite(siteId: string, provider?: P
       }
     },
     select: {
+      encryptedAccessToken: true,
       externalAccountId: true,
+      expiresAt: true,
       merchantId: true,
+      metadata: true,
       status: true
     }
   });
   const connected =
-    credential?.status === PaymentGatewayConnectionStatus.CONNECTED &&
-    (selectedProvider === PaymentProvider.STRIPE ? Boolean(credential.externalAccountId.trim()) : Boolean(credential.merchantId.trim()));
+    (selectedProvider === PaymentProvider.SQUARE
+      ? isSquareCredentialUsable(credential)
+      : credential?.status === PaymentGatewayConnectionStatus.CONNECTED) &&
+    (selectedProvider === PaymentProvider.STRIPE
+      ? Boolean(credential?.externalAccountId.trim())
+      : Boolean(credential?.merchantId.trim()));
 
   if (connected) return selectedProvider;
   if (provider) throw new Error(`${selectedProvider} checkout is not connected for this site.`);
 
-  const connectedFallback = await prisma.paymentGatewayCredential.findFirst({
+  const fallbackCredentials = await prisma.paymentGatewayCredential.findMany({
     where: {
       siteId,
-      status: PaymentGatewayConnectionStatus.CONNECTED,
+      status: { in: [PaymentGatewayConnectionStatus.CONNECTED, PaymentGatewayConnectionStatus.ERROR] },
       OR: [
         { provider: PaymentProvider.STRIPE, externalAccountId: { not: "" } },
         { provider: { in: [PaymentProvider.SQUARE, PaymentProvider.PAYPAL] }, merchantId: { not: "" } }
       ]
     },
     orderBy: { connectedAt: "desc" },
-    select: { provider: true }
+    select: {
+      encryptedAccessToken: true,
+      expiresAt: true,
+      metadata: true,
+      provider: true,
+      status: true
+    }
   });
+  const connectedFallback = fallbackCredentials.find((candidate) =>
+    candidate.provider === PaymentProvider.SQUARE
+      ? isSquareCredentialUsable(candidate)
+      : candidate.status === PaymentGatewayConnectionStatus.CONNECTED
+  );
 
   if (connectedFallback) return connectedFallback.provider;
   throw new Error("Connect a payment provider before creating hosted checkout.");

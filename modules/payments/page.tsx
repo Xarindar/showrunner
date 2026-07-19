@@ -2,6 +2,7 @@ import { PaymentGatewayConnectionStatus, type PaymentGatewayCredential, PaymentP
 import { requireAdmin } from "@/lib/auth";
 import { publicAppBaseUrl } from "@/lib/env";
 import { isConnectBrokerConfigured } from "@/lib/payments/connect/config";
+import { squareRefreshRequiresReconnect } from "@/lib/payments/connect/square-refresh";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { getStripePaymentMethodSettings } from "@/lib/payments/methods";
 import { prisma } from "@/lib/prisma";
@@ -74,9 +75,13 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
 
   const stripeCredential = stripeMethods.credential;
   const stripeConnected = stripeMethods.connected;
+  const squareReconnectRequired = Boolean(
+    squareCredential &&
+    squareRefreshRequiresReconnect(squareCredential)
+  );
   const squareConnected =
     squareCredential?.status === PaymentGatewayConnectionStatus.CONNECTED &&
-    Boolean(squareCredential.merchantId || squareCredential.encryptedAccessToken);
+    Boolean(squareCredential?.merchantId || squareCredential?.encryptedAccessToken);
   const paypalConnected =
     paypalCredential?.status === PaymentGatewayConnectionStatus.CONNECTED && Boolean(paypalCredential.externalAccountId);
 
@@ -118,12 +123,16 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
       needsAttention: needsAttention(squareCredential),
       oauthConnect: oauthEnabled,
       webhookMissing: squareWebhookMissing,
-      headline: squareConnected
+      headline: squareReconnectRequired
+        ? `Square's refresh authorization was lost. Reconnect now; the current access token expires on ${squareCredential?.expiresAt?.toISOString().slice(0, 10) || "its existing expiry date"}.`
+        : squareConnected
         ? `${squareCredential?.displayName || "Square"} · ${squareEnv}.${lastChecked(squareCredential)}`
         : oauthEnabled
           ? "Optional. One click: sign in to Square for hosted checkout with cards, wallets, and Cash App Pay."
           : "Optional. Square-hosted checkout with cards, wallets, and Cash App Pay.",
-      manageDetail: squareConnected
+      manageDetail: squareReconnectRequired
+        ? `Square's refresh authorization was lost. Reconnect now; the current access token expires on ${squareCredential?.expiresAt?.toISOString().slice(0, 10) || "its existing expiry date"}.`
+        : squareConnected
         ? `${squareCredential?.displayName || "Square"} · ${squareEnv}${squareOAuth ? " · connected with one-click" : ""}.${lastChecked(squareCredential)}`
         : "Square is not connected yet."
     },
