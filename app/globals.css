@@ -1150,6 +1150,7 @@ body {
 
 .blog-composer-form[data-focus="true"] .blog-writing-pane {
   background: var(--color-surface);
+  border-right: 0;
 }
 
 .blog-article-preview {
@@ -1213,7 +1214,7 @@ body {
 
 .blog-preview-hero {
   aspect-ratio: 16 / 7.2;
-  background: #eef1ef;
+  background: var(--color-surface-sunken);
   display: grid;
   place-items: center;
   position: relative;
