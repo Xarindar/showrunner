@@ -18,6 +18,7 @@ import {
 import {
   dashboardCardSizeFromLayout,
   getDashboardCardLayoutDefaults,
+  getDashboardCardMinimumLayout,
   normalizeDashboardCardColumns,
   normalizeDashboardCardRows
 } from "@/shell/dashboard-layout";
@@ -97,6 +98,17 @@ export async function addDashboardCardAction(formData: FormData) {
   redirectWithStatus(returnTo, "saved", "dashboard-card-added");
 }
 
+function dashboardDateKey(value: string) {
+  const match = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(value);
+  if (!match) return null;
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  const year = 2000 + Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return `${year}-${match[1]}-${match[2]}`;
+}
+
 export async function updateDashboardCardSettingsAction(formData: FormData) {
   const returnTo = safeReturnTo(formData.get("returnTo"));
   const instanceId = String(formData.get("instanceId") || "");
@@ -108,9 +120,37 @@ export async function updateDashboardCardSettingsAction(formData: FormData) {
     redirectWithStatus(returnTo, "error", "That widget was not found.");
   }
 
+  for (const setting of card.settings || []) {
+    if (setting.type !== "date-range") continue;
+    const start = String(formData.get(`setting.${setting.id}.start`) || "").trim();
+    const end = String(formData.get(`setting.${setting.id}.end`) || "").trim();
+    if (Boolean(start) !== Boolean(end)) {
+      redirectWithStatus(returnTo, "error", "Enter both a start and end date, or leave both blank.");
+    }
+    if (!start && !end) continue;
+    const startKey = dashboardDateKey(start);
+    const endKey = dashboardDateKey(end);
+    if (!startKey || !endKey) {
+      redirectWithStatus(returnTo, "error", "Use MM/DD/YY for both dates.");
+    }
+    if (startKey > endKey) {
+      redirectWithStatus(returnTo, "error", "The start date must be on or before the end date.");
+    }
+  }
+
   const nextSettings = normalizeDashboardCardSettings(
     card.id,
-    Object.fromEntries((card.settings || []).map((setting) => [setting.id, formData.get(`setting.${setting.id}`) === "on"]))
+    Object.fromEntries(
+      (card.settings || []).map((setting) => [
+        setting.id,
+        setting.type === "date-range"
+          ? {
+              end: String(formData.get(`setting.${setting.id}.end`) || ""),
+              start: String(formData.get(`setting.${setting.id}.start`) || "")
+            }
+          : formData.get(`setting.${setting.id}`) === "on"
+      ])
+    )
   );
   const nextPlacements = placements.map((item) => (item.instanceId === instanceId ? { ...item, settings: nextSettings } : item));
 
@@ -172,8 +212,10 @@ export async function saveDashboardCardLayoutAction(items: DashboardLayoutItemIn
     const current = currentByInstanceId.get(instanceId);
     if (!current || seen.has(instanceId)) continue;
 
-    const columns = normalizeDashboardCardColumns(item.columns, current.columns);
-    const rows = normalizeDashboardCardRows(item.rows, current.rows);
+    const card = getDashboardCardDefinition(current.cardId);
+    const minimumLayout = getDashboardCardMinimumLayout(card?.sizes || []);
+    const columns = normalizeDashboardCardColumns(item.columns, current.columns, minimumLayout.columns);
+    const rows = normalizeDashboardCardRows(item.rows, current.rows, minimumLayout.rows);
     nextPlacements.push({
       ...current,
       columns,

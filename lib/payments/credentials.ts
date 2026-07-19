@@ -2,6 +2,7 @@ import "server-only";
 
 import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
 import { decryptGatewaySecret, encryptGatewaySecret } from "@/lib/payments/credential-crypto";
+import { isSquareCredentialUsable } from "@/lib/payments/connect/square-refresh";
 import { prisma } from "@/lib/prisma";
 
 export { decryptGatewaySecret, encryptGatewaySecret };
@@ -170,7 +171,7 @@ function toPayPalSiteCredentials(credential: {
 // never contact AdmitOne Connect or perform token maintenance.
 export async function getSquareAccessToken(siteId: string) {
   const credential = await getConnectedGatewayCredential(siteId, PaymentProvider.SQUARE);
-  if (credential?.status !== PaymentGatewayConnectionStatus.CONNECTED || !credential.encryptedAccessToken) {
+  if (!isSquareCredentialUsable(credential) || !credential) {
     throw new Error("Connect Square and confirm its location before using Square checkout.");
   }
   if (credential.expiresAt && credential.expiresAt.getTime() <= Date.now()) {

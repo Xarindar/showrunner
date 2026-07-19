@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin/modules/communications",
   icon: "Mail",
   order: 100,
+  navigation: { category: "marketing" },
   description: "Message templates, visual email builder, delivery logs, and suppression controls.",
   layout: "standard",
   status: "active",

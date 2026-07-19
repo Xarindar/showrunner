@@ -200,15 +200,23 @@ function initials(value: string) {
     .join("") || "—";
 }
 
-export function DashboardIdentityList({ empty, items }: { empty: string; items: DashboardIdentityItem[] }) {
+export function DashboardIdentityList({
+  empty,
+  items,
+  showAvatar = true
+}: {
+  empty: string;
+  items: DashboardIdentityItem[];
+  showAvatar?: boolean;
+}) {
   if (!items.length) return <p className="dashboard-card-empty">{empty}</p>;
 
   return (
-    <ul className="dashboard-widget-identity-list">
+    <ul className={cx("dashboard-widget-identity-list", !showAvatar && "dashboard-widget-identity-list-no-avatar")}>
       {items.map((item) => {
         const copy = (
           <>
-            <span className="dashboard-widget-avatar" aria-hidden="true">{initials(item.title)}</span>
+            {showAvatar ? <span className="dashboard-widget-avatar" aria-hidden="true">{initials(item.title)}</span> : null}
             <strong className="dashboard-widget-row-title">{item.title}</strong>
             <small className="dashboard-widget-row-detail">{item.detail || null}</small>
             <em>{item.meta || null}</em>
@@ -292,7 +300,10 @@ type DashboardKpi = {
 
 export function DashboardKpiRow({ items }: { items: DashboardKpi[] }) {
   return (
-    <div className="dashboard-card-kpis">
+    <div
+      className="dashboard-card-kpis"
+      style={{ "--dashboard-kpi-columns": Math.max(1, items.length) } as CSSProperties}
+    >
       {items.map((item) => (
         <span className="dashboard-card-kpi" key={item.label}>
           <strong>{item.value}</strong>

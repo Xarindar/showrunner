@@ -5,13 +5,14 @@ import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
-import type { EventClickArg, EventContentArg, EventDropArg, EventInput } from "@fullcalendar/core";
+import type { EventClickArg, EventDropArg, EventInput } from "@fullcalendar/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { AlertTriangle, Ban, CalendarClock, Check, ExternalLink, GripVertical, ListChecks, Mail, X } from "lucide-react";
+import { AlertTriangle, Ban, CalendarClock, Check, ExternalLink, ListChecks, Mail, X } from "lucide-react";
 import { Modal, Tab, Tabs } from "@/components/ui";
 import { rescheduleBookingFromCalendarAction, updateBookingStatusAction } from "../actions";
+import { AppointmentEventChip } from "./appointment-event-chip";
 
 const calendarViews = ["month", "week", "day", "agenda"] as const;
 const calendarViewInputId = "appointment-calendar-view-input";
@@ -155,34 +156,25 @@ function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60_000);
 }
 
-function formatClockLabel(date: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit", timeZone }).format(date);
+function formatCalendarClockLabel(date: Date) {
+  return new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(date);
 }
 
-function formatDateLabel(date: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", weekday: "short", timeZone }).format(date);
+function formatCalendarDateLabel(date: Date) {
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", weekday: "short", timeZone: "UTC" }).format(date);
 }
 
-function zonedDateParts(date: Date, timeZone: string) {
-  const values = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      day: "2-digit",
-      hour: "2-digit",
-      hourCycle: "h23",
-      minute: "2-digit",
-      month: "2-digit",
-      timeZone,
-      year: "numeric"
-    })
-      .formatToParts(date)
-      .map((part) => [part.type, part.value])
-  );
-
+function calendarDateParts(date: Date) {
   return {
-    dateKey: `${values.year}-${values.month}-${values.day}`,
-    hour: Number(values.hour),
-    minute: Number(values.minute)
+    dateKey: dateKeyFromUtcDate(date),
+    hour: date.getUTCHours(),
+    minute: date.getUTCMinutes()
   };
+}
+
+function calendarDateForBooking(booking: AppointmentCalendarBooking) {
+  const [year, month, day] = booking.dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, booking.hour, booking.minute));
 }
 
 function initialsFor(name: string, email: string) {
@@ -229,29 +221,8 @@ function statusClass(booking: AppointmentCalendarBooking) {
   return `status-${booking.status.toLowerCase()}`;
 }
 
-function AppointmentEventContent({ event }: EventContentArg) {
-  const booking = event.extendedProps.booking as AppointmentCalendarBooking | undefined;
-  if (!booking) return <span>{event.title}</span>;
-
-  return (
-    <div className="appointment-fc-event-content">
-      <span>
-        {canDrag(booking) ? <GripVertical size={13} /> : null}
-        {booking.timeLabel} - {booking.endTimeLabel}
-      </span>
-      <strong>{booking.customerName}</strong>
-      <small>
-        {booking.serviceName}
-        {booking.staffName ? ` | ${booking.staffName}` : ""}
-      </small>
-      {booking.warnings.length ? (
-        <em>
-          <AlertTriangle size={13} />
-          {booking.warnings[0]}
-        </em>
-      ) : null}
-    </div>
-  );
+function hasConflict(booking: AppointmentCalendarBooking) {
+  return booking.warnings.some((warning) => /\bconflicts?\b/i.test(warning));
 }
 
 function AppointmentExpandedDetails({ booking, dayLabel }: { booking: AppointmentCalendarBooking; dayLabel: string }) {
@@ -391,7 +362,7 @@ function AppointmentFloatingDetails({
   );
 }
 
-export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, timezone, view }: AppointmentCalendarProps) {
+export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, view }: AppointmentCalendarProps) {
   const router = useRouter();
   const calendarRef = useRef<FullCalendar | null>(null);
   const [message, setMessage] = useState("");
@@ -415,22 +386,30 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, ti
 
   const calendarEvents = useMemo<EventInput[]>(
     () =>
-      bookings.map((booking) => ({
-        id: booking.id,
-        title: `${booking.customerName} - ${booking.serviceName}`,
-        start: booking.startsAt,
-        end: booking.endsAt,
-        editable: canDrag(booking),
-        startEditable: canDrag(booking),
-        durationEditable: false,
-        classNames: [
-          "appointment-fc-event",
-          statusClass(booking),
-          canDrag(booking) ? "can-reschedule" : "locked",
-          booking.warnings.length ? "has-warning" : ""
-        ].filter(Boolean),
-        extendedProps: { booking }
-      })),
+      bookings.map((booking) => {
+        // FullCalendar needs an extra plugin for named time zones. Treat UTC as a
+        // wall-clock coordinate so the site-local parts supplied by the server
+        // render consistently even when the browser is in another time zone.
+        const start = calendarDateForBooking(booking);
+        const end = addMinutes(start, booking.durationMinutes);
+
+        return {
+          id: booking.id,
+          title: `${booking.customerName} - ${booking.serviceName}`,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          editable: canDrag(booking),
+          startEditable: canDrag(booking),
+          durationEditable: false,
+          classNames: [
+            "appointment-fc-event",
+            statusClass(booking),
+            canDrag(booking) ? "can-reschedule" : "locked",
+            hasConflict(booking) ? "has-conflict" : ""
+          ].filter(Boolean),
+          extendedProps: { booking }
+        };
+      }),
     [bookings]
   );
 
@@ -516,7 +495,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, ti
     }
 
     const end = info.event.end || addMinutes(start, booking.durationMinutes);
-    const parts = zonedDateParts(start, timezone);
+    const parts = calendarDateParts(start);
     setSelectedBookingId("");
     setMessage("");
     setPendingReschedule({
@@ -524,9 +503,9 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, ti
       dateKey: parts.dateKey,
       hour: parts.hour,
       minute: parts.minute,
-      newDateLabel: formatDateLabel(start, timezone),
-      newEndLabel: formatClockLabel(end, timezone),
-      newStartLabel: formatClockLabel(start, timezone)
+      newDateLabel: formatCalendarDateLabel(start),
+      newEndLabel: formatCalendarClockLabel(end),
+      newStartLabel: formatCalendarClockLabel(start)
     });
     setConfirmStage("change");
     info.revert();
@@ -627,11 +606,13 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, ti
           dayMaxEvents
           editable
           eventClick={handleEventClick}
-          eventContent={(eventInfo) => <AppointmentEventContent {...eventInfo} />}
+          eventContent={(eventInfo) => <AppointmentEventChip {...eventInfo} />}
           eventDisplay="block"
           eventDrop={handleEventDrop}
           eventDurationEditable={false}
-          eventMinHeight={28}
+          eventMaxStack={2}
+          eventMinHeight={34}
+          eventShortHeight={52}
           events={calendarEvents}
           expandRows
           firstDay={0}
@@ -648,8 +629,8 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, ti
           slotDuration="00:30:00"
           slotMaxTime={slotTime(slotMaxHour)}
           slotMinTime={slotTime(slotMinHour)}
-          slotEventOverlap={false}
-          timeZone={timezone}
+          slotEventOverlap
+          timeZone="UTC"
           views={{
             appointmentAgenda: {
               buttonText: "agenda",

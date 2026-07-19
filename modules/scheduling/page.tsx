@@ -298,9 +298,11 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   ];
 
   return (
-    <div className="products-workspace service-workspace">
-      <header className="products-page-header">
-        <h1>Services</h1>
+    <div className="stack products-workspace service-workspace">
+      <header className="page-header">
+        <div>
+          <h1>Services</h1>
+        </div>
       </header>
 
       {savedMessage ? <div className="success-message">{savedMessage}</div> : null}

@@ -5,21 +5,18 @@ import Image from "next/image";
 import {
   ArrowLeft,
   ChevronDown,
-  Ellipsis,
-  Globe2,
+  ExternalLink,
   LogOut,
-  Megaphone,
   Menu,
   Settings,
   UserRound,
-  WalletCards,
-  X,
-  type LucideIcon
+  X
 } from "lucide-react";
 import type { AdminRole } from "@prisma/client";
 import { usePathname } from "next/navigation";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import { moduleIcons, moduleRegistry, type ModuleId } from "@/shell/modules";
+import { collapsibleModuleNavigationCategories, type CollapsibleModuleNavigationCategory } from "@/shell/module-navigation";
 import type { ModuleStatus, ShellModule } from "@/shell/module-types";
 import { useAdminMobileHeaderContext } from "@/shell/admin-mobile-header";
 import { logoutAction } from "@/app/admin/(protected)/actions";
@@ -33,42 +30,6 @@ type AdminSidebarProps = {
   userEmail: string;
   userRole: AdminRole;
 };
-
-type SidebarNavigationGroup = {
-  icon: LucideIcon;
-  id: string;
-  label: string;
-  moduleIds: readonly ModuleId[];
-};
-
-const primaryNavigationIds = ["dashboard", "appointments", "clients", "scheduling", "products"] as const satisfies readonly ModuleId[];
-
-const navigationGroups = [
-  {
-    id: "website",
-    label: "Website",
-    icon: Globe2,
-    moduleIds: ["content", "media", "forms", "testimonials", "portfolio"]
-  },
-  {
-    id: "marketing",
-    label: "Marketing",
-    icon: Megaphone,
-    moduleIds: ["communications", "automation", "analytics"]
-  },
-  {
-    id: "finance",
-    label: "Finance",
-    icon: WalletCards,
-    moduleIds: ["payments", "billing"]
-  },
-  {
-    id: "system",
-    label: "More",
-    icon: Ellipsis,
-    moduleIds: ["users", "deployments", "help"]
-  }
-] as const satisfies readonly SidebarNavigationGroup[];
 
 function roleLabel(role: AdminRole) {
   return role.toLowerCase().split("_").join(" ");
@@ -136,7 +97,7 @@ function SidebarNavGroup({
 }: {
   closeMenu: () => void;
   enabledModules: ModuleId[];
-  group: SidebarNavigationGroup;
+  group: CollapsibleModuleNavigationCategory;
   items: ShellModule[];
   pathname: string;
 }) {
@@ -189,10 +150,7 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, userEmail,
       item.id !== "settings" &&
       (!item.permissions?.length || item.permissions.some((permission) => hasAdminPermission({ role: userRole }, permission)))
   );
-  const visibleModulesById = new Map(visibleModules.map((item) => [item.id, item]));
-  const primaryModules = primaryNavigationIds
-    .map((moduleId) => visibleModulesById.get(moduleId))
-    .filter((item): item is ShellModule => Boolean(item));
+  const primaryModules = visibleModules.filter((item) => item.navigation.category === "primary");
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -250,14 +208,12 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, userEmail,
               ))}
             </div>
             <div className="admin-nav-secondary">
-              {navigationGroups.map((group) => (
+              {collapsibleModuleNavigationCategories.map((group) => (
                 <SidebarNavGroup
                   closeMenu={closeMenu}
                   enabledModules={enabledModules}
                   group={group}
-                  items={group.moduleIds
-                    .map((moduleId) => visibleModulesById.get(moduleId))
-                    .filter((item): item is ShellModule => Boolean(item))}
+                  items={visibleModules.filter((item) => item.navigation.category === group.id)}
                   key={`${group.id}:${pathname}`}
                   pathname={pathname}
                 />
@@ -265,6 +221,11 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, userEmail,
             </div>
           </nav>
         </div>
+
+        <Link className="admin-sidebar-public-link" href="/" onClick={closeMenu}>
+          <ExternalLink size={17} />
+          <span>View public site</span>
+        </Link>
 
         <div className="admin-sidebar-account">
           <span className="admin-user-avatar" aria-hidden="true">

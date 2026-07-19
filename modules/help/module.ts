@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin/modules/help",
   icon: "BookOpen",
   order: 80,
+  navigation: { category: "more" },
   description: "Plain-language admin operating guide.",
   layout: "standard",
   status: "active",

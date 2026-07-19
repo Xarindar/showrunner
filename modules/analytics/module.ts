@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin/modules/analytics",
   icon: "Gauge",
   order: 130,
+  navigation: { category: "marketing" },
   description: "Module metrics, source attribution, standard events, and conversion goals.",
   layout: "wide",
   status: "active",

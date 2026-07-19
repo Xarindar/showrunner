@@ -25,6 +25,7 @@
     "abandoned-carts:process": "tsx scripts/process-abandoned-carts.ts",
     "payments:refresh-square": "tsx scripts/refresh-square-tokens.ts",
     "seed": "tsx prisma/seed.ts",
+    "seed:demo-appointments": "tsx scripts/seed-demo-appointments.ts",
     "seed:cottage616-beta": "tsx scripts/seed-cottage616-beta.ts"
   },
   "prisma": {

@@ -203,9 +203,13 @@ export function PaymentsWorkspace({
               <span className="pay-row-title">
                 <ProviderMark provider={provider.provider} size={18} />
                 {provider.name}
-                {provider.connected ? (
-                  <span className={provider.needsAttention ? "ui-badge ui-badge-warning" : "ui-badge ui-badge-success"}>
-                    {provider.needsAttention ? "Needs attention" : "Connected"}
+                {provider.needsAttention ? (
+                  <span className="ui-badge ui-badge-warning">
+                    Needs attention
+                  </span>
+                ) : provider.connected ? (
+                  <span className="ui-badge ui-badge-success">
+                    Connected
                   </span>
                 ) : provider.recommended ? (
                   <span className="ui-badge">Recommended</span>
@@ -236,7 +240,7 @@ export function PaymentsWorkspace({
                   className={`ui-button ui-button-sm${provider.recommended && connectedCount === 0 ? "" : " ui-button-secondary"}`}
                   href={connectStartHref(provider.provider)}>
                   <Zap size={15} />
-                  Connect
+                  {provider.needsAttention ? "Reconnect" : "Connect"}
                 </a>
               </span>
             ) : (

@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin/modules/deployments",
   icon: "Rocket",
   order: 74,
+  navigation: { category: "more" },
   description: "Internal deployment builder for client GitHub repo handoffs.",
   layout: "standard",
   status: "active",

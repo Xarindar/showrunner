@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 import type { AdminRole } from "@prisma/client";
 import type { AdminPermission } from "@/lib/admin-permissions";
 import type { ModuleIconName } from "@/shell/module-icons";
+import type { ModuleNavigationCategory } from "@/shell/module-navigation";
 
 export type { ModuleIconName };
+export type { ModuleNavigationCategory };
 export type ModuleLayout = "standard" | "wide" | "workspace" | "fullscreen";
 export type ModuleStatus = "active" | "future";
 export type ModuleReadinessLevel = "live" | "partial" | "admin-foundation" | "manual" | "planned";
@@ -62,6 +64,9 @@ export type ShellModule = {
   href: string;
   icon: ModuleIconName;
   order: number;
+  navigation: {
+    category: ModuleNavigationCategory;
+  };
   description: string;
   layout: ModuleLayout;
   status: ModuleStatus;

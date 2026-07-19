@@ -3,6 +3,7 @@ import { PaymentGatewayConnectionStatus, PaymentProvider } from "@prisma/client"
 import {
   isOAuthSquareCredential,
   refreshSquareCredentialDirect,
+  squareRefreshRequiresReconnect,
   squareTokenRefreshedAt
 } from "../lib/payments/connect/square-refresh";
 import { prisma } from "../lib/prisma";
@@ -20,7 +21,7 @@ async function main() {
   const credentials = await prisma.paymentGatewayCredential.findMany({
     where: {
       provider: PaymentProvider.SQUARE,
-      status: PaymentGatewayConnectionStatus.CONNECTED,
+      status: { in: [PaymentGatewayConnectionStatus.CONNECTED, PaymentGatewayConnectionStatus.ERROR] },
       encryptedRefreshToken: { not: "" }
     }
   });
@@ -28,7 +29,10 @@ async function main() {
   const oauthCredentials = credentials.filter(
     (credential) => {
       const refreshedAt = squareTokenRefreshedAt(credential);
-      return isOAuthSquareCredential(credential) && (!refreshedAt || refreshedAt <= cadenceCutoff);
+      return credential.status === PaymentGatewayConnectionStatus.CONNECTED &&
+        isOAuthSquareCredential(credential) &&
+        !squareRefreshRequiresReconnect(credential) &&
+        (!refreshedAt || refreshedAt <= cadenceCutoff);
     }
   );
   let refreshed = 0;
@@ -52,9 +56,18 @@ async function main() {
       return isOAuthSquareCredential(credential) && (!refreshedAt || refreshedAt <= staleCutoff);
     })
     .map((credential) => credential.siteId);
+  const reconnectRequired = credentials
+    .filter((credential) => isOAuthSquareCredential(credential) && squareRefreshRequiresReconnect(credential))
+    .map((credential) => credential.siteId);
 
-  console.log(JSON.stringify({ candidates: oauthCredentials.length, failures, refreshed, staleConnections: stale }));
-  if (failures.length || stale.length) process.exitCode = 1;
+  console.log(JSON.stringify({
+    candidates: oauthCredentials.length,
+    failures,
+    reconnectRequired,
+    refreshed,
+    staleConnections: stale
+  }));
+  if (failures.length || reconnectRequired.length || stale.length) process.exitCode = 1;
 }
 
 main()

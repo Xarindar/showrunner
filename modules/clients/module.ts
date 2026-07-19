@@ -7,6 +7,7 @@ export const manifest = {
   href: "/admin/modules/clients",
   icon: "Users",
   order: 40,
+  navigation: { category: "primary" },
   description: "Client profiles, pipeline stages, saved segments, documents, private notes, and unified relationship history.",
   layout: "standard",
   status: "active",

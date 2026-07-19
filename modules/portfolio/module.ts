@@ -7,6 +7,7 @@ export const manifest = {
   href: "/admin/modules/portfolio",
   icon: "Image",
   order: 120,
+  navigation: { category: "website" },
   description: "Photography galleries, proofing records, access links, and image delivery settings.",
   layout: "wide",
   status: "active",

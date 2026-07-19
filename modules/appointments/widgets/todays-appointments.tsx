@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { DashboardMetric, DashboardTimeline } from "@/components/ui";
+import { DashboardIdentityList, DashboardMetric } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import { getZonedDayBounds } from "@/lib/timezone";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
@@ -18,13 +18,14 @@ export const todaysAppointmentsWidget = {
         <>
           <DashboardMetric detail="1 pending" label="Appointments today" value={4} />
           {size !== "sm" ? (
-            <DashboardTimeline
+            <DashboardIdentityList
               empty=""
               items={[
-                { detail: "Portrait session", id: "preview-1", time: "9:00", title: "Maya Chen" },
-                { detail: "Consultation", id: "preview-2", time: "11:30", title: "Jordan Lee" },
-                { detail: "Family session", id: "preview-3", time: "2:00", title: "The Martins" }
+                { detail: "Maya Chen", id: "preview-1", meta: "9:00 AM", title: "Portrait session" },
+                { detail: "Jordan Lee", id: "preview-2", meta: "11:30 AM", title: "Consultation" },
+                { detail: "The Martins", id: "preview-3", meta: "2:00 PM", title: "Family session" }
               ]}
+              showAvatar={false}
             />
           ) : null}
         </>
@@ -72,15 +73,16 @@ export const todaysAppointmentsWidget = {
             <small>No appointments are scheduled.</small>
           </div>
         ) : size !== "sm" ? (
-          <DashboardTimeline
+          <DashboardIdentityList
             empty="No appointments are scheduled for today."
             items={bookings.map((booking) => ({
-              detail: booking.service.name,
+              detail: booking.customerName,
               href: `/admin/appointments/${booking.id}`,
               id: booking.id,
-              time: widgetTimeLabel(booking.startsAt, timezone),
-              title: booking.customerName
+              meta: widgetTimeLabel(booking.startsAt, timezone),
+              title: booking.service.name
             }))}
+            showAvatar={false}
           />
         ) : null}
       </>

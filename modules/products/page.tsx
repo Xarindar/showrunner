@@ -219,9 +219,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   );
 
   return (
-    <div className="products-workspace">
-      <header className="products-page-header">
-        <h1>Products</h1>
+    <div className="stack products-workspace">
+      <header className="page-header">
+        <div>
+          <h1>Products</h1>
+        </div>
       </header>
 
       {savedMessage ? <div className="success-message">{savedMessage}</div> : null}

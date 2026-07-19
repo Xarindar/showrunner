@@ -1,11 +1,12 @@
 "use client";
 
 import { FileText, ImagePlus, UploadCloud } from "lucide-react";
-import { useId, useRef, useState, type DragEvent, type InputHTMLAttributes } from "react";
+import { useEffect, useId, useRef, useState, type DragEvent, type InputHTMLAttributes } from "react";
 import { cx } from "./utils";
 
 type UploadFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "type"> & {
   description?: string;
+  initialFile?: File | null;
   label?: string;
   variant?: "image" | "document" | "data";
 };
@@ -15,6 +16,7 @@ export function UploadField({
   description,
   disabled,
   id,
+  initialFile,
   label = "Choose a file",
   onChange,
   variant = "image",
@@ -27,6 +29,15 @@ export function UploadField({
   const [fileName, setFileName] = useState("");
   const Icon = variant === "image" ? ImagePlus : variant === "data" ? FileText : UploadCloud;
   const guidance = description || (variant === "image" ? "JPG, PNG, WebP, GIF, or SVG · up to 12 MB" : "Drop a file here or browse your device");
+
+  useEffect(() => {
+    if (!initialFile || !inputRef.current) return;
+
+    const transfer = new DataTransfer();
+    transfer.items.add(initialFile);
+    inputRef.current.files = transfer.files;
+    setFileName(initialFile.name);
+  }, [initialFile]);
 
   function handleDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();

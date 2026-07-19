@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin/modules/payments",
   icon: "Wallet",
   order: 95,
+  navigation: { category: "finance" },
   description: "Connect payment accounts, choose how customers pay, and manage checkout coupons and totals.",
   layout: "standard",
   status: "active",

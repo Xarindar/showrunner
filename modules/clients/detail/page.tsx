@@ -922,7 +922,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
 
   return (
     <div className="stack">
-      <header className="page-header clients-detail-page-header">
+      <header className="page-header">
         <div>
           <h1>Client Details</h1>
         </div>

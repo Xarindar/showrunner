@@ -7,6 +7,7 @@ export const manifest = {
   href: "/admin/modules/appointments",
   icon: "CalendarCheck",
   order: 30,
+  navigation: { category: "primary" },
   description: "Booking queue, calendar views, appointment notes, and scheduling rules.",
   layout: "standard",
   status: "active",

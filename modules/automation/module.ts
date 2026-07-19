@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin/modules/automation",
   icon: "Workflow",
   order: 120,
+  navigation: { category: "marketing" },
   description: "Trigger rules, live action executors, run history, tasks, and outbound webhook setup.",
   layout: "wide",
   status: "active",

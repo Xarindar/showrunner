@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin/modules/billing",
   icon: "ReceiptText",
   order: 110,
+  navigation: { category: "finance" },
   description: "Quotes, invoices, contracts, documents, and payment state.",
   layout: "wide",
   status: "active",
