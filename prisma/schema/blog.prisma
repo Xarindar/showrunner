@@ -1,0 +1,29 @@
+// Blog publishing module models and enums.
+
+enum BlogPostStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model BlogPost {
+  id             String         @id @default(cuid())
+  siteId         String
+  site           Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  title          String
+  slug           String
+  excerpt        String         @default("")
+  contentHtml    String         @default("")
+  thumbnailUrl   String         @default("")
+  headerImageUrl String         @default("")
+  authorName     String         @default("")
+  category       String         @default("")
+  tags           Json           @default("[]")
+  status         BlogPostStatus @default(DRAFT)
+  publishedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([siteId, slug])
+  @@index([siteId, status, publishedAt])
+  @@index([siteId, updatedAt])
+}

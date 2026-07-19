@@ -4,6 +4,7 @@ import { manifest as appointmentsModule } from "@/modules/appointments/module";
 import { manifest as analyticsModule } from "@/modules/analytics/module";
 import { manifest as automationModule } from "@/modules/automation/module";
 import { manifest as billingModule } from "@/modules/billing/module";
+import { manifest as blogModule } from "@/modules/blog/module";
 import { manifest as clientsModule } from "@/modules/clients/module";
 import { manifest as communicationsModule } from "@/modules/communications/module";
 import { manifest as contentModule } from "@/modules/content/module";
@@ -25,6 +26,7 @@ export { moduleIcons };
 const registeredModules = [
   dashboardModule,
   contentModule,
+  blogModule,
   appointmentsModule,
   clientsModule,
   schedulingModule,

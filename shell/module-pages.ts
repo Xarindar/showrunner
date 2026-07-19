@@ -6,6 +6,7 @@ const modulePageLoaders = {
   appointments: () => import("@/modules/appointments/page"),
   automation: () => import("@/modules/automation/page"),
   billing: () => import("@/modules/billing/page"),
+  blog: () => import("@/modules/blog/page"),
   clients: () => import("@/modules/clients/page"),
   communications: () => import("@/modules/communications/page"),
   content: () => import("@/modules/content/page"),
