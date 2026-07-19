@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import fs from "node:fs";
 import test from "node:test";
 import {
   base64urlEncode,
@@ -10,6 +11,11 @@ import {
 } from "../lib/payments/connect/tokens";
 import { brokerRequest } from "../lib/payments/connect/broker-client";
 import { decryptGatewaySecret, encryptGatewaySecret } from "../lib/payments/credential-crypto";
+import {
+  createSquarePkcePair,
+  exchangeSquarePkceCode,
+  refreshSquarePkceToken
+} from "../lib/payments/connect/square-refresh";
 
 const secret = "test-shared-secret-with-sufficient-entropy";
 
@@ -37,16 +43,16 @@ test("service signatures bind method, path, tenant envelope, time, nonce, and bo
     request_id: "abcdefghijklmnopqrstuvwxyz123456"
   };
   const body = JSON.stringify({ ...envelope, refreshToken: "opaque-handle" });
-  const signature = signServiceRequest("POST", "/connect/square/refresh", body, envelope, secret);
+  const signature = signServiceRequest("POST", "/connect/stripe/revoke", body, envelope, secret);
   assert.match(signature, /^v1=[A-Za-z0-9_-]{43}$/);
   assert.notEqual(signature, signServiceRequest("POST", "/connect/handoff/redeem", body, envelope, secret));
-  assert.notEqual(signature, signServiceRequest("POST", "/connect/square/refresh", `${body} `, envelope, secret));
+  assert.notEqual(signature, signServiceRequest("POST", "/connect/stripe/revoke", `${body} `, envelope, secret));
 
   const bodyDigest = crypto.createHash("sha256").update(body, "utf8").digest("hex");
   const canonical = [
     "admitone-service-request-v1",
     "POST",
-    "/connect/square/refresh",
+    "/connect/stripe/revoke",
     envelope.client_id,
     envelope.site_id,
     envelope.provider,
@@ -121,6 +127,83 @@ test("broker requests use at least 256 bits of request-id entropy", async () => 
     restoreEnv("ADMITONE_CONNECT_CLIENT_ID", previous.clientId);
     restoreEnv("ADMITONE_CONNECT_SHARED_SECRET", previous.sharedSecret);
   }
+});
+
+test("Square PKCE exchange and refresh happen directly without an application secret", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ body: Record<string, unknown>; url: string }> = [];
+  try {
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      const body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
+      requests.push({ body, url });
+      return new Response(JSON.stringify({
+        access_token: `access-${requests.length}`,
+        expires_at: "2026-08-18T00:00:00Z",
+        merchant_id: "merchant-1",
+        refresh_token: `refresh-${requests.length}`,
+        refresh_token_expires_at: "2026-10-16T00:00:00Z"
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    const pair = createSquarePkcePair();
+    assert.match(pair.verifier, /^[A-Za-z0-9_-]{43,128}$/);
+    assert.equal(
+      pair.challenge,
+      crypto.createHash("sha256").update(pair.verifier, "ascii").digest("base64url")
+    );
+
+    await exchangeSquarePkceCode({
+      authorizationCode: "short-lived-code",
+      clientId: "sandbox-sq0idb-public",
+      codeVerifier: pair.verifier,
+      environment: "sandbox",
+      redirectUri: "https://connect.example.com/connect/square/callback",
+      squareVersion: "2026-05-20"
+    });
+    await refreshSquarePkceToken({
+      clientId: "sandbox-sq0idb-public",
+      environment: "sandbox",
+      refreshToken: "rotating-refresh-token",
+      squareVersion: "2026-05-20"
+    });
+
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0]?.url, "https://connect.squareupsandbox.com/oauth2/token");
+    assert.deepEqual(requests[0]?.body, {
+      client_id: "sandbox-sq0idb-public",
+      code: "short-lived-code",
+      code_verifier: pair.verifier,
+      grant_type: "authorization_code",
+      redirect_uri: "https://connect.example.com/connect/square/callback"
+    });
+    assert.deepEqual(requests[1]?.body, {
+      client_id: "sandbox-sq0idb-public",
+      grant_type: "refresh_token",
+      refresh_token: "rotating-refresh-token"
+    });
+    assert.equal(requests.some((request) => "client_secret" in request.body), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("payment runtime has no Connect broker dependency and Stripe OAuth is stored once", () => {
+  const runtimeFiles = [
+    "lib/commerce/stripe.ts",
+    "lib/commerce/square.ts",
+    "lib/payments/credentials.ts",
+    "lib/payments/methods.ts",
+    "lib/payments/connect/square-refresh.ts"
+  ];
+  for (const file of runtimeFiles) {
+    const source = fs.readFileSync(file, "utf8");
+    assert.doesNotMatch(source, /payments\/connect\/broker-client/);
+    assert.doesNotMatch(source, /\bbrokerRequest\s*\(/);
+  }
+
+  const handoffSource = fs.readFileSync("lib/payments/connect/flow.ts", "utf8");
+  assert.doesNotMatch(handoffSource, /secretKey:\s*accessToken/);
 });
 
 function legacyEncryptedValue(value: string, secretValue: string) {

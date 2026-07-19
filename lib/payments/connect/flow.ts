@@ -7,8 +7,9 @@ import { publicAppBaseUrl } from "@/lib/env";
 import { encryptGatewaySecret, upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { secretHint, squareApiVersion, squareVerify, type SquareEnvironment } from "@/lib/payments/provider-onboarding";
 import { prisma } from "@/lib/prisma";
-import { brokerRequest, revokeOAuthProvider } from "./broker-client";
+import { brokerRequest, revokeStripeOAuthProvider } from "./broker-client";
 import { getConnectBrokerConfig } from "./config";
+import { createSquarePkcePair, exchangeSquarePkceCode } from "./square-refresh";
 import { ConnectTokenError, signConnectToken, verifyConnectToken } from "./tokens";
 
 // The AdmitOne Connect wire protocol (documented in the broker repo's README):
@@ -16,8 +17,9 @@ import { ConnectTokenError, signConnectToken, verifyConnectToken } from "./token
 //            where `state` is signed with this deployment's shared secret and a nonce is bound
 //            to the browser via a signed httpOnly cookie.
 // - handoff: the broker returns an opaque one-time code in the browser. This server redeems
-//            it over an authenticated back channel, verifies provider/site/browser binding,
-//            then stores merchant tokens encrypted.
+//            it over an authenticated back channel and verifies provider/site/browser binding.
+//            Stripe receives a one-time token handoff. Square receives only its short-lived
+//            authorization code and exchanges it locally with the PKCE verifier.
 
 export type OAuthConnectProvider = "stripe" | "square";
 
@@ -61,6 +63,7 @@ export function createConnectStart(input: { provider: OAuthConnectProvider; site
   }
 
   const nonce = crypto.randomBytes(16).toString("hex");
+  const squarePkce = input.provider === "square" ? createSquarePkcePair() : undefined;
   const iat = nowSeconds();
   const state = signConnectToken(
     {
@@ -70,6 +73,7 @@ export function createConnectStart(input: { provider: OAuthConnectProvider; site
       provider: input.provider,
       returnUrl: callbackUrl(input.provider),
       nonce,
+      ...(squarePkce ? { codeChallenge: squarePkce.challenge } : {}),
       iat,
       exp: iat + STATE_TTL_SECONDS
     },
@@ -81,7 +85,17 @@ export function createConnectStart(input: { provider: OAuthConnectProvider; site
   redirectUrl.searchParams.set("state", state);
 
   return {
-    nonceCookie: signConnectToken({ typ: NONCE_COOKIE_TYPE, v: 1, nonce, iat, exp: iat + STATE_TTL_SECONDS }, broker.sharedSecret),
+    nonceCookie: signConnectToken(
+      {
+        typ: NONCE_COOKIE_TYPE,
+        v: 1,
+        nonce,
+        ...(squarePkce ? { codeVerifier: squarePkce.verifier } : {}),
+        iat,
+        exp: iat + STATE_TTL_SECONDS
+      },
+      broker.sharedSecret
+    ),
     nonceCookieMaxAge: STATE_TTL_SECONDS,
     redirectUrl: redirectUrl.toString()
   };
@@ -124,7 +138,7 @@ export async function completeConnectHandoff(input: {
   const broker = getConnectBrokerConfig();
   if (!broker) throw new Error("One-click connect is not configured for this deployment.");
 
-  let cookie: { nonce?: unknown };
+  let cookie: { codeVerifier?: unknown; nonce?: unknown };
   try {
     if (!input.nonceCookie) throw new ConnectTokenError("missing nonce cookie");
     cookie = verifyConnectToken<{ nonce?: unknown }>(input.nonceCookie, broker.sharedSecret, NONCE_COOKIE_TYPE);
@@ -164,15 +178,21 @@ export async function completeConnectHandoff(input: {
   if (input.provider === "stripe") {
     return completeStripeHandoff(input.siteId, handoff.data);
   }
-  return completeSquareHandoff(input.siteId, handoff.data);
+  if (
+    typeof cookie.codeVerifier !== "string" ||
+    !/^[A-Za-z0-9_-]{43,128}$/.test(cookie.codeVerifier)
+  ) {
+    throw new Error("The Square PKCE verifier is missing or invalid. Try connecting again.");
+  }
+  return completeSquareHandoff(input.siteId, handoff.data, cookie.codeVerifier);
 }
 
 // ---------------------------------------------------------------------------
 // Stripe (Connect Standard OAuth): the access token acts as the merchant's own
-// secret key, so it is stored in the same fields the paste flow uses and every
-// existing charge/refund/reverify path keeps working unchanged. We also create
-// the checkout webhook endpoint on the merchant account automatically — that is
-// the whole point of one-click connect.
+// secret key, but is stored only in the dedicated access-token field. Every
+// charge/refund/reverify path reads it directly and never calls Connect. We also
+// create the checkout webhook endpoint on the merchant account automatically —
+// that is the whole point of one-click connect.
 // ---------------------------------------------------------------------------
 
 async function provisionStripeWebhook(stripe: Stripe) {
@@ -229,7 +249,7 @@ async function completeStripeHandoff(siteId: string, data: Record<string, unknow
       externalAccountId: stripeUserId,
       provider: PaymentProvider.STRIPE,
       refreshToken,
-      secretKey: accessToken,
+      secretKey: "",
       siteId,
       supportedWallets: stripeWallets,
       webhookSecret: webhook.secret,
@@ -241,7 +261,7 @@ async function completeStripeHandoff(siteId: string, data: Record<string, unknow
     if (webhookEndpointId) {
       await stripe.webhookEndpoints.del(webhookEndpointId).catch(() => undefined);
     }
-    await revokeOAuthProvider({ provider: "stripe", siteId, externalAccountId: stripeUserId }).catch((revokeError) => {
+    await revokeStripeOAuthProvider({ siteId, externalAccountId: stripeUserId }).catch((revokeError) => {
       console.error("[payments:connect] Stripe compensation failed", {
         name: revokeError instanceof Error ? revokeError.name : "UnknownError",
         siteId
@@ -253,26 +273,33 @@ async function completeStripeHandoff(siteId: string, data: Record<string, unknow
 }
 
 // ---------------------------------------------------------------------------
-// Square OAuth: tokens expire (~30 days) and are refreshed through the broker,
-// off the payment path. The location is resolved here so checkout works
-// immediately. Square webhook subscriptions are app-level and cannot be created
-// with the merchant token — the signature key is added separately (see docs).
+// Square OAuth uses end-to-end PKCE. Connect hands back only the authorization
+// code and public exchange metadata; this deployment exchanges and refreshes its
+// own tokens directly with Square. The location is resolved here so checkout
+// works immediately.
 // ---------------------------------------------------------------------------
 
-async function completeSquareHandoff(siteId: string, data: Record<string, unknown>) {
-  const accessToken = requireString(data, "accessToken");
-  const refreshToken = requireString(data, "refreshToken");
-  const merchantId = requireString(data, "merchantId");
-  const expiresAtText = requireString(data, "expiresAt");
+async function completeSquareHandoff(
+  siteId: string,
+  data: Record<string, unknown>,
+  codeVerifier: string
+) {
+  const authorizationCode = requireString(data, "authorizationCode");
+  const clientId = requireString(data, "clientId");
+  const redirectUri = requireString(data, "redirectUri");
+  const handedOffSquareVersion = requireString(data, "squareVersion");
   const environment: SquareEnvironment = data.environment === "sandbox" ? "sandbox" : "production";
 
-  const expiresAt = new Date(expiresAtText);
-  if (Number.isNaN(expiresAt.getTime())) {
-    throw new Error("Square connect finished but returned an unreadable token expiry. Try connecting again.");
-  }
-
   try {
-    const locations = await squareVerify(environment, accessToken);
+    const tokenSet = await exchangeSquarePkceCode({
+      authorizationCode,
+      clientId,
+      codeVerifier,
+      environment,
+      redirectUri,
+      squareVersion: handedOffSquareVersion
+    });
+    const locations = await squareVerify(environment, tokenSet.accessToken);
     const usable = locations.filter((location): location is { id: string; name?: string; status?: string } =>
       Boolean(location.id) && location.status !== "INACTIVE"
     );
@@ -283,26 +310,45 @@ async function completeSquareHandoff(siteId: string, data: Record<string, unknow
       where: { siteId_provider: { siteId, provider: PaymentProvider.SQUARE } },
       update: {
         connectedAt: null,
-        displayName: merchantId,
-        encryptedAccessToken: encryptGatewaySecret(accessToken),
-        encryptedRefreshToken: encryptGatewaySecret(refreshToken),
-        expiresAt,
-        externalAccountId: merchantId,
+        displayName: tokenSet.merchantId,
+        encryptedAccessToken: encryptGatewaySecret(tokenSet.accessToken),
+        encryptedRefreshToken: encryptGatewaySecret(tokenSet.refreshToken),
+        encryptedSecretKey: "",
+        expiresAt: tokenSet.expiresAt,
+        externalAccountId: tokenSet.merchantId,
         lastVerifiedAt: new Date(),
-        merchantId,
-        metadata: { environment, onboarding: "oauth", pendingLocations, squareVersion: squareApiVersion },
+        merchantId: tokenSet.merchantId,
+        metadata: {
+          environment,
+          oauthClientId: clientId,
+          onboarding: "oauth",
+          pendingLocations,
+          refreshTokenExpiresAt: tokenSet.refreshTokenExpiresAt.toISOString(),
+          squareVersion: handedOffSquareVersion || squareApiVersion,
+          tokenRefreshedAt: new Date().toISOString(),
+          tokenFlow: "pkce"
+        },
         status: PaymentGatewayConnectionStatus.PENDING,
         supportedWallets: stripeWallets
       },
       create: {
-        displayName: merchantId,
-        encryptedAccessToken: encryptGatewaySecret(accessToken),
-        encryptedRefreshToken: encryptGatewaySecret(refreshToken),
-        expiresAt,
-        externalAccountId: merchantId,
+        displayName: tokenSet.merchantId,
+        encryptedAccessToken: encryptGatewaySecret(tokenSet.accessToken),
+        encryptedRefreshToken: encryptGatewaySecret(tokenSet.refreshToken),
+        expiresAt: tokenSet.expiresAt,
+        externalAccountId: tokenSet.merchantId,
         lastVerifiedAt: new Date(),
-        merchantId,
-        metadata: { environment, onboarding: "oauth", pendingLocations, squareVersion: squareApiVersion },
+        merchantId: tokenSet.merchantId,
+        metadata: {
+          environment,
+          oauthClientId: clientId,
+          onboarding: "oauth",
+          pendingLocations,
+          refreshTokenExpiresAt: tokenSet.refreshTokenExpiresAt.toISOString(),
+          squareVersion: handedOffSquareVersion || squareApiVersion,
+          tokenRefreshedAt: new Date().toISOString(),
+          tokenFlow: "pkce"
+        },
         provider: PaymentProvider.SQUARE,
         siteId,
         status: PaymentGatewayConnectionStatus.PENDING,
@@ -311,19 +357,14 @@ async function completeSquareHandoff(siteId: string, data: Record<string, unknow
     });
 
     return {
-      displayName: merchantId,
+      displayName: tokenSet.merchantId,
       provider: PaymentProvider.SQUARE,
       webhookAutoCreated: false,
       pendingLocationSelection: true
     };
   } catch (error) {
-    await revokeOAuthProvider({ provider: "square", siteId, externalAccountId: merchantId }).catch((revokeError) => {
-      console.error("[payments:connect] Square compensation failed", {
-        name: revokeError instanceof Error ? revokeError.name : "UnknownError",
-        siteId
-      });
-    });
-    throw error;
+    const message = error instanceof Error ? error.message : "Square setup failed.";
+    throw new Error(`Square connect could not be completed: ${message}`);
   }
 }
 

@@ -3,7 +3,7 @@ import "server-only";
 import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
 import Stripe from "stripe";
 import { publicAppBaseUrl } from "@/lib/env";
-import { revokeOAuthProvider } from "@/lib/payments/connect/broker-client";
+import { revokeStripeOAuthProvider } from "@/lib/payments/connect/broker-client";
 import { decryptGatewaySecret, encryptGatewaySecret, getConnectedGatewayCredential, upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { prisma } from "@/lib/prisma";
 
@@ -245,34 +245,24 @@ export async function disconnectPaymentProvider(input: { provider: PaymentProvid
   const metadata = metadataObject(credential.metadata);
   const isOAuth = metadata.onboarding === "oauth";
 
-  if (isOAuth && (input.provider === PaymentProvider.STRIPE || input.provider === PaymentProvider.SQUARE)) {
+  if (isOAuth && input.provider === PaymentProvider.STRIPE) {
     await prisma.paymentGatewayCredential.update({
       where: { id: credential.id },
       data: { status: PaymentGatewayConnectionStatus.DISCONNECTING }
     });
     try {
-      if (input.provider === PaymentProvider.STRIPE) {
-        const accessToken = credential.encryptedSecretKey ? decryptGatewaySecret(credential.encryptedSecretKey) : "";
-        if (!accessToken || !credential.externalAccountId) throw new Error("Stripe OAuth credentials are incomplete.");
-        const stripe = new Stripe(accessToken, { maxNetworkRetries: 2, timeout: 10_000 });
-        const webhookUrl = `${publicAppBaseUrl()}/api/webhooks/stripe`;
-        const endpoints = await stripe.webhookEndpoints.list({ limit: 100 });
-        for (const endpoint of endpoints.data) {
-          if (endpoint.url === webhookUrl) await stripe.webhookEndpoints.del(endpoint.id);
-        }
-        await revokeOAuthProvider({
-          provider: "stripe",
-          siteId: input.siteId,
-          externalAccountId: credential.externalAccountId
-        });
-      } else {
-        if (!credential.merchantId) throw new Error("Square OAuth credentials are incomplete.");
-        await revokeOAuthProvider({
-          provider: "square",
-          siteId: input.siteId,
-          externalAccountId: credential.merchantId
-        });
+      const accessToken = credential.encryptedAccessToken ? decryptGatewaySecret(credential.encryptedAccessToken) : "";
+      if (!accessToken || !credential.externalAccountId) throw new Error("Stripe OAuth credentials are incomplete.");
+      const stripe = new Stripe(accessToken, { maxNetworkRetries: 2, timeout: 10_000 });
+      const webhookUrl = `${publicAppBaseUrl()}/api/webhooks/stripe`;
+      const endpoints = await stripe.webhookEndpoints.list({ limit: 100 });
+      for (const endpoint of endpoints.data) {
+        if (endpoint.url === webhookUrl) await stripe.webhookEndpoints.del(endpoint.id);
       }
+      await revokeStripeOAuthProvider({
+        siteId: input.siteId,
+        externalAccountId: credential.externalAccountId
+      });
     } catch (error) {
       await prisma.paymentGatewayCredential.update({
         where: { id: credential.id },
@@ -317,7 +307,9 @@ export async function reverifyPaymentProvider(input: { provider: PaymentProvider
   const metadata = metadataObject(credential.metadata);
   try {
     if (input.provider === PaymentProvider.STRIPE) {
-      const apiKey = credential.encryptedSecretKey ? decryptGatewaySecret(credential.encryptedSecretKey) : "";
+      const apiKey = metadata.onboarding === "oauth"
+        ? (credential.encryptedAccessToken ? decryptGatewaySecret(credential.encryptedAccessToken) : "")
+        : (credential.encryptedSecretKey ? decryptGatewaySecret(credential.encryptedSecretKey) : "");
       if (!apiKey) throw new Error("No stored Stripe secret key to re-check.");
       const account = await new Stripe(apiKey).accounts.retrieveCurrent();
       if (!account.charges_enabled) throw new Error("Stripe account can no longer accept charges.");

@@ -1,7 +1,6 @@
 import "server-only";
 
 import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
-import { maybeRefreshSquareAccessToken } from "@/lib/payments/connect/square-refresh";
 import { decryptGatewaySecret, encryptGatewaySecret } from "@/lib/payments/credential-crypto";
 import { prisma } from "@/lib/prisma";
 
@@ -107,8 +106,15 @@ function isConnected(credential: { encryptedSecretKey?: string; status: PaymentG
 export async function getStripeApiKeyForSite(siteId: string) {
   const credential = await getConnectedGatewayCredential(siteId, PaymentProvider.STRIPE);
   if (!isConnected(credential) || !credential) return "";
-  if (credential.encryptedSecretKey) return decryptGatewaySecret(credential.encryptedSecretKey);
-  if (credential.encryptedAccessToken) return decryptGatewaySecret(credential.encryptedAccessToken);
+  const metadata = credentialMetadata(credential.metadata);
+  if (metadataString(metadata, "onboarding") === "oauth") {
+    return credential.encryptedAccessToken
+      ? decryptGatewaySecret(credential.encryptedAccessToken)
+      : "";
+  }
+  if (credential.encryptedSecretKey) {
+    return decryptGatewaySecret(credential.encryptedSecretKey);
+  }
   return "";
 }
 
@@ -159,20 +165,22 @@ function toPayPalSiteCredentials(credential: {
   };
 }
 
-// Square access token + environment for this site — pasted or OAuth-connected. OAuth tokens
-// expire (~30 days), so this refreshes through the AdmitOne Connect broker when close to expiry;
-// every charge/refund/webhook caller gets a token with runway without knowing about OAuth.
+// Square access token + environment for this site — pasted or OAuth-connected.
+// Refresh is exclusively a scheduled direct-to-Square task; payment requests
+// never contact AdmitOne Connect or perform token maintenance.
 export async function getSquareAccessToken(siteId: string) {
   const credential = await getConnectedGatewayCredential(siteId, PaymentProvider.SQUARE);
   if (credential?.status !== PaymentGatewayConnectionStatus.CONNECTED || !credential.encryptedAccessToken) {
     throw new Error("Connect Square and confirm its location before using Square checkout.");
   }
+  if (credential.expiresAt && credential.expiresAt.getTime() <= Date.now()) {
+    throw new Error("The Square connection expired. Reconnect Square in Settings → Payments.");
+  }
   const metadata = credentialMetadata(credential.metadata);
   const environment = metadataString(metadata, "environment") === "sandbox" ? "sandbox" : "production";
-  const refreshedToken = await maybeRefreshSquareAccessToken(credential);
 
   return {
-    accessToken: refreshedToken ?? decryptGatewaySecret(credential.encryptedAccessToken),
+    accessToken: decryptGatewaySecret(credential.encryptedAccessToken),
     credential,
     environment: environment as "production" | "sandbox"
   };
