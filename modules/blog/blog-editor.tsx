@@ -250,6 +250,15 @@ function BlogComposer({
     if (headerPreview) URL.revokeObjectURL(headerPreview);
   }, [headerPreview]);
 
+  useEffect(() => {
+    if (!focusMode) return;
+    const exitFocusMode = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setFocusMode(false);
+    };
+    window.addEventListener("keydown", exitFocusMode);
+    return () => window.removeEventListener("keydown", exitFocusMode);
+  }, [focusMode]);
+
   const metrics = useMemo(() => {
     const words = textFromHtml(contentHtml).split(/\s+/).filter(Boolean).length;
     return { minutes: Math.max(1, Math.ceil(words / 220)), words };
@@ -401,6 +410,9 @@ function BlogComposer({
       <Link className="blog-back-link" href="/admin/modules/blog"><ChevronLeft aria-hidden="true" size={16} />All stories</Link>
       <div className="blog-save-state"><span />Ready to save</div>
       <div className="blog-composer-actions">
+        <Button aria-pressed={focusMode} onClick={() => setFocusMode((current) => !current)} size="sm" title={focusMode ? "Restore story details" : "Hide story details"} type="button" variant="secondary">
+          <Focus aria-hidden="true" size={15} />{focusMode ? "Show details" : "Hide details"}
+        </Button>
         <Button aria-pressed={view === "preview"} onClick={() => setView(view === "write" ? "preview" : "write")} size="sm" type="button" variant="secondary">
           {view === "write" ? <Eye aria-hidden="true" size={15} /> : <FileText aria-hidden="true" size={15} />}
           {view === "write" ? "Preview" : "Write"}
@@ -465,7 +477,6 @@ function BlogComposer({
                   onCommand={command}
                   onEmoji={insertEmoji}
                   onEmojiOpen={() => setEmojiOpen((current) => !current)}
-                  onFocus={() => setFocusMode((current) => !current)}
                   onFontSize={applyFontSize}
                   onFormatBlock={formatBlock}
                   onInlineUpload={() => inlineUploadRef.current?.click()}
@@ -511,9 +522,6 @@ function BlogComposer({
           <aside className="blog-settings-rail">
             <div className="blog-settings-heading">
               <div><span>Story details</span><small>For the listing and opened article</small></div>
-              <button aria-label={focusMode ? "Exit focus mode" : "Enter focus mode"} onClick={() => setFocusMode((current) => !current)} type="button">
-                <Focus aria-hidden="true" size={17} />
-              </button>
             </div>
 
             <ImageSetting
@@ -597,7 +605,6 @@ function RichTextToolbar({
   onCommand,
   onEmoji,
   onEmojiOpen,
-  onFocus,
   onFontSize,
   onFormatBlock,
   onInlineUpload,
@@ -613,7 +620,6 @@ function RichTextToolbar({
   onCommand: (name: string, value?: string) => void;
   onEmoji: (emoji: string) => void;
   onEmojiOpen: () => void;
-  onFocus: () => void;
   onFontSize: (value: number) => void;
   onFormatBlock: (tag: string) => void;
   onInlineUpload: () => void;
@@ -730,7 +736,6 @@ function RichTextToolbar({
                   {uploadingInline ? <LoaderCircle className="blog-spin" size={15} /> : <Upload size={15} />}
                   {uploadingInline ? "Adding image…" : "Upload image"}
                 </button>
-                <button onClick={onFocus} type="button"><Focus size={15} />Focus mode</button>
               </div>
             </div>
           ) : null}
