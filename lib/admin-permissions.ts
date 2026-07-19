@@ -6,6 +6,7 @@ export const adminPermissions = [
   "appointments:manage",
   "automation:manage",
   "billing:manage",
+  "blog:manage",
   "clients:export",
   "clients:manage",
   "communications:manage",
