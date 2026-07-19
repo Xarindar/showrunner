@@ -783,9 +783,9 @@ function ImageSetting({
         onUploadRequest={onUpload}
         title={`Choose ${label.toLowerCase()}`}
         triggerClassName={`blog-image-setting-trigger${assetUrl ? " has-image" : ""}`}
-        triggerHint={assetUrl ? "Replace image" : "Add image"}>
+        triggerHint={assetUrl ? "Replace image" : ""}>
         <span className="blog-image-setting-preview" data-ratio={ratio}>
-          {assetUrl ? <Image alt="" fill sizes="300px" src={assetUrl} unoptimized /> : <span><ImageIcon aria-hidden="true" size={22} />No image selected</span>}
+          {assetUrl ? <Image alt="" fill sizes="300px" src={assetUrl} unoptimized /> : <span><Upload aria-hidden="true" size={22} />Pick an image</span>}
         </span>
       </AssetPicker>
     </section>

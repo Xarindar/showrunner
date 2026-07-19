@@ -1,5 +1,5 @@
 import NextImage from "next/image";
-import { ImageIcon, Upload, X } from "lucide-react";
+import { Upload, X } from "lucide-react";
 import { AssetPicker, Button, EqualGrid, type AssetPickerAsset } from "@/components/ui";
 
 type BusinessSettingsProps = {
@@ -46,7 +46,7 @@ export function BusinessSettings({
           emptyLibraryMessage="No reusable logo assets yet."
           title="Site logo"
           triggerClassName={logo ? "ui-logo-picker-trigger has-logo" : "ui-logo-picker-trigger"}
-          triggerHint={logo ? "Replace logo" : "Upload logo"}
+          triggerHint={logo ? "Replace logo" : ""}
           uploadFormId={uploadFormId}
           uploadUnavailableMessage="Uploads need Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images. You can still choose from the library.">
           <span className="ui-logo-preview">
@@ -54,7 +54,8 @@ export function BusinessSettings({
               <NextImage alt={logoAlt} fill sizes="160px" src={logo.url} unoptimized />
             ) : (
               <span className="ui-logo-preview-empty">
-                <ImageIcon size={24} />
+                <Upload aria-hidden="true" size={24} />
+                <span>Pick an image</span>
               </span>
             )}
           </span>

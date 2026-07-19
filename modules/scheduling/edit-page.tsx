@@ -1,7 +1,7 @@
 import NextImage from "next/image";
 import { notFound } from "next/navigation";
 import { MediaVariantType, type Prisma } from "@prisma/client";
-import { ArrowLeft, Boxes, CalendarCheck, Clock3, FileText, ImageIcon, Save, Tags, X } from "lucide-react";
+import { ArrowLeft, Boxes, CalendarCheck, Clock3, FileText, Save, Tags, Upload, X } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { stringArrayCsv } from "@/lib/format";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
@@ -473,7 +473,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
               emptyLibraryMessage="No reusable service images yet."
               title="Service booking image"
               triggerClassName={serviceImageUrl ? "service-image-trigger has-image" : "service-image-trigger"}
-              triggerHint={serviceImageUrl ? "Replace image" : "Add image"}
+              triggerHint={serviceImageUrl ? "Replace image" : ""}
               uploadFields={{ serviceId: service.id }}
               uploadFormId={serviceImageUploadFormId}
               uploadUnavailableMessage="Uploads need Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images. You can still choose from the library.">
@@ -482,8 +482,8 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
                   <NextImage alt={serviceImageAlt} fill sizes="(max-width: 760px) 100vw, 280px" src={serviceImageUrl} unoptimized />
                 ) : (
                   <span className="studio-media-empty">
-                    <ImageIcon size={24} />
-                    <span>No image</span>
+                    <Upload aria-hidden="true" size={24} />
+                    <span>Pick an image</span>
                   </span>
                 )}
               </span>
