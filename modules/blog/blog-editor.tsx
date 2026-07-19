@@ -22,6 +22,7 @@ import {
   List,
   ListOrdered,
   LoaderCircle,
+  MoreHorizontal,
   Minus,
   Palette,
   Plus,
@@ -435,14 +436,16 @@ function BlogComposer({
             {view === "write" ? (
               <>
                 <div className="blog-title-fields">
-                  <input
+                  <textarea
                     aria-label="Story title"
                     autoFocus={!post.id}
                     className="blog-title-input"
+                    maxLength={180}
                     name="title"
                     onChange={(event) => updateTitle(event.currentTarget.value)}
                     placeholder="Give your story a memorable title"
                     required
+                    rows={1}
                     value={title}
                   />
                   <textarea
@@ -627,16 +630,16 @@ function RichTextToolbar({
   onRememberSelection: () => void;
   uploadingInline: boolean;
 }) {
+  const [moreOpen, setMoreOpen] = useState(false);
   const keepSelection = (event: MouseEvent) => {
     if ((event.target as HTMLElement).closest("button")) {
-      event.preventDefault();
       onRememberSelection();
     }
   };
 
   return (
-    <div className="blog-editor-toolbar" onMouseDown={keepSelection}>
-      <div className="blog-tool-group">
+    <div aria-label="Story formatting" className="blog-editor-toolbar" onMouseDown={keepSelection} role="toolbar">
+      <div className="blog-tool-group blog-history-tools">
         <Tool label="Undo" onClick={() => onCommand("undo")}><Undo2 size={16} /></Tool>
         <Tool label="Redo" onClick={() => onCommand("redo")}><Redo2 size={16} /></Tool>
       </div>
@@ -647,7 +650,7 @@ function RichTextToolbar({
           <option value="h3">Heading 3</option>
           <option value="blockquote">Quote</option>
         </select>
-        <select aria-label="Font family" defaultValue={fontFamilies[0].value} onChange={(event) => onCommand("fontName", event.currentTarget.value)}>
+        <select aria-label="Font family" className="blog-font-family-select" defaultValue={fontFamilies[0].value} onChange={(event) => onCommand("fontName", event.currentTarget.value)}>
           {fontFamilies.map((font) => <option key={font.value} value={font.value}>{font.label}</option>)}
         </select>
         <label className="blog-font-size-control">
@@ -655,25 +658,12 @@ function RichTextToolbar({
           <span>px</span>
         </label>
       </div>
-      <div className="blog-tool-group">
+      <div className="blog-tool-group blog-format-tools">
         <Tool label="Bold" onClick={() => onCommand("bold")}><Bold size={16} /></Tool>
         <Tool label="Italic" onClick={() => onCommand("italic")}><Italic size={16} /></Tool>
         <Tool label="Underline" onClick={() => onCommand("underline")}><Underline size={16} /></Tool>
-        <Tool label="Strikethrough" onClick={() => onCommand("strikeThrough")}><Strikethrough size={16} /></Tool>
-      </div>
-      <div className="blog-tool-group">
-        <label className="blog-color-tool" title="Text color"><Palette size={15} /><input aria-label="Text color" onChange={(event) => onCommand("foreColor", event.currentTarget.value)} type="color" /></label>
-        <label className="blog-color-tool" title="Highlight"><Highlighter size={15} /><input aria-label="Highlight color" defaultValue="#fff0a8" onChange={(event) => onCommand("hiliteColor", event.currentTarget.value)} type="color" /></label>
-        <Tool label="Link" onClick={onAddLink}><Link2 size={16} /></Tool>
-      </div>
-      <div className="blog-tool-group">
-        <Tool label="Align left" onClick={() => onCommand("justifyLeft")}><AlignLeft size={16} /></Tool>
-        <Tool label="Align center" onClick={() => onCommand("justifyCenter")}><AlignCenter size={16} /></Tool>
-        <Tool label="Align right" onClick={() => onCommand("justifyRight")}><AlignRight size={16} /></Tool>
-        <Tool label="Bulleted list" onClick={() => onCommand("insertUnorderedList")}><List size={16} /></Tool>
-        <Tool label="Numbered list" onClick={() => onCommand("insertOrderedList")}><ListOrdered size={16} /></Tool>
-        <Tool label="Quote" onClick={() => onFormatBlock("blockquote")}><Quote size={16} /></Tool>
-        <Tool label="Divider" onClick={() => onCommand("insertHorizontalRule")}><Minus size={16} /></Tool>
+        <span className="blog-strike-tool"><Tool label="Strikethrough" onClick={() => onCommand("strikeThrough")}><Strikethrough size={16} /></Tool></span>
+        <span className="blog-link-tool"><Tool label="Link" onClick={onAddLink}><Link2 size={16} /></Tool></span>
       </div>
       <div className="blog-tool-group blog-insert-tools">
         <AssetPicker
@@ -686,9 +676,6 @@ function RichTextToolbar({
           triggerClassName="blog-tool-button">
           <ImageIcon aria-hidden="true" size={16} /><span>Image</span>
         </AssetPicker>
-        <button className="blog-tool-button" disabled={!canUpload || uploadingInline} onClick={onInlineUpload} type="button">
-          {uploadingInline ? <LoaderCircle className="blog-spin" size={16} /> : <Upload size={16} />}<span>{uploadingInline ? "Adding…" : "Upload"}</span>
-        </button>
         <div className="blog-emoji-wrap">
           <button aria-expanded={emojiOpen} className="blog-tool-button" onClick={onEmojiOpen} type="button"><Smile size={16} /><span>Emoji</span></button>
           {emojiOpen ? (
@@ -699,7 +686,64 @@ function RichTextToolbar({
             </div>
           ) : null}
         </div>
-        <Tool label="Focus mode" onClick={onFocus}><Focus size={16} /></Tool>
+        <div className="blog-more-wrap">
+          <button
+            aria-expanded={moreOpen}
+            aria-haspopup="dialog"
+            aria-label="More formatting"
+            className="blog-tool-icon"
+            onClick={() => setMoreOpen((current) => !current)}
+            title="More formatting"
+            type="button">
+            <MoreHorizontal size={17} />
+          </button>
+          {moreOpen ? (
+            <div aria-label="More formatting" className="blog-more-menu" role="dialog">
+              <div className="blog-more-section blog-more-type">
+                <span>Typography</span>
+                <select aria-label="Font family in more formatting" defaultValue={fontFamilies[0].value} onChange={(event) => onCommand("fontName", event.currentTarget.value)}>
+                  {fontFamilies.map((font) => <option key={font.value} value={font.value}>{font.label}</option>)}
+                </select>
+              </div>
+              <div className="blog-more-section">
+                <span>Color</span>
+                <div className="blog-more-color-row">
+                  <label className="blog-more-color">
+                    <Palette size={15} />
+                    <span>Text</span>
+                    <input aria-label="Text color" onChange={(event) => onCommand("foreColor", event.currentTarget.value)} type="color" />
+                  </label>
+                  <label className="blog-more-color">
+                    <Highlighter size={15} />
+                    <span>Highlight</span>
+                    <input aria-label="Highlight color" defaultValue="#fff0a8" onChange={(event) => onCommand("hiliteColor", event.currentTarget.value)} type="color" />
+                  </label>
+                </div>
+              </div>
+              <div className="blog-more-section">
+                <span>Layout</span>
+                <div className="blog-more-grid">
+                  <MoreTool icon={<AlignLeft size={15} />} label="Align left" onClick={() => onCommand("justifyLeft")} />
+                  <MoreTool icon={<AlignCenter size={15} />} label="Center" onClick={() => onCommand("justifyCenter")} />
+                  <MoreTool icon={<AlignRight size={15} />} label="Align right" onClick={() => onCommand("justifyRight")} />
+                  <MoreTool icon={<List size={15} />} label="Bullets" onClick={() => onCommand("insertUnorderedList")} />
+                  <MoreTool icon={<ListOrdered size={15} />} label="Numbered" onClick={() => onCommand("insertOrderedList")} />
+                  <MoreTool icon={<Quote size={15} />} label="Quote" onClick={() => onFormatBlock("blockquote")} />
+                  <MoreTool icon={<Minus size={15} />} label="Divider" onClick={() => onCommand("insertHorizontalRule")} />
+                  <MoreTool icon={<Strikethrough size={15} />} label="Strike" onClick={() => onCommand("strikeThrough")} />
+                  <MoreTool icon={<Link2 size={15} />} label="Link" onClick={onAddLink} />
+                </div>
+              </div>
+              <div className="blog-more-section blog-more-utilities">
+                <button disabled={!canUpload || uploadingInline} onClick={onInlineUpload} type="button">
+                  {uploadingInline ? <LoaderCircle className="blog-spin" size={15} /> : <Upload size={15} />}
+                  {uploadingInline ? "Adding image…" : "Upload image"}
+                </button>
+                <button onClick={onFocus} type="button"><Focus size={15} />Focus mode</button>
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -707,6 +751,10 @@ function RichTextToolbar({
 
 function Tool({ children, label, onClick }: { children: ReactNode; label: string; onClick: () => void }) {
   return <button aria-label={label} className="blog-tool-icon" onClick={onClick} title={label} type="button">{children}</button>;
+}
+
+function MoreTool({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) {
+  return <button onClick={onClick} type="button">{icon}<span>{label}</span></button>;
 }
 
 function ImageSetting({
