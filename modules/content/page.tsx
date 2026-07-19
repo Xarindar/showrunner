@@ -68,7 +68,7 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
 
   return (
     <div className="stack content-studio">
-      <header className="page-header content-studio-header">
+      <header className="page-header">
         <div>
           <h1>Content</h1>
         </div>

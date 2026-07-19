@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin/modules/users",
   icon: "Users",
   order: 72,
+  navigation: { category: "more" },
   description: "Admin users, roles, and access control.",
   layout: "standard",
   status: "active",

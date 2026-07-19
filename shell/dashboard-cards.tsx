@@ -6,12 +6,13 @@ import {
   dashboardCardSizeFromLayout,
   dashboardCardSizes,
   getDashboardCardLayoutDefaults,
+  getDashboardCardMinimumLayout,
   normalizeDashboardCardColumns,
   normalizeDashboardCardRows,
   type DashboardCardSize
 } from "@/shell/dashboard-layout";
 import { dashboardWidgetDefinitions } from "@/shell/dashboard-widget-registry";
-import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
+import type { DashboardWidgetDefinition, DashboardWidgetSettings } from "@/shell/dashboard-widget-types";
 import { moduleRegistry, type ModuleId } from "@/shell/modules";
 
 export type DashboardCardDefinition = DashboardWidgetDefinition;
@@ -22,7 +23,7 @@ export type DashboardCardPlacement = {
   instanceId: string;
   order: number;
   rows: number;
-  settings: Record<string, boolean>;
+  settings: DashboardWidgetSettings;
   size: DashboardCardSize;
 };
 
@@ -69,13 +70,38 @@ export function normalizeDashboardCardSize(cardId: string, value: unknown) {
   return card?.sizes.includes(requested) ? requested : card?.defaultSize || "md";
 }
 
-export function normalizeDashboardCardSettings(cardId: string, value: unknown): Record<string, boolean> {
+function normalizedDateRangePart(value: unknown) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim().slice(0, 8);
+  if (!trimmed) return "";
+
+  const match = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(trimmed);
+  if (!match) return "";
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  const year = 2000 + Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return "";
+  return trimmed;
+}
+
+export function normalizeDashboardCardSettings(cardId: string, value: unknown): DashboardWidgetSettings {
   const card = getDashboardCardDefinition(cardId);
   const source = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
-  return (card?.settings || []).reduce<Record<string, boolean>>((settings, setting) => {
+  return (card?.settings || []).reduce<DashboardWidgetSettings>((settings, setting) => {
     const savedValue = source[setting.id];
-    settings[setting.id] = typeof savedValue === "boolean" ? savedValue : setting.defaultValue;
+    if (setting.type === "date-range") {
+      const savedRange = savedValue && typeof savedValue === "object" && !Array.isArray(savedValue)
+        ? (savedValue as Record<string, unknown>)
+        : setting.defaultValue;
+      settings[setting.id] = {
+        end: normalizedDateRangePart(savedRange.end),
+        start: normalizedDateRangePart(savedRange.start)
+      };
+    } else {
+      settings[setting.id] = typeof savedValue === "boolean" ? savedValue : setting.defaultValue;
+    }
     return settings;
   }, {});
 }
@@ -100,8 +126,9 @@ export function normalizeDashboardCardPlacements(
     const instanceId = typeof record.instanceId === "string" && record.instanceId.trim() ? record.instanceId : cardId;
     const requestedSize = normalizeDashboardCardSize(cardId, record.size);
     const fallbackLayout = getDashboardCardLayoutDefaults(requestedSize);
-    const columns = normalizeDashboardCardColumns(record.columns, fallbackLayout.columns);
-    const rows = normalizeDashboardCardRows(record.rows, fallbackLayout.rows);
+    const minimumLayout = getDashboardCardMinimumLayout(card.sizes);
+    const columns = normalizeDashboardCardColumns(record.columns, fallbackLayout.columns, minimumLayout.columns);
+    const rows = normalizeDashboardCardRows(record.rows, fallbackLayout.rows, minimumLayout.rows);
     normalized.push({
       cardId,
       columns,

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { CheckCircle2, Circle, ExternalLink } from "lucide-react";
+import { CheckCircle2, Circle } from "lucide-react";
 import { requireAuthenticatedAdmin } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site";
 import {
@@ -13,6 +13,8 @@ import {
 import { ButtonLink, EmptyState, Feedback } from "@/components/ui";
 import { DashboardWidgetsBoard } from "./dashboard-board";
 import { getOnboardingChecklist } from "./onboarding";
+import type { DashboardWidgetSettings } from "@/shell/dashboard-widget-types";
+import { getDashboardCardMinimumLayout } from "@/shell/dashboard-layout";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +43,7 @@ async function renderCardBody(
   size: DashboardCardPlacement["size"],
   siteId: string,
   timezone: string,
-  widgetSettings: Record<string, boolean>,
+  widgetSettings: DashboardWidgetSettings,
   preview = false
 ) {
   try {
@@ -63,20 +65,26 @@ export default async function AdminDashboardPage({ searchParams }: DashboardPage
   const progressPercent = onboarding.total ? Math.round((onboarding.completed / onboarding.total) * 100) : 0;
   const placedCards = placedDashboardCards(placements);
   const renderedCards = await Promise.all(
-    placedCards.map(async ({ card, module: shellModule, placement }) => ({
-      body: await renderCardBody(card, placement.size, settings.siteId, settings.timezone, placement.settings),
-      cardId: card.id,
-      columns: placement.columns,
-      description: card.description,
-      instanceId: placement.instanceId,
-      moduleHref: shellModule.href,
-      moduleIcon: shellModule.icon,
-      rows: placement.rows,
-      settingsDefinition: card.settings || [],
-      settingsValues: placement.settings,
-      size: placement.size,
-      title: card.title
-    }))
+    placedCards.map(async ({ card, module: shellModule, placement }) => {
+      const minimumLayout = getDashboardCardMinimumLayout(card.sizes);
+
+      return {
+        body: await renderCardBody(card, placement.size, settings.siteId, settings.timezone, placement.settings),
+        cardId: card.id,
+        columns: placement.columns,
+        description: card.description,
+        instanceId: placement.instanceId,
+        minColumns: minimumLayout.columns,
+        minRows: minimumLayout.rows,
+        moduleHref: shellModule.href,
+        moduleIcon: shellModule.icon,
+        rows: placement.rows,
+        settingsDefinition: card.settings || [],
+        settingsValues: placement.settings,
+        size: placement.size,
+        title: card.title
+      };
+    })
   );
   const catalogGroups = await Promise.all(
     dashboardCardCatalogGroups(settings.enabledModuleIds, placements).map(async ({ cards, module }) => ({
@@ -115,10 +123,6 @@ export default async function AdminDashboardPage({ searchParams }: DashboardPage
           <h1>{settings.businessName}</h1>
           <p>Build a home dashboard from the module cards you actually use.</p>
         </div>
-        <ButtonLink href="/" variant="secondary">
-          <ExternalLink size={18} />
-          View public site
-        </ButtonLink>
       </header>
 
       <DashboardStatusMessage error={query.error} saved={query.saved} />

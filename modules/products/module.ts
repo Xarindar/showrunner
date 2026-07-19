@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin/modules/products",
   icon: "ShoppingBag",
   order: 90,
+  navigation: { category: "primary" },
   description: "Product catalog, media, variants, categories, bundles, and storefront organization.",
   layout: "standard",
   status: "active",

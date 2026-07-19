@@ -15,6 +15,7 @@ import {
   dashboardLayoutColumns,
   type DashboardCardSize
 } from "@/shell/dashboard-layout";
+import type { DashboardWidgetSettingDefinition, DashboardWidgetSettings } from "@/shell/dashboard-widget-types";
 import {
   addDashboardCardAction,
   removeDashboardCardAction,
@@ -28,16 +29,13 @@ type DashboardBoardCard = {
   columns: number;
   description: string;
   instanceId: string;
+  minColumns: number;
+  minRows: number;
   moduleHref: string;
   moduleIcon: keyof typeof moduleIcons;
   rows: number;
-  settingsDefinition: {
-    defaultValue: boolean;
-    description?: string;
-    id: string;
-    label: string;
-  }[];
-  settingsValues: Record<string, boolean>;
+  settingsDefinition: DashboardWidgetSettingDefinition[];
+  settingsValues: DashboardWidgetSettings;
   size: DashboardCardSize;
   title: string;
 };
@@ -233,8 +231,16 @@ export function DashboardWidgetsBoard({ cards, catalogGroups }: DashboardWidgets
     setInteraction("resize");
 
     const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
-      const nextColumns = clamp(startColumns + (moveEvent.clientX - startX) / columnStep, dashboardCardMinColumns, dashboardCardMaxColumns);
-      const nextRows = clamp(startRows + (moveEvent.clientY - startY) / rowStep, dashboardCardMinRows, dashboardCardMaxRows);
+      const nextColumns = clamp(
+        startColumns + (moveEvent.clientX - startX) / columnStep,
+        Math.max(dashboardCardMinColumns, card.minColumns),
+        dashboardCardMaxColumns
+      );
+      const nextRows = clamp(
+        startRows + (moveEvent.clientY - startY) / rowStep,
+        Math.max(dashboardCardMinRows, card.minRows),
+        dashboardCardMaxRows
+      );
 
       updateLayout((current) =>
         current.map((item) =>
@@ -377,19 +383,65 @@ export function DashboardWidgetsBoard({ cards, catalogGroups }: DashboardWidgets
                             <input name="returnTo" type="hidden" value="/admin" />
                             <fieldset>
                               <legend>Visible details</legend>
-                              {item.settingsDefinition.map((setting) => (
-                                <label key={setting.id}>
-                                  <input
-                                    defaultChecked={item.settingsValues[setting.id] ?? setting.defaultValue}
-                                    name={`setting.${setting.id}`}
-                                    type="checkbox"
-                                  />
-                                  <span>
-                                    <strong>{setting.label}</strong>
-                                    {setting.description ? <small>{setting.description}</small> : null}
-                                  </span>
-                                </label>
-                              ))}
+                              {item.settingsDefinition.map((setting) => {
+                                if (setting.type === "date-range") {
+                                  const savedValue = item.settingsValues[setting.id];
+                                  const range = typeof savedValue === "object" ? savedValue : setting.defaultValue;
+
+                                  return (
+                                    <div className="dashboard-card-date-setting" key={setting.id}>
+                                      <span>
+                                        <strong>{setting.label}</strong>
+                                        {setting.description ? <small>{setting.description}</small> : null}
+                                      </span>
+                                      <div className="dashboard-card-date-range">
+                                        <label>
+                                          <span className="ui-sr-only">Start date</span>
+                                          <input
+                                            aria-label={`${setting.label} start date`}
+                                            defaultValue={range.start}
+                                            inputMode="numeric"
+                                            maxLength={8}
+                                            name={`setting.${setting.id}.start`}
+                                            pattern="[0-9]{2}/[0-9]{2}/[0-9]{2}"
+                                            placeholder="MM/DD/YY"
+                                            type="text"
+                                          />
+                                        </label>
+                                        <span aria-hidden="true">–</span>
+                                        <label>
+                                          <span className="ui-sr-only">End date</span>
+                                          <input
+                                            aria-label={`${setting.label} end date`}
+                                            defaultValue={range.end}
+                                            inputMode="numeric"
+                                            maxLength={8}
+                                            name={`setting.${setting.id}.end`}
+                                            pattern="[0-9]{2}/[0-9]{2}/[0-9]{2}"
+                                            placeholder="MM/DD/YY"
+                                            type="text"
+                                          />
+                                        </label>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+
+                                const savedValue = item.settingsValues[setting.id];
+                                return (
+                                  <label className="dashboard-card-toggle-setting" key={setting.id}>
+                                    <input
+                                      defaultChecked={typeof savedValue === "boolean" ? savedValue : setting.defaultValue}
+                                      name={`setting.${setting.id}`}
+                                      type="checkbox"
+                                    />
+                                    <span>
+                                      <strong>{setting.label}</strong>
+                                      {setting.description ? <small>{setting.description}</small> : null}
+                                    </span>
+                                  </label>
+                                );
+                              })}
                             </fieldset>
                             <Button size="sm" type="submit" variant="secondary">
                               Save settings

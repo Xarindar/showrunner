@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin/modules/services",
   icon: "CalendarDays",
   order: 50,
+  navigation: { category: "primary" },
   description: "Base services, service builder, packages, and booking catalog organization.",
   layout: "standard",
   status: "active",

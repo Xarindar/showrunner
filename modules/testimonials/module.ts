@@ -7,6 +7,7 @@ export const manifest = {
   href: "/admin/modules/testimonials",
   icon: "Star",
   order: 64,
+  navigation: { category: "website" },
   description: "Review collection, moderation, featured quotes, and proof content.",
   layout: "standard",
   status: "active",

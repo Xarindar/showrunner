@@ -105,7 +105,7 @@ The add-widget gallery renders every available widget at its `defaultSize` by ca
 
 ## Widget Settings
 
-Settings are declared by the module-owned widget and rendered by the dashboard shell. Keep settings boolean and presentation-focused: they should choose which supporting details appear, not replace a module's full filtering or configuration UI.
+Settings are declared by the module-owned widget and rendered by the dashboard shell. Most settings are boolean and presentation-focused: they choose which supporting details appear, not replace a module's full filtering or configuration UI. A widget may declare a persisted `date-range` setting when the product explicitly calls for a dashboard-scoped reporting window.
 
 ```tsx
 export const activityWidget = {
@@ -131,6 +131,22 @@ export const activityWidget = {
   }
 } satisfies DashboardWidgetDefinition;
 ```
+
+Date ranges persist one inclusive start/end pair and render as `MM/DD/YY – MM/DD/YY` in the settings surface:
+
+```tsx
+settings: [
+  {
+    defaultValue: { start: "", end: "" },
+    description: "Enter both dates as MM/DD/YY. Leave both blank to use the current week.",
+    id: "dateRange",
+    label: "Order date range",
+    type: "date-range"
+  }
+]
+```
+
+The shell validates real dates, requires both endpoints together, and rejects an end date before the start date. The widget remains responsible for defining what an empty range means and for treating the saved end date as inclusive in its query.
 
 - Setting IDs are stable persistence keys. Do not rename or recycle them after release.
 - Defaults should produce the most useful version of the widget.

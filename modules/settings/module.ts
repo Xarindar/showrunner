@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin/modules/settings",
   icon: "Settings",
   order: 70,
+  navigation: { category: "hidden" },
   description: "Business settings, theme basics, and module toggles.",
   layout: "standard",
   status: "active",

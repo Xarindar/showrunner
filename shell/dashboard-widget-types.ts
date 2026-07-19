@@ -4,18 +4,39 @@ import type { ModuleId } from "@/shell/modules";
 
 export type DashboardWidgetRenderContext = {
   preview?: boolean;
-  settings: Record<string, boolean>;
+  settings: DashboardWidgetSettings;
   siteId: string;
   size: DashboardCardSize;
   timezone: string;
 };
 
-export type DashboardWidgetSettingDefinition = {
+export type DashboardWidgetDateRangeValue = {
+  end: string;
+  start: string;
+};
+
+export type DashboardWidgetSettingValue = boolean | DashboardWidgetDateRangeValue;
+export type DashboardWidgetSettings = Record<string, DashboardWidgetSettingValue>;
+
+export type DashboardWidgetToggleSettingDefinition = {
   defaultValue: boolean;
   description?: string;
   id: string;
   label: string;
+  type?: "toggle";
 };
+
+export type DashboardWidgetDateRangeSettingDefinition = {
+  defaultValue: DashboardWidgetDateRangeValue;
+  description?: string;
+  id: string;
+  label: string;
+  type: "date-range";
+};
+
+export type DashboardWidgetSettingDefinition =
+  | DashboardWidgetToggleSettingDefinition
+  | DashboardWidgetDateRangeSettingDefinition;
 
 export type DashboardWidgetDefinition = {
   defaultSize: DashboardCardSize;

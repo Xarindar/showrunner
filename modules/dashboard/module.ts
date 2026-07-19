@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin",
   icon: "Gauge",
   order: 10,
+  navigation: { category: "primary" },
   description: "Setup checklist, business snapshot, and quick access to your modules.",
   layout: "standard",
   status: "active",

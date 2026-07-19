@@ -6,6 +6,7 @@ export const manifest = {
   href: "/admin/modules/content",
   icon: "LayoutTemplate",
   order: 20,
+  navigation: { category: "website" },
   description: "Venue content studio: per-venue hero canvas, featured booking card, and testimonial curation.",
   layout: "standard",
   status: "active",

@@ -7,6 +7,7 @@ export const manifest = {
   href: "/admin/modules/forms",
   icon: "ClipboardList",
   order: 62,
+  navigation: { category: "website" },
   description: "Reusable forms, intake questions, and submission inbox.",
   layout: "standard",
   status: "active",

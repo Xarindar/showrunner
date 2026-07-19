@@ -1989,10 +1989,6 @@
 }
 
 @media (max-width: 560px) {
-  .page :global(.page-header) {
-    min-height: 44px;
-  }
-
   .pageActions :global(.ui-button) {
     min-width: 0;
   }
