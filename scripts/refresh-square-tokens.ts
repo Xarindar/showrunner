@@ -1,11 +1,15 @@
 import "dotenv/config";
 import { PaymentGatewayConnectionStatus, PaymentProvider } from "@prisma/client";
-import { isOAuthSquareCredential, refreshSquareCredentialViaBroker } from "../lib/payments/connect/square-refresh";
+import {
+  isOAuthSquareCredential,
+  refreshSquareCredentialDirect,
+  squareTokenRefreshedAt
+} from "../lib/payments/connect/square-refresh";
 import { prisma } from "../lib/prisma";
 
-// Proactively refresh OAuth-connected Square tokens via the AdmitOne Connect broker
-// well before their ~30-day expiry, so charges never depend on a just-in-time refresh.
-// Run on a schedule (e.g. daily): npm run payments:refresh-square
+// Proactively rotate PKCE OAuth tokens directly with Square. This process shares
+// Showrunner's code and database but runs as a separate daily Railway cron service.
+// Connect is never contacted after the one-time browser handoff.
 
 const refreshCadenceMs = 7 * 24 * 60 * 60 * 1000;
 const staleAlertMs = 8 * 24 * 60 * 60 * 1000;
@@ -22,23 +26,31 @@ async function main() {
   });
 
   const oauthCredentials = credentials.filter(
-    (credential) => isOAuthSquareCredential(credential) && (!credential.lastVerifiedAt || credential.lastVerifiedAt <= cadenceCutoff)
+    (credential) => {
+      const refreshedAt = squareTokenRefreshedAt(credential);
+      return isOAuthSquareCredential(credential) && (!refreshedAt || refreshedAt <= cadenceCutoff);
+    }
   );
   let refreshed = 0;
   const failures: { error: string; siteId: string }[] = [];
 
   for (const credential of oauthCredentials) {
     try {
-      const result = await refreshSquareCredentialViaBroker(credential);
-      refreshed += 1;
-      console.log(`refreshed site=${credential.siteId} newExpiry=${result.expiresAt.toISOString()}`);
+      const result = await refreshSquareCredentialDirect(credential);
+      if (result) {
+        refreshed += 1;
+        console.log(`refreshed site=${credential.siteId} newExpiry=${result.expiresAt.toISOString()}`);
+      }
     } catch (error) {
       failures.push({ error: error instanceof Error ? error.message : String(error), siteId: credential.siteId });
     }
   }
 
   const stale = credentials
-    .filter((credential) => isOAuthSquareCredential(credential) && (!credential.lastVerifiedAt || credential.lastVerifiedAt <= staleCutoff))
+    .filter((credential) => {
+      const refreshedAt = squareTokenRefreshedAt(credential);
+      return isOAuthSquareCredential(credential) && (!refreshedAt || refreshedAt <= staleCutoff);
+    })
     .map((credential) => credential.siteId);
 
   console.log(JSON.stringify({ candidates: oauthCredentials.length, failures, refreshed, staleConnections: stale }));

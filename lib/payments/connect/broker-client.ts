@@ -47,14 +47,13 @@ export async function brokerRequest<T>(input: {
   return parsed as T;
 }
 
-export async function revokeOAuthProvider(input: {
-  provider: BrokerProvider;
+export async function revokeStripeOAuthProvider(input: {
   siteId: string;
   externalAccountId: string;
 }) {
   await brokerRequest<void>({
-    path: `/connect/${input.provider}/revoke`,
-    provider: input.provider,
+    path: "/connect/stripe/revoke",
+    provider: "stripe",
     siteId: input.siteId,
     fields: { externalAccountId: input.externalAccountId }
   });
