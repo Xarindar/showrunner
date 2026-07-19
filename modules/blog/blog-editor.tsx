@@ -172,19 +172,15 @@ function BlogStoryCard({ deleteAction, post }: { deleteAction: BlogAction; post:
   const image = post.thumbnailUrl || post.headerImageUrl;
   return (
     <article className="blog-story-card">
-      <Link aria-label={`Edit ${post.title}`} className="blog-story-card-link" href={`/admin/modules/blog?post=${post.id}`}>
+      <Link aria-label={`Edit ${post.title} (${post.status === "DRAFT" ? "draft" : "published"})`} className="blog-story-card-link" href={`/admin/modules/blog?post=${post.id}`}>
         <span className="blog-story-image">
           {image ? <Image alt="" fill sizes="280px" src={image} unoptimized /> : <span><ImageIcon aria-hidden="true" size={24} /></span>}
-          <span className="blog-story-status" data-status={post.status.toLowerCase()}>
-            {post.status === "PUBLISHED" ? <Check aria-hidden="true" size={12} /> : <FileText aria-hidden="true" size={12} />}
-            {post.status === "PUBLISHED" ? "Live" : "Draft"}
-          </span>
+          {post.status === "DRAFT" ? <span aria-label="Draft" className="blog-story-status" title="Draft"><FileText aria-hidden="true" size={15} /></span> : null}
         </span>
         <span className="blog-story-copy">
-          <small>{post.category || "Uncategorized"}</small>
           <strong>{post.title}</strong>
-          <span>{post.excerpt || textFromHtml(post.contentHtml) || "Your story is waiting for its first paragraph."}</span>
-          <time dateTime={post.updatedAt}><Clock3 aria-hidden="true" size={13} />Updated {formatShortDate(post.updatedAt)}</time>
+          <small>{post.category || "Uncategorized"}</small>
+          <time dateTime={post.updatedAt}><Clock3 aria-hidden="true" size={13} />Last edited {formatShortDate(post.updatedAt)}</time>
         </span>
       </Link>
       <form action={deleteAction} className="blog-story-delete">
