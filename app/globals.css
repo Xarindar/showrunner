@@ -70,21 +70,6 @@ body {
   margin-bottom: var(--space-2);
 }
 
-.blog-page-header p {
-  color: var(--color-muted);
-  line-height: 1.55;
-}
-
-.blog-page-kicker {
-  color: var(--color-brand);
-  display: block;
-  font-size: var(--type-caption);
-  font-weight: 760;
-  letter-spacing: 0.08em;
-  margin-bottom: var(--space-2);
-  text-transform: uppercase;
-}
-
 .blog-library-shell {
   grid-template-rows: auto minmax(0, 1fr);
 }
