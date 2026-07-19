@@ -1,5 +1,5 @@
 import NextImage from "next/image";
-import { ImageIcon, Plus, Save, X } from "lucide-react";
+import { ImageIcon, Plus, Save, Upload, X } from "lucide-react";
 import { AssetPicker, Button, type AssetPickerAsset } from "@/components/ui";
 import {
   attachServiceCategoryImageAction,
@@ -82,7 +82,7 @@ export function ServiceCategoryManager({ canUpload, categories, mediaAssets }: S
                 emptyLibraryMessage="No reusable category images yet."
                 title={`${category.name} image`}
                 triggerClassName={category.imageUrl ? "service-category-image-trigger has-image" : "service-category-image-trigger"}
-                triggerHint={category.imageUrl ? "Replace image" : "Add image"}
+                triggerHint={category.imageUrl ? "Replace image" : ""}
                 uploadFields={{ categoryId: category.id }}
                 uploadFormId={uploadFormId}
                 uploadUnavailableMessage="Uploads need Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images. You can still choose from the library.">
@@ -91,8 +91,8 @@ export function ServiceCategoryManager({ canUpload, categories, mediaAssets }: S
                     <NextImage alt={imageAlt} fill sizes="(max-width: 760px) 100vw, 320px" src={category.imageUrl} unoptimized />
                   ) : (
                     <span className="studio-media-empty">
-                      <ImageIcon size={24} />
-                      <span>No image</span>
+                      <Upload aria-hidden="true" size={24} />
+                      <span>Pick an image</span>
                     </span>
                   )}
                 </span>

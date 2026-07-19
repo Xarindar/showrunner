@@ -14,6 +14,7 @@ import {
   Star,
   Tags,
   Trash2,
+  Upload,
   Wand2
 } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
@@ -251,8 +252,8 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
                         <NextImage alt={selectedMedia?.alt || product.name} fill priority sizes="(max-width: 760px) 100vw, (max-width: 1280px) 300px, 320px" src={selectedMediaUrl} unoptimized />
                       ) : (
                         <span className="studio-media-empty">
-                          <ImageIcon size={26} />
-                          <span>No product image</span>
+                          <Upload aria-hidden="true" size={26} />
+                          <span>Pick an image</span>
                         </span>
                       )}
                     </AssetPicker>
