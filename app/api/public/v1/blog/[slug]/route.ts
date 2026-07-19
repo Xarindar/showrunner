@@ -33,7 +33,7 @@ export async function GET(request: NextRequest, { params }: BlogPostRouteProps) 
       },
       select: {
         authorName: true,
-        category: true,
+        category: { select: { name: true, slug: true } },
         contentHtml: true,
         excerpt: true,
         headerImageUrl: true,
@@ -47,9 +47,12 @@ export async function GET(request: NextRequest, { params }: BlogPostRouteProps) 
     });
     if (!post) throw new EmbedRequestError("Story not found.", 404);
 
+    const { category, ...story } = post;
     return embedJson({
       post: {
-        ...post,
+        ...story,
+        category: category?.name || "",
+        categorySlug: category?.slug || "",
         contentHtml: sanitizeBlogHtml(post.contentHtml),
         publishedAt: post.publishedAt?.toISOString() || null,
         tags: Array.isArray(post.tags) ? post.tags : [],

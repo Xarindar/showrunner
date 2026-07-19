@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 export type BlogPostDraft = {
   authorName: string;
   category: string;
+  categoryId: string;
   contentHtml: string;
   excerpt: string;
   headerImageUrl: string;
@@ -25,7 +26,7 @@ export async function getBlogPosts(siteId: string): Promise<BlogPostDraft[]> {
     orderBy: [{ updatedAt: "desc" }],
     select: {
       authorName: true,
-      category: true,
+      category: { select: { id: true, name: true } },
       contentHtml: true,
       excerpt: true,
       headerImageUrl: true,
@@ -40,8 +41,10 @@ export async function getBlogPosts(siteId: string): Promise<BlogPostDraft[]> {
     }
   });
 
-  return posts.map((post) => ({
+  return posts.map(({ category, ...post }) => ({
     ...post,
+    category: category?.name || "",
+    categoryId: category?.id || "",
     publishedAt: post.publishedAt?.toISOString() || "",
     tags: stringArray(post.tags),
     updatedAt: post.updatedAt.toISOString()
@@ -51,6 +54,7 @@ export async function getBlogPosts(siteId: string): Promise<BlogPostDraft[]> {
 export const emptyBlogPost: BlogPostDraft = {
   authorName: "",
   category: "",
+  categoryId: "",
   contentHtml: "",
   excerpt: "",
   headerImageUrl: "",

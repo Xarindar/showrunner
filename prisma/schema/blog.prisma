@@ -5,6 +5,21 @@ enum BlogPostStatus {
   PUBLISHED
 }
 
+model BlogCategory {
+  id        String     @id @default(cuid())
+  siteId    String
+  site      Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  name      String
+  slug      String
+  sortOrder Int        @default(0)
+  posts     BlogPost[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([siteId, slug])
+  @@index([siteId, sortOrder])
+}
+
 model BlogPost {
   id             String         @id @default(cuid())
   siteId         String
@@ -16,7 +31,8 @@ model BlogPost {
   thumbnailUrl   String         @default("")
   headerImageUrl String         @default("")
   authorName     String         @default("")
-  category       String         @default("")
+  categoryId     String?
+  category       BlogCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   tags           Json           @default("[]")
   status         BlogPostStatus @default(DRAFT)
   publishedAt    DateTime?
@@ -26,4 +42,5 @@ model BlogPost {
   @@unique([siteId, slug])
   @@index([siteId, status, publishedAt])
   @@index([siteId, updatedAt])
+  @@index([categoryId])
 }

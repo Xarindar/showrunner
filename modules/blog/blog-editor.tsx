@@ -44,16 +44,18 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type KeyboardEvent,
   type MouseEvent,
   type ReactNode
 } from "react";
-import { AssetPicker, Button, Card, type AssetPickerAsset } from "@/components/ui";
+import { AssetPicker, Button, Card, Modal, type AssetPickerAsset } from "@/components/ui";
 import type { BlogPostDraft } from "./data";
 
 type BlogAction = (formData: FormData) => void | Promise<void>;
 
 type BlogEditorProps = {
   canUpload: boolean;
+  categories: BlogCategoryOption[];
   deleteAction: BlogAction;
   editing: boolean;
   mediaAssets: AssetPickerAsset[];
@@ -61,6 +63,8 @@ type BlogEditorProps = {
   posts: BlogPostDraft[];
   saveAction: BlogAction;
 };
+
+type BlogCategoryOption = { id: string; name: string };
 
 const emojiGroups = [
   { label: "Popular", values: ["✨", "❤️", "📸", "🎉", "🌿", "☀️", "💫", "🥂", "😊", "🙌", "🤍", "📍"] },
@@ -75,7 +79,7 @@ const fontFamilies = [
   { label: "Mono", value: "Courier New, monospace" }
 ];
 
-export function BlogEditor({ canUpload, deleteAction, editing, mediaAssets, post, posts, saveAction }: BlogEditorProps) {
+export function BlogEditor({ canUpload, categories, deleteAction, editing, mediaAssets, post, posts, saveAction }: BlogEditorProps) {
   if (!editing) {
     return <BlogLibrary deleteAction={deleteAction} posts={posts} />;
   }
@@ -83,6 +87,7 @@ export function BlogEditor({ canUpload, deleteAction, editing, mediaAssets, post
   return (
     <BlogComposer
       canUpload={canUpload}
+      categories={categories}
       deleteAction={deleteAction}
       key={post.id || "new"}
       mediaAssets={mediaAssets}
@@ -199,12 +204,14 @@ function BlogStoryCard({ deleteAction, post }: { deleteAction: BlogAction; post:
 
 function BlogComposer({
   canUpload,
+  categories,
   deleteAction,
   mediaAssets,
   post,
   saveAction
 }: {
   canUpload: boolean;
+  categories: BlogCategoryOption[];
   deleteAction: BlogAction;
   mediaAssets: AssetPickerAsset[];
   post: BlogPostDraft;
@@ -217,8 +224,6 @@ function BlogComposer({
   const headerUploadRef = useRef<HTMLInputElement>(null);
   const savedRangeRef = useRef<Range | null>(null);
   const [title, setTitle] = useState(post.title);
-  const [slug, setSlug] = useState(post.slug);
-  const [slugTouched, setSlugTouched] = useState(Boolean(post.slug));
   const [excerpt, setExcerpt] = useState(post.excerpt);
   const [contentHtml, setContentHtml] = useState(post.contentHtml);
   const [authorName, setAuthorName] = useState(post.authorName);
@@ -253,11 +258,6 @@ function BlogComposer({
     const words = textFromHtml(contentHtml).split(/\s+/).filter(Boolean).length;
     return { minutes: Math.max(1, Math.ceil(words / 220)), words };
   }, [contentHtml]);
-
-  function updateTitle(value: string) {
-    setTitle(value);
-    if (!slugTouched) setSlug(slugify(value));
-  }
 
   function syncEditor() {
     setContentHtml(editorRef.current?.innerHTML || "");
@@ -442,7 +442,7 @@ function BlogComposer({
                     className="blog-title-input"
                     maxLength={180}
                     name="title"
-                    onChange={(event) => updateTitle(event.currentTarget.value)}
+                    onChange={(event) => setTitle(event.currentTarget.value)}
                     placeholder="Give your story a memorable title"
                     required
                     rows={1}
@@ -552,17 +552,14 @@ function BlogComposer({
             />
 
             <label className="blog-setting-field">
-              <span>URL slug</span>
-              <div className="blog-slug-field"><span>/blog/</span><input name="slug" onChange={(event) => { setSlugTouched(true); setSlug(slugify(event.currentTarget.value)); }} placeholder="story-title" value={slug} /></div>
-            </label>
-            <label className="blog-setting-field">
               <span>Author</span>
               <input name="authorName" onChange={(event) => setAuthorName(event.currentTarget.value)} placeholder="Your name" value={authorName} />
             </label>
-            <label className="blog-setting-field">
-              <span>Category</span>
-              <input name="category" onChange={(event) => setCategory(event.currentTarget.value)} placeholder="Behind the scenes" value={category} />
-            </label>
+            <BlogCategoryField
+              categories={categories}
+              initialCategoryId={post.categoryId}
+              onChange={setCategory}
+            />
             <label className="blog-setting-field">
               <span>Tags</span>
               <input name="tags" onChange={(event) => setTags(event.currentTarget.value)} placeholder="weddings, planning, studio" value={tags} />
@@ -793,6 +790,92 @@ function ImageSetting({
   );
 }
 
+const newCategoryValue = "__new_category__";
+const customCategoryValue = "__custom_category__";
+
+function BlogCategoryField({
+  categories,
+  initialCategoryId,
+  onChange
+}: {
+  categories: BlogCategoryOption[];
+  initialCategoryId: string;
+  onChange: (name: string) => void;
+}) {
+  const [selectedValue, setSelectedValue] = useState(initialCategoryId);
+  const [customName, setCustomName] = useState("");
+  const [draftName, setDraftName] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+
+  function closeModal() {
+    setDraftName("");
+    setModalOpen(false);
+  }
+
+  function addCategory() {
+    const nextName = draftName.trim().slice(0, 80);
+    if (!nextName) return;
+    setCustomName(nextName);
+    setSelectedValue(customCategoryValue);
+    onChange(nextName);
+    closeModal();
+  }
+
+  function selectCategory(value: string) {
+    if (value === newCategoryValue) {
+      setDraftName("");
+      setModalOpen(true);
+      return;
+    }
+    setSelectedValue(value);
+    onChange(value === customCategoryValue ? customName : categories.find((category) => category.id === value)?.name || "");
+  }
+
+  function handleDraftKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    addCategory();
+  }
+
+  return (
+    <div className="blog-setting-field blog-category-field">
+      <label htmlFor="blog-category">Category</label>
+      <select id="blog-category" onChange={(event) => selectCategory(event.currentTarget.value)} value={selectedValue}>
+        <option value="">Uncategorized</option>
+        {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+        {customName ? <option value={customCategoryValue}>{customName}</option> : null}
+        <option value={newCategoryValue}>New Category…</option>
+      </select>
+      <input name="categoryId" readOnly type="hidden" value={selectedValue === customCategoryValue ? "" : selectedValue} />
+      <input name="newCategoryName" readOnly type="hidden" value={selectedValue === customCategoryValue ? customName : ""} />
+      <Modal
+        bodyClassName="service-preset-modal-body"
+        className="service-preset-modal"
+        closeLabel="Close new category dialog"
+        onClose={closeModal}
+        open={modalOpen}
+        title="New Category">
+        <div className="ui-field">
+          <input
+            aria-label="Category name"
+            autoComplete="off"
+            autoFocus
+            maxLength={80}
+            onChange={(event) => setDraftName(event.currentTarget.value)}
+            onKeyDown={handleDraftKeyDown}
+            placeholder="Behind the scenes"
+            value={draftName}
+          />
+        </div>
+        <div className="module-modal-actions">
+          <Button onClick={closeModal} type="button" variant="ghost">Cancel</Button>
+          <Button disabled={!draftName.trim()} onClick={addCategory} type="button">Add</Button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
 function ArticlePreview({
   authorName,
   category,
@@ -842,16 +925,6 @@ function textFromHtml(value: string) {
 function formatShortDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "recently" : new Intl.DateTimeFormat("en-US", { day: "numeric", month: "short", year: "numeric" }).format(date);
-}
-
-function slugify(value: string) {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 180);
 }
 
 function safeHref(value: string) {
