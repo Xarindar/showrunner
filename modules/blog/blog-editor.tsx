@@ -580,12 +580,10 @@ function BlogComposer({
                 <button
                   formAction={deleteAction}
                   formNoValidate
-                  name="id"
                   onClick={(event) => {
                     if (!window.confirm(`Delete “${post.title}”? This cannot be undone.`)) event.preventDefault();
                   }}
-                  type="submit"
-                  value={post.id}>
+                  type="submit">
                   <Trash2 aria-hidden="true" size={14} />Delete story
                 </button>
               </div>

@@ -33,9 +33,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
     <div className="stack blog-studio">
       <header className="page-header blog-page-header">
         <div>
-          <span className="blog-page-kicker">Editorial studio</span>
-          <h1>{editing ? (selected ? "Edit story" : "New story") : "Blog"}</h1>
-          <p>{editing ? "Shape the reading experience, then preview it before it goes live." : "Write stories worth lingering over."}</p>
+          <h1>Blog</h1>
         </div>
       </header>
 
