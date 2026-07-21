@@ -22,6 +22,7 @@ model AdminUser {
   auditLogs    AuditLog[]
   staffProfiles StaffMember[]
   clientDeployments ClientDeployment[]
+  moduleNavigationItems AdminModuleNavigationItem[]
 
   @@index([tenantId])
 }

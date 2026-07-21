@@ -3,6 +3,30 @@
 // per-module config, replacing the single SiteSettings.enabledModules JSON array as the richer source
 // of deployment truth.
 
+enum AdminModuleNavigationCategory {
+  PRIMARY
+  WEBSITE
+  MARKETING
+  FINANCE
+  MORE
+}
+
+// A user's durable admin-sidebar layout. Module manifests supply the initial category and registry
+// order; after initialization these rows are the source of truth for category membership and order.
+model AdminModuleNavigationItem {
+  id        String                        @id @default(cuid())
+  userId    String
+  user      AdminUser                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId  String
+  category  AdminModuleNavigationCategory
+  sortOrder Int
+  createdAt DateTime                      @default(now())
+  updatedAt DateTime                      @updatedAt
+
+  @@unique([userId, moduleId])
+  @@index([userId, category, sortOrder])
+}
+
 model ModuleInstallation {
   id              String          @id @default(cuid())
   siteId          String

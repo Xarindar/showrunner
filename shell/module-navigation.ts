@@ -1,5 +1,7 @@
 import { Ellipsis, Globe2, Megaphone, WalletCards } from "lucide-react";
 
+export const movableModuleNavigationCategories = ["primary", "website", "marketing", "finance", "more"] as const;
+
 export const collapsibleModuleNavigationCategories = [
   {
     id: "website",
@@ -24,4 +26,14 @@ export const collapsibleModuleNavigationCategories = [
 ] as const;
 
 export type CollapsibleModuleNavigationCategory = (typeof collapsibleModuleNavigationCategories)[number];
-export type ModuleNavigationCategory = "primary" | CollapsibleModuleNavigationCategory["id"] | "hidden";
+export type MovableModuleNavigationCategory = (typeof movableModuleNavigationCategories)[number];
+export type ModuleNavigationCategory = MovableModuleNavigationCategory | "hidden";
+
+export type AdminModuleNavigationLayoutItem = {
+  category: MovableModuleNavigationCategory;
+  moduleId: string;
+};
+
+export function isMovableModuleNavigationCategory(value: unknown): value is MovableModuleNavigationCategory {
+  return typeof value === "string" && movableModuleNavigationCategories.includes(value as MovableModuleNavigationCategory);
+}
