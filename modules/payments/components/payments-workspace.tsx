@@ -226,23 +226,14 @@ export function PaymentsWorkspace({
                 Manage
               </Button>
             ) : provider.oauthConnect ? (
-              // One-click OAuth: a real navigation to the start route (which redirects to the
-              // provider's hosted login), so this must be an anchor rather than a modal trigger.
-              <span className="pay-row-title">
-                <Button
-                  onClick={() => setActive({ kind: "connect", provider: provider.provider })}
-                  size="sm"
-                  type="button"
-                  variant="ghost">
-                  Paste keys
-                </Button>
-                <a
-                  className={`ui-button ui-button-sm${provider.recommended && connectedCount === 0 ? "" : " ui-button-secondary"}`}
-                  href={connectStartHref(provider.provider)}>
-                  <Zap size={15} />
-                  {provider.needsAttention ? "Reconnect" : "Connect"}
-                </a>
-              </span>
+              // One-click OAuth: navigate directly to the provider-hosted login. OAuth providers
+              // do not expose the manual credential path because reconnecting must repeat OAuth.
+              <a
+                className={`ui-button ui-button-sm${provider.recommended && connectedCount === 0 ? "" : " ui-button-secondary"}`}
+                href={connectStartHref(provider.provider)}>
+                <Zap size={15} />
+                {provider.needsAttention ? "Reconnect" : "Connect"}
+              </a>
             ) : (
               <Button
                 onClick={() => setActive({ kind: "connect", provider: provider.provider })}
@@ -394,7 +385,7 @@ export function PaymentsWorkspace({
             name={manageProvider.name}
             oauthReconnectHref={manageProvider.oauthConnect ? connectStartHref(manageProvider.provider) : undefined}
             onClose={close}
-            onReplace={() => setActive({ kind: "connect", provider: manageProvider.provider })}
+            onReplace={manageProvider.oauthConnect ? undefined : () => setActive({ kind: "connect", provider: manageProvider.provider })}
             provider={manageProvider.provider}
             webhookMissing={manageProvider.webhookMissing} />
         ) : null}
