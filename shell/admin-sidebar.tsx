@@ -201,6 +201,7 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, navigation
   const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const saveRequestRef = useRef(0);
   const saveStateTimerRef = useRef<number | null>(null);
+  const keyboardSaveTimerRef = useRef<number | null>(null);
   const mobileHeaderContext = useAdminMobileHeaderContext();
   const activeModule = moduleRegistry.find((item) => moduleIsActive(pathname, item));
   const resolvedMobileHeader = mobileHeaderContext ?? (activeModule ? { title: activeModule.label } : null);
@@ -222,6 +223,7 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, navigation
   useEffect(() => {
     return () => {
       if (saveStateTimerRef.current) window.clearTimeout(saveStateTimerRef.current);
+      if (keyboardSaveTimerRef.current) window.clearTimeout(keyboardSaveTimerRef.current);
     };
   }, []);
 
@@ -231,6 +233,10 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, navigation
   }
 
   function persistLayout(nextLayout: AdminModuleNavigationLayoutItem[]) {
+    if (keyboardSaveTimerRef.current) {
+      window.clearTimeout(keyboardSaveTimerRef.current);
+      keyboardSaveTimerRef.current = null;
+    }
     if (saveStateTimerRef.current) window.clearTimeout(saveStateTimerRef.current);
     const requestId = ++saveRequestRef.current;
     setSaveState("saving");
@@ -255,6 +261,20 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, navigation
           setSaveState("error");
         });
     });
+  }
+
+  function scheduleKeyboardLayoutSave() {
+    if (keyboardSaveTimerRef.current) window.clearTimeout(keyboardSaveTimerRef.current);
+    setSaveState("saving");
+    keyboardSaveTimerRef.current = window.setTimeout(() => {
+      keyboardSaveTimerRef.current = null;
+      persistLayout(layoutRef.current);
+    }, 400);
+  }
+
+  function toggleEditing() {
+    if (editing && keyboardSaveTimerRef.current) persistLayout(layoutRef.current);
+    setEditing((current) => !current);
   }
 
   function beginMove(moduleId: string, event: PointerEvent<HTMLButtonElement>) {
@@ -326,7 +346,9 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, navigation
     event.preventDefault();
 
     const categoryIndex = movableModuleNavigationCategories.indexOf(active.category);
-    const categoryItems = current.filter((item) => item.category === active.category);
+    const categoryItems = current.filter(
+      (item) => item.category === active.category && permittedModuleIds.has(item.moduleId)
+    );
     const itemIndex = categoryItems.findIndex((item) => item.moduleId === moduleId);
     let nextLayout = current;
 
@@ -342,7 +364,7 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, navigation
 
     if (nextLayout === current) return;
     updateLayout(nextLayout);
-    persistLayout(nextLayout);
+    scheduleKeyboardLayoutSave();
   }
 
   const saveStatus =
@@ -405,7 +427,7 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, navigation
             <div className="admin-nav-customize">
               <button
                 aria-pressed={editing}
-                onClick={() => setEditing((current) => !current)}
+                onClick={toggleEditing}
                 type="button"
               >
                 {editing ? <Check aria-hidden="true" size={15} /> : <Pencil aria-hidden="true" size={14} />}
