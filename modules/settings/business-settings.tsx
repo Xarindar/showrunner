@@ -1,4 +1,5 @@
 import NextImage from "next/image";
+import Link from "next/link";
 import { Upload, X } from "lucide-react";
 import { AssetPicker, Button, EqualGrid, type AssetPickerAsset } from "@/components/ui";
 
@@ -15,6 +16,7 @@ type BusinessSettingsProps = {
     businessName: string;
     contactEmail: string;
     timezone: string;
+    enabledModuleIds?: string[];
   };
   uploadFormId: string;
 };
@@ -29,6 +31,7 @@ export function BusinessSettings({
   uploadFormId
 }: BusinessSettingsProps) {
   const logoAlt = logo?.alt || `${settings.businessName} logo`;
+  const contactInContent = settings.enabledModuleIds?.includes("content");
 
   return (
     <section className="subpanel form-grid">
@@ -85,18 +88,19 @@ export function BusinessSettings({
       <EqualGrid>
         <div className="ui-field">
           <label htmlFor="businessName">Business name</label>
-          <input id="businessName" name="businessName" defaultValue={settings.businessName} required />
+          <input id="businessName" name="businessName" defaultValue={settings.businessName} readOnly={contactInContent} required />
         </div>
         <div className="ui-field">
           <label htmlFor="contactEmail">Contact email</label>
-          <input id="contactEmail" name="contactEmail" type="email" defaultValue={settings.contactEmail} required />
+          <input id="contactEmail" name="contactEmail" type="email" defaultValue={settings.contactEmail} readOnly={contactInContent} required />
         </div>
       </EqualGrid>
 
       <div className="ui-field">
         <label htmlFor="timezone">Timezone</label>
-        <input id="timezone" name="timezone" defaultValue={settings.timezone} required />
+        <input id="timezone" name="timezone" defaultValue={settings.timezone} readOnly={contactInContent} required />
       </div>
+      {contactInContent ? <Link href="/admin/modules/content#business-info-title-heading">Edit contact details in Content → Contact / Business Info</Link> : null}
     </section>
   );
 }
