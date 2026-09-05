@@ -7,24 +7,24 @@ export const manifest = {
   icon: "LayoutTemplate",
   order: 20,
   navigation: { category: "website" },
-  description: "Venue content studio: per-venue hero canvas, featured booking card, and testimonial curation.",
+  description: "Client-specific content studio assembled from reusable editors and deployment configuration.",
   layout: "standard",
   status: "active",
   enabledByDefault: true,
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Homepage copy, canvas hero layout, and JSON delivery are live.",
-    primaryGap: "Page models, redirects, sitemap controls, and deeper SEO controls are not installed yet."
+    summary: "Manifest-driven content editors, canonical business info, page SEO, and scoped JSON delivery.",
+    primaryGap: "Cottage production migration and promotional renderer/integration verification remain pending."
   },
   capabilities: [
-    { label: "Per-venue hero canvas", status: "live" },
+    { label: "Configured hero content", status: "live" },
     { label: "Featured booking card builder", status: "live" },
-    { label: "Venue testimonial curation", status: "live" },
-    { label: "SEO/page management", status: "planned" }
+    { label: "Testimonial curation", status: "live" },
+    { label: "Contact / Business Info and page SEO", status: "live" }
   ],
   adminRoutes: ["/admin/modules/content"],
-  publicRoutes: ["/", "/api/public/v1/content/profile"],
+  publicRoutes: ["/", "/api/public/v1/content/profile", "/api/public/v1/content/studio"],
   dependencies: ["settings", "media"],
   dataModels: ["SiteSettings.publicContentConfig", "HeroPresentation", "HeroSlide", "HeroSlideElement"],
   permissions: ["content:manage"],
