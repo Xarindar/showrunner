@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Puck, usePuck, type Config, type Data } from "@puckeditor/core";
 import { Monitor, Smartphone, Undo2, Redo2, X, ExternalLink } from "lucide-react";
 import { type Choice } from "./editor";
 import { ContentFields } from "./content-fields";
-import { contentLinkOptions, type LinkChoices } from "./field-layout";
+import { contentLinkOptions, editorPageDestination, type LinkChoices } from "./field-layout";
 import { saveStudioBlock } from "./actions";
 import type { ContentBlockConfig, ContentManifest } from "./manifest";
 import "@puckeditor/core/puck.css";
@@ -27,6 +27,7 @@ export function PuckContentEditor(props: Props) {
 function Workspace({ manifest, entries }: Props) {
   const { appState, dispatch, selectedItem, history } = usePuck();
   const [pageId, setPageId] = useState(manifest.pages[0].id);
+  const [pageLocation, setPageLocation] = useState("");
   const [mobile, setMobile] = useState(false);
   const [focusedItem, setFocusedItem] = useState("");
   useEffect(() => {
@@ -47,9 +48,19 @@ function Workspace({ manifest, entries }: Props) {
   const changed = content.filter(item => JSON.stringify(item.props.payload) !== JSON.stringify(saved[item.props.id]?.payload));
   const dirty = changed.length > 0;
   const selected = entries.find(entry => entry.block.id === selectedItem?.props.id);
-  const siteUrl = manifest.previewUrl ? new URL(page.path, manifest.previewUrl).toString() : "";
-  const previewUrl = siteUrl ? `${siteUrl}?showrunner-editor=1` : "";
+  const siteUrl = manifest.previewUrl ? new URL(pageLocation || page.path, manifest.previewUrl).toString() : "";
+  const preview = siteUrl ? new URL(siteUrl) : null;
+  preview?.searchParams.set("showrunner-editor", "1");
+  const previewUrl = preview?.href || "";
   const previewOrigin = siteUrl ? new URL(siteUrl).origin : "";
+  const navigate = useCallback((href: string) => {
+    if (pending) return;
+    const destination = editorPageDestination(href, siteUrl, manifest.pages);
+    if (!destination || destination.href === siteUrl) return;
+    setPageId(destination.pageId); setPageLocation(destination.href);
+    setReady(false); setFrameError(false); setFocusedItem("");
+    dispatch({ type: "setUi", ui: { itemSelector: null } });
+  }, [dispatch, manifest.pages, pending, siteUrl]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -64,11 +75,12 @@ function Workspace({ manifest, entries }: Props) {
     const retry = window.setInterval(connect, 1000);
     const timer = window.setTimeout(() => { window.clearInterval(retry); setFrameError(true); }, 20000);
     return () => { window.clearInterval(retry); window.clearTimeout(timer); };
-  }, [pageId, ready, previewOrigin]);
+  }, [previewUrl, ready, previewOrigin]);
   useEffect(() => {
     function receive(event: MessageEvent) {
       if (event.source !== frame.current?.contentWindow || event.origin !== previewOrigin || event.data?.channel !== "showrunner-editor-v1") return;
       if (event.data.type === "ready") { setReady(true); setFrameError(false); }
+      if (event.data.type === "navigate" && typeof event.data.href === "string") navigate(event.data.href);
       if (event.data.type === "select") {
         const index = content.findIndex(item => item.props.id === event.data.id);
         if (index >= 0 && pageEntries.some(entry => entry.block.id === event.data.id)) dispatch({ type: "setUi", ui: { itemSelector: { index } } });
@@ -76,7 +88,7 @@ function Workspace({ manifest, entries }: Props) {
     }
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [content, dispatch, pageEntries, previewOrigin]);
+  }, [content, dispatch, pageEntries, previewOrigin, navigate]);
   useEffect(() => {
     if (!ready || !frame.current?.contentWindow) return;
     const mediaUrl = (value: string) => value?.startsWith("/") ? new URL(value, window.location.origin).toString() : value;
@@ -108,7 +120,7 @@ function Workspace({ manifest, entries }: Props) {
   return <div className={`${styles.workspace} showrunner-content-workspace`}>
     <header className={styles.toolbar}>
       <h1>Content</h1>
-      <label className={styles.pageLabel}>Page<select aria-label="Page" value={pageId} disabled={pending} onChange={event => { setPageId(event.target.value); setReady(false); setFrameError(false); dispatch({ type: "setUi", ui: { itemSelector: null } }); }}>{manifest.pages.map(item => <option value={item.id} key={item.id}>{item.label}</option>)}</select></label>
+      <label className={styles.pageLabel}>Page<select aria-label="Page" value={pageId} disabled={pending} onChange={event => navigate(manifest.pages.find(page => page.id === event.target.value)!.path)}>{manifest.pages.map(item => <option value={item.id} key={item.id}>{item.label}</option>)}</select></label>
       <div className={styles.devices} role="group" aria-label="Preview size"><button aria-label="Desktop preview" aria-pressed={!mobile} onClick={() => setMobile(false)}><Monitor size={18} /></button><button aria-label="Mobile preview" aria-pressed={mobile} onClick={() => setMobile(true)}><Smartphone size={18} /></button></div>
       <div className={styles.history}><button aria-label="Undo" disabled={!history.hasPast || pending} onClick={history.back}><Undo2 size={17} /></button><button aria-label="Redo" disabled={!history.hasFuture || pending} onClick={history.forward}><Redo2 size={17} /></button></div>
       <span className={styles.saveState}>{dirty ? "Unpublished changes" : "Up to date"}</span>
@@ -120,7 +132,7 @@ function Workspace({ manifest, entries }: Props) {
       <div className={styles.canvas}>
         {previewUrl ? <>
           {!ready && <div className={styles.loading} role="status">{frameError ? "The website editor connection is unavailable. Check that the site integration is deployed, then reload." : "Loading your website…"}</div>}
-          <iframe ref={frame} key={pageId} src={previewUrl} title={`${page.label} website preview`} className={mobile ? styles.mobileFrame : styles.frame} onLoad={() => frame.current?.contentWindow?.postMessage({ channel: "showrunner-editor-v1", type: "connect" }, previewOrigin)} />
+          <iframe ref={frame} key={previewUrl} src={previewUrl} title={`${page.label} website preview`} className={mobile ? styles.mobileFrame : styles.frame} onLoad={() => frame.current?.contentWindow?.postMessage({ channel: "showrunner-editor-v1", type: "connect" }, previewOrigin)} />
         </> : <div className={styles.loading}>Your website preview has not been connected. Your site administrator can connect it in the content manifest.</div>}
       </div>
       {selected ? <aside key={selected.block.id} className={styles.inspector} aria-label="Section settings"><div className={styles.inspectorHeader}><h2>{selected.block.label}</h2><button aria-label="Close section settings" onClick={() => dispatch({ type: "setUi", ui: { itemSelector: null } })}><X size={18} /></button></div><fieldset disabled={pending}><Puck.Fields /></fieldset></aside> : null}

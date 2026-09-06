@@ -70,9 +70,24 @@
     });
   });
   document.addEventListener("click", event => {
-    const section = event.target.closest("[data-sr-section]");
-    // Editing never follows booking links or submits live forms.
-    if (section || event.target.closest("a,button")) { event.preventDefault(); event.stopImmediatePropagation(); }
+    const target = event.target instanceof Element ? event.target : event.target.parentElement;
+    if (!target) return;
+    const section = target.closest("[data-sr-section]");
+    const navigation = target.closest('nav,[role="navigation"]');
+    const button = target.closest("button");
+    const controlled = button?.getAttribute("aria-controls");
+    // Menus retain their native click handlers, including menus within editable headers.
+    if (button && (navigation || (controlled && document.getElementById(controlled)?.matches('nav,[role="navigation"]')))) return;
+    const link = target.closest("a[href]");
+    if (link && (navigation || !section)) {
+      const url = new URL(link.href, location.href);
+      if (url.origin === location.origin && url.pathname === location.pathname && url.search === location.search && url.hash) return;
+      event.preventDefault();
+      send("navigate", { href: url.href });
+      return;
+    }
+    // Content clicks select a section; live form actions stay disabled.
+    if (section || link || button?.type === "submit") { event.preventDefault(); event.stopImmediatePropagation(); }
     if (section) send("select", { id: section.dataset.srSection });
   }, true);
   document.addEventListener("submit", event => { event.preventDefault(); event.stopImmediatePropagation(); }, true);

@@ -18,7 +18,7 @@ export default async function ContentPage() {
   const services = settings.enabledModuleIds.includes("scheduling") ? await prisma.service.findMany({
     where: { siteId: settings.siteId, isActive: true }, include: { mediaAsset: true }, orderBy: { name: "asc" }
   }) : [];
-  return <PuckContentEditor manifest={manifest} canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)} linkChoices={services.map(service => ({ id: service.id, slug: service.slug, label: service.name, category: service.category || "" }))} entries={manifest.blocks.filter(block => blockDependenciesAvailable(block, settings.enabledModuleIds)).map(block => ({
+  return <PuckContentEditor manifest={manifest} canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)} linkChoices={services.map(service => ({ id: service.id, slug: service.slug, label: service.name, category: service.category || "" }))} entries={manifest.blocks.filter(block => block.type !== "seo" && blockDependenciesAvailable(block, settings.enabledModuleIds)).map(block => ({
     block,
     payload: block.type === "business" ? resolveBusinessInfo(settings, block.defaults) : resolveStudioPayload(block, studio.blocks[block.id]),
     revision: studio.blocks[block.id]?.revision || 0,

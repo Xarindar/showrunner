@@ -89,7 +89,7 @@ Toolbar controls have modest corners; content inputs and image previews use the 
 - **Button settings:** Title and destination appear together. Link to selects Page, Service where available, or Web address, followed by the corresponding labeled selector or input. Service destinations include next-available-date guidance; existing destinations remain selectable.
 - **Focus:** Toolbar buttons and selectors retain a visible (2px) brand outline with (2px) offset. Content fields retain their existing explicit focus outline and visible labels.
 - **Feedback:** Loading and connection messages appear over the canvas; publish feedback appears below the toolbar with status or alert semantics. Preserve edits when publishing fails.
-- **Website canvas:** Render the actual website, with draft changes previewed immediately. Clicking a fixed section selects its content inspector. Content owners edit approved text, images, and services; page sections, their layout, and their order remain designer-owned. Do not expose insertion, deletion, duplication, or drag controls for page sections.
+- **Website canvas:** Native menus and in-page anchors remain usable; navigation links switch registered pages while retaining drafts. Hide technical metadata from the inspector while preserving accessibility data. Render the actual website, with draft changes previewed immediately. Clicking a fixed section selects its content inspector. Content owners edit approved text, images, and services; page sections, their layout, and their order remain designer-owned. Do not expose insertion, deletion, duplication, or drag controls for page sections.
 
 ## Do's and Don'ts
 

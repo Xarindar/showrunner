@@ -397,7 +397,7 @@ export function AssetPicker({
                         ? "Find a tag…"
                         : selectedTag
                           ? `Search within ${selectedTag}…`
-                          : "Search filename, alt text, folder, or tag…"
+                          : "Search images, folders, or tags…"
                     }
                     type="search"
                     value={query}
@@ -529,7 +529,7 @@ export function AssetPicker({
                     </strong>
                     <p>
                       {query
-                        ? "Try a filename, alt text, folder, or tag."
+                        ? "Try an image name, folder, or tag."
                         : selectedTag
                           ? "Choose another tag or add this tag to an image in Media."
                           : libraryFilter === "recent"
@@ -564,10 +564,6 @@ export function AssetPicker({
                       <span className={styles.readyBadge}><Check aria-hidden="true" size={13} /> Selected</span>
                       <h3>{selectedAsset.filename}</h3>
                       <dl>
-                        <div>
-                          <dt>Alt text</dt>
-                          <dd>{selectedAsset.alt || "Not provided"}</dd>
-                        </div>
                         {selectedAsset.folder ? (
                           <div>
                             <dt>Folder</dt>

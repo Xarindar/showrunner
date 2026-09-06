@@ -20,5 +20,18 @@ export function contentLinkOptions(manifest: ContentManifest, services: LinkChoi
 export function imageFirst(fields: Record<string, Field>) {
   const imageKeys = ["imageUrl", "url", "imageAlt", "alt", "images"];
   const priority = (key: string) => imageKeys.includes(key) ? imageKeys.indexOf(key) : imageKeys.length;
-  return Object.entries(fields).sort(([a], [b]) => priority(a) - priority(b));
+  // Preserve hidden descriptions and references in the payload.
+  return Object.entries(fields).filter(([key]) => !["alt", "imageAlt", "locationId"].includes(key)).sort(([a], [b]) => priority(a) - priority(b));
+}
+
+export function editorPageDestination(href: string, currentUrl: string, pages: ContentManifest["pages"]) {
+  try {
+    const url = new URL(href, currentUrl);
+    if (url.origin !== new URL(currentUrl).origin) return null;
+    const path = (value: string) => value.replace(/\/index\.html$/, "/");
+    const page = pages.find(page => path(page.path) === path(url.pathname));
+    if (!page) return null;
+    url.searchParams.delete("showrunner-editor");
+    return { pageId: page.id, href: url.href };
+  } catch { return null; }
 }
