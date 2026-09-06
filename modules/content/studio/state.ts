@@ -23,6 +23,7 @@ export function validateBlockUpdate(block: ContentBlockConfig, current: StoredBl
     const before = current?.payload[key];
     if (!Array.isArray(value) || !Array.isArray(before)) continue;
     const oldIds = before.map(row => row.id);
+    if (block.fixedRows && JSON.stringify(value.map(row => row.id)) !== JSON.stringify(oldIds)) throw new Error("This section's items and order are fixed by your site administrator");
     const retained = value.map(row => row.id).filter(id => oldIds.includes(id));
     if (JSON.stringify(retained) !== JSON.stringify(oldIds.filter(id => retained.includes(id)))) throw new Error("Item ordering is configured by your site administrator");
   }

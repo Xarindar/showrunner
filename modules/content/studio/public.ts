@@ -4,7 +4,7 @@ import { publicAppBaseUrl } from "@/lib/env";
 import { mediaAssetDisplayUrl } from "@/lib/media";
 import { getSiteSettingsForSite } from "@/lib/site";
 import { prisma } from "@/lib/prisma";
-import { resolveContentManifest } from "@/clients/content-manifests";
+import { getEditorManifest } from "@/clients/content-editor-manifests";
 import { readStudio } from "./state";
 import { resolveBusinessInfo, resolveBusinessLocation } from "./business-info";
 import { blockDependenciesAvailable } from "./manifest";
@@ -13,10 +13,10 @@ import { renderContentRichText } from "./rich-text";
 
 export async function getPublicStudio(siteId: string, pageId: string) {
   const settings = await getSiteSettingsForSite(siteId);
-  const manifest = resolveContentManifest(siteId, settings.publicContentConfig);
+  const manifest = await getEditorManifest(settings);
   if (!manifest.pages.some(page => page.id === pageId)) throw new EmbedRequestError("Unknown content page", 404);
   const state = readStudio(settings.publicContentConfig);
-  const business = resolveBusinessInfo(settings);
+  const business = resolveBusinessInfo(settings, manifest.blocks.find(block => block.type === "business")?.defaults);
   const blocks = await Promise.all(manifest.blocks.filter(block => block.type !== "business" && blockDependenciesAvailable(block, settings.enabledModuleIds)).map(async block => {
     const stored = state.blocks[block.id];
     const payloadPages = stored?.pageIds || block.pageIds;
@@ -70,6 +70,7 @@ function absolutizeRows(payload: Record<string, unknown>, field: string, urlKey:
 }
 
 function absolutizeBlockMedia(type: string, payload: Record<string, unknown>) {
+  if (type === "strip") return absolutizeRows(payload, "images", "url");
   if (type === "hero" || type === "gallery") return absolutizeRows(payload, "images", "url");
   if (type === "team" || type === "directory") return absolutizeRows(payload, "items", "imageUrl");
   if (["about", "coupon", "featured", "mailingList"].includes(type)) return { ...payload, imageUrl: publicMediaUrl(payload.imageUrl) };

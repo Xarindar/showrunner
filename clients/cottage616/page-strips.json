@@ -1,0 +1,1611 @@
+[
+  {
+    "id": "home-section-2",
+    "type": "strip",
+    "label": "Get to know us",
+    "editableFields": [
+      "texts"
+    ],
+    "pageIds": [
+      "home"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Get to know us"
+        },
+        {
+          "id": "text-2",
+          "text": "Local love"
+        },
+        {
+          "id": "text-3",
+          "text": "Our country charm is home grown from a love for our community and the people in it."
+        },
+        {
+          "id": "text-4",
+          "text": "Small venue, lots to love"
+        },
+        {
+          "id": "text-5",
+          "text": "The Cottage is a small but cozy space to celebrate special days and events with the people who matter most."
+        },
+        {
+          "id": "text-6",
+          "text": "Indoor / Outdoor"
+        },
+        {
+          "id": "text-7",
+          "text": "Enjoy indoor comfort or relax under the country stars in our spacious outdoor area."
+        }
+      ],
+      "images": [],
+      "links": []
+    },
+    "presentation": {
+      "selector": "#top > section:nth-of-type(2)",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "#top > section:nth-of-type(2) > div:nth-of-type(1) > h2:nth-of-type(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#top > section:nth-of-type(2) > div:nth-of-type(2) > article:nth-of-type(1) > div:nth-of-type(1) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "#top > section:nth-of-type(2) > div:nth-of-type(2) > article:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.3.text",
+          "selector": "#top > section:nth-of-type(2) > div:nth-of-type(2) > article:nth-of-type(2) > div:nth-of-type(1) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.4.text",
+          "selector": "#top > section:nth-of-type(2) > div:nth-of-type(2) > article:nth-of-type(2) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.5.text",
+          "selector": "#top > section:nth-of-type(2) > div:nth-of-type(2) > article:nth-of-type(3) > div:nth-of-type(1) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.6.text",
+          "selector": "#top > section:nth-of-type(2) > div:nth-of-type(2) > article:nth-of-type(3) > p:nth-of-type(1)"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "home-section-6",
+    "type": "strip",
+    "label": "Vendor partners.",
+    "editableFields": [
+      "texts",
+      "images"
+    ],
+    "pageIds": [
+      "home"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Vendor partners."
+        },
+        {
+          "id": "text-2",
+          "text": "Meet our local partners, with exclusive offers for Cottage 616 guests."
+        },
+        {
+          "id": "text-3",
+          "text": "Florals & styling"
+        },
+        {
+          "id": "text-4",
+          "text": "Catering & cakes"
+        },
+        {
+          "id": "text-5",
+          "text": "Soft play rentals"
+        },
+        {
+          "id": "text-6",
+          "text": "Music & photo booths"
+        }
+      ],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "assets/vendors/photos/soft-play-rental-setup.jpg",
+          "alt": "White soft play rentals and pale blue balloons arranged for a celebration",
+          "caption": ""
+        }
+      ],
+      "links": []
+    },
+    "presentation": {
+      "selector": "#vendor-partners",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "#vendor-partners-title"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#vendor-partners > div:nth-of-type(1) > div:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "#vendor-partners > div:nth-of-type(1) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(1)"
+        },
+        {
+          "path": "texts.3.text",
+          "selector": "#vendor-partners > div:nth-of-type(1) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(2)"
+        },
+        {
+          "path": "texts.4.text",
+          "selector": "#vendor-partners > div:nth-of-type(1) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(3)"
+        },
+        {
+          "path": "texts.5.text",
+          "selector": "#vendor-partners > div:nth-of-type(1) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(4)"
+        },
+        {
+          "path": "images.0.url",
+          "selector": "#vendor-partners > div:nth-of-type(1) > figure:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": "#vendor-partners > div:nth-of-type(1) > figure:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "alt"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "home-section-7",
+    "type": "strip",
+    "label": "Cottage 616 team",
+    "editableFields": [
+      "texts",
+      "images"
+    ],
+    "pageIds": [
+      "home"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Meet the Cottage 616 team"
+        },
+        {
+          "id": "text-2",
+          "text": "Jo Lynne Skaggs"
+        },
+        {
+          "id": "text-3",
+          "text": "Founder/CEO\nHead-Spa Specialist"
+        },
+        {
+          "id": "text-4",
+          "text": "Abigail Freligh"
+        },
+        {
+          "id": "text-5",
+          "text": "Social Media Coordinator"
+        },
+        {
+          "id": "text-6",
+          "text": "Tiffany Duggin"
+        },
+        {
+          "id": "text-7",
+          "text": "Assistant"
+        },
+        {
+          "id": "text-8",
+          "text": "Max Skaggs"
+        },
+        {
+          "id": "text-9",
+          "text": "Co-Founder"
+        }
+      ],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "assets/employees/jo-lynne-skaggs.png",
+          "alt": "Jo Lynne Skaggs",
+          "caption": ""
+        },
+        {
+          "id": "image-2",
+          "url": "assets/employees/abigail-freligh.jpg",
+          "alt": "Abigail Freligh",
+          "caption": ""
+        },
+        {
+          "id": "image-3",
+          "url": "assets/employees/tiffany-duggin.jpg",
+          "alt": "Tiffany Duggin",
+          "caption": ""
+        },
+        {
+          "id": "image-4",
+          "url": "assets/employees/max-skaggs.jpg",
+          "alt": "Max Skaggs",
+          "caption": ""
+        }
+      ],
+      "links": []
+    },
+    "presentation": {
+      "selector": "#team",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "#team > div:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "images.0.url",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(1) > div:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(1) > div:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(1) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "images.1.url",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(2) > div:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.1.alt",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(2) > div:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "texts.3.text",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(2) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.4.text",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(2) > p:nth-of-type(1)"
+        },
+        {
+          "path": "images.2.url",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(3) > div:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.2.alt",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(3) > div:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "texts.5.text",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(3) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.6.text",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(3) > p:nth-of-type(1)"
+        },
+        {
+          "path": "images.3.url",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(4) > div:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.3.alt",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(4) > div:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "texts.7.text",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(4) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.8.text",
+          "selector": "#team > div:nth-of-type(2) > article:nth-of-type(4) > p:nth-of-type(1)"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "home-section-8",
+    "type": "strip",
+    "label": "Let's stay in touch, gorgeous",
+    "editableFields": [
+      "texts"
+    ],
+    "pageIds": [
+      "home"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Let's stay in touch, gorgeous"
+        },
+        {
+          "id": "text-2",
+          "text": "Sign up for Cottage 616 deals and updates"
+        }
+      ],
+      "images": [],
+      "links": []
+    },
+    "presentation": {
+      "selector": "#contact > div:nth-of-type(1)",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "#hive-updates-title"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#contact > div:nth-of-type(1) > p:nth-of-type(1)"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "hive-section-2",
+    "type": "strip",
+    "label": "A soft reset for scalp care, stress relief, and shine.",
+    "editableFields": [
+      "texts",
+      "images",
+      "links"
+    ],
+    "pageIds": [
+      "hive"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Head Spa"
+        },
+        {
+          "id": "text-2",
+          "text": "A soft reset for scalp care, stress relief, and shine."
+        },
+        {
+          "id": "text-3",
+          "text": "A head spa is a rejuvenating treatment designed to support healthy hair growth while promoting total relaxation. Specialized tools, massage techniques, and professional-grade products help stimulate scalp circulation and deeply hydrate the skin."
+        }
+      ],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "assets/hive/photos/treatments/scalp-rinse.jpg",
+          "alt": "Cottage 616 head-spa water treatment",
+          "caption": ""
+        },
+        {
+          "id": "image-2",
+          "url": "assets/hive/photos/products/amika-products.jpg",
+          "alt": "Head-spa tools and relaxing treatment setup",
+          "caption": ""
+        }
+      ],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Book The Hive",
+          "href": "booking.html?profile=the-hive"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": "main:nth-of-type(1) > section:nth-of-type(2)",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(1) > h2:nth-of-type(1)"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(1) > p:nth-of-type(2)"
+        },
+        {
+          "path": "links.0.label",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(1) > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(1) > a:nth-of-type(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "images.0.url",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(2) > img:nth-of-type(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(2) > img:nth-of-type(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "images.1.url",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(2) > img:nth-of-type(2)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.1.alt",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(2) > img:nth-of-type(2)",
+          "attribute": "alt"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "hive-section-4",
+    "type": "strip",
+    "label": "Meet the team.",
+    "editableFields": [
+      "texts",
+      "images"
+    ],
+    "pageIds": [
+      "hive"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "The Hive Spa People"
+        },
+        {
+          "id": "text-2",
+          "text": "Meet the team."
+        },
+        {
+          "id": "text-3",
+          "text": "Jo and Deanna bring a calm, confidence-focused approach to every head-spa service, from scalp care and massage to the softer hair, lighter shoulders part everyone comes in hoping for."
+        },
+        {
+          "id": "text-4",
+          "text": "Jo Lynne Skaggs"
+        },
+        {
+          "id": "text-5",
+          "text": "Founder/CEO\nHead-Spa Specialist"
+        },
+        {
+          "id": "text-6",
+          "text": "Deanna"
+        },
+        {
+          "id": "text-7",
+          "text": "Head-Spa Specialist\nCosmetologist and certified lash tech"
+        }
+      ],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "https://www.cottage616.com/wp-content/uploads/go-x/u/e240b829-0633-4bec-aba1-d07d08415dd0/l572,t767,w694,h694/image-455x455.jpg",
+          "alt": "Jo Lynne Skaggs",
+          "caption": ""
+        },
+        {
+          "id": "image-2",
+          "url": "assets/hive/photos/team/deanna.jpg",
+          "alt": "Deanna, Head-Spa Specialist at Cottage 616",
+          "caption": ""
+        }
+      ],
+      "links": []
+    },
+    "presentation": {
+      "selector": "main:nth-of-type(1) > section:nth-of-type(4)",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#hive-team-title"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(1) > p:nth-of-type(2)"
+        },
+        {
+          "path": "images.0.url",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "texts.3.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(1) > div:nth-of-type(1) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.4.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(1) > div:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "images.1.url",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(2) > img:nth-of-type(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.1.alt",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(2) > img:nth-of-type(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "texts.5.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(2) > div:nth-of-type(1) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.6.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(2) > div:nth-of-type(1) > p:nth-of-type(1)"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "hive-section-5",
+    "type": "strip",
+    "label": "Head spa menu.",
+    "editableFields": [
+      "texts",
+      "links"
+    ],
+    "pageIds": [
+      "hive"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Head spa menu."
+        },
+        {
+          "id": "text-2",
+          "text": "The Refresh"
+        },
+        {
+          "id": "text-3",
+          "text": "Neck & shoulder massage."
+        },
+        {
+          "id": "text-4",
+          "text": "The Unwind"
+        },
+        {
+          "id": "text-5",
+          "text": "Head, neck, shoulder & face massage."
+        },
+        {
+          "id": "text-6",
+          "text": "The Glow"
+        },
+        {
+          "id": "text-7",
+          "text": "Extended massage, including arms & hands."
+        },
+        {
+          "id": "text-8",
+          "text": "The Full Ritual"
+        },
+        {
+          "id": "text-9",
+          "text": "Our longest session, including leg & foot massage."
+        },
+        {
+          "id": "text-10",
+          "text": "The Botanical"
+        },
+        {
+          "id": "text-11",
+          "text": "Botanical scalp cleanse & steamed hair mask, with neck, shoulder & face massage."
+        },
+        {
+          "id": "text-12",
+          "text": "Every head spa includes a scalp cleanse, leave-in conditioner, and a braid or airy blow dry."
+        },
+        {
+          "id": "text-13",
+          "text": "Textured, thick, or long hair may need extra detangling and blow-dry time. A $10 upcharge may apply and will be discussed before booking."
+        },
+        {
+          "id": "text-14",
+          "text": "The Refresh"
+        },
+        {
+          "id": "text-15",
+          "text": "30 min $30"
+        },
+        {
+          "id": "text-16",
+          "text": "Scalp cleanse"
+        },
+        {
+          "id": "text-17",
+          "text": "Neck and shoulder massage"
+        },
+        {
+          "id": "text-18",
+          "text": "Leave-in conditioner"
+        },
+        {
+          "id": "text-19",
+          "text": "Braid or airy blow dry"
+        },
+        {
+          "id": "text-20",
+          "text": "The Unwind"
+        },
+        {
+          "id": "text-21",
+          "text": "60 min $65"
+        },
+        {
+          "id": "text-22",
+          "text": "Deep scalp cleanse"
+        },
+        {
+          "id": "text-23",
+          "text": "Head, neck, shoulder and face massage"
+        },
+        {
+          "id": "text-24",
+          "text": "Leave-in conditioner"
+        },
+        {
+          "id": "text-25",
+          "text": "Braid or airy blow dry"
+        },
+        {
+          "id": "text-26",
+          "text": "The Glow"
+        },
+        {
+          "id": "text-27",
+          "text": "75 min $75"
+        },
+        {
+          "id": "text-28",
+          "text": "Deep scalp cleanse"
+        },
+        {
+          "id": "text-29",
+          "text": "Head, neck, shoulder, face, arm and hand massage"
+        },
+        {
+          "id": "text-30",
+          "text": "Leave-in conditioner"
+        },
+        {
+          "id": "text-31",
+          "text": "Braid or airy blow dry"
+        },
+        {
+          "id": "text-32",
+          "text": "The Full Ritual"
+        },
+        {
+          "id": "text-33",
+          "text": "90 min $90"
+        },
+        {
+          "id": "text-34",
+          "text": "Scalp cleanse with steam"
+        },
+        {
+          "id": "text-35",
+          "text": "Head, neck, shoulder, face, arm, hand, leg and foot massage"
+        },
+        {
+          "id": "text-36",
+          "text": "Leave-in conditioner"
+        },
+        {
+          "id": "text-37",
+          "text": "Braid or airy blow dry"
+        },
+        {
+          "id": "text-38",
+          "text": "The Botanical"
+        },
+        {
+          "id": "text-39",
+          "text": "75 min $75"
+        },
+        {
+          "id": "text-40",
+          "text": "Plant-based botanical scalp cleanse"
+        },
+        {
+          "id": "text-41",
+          "text": "Hair mask with natural ingredients and warm steam"
+        },
+        {
+          "id": "text-42",
+          "text": "Neck, shoulder and face massage"
+        },
+        {
+          "id": "text-43",
+          "text": "Leave-in conditioner"
+        },
+        {
+          "id": "text-44",
+          "text": "Braid or airy blow dry"
+        }
+      ],
+      "images": [],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Book",
+          "href": "booking.html?profile=the-hive"
+        },
+        {
+          "id": "link-2",
+          "label": "Book",
+          "href": "booking.html?profile=the-hive"
+        },
+        {
+          "id": "link-3",
+          "label": "Book",
+          "href": "booking.html?profile=the-hive"
+        },
+        {
+          "id": "link-4",
+          "label": "Book",
+          "href": "booking.html?profile=the-hive"
+        },
+        {
+          "id": "link-5",
+          "label": "Book",
+          "href": "booking.html?profile=the-hive"
+        },
+        {
+          "id": "link-6",
+          "label": "Book The Refresh",
+          "href": "booking.html?profile=the-hive"
+        },
+        {
+          "id": "link-7",
+          "label": "Book The Unwind",
+          "href": "booking.html?profile=the-hive"
+        },
+        {
+          "id": "link-8",
+          "label": "Book The Glow",
+          "href": "booking.html?profile=the-hive"
+        },
+        {
+          "id": "link-9",
+          "label": "Book The Full Ritual",
+          "href": "booking.html?profile=the-hive"
+        },
+        {
+          "id": "link-10",
+          "label": "Book The Botanical",
+          "href": "booking.html?profile=the-hive"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": "#head-spa-menu",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "#hive-pricing-title"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#refresh-title"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "#head-spa-menu > div:nth-of-type(2) > article:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "links.0.label",
+          "selector": "#head-spa-menu > div:nth-of-type(2) > article:nth-of-type(1) > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": "#head-spa-menu > div:nth-of-type(2) > article:nth-of-type(1) > a:nth-of-type(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "texts.3.text",
+          "selector": "#unwind-title"
+        },
+        {
+          "path": "texts.4.text",
+          "selector": "#head-spa-menu > div:nth-of-type(2) > article:nth-of-type(2) > p:nth-of-type(1)"
+        },
+        {
+          "path": "links.1.label",
+          "selector": "#head-spa-menu > div:nth-of-type(2) > article:nth-of-type(2) > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.1.href",
+          "selector": "#head-spa-menu > div:nth-of-type(2) > article:nth-of-type(2) > a:nth-of-type(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "texts.5.text",
+          "selector": "#glow-title"
+        },
+        {
+          "path": "texts.6.text",
+          "selector": "#head-spa-menu > div:nth-of-type(2) > article:nth-of-type(3) > p:nth-of-type(1)"
+        },
+        {
+          "path": "links.2.label",
+          "selector": "#head-spa-menu > div:nth-of-type(2) > article:nth-of-type(3) > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.2.href",
+          "selector": "#head-spa-menu > div:nth-of-type(2) > article:nth-of-type(3) > a:nth-of-type(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "texts.7.text",
+          "selector": "#ritual-title"
+        },
+        {
+          "path": "texts.8.text",
+          "selector": "#head-spa-menu > div:nth-of-type(2) > article:nth-of-type(4) > p:nth-of-type(1)"
+        },
+        {
+          "path": "links.3.label",
+          "selector": "#head-spa-menu > div:nth-of-type(2) > article:nth-of-type(4) > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.3.href",
+          "selector": "#head-spa-menu > div:nth-of-type(2) > article:nth-of-type(4) > a:nth-of-type(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "texts.9.text",
+          "selector": "#botanical-title"
+        },
+        {
+          "path": "texts.10.text",
+          "selector": "#head-spa-menu > article:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "links.4.label",
+          "selector": "#head-spa-menu > article:nth-of-type(1) > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.4.href",
+          "selector": "#head-spa-menu > article:nth-of-type(1) > a:nth-of-type(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "texts.11.text",
+          "selector": "#head-spa-menu > div:nth-of-type(3) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.12.text",
+          "selector": "#head-spa-menu > div:nth-of-type(3) > p:nth-of-type(2)"
+        },
+        {
+          "path": "texts.13.text",
+          "selector": "#refresh-details-title"
+        },
+        {
+          "path": "texts.14.text",
+          "selector": "#refresh-details > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.15.text",
+          "selector": "#refresh-details > ul:nth-of-type(1) > li:nth-of-type(1)"
+        },
+        {
+          "path": "texts.16.text",
+          "selector": "#refresh-details > ul:nth-of-type(1) > li:nth-of-type(2)"
+        },
+        {
+          "path": "texts.17.text",
+          "selector": "#refresh-details > ul:nth-of-type(1) > li:nth-of-type(3)"
+        },
+        {
+          "path": "texts.18.text",
+          "selector": "#refresh-details > ul:nth-of-type(1) > li:nth-of-type(4)"
+        },
+        {
+          "path": "links.5.label",
+          "selector": "#refresh-details > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.5.href",
+          "selector": "#refresh-details > a:nth-of-type(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "texts.19.text",
+          "selector": "#unwind-details-title"
+        },
+        {
+          "path": "texts.20.text",
+          "selector": "#unwind-details > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.21.text",
+          "selector": "#unwind-details > ul:nth-of-type(1) > li:nth-of-type(1)"
+        },
+        {
+          "path": "texts.22.text",
+          "selector": "#unwind-details > ul:nth-of-type(1) > li:nth-of-type(2)"
+        },
+        {
+          "path": "texts.23.text",
+          "selector": "#unwind-details > ul:nth-of-type(1) > li:nth-of-type(3)"
+        },
+        {
+          "path": "texts.24.text",
+          "selector": "#unwind-details > ul:nth-of-type(1) > li:nth-of-type(4)"
+        },
+        {
+          "path": "links.6.label",
+          "selector": "#unwind-details > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.6.href",
+          "selector": "#unwind-details > a:nth-of-type(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "texts.25.text",
+          "selector": "#glow-details-title"
+        },
+        {
+          "path": "texts.26.text",
+          "selector": "#glow-details > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.27.text",
+          "selector": "#glow-details > ul:nth-of-type(1) > li:nth-of-type(1)"
+        },
+        {
+          "path": "texts.28.text",
+          "selector": "#glow-details > ul:nth-of-type(1) > li:nth-of-type(2)"
+        },
+        {
+          "path": "texts.29.text",
+          "selector": "#glow-details > ul:nth-of-type(1) > li:nth-of-type(3)"
+        },
+        {
+          "path": "texts.30.text",
+          "selector": "#glow-details > ul:nth-of-type(1) > li:nth-of-type(4)"
+        },
+        {
+          "path": "links.7.label",
+          "selector": "#glow-details > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.7.href",
+          "selector": "#glow-details > a:nth-of-type(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "texts.31.text",
+          "selector": "#ritual-details-title"
+        },
+        {
+          "path": "texts.32.text",
+          "selector": "#ritual-details > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.33.text",
+          "selector": "#ritual-details > ul:nth-of-type(1) > li:nth-of-type(1)"
+        },
+        {
+          "path": "texts.34.text",
+          "selector": "#ritual-details > ul:nth-of-type(1) > li:nth-of-type(2)"
+        },
+        {
+          "path": "texts.35.text",
+          "selector": "#ritual-details > ul:nth-of-type(1) > li:nth-of-type(3)"
+        },
+        {
+          "path": "texts.36.text",
+          "selector": "#ritual-details > ul:nth-of-type(1) > li:nth-of-type(4)"
+        },
+        {
+          "path": "links.8.label",
+          "selector": "#ritual-details > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.8.href",
+          "selector": "#ritual-details > a:nth-of-type(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "texts.37.text",
+          "selector": "#botanical-details-title"
+        },
+        {
+          "path": "texts.38.text",
+          "selector": "#botanical-details > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.39.text",
+          "selector": "#botanical-details > ul:nth-of-type(1) > li:nth-of-type(1)"
+        },
+        {
+          "path": "texts.40.text",
+          "selector": "#botanical-details > ul:nth-of-type(1) > li:nth-of-type(2)"
+        },
+        {
+          "path": "texts.41.text",
+          "selector": "#botanical-details > ul:nth-of-type(1) > li:nth-of-type(3)"
+        },
+        {
+          "path": "texts.42.text",
+          "selector": "#botanical-details > ul:nth-of-type(1) > li:nth-of-type(4)"
+        },
+        {
+          "path": "texts.43.text",
+          "selector": "#botanical-details > ul:nth-of-type(1) > li:nth-of-type(5)"
+        },
+        {
+          "path": "links.9.label",
+          "selector": "#botanical-details > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.9.href",
+          "selector": "#botanical-details > a:nth-of-type(1)",
+          "attribute": "href"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "hive-section-6",
+    "type": "strip",
+    "label": "Foot Facial.",
+    "editableFields": [
+      "texts",
+      "links"
+    ],
+    "pageIds": [
+      "hive"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Foot Facial."
+        },
+        {
+          "id": "text-2",
+          "text": "Foot soak, exfoliation & massage."
+        },
+        {
+          "id": "text-3",
+          "text": "30 min $30"
+        }
+      ],
+      "images": [],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Book foot facial",
+          "href": "booking.html?profile=the-hive"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": "#foot-spa",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "#foot-spa-title"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#foot-spa > div:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "#foot-spa > p:nth-of-type(1)"
+        },
+        {
+          "path": "links.0.label",
+          "selector": "#foot-spa > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": "#foot-spa > a:nth-of-type(1)",
+          "attribute": "href"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "hive-section-7",
+    "type": "strip",
+    "label": "What the treatment supports.",
+    "editableFields": [
+      "texts"
+    ],
+    "pageIds": [
+      "hive"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Head spa benefits"
+        },
+        {
+          "id": "text-2",
+          "text": "What the treatment supports."
+        },
+        {
+          "id": "text-3",
+          "text": "Scalp Clarity"
+        },
+        {
+          "id": "text-4",
+          "text": "Helps cleanse and unclog hair follicles while removing buildup from styling products and everyday pollution."
+        },
+        {
+          "id": "text-5",
+          "text": "Oil Balance"
+        },
+        {
+          "id": "text-6",
+          "text": "Supports a cleaner, calmer scalp by rebalancing excess oil and helping reduce dandruff concerns."
+        },
+        {
+          "id": "text-7",
+          "text": "Circulation"
+        },
+        {
+          "id": "text-8",
+          "text": "Massage-focused techniques stimulate the scalp and create a fresh foundation for healthy-looking hair."
+        },
+        {
+          "id": "text-9",
+          "text": "Relaxation"
+        },
+        {
+          "id": "text-10",
+          "text": "Eases tension, relieves headache pressure, and melts stress away in a quiet treatment space."
+        }
+      ],
+      "images": [],
+      "links": []
+    },
+    "presentation": {
+      "selector": "main:nth-of-type(1) > section:nth-of-type(7)",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(7) > div:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#hive-benefits-title"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(7) > div:nth-of-type(2) > article:nth-of-type(1) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.3.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(7) > div:nth-of-type(2) > article:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.4.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(7) > div:nth-of-type(2) > article:nth-of-type(2) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.5.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(7) > div:nth-of-type(2) > article:nth-of-type(2) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.6.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(7) > div:nth-of-type(2) > article:nth-of-type(3) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.7.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(7) > div:nth-of-type(2) > article:nth-of-type(3) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.8.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(7) > div:nth-of-type(2) > article:nth-of-type(4) > h3:nth-of-type(1)"
+        },
+        {
+          "path": "texts.9.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(7) > div:nth-of-type(2) > article:nth-of-type(4) > p:nth-of-type(1)"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "hive-section-8",
+    "type": "strip",
+    "label": "Amika, start to finish.",
+    "editableFields": [
+      "texts"
+    ],
+    "pageIds": [
+      "hive"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Amika Products"
+        },
+        {
+          "id": "text-2",
+          "text": "Amika, start to finish."
+        },
+        {
+          "id": "text-3",
+          "text": "The Hive exclusively uses Amika throughout each head-spa service, pairing the brand's high-performance formulas with a treatment flow designed to support scalp health, softness, hydration, and shine."
+        },
+        {
+          "id": "text-4",
+          "text": "Clean formulas free from harsh sulfates, parabens, and phthalates"
+        },
+        {
+          "id": "text-5",
+          "text": "Nutrient-rich sea buckthorn with vitamins, antioxidants, and fatty acids"
+        },
+        {
+          "id": "text-6",
+          "text": "Options for dryness, oil imbalance, dandruff, and buildup"
+        },
+        {
+          "id": "text-7",
+          "text": "Only Amika touches the service."
+        }
+      ],
+      "images": [],
+      "links": []
+    },
+    "presentation": {
+      "selector": "main:nth-of-type(1) > section:nth-of-type(8)",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(8) > div:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#hive-amika-title"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(8) > div:nth-of-type(1) > p:nth-of-type(2)"
+        },
+        {
+          "path": "texts.3.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(8) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(1)"
+        },
+        {
+          "path": "texts.4.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(8) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(2)"
+        },
+        {
+          "path": "texts.5.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(8) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(3)"
+        },
+        {
+          "path": "texts.6.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(8) > div:nth-of-type(2) > p:nth-of-type(1)"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "hive-section-9",
+    "type": "strip",
+    "label": "A head-spa reset for softer hair and quieter shoulders.",
+    "editableFields": [
+      "texts",
+      "links"
+    ],
+    "pageIds": [
+      "hive"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Girls' Day, Bride Reset, Solo Unwind"
+        },
+        {
+          "id": "text-2",
+          "text": "A head-spa reset for softer hair and quieter shoulders."
+        },
+        {
+          "id": "text-3",
+          "text": "A tucked-away reset for scalp care, slow massage, hydration, and the kind of shine that feels easy to wear out the door."
+        }
+      ],
+      "images": [],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Book The Hive",
+          "href": "booking.html?profile=the-hive"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": "main:nth-of-type(1) > section:nth-of-type(9)",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(9) > div:nth-of-type(2) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#hive-cta-title"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(9) > div:nth-of-type(2) > p:nth-of-type(2)"
+        },
+        {
+          "path": "links.0.label",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(9) > div:nth-of-type(2) > a:nth-of-type(1)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(9) > div:nth-of-type(2) > a:nth-of-type(1)",
+          "attribute": "href"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "hive-section-10",
+    "type": "strip",
+    "label": "Bee in the know!",
+    "editableFields": [
+      "texts"
+    ],
+    "pageIds": [
+      "hive"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Bee in the know!"
+        },
+        {
+          "id": "text-2",
+          "text": "Sign up for The Hive Updates!"
+        }
+      ],
+      "images": [],
+      "links": []
+    },
+    "presentation": {
+      "selector": "#contact > div:nth-of-type(1)",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "#hive-updates-title"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#contact > div:nth-of-type(1) > p:nth-of-type(1)"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "vendors-section-1",
+    "type": "strip",
+    "label": "Our preferred partners.",
+    "editableFields": [
+      "texts",
+      "images"
+    ],
+    "pageIds": [
+      "vendors"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Cottage 616 partner guide"
+        },
+        {
+          "id": "text-2",
+          "text": "Our preferred partners."
+        },
+        {
+          "id": "text-3",
+          "text": "Thoughtful, local businesses we trust to bring beautiful celebrations together."
+        }
+      ],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "assets/vendors/photos/sympathy-floral-arrangement.jpg",
+          "alt": "Red and orange sympathy arrangement by Fleurish Flowers",
+          "caption": ""
+        }
+      ],
+      "links": []
+    },
+    "presentation": {
+      "selector": "main:nth-of-type(1) > section:nth-of-type(1)",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(1) > div:nth-of-type(1) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(1) > div:nth-of-type(1) > h1:nth-of-type(1)"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(1) > div:nth-of-type(1) > p:nth-of-type(2)"
+        },
+        {
+          "path": "images.0.url",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(1) > figure:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(1) > figure:nth-of-type(1) > img:nth-of-type(1)",
+          "attribute": "alt"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "vendors-section-2",
+    "type": "strip",
+    "label": "The details deserve good people.",
+    "editableFields": [
+      "texts"
+    ],
+    "pageIds": [
+      "vendors"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Made close to home"
+        },
+        {
+          "id": "text-2",
+          "text": "The details deserve good people."
+        },
+        {
+          "id": "text-3",
+          "text": "Cottage 616 is proud to work alongside local partners with a genuine eye for hospitality. Explore their offerings and contact them directly to make your celebration your own."
+        }
+      ],
+      "images": [],
+      "links": []
+    },
+    "presentation": {
+      "selector": "main:nth-of-type(1) > section:nth-of-type(2)",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > p:nth-of-type(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#vendors-intro-title"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > p:nth-of-type(2)"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  },
+  {
+    "id": "vendors-section-5",
+    "type": "strip",
+    "label": "Let's stay in touch, gorgeous",
+    "editableFields": [
+      "texts"
+    ],
+    "pageIds": [
+      "vendors"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Let's stay in touch, gorgeous"
+        },
+        {
+          "id": "text-2",
+          "text": "Sign up for Cottage 616 deals and updates"
+        }
+      ],
+      "images": [],
+      "links": []
+    },
+    "presentation": {
+      "selector": "#contact > div:nth-of-type(1)",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "#hive-updates-title"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#contact > div:nth-of-type(1) > p:nth-of-type(1)"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    }
+  }
+]
+

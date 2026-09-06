@@ -47,7 +47,7 @@ export function StudioEditor({ block, canUpload = false, pages, initialPayload, 
   </section>;
 }
 
-export function Fields({ canUpload = false, fields, limits, minimums, value, prefix, onChange, choices = [] }: { canUpload?: boolean; fields: Record<string, Field>; limits?: Record<string, number>; minimums?: Record<string, number>; value: Record<string, unknown>; prefix: string; onChange: (next: Record<string, unknown>) => void; choices?: Choice[] }) {
+export function Fields({ canUpload = false, fixedRows = false, assetBaseUrl, fields, limits, minimums, value, prefix, onChange, choices = [] }: { canUpload?: boolean; fixedRows?: boolean; assetBaseUrl?: string; fields: Record<string, Field>; limits?: Record<string, number>; minimums?: Record<string, number>; value: Record<string, unknown>; prefix: string; onChange: (next: Record<string, unknown>) => void; choices?: Choice[] }) {
   return <>{Object.entries(fields).map(([key, field]) => {
     const id = `${prefix}-${key}`;
     const update = (next: unknown) => onChange({ ...value, [key]: next });
@@ -58,17 +58,19 @@ export function Fields({ canUpload = false, fields, limits, minimums, value, pre
       const minimum = minimums?.[key] ?? 0;
       return <fieldset key={key} className={styles.list}><legend>{field.label}</legend>
         {rows.map((row, index) => <div key={String(row.id)} className={styles.item}>
-          <Fields canUpload={canUpload} fields={field.fields!} value={row} prefix={`${id}-${row.id}`} choices={choices} onChange={next => update(rows.map((current, i) => i === index ? next : current))} />
-          <button type="button" disabled={rows.length <= minimum} onClick={() => update(rows.filter((_, i) => i !== index))}>Remove {field.label.toLowerCase()} item {index + 1}</button>
+          <Fields canUpload={canUpload} assetBaseUrl={assetBaseUrl} fields={field.fields!} value={row} prefix={`${id}-${row.id}`} choices={choices} onChange={next => update(rows.map((current, i) => i === index ? next : current))} />
+          {!fixedRows && <button type="button" disabled={rows.length <= minimum} onClick={() => update(rows.filter((_, i) => i !== index))}>Remove {field.label.toLowerCase()} item {index + 1}</button>}
         </div>)}
         {minimum > 0 ? <small>Keep at least {minimum} {field.label.toLowerCase()}.</small> : null}
-        <button type="button" disabled={rows.length >= maximum} onClick={() => update([...rows, { id: crypto.randomUUID(), ...emptyFields(field.fields!) }])}>Add {field.label.toLowerCase()}</button>
+        {!fixedRows && <button type="button" disabled={rows.length >= maximum} onClick={() => update([...rows, { id: crypto.randomUUID(), ...emptyFields(field.fields!) }])}>Add {field.label.toLowerCase()}</button>}
       </fieldset>;
     }
     if (key === "referenceId") return <label key={key} htmlFor={id}>Item<select id={id} value={String(value[key] || "")} onChange={event => update(event.target.value)}><option value="">Select an item</option>{choices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label>;
     const media = key === "imageUrl" || (key === "url" && "alt" in fields);
-    return <div key={key} className={styles.field}><label htmlFor={id}>{field.label}</label>
-      {field.kind === "richtext" ? <RichText id={id} value={String(value[key] || "")} maxLength={field.max} onChange={update} /> : field.kind === "multiline" ? <textarea id={id} rows={4} maxLength={field.max} value={String(value[key] || "")} onChange={event => update(event.target.value)} /> : <input id={id} type={field.kind === "email" ? "email" : "text"} maxLength={field.max} value={String(value[key] || "")} onChange={event => update(event.target.value)} />}
+    const source = String(value[key] || "");
+    const preview = media && source && assetBaseUrl && !source.startsWith("/") ? new URL(source, assetBaseUrl).toString() : source;
+    return <div key={key} className={styles.field}>{media ? <span>Image</span> : <label htmlFor={id}>{field.label}</label>}
+      {media ? <div className={styles.mediaPreview} role="img" aria-label={String(value.alt || value.imageAlt || "Selected image")} style={{ backgroundImage: preview ? `url(${JSON.stringify(preview)})` : undefined }}>{!preview && "Choose an image"}</div> : field.kind === "richtext" ? <RichText id={id} value={String(value[key] || "")} maxLength={field.max} onChange={update} /> : field.kind === "multiline" ? <textarea id={id} rows={4} maxLength={field.max} value={String(value[key] || "")} onChange={event => update(event.target.value)} /> : <input id={id} type={field.kind === "email" ? "email" : "text"} maxLength={field.max} value={source} onChange={event => update(event.target.value)} />}
       {media ? <StudioMediaPicker
         canUpload={canUpload}
         context={prefix}

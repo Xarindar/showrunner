@@ -3,14 +3,15 @@ import { blockRegistry, emptyPayload, payloadSchema, type BlockType } from "./re
 export type ContentBlockConfig = {
   id: string; type: BlockType; label: string; editableFields: string[];
   pageIds: string[]; allowPageTargeting?: boolean; limits?: Record<string, number>; minimums?: Record<string, number>;
-  presentation?: { assetBaseUrl?: string; variant?: string }; source?: "services";
+  presentation?: { assetBaseUrl?: string; variant?: string; selector?: string; bindings?: { path: string; selector: string; attribute?: "src" | "alt" | "href" | "background" }[] }; source?: "services";
+  fixedRows?: boolean;
   sourceCategory?: string;
   formId?: string;
   defaults?: Record<string, unknown>;
 };
 export type ContentManifest = {
   version: 1; id: string; pages: { id: string; path: string; label: string }[];
-  blocks: ContentBlockConfig[]; legacyProfiles?: boolean;
+  blocks: ContentBlockConfig[]; legacyProfiles?: boolean; previewUrl?: string;
 };
 export function validateManifest(manifest: ContentManifest): ContentManifest {
   const ids = new Set<string>();

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  distDir: process.env.SHOWRUNNER_BUILD_DIR || ".next",
   env: {
     MODULE_INCL: process.env.MODULE_INCL ?? ""
   },
