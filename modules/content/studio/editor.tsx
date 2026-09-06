@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { Image as ImageIcon, Plus } from "lucide-react";
-import { imageFirst, type LinkOptions } from "./field-layout";
+import { destinationKind, imageFirst, type LinkOptions } from "./field-layout";
 import { AssetPicker, type AssetPickerAsset } from "@/components/ui/asset-picker";
 import { blockRegistry, emptyFields, type Field } from "./registry";
 import type { ContentBlockConfig, ContentManifest } from "./manifest";
@@ -89,11 +89,15 @@ export function Fields({ canUpload = false, fixedRows = false, assetBaseUrl, lin
 }
 
 function DestinationField({ id, value, options, onChange }: { id: string; value: string; options: LinkOptions; onChange: (value: string) => void }) {
-  const infer = (href: string) => options.services.some(service => service.href === href) ? "service" : !href || options.pages.some(page => new URL(href, "https://site.invalid").pathname === page.path) ? "page" : "url";
-  const [kind, setKind] = useState(() => infer(value));
-  const selectedKind = value ? infer(value) : kind;
-  return <><label htmlFor={`${id}-type`}>Link to<select id={`${id}-type`} value={selectedKind} onChange={event => { setKind(event.target.value); onChange(""); }}><option value="page">Page</option>{options.services.length > 0 && <option value="service">Service</option>}<option value="url">Web address</option></select></label>
-    {selectedKind === "url" ? <label htmlFor={id}>Web address<input id={id} value={value} onChange={event => onChange(event.target.value)} /></label> : <label htmlFor={id}>{selectedKind === "service" ? "Service" : "Page"}<select id={id} value={value} onChange={event => onChange(event.target.value)}><option value="">Choose {selectedKind === "service" ? "a service" : "a page"}</option>{(selectedKind === "service" ? options.services.map(service => ({ label: service.label, value: service.href })) : options.pages.map(page => ({ label: page.label, value: page.path }))).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}{value && !(selectedKind === "service" ? options.services.some(service => service.href === value) : options.pages.some(page => page.path === value)) && <option value={value}>Current destination</option>}</select></label>}
+  const [selection, setSelection] = useState(() => ({ value, kind: destinationKind(value, options) as string, authored: null as string | null }));
+  if (selection.value !== value) setSelection({ ...selection, value, kind: selection.authored === value ? selection.kind : destinationKind(value, options) });
+  const selectedKind = selection.kind;
+  function edit(next: string, kind = selectedKind) {
+    setSelection({ value, kind, authored: next });
+    onChange(next);
+  }
+  return <><label htmlFor={`${id}-type`}>Link to<select id={`${id}-type`} value={selectedKind} onChange={event => { edit("", event.target.value); }}><option value="page">Page</option>{options.services.length > 0 && <option value="service">Service</option>}<option value="url">Web address</option></select></label>
+    {selectedKind === "url" ? <label htmlFor={id}>Web address<input id={id} value={value} onChange={event => edit(event.target.value)} /></label> : <label htmlFor={id}>{selectedKind === "service" ? "Service" : "Page"}<select id={id} value={value} onChange={event => edit(event.target.value)}><option value="">Choose {selectedKind === "service" ? "a service" : "a page"}</option>{(selectedKind === "service" ? options.services.map(service => ({ label: service.label, value: service.href })) : options.pages.map(page => ({ label: page.label, value: page.path }))).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}{value && !(selectedKind === "service" ? options.services.some(service => service.href === value) : options.pages.some(page => page.path === value)) && <option value={value}>Current destination</option>}</select></label>}
     {selectedKind === "service" && <small>Opens booking at this service’s next available date.</small>}
   </>;
 }

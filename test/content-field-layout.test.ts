@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { contentLinkOptions, imageFirst } from "../modules/content/studio/field-layout";
+import { contentLinkOptions, destinationKind, imageFirst } from "../modules/content/studio/field-layout";
 import { blockRegistry, emptyFields } from "../modules/content/studio/registry";
 import { configuredBlock } from "../modules/content/studio/manifest";
 import { resolveStudioPayload, validateBlockUpdate, type StoredBlock } from "../modules/content/studio/state";
@@ -20,6 +20,8 @@ test("settings put each item's image first and keep every template binding in a 
 
 test("service buttons use slugs and route to the matching booking profile", () => {
   const options = contentLinkOptions(cottageContentManifest, [{ id: "private-id", slug: "head-spa", label: "Head spa", category: "The-Hive" }]);
+  assert.equal(destinationKind("https://", options), "url");
+  assert.equal(destinationKind("http://[", options), "url");
   assert.equal(options.services[0].href, "/booking.html?service=head-spa&next=1&profile=the-hive");
 });
 
