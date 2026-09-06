@@ -72,6 +72,12 @@ test("directory entries accept display and contact fields but reject unknown dat
 test("source categories are only valid with service-backed blocks", () => {
   assert.throws(() => validateManifest({ version: 1, id: "test", pages: [], blocks: [configuredBlock("gallery", "gallery", [], { sourceCategory: "events" })] }), /service source/);
 });
+test("manifest list minimums preserve layouts that require a fixed number of cards", () => {
+  const events = cottageContentManifest.blocks.find(block => block.id === "home-events")!;
+  assert.throws(() => validateBlockUpdate(events, undefined, { id: events.id, revision: 0, payload: { ...events.defaults, items: [] }, pageIds: ["home"] }), /at least 3/);
+  assert.doesNotThrow(() => validateBlockUpdate(events, undefined, { id: events.id, revision: 0, payload: events.defaults || {}, pageIds: ["home"] }));
+  assert.throws(() => validateManifest({ version: 1, id: "test", pages: [], blocks: [configuredBlock("gallery", "gallery", [], { limits: { images: 2 }, minimums: { images: 3 } })] }), /minimum/);
+});
 test("mailing-list editors require a configured form", () => {
   assert.throws(() => validateManifest({ version: 1, id: "test", pages: [], blocks: [configuredBlock("signup", "mailingList", [])] }), /form/);
 });

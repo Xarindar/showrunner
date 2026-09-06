@@ -27,6 +27,7 @@ export function validateBlockUpdate(block: ContentBlockConfig, current: StoredBl
     if (JSON.stringify(retained) !== JSON.stringify(oldIds.filter(id => retained.includes(id)))) throw new Error("Item ordering is configured by your site administrator");
   }
   for (const [key, limit] of Object.entries(block.limits || {})) if (Array.isArray(payload[key]) && payload[key].length > limit) throw new Error(`${key} allows at most ${limit} items`);
+  for (const [key, minimum] of Object.entries(block.minimums || {})) if (Array.isArray(payload[key]) && payload[key].length < minimum) throw new Error(`${key} requires at least ${minimum} items`);
   if (new Set(input.pageIds).size !== input.pageIds.length || input.pageIds.some(id => !block.pageIds.includes(id))) throw new Error("Page is not allowed for this block");
   const existingPages = current?.pageIds || block.pageIds;
   if (!block.allowPageTargeting && JSON.stringify(input.pageIds) !== JSON.stringify(existingPages)) throw new Error("Page targeting is locked");

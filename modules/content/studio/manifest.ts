@@ -2,7 +2,7 @@ import { blockRegistry, emptyPayload, payloadSchema, type BlockType } from "./re
 
 export type ContentBlockConfig = {
   id: string; type: BlockType; label: string; editableFields: string[];
-  pageIds: string[]; allowPageTargeting?: boolean; limits?: Record<string, number>;
+  pageIds: string[]; allowPageTargeting?: boolean; limits?: Record<string, number>; minimums?: Record<string, number>;
   presentation?: { assetBaseUrl?: string; variant?: string }; source?: "services";
   sourceCategory?: string;
   formId?: string;
@@ -32,6 +32,11 @@ export function validateManifest(manifest: ContentManifest): ContentManifest {
     for (const [key, limit] of Object.entries(block.limits || {})) {
       const field = (definition.fields as Record<string, { kind: string; max?: number }>)[key];
       if (!field || field.kind !== "list" || !Number.isInteger(limit) || limit < 0 || limit > (field.max || 12)) throw new Error("Invalid item limit");
+    }
+    for (const [key, minimum] of Object.entries(block.minimums || {})) {
+      const field = (definition.fields as Record<string, { kind: string; max?: number }>)[key];
+      const maximum = block.limits?.[key] ?? field?.max ?? 12;
+      if (!field || field.kind !== "list" || !Number.isInteger(minimum) || minimum < 0 || minimum > maximum) throw new Error("Invalid item minimum");
     }
   }
   if (manifest.blocks.filter(block => block.type === "business").length > 1) throw new Error("Business Info must have one source");
