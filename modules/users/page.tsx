@@ -123,7 +123,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
                     <td>
                       <form action={updateAdminUserRoleAction} className="ui-inline-actions">
                         <input type="hidden" name="id" value={user.id} />
-                        <Select name="role" defaultValue={user.role} disabled={isSelf || isLastOwner}>
+                        <Select aria-label={`Role for ${user.email}`} name="role" defaultValue={user.role} disabled={isSelf || isLastOwner}>
                           {Object.values(AdminRole).map((role) => (
                             <option key={role} value={role}>
                               {enumLabel(role)}

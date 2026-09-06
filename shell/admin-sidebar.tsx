@@ -11,6 +11,8 @@ import {
   LogOut,
   Menu,
   Pencil,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   UserRound,
   X
@@ -35,6 +37,7 @@ import { Button } from "@/components/ui";
 import { useEffect, useRef, useState, useTransition, type KeyboardEvent, type PointerEvent } from "react";
 
 type AdminSidebarProps = {
+  initialCollapsed: boolean;
   businessName: string;
   enabledModules: ModuleId[];
   logoUrl: string;
@@ -188,9 +191,47 @@ function SidebarNavGroup({
   );
 }
 
-export function AdminSidebar({ businessName, enabledModules, logoUrl, navigationLayout, userEmail, userRole }: AdminSidebarProps) {
+export function AdminSidebar({ businessName, enabledModules, logoUrl, navigationLayout, userEmail, userRole, initialCollapsed }: AdminSidebarProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const sidebar = document.getElementById("admin-sidebar");
+    const main = document.querySelector<HTMLElement>(".admin-main");
+    const header = document.querySelector<HTMLElement>(".admin-mobile-bar");
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    const mobile = window.matchMedia("(max-width: 860px)");
+    if (!mobile.matches || !sidebar) return;
+    if (main) main.inert = true;
+    if (header) header.inert = true;
+    document.body.style.overflow = "hidden";
+    sidebar.querySelector<HTMLButtonElement>(".admin-sidebar-close")?.focus();
+    const resized = () => { if (!mobile.matches) setMenuOpen(false); };
+    const keydown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setMenuOpen(false); }
+      if (event.key !== "Tab") return;
+      const controls = Array.from(sidebar.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex="0"]')).filter(node => node.getClientRects().length);
+      const first = controls[0], last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    sidebar.addEventListener("keydown", keydown);
+    mobile.addEventListener("change", resized);
+    return () => {
+      if (main) main.inert = false;
+      if (header) header.inert = false;
+      document.body.style.overflow = previousOverflow;
+      sidebar.removeEventListener("keydown", keydown);
+      mobile.removeEventListener("change", resized);
+      previousFocus?.focus();
+    };
+  }, [menuOpen]);
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
+  function toggleCollapsed() {
+    setCollapsed(!collapsed);
+    document.cookie = `showrunner-sidebar-collapsed=${!collapsed}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
+  }
   const [editing, setEditing] = useState(false);
   const [draggedModuleId, setDraggedModuleId] = useState<string | null>(null);
   const [layoutItems, setLayoutItems] = useState(() => groupAdminModuleNavigationLayout(navigationLayout));
@@ -412,7 +453,8 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, navigation
         type="button"
       />
 
-      <aside className={`admin-sidebar ${menuOpen ? "open" : ""}`} id="admin-sidebar">
+      <aside className={`admin-sidebar ${menuOpen ? "open" : ""} ${collapsed ? "is-collapsed" : ""}`} id="admin-sidebar">
+        <button className="admin-sidebar-collapse" aria-label={collapsed ? "Expand dashboard panel" : "Collapse dashboard panel"} aria-expanded={!collapsed} onClick={toggleCollapsed} type="button">{collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}</button>
         <div className="admin-sidebar-header">
           <Link href="/admin" className="brand" onClick={closeMenu}>
             <SidebarBrand businessName={businessName} logoUrl={logoUrl} />

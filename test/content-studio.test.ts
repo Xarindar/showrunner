@@ -8,6 +8,19 @@ import { cottageContentManifest, resolveContentManifest } from "../clients/conte
 import { renderContentRichText } from "../modules/content/studio/rich-text";
 
 const faq = configuredBlock("faq", "faq", ["home", "about"], { allowPageTargeting: true, limits: { items: 1 } });
+test("fixed website sections permit copy edits but reject added, deleted, or reordered rows", () => {
+  const block = cottageContentManifest.blocks.find(block => block.type === "strip" && (block.defaults?.texts as unknown[]).length > 1)!;
+  const payload = structuredClone(block.defaults!);
+  const baseline: StoredBlock = { schemaVersion: 1, revision: 0, payload, pageIds: block.pageIds, updatedAt: "", updatedBy: "" };
+  const request = { id: block.id, revision: 0, pageIds: block.pageIds, payload: { texts: structuredClone(payload.texts) } };
+  const rows = request.payload.texts as { id: string; text: string }[];
+  rows[0].text = "Updated copy";
+  assert.doesNotThrow(() => validateBlockUpdate(block, baseline, request));
+  for (const texts of [rows.slice(1), [...rows].reverse(), [...rows, { id: "new", text: "Extra" }]]) {
+    assert.throws(() => validateBlockUpdate(block, baseline, { ...request, payload: { texts } }), /fixed/);
+  }
+  assert.throws(() => validateBlockUpdate(block, baseline, { ...request, payload: { presentation: {} } }), /locked/);
+});
 test("event display overrides preserve legacy rows and validate edited copy", () => {
   const schema = payloadSchema("featured");
   const legacy = { ...emptyPayload("featured"), items: [{ id: "slot-1", referenceId: "service-1" }] };

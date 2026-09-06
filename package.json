@@ -41,6 +41,7 @@
     "@fullcalendar/timegrid": "^6.1.21",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@puckeditor/core": "^0.23.0",
     "@react-email/editor": "^1.5.7",
     "@types/mjml": "^5.0.0",
     "bcryptjs": "^3.0.3",

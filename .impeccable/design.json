@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-06T05:08:50.660301+00:00",
+  "title": "Design System: Showrunner Content Editor",
+  "extensions": {
+    "colorMeta": {
+      "brand": {
+        "role": "primary",
+        "displayName": "Tenant brand",
+        "canonical": "var(--color-brand, #116466)",
+        "description": "Runtime tenant token; no fixed tonal ramp."
+      },
+      "brand-dark": {
+        "role": "primary",
+        "displayName": "Tenant brand hover",
+        "canonical": "var(--color-brand-dark, #164e50)",
+        "description": "Runtime tenant token; no fixed tonal ramp."
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "White surface",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ],
+        "description": "Tonal ramp is display metadata, not an implemented color scale."
+      },
+      "surface-sunken": {
+        "role": "neutral",
+        "displayName": "Sunken neutral",
+        "canonical": "#ecece9",
+        "tonalRamp": [
+          "oklch(15% 0.004 106)",
+          "oklch(26% 0.004 106)",
+          "oklch(38% 0.004 106)",
+          "oklch(49% 0.004 106)",
+          "oklch(61% 0.004 106)",
+          "oklch(72% 0.004 106)",
+          "oklch(84% 0.004 106)",
+          "oklch(95% 0.004 106)"
+        ],
+        "description": "Tonal ramp is display metadata, not an implemented color scale."
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Admin ink",
+        "canonical": "#20221f",
+        "tonalRamp": [
+          "oklch(15% 0.006 133)",
+          "oklch(26% 0.006 133)",
+          "oklch(38% 0.006 133)",
+          "oklch(49% 0.006 133)",
+          "oklch(61% 0.006 133)",
+          "oklch(72% 0.006 133)",
+          "oklch(84% 0.006 133)",
+          "oklch(95% 0.006 133)"
+        ],
+        "description": "Tonal ramp is display metadata, not an implemented color scale."
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted text",
+        "canonical": "#656a65",
+        "tonalRamp": [
+          "oklch(15% 0.009 145)",
+          "oklch(26% 0.009 145)",
+          "oklch(38% 0.009 145)",
+          "oklch(49% 0.009 145)",
+          "oklch(61% 0.009 145)",
+          "oklch(72% 0.009 145)",
+          "oklch(84% 0.009 145)",
+          "oklch(95% 0.009 145)"
+        ],
+        "description": "Tonal ramp is display metadata, not an implemented color scale."
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Fine divider",
+        "canonical": "#d9dbd6",
+        "tonalRamp": [
+          "oklch(15% 0.007 128)",
+          "oklch(26% 0.007 128)",
+          "oklch(38% 0.007 128)",
+          "oklch(49% 0.007 128)",
+          "oklch(61% 0.007 128)",
+          "oklch(72% 0.007 128)",
+          "oklch(84% 0.007 128)",
+          "oklch(95% 0.007 128)"
+        ],
+        "description": "Tonal ramp is display metadata, not an implemented color scale."
+      },
+      "danger": {
+        "role": "neutral",
+        "displayName": "Error red",
+        "canonical": "#b42318",
+        "tonalRamp": [
+          "oklch(15% 0.18 28)",
+          "oklch(26% 0.18 28)",
+          "oklch(38% 0.18 28)",
+          "oklch(49% 0.18 28)",
+          "oklch(61% 0.18 28)",
+          "oklch(72% 0.18 28)",
+          "oklch(84% 0.18 28)",
+          "oklch(95% 0.18 28)"
+        ],
+        "description": "Tonal ramp is display metadata, not an implemented color scale."
+      }
+    },
+    "shadows": [
+      {
+        "name": "mobile-inspector",
+        "value": "-6px 0 24px #0002",
+        "purpose": "Distinguish the inspector overlay from the website on narrow screens."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-toolbar",
+        "value": "1050px"
+      },
+      {
+        "name": "overlay-inspector",
+        "value": "860px"
+      },
+      {
+        "name": "desktop-collapse",
+        "value": "861px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Publish",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Publish approved content changes.",
+      "html": "<button class=\"ds-publish\">Publish</button>",
+      "css": ".ds-publish{font-family:var(--font-sans,sans-serif);font-size:14px;min-height:36px;padding:0 18px;border:0;border-radius:5px;background:var(--color-brand,#116466);color:#fff;cursor:pointer}.ds-publish:hover{background:var(--color-brand-dark,#164e50)}.ds-publish:focus-visible{outline:2px solid var(--color-brand,#116466);outline-offset:2px;}.ds-publish:disabled{opacity:.45;cursor:default}"
+    },
+    {
+      "name": "Quiet control",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Toolbar and inspector controls.",
+      "html": "<button class=\"ds-quiet\" aria-label=\"Close section settings\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"m18 6-12 12M6 6l12 12\"/></svg></button>",
+      "css": ".ds-quiet{font-family:var(--font-sans,sans-serif);font-size:14px;display:inline-flex;align-items:center;justify-content:center;min-width:36px;min-height:36px;border:0;border-radius:5px;background:transparent;color:var(--color-text,#20221f);cursor:pointer}.ds-quiet:hover{background:var(--color-surface-sunken,#ecece9)}.ds-quiet:focus-visible{outline:2px solid var(--color-brand,#116466);outline-offset:2px;}"
+    },
+    {
+      "name": "Content field",
+      "kind": "input",
+      "description": "Visible label and approved text input.",
+      "html": "<label class=\"ds-field\">Heading<input value=\"Section heading\"></label>",
+      "css": ".ds-field{font-family:var(--font-sans,sans-serif);font-size:14px;display:grid;gap:6px;color:var(--color-text,#20221f)}.ds-field input{font:inherit;width:100%;border:1px solid #ccc;border-radius:6px;padding:10px 12px;background:#fff;color:#222}.ds-field input:focus-visible{outline:2px solid #116466;outline-offset:2px}"
+    },
+    {
+      "name": "Admin navigation",
+      "kind": "nav",
+      "description": "Existing shell navigation with a quiet selected fill; desktop collapse leaves a 52px expand-control rail and persists across visits. Mobile retains its drawer.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Website\"><a class=\"ds-active\" aria-current=\"page\" href=\"#content\">Content</a></nav>",
+      "css": ".ds-nav a{display:flex;align-items:center;min-height:34px;border:1px solid transparent;border-radius:6px;padding:0 9px;font-family:var(--font-sans,sans-serif);font-size:var(--type-small,.84rem);font-weight:540;color:var(--admin-sidebar-text,#242724);text-decoration:none;transition:background-color var(--motion-fast,160ms) ease}.ds-nav a:hover{background:var(--admin-sidebar-hover,#e5e6e2)}.ds-nav .ds-active{background:var(--admin-sidebar-active,#dcded9);font-weight:620}.ds-nav a:focus-visible{outline:2px solid var(--color-brand,#116466);outline-offset:2px}"
+    },
+    {
+      "name": "Visual item accordion",
+      "kind": "card",
+      "description": "Native disclosure per visual item, with image first. Header slides group image, title, caption, and button; Add header appends within the fixed section.",
+      "html": "<details class=\"ds-group\" open><summary>Header 1</summary><div class=\"ds-group-fields\"><label>Title<input value=\"Section heading\"></label><label>Link to<select><option>Page</option><option>Service</option><option>Web address</option></select></label></div></details>",
+      "css": ".ds-group{font-family:var(--font-sans,sans-serif);font-size:14px;min-width:0;border-bottom:1px solid var(--color-border,#ddd);color:#222}.ds-group>summary{cursor:pointer;padding:16px 4px;font-weight:600;overflow-wrap:anywhere}.ds-group>summary:focus-visible{outline:2px solid var(--color-brand,#116466)}.ds-group-fields{display:grid;gap:14px;padding:0 4px 20px}.ds-group label{display:grid;gap:6px}.ds-group input,.ds-group select{font:inherit;width:100%;border:1px solid #ccc;border-radius:6px;padding:10px 12px;background:#fff;color:#222}.ds-group input:focus-visible,.ds-group select:focus-visible{outline:2px solid #116466;outline-offset:2px}"
+    },
+    {
+      "name": "Image picker trigger",
+      "kind": "button",
+      "description": "The image or empty placeholder opens the media picker. Hover and keyboard focus reveal the hint; touch and empty states keep it visible.",
+      "html": "<button class=\"ds-image\" aria-label=\"Choose image\"><span class=\"ds-image-placeholder\">Image</span><span class=\"ds-image-hint\">Choose image</span></button>",
+      "css": ".ds-image{position:relative;display:block;width:100%;padding:0;border:0;border-radius:6px;overflow:hidden;background:var(--color-surface-sunken,#ecece9);color:#222;cursor:pointer;font:14px var(--font-sans,sans-serif)}.ds-image-placeholder{aspect-ratio:16/10;display:grid;place-items:center}.ds-image-hint{position:absolute;left:0;right:0;bottom:0;background:#20221fe6;color:#fff;padding:10px;font-size:12px}.ds-image:hover .ds-image-hint,.ds-image:focus-visible .ds-image-hint{opacity:1}.ds-image:focus-visible{outline:2px solid #116466;outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "overview": "The established direction is quiet administrative chrome around the actual client website. This document records the Content editor inside Showrunner's existing admin shell; it does not prescribe a visual identity for client websites or unrelated Showrunner surfaces. The explicit composition in PRODUCT.md is the direction contract.",
+    "keyCharacteristics": [
+      "Restrained white surfaces, fine dividers, compact controls.",
+      "A central website preview with a contextual right inspector.",
+      "Client typography, imagery, colors, and responsive behavior remain owned by the website."
+    ],
+    "rules": [],
+    "dos": [
+      "Do preserve the existing Showrunner shell and tenant brand tokens.",
+      "Do keep the real website central and the inspector contextual.",
+      "Do retain keyboard access, visible focus, field labels, and publish feedback."
+    ],
+    "donts": [
+      "Don't substitute reconstructed editor cards for the real website iframe.",
+      "Don't apply admin typography or colors to the client website.",
+      "Don't expose controls that add, remove, duplicate, or reorder page sections."
+    ]
+  }
+}

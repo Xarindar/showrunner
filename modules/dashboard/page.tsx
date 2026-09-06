@@ -141,7 +141,7 @@ export default async function AdminDashboardPage({ searchParams }: DashboardPage
               {progressPercent}%
             </span>
           </div>
-          <div className="onboarding-progress-track" role="progressbar" aria-valuemax={100} aria-valuemin={0} aria-valuenow={progressPercent}>
+          <div className="onboarding-progress-track" role="progressbar" aria-label="Site setup" aria-valuemax={100} aria-valuemin={0} aria-valuenow={progressPercent}>
             <span className="onboarding-progress-bar" style={{ width: `${progressPercent}%` }} />
           </div>
           <ol className="onboarding-steps">

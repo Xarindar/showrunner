@@ -1,9 +1,9 @@
 import { emptyPayload, payloadSchema } from "./registry";
 import { readStudio } from "./state";
 
-export function resolveBusinessInfo(settings: { businessName: string; contactEmail: string; timezone: string; publicContentConfig: unknown }): Record<string, unknown> {
+export function resolveBusinessInfo(settings: { businessName: string; contactEmail: string; timezone: string; publicContentConfig: unknown }, defaults: Record<string, unknown> = {}): Record<string, unknown> {
   const stored = readStudio(settings.publicContentConfig).blocks["business-info"]?.payload;
-  return { ...emptyPayload("business"), ...stored, businessName: settings.businessName, email: settings.contactEmail, timezone: settings.timezone };
+  return { ...emptyPayload("business"), ...defaults, ...stored, businessName: settings.businessName, email: settings.contactEmail, timezone: settings.timezone };
 }
 export function businessInfoExtensions(payload: Record<string, unknown>) {
   return Object.fromEntries(Object.entries(payload).filter(([key]) => !["businessName", "email", "timezone"].includes(key)));

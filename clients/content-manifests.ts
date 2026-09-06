@@ -1,5 +1,7 @@
 import { configuredBlock, validateManifest, type ContentManifest } from "@/modules/content/studio/manifest";
 import { cottageEventStripDefaults, cottageVendorDirectoryDefaults, cottageVenueGalleryDefaults } from "./cottage616/content-defaults";
+import pageStrips from "./cottage616/page-strips.json";
+import type { ContentBlockConfig } from "@/modules/content/studio/manifest";
 
 // Trusted deployment configuration. Add explicit site-ID bindings here as clients are onboarded.
 export const siteContentManifests: Record<string, ContentManifest> = {};
@@ -8,10 +10,12 @@ export const defaultContentManifest = validateManifest({
   blocks: [configuredBlock("home-hero", "hero", ["home"]), configuredBlock("business-info", "business", []), configuredBlock("home-seo", "seo", ["home"])],
 });
 export const cottageContentManifest = validateManifest({
-  version: 1, id: "cottage616", legacyProfiles: true,
+  version: 1, id: "cottage616", legacyProfiles: true, previewUrl: "https://cottage616-production.up.railway.app/",
+  booking: { path: "/booking.html", profilesByCategory: { events: "cottage616", "the-hive": "the-hive" } },
   pages: [{ id: "home", path: "/index.html", label: "Cottage 616" }, { id: "hive", path: "/the-hive.html", label: "The Hive" }, { id: "booking", path: "/booking.html", label: "Booking" }, { id: "vendors", path: "/vendors.html", label: "Vendors" }],
   blocks: [
-    configuredBlock("home-events", "featured", ["home"], { defaults: cottageEventStripDefaults, label: "Events panel", limits: { items: 3 }, minimums: { items: 3 }, presentation: { assetBaseUrl: "https://cottage616-production.up.railway.app/", variant: "event-strip" }, source: "services", sourceCategory: "events" }),
+    ...pageStrips as ContentBlockConfig[],
+    configuredBlock("home-events", "featured", ["home"], { defaults: cottageEventStripDefaults, label: "Events panel", fixedRows: true, limits: { items: 3 }, minimums: { items: 3 }, presentation: { assetBaseUrl: "https://cottage616-production.up.railway.app/", variant: "event-strip" }, source: "services", sourceCategory: "events" }),
     configuredBlock("home-venue-gallery", "gallery", ["home"], { defaults: cottageVenueGalleryDefaults, label: "Small venue image carousel", limits: { images: 30 }, presentation: { assetBaseUrl: "https://cottage616-production.up.railway.app/", variant: "image-strip" } }),
     configuredBlock("vendors-directory", "directory", ["vendors"], { defaults: cottageVendorDirectoryDefaults, label: "Vendors", limits: { items: 30 }, presentation: { assetBaseUrl: "https://cottage616-production.up.railway.app/", variant: "vendor-directory" } }),
     configuredBlock("business-info", "business", []),

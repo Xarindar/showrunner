@@ -4,8 +4,8 @@ import { publicAppBaseUrl } from "@/lib/env";
 import { mediaAssetDisplayUrl } from "@/lib/media";
 import { getSiteSettingsForSite } from "@/lib/site";
 import { prisma } from "@/lib/prisma";
-import { resolveContentManifest } from "@/clients/content-manifests";
-import { readStudio } from "./state";
+import { getEditorManifest } from "@/clients/content-editor-manifests";
+import { readStudio, resolveStudioPayload } from "./state";
 import { resolveBusinessInfo, resolveBusinessLocation } from "./business-info";
 import { blockDependenciesAvailable } from "./manifest";
 import { EmbedRequestError } from "@/lib/embed/gateway";
@@ -13,16 +13,16 @@ import { renderContentRichText } from "./rich-text";
 
 export async function getPublicStudio(siteId: string, pageId: string) {
   const settings = await getSiteSettingsForSite(siteId);
-  const manifest = resolveContentManifest(siteId, settings.publicContentConfig);
+  const manifest = await getEditorManifest(settings);
   if (!manifest.pages.some(page => page.id === pageId)) throw new EmbedRequestError("Unknown content page", 404);
   const state = readStudio(settings.publicContentConfig);
-  const business = resolveBusinessInfo(settings);
+  const business = resolveBusinessInfo(settings, manifest.blocks.find(block => block.type === "business")?.defaults);
   const blocks = await Promise.all(manifest.blocks.filter(block => block.type !== "business" && blockDependenciesAvailable(block, settings.enabledModuleIds)).map(async block => {
     const stored = state.blocks[block.id];
     const payloadPages = stored?.pageIds || block.pageIds;
     if ((!stored && !block.defaults) || !block.pageIds.includes(pageId) || !payloadPages.includes(pageId)) return null;
     if (block.formId && !await prisma.form.findFirst({ where: { id: block.formId, siteId, status: "ACTIVE" }, select: { id: true } })) return null;
-    let payload = stored?.payload || block.defaults!;
+    let payload = resolveStudioPayload(block, stored);
     if (block.type === "about") payload = { ...payload, copyHtml: renderContentRichText(String(payload.copy || "")) };
     if (block.type === "faq") payload = { ...payload, items: (payload.items as Record<string, unknown>[]).map(item => ({ ...item, answerHtml: renderContentRichText(String(item.answer || "")) })) };
     if (block.type === "contact") {
@@ -70,6 +70,8 @@ function absolutizeRows(payload: Record<string, unknown>, field: string, urlKey:
 }
 
 function absolutizeBlockMedia(type: string, payload: Record<string, unknown>) {
+  if (type === "slideshow") return absolutizeRows(payload, "slides", "imageUrl");
+  if (type === "strip") return absolutizeRows(payload, "images", "url");
   if (type === "hero" || type === "gallery") return absolutizeRows(payload, "images", "url");
   if (type === "team" || type === "directory") return absolutizeRows(payload, "items", "imageUrl");
   if (["about", "coupon", "featured", "mailingList"].includes(type)) return { ...payload, imageUrl: publicMediaUrl(payload.imageUrl) };

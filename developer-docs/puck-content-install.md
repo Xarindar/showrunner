@@ -1,0 +1,21 @@
+# Install the website content editor
+
+Showrunner owns the Puck editor, media picker, permissions, validation and publication. The center canvas loads the client's actual website. Content changes use the site's own markup and rendering code; clients cannot insert, delete, duplicate or drag page sections.
+
+1. Register a trusted manifest in `clients/content-manifests.ts`, bound to the site's ID. Set `previewUrl` to the website origin and declare each page's ID, path and label.
+2. Declare the approved blocks and their editable fields. `presentation.selector` identifies the existing section in the website. For an existing HTML template, a `strip` block contains fixed `texts`, `images` and `links` rows; `presentation.bindings` maps payload paths to approved selectors and text or `src`, `alt`, `href`, `background` updates. Set `fixedRows: true` to lock row identity and order. Do not accept selectors or manifests from client save requests.
+3. Copy `public/showrunner-content.js` into the client's static assets and load it before the site's content integration. Give its script tag `data-editor-origins` containing the exact permitted Showrunner origin. The site's frame policy must allow that origin. No authentication cookies or private API keys are passed to the website.
+4. Fetch published content from `/api/public/v1/content/studio?page=PAGE_ID` with the site's existing publishable key. Dispatch `showrunner:content` with the response's `data` after the site's own initial renderer finishes. Assign the startup promise to `window.showrunnerContentReady`.
+5. For richer blocks, listen for `showrunner:render`. Its `detail.blocks` contains changed blocks; use the same renderer for published and preview content. Service references are resolved by Showrunner. Keep the website's configured layout and order intact.
+
+The bridge activates editing only inside an iframe with `?showrunner-editor=1`, and validates the parent origin and window on every message. It waits for the document and content startup before connecting. Draft messages only change the iframe; authenticated server actions publish approved payload fields with revision checks. Menus and same-page anchors retain native behavior. Links outside editable content (including navigation menus) request a page switch through the parent editor, which accepts only registered pages on the preview origin and preserves draft state. Content buttons still select their section; form submission remains disabled. Keyboard users can select sections with Tab/Enter or the section dropdown.
+
+Cottage616 is the first adapter: `clients/cottage616/page-strips.json` records the existing template bindings; the server adapter reads existing hero slides and reviews without replacing legacy data. Keep those selectors in sync when changing its template. Its `scripts/integrations/showrunner/editor.js` must match the shared SDK when installing an upgrade.
+
+For local integration checks only, `CONTENT_PREVIEW_URL` can override Cottage616's preview origin and `SHOWRUNNER_BUILD_DIR` can isolate a second dev server's build output. Local previews still need an approved public API origin. Do not broaden production origin checks for testing.
+
+The inspector groups controls by visual item. Put images first within each group, followed by its title, caption and button. `editorGroups` maps existing strip payload paths to these groups without changing stored content or public bindings. Image previews are accessible picker buttons with a hover/focus hint.
+
+Use `slideshow` for a header carousel: clients may append/remove slides within its minimum/maximum limits while the page section remains fixed. The Cottage adapter reads legacy header arrays into the new slide shape until first publication. Button destinations offer registered pages and active services; configure `booking.path` and optional `profilesByCategory` to produce slug-based links. The booking client resolves the slug, then uses its existing earliest-availability lookup without selecting a time or creating a booking.
+
+Client-facing fields omit alternative text and internal location IDs while retaining them in stored payloads and image rendering. SEO blocks remain available to the public renderer but are omitted from the visual editor.

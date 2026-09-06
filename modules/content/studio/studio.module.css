@@ -12,6 +12,21 @@
 .fields button:disabled { opacity: .55; cursor: default; }
 .mediaPicker { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
 .mediaPicker small { color: var(--color-muted, #667085); }
+.mediaPreview { aspect-ratio: 16 / 10; background: var(--color-surface-sunken, #eee) center / cover; border-radius: 6px; display: grid; place-items: center; }
+.mediaPicker { display: block; }
+.fields .imageTrigger { width: 100%; display: block; position: relative; padding: 0; border: 0; overflow: hidden; background: var(--color-surface-sunken); }
+.imageHint { position: absolute; left: 0; bottom: 0; right: 0; background: #20221fe6; color: #fff; padding: 10px; font-size: 12px; opacity: 0; transition: opacity .15s; }
+.imageTrigger:hover .imageHint, .imageTrigger:focus-visible .imageHint, .emptyImageHint { opacity: 1; }
+@media (hover: none) { .imageHint { opacity: 1; } }
+.contentGroup { min-width: 0; border-bottom: 1px solid var(--color-border, #ddd); }
+.contentGroup > summary { cursor: pointer; padding: 16px 4px; font-weight: 600; overflow-wrap: anywhere; }
+.contentGroup > summary:focus-visible { outline: 2px solid var(--color-brand); }
+.groupFields { display: grid; gap: 14px; padding: 0 4px 20px; }
+.contentList { display: grid; gap: 4px; min-width: 0; }
+.contentList > h3, .buttonSettings > h3 { font-size: 13px; margin: 6px 0; }
+.buttonSettings { display: grid; gap: 10px; padding-top: 10px; border-top: 1px solid var(--color-border, #ddd); }
+.fields .addContent { display: flex; align-items: center; gap: 8px; justify-content: center; width: 100%; margin-top: 12px; }
+.fields .removeItem { background: transparent; border: 0; padding: 4px 0; color: var(--color-muted); font-size: 12px; }
 .eventPreview { background: #e4dfd3; border: 1px solid var(--color-border, #ddd); border-radius: 10px; display: grid; grid-template-columns: minmax(180px, .42fr) minmax(0, .58fr); min-height: 430px; overflow: hidden; }
 .eventFeature { align-items: end; background-color: #cfc8ba; background-position: center; background-size: cover; display: flex; min-height: 430px; padding: 28px; }
 .eventFeature span { color: #fffdf8; font: italic clamp(2.2rem, 5vw, 4rem)/.95 Georgia, serif; text-shadow: 0 10px 30px rgb(0 0 0 / .35); }

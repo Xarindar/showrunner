@@ -620,6 +620,12 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
           height="100%"
           initialDate={selectedDateKey}
           initialView={fullCalendarViewFor(view)}
+          viewDidMount={({ el }) => {
+            el.querySelectorAll<HTMLElement>(".fc-scroller").forEach(node => {
+              const cell = node.querySelector<HTMLElement>('[role="gridcell"]');
+              if (cell) cell.tabIndex = 0;
+            });
+          }}
           listDayFormat={{ month: "short", day: "numeric", weekday: "short" }}
           listDaySideFormat={false}
           moreLinkClick="popover"

@@ -7,8 +7,8 @@ import { recordAuditLog } from "@/lib/audit";
 import { mediaAssetDisplayUrl, uploadMedia } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettingsForSite, resolveCurrentSite } from "@/lib/site";
-import { resolveContentManifest } from "@/clients/content-manifests";
-import { configRecord, readStudio, saveRequestSchema, validateBlockUpdate } from "./state";
+import { getEditorManifest } from "@/clients/content-editor-manifests";
+import { configRecord, readStudio, resolveStudioPayload, saveRequestSchema, validateBlockUpdate } from "./state";
 import { businessInfoExtensions, resolveBusinessInfo, validateBusinessInfo } from "./business-info";
 import { blockDependenciesAvailable } from "./manifest";
 
@@ -19,9 +19,10 @@ export async function saveStudioBlock(raw: unknown): Promise<{ error?: string; r
   if (!settings.enabledModuleIds.includes("content")) return { error: "Content is not enabled" };
   try {
     const input = saveRequestSchema.parse(raw);
+    const editorManifest = await getEditorManifest(settings);
     const revision = await prisma.$transaction(async tx => {
       const current = await tx.siteSettings.findUniqueOrThrow({ where: { siteId: site.id } });
-      const manifest = resolveContentManifest(site.id, current.publicContentConfig);
+      const manifest = editorManifest;
       const block = manifest.blocks.find(item => item.id === input.id);
       if (!block) throw new Error("This content editor is not configured for your site");
       if (!blockDependenciesAvailable(block, settings.enabledModuleIds)) throw new Error("A required content integration is not enabled");
@@ -29,8 +30,8 @@ export async function saveStudioBlock(raw: unknown): Promise<{ error?: string; r
       const studio = readStudio(current.publicContentConfig);
       const stored = studio.blocks[block.id];
       const baseline = block.type === "business"
-        ? { schemaVersion: 1 as const, revision: stored?.revision || 0, payload: resolveBusinessInfo(current), pageIds: [], updatedAt: stored?.updatedAt || "", updatedBy: stored?.updatedBy || "" }
-        : stored || (block.defaults ? { schemaVersion: 1 as const, revision: 0, payload: block.defaults, pageIds: block.pageIds, updatedAt: "", updatedBy: "" } : undefined);
+        ? { schemaVersion: 1 as const, revision: stored?.revision || 0, payload: resolveBusinessInfo(current, block.defaults), pageIds: [], updatedAt: stored?.updatedAt || "", updatedBy: stored?.updatedBy || "" }
+        : stored ? { ...stored, payload: resolveStudioPayload(block, stored) } : (block.defaults ? { schemaVersion: 1 as const, revision: 0, payload: block.defaults, pageIds: block.pageIds, updatedAt: "", updatedBy: "" } : undefined);
       const { payload, pageIds } = validateBlockUpdate(block, baseline, input);
       if (block.type === "business") validateBusinessInfo(payload);
       if (block.type === "contact") {
@@ -40,7 +41,7 @@ export async function saveStudioBlock(raw: unknown): Promise<{ error?: string; r
       if (block.source === "services") {
         const ids = (payload.items as { referenceId: string }[]).map(item => item.referenceId);
         if (new Set(ids).size !== ids.length) throw new Error("Select each item only once");
-        const count = await tx.service.count({ where: { siteId: site.id, isActive: true, id: { in: ids } } });
+        const count = await tx.service.count({ where: { siteId: site.id, isActive: true, id: { in: ids }, ...(block.sourceCategory ? { category: { equals: block.sourceCategory, mode: "insensitive" } } : {}) } });
         if (count !== ids.length) throw new Error("A selected service is unavailable for this site");
       }
       const nextRevision = (stored?.revision || 0) + 1;

@@ -43,7 +43,10 @@ export function SelectMenu({ className, id, label, name, onValueChange, options,
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape" && rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+        rootRef.current.querySelector<HTMLButtonElement>("button")?.focus();
+      }
     };
 
     document.addEventListener("pointerdown", handlePointerDown);
@@ -72,6 +75,12 @@ export function SelectMenu({ className, id, label, name, onValueChange, options,
     } else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       setOpen((current) => !current);
+    } else if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      const option = event.key === "Home" ? options[0] : options.at(-1);
+      if (option) selectValue(option.value);
+    } else if (event.key === "Tab") {
+      setOpen(false);
     }
   };
 
@@ -79,7 +88,10 @@ export function SelectMenu({ className, id, label, name, onValueChange, options,
     <div className={cx("ui-select-menu", className)} data-open={open ? "true" : undefined} ref={rootRef}>
       <input name={name} type="hidden" value={selectedOption.value} />
       <button
-        aria-controls={listboxId}
+        role="combobox"
+        aria-label={label}
+        aria-controls={open ? listboxId : undefined}
+        aria-activedescendant={open && options.length ? `${listboxId}-${options.indexOf(selectedOption)}` : undefined}
         aria-expanded={open}
         aria-haspopup="listbox"
         className="ui-select-trigger"
@@ -96,16 +108,19 @@ export function SelectMenu({ className, id, label, name, onValueChange, options,
 
       {open ? (
         <div aria-labelledby={labelId} className="ui-select-popover" id={listboxId} role="listbox">
-          {options.map((option) => {
+          {options.map((option, index) => {
             const selected = option.value === selectedOption.value;
             return (
               <button
                 aria-selected={selected}
                 className={cx("ui-select-option", selected && "is-selected")}
                 key={option.value}
+                id={`${listboxId}-${index}`}
+                tabIndex={-1}
                 onClick={() => {
                   selectValue(option.value);
                   setOpen(false);
+                  rootRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
                 }}
                 role="option"
                 type="button">

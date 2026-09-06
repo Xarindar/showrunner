@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent } from "react";
-import { Image as ImageIcon } from "lucide-react";
+import { Image as ImageIcon, Plus } from "lucide-react";
+import { destinationKind, imageFirst, type LinkOptions } from "./field-layout";
 import { AssetPicker, type AssetPickerAsset } from "@/components/ui/asset-picker";
 import { blockRegistry, emptyFields, type Field } from "./registry";
 import type { ContentBlockConfig, ContentManifest } from "./manifest";
@@ -47,8 +48,14 @@ export function StudioEditor({ block, canUpload = false, pages, initialPayload, 
   </section>;
 }
 
-export function Fields({ canUpload = false, fields, limits, minimums, value, prefix, onChange, choices = [] }: { canUpload?: boolean; fields: Record<string, Field>; limits?: Record<string, number>; minimums?: Record<string, number>; value: Record<string, unknown>; prefix: string; onChange: (next: Record<string, unknown>) => void; choices?: Choice[] }) {
-  return <>{Object.entries(fields).map(([key, field]) => {
+export function Fields({ canUpload = false, fixedRows = false, assetBaseUrl, linkOptions, fields, limits, minimums, value, prefix, onChange, choices = [] }: { canUpload?: boolean; fixedRows?: boolean; assetBaseUrl?: string; linkOptions?: LinkOptions; fields: Record<string, Field>; limits?: Record<string, number>; minimums?: Record<string, number>; value: Record<string, unknown>; prefix: string; onChange: (next: Record<string, unknown>) => void; choices?: Choice[] }) {
+  return <>{imageFirst(fields).map(([key, field]) => {
+    const buttonPairs: Record<string, string> = { buttonLabel: "buttonHref", ctaLabel: "ctaHref", label: "href" };
+    if (linkOptions && Object.entries(buttonPairs).some(([label, href]) => key === href && fields[label])) return null;
+    if (linkOptions && buttonPairs[key] && fields[buttonPairs[key]]) {
+      const href = buttonPairs[key];
+      return <div className={styles.buttonSettings} key={key}><h3>Button</h3><Fields fields={{ [key]: { ...field, label: "Title" } }} prefix={prefix} value={value} onChange={onChange} /><DestinationField id={`${prefix}-${href}`} value={String(value[href] || "")} options={linkOptions} onChange={next => onChange({ ...value, [href]: next })} /></div>;
+    }
     const id = `${prefix}-${key}`;
     const update = (next: unknown) => onChange({ ...value, [key]: next });
     if (field.kind === "checkbox") return <label className={styles.check} key={key} htmlFor={id}><input type="checkbox" id={id} checked={Boolean(value[key])} onChange={event => update(event.target.checked)} />{field.label}</label>;
@@ -56,35 +63,46 @@ export function Fields({ canUpload = false, fields, limits, minimums, value, pre
       const rows = (value[key] || []) as Record<string, unknown>[];
       const maximum = limits?.[key] ?? field.max ?? 12;
       const minimum = minimums?.[key] ?? 0;
-      return <fieldset key={key} className={styles.list}><legend>{field.label}</legend>
-        {rows.map((row, index) => <div key={String(row.id)} className={styles.item}>
-          <Fields canUpload={canUpload} fields={field.fields!} value={row} prefix={`${id}-${row.id}`} choices={choices} onChange={next => update(rows.map((current, i) => i === index ? next : current))} />
-          <button type="button" disabled={rows.length <= minimum} onClick={() => update(rows.filter((_, i) => i !== index))}>Remove {field.label.toLowerCase()} item {index + 1}</button>
-        </div>)}
-        {minimum > 0 ? <small>Keep at least {minimum} {field.label.toLowerCase()}.</small> : null}
-        <button type="button" disabled={rows.length >= maximum} onClick={() => update([...rows, { id: crypto.randomUUID(), ...emptyFields(field.fields!) }])}>Add {field.label.toLowerCase()}</button>
-      </fieldset>;
+      return <div key={key} className={styles.contentList}>
+        {key !== "slides" && <h3>{field.label}</h3>}
+        {rows.map((row, index) => <details key={String(row.id)} className={styles.contentGroup} open onFocusCapture={() => { if (key === "slides") window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: row.id } })); }} onClick={() => { if (key === "slides") window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: row.id } })); }}>
+          <summary>{key === "slides" ? `Header ${index + 1}` : String(row.name || row.title || row.author || row.question || `${field.label === "Images" ? "Image" : "Item"} ${index + 1}`)}</summary>
+          <div className={styles.groupFields}><Fields canUpload={canUpload} assetBaseUrl={assetBaseUrl} linkOptions={linkOptions} fields={field.fields!} value={row} prefix={`${id}-${row.id}`} choices={choices} onChange={next => update(rows.map((current, i) => i === index ? next : current))} />
+          {!fixedRows && <button className={styles.removeItem} type="button" disabled={rows.length <= minimum} onClick={() => update(rows.filter((_, i) => i !== index))}>Remove {key === "slides" ? "header" : "item"}</button>}</div>
+        </details>)}
+        {!fixedRows && <button className={styles.addContent} type="button" disabled={rows.length >= maximum} onClick={() => update([...rows, { id: crypto.randomUUID(), ...emptyFields(field.fields!) }])}><Plus size={16} aria-hidden="true" />Add {field.label === "Header" ? "header" : field.label.toLowerCase()}</button>}
+      </div>;
     }
     if (key === "referenceId") return <label key={key} htmlFor={id}>Item<select id={id} value={String(value[key] || "")} onChange={event => update(event.target.value)}><option value="">Select an item</option>{choices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label>;
     const media = key === "imageUrl" || (key === "url" && "alt" in fields);
-    return <div key={key} className={styles.field}><label htmlFor={id}>{field.label}</label>
-      {field.kind === "richtext" ? <RichText id={id} value={String(value[key] || "")} maxLength={field.max} onChange={update} /> : field.kind === "multiline" ? <textarea id={id} rows={4} maxLength={field.max} value={String(value[key] || "")} onChange={event => update(event.target.value)} /> : <input id={id} type={field.kind === "email" ? "email" : "text"} maxLength={field.max} value={String(value[key] || "")} onChange={event => update(event.target.value)} />}
-      {media ? <StudioMediaPicker
-        canUpload={canUpload}
-        context={prefix}
-        defaultAlt={String(value.alt || value.imageAlt || "Website image")}
-        onSelect={(asset) => {
-          const next: Record<string, unknown> = { ...value, [key]: asset.url || asset.thumbnailUrl };
-          if ("alt" in fields && !String(value.alt || "").trim()) next.alt = asset.alt;
-          if ("imageAlt" in fields && !String(value.imageAlt || "").trim()) next.imageAlt = asset.alt;
-          onChange(next);
-        }}
-      /> : null}
+    const source = String(value[key] || "");
+    const preview = media && source && assetBaseUrl && !source.startsWith("/") ? new URL(source, assetBaseUrl).toString() : source;
+    return <div key={key} className={styles.field}>{media ? <span>Image</span> : <label htmlFor={id}>{field.label}</label>}
+      {media ? <StudioMediaPicker canUpload={canUpload} context={prefix} preview={preview} defaultAlt={String(value.alt || value.imageAlt || "Website image")} onSelect={asset => {
+        const next: Record<string, unknown> = { ...value, [key]: asset.url || asset.thumbnailUrl };
+        if ("alt" in fields && !String(value.alt || "").trim()) next.alt = asset.alt;
+        if ("imageAlt" in fields && !String(value.imageAlt || "").trim()) next.imageAlt = asset.alt;
+        onChange(next);
+      }} /> : field.kind === "richtext" ? <RichText id={id} value={String(value[key] || "")} maxLength={field.max} onChange={update} /> : field.kind === "multiline" ? <textarea id={id} rows={3} maxLength={field.max} value={String(value[key] || "")} onChange={event => update(event.target.value)} /> : <input id={id} type={field.kind === "email" ? "email" : "text"} maxLength={field.max} value={source} onChange={event => update(event.target.value)} />}
     </div>;
   })}</>;
 }
 
-function StudioMediaPicker({ canUpload, context, defaultAlt, onSelect }: { canUpload: boolean; context: string; defaultAlt: string; onSelect: (asset: AssetPickerAsset) => void }) {
+function DestinationField({ id, value, options, onChange }: { id: string; value: string; options: LinkOptions; onChange: (value: string) => void }) {
+  const [selection, setSelection] = useState(() => ({ value, kind: destinationKind(value, options) as string, authored: null as string | null }));
+  if (selection.value !== value) setSelection({ ...selection, value, kind: selection.authored === value ? selection.kind : destinationKind(value, options) });
+  const selectedKind = selection.kind;
+  function edit(next: string, kind = selectedKind) {
+    setSelection({ value, kind, authored: next });
+    onChange(next);
+  }
+  return <><label htmlFor={`${id}-type`}>Link to<select id={`${id}-type`} value={selectedKind} onChange={event => { edit("", event.target.value); }}><option value="page">Page</option>{options.services.length > 0 && <option value="service">Service</option>}<option value="url">Web address</option></select></label>
+    {selectedKind === "url" ? <label htmlFor={id}>Web address<input id={id} value={value} onChange={event => edit(event.target.value)} /></label> : <label htmlFor={id}>{selectedKind === "service" ? "Service" : "Page"}<select id={id} value={value} onChange={event => edit(event.target.value)}><option value="">Choose {selectedKind === "service" ? "a service" : "a page"}</option>{(selectedKind === "service" ? options.services.map(service => ({ label: service.label, value: service.href })) : options.pages.map(page => ({ label: page.label, value: page.path }))).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}{value && !(selectedKind === "service" ? options.services.some(service => service.href === value) : options.pages.some(page => page.path === value)) && <option value={value}>Current destination</option>}</select></label>}
+    {selectedKind === "service" && <small>Opens booking at this service’s next available date.</small>}
+  </>;
+}
+
+function StudioMediaPicker({ canUpload, context, defaultAlt, preview, onSelect }: { canUpload: boolean; context: string; defaultAlt: string; preview: string; onSelect: (asset: AssetPickerAsset) => void }) {
   const input = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
@@ -123,10 +141,10 @@ function StudioMediaPicker({ canUpload, context, defaultAlt, onSelect }: { canUp
       onSelectAsset={onSelect}
       onUploadRequest={() => input.current?.click()}
       title="Choose an image"
-      triggerClassName="ui-button ui-button-secondary ui-button-sm"
+      triggerClassName={styles.imageTrigger}
     >
-      <ImageIcon aria-hidden="true" size={15} />
-      {uploading ? "Uploading…" : "Choose or upload image"}
+      <span className={styles.mediaPreview} style={{ backgroundImage: preview ? `url(${JSON.stringify(preview)})` : undefined }}>{!preview && <ImageIcon aria-hidden="true" size={30} />}</span>
+      <span className={`${styles.imageHint} ${!preview ? styles.emptyImageHint : ""}`}>{uploading ? "Uploading…" : "Choose or upload"}</span>
     </AssetPicker>
     <input accept="image/*" className="ui-hidden" onChange={handleUpload} ref={input} type="file" />
     {message ? <small aria-live="polite">{message}</small> : null}

@@ -10,6 +10,12 @@ export function readStudio(value: unknown): StudioState {
   if (studio.version !== undefined && studio.version !== 1) throw new Error("Unsupported content studio version");
   return { version: 1, blocks: configRecord(studio.blocks) as Record<string, StoredBlock> };
 }
+export function resolveStudioPayload(block: ContentBlockConfig, stored?: StoredBlock) {
+  // The adapter supplies a lossless read of the previous header field arrays.
+  return block.type === "slideshow" && !Array.isArray(stored?.payload.slides)
+    ? block.defaults || emptyPayload(block.type)
+    : stored?.payload || block.defaults || emptyPayload(block.type);
+}
 export const saveRequestSchema = z.strictObject({
   id: z.string(), revision: z.number().int().nonnegative(), payload: z.record(z.string(), z.unknown()), pageIds: z.array(z.string()).max(100),
 });
@@ -23,6 +29,7 @@ export function validateBlockUpdate(block: ContentBlockConfig, current: StoredBl
     const before = current?.payload[key];
     if (!Array.isArray(value) || !Array.isArray(before)) continue;
     const oldIds = before.map(row => row.id);
+    if (block.fixedRows && JSON.stringify(value.map(row => row.id)) !== JSON.stringify(oldIds)) throw new Error("This section's items and order are fixed by your site administrator");
     const retained = value.map(row => row.id).filter(id => oldIds.includes(id));
     if (JSON.stringify(retained) !== JSON.stringify(oldIds.filter(id => retained.includes(id)))) throw new Error("Item ordering is configured by your site administrator");
   }
