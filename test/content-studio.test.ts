@@ -4,7 +4,7 @@ import { blockRegistry, emptyPayload, isSafeContentUrl, payloadSchema } from "..
 import { configuredBlock, validateManifest } from "../modules/content/studio/manifest";
 import { readStudio, validateBlockUpdate, type StoredBlock } from "../modules/content/studio/state";
 import { resolveBusinessInfo, resolveBusinessLocation, validateBusinessInfo } from "../modules/content/studio/business-info";
-import { resolveContentManifest } from "../clients/content-manifests";
+import { cottageContentManifest, resolveContentManifest } from "../clients/content-manifests";
 import { renderContentRichText } from "../modules/content/studio/rich-text";
 
 const faq = configuredBlock("faq", "faq", ["home", "about"], { allowPageTargeting: true, limits: { items: 1 } });
@@ -46,6 +46,31 @@ test("second deployment can compose different editors without shared code change
   assert.equal(manifest.blocks[1].label, "Our story");
   assert.throws(() => validateManifest({ ...manifest, blocks: [...manifest.blocks, faq] }), /duplicate/);
   assert.throws(() => validateManifest({ ...manifest, blocks: [{ ...faq, pageIds: ["missing"] }] }), /page/);
+});
+test("Cottage manifest composes reusable defaults and event-only service sourcing", () => {
+  const events = cottageContentManifest.blocks.find(block => block.id === "home-events");
+  const gallery = cottageContentManifest.blocks.find(block => block.id === "home-venue-gallery");
+  const vendors = cottageContentManifest.blocks.find(block => block.id === "vendors-directory");
+  assert.equal(events?.type, "featured");
+  assert.equal(events?.source, "services");
+  assert.equal(events?.sourceCategory, "events");
+  assert.equal((events?.defaults?.items as unknown[]).length, 3);
+  assert.equal(gallery?.type, "gallery");
+  assert.equal((gallery?.defaults?.images as unknown[]).length, 10);
+  assert.equal(vendors?.type, "directory");
+  assert.equal((vendors?.defaults?.items as unknown[]).length, 7);
+});
+test("directory entries accept display and contact fields but reject unknown data", () => {
+  const entry = {
+    id: "vendor-1", name: "Vendor", category: "Florals", offer: "Preferred rate", description: "Local event florist.",
+    imageUrl: "assets/vendor.jpg", imageAlt: "Vendor arrangement", ctaLabel: "Get in touch", phone: "tel:+15551234567",
+    secondaryPhone: "", email: "mailto:hello@example.com", website: "https://example.com", facebook: "", addressUrl: ""
+  };
+  assert.equal(payloadSchema("directory").safeParse({ heading: "Favorites", copy: "Trusted partners", items: [entry] }).success, true);
+  assert.equal(payloadSchema("directory").safeParse({ heading: "Favorites", copy: "Trusted partners", items: [{ ...entry, secret: "no" }] }).success, false);
+});
+test("source categories are only valid with service-backed blocks", () => {
+  assert.throws(() => validateManifest({ version: 1, id: "test", pages: [], blocks: [configuredBlock("gallery", "gallery", [], { sourceCategory: "events" })] }), /service source/);
 });
 test("mailing-list editors require a configured form", () => {
   assert.throws(() => validateManifest({ version: 1, id: "test", pages: [], blocks: [configuredBlock("signup", "mailingList", [])] }), /form/);

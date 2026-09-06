@@ -10,3 +10,21 @@
 .fields button { justify-self: start; border: 1px solid #bbb; border-radius: 6px; padding: 8px 14px; font: inherit; cursor: pointer; background: #f7f7f7; color: #222; }
 .fields button[type="submit"] { background: #116466; border-color: #116466; color: #fff; }
 .fields button:disabled { opacity: .55; cursor: default; }
+.mediaPicker { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+.mediaPicker small { color: var(--color-muted, #667085); }
+.eventPreview { background: #e4dfd3; border: 1px solid var(--color-border, #ddd); border-radius: 10px; display: grid; grid-template-columns: minmax(180px, .42fr) minmax(0, .58fr); min-height: 430px; overflow: hidden; }
+.eventFeature { align-items: end; background-color: #cfc8ba; background-position: center; background-size: cover; display: flex; min-height: 430px; padding: 28px; }
+.eventFeature span { color: #fffdf8; font: italic clamp(2.2rem, 5vw, 4rem)/.95 Georgia, serif; text-shadow: 0 10px 30px rgb(0 0 0 / .35); }
+.eventContent { align-content: center; display: grid; gap: 20px; padding: clamp(24px, 4vw, 48px); }
+.eventContent h3 { color: #173f5f; font: 400 clamp(1.8rem, 4vw, 3.4rem)/1.02 Georgia, serif; margin: 0; }
+.eventContent > div > p { color: #65727a; line-height: 1.6; margin: 14px 0 0; }
+.eventCards { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.eventCards article { background: #fffdf8; border-radius: 4px; display: grid; gap: 8px; grid-template-rows: auto auto 1fr auto; min-width: 0; overflow: hidden; padding: 0 10px 12px; }
+.eventCardImage { aspect-ratio: 1.1; background: #d8d2c6 center/cover; margin: 0 -10px; }
+.eventCards strong { color: #1f2930; font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eventCards p { color: #53646c; font-size: .67rem; line-height: 1.35; margin: 0; }
+.eventCards span { border: 1px solid rgb(23 63 95 / .45); color: #173f5f; font-size: .7rem; padding: 8px 4px; text-align: center; }
+.imageStripPreview { background: #0f1419; border-radius: 10px; display: grid; gap: 10px; grid-auto-columns: minmax(150px, 22%); grid-auto-flow: column; min-height: 190px; overflow-x: auto; padding: 20px; }
+.imageStripPreview div { background: #2a3035 center/cover; border-radius: 3px; min-height: 150px; }
+@media (max-width: 820px) { .eventPreview { grid-template-columns: 1fr; } .eventFeature { min-height: 260px; } }
+@media (max-width: 620px) { .eventCards { grid-template-columns: 1fr; } }

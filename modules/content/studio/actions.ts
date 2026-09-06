@@ -1,9 +1,10 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
+import { MediaVariantType, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth";
+import { getOwnerStaffIds, requireAdmin, resolveDataScopeMode } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
+import { mediaAssetDisplayUrl, uploadMedia } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettingsForSite, resolveCurrentSite } from "@/lib/site";
 import { resolveContentManifest } from "@/clients/content-manifests";
@@ -27,7 +28,9 @@ export async function saveStudioBlock(raw: unknown): Promise<{ error?: string; r
       if (block.formId && !await tx.form.findFirst({ where: { id: block.formId, siteId: site.id, status: "ACTIVE" }, select: { id: true } })) throw new Error("The configured form is unavailable");
       const studio = readStudio(current.publicContentConfig);
       const stored = studio.blocks[block.id];
-      const baseline = block.type === "business" ? { schemaVersion: 1 as const, revision: stored?.revision || 0, payload: resolveBusinessInfo(current), pageIds: [], updatedAt: stored?.updatedAt || "", updatedBy: stored?.updatedBy || "" } : stored;
+      const baseline = block.type === "business"
+        ? { schemaVersion: 1 as const, revision: stored?.revision || 0, payload: resolveBusinessInfo(current), pageIds: [], updatedAt: stored?.updatedAt || "", updatedBy: stored?.updatedBy || "" }
+        : stored || (block.defaults ? { schemaVersion: 1 as const, revision: 0, payload: block.defaults, pageIds: block.pageIds, updatedAt: "", updatedBy: "" } : undefined);
       const { payload, pageIds } = validateBlockUpdate(block, baseline, input);
       if (block.type === "business") validateBusinessInfo(payload);
       if (block.type === "contact") {
@@ -58,5 +61,46 @@ export async function saveStudioBlock(raw: unknown): Promise<{ error?: string; r
     return { revision };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Content could not be saved" };
+  }
+}
+
+export async function uploadStudioAsset(formData: FormData) {
+  const user = await requireAdmin("content:manage");
+  const site = await resolveCurrentSite();
+  const settings = await getSiteSettingsForSite(site.id);
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose an image to upload." };
+
+  const ownerStaffIds = await getOwnerStaffIds(user, site.id);
+  if ((await resolveDataScopeMode(user, site.id, "media")) === "OWN" && !ownerStaffIds.length) {
+    return { error: "Create an active staff profile before uploading scoped media." };
+  }
+
+  try {
+    const context = String(formData.get("context") || "content").trim().slice(0, 80) || "content";
+    const alt = String(formData.get("alt") || "Website image").trim().slice(0, 500) || "Website image";
+    const asset = await uploadMedia(file, {
+      alt,
+      folder: "content/studio",
+      tags: ["content", context],
+      uploadedByStaffId: ownerStaffIds[0],
+      usageContext: `Content studio: ${context}`
+    }, settings.mediaDriver, site.id);
+
+    return {
+      asset: {
+        alt: asset.alt || alt,
+        createdAt: asset.createdAt.toISOString(),
+        filename: asset.filename,
+        folder: asset.folder,
+        id: asset.id,
+        source: "library" as const,
+        tags: Array.isArray(asset.tags) ? asset.tags.filter((tag): tag is string => typeof tag === "string") : [],
+        thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
+        url: mediaAssetDisplayUrl(asset, MediaVariantType.HERO)
+      }
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Image upload failed." };
   }
 }

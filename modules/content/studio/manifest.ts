@@ -1,10 +1,12 @@
-import { blockRegistry, type BlockType } from "./registry";
+import { blockRegistry, emptyPayload, payloadSchema, type BlockType } from "./registry";
 
 export type ContentBlockConfig = {
   id: string; type: BlockType; label: string; editableFields: string[];
   pageIds: string[]; allowPageTargeting?: boolean; limits?: Record<string, number>;
-  presentation?: { variant?: string }; source?: "services";
+  presentation?: { assetBaseUrl?: string; variant?: string }; source?: "services";
+  sourceCategory?: string;
   formId?: string;
+  defaults?: Record<string, unknown>;
 };
 export type ContentManifest = {
   version: 1; id: string; pages: { id: string; path: string; label: string }[];
@@ -24,7 +26,9 @@ export function validateManifest(manifest: ContentManifest): ContentManifest {
     if (block.type === "seo" && block.pageIds.length !== 1) throw new Error("SEO must bind to one page");
     if (block.type === "business" && block.id !== "business-info") throw new Error("Canonical Business Info ID must be business-info");
     if (block.type === "featured" && !block.source) throw new Error("Featured items require a source");
+    if (block.sourceCategory && block.source !== "services") throw new Error("Source categories require a service source");
     if (block.type === "mailingList" && !block.formId) throw new Error("Mailing-list popup requires a configured form");
+    if (block.defaults) payloadSchema(block.type).parse({ ...emptyPayload(block.type), ...block.defaults });
     for (const [key, limit] of Object.entries(block.limits || {})) {
       const field = (definition.fields as Record<string, { kind: string; max?: number }>)[key];
       if (!field || field.kind !== "list" || !Number.isInteger(limit) || limit < 0 || limit > (field.max || 12)) throw new Error("Invalid item limit");

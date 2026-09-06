@@ -127,7 +127,8 @@ async function seedServices(siteId: string) {
       slug: "birthday-party",
       name: "Birthday Party",
       category: "events",
-      description: "Placeholder party booking for Cottage 616 celebrations.",
+      description: "A cozy setting for milestone birthdays, kids' parties, and easy add-ons.",
+      imageUrl: "assets/cottage-616/photos/events/cards/birthday-480w.webp",
       durationMinutes: 180,
       requestOnly: true,
       intakePrompt: "Tell us the date, guest count, celebration style, and any setup notes."
@@ -137,7 +138,8 @@ async function seedServices(siteId: string) {
       slug: "baby-shower",
       name: "Baby Shower",
       category: "events",
-      description: "Placeholder shower booking for family celebrations.",
+      description: "A welcoming place for family, friends, and sweet details.",
+      imageUrl: "assets/cottage-616/photos/events/cards/shower-480w.webp",
       durationMinutes: 180,
       requestOnly: true,
       intakePrompt: "Share your preferred date, guest count, colors, and vendor needs."
@@ -147,7 +149,8 @@ async function seedServices(siteId: string) {
       slug: "intimate-wedding",
       name: "Intimate Wedding",
       category: "events",
-      description: "Placeholder wedding inquiry for small gatherings.",
+      description: "A peaceful backdrop for close-knit ceremonies and relaxed receptions.",
+      imageUrl: "assets/cottage-616/photos/events/cards/wedding-480w.webp",
       durationMinutes: 240,
       requestOnly: true,
       intakePrompt: "Share your date range, ceremony size, reception plan, and must-haves."

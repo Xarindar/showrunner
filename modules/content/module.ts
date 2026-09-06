@@ -14,13 +14,15 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Manifest-driven content editors, canonical business info, page SEO, and scoped JSON delivery.",
-    primaryGap: "Cottage production migration and promotional renderer/integration verification remain pending."
+    summary: "Manifest-driven content editors, media-backed galleries, directories, canonical business info, page SEO, and scoped JSON delivery.",
+    primaryGap: "Additional client manifests and presentation previews are added as sites are onboarded."
   },
   capabilities: [
     { label: "Configured hero content", status: "live" },
     { label: "Featured booking card builder", status: "live" },
     { label: "Testimonial curation", status: "live" },
+    { label: "Media-backed galleries and carousels", status: "live" },
+    { label: "Vendor and partner directories", status: "live" },
     { label: "Contact / Business Info and page SEO", status: "live" }
   ],
   adminRoutes: ["/admin/modules/content"],

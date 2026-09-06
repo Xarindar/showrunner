@@ -20,8 +20,14 @@ export const blockRegistry = {
   mailingList: { label: "Mailing-list popup", fields: { ...section, imageUrl: url("Image URL"), submitLabel: text("Submit label"), successCopy: copy("Success message") } },
   coupon: { label: "Coupon / promo popup", fields: { ...section, code: text("Display code"), imageUrl: url("Image URL"), ...cta } },
   cta: { label: "CTA section", fields: { ...section, ...cta } },
-  featured: { label: "Featured items", fields: { heading: text("Heading"), items: list("Selected items", { referenceId: text("Record ID") }) } },
+  featured: { label: "Featured items", fields: { ...section, imageUrl: url("Feature image URL"), imageAlt: text("Feature image alternative text"), items: list("Selected items", { referenceId: text("Record ID") }) } },
   gallery: { label: "Image gallery / slideshow", fields: { heading: text("Heading"), images: list("Images", image, 30) } },
+  directory: { label: "Directory / partners", fields: { ...section, items: list("Directory entries", {
+    name: text("Name"), category: text("Category"), offer: copy("Featured offer"), description: copy("Description"),
+    imageUrl: url("Image URL"), imageAlt: text("Image alternative text"), ctaLabel: text("Button label"),
+    phone: url("Phone link"), secondaryPhone: url("Second phone link"), email: url("Email link"), website: url("Website"),
+    facebook: url("Facebook"), addressUrl: url("Directions link")
+  }, 30) } },
   about: { label: "About / story section", fields: { ...section, copy: { ...copy("Copy"), kind: "richtext" } as Field, imageUrl: url("Image URL"), imageAlt: text("Alternative text") } },
   faq: { label: "FAQ section", fields: { heading: text("Heading"), items: list("Questions", { question: text("Question", 500), answer: { ...copy("Answer"), kind: "richtext" } }) } },
   team: { label: "Team / staff spotlight", fields: { ...section, items: list("People", { name: text("Name"), role: text("Role"), bio: copy("Biography"), imageUrl: url("Photo URL"), imageAlt: text("Alternative text") }) } },

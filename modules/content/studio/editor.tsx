@@ -1,16 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { AssetPicker } from "@/components/ui/asset-picker";
+import { useRef, useState, type ChangeEvent } from "react";
+import { Image as ImageIcon } from "lucide-react";
+import { AssetPicker, type AssetPickerAsset } from "@/components/ui/asset-picker";
 import { blockRegistry, emptyFields, type Field } from "./registry";
 import type { ContentBlockConfig, ContentManifest } from "./manifest";
-import { saveStudioBlock } from "./actions";
+import { saveStudioBlock, uploadStudioAsset } from "./actions";
 import styles from "./studio.module.css";
 import { renderContentRichText } from "./rich-text";
 
-export type Choice = { id: string; label: string };
-export function StudioEditor({ block, pages, initialPayload, initialRevision, initialPages, choices = [] }: {
-  block: ContentBlockConfig; pages: ContentManifest["pages"]; initialPayload: Record<string, unknown>; initialRevision: number; initialPages: string[]; choices?: Choice[];
+export type Choice = { description?: string; id: string; imageUrl?: string; label: string };
+export function StudioEditor({ block, canUpload = false, pages, initialPayload, initialRevision, initialPages, choices = [] }: {
+  block: ContentBlockConfig; canUpload?: boolean; pages: ContentManifest["pages"]; initialPayload: Record<string, unknown>; initialRevision: number; initialPages: string[]; choices?: Choice[];
 }) {
   const [payload, setPayload] = useState(initialPayload);
   const [revision, setRevision] = useState(initialRevision);
@@ -34,7 +35,8 @@ export function StudioEditor({ block, pages, initialPayload, initialRevision, in
       finally { setPending(false); }
     }}>
       <fieldset disabled={pending} className={styles.fields}>
-        <Fields fields={fields} value={payload} prefix={block.id} onChange={setPayload} choices={choices} />
+        <StudioBlockPreview block={block} choices={choices} payload={payload} />
+        <Fields canUpload={canUpload} fields={fields} value={payload} prefix={block.id} onChange={setPayload} choices={choices} />
         {block.allowPageTargeting ? <fieldset><legend>Show on pages</legend>{pages.filter(page => block.pageIds.includes(page.id)).map(page => <label key={page.id} className={styles.check}><input type="checkbox" checked={pageIds.includes(page.id)} onChange={event => setPageIds(current => event.target.checked ? [...current, page.id] : current.filter(id => id !== page.id))} />{page.label}</label>)}</fieldset> : null}
         <button type="submit">{pending ? "Saving…" : "Save changes"}</button>
       </fieldset>
@@ -43,7 +45,7 @@ export function StudioEditor({ block, pages, initialPayload, initialRevision, in
   </section>;
 }
 
-export function Fields({ fields, value, prefix, onChange, choices = [] }: { fields: Record<string, Field>; value: Record<string, unknown>; prefix: string; onChange: (next: Record<string, unknown>) => void; choices?: Choice[] }) {
+export function Fields({ canUpload = false, fields, value, prefix, onChange, choices = [] }: { canUpload?: boolean; fields: Record<string, Field>; value: Record<string, unknown>; prefix: string; onChange: (next: Record<string, unknown>) => void; choices?: Choice[] }) {
   return <>{Object.entries(fields).map(([key, field]) => {
     const id = `${prefix}-${key}`;
     const update = (next: unknown) => onChange({ ...value, [key]: next });
@@ -52,7 +54,7 @@ export function Fields({ fields, value, prefix, onChange, choices = [] }: { fiel
       const rows = (value[key] || []) as Record<string, unknown>[];
       return <fieldset key={key} className={styles.list}><legend>{field.label}</legend>
         {rows.map((row, index) => <div key={String(row.id)} className={styles.item}>
-          <Fields fields={field.fields!} value={row} prefix={`${id}-${row.id}`} choices={choices} onChange={next => update(rows.map((current, i) => i === index ? next : current))} />
+          <Fields canUpload={canUpload} fields={field.fields!} value={row} prefix={`${id}-${row.id}`} choices={choices} onChange={next => update(rows.map((current, i) => i === index ? next : current))} />
           <button type="button" onClick={() => update(rows.filter((_, i) => i !== index))}>Remove {field.label.toLowerCase()} item {index + 1}</button>
         </div>)}
         <button type="button" disabled={rows.length >= (field.max ?? 12)} onClick={() => update([...rows, { id: crypto.randomUUID(), ...emptyFields(field.fields!) }])}>Add {field.label.toLowerCase()}</button>
@@ -62,9 +64,114 @@ export function Fields({ fields, value, prefix, onChange, choices = [] }: { fiel
     const media = key === "imageUrl" || (key === "url" && "alt" in fields);
     return <div key={key} className={styles.field}><label htmlFor={id}>{field.label}</label>
       {field.kind === "richtext" ? <RichText id={id} value={String(value[key] || "")} maxLength={field.max} onChange={update} /> : field.kind === "multiline" ? <textarea id={id} rows={4} maxLength={field.max} value={String(value[key] || "")} onChange={event => update(event.target.value)} /> : <input id={id} type={field.kind === "email" ? "email" : "text"} maxLength={field.max} value={String(value[key] || "")} onChange={event => update(event.target.value)} />}
-      {media ? <AssetPicker assets={[]} canUpload={false} loadFromServer title="Choose an image" onSelectAsset={asset => update(asset.url || asset.thumbnailUrl)}><span>Choose from media library</span></AssetPicker> : null}
+      {media ? <StudioMediaPicker
+        canUpload={canUpload}
+        context={prefix}
+        defaultAlt={String(value.alt || value.imageAlt || "Website image")}
+        onSelect={(asset) => {
+          const next: Record<string, unknown> = { ...value, [key]: asset.url || asset.thumbnailUrl };
+          if ("alt" in fields && !String(value.alt || "").trim()) next.alt = asset.alt;
+          if ("imageAlt" in fields && !String(value.imageAlt || "").trim()) next.imageAlt = asset.alt;
+          onChange(next);
+        }}
+      /> : null}
     </div>;
   })}</>;
+}
+
+function StudioMediaPicker({ canUpload, context, defaultAlt, onSelect }: { canUpload: boolean; context: string; defaultAlt: string; onSelect: (asset: AssetPickerAsset) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
+    const fileInput = event.currentTarget;
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setMessage("");
+    const formData = new FormData();
+    formData.set("file", file);
+    formData.set("alt", defaultAlt);
+    formData.set("context", context);
+    try {
+      const result = await uploadStudioAsset(formData);
+      if (result.asset) {
+        onSelect(result.asset);
+        setMessage(`${result.asset.filename} uploaded and selected.`);
+      } else {
+        setMessage(result.error || "Image upload failed.");
+      }
+    } catch {
+      setMessage("Image upload failed.");
+    } finally {
+      fileInput.value = "";
+      setUploading(false);
+    }
+  }
+
+  return <div className={styles.mediaPicker}>
+    <AssetPicker
+      assets={[]}
+      canUpload={canUpload && !uploading}
+      loadFromServer
+      onSelectAsset={onSelect}
+      onUploadRequest={() => input.current?.click()}
+      title="Choose an image"
+      triggerClassName="ui-button ui-button-secondary ui-button-sm"
+    >
+      <ImageIcon aria-hidden="true" size={15} />
+      {uploading ? "Uploading…" : "Choose or upload image"}
+    </AssetPicker>
+    <input accept="image/*" className="ui-hidden" onChange={handleUpload} ref={input} type="file" />
+    {message ? <small aria-live="polite">{message}</small> : null}
+  </div>;
+}
+
+function StudioBlockPreview({ block, choices, payload }: { block: ContentBlockConfig; choices: Choice[]; payload: Record<string, unknown> }) {
+  if (block.presentation?.variant === "event-strip") {
+    const rows = Array.isArray(payload.items) ? payload.items as { referenceId?: string }[] : [];
+    const items = rows.map(row => choices.find(choice => choice.id === row.referenceId)).filter((choice): choice is Choice => Boolean(choice));
+    const featureImage = previewMediaUrl(String(payload.imageUrl || ""), block.presentation.assetBaseUrl);
+    return <section aria-label="Events panel preview" className={styles.eventPreview}>
+      <div className={styles.eventFeature} style={featureImage ? { backgroundImage: `url("${featureImage.replace(/"/g, "%22")}")` } : undefined}><span>Events</span></div>
+      <div className={styles.eventContent}>
+        <div><h3>{String(payload.heading || "Events")}</h3><p>{String(payload.copy || "")}</p></div>
+        <div className={styles.eventCards}>
+          {[0, 1, 2].map(index => {
+            const item = items[index];
+            const imageUrl = previewMediaUrl(item?.imageUrl || "", block.presentation?.assetBaseUrl);
+            return <article key={item?.id || `empty-${index}`}>
+              <div className={styles.eventCardImage} style={imageUrl ? { backgroundImage: `url("${imageUrl.replace(/"/g, "%22")}")` } : undefined} />
+              <strong>{item?.label || "Choose an event"}</strong>
+              <p>{item?.description || "This slot will use the selected service details."}</p>
+              <span>Book now</span>
+            </article>;
+          })}
+        </div>
+      </div>
+    </section>;
+  }
+
+  if (block.presentation?.variant === "image-strip") {
+    const images = Array.isArray(payload.images) ? payload.images as { id?: string; url?: string; alt?: string }[] : [];
+    return <section aria-label="Image carousel preview" className={styles.imageStripPreview}>
+      {images.map((image, index) => {
+        const imageUrl = previewMediaUrl(image.url || "", block.presentation?.assetBaseUrl);
+        return <div aria-label={image.alt || `Carousel image ${index + 1}`} key={image.id || index} role="img" style={imageUrl ? { backgroundImage: `url("${imageUrl.replace(/"/g, "%22")}")` } : undefined} />;
+      })}
+    </section>;
+  }
+
+  return null;
+}
+
+function previewMediaUrl(value: string, assetBaseUrl?: string) {
+  const url = value.trim();
+  if (!url || /^https?:\/\//i.test(url) || url.startsWith("/")) return url;
+  if (!assetBaseUrl) return url;
+  try { return new URL(url, assetBaseUrl).toString(); }
+  catch { return url; }
 }
 function RichText({ id, value, maxLength, onChange }: { id: string; value: string; maxLength?: number; onChange: (value: string) => void }) {
   const input = useRef<HTMLTextAreaElement>(null);
