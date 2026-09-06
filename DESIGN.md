@@ -69,9 +69,9 @@ The editor inherits the existing sans stack through `--font-sans` (the base them
 
 ## Layout
 
-The desktop admin navigation occupies (240px). The editor fills the remaining viewport height, with a wrapping toolbar of at least (60px), a flexible central canvas, and a compact footer. The website iframe fills the canvas; mobile preview centers a (390px) iframe constrained to the available width.
+The expanded desktop admin navigation occupies (240px). Above (860px), its collapse control reduces it to a (52px) rail containing only the expand control; the preference persists across visits. Mobile retains the existing navigation drawer. The editor fills the remaining viewport height, with a wrapping toolbar of at least (60px), a flexible central canvas, and a compact footer. The website iframe fills the canvas; mobile preview centers a (390px) iframe constrained to the available width.
 
-Selecting a fixed website section opens a right inspector; closing it returns the width to the canvas. The inspector scrolls independently. At (1050px) and below, toolbar spacing tightens, save status hides, and the inspector narrows to (310px). At (760px) and below, the editor accounts for the mobile shell header, the title wraps onto its own row, history controls hide, and the inspector overlays the canvas at `min(340px, 92%)`. The footer section selector remains an alternative to clicking the website.
+Selecting a fixed website section opens a right inspector; closing it returns the width to the canvas. The inspector scrolls independently. At (1050px) and below, toolbar spacing tightens, save status hides, and the inspector narrows to (310px). At (860px) and below, the editor accounts for the mobile shell header, the title wraps onto its own row, history controls hide, and the inspector overlays the canvas at `min(340px, 92%)`. The footer section selector remains an alternative to clicking the website.
 
 ## Elevation & Depth
 
@@ -84,7 +84,9 @@ Toolbar controls have modest corners; content inputs and image previews use the 
 ## Components
 
 - **Toolbar:** Content title, page selector, desktop/mobile toggle, undo/redo, save status, website link, and Publish. Quiet controls use the sunken surface on hover; selected preview size uses that same fill. Publish alone has the solid brand treatment. Disabled toolbar actions use reduced opacity (.45).
-- **Inspector:** A section heading and close control precede approved content fields. Inputs have (10px 12px) padding; fields use (16px) vertical gaps. Image selection includes a preview and the existing media picker. Service fields select existing services and allow approved content overrides.
+- **Inspector:** A section heading and close control precede approved content fields, grouped by visual item with the image first. Native disclosure groups use fine bottom dividers and compact headings. Each Header accordion contains its slide's image, title, caption, and Button settings; Add header appends a slide within the fixed section. Inputs have (10px 12px) padding; fields use (16px) vertical gaps.
+- **Image picker:** The full photo or empty placeholder is the picker button. A bottom hint appears on hover and keyboard focus; empty placeholders and touch devices keep the hint visible. Preserve its accessible button label and focus outline.
+- **Button settings:** Title and destination appear together. Link to selects Page, Service where available, or Web address, followed by the corresponding labeled selector or input. Service destinations include next-available-date guidance; existing destinations remain selectable.
 - **Focus:** Toolbar buttons and selectors retain a visible (2px) brand outline with (2px) offset. Content fields retain their existing explicit focus outline and visible labels.
 - **Feedback:** Loading and connection messages appear over the canvas; publish feedback appears below the toolbar with status or alert semantics. Preserve edits when publishing fails.
 - **Website canvas:** Render the actual website, with draft changes previewed immediately. Clicking a fixed section selects its content inspector. Content owners edit approved text, images, and services; page sections, their layout, and their order remain designer-owned. Do not expose insertion, deletion, duplication, or drag controls for page sections.
@@ -98,4 +100,4 @@ Toolbar controls have modest corners; content inputs and image previews use the 
 - Don't apply admin typography or colors to the client website.
 - Don't expose controls that add, remove, duplicate, or reorder page sections.
 
-Source of truth: modules/content/studio/puck-editor.tsx, puck-editor.module.css, the active field rules in studio.module.css, app/globals.css, and lib/theme/tokens.ts. Reviewed screenshots are in .impeccable/review; saved beta copy and incomplete image loading in captures are not visual design requirements.
+Source of truth: modules/content/studio/{puck-editor.tsx,puck-editor.module.css,editor.tsx,content-fields.tsx,field-layout.ts,studio.module.css}, shell/admin-sidebar.tsx, app/globals.css, and lib/theme/tokens.ts. Reviewed screenshots are .impeccable/review/pass2-desktop.png, pass2-team.png, and pass2-mobile.png; saved beta copy and incomplete image loading in captures are not visual design requirements.

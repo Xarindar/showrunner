@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-06T04:00:11.436Z",
+  "generatedAt": "2026-09-06T05:08:50.660301+00:00",
   "title": "Design System: Showrunner Content Editor",
   "extensions": {
     "colorMeta": {
@@ -127,7 +127,11 @@
       },
       {
         "name": "overlay-inspector",
-        "value": "760px"
+        "value": "860px"
+      },
+      {
+        "name": "desktop-collapse",
+        "value": "861px"
       }
     ]
   },
@@ -158,16 +162,23 @@
     {
       "name": "Admin navigation",
       "kind": "nav",
-      "description": "Existing shell navigation with a quiet selected fill.",
+      "description": "Existing shell navigation with a quiet selected fill; desktop collapse leaves a 52px expand-control rail and persists across visits. Mobile retains its drawer.",
       "html": "<nav class=\"ds-nav\" aria-label=\"Website\"><a class=\"ds-active\" aria-current=\"page\" href=\"#content\">Content</a></nav>",
       "css": ".ds-nav a{display:flex;align-items:center;min-height:34px;border:1px solid transparent;border-radius:6px;padding:0 9px;font-family:var(--font-sans,sans-serif);font-size:var(--type-small,.84rem);font-weight:540;color:var(--admin-sidebar-text,#242724);text-decoration:none;transition:background-color var(--motion-fast,160ms) ease}.ds-nav a:hover{background:var(--admin-sidebar-hover,#e5e6e2)}.ds-nav .ds-active{background:var(--admin-sidebar-active,#dcded9);font-weight:620}.ds-nav a:focus-visible{outline:2px solid var(--color-brand,#116466);outline-offset:2px}"
     },
     {
-      "name": "Grouped content rows",
+      "name": "Visual item accordion",
       "kind": "card",
-      "description": "A bordered field group inside the inspector.",
-      "html": "<fieldset class=\"ds-group\"><legend>Selected items</legend><label>Item<select><option>Selected service</option></select></label></fieldset>",
-      "css": ".ds-group{font-family:var(--font-sans,sans-serif);font-size:14px;display:grid;gap:12px;min-width:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:16px;background:#fff;color:#222}.ds-group label{display:grid;gap:6px}.ds-group select{font:inherit;width:100%;border:1px solid #ccc;border-radius:6px;padding:10px 12px;background:#fff;color:#222}.ds-group select:focus-visible{outline:2px solid #116466;outline-offset:2px}"
+      "description": "Native disclosure per visual item, with image first. Header slides group image, title, caption, and button; Add header appends within the fixed section.",
+      "html": "<details class=\"ds-group\" open><summary>Header 1</summary><div class=\"ds-group-fields\"><label>Title<input value=\"Section heading\"></label><label>Link to<select><option>Page</option><option>Service</option><option>Web address</option></select></label></div></details>",
+      "css": ".ds-group{font-family:var(--font-sans,sans-serif);font-size:14px;min-width:0;border-bottom:1px solid var(--color-border,#ddd);color:#222}.ds-group>summary{cursor:pointer;padding:16px 4px;font-weight:600;overflow-wrap:anywhere}.ds-group>summary:focus-visible{outline:2px solid var(--color-brand,#116466)}.ds-group-fields{display:grid;gap:14px;padding:0 4px 20px}.ds-group label{display:grid;gap:6px}.ds-group input,.ds-group select{font:inherit;width:100%;border:1px solid #ccc;border-radius:6px;padding:10px 12px;background:#fff;color:#222}.ds-group input:focus-visible,.ds-group select:focus-visible{outline:2px solid #116466;outline-offset:2px}"
+    },
+    {
+      "name": "Image picker trigger",
+      "kind": "button",
+      "description": "The image or empty placeholder opens the media picker. Hover and keyboard focus reveal the hint; touch and empty states keep it visible.",
+      "html": "<button class=\"ds-image\" aria-label=\"Choose image\"><span class=\"ds-image-placeholder\">Image</span><span class=\"ds-image-hint\">Choose image</span></button>",
+      "css": ".ds-image{position:relative;display:block;width:100%;padding:0;border:0;border-radius:6px;overflow:hidden;background:var(--color-surface-sunken,#ecece9);color:#222;cursor:pointer;font:14px var(--font-sans,sans-serif)}.ds-image-placeholder{aspect-ratio:16/10;display:grid;place-items:center}.ds-image-hint{position:absolute;left:0;right:0;bottom:0;background:#20221fe6;color:#fff;padding:10px;font-size:12px}.ds-image:hover .ds-image-hint,.ds-image:focus-visible .ds-image-hint{opacity:1}.ds-image:focus-visible{outline:2px solid #116466;outline-offset:2px}"
     }
   ],
   "narrative": {
