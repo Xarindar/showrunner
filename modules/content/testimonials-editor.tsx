@@ -5,6 +5,7 @@ import NextImage from "next/image";
 import { Check, ChevronLeft, ChevronRight, Image as ImageIcon, Plus, Save, Star, Trash2 } from "lucide-react";
 import { AssetPicker, Button, Card, Field, Input, Modal, Switch, type AssetPickerAsset } from "@/components/ui";
 import type { ContentTestimonial } from "./testimonials-data";
+import { EditSurface } from "./studio/visual-block";
 
 type TestimonialAction = (formData: FormData) => void | Promise<void>;
 
@@ -62,6 +63,7 @@ export function TestimonialsEditor({
   const railRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
+  const [editingHeading, setEditingHeading] = useState(false);
   const [draft, setDraft] = useState<TestimonialDraft>(emptyDraft);
   const [previewUrl, setPreviewUrl] = useState("");
   const [uploadName, setUploadName] = useState("");
@@ -180,18 +182,19 @@ export function TestimonialsEditor({
 
   return (
     <Card className="content-testimonial-shell" minHeight="none" reservedHeader={toolbar}>
+      <EditSurface label="Edit reviews heading" onEdit={() => setEditingHeading(!editingHeading)}><h3>{heading}</h3><p>{intro}</p></EditSurface>
       <form action={curationAction} className="content-curation-bar">
         <input name="profileKey" type="hidden" value={profileKey} readOnly />
         {assigned.map((id) => (
           <input key={id} name="testimonialIds" type="hidden" value={id} readOnly />
         ))}
-        <Field label={`${venueLabel} section heading`}>
+        <div hidden={!editingHeading}><Field label={`${venueLabel} section heading`}>
           <Input defaultValue={heading} name="testimonialHeading" placeholder="Sweet words from our guests" />
         </Field>
         <Field label="Intro line">
           <Input defaultValue={intro} name="testimonialIntro" placeholder="Optional intro under the heading" />
         </Field>
-        <Button size="sm" type="submit">
+        </div><Button size="sm" type="submit">
           <Save size={16} aria-hidden="true" />
           Save curation
         </Button>

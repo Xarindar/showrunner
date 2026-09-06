@@ -20,7 +20,7 @@ export const blockRegistry = {
   mailingList: { label: "Mailing-list popup", fields: { ...section, imageUrl: url("Image URL"), submitLabel: text("Submit label"), successCopy: copy("Success message") } },
   coupon: { label: "Coupon / promo popup", fields: { ...section, code: text("Display code"), imageUrl: url("Image URL"), ...cta } },
   cta: { label: "CTA section", fields: { ...section, ...cta } },
-  featured: { label: "Featured items", fields: { ...section, imageUrl: url("Feature image URL"), imageAlt: text("Feature image alternative text"), items: list("Selected items", { referenceId: text("Record ID") }) } },
+  featured: { label: "Featured items", fields: { ...section, imageUrl: url("Feature image URL"), imageAlt: text("Feature image alternative text"), items: list("Selected items", { referenceId: text("Service"), title: text("Heading (blank uses service name)"), description: copy("Description (blank uses service description)") }) } },
   gallery: { label: "Image gallery / slideshow", fields: { heading: text("Heading"), images: list("Images", image, 30) } },
   directory: { label: "Directory / partners", fields: { ...section, items: list("Directory entries", {
     name: text("Name"), category: text("Category"), offer: copy("Featured offer"), description: copy("Description"),
@@ -55,7 +55,7 @@ export function isSafeContentUrl(value: string) {
 
 export function fieldSchema(field: Field): z.ZodType {
   if (field.kind === "checkbox") return z.boolean();
-  if (field.kind === "list") return z.array(z.strictObject({ id: z.string().min(1).max(100), ...schemaFields(field.fields!) }))
+  if (field.kind === "list") return z.array(z.strictObject({ id: z.string().min(1).max(100), ...schemaFields(field.fields!), ...("referenceId" in (field.fields || {}) ? { title: z.string().max(200).default(""), description: z.string().max(10000).default("") } : {}) }))
     .max(field.max || 12).refine(rows => new Set(rows.map(row => row.id)).size === rows.length, "Item IDs must be unique");
   let schema = z.string().max(field.max || 200);
   if (field.kind === "url") schema = schema.refine(isSafeContentUrl, "Use a safe website, email, phone, or relative link");

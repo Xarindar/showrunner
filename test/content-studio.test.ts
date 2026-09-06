@@ -8,6 +8,14 @@ import { cottageContentManifest, resolveContentManifest } from "../clients/conte
 import { renderContentRichText } from "../modules/content/studio/rich-text";
 
 const faq = configuredBlock("faq", "faq", ["home", "about"], { allowPageTargeting: true, limits: { items: 1 } });
+test("event display overrides preserve legacy rows and validate edited copy", () => {
+  const schema = payloadSchema("featured");
+  const legacy = { ...emptyPayload("featured"), items: [{ id: "slot-1", referenceId: "service-1" }] };
+  assert.equal(schema.safeParse(legacy).success, true);
+  const edited = { ...legacy, items: [{ ...legacy.items[0], title: "Celebrate here", description: "Your private event" }] };
+  assert.equal(schema.safeParse(edited).success, true);
+  assert.equal(schema.safeParse({ ...edited, items: [{ ...edited.items[0], title: "x".repeat(201) }] }).success, false);
+});
 test("all selected block payloads have strict reusable schemas", () => {
   for (const type of Object.keys(blockRegistry) as (keyof typeof blockRegistry)[]) {
     assert.equal(payloadSchema(type).safeParse(emptyPayload(type)).success, true, type);

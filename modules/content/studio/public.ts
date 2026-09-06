@@ -42,11 +42,11 @@ export async function getPublicStudio(siteId: string, pageId: string) {
       });
       payload = {
         ...payload,
-        items: ids.flatMap(id => items.filter(item => item.id === id).map(item => ({
-          description: item.description || "",
+        items: (payload.items as { referenceId: string; title?: string; description?: string }[]).flatMap(row => items.filter(item => item.id === row.referenceId).map(item => ({
+          description: row.description?.trim() || item.description || "",
           id: item.id,
           imageUrl: publicMediaUrl(item.mediaAsset ? mediaAssetDisplayUrl(item.mediaAsset, MediaVariantType.CARD) : item.imageUrl),
-          name: item.name
+          name: row.title?.trim() || item.name
         })))
       };
     }

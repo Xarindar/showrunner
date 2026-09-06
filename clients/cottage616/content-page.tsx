@@ -81,7 +81,7 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
       {params.saved ? <div className="success-message">{savedContentMessage(params.saved, profile.label)}</div> : null}
       {params.error ? <div className="error">{decodeURIComponent(params.error)}</div> : null}
 
-      <HeroCopyEditor initialPresentation={heroPresentation} profileKey={profileKey} revision={settings.updatedAt.toISOString()} key={`hero-${profileKey}`} />
+      <HeroCopyEditor canUpload={canUpload} initialPresentation={heroPresentation} profileKey={profileKey} revision={settings.updatedAt.toISOString()} key={`hero-${profileKey}`} />
 
       <FeaturedCardEditor
         action={updateFeaturedCardAction}
