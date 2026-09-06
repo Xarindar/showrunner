@@ -17277,3 +17277,11 @@ button.button:disabled,
     animation: none;
   }
 }
+.admin-sidebar-collapse { display: none; }
+@media (min-width: 861px) {
+  .admin-sidebar-collapse { display: flex; align-items: center; justify-content: center; align-self: flex-end; flex-shrink: 0; width: 36px; height: 36px; margin: 8px; background: transparent; border: 1px solid var(--admin-sidebar-border); border-radius: 5px; color: var(--admin-sidebar-text); cursor: pointer; }
+  .admin-sidebar-collapse:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+  .admin-root:has(.admin-sidebar.is-collapsed) { grid-template-columns: 52px minmax(0, 1fr); }
+  .admin-sidebar.is-collapsed { scrollbar-gutter: auto; }
+  .admin-sidebar.is-collapsed > :not(.admin-sidebar-collapse) { display: none; }
+}

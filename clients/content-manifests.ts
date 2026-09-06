@@ -11,6 +11,7 @@ export const defaultContentManifest = validateManifest({
 });
 export const cottageContentManifest = validateManifest({
   version: 1, id: "cottage616", legacyProfiles: true, previewUrl: "https://cottage616-production.up.railway.app/",
+  booking: { path: "/booking.html", profilesByCategory: { events: "cottage616", "the-hive": "the-hive" } },
   pages: [{ id: "home", path: "/index.html", label: "Cottage 616" }, { id: "hive", path: "/the-hive.html", label: "The Hive" }, { id: "booking", path: "/booking.html", label: "Booking" }, { id: "vendors", path: "/vendors.html", label: "Vendors" }],
   blocks: [
     ...pageStrips as ContentBlockConfig[],

@@ -13,3 +13,7 @@ The bridge activates editing only inside an iframe with `?showrunner-editor=1`, 
 Cottage616 is the first adapter: `clients/cottage616/page-strips.json` records the existing template bindings; the server adapter reads existing hero slides and reviews without replacing legacy data. Keep those selectors in sync when changing its template. Its `scripts/integrations/showrunner/editor.js` must match the shared SDK when installing an upgrade.
 
 For local integration checks only, `CONTENT_PREVIEW_URL` can override Cottage616's preview origin and `SHOWRUNNER_BUILD_DIR` can isolate a second dev server's build output. Local previews still need an approved public API origin. Do not broaden production origin checks for testing.
+
+The inspector groups controls by visual item. Put images first within each group, followed by its title, caption and button. `editorGroups` maps existing strip payload paths to these groups without changing stored content or public bindings. Image previews are accessible picker buttons with a hover/focus hint.
+
+Use `slideshow` for a header carousel: clients may append/remove slides within its minimum/maximum limits while the page section remains fixed. The Cottage adapter reads legacy header arrays into the new slide shape until first publication. Button destinations offer registered pages and active services; configure `booking.path` and optional `profilesByCategory` to produce slug-based links. The booking client resolves the slug, then uses its existing earliest-availability lookup without selecting a time or creating a booking.

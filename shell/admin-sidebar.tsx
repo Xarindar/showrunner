@@ -11,6 +11,8 @@ import {
   LogOut,
   Menu,
   Pencil,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   UserRound,
   X
@@ -35,6 +37,7 @@ import { Button } from "@/components/ui";
 import { useEffect, useRef, useState, useTransition, type KeyboardEvent, type PointerEvent } from "react";
 
 type AdminSidebarProps = {
+  initialCollapsed: boolean;
   businessName: string;
   enabledModules: ModuleId[];
   logoUrl: string;
@@ -188,9 +191,14 @@ function SidebarNavGroup({
   );
 }
 
-export function AdminSidebar({ businessName, enabledModules, logoUrl, navigationLayout, userEmail, userRole }: AdminSidebarProps) {
+export function AdminSidebar({ businessName, enabledModules, logoUrl, navigationLayout, userEmail, userRole, initialCollapsed }: AdminSidebarProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
+  function toggleCollapsed() {
+    setCollapsed(!collapsed);
+    document.cookie = `showrunner-sidebar-collapsed=${!collapsed}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
+  }
   const [editing, setEditing] = useState(false);
   const [draggedModuleId, setDraggedModuleId] = useState<string | null>(null);
   const [layoutItems, setLayoutItems] = useState(() => groupAdminModuleNavigationLayout(navigationLayout));
@@ -412,7 +420,8 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, navigation
         type="button"
       />
 
-      <aside className={`admin-sidebar ${menuOpen ? "open" : ""}`} id="admin-sidebar">
+      <aside className={`admin-sidebar ${menuOpen ? "open" : ""} ${collapsed ? "is-collapsed" : ""}`} id="admin-sidebar">
+        <button className="admin-sidebar-collapse" aria-label={collapsed ? "Expand dashboard panel" : "Collapse dashboard panel"} aria-expanded={!collapsed} onClick={toggleCollapsed} type="button">{collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}</button>
         <div className="admin-sidebar-header">
           <Link href="/admin" className="brand" onClick={closeMenu}>
             <SidebarBrand businessName={businessName} logoUrl={logoUrl} />

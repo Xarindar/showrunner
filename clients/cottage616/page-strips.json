@@ -77,7 +77,57 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Title"
+          }
+        ]
+      },
+      {
+        "label": "Local love",
+        "fields": [
+          {
+            "path": "texts.1.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Caption"
+          }
+        ]
+      },
+      {
+        "label": "Small venue, lots to love",
+        "fields": [
+          {
+            "path": "texts.3.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.4.text",
+            "label": "Caption"
+          }
+        ]
+      },
+      {
+        "label": "Indoor / Outdoor",
+        "fields": [
+          {
+            "path": "texts.5.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.6.text",
+            "label": "Caption"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "home-section-6",
@@ -167,7 +217,42 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Image"
+          },
+          {
+            "path": "texts.0.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.3.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.4.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.5.text",
+            "label": "Caption"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "home-section-7",
@@ -329,7 +414,86 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Label"
+          }
+        ]
+      },
+      {
+        "label": "Jo Lynne Skaggs",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Image"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Caption"
+          }
+        ]
+      },
+      {
+        "label": "Abigail Freligh",
+        "fields": [
+          {
+            "path": "images.1",
+            "label": "Image"
+          },
+          {
+            "path": "texts.3.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.4.text",
+            "label": "Caption"
+          }
+        ]
+      },
+      {
+        "label": "Tiffany Duggin",
+        "fields": [
+          {
+            "path": "images.2",
+            "label": "Image"
+          },
+          {
+            "path": "texts.5.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.6.text",
+            "label": "Caption"
+          }
+        ]
+      },
+      {
+        "label": "Max Skaggs",
+        "fields": [
+          {
+            "path": "images.3",
+            "label": "Image"
+          },
+          {
+            "path": "texts.7.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.8.text",
+            "label": "Caption"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "home-section-8",
@@ -369,7 +533,22 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Caption"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "hive-section-2",
@@ -467,7 +646,38 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Image"
+          },
+          {
+            "path": "images.1",
+            "label": "Image"
+          },
+          {
+            "path": "texts.0.text",
+            "label": "Label"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.0",
+            "label": "Button"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "hive-section-4",
@@ -581,7 +791,60 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Label"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Caption"
+          }
+        ]
+      },
+      {
+        "label": "Jo Lynne Skaggs",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Image"
+          },
+          {
+            "path": "texts.3.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.4.text",
+            "label": "Caption"
+          }
+        ]
+      },
+      {
+        "label": "Deanna",
+        "fields": [
+          {
+            "path": "images.1",
+            "label": "Image"
+          },
+          {
+            "path": "texts.5.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.6.text",
+            "label": "Caption"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "hive-section-5",
@@ -1099,7 +1362,255 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.11.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.12.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.13.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.14.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.15.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.16.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.17.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.18.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.5",
+            "label": "Button"
+          },
+          {
+            "path": "texts.19.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.20.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.21.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.22.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.23.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.24.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.6",
+            "label": "Button"
+          },
+          {
+            "path": "texts.25.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.26.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.27.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.28.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.29.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.30.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.7",
+            "label": "Button"
+          },
+          {
+            "path": "texts.31.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.32.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.33.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.34.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.35.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.36.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.8",
+            "label": "Button"
+          },
+          {
+            "path": "texts.37.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.38.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.39.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.40.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.41.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.42.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.43.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.9",
+            "label": "Button"
+          }
+        ]
+      },
+      {
+        "label": "The Refresh",
+        "fields": [
+          {
+            "path": "texts.1.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.0",
+            "label": "Button"
+          }
+        ]
+      },
+      {
+        "label": "The Unwind",
+        "fields": [
+          {
+            "path": "texts.3.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.4.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.1",
+            "label": "Button"
+          }
+        ]
+      },
+      {
+        "label": "The Glow",
+        "fields": [
+          {
+            "path": "texts.5.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.6.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.2",
+            "label": "Button"
+          }
+        ]
+      },
+      {
+        "label": "The Full Ritual",
+        "fields": [
+          {
+            "path": "texts.7.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.8.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.3",
+            "label": "Button"
+          }
+        ]
+      },
+      {
+        "label": "The Botanical",
+        "fields": [
+          {
+            "path": "texts.9.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.10.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.4",
+            "label": "Button"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "hive-section-6",
@@ -1163,7 +1674,30 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.0",
+            "label": "Button"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "hive-section-7",
@@ -1267,7 +1801,74 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Label"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Title"
+          }
+        ]
+      },
+      {
+        "label": "Scalp Clarity",
+        "fields": [
+          {
+            "path": "texts.2.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.3.text",
+            "label": "Caption"
+          }
+        ]
+      },
+      {
+        "label": "Oil Balance",
+        "fields": [
+          {
+            "path": "texts.4.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.5.text",
+            "label": "Caption"
+          }
+        ]
+      },
+      {
+        "label": "Circulation",
+        "fields": [
+          {
+            "path": "texts.6.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.7.text",
+            "label": "Caption"
+          }
+        ]
+      },
+      {
+        "label": "Relaxation",
+        "fields": [
+          {
+            "path": "texts.8.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.9.text",
+            "label": "Caption"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "hive-section-8",
@@ -1347,7 +1948,42 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Label"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.3.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.4.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.5.text",
+            "label": "Caption"
+          },
+          {
+            "path": "texts.6.text",
+            "label": "Caption"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "hive-section-9",
@@ -1411,7 +2047,30 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Label"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Caption"
+          },
+          {
+            "path": "links.0",
+            "label": "Button"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "hive-section-10",
@@ -1451,7 +2110,22 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Caption"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "vendors-section-1",
@@ -1517,7 +2191,30 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Image"
+          },
+          {
+            "path": "texts.0.text",
+            "label": "Label"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Caption"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "vendors-section-2",
@@ -1565,7 +2262,26 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Label"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Caption"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "vendors-section-5",
@@ -1605,7 +2321,21 @@
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
-    }
+    },
+    "editorGroups": [
+      {
+        "label": "Section content",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Caption"
+          }
+        ]
+      }
+    ]
   }
 ]
-

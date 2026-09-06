@@ -1,6 +1,7 @@
 import "server-only";
 import { resolveContentManifest } from "@/clients/content-manifests";
 import { getPublicContentProfilePayload } from "@/clients/cottage616/content-profiles";
+import { readStudio } from "@/modules/content/studio/state";
 import type { SiteSettingsWithModules } from "@/lib/site";
 import { configuredBlock, type ContentBlockConfig } from "@/modules/content/studio/manifest";
 
@@ -15,29 +16,30 @@ export async function getEditorManifest(settings: SiteSettingsWithModules) {
     const configuredScreens = allScreens.filter(screen => screen.backgrounds.some(bg => bg.url && !/\/hero\.svg([?#]|$)/i.test(bg.url)));
     const staticHero = configuredScreens.length === 0;
     const screens = staticHero ? allScreens.slice(0, 1) : configuredScreens;
-    const payload = { texts: [] as { id: string; text: string }[], images: [] as { id: string; url: string; alt: string; caption: string }[], links: [] as { id: string; label: string; href: string }[] };
-    const bindings: NonNullable<NonNullable<ContentBlockConfig["presentation"]>["bindings"]> = [];
-    screens.forEach((screen, index) => {
-      const selector = `.sr-hero-screen:nth-child(${index + 1})`;
-      screen.backgrounds.slice(0, 1).forEach(bg => {
-        const target = staticHero ? ".hero" : `${selector} .sr-hero-bg`;
-        bindings.push({ path: `images.${payload.images.length}.url`, selector: target, attribute: "background" }, { path: `images.${payload.images.length}.alt`, selector: target, attribute: "alt" });
-        const fallback = pageIndex ? "assets/hive/photos/treatments/head-spa-1280w.webp" : "assets/cottage-616/photos/venue/neon-sign-1280w.webp";
-        payload.images.push({ id: `slide-${index + 1}`, url: staticHero ? new URL(fallback, manifest.previewUrl).toString() : bg.url, alt: bg.altText || "", caption: "" });
-      });
+    const legacy = readStudio(settings.publicContentConfig).blocks[`${page}-hero`]?.payload;
+    const oldTexts = legacy?.texts as { text: string }[] | undefined;
+    const oldImages = legacy?.images as { url: string; alt: string }[] | undefined;
+    const oldLinks = legacy?.links as { label: string; href: string }[] | undefined;
+    let textIndex = 0, linkIndex = 0;
+    const slides = screens.map((screen, index) => {
+      let title = "", caption = "", buttonLabel = "", buttonHref = "";
       screen.canvasLayers.forEach(layer => {
         if (layer.type === "text") {
-          bindings.push({ path: `texts.${payload.texts.length}.text`, selector: staticHero ? `[data-content-header-${layer.role === "headline" ? "headline" : "copy"}]` : `${selector} .sr-hero-${layer.role}` });
-          payload.texts.push({ id: `slide-${index}-${layer.id}`, text: layer.content });
+          const text = oldTexts?.[textIndex++]?.text ?? layer.content;
+          if (layer.role === "headline") title = text;
+          else caption = [caption, text].filter(Boolean).join("\n");
         } else {
-          const target = staticHero ? "[data-content-header-cta]" : `${selector} .sr-hero-cta`;
-          bindings.push({ path: `links.${payload.links.length}.label`, selector: target }, { path: `links.${payload.links.length}.href`, selector: target, attribute: "href" });
-          payload.links.push({ id: `slide-${index}-${layer.id}`, label: layer.content, href: layer.link });
+          const link = oldLinks?.[linkIndex++];
+          buttonLabel = link?.label ?? layer.content;
+          buttonHref = link?.href ?? layer.link;
         }
       });
+      const bg = screen.backgrounds[0];
+      const fallback = pageIndex ? "assets/hive/photos/treatments/head-spa-1280w.webp" : "assets/cottage-616/photos/venue/neon-sign-1280w.webp";
+      return { id: `slide-${index + 1}`, imageUrl: oldImages?.[index]?.url ?? (staticHero ? new URL(fallback, manifest.previewUrl).toString() : bg?.url || ""), imageAlt: oldImages?.[index]?.alt ?? bg?.altText ?? "", title, caption, buttonLabel, buttonHref };
     });
     return [
-      configuredBlock(`${page}-hero`, "strip", [page], { label: "Hero / slideshow", fixedRows: true, defaults: payload, presentation: { selector: ".hero", bindings } }),
+      configuredBlock(`${page}-hero`, "slideshow", [page], { label: "Header carousel", defaults: { slides }, minimums: { slides: 1 }, presentation: { selector: ".hero" } }),
       configuredBlock(`${page}-reviews`, "testimonials", [page], { label: "Guest reviews", defaults: { heading: profile.testimonials.heading, copy: profile.testimonials.intro, items: profile.testimonials.items.map(item => ({ id: item.id, author: item.authorName, quote: item.quote, role: item.authorRole || "" })) }, presentation: { selector: "[data-showrunner-testimonials]" } }),
     ];
   });
@@ -47,4 +49,3 @@ export async function getEditorManifest(settings: SiteSettingsWithModules) {
     ...(selectors[block.id] ? { presentation: { ...block.presentation, selector: selectors[block.id] } } : {})
   }))] };
 }
-

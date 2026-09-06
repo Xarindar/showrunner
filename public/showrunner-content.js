@@ -57,6 +57,7 @@
     if (event.data.type !== "update" || event.origin !== parentOrigin || !Array.isArray(event.data.blocks)) return;
     blocks = event.data.blocks;
     apply(blocks, event.origin);
+    if (event.data.focusedItem) window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: event.data.focusedItem } }));
     document.querySelectorAll("[data-sr-selected]").forEach(node => node.removeAttribute("data-sr-selected"));
     blocks.forEach(block => {
       if (!block.presentation?.selector) return;

@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Puck, usePuck, type Config, type Data } from "@puckeditor/core";
 import { Monitor, Smartphone, Undo2, Redo2, X, ExternalLink } from "lucide-react";
-import { Fields, type Choice } from "./editor";
-import { blockRegistry } from "./registry";
+import { type Choice } from "./editor";
+import { ContentFields } from "./content-fields";
+import { contentLinkOptions, type LinkChoices } from "./field-layout";
 import { saveStudioBlock } from "./actions";
 import type { ContentBlockConfig, ContentManifest } from "./manifest";
 import "@puckeditor/core/puck.css";
@@ -12,17 +13,13 @@ import styles from "./puck-editor.module.css";
 import fieldStyles from "./studio.module.css";
 
 type Entry = { block: ContentBlockConfig; payload: Record<string, unknown>; revision: number; pageIds: string[]; choices: Choice[] };
-type Props = { manifest: ContentManifest; entries: Entry[]; canUpload: boolean };
+type Props = { manifest: ContentManifest; entries: Entry[]; canUpload: boolean; linkChoices: LinkChoices };
 export function PuckContentEditor(props: Props) {
   const config = useMemo<Config>(() => ({ components: Object.fromEntries(props.entries.map(entry => [entry.block.id, {
     label: entry.block.label,
-    fields: { payload: { type: "custom", render: ({ value, onChange }: { value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void }) => <div className={fieldStyles.fields}><Fields
-      canUpload={props.canUpload} fixedRows={entry.block.fixedRows} assetBaseUrl={entry.block.presentation?.assetBaseUrl || props.manifest.previewUrl} prefix={entry.block.id} value={value} onChange={onChange} choices={entry.choices}
-      limits={entry.block.limits} minimums={entry.block.minimums}
-      fields={Object.fromEntries(Object.entries(blockRegistry[entry.block.type].fields).filter(([key]) => entry.block.editableFields.includes(key)))}
-    /></div> } },
+    fields: { payload: { type: "custom", render: ({ value, onChange }: { value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void }) => <div className={fieldStyles.fields}><ContentFields block={entry.block} canUpload={props.canUpload} assetBaseUrl={entry.block.presentation?.assetBaseUrl || props.manifest.previewUrl} value={value} onChange={onChange} choices={entry.choices} linkOptions={contentLinkOptions(props.manifest, props.linkChoices)} /></div> } },
     render: () => <></>
-  }])) }), [props.entries, props.canUpload, props.manifest.previewUrl]);
+  }])) }), [props.entries, props.canUpload, props.manifest, props.linkChoices]);
   const data = useMemo<Data>(() => ({ root: { props: {} }, content: props.entries.map(entry => ({ type: entry.block.id, props: { id: entry.block.id, payload: entry.payload } })) }), [props.entries]);
   return <Puck config={config} data={data} permissions={{ insert: false, delete: false, duplicate: false, drag: false, edit: true }}><Workspace {...props} /></Puck>;
 }
@@ -31,6 +28,12 @@ function Workspace({ manifest, entries }: Props) {
   const { appState, dispatch, selectedItem, history } = usePuck();
   const [pageId, setPageId] = useState(manifest.pages[0].id);
   const [mobile, setMobile] = useState(false);
+  const [focusedItem, setFocusedItem] = useState("");
+  useEffect(() => {
+    const focus = (event: Event) => setFocusedItem((event as CustomEvent<{ id: string }>).detail.id);
+    window.addEventListener("showrunner:focus-item", focus);
+    return () => window.removeEventListener("showrunner:focus-item", focus);
+  }, []);
   const [ready, setReady] = useState(false);
   const [frameError, setFrameError] = useState(false);
   const [pending, setPending] = useState(false);
@@ -79,15 +82,15 @@ function Workspace({ manifest, entries }: Props) {
     const mediaUrl = (value: string) => value?.startsWith("/") ? new URL(value, window.location.origin).toString() : value;
     const blocks = pageEntries.map(entry => {
       let payload = content.find(item => item.props.id === entry.block.id)?.props.payload || entry.payload;
-      payload = { ...payload, ...(payload.imageUrl ? { imageUrl: mediaUrl(payload.imageUrl) } : {}), ...(Array.isArray(payload.images) ? { images: payload.images.map((image: Record<string, string>) => ({ ...image, url: mediaUrl(image.url) })) } : {}) };
+      payload = { ...payload, ...(payload.imageUrl ? { imageUrl: mediaUrl(payload.imageUrl) } : {}), ...(Array.isArray(payload.slides) ? { slides: payload.slides.map((slide: Record<string, string>) => ({ ...slide, imageUrl: mediaUrl(slide.imageUrl) })) } : {}), ...(Array.isArray(payload.images) ? { images: payload.images.map((image: Record<string, string>) => ({ ...image, url: mediaUrl(image.url) })) } : {}) };
       if (entry.block.source === "services") payload = { ...payload, items: (payload.items as Record<string, string>[]).map(row => {
         const choice = entry.choices.find(item => item.id === row.referenceId);
         return { id: choice?.id, name: row.title || choice?.label || "", description: row.description || choice?.description || "", imageUrl: mediaUrl(choice?.imageUrl || "") };
       }) };
       return { id: entry.block.id, type: entry.block.type, payload, presentation: entry.block.presentation || {} };
     });
-    frame.current.contentWindow.postMessage({ channel: "showrunner-editor-v1", type: "update", blocks, selectedId: selected?.block.id, assetOrigin: window.location.origin }, previewOrigin);
-  }, [content, ready, pageEntries, previewOrigin, selected?.block.id]);
+    frame.current.contentWindow.postMessage({ channel: "showrunner-editor-v1", type: "update", blocks, selectedId: selected?.block.id, assetOrigin: window.location.origin, focusedItem }, previewOrigin);
+  }, [content, ready, pageEntries, previewOrigin, selected?.block.id, focusedItem]);
 
   async function publish() {
     setPending(true); setMessage(""); setError(false);
@@ -120,7 +123,7 @@ function Workspace({ manifest, entries }: Props) {
           <iframe ref={frame} key={pageId} src={previewUrl} title={`${page.label} website preview`} className={mobile ? styles.mobileFrame : styles.frame} onLoad={() => frame.current?.contentWindow?.postMessage({ channel: "showrunner-editor-v1", type: "connect" }, previewOrigin)} />
         </> : <div className={styles.loading}>Your website preview has not been connected. Your site administrator can connect it in the content manifest.</div>}
       </div>
-      {selected ? <aside className={styles.inspector} aria-label="Section settings"><div className={styles.inspectorHeader}><h2>{selected.block.label}</h2><button aria-label="Close section settings" onClick={() => dispatch({ type: "setUi", ui: { itemSelector: null } })}><X size={18} /></button></div><fieldset disabled={pending}><Puck.Fields /></fieldset></aside> : null}
+      {selected ? <aside key={selected.block.id} className={styles.inspector} aria-label="Section settings"><div className={styles.inspectorHeader}><h2>{selected.block.label}</h2><button aria-label="Close section settings" onClick={() => dispatch({ type: "setUi", ui: { itemSelector: null } })}><X size={18} /></button></div><fieldset disabled={pending}><Puck.Fields /></fieldset></aside> : null}
     </div>
     <footer className={styles.statusbar}><span>Click a section to edit its content</span><label>Section<select aria-label="Select section" value={selected?.block.id || ""} onChange={event => { const index = content.findIndex(item => item.props.id === event.target.value); dispatch({ type: "setUi", ui: { itemSelector: index < 0 ? null : { index } } }); }}><option value="">Choose a section</option>{pageEntries.map(entry => <option key={entry.block.id} value={entry.block.id}>{entry.block.label}</option>)}</select></label></footer>
   </div>;

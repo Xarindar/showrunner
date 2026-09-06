@@ -5,6 +5,7 @@ export type ContentBlockConfig = {
   pageIds: string[]; allowPageTargeting?: boolean; limits?: Record<string, number>; minimums?: Record<string, number>;
   presentation?: { assetBaseUrl?: string; variant?: string; selector?: string; bindings?: { path: string; selector: string; attribute?: "src" | "alt" | "href" | "background" }[] }; source?: "services";
   fixedRows?: boolean;
+  editorGroups?: { label: string; fields: { path: string; label: string }[] }[];
   sourceCategory?: string;
   formId?: string;
   defaults?: Record<string, unknown>;
@@ -12,6 +13,7 @@ export type ContentBlockConfig = {
 export type ContentManifest = {
   version: 1; id: string; pages: { id: string; path: string; label: string }[];
   blocks: ContentBlockConfig[]; legacyProfiles?: boolean; previewUrl?: string;
+  booking?: { path: string; profilesByCategory?: Record<string, string> };
 };
 export function validateManifest(manifest: ContentManifest): ContentManifest {
   const ids = new Set<string>();

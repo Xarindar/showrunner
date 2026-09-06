@@ -5,7 +5,7 @@ import { mediaAssetDisplayUrl } from "@/lib/media";
 import { getSiteSettingsForSite } from "@/lib/site";
 import { prisma } from "@/lib/prisma";
 import { getEditorManifest } from "@/clients/content-editor-manifests";
-import { readStudio } from "./state";
+import { readStudio, resolveStudioPayload } from "./state";
 import { resolveBusinessInfo, resolveBusinessLocation } from "./business-info";
 import { blockDependenciesAvailable } from "./manifest";
 import { EmbedRequestError } from "@/lib/embed/gateway";
@@ -22,7 +22,7 @@ export async function getPublicStudio(siteId: string, pageId: string) {
     const payloadPages = stored?.pageIds || block.pageIds;
     if ((!stored && !block.defaults) || !block.pageIds.includes(pageId) || !payloadPages.includes(pageId)) return null;
     if (block.formId && !await prisma.form.findFirst({ where: { id: block.formId, siteId, status: "ACTIVE" }, select: { id: true } })) return null;
-    let payload = stored?.payload || block.defaults!;
+    let payload = resolveStudioPayload(block, stored);
     if (block.type === "about") payload = { ...payload, copyHtml: renderContentRichText(String(payload.copy || "")) };
     if (block.type === "faq") payload = { ...payload, items: (payload.items as Record<string, unknown>[]).map(item => ({ ...item, answerHtml: renderContentRichText(String(item.answer || "")) })) };
     if (block.type === "contact") {
@@ -70,6 +70,7 @@ function absolutizeRows(payload: Record<string, unknown>, field: string, urlKey:
 }
 
 function absolutizeBlockMedia(type: string, payload: Record<string, unknown>) {
+  if (type === "slideshow") return absolutizeRows(payload, "slides", "imageUrl");
   if (type === "strip") return absolutizeRows(payload, "images", "url");
   if (type === "hero" || type === "gallery") return absolutizeRows(payload, "images", "url");
   if (type === "team" || type === "directory") return absolutizeRows(payload, "items", "imageUrl");

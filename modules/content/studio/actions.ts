@@ -8,7 +8,7 @@ import { mediaAssetDisplayUrl, uploadMedia } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettingsForSite, resolveCurrentSite } from "@/lib/site";
 import { getEditorManifest } from "@/clients/content-editor-manifests";
-import { configRecord, readStudio, saveRequestSchema, validateBlockUpdate } from "./state";
+import { configRecord, readStudio, resolveStudioPayload, saveRequestSchema, validateBlockUpdate } from "./state";
 import { businessInfoExtensions, resolveBusinessInfo, validateBusinessInfo } from "./business-info";
 import { blockDependenciesAvailable } from "./manifest";
 
@@ -31,7 +31,7 @@ export async function saveStudioBlock(raw: unknown): Promise<{ error?: string; r
       const stored = studio.blocks[block.id];
       const baseline = block.type === "business"
         ? { schemaVersion: 1 as const, revision: stored?.revision || 0, payload: resolveBusinessInfo(current, block.defaults), pageIds: [], updatedAt: stored?.updatedAt || "", updatedBy: stored?.updatedBy || "" }
-        : stored || (block.defaults ? { schemaVersion: 1 as const, revision: 0, payload: block.defaults, pageIds: block.pageIds, updatedAt: "", updatedBy: "" } : undefined);
+        : stored ? { ...stored, payload: resolveStudioPayload(block, stored) } : (block.defaults ? { schemaVersion: 1 as const, revision: 0, payload: block.defaults, pageIds: block.pageIds, updatedAt: "", updatedBy: "" } : undefined);
       const { payload, pageIds } = validateBlockUpdate(block, baseline, input);
       if (block.type === "business") validateBusinessInfo(payload);
       if (block.type === "contact") {

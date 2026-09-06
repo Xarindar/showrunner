@@ -1,4 +1,5 @@
 import { AdminSidebar } from "@/shell/admin-sidebar";
+import { cookies } from "next/headers";
 import { requireAuthenticatedAdmin } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site";
 import { mediaAssetDisplayUrl, mediaAssetIdFromUrl } from "@/lib/media";
@@ -30,6 +31,7 @@ export default async function AdminLayout({
   return (
     <div className="admin-root">
       <AdminSidebar
+        initialCollapsed={(await cookies()).get("showrunner-sidebar-collapsed")?.value === "true"}
         businessName={settings.businessName}
         enabledModules={settings.enabledModuleIds}
         logoUrl={logoUrl}

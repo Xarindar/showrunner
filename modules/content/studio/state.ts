@@ -10,6 +10,12 @@ export function readStudio(value: unknown): StudioState {
   if (studio.version !== undefined && studio.version !== 1) throw new Error("Unsupported content studio version");
   return { version: 1, blocks: configRecord(studio.blocks) as Record<string, StoredBlock> };
 }
+export function resolveStudioPayload(block: ContentBlockConfig, stored?: StoredBlock) {
+  // The adapter supplies a lossless read of the previous header field arrays.
+  return block.type === "slideshow" && !Array.isArray(stored?.payload.slides)
+    ? block.defaults || emptyPayload(block.type)
+    : stored?.payload || block.defaults || emptyPayload(block.type);
+}
 export const saveRequestSchema = z.strictObject({
   id: z.string(), revision: z.number().int().nonnegative(), payload: z.record(z.string(), z.unknown()), pageIds: z.array(z.string()).max(100),
 });
