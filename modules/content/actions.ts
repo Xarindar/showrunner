@@ -1,167 +1,36 @@
 "use server";
+import { requireLegacyContentSite } from "@/clients/cottage616/guard";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { HeroPresentationMode, HeroSlideElementType, MediaVariantType } from "@prisma/client";
+import { MediaVariantType } from "@prisma/client";
 import { getOwnerStaffIds, requireAdmin, resolveDataScopeMode } from "@/lib/auth";
 import { mediaAssetDisplayUrl, uploadMedia } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettingsForSite, resolveCurrentSite } from "@/lib/site";
-import { defaultEnabledModules } from "@/shell/modules";
 import {
   contentProfilesToJson,
   featuredBookingTargetTypes,
-  heroFallbackForProfile,
   normalizeContentProfileKey,
   normalizeContentProfiles,
   type FeaturedBookingTargetType
 } from "./content-profiles";
-import {
-  defaultHeroSlideFromSettings,
-  heroElementsArray,
-  parseHeroPresentationPayload,
-  type HeroElementType
-} from "./hero-presentation";
-
-const heroElementTypeMap: Record<HeroElementType, HeroSlideElementType> = {
-  IMAGE: HeroSlideElementType.IMAGE,
-  HEADLINE: HeroSlideElementType.HEADLINE,
-  CAPTION: HeroSlideElementType.CAPTION,
-  CTA: HeroSlideElementType.CTA
-};
-
-export async function updateContentAction(formData: FormData) {
-  const user = await requireAdmin("content:manage");
-  const site = await resolveCurrentSite();
-  const currentSettings = await getSiteSettingsForSite(site.id);
-  const profileKey = normalizeContentProfileKey(stringOrFallback(formData.get("profileKey"), "cottage616"));
-  const fallbackPresentation = {
-    mode: "STATIC" as const,
-    autoplayIntervalMs: 6500,
-    slides: [defaultHeroSlideFromSettings(heroFallbackForProfile(currentSettings, profileKey))]
-  };
-  let heroPresentation = parseHeroPresentationPayload(formData.get("heroPresentation"), fallbackPresentation);
-  const uploadedHeroUrl = await uploadHeroBackgroundIfPresent(formData, {
-    headline: heroPresentation.slides[0]?.headline || currentSettings.heroHeadline,
-    profileKey,
-    siteId: site.id,
-    user
-  });
-  if (uploadedHeroUrl) {
-    const slideIndex = clampUploadSlideIndex(formData.get("activeHeroSlideIndex"), heroPresentation.slides.length);
-    heroPresentation = {
-      ...heroPresentation,
-      slides: heroPresentation.slides.map((slide, index) => (index === slideIndex ? { ...slide, imageUrl: uploadedHeroUrl } : slide))
-    };
-  }
-  const primarySlide = heroPresentation.slides[0] || fallbackPresentation.slides[0];
-
-  await prisma.$transaction(async (tx) => {
-    // Site-wide hero settings mirror the primary venue so legacy consumers
-    // (SEO snippets, admin summaries) keep showing the main homepage content.
-    if (profileKey === "cottage616") {
-      await tx.siteSettings.upsert({
-        where: { siteId: site.id },
-        update: {
-          heroImageUrl: primarySlide.imageUrl,
-          heroHeadline: primarySlide.headline,
-          heroSubheadline: primarySlide.caption
-        },
-        create: {
-          siteId: site.id,
-          enabledModules: defaultEnabledModules,
-          heroImageUrl: primarySlide.imageUrl,
-          heroHeadline: primarySlide.headline,
-          heroSubheadline: primarySlide.caption
-        }
-      });
-    }
-
-    const profiles = normalizeContentProfiles(currentSettings.publicContentConfig);
-    const currentProfile = profiles[profileKey];
-    profiles[profileKey] = {
-      ...currentProfile,
-      header: {
-        ...currentProfile.header,
-        copy: primarySlide.caption,
-        ctaHref: primarySlide.ctaHref,
-        ctaLabel: primarySlide.ctaLabel,
-        headline: primarySlide.headline
-      }
-    };
-
-    await tx.siteSettings.upsert({
-      where: { siteId: site.id },
-      update: {
-        publicContentConfig: contentProfilesToJson(profiles)
-      },
-      create: {
-        siteId: site.id,
-        enabledModules: defaultEnabledModules,
-        publicContentConfig: contentProfilesToJson(profiles)
-      }
-    });
-
-    const presentation = await tx.heroPresentation.upsert({
-      where: { siteId_profileKey: { siteId: site.id, profileKey } },
-      update: {
-        mode: heroPresentation.mode === "SLIDESHOW" ? HeroPresentationMode.SLIDESHOW : HeroPresentationMode.STATIC,
-        autoplayIntervalMs: heroPresentation.autoplayIntervalMs
-      },
-      create: {
-        siteId: site.id,
-        profileKey,
-        mode: heroPresentation.mode === "SLIDESHOW" ? HeroPresentationMode.SLIDESHOW : HeroPresentationMode.STATIC,
-        autoplayIntervalMs: heroPresentation.autoplayIntervalMs
-      }
-    });
-
-    await tx.heroSlide.deleteMany({
-      where: { presentationId: presentation.id }
-    });
-
-    for (const [index, slide] of heroPresentation.slides.entries()) {
-      await tx.heroSlide.create({
-        data: {
-          presentationId: presentation.id,
-          sortOrder: index,
-          headline: slide.headline,
-          caption: slide.caption,
-          imageUrl: slide.imageUrl,
-          ctaLabel: slide.ctaLabel,
-          ctaHref: slide.ctaHref,
-          elements: {
-            create: heroElementsArray(slide.elements).map((element) => ({
-              type: heroElementTypeMap[element.type],
-              gridColumn: element.gridColumn,
-              gridRow: element.gridRow,
-              columnSpan: element.columnSpan,
-              rowSpan: element.rowSpan,
-              zIndex: element.zIndex,
-              isVisible: element.isVisible
-            }))
-          }
-        }
-      });
-    }
-  });
-
-  revalidatePath("/");
-  revalidatePath("/admin/modules/content");
-  revalidatePath("/sitemap.xml");
-  redirect(`/admin/modules/content?profile=${profileKey}&saved=hero`);
-}
+export async function updateContentAction() { throw new Error("Hero layout editing is deployment-only. Use the content editor."); }
 
 export async function updateFeaturedCardAction(formData: FormData) {
   const user = await requireAdmin("content:manage");
   const site = await resolveCurrentSite();
   const settings = await getSiteSettingsForSite(site.id);
   const profileKey = normalizeContentProfileKey(stringOrFallback(formData.get("profileKey"), "cottage616"));
+  await requireLegacyContentSite(site.id);
   const profiles = normalizeContentProfiles(settings.publicContentConfig);
   const current = profiles[profileKey];
   const targetType = normalizeFeaturedTargetType(formData.get("featuredTargetType"));
   const serviceId = stringOrFallback(formData.get("featuredServiceId"), "").trim();
   const packageId = stringOrFallback(formData.get("featuredPackageId"), "").trim();
+  if (targetType === "SERVICE" && !await prisma.service.findFirst({ where: { id: serviceId, siteId: site.id, isActive: true }, select: { id: true } })) throw new Error("Select a service belonging to this site");
+  if (targetType === "PACKAGE" && !await prisma.servicePackage.findFirst({ where: { id: packageId, siteId: site.id, isActive: true }, select: { id: true } })) throw new Error("Select a package belonging to this site");
+  if (targetType === "CATEGORY" && !await prisma.serviceCategory.findFirst({ where: { slug: String(formData.get("featuredCategoryId") || ""), siteId: site.id }, select: { id: true } })) throw new Error("Select a category belonging to this site");
   const uploadedImageUrl = await uploadFeaturedImageIfPresent(formData, {
     profileKey,
     siteId: site.id,
@@ -175,7 +44,7 @@ export async function updateFeaturedCardAction(formData: FormData) {
       categoryId: stringOrFallback(formData.get("featuredCategoryId"), current.featured.categoryId).trim(),
       copy: stringOrFallback(formData.get("featuredCopy"), current.featured.copy).trim(),
       cta: stringOrFallback(formData.get("featuredCta"), current.featured.cta).trim(),
-      enabled: formData.get("featuredEnabled") === "on",
+      enabled: current.featured.enabled,
       imageUrl: uploadedImageUrl || storableImageUrl(stringOrFallback(formData.get("featuredImageUrl"), current.featured.imageUrl)),
       packageId: targetType === "PACKAGE" ? packageId : "",
       serviceId: targetType === "SERVICE" ? serviceId : "",
@@ -184,11 +53,12 @@ export async function updateFeaturedCardAction(formData: FormData) {
     }
   };
 
-  await prisma.siteSettings.update({
-    where: { siteId: site.id },
-    data: { publicContentConfig: contentProfilesToJson(profiles) }
+  const saved = await prisma.siteSettings.updateMany({
+    where: { siteId: site.id, updatedAt: settings.updatedAt },
+    data: { publicContentConfig: contentProfilesToJson(profiles, settings.publicContentConfig) }
   });
 
+  if (saved.count !== 1) throw new Error("Site content changed while saving. Reload before retrying.");
   revalidatePath("/");
   revalidatePath("/admin/modules/content");
   redirect(`/admin/modules/content?profile=${profileKey}&saved=featured`);
@@ -199,6 +69,7 @@ export async function updateProfileTestimonialsAction(formData: FormData) {
   const site = await resolveCurrentSite();
   const settings = await getSiteSettingsForSite(site.id);
   const profileKey = normalizeContentProfileKey(stringOrFallback(formData.get("profileKey"), "cottage616"));
+  await requireLegacyContentSite(site.id);
   const profiles = normalizeContentProfiles(settings.publicContentConfig);
   const current = profiles[profileKey];
   const selectedTestimonialIds = formData
@@ -207,6 +78,9 @@ export async function updateProfileTestimonialsAction(formData: FormData) {
     .map((value) => value.trim())
     .filter(Boolean);
 
+  if (selectedTestimonialIds.length > 12 || new Set(selectedTestimonialIds).size !== selectedTestimonialIds.length) throw new Error("Select at most 12 unique testimonials");
+  if (await prisma.testimonial.count({ where: { siteId: site.id, id: { in: selectedTestimonialIds }, status: "APPROVED" } }) !== selectedTestimonialIds.length) throw new Error("Select approved testimonials belonging to this site");
+
   profiles[profileKey] = {
     ...current,
     testimonialHeading: stringOrFallback(formData.get("testimonialHeading"), current.testimonialHeading).trim(),
@@ -214,52 +88,15 @@ export async function updateProfileTestimonialsAction(formData: FormData) {
     testimonialIntro: stringOrFallback(formData.get("testimonialIntro"), current.testimonialIntro).trim()
   };
 
-  await prisma.siteSettings.update({
-    where: { siteId: site.id },
-    data: { publicContentConfig: contentProfilesToJson(profiles) }
+  const saved = await prisma.siteSettings.updateMany({
+    where: { siteId: site.id, updatedAt: settings.updatedAt },
+    data: { publicContentConfig: contentProfilesToJson(profiles, settings.publicContentConfig) }
   });
 
+  if (saved.count !== 1) throw new Error("Site content changed while saving. Reload before retrying.");
   revalidatePath("/");
   revalidatePath("/admin/modules/content");
   redirect(`/admin/modules/content?profile=${profileKey}&saved=curation`);
-}
-
-async function uploadHeroBackgroundIfPresent(
-  formData: FormData,
-  input: {
-    headline: string;
-    profileKey: string;
-    siteId: string;
-    user: Awaited<ReturnType<typeof requireAdmin>>;
-  }
-) {
-  const file = formData.get("heroBackgroundUpload");
-  if (!(file instanceof File) || file.size === 0) return "";
-
-  const ownerStaffIds = await getOwnerStaffIds(input.user, input.siteId);
-  if ((await resolveDataScopeMode(input.user, input.siteId, "media")) === "OWN" && !ownerStaffIds.length) {
-    redirect(`/admin/modules/content?profile=${input.profileKey}&error=${encodeURIComponent("Create an active staff profile before uploading scoped media.")}`);
-  }
-
-  try {
-    const settings = await getSiteSettingsForSite(input.siteId);
-    const asset = await uploadMedia(
-      file,
-      {
-        alt: input.headline ? `${input.headline} hero background` : "Homepage hero background",
-        folder: "content/hero",
-        tags: ["hero", "homepage", input.profileKey],
-        uploadedByStaffId: ownerStaffIds[0],
-        usageContext: "homepage hero"
-      },
-      settings.mediaDriver,
-      input.siteId
-    );
-    return mediaAssetDisplayUrl(asset, MediaVariantType.HERO);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Hero image upload failed.";
-    redirect(`/admin/modules/content?profile=${input.profileKey}&error=${encodeURIComponent(message)}`);
-  }
 }
 
 async function uploadFeaturedImageIfPresent(
@@ -305,12 +142,6 @@ async function uploadFeaturedImageIfPresent(
 function storableImageUrl(value: string) {
   const trimmed = value.trim();
   return trimmed.startsWith("/") || trimmed.startsWith("http://") || trimmed.startsWith("https://") ? trimmed : "";
-}
-
-function clampUploadSlideIndex(value: FormDataEntryValue | null, slideCount: number) {
-  const index = Number(value || 0);
-  if (!Number.isFinite(index) || slideCount < 1) return 0;
-  return Math.max(0, Math.min(slideCount - 1, Math.round(index)));
 }
 
 function stringOrFallback(value: FormDataEntryValue | null, fallback: string) {

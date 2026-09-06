@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Image as ImageIcon, Save } from "lucide-react";
-import { AssetPicker, Button, Card, Field, Select, Switch, type AssetPickerAsset } from "@/components/ui";
+import { AssetPicker, Button, Card, Field, Select, type AssetPickerAsset } from "@/components/ui";
 import type { ContentProfileDraft, ContentProfileKey, FeaturedBookingTargetType } from "./content-profiles";
 
 type FeaturedAction = (formData: FormData) => void | Promise<void>;
@@ -45,8 +45,7 @@ type FeaturedCardEditorProps = {
 const targetTypeOptions: Array<{ label: string; value: FeaturedBookingTargetType }> = [
   { label: "Category", value: "CATEGORY" },
   { label: "Service", value: "SERVICE" },
-  { label: "Package", value: "PACKAGE" },
-  { label: "Hidden", value: "NONE" }
+  { label: "Package", value: "PACKAGE" }
 ];
 
 export function FeaturedCardEditor({
@@ -215,13 +214,6 @@ export function FeaturedCardEditor({
       </div>
 
       <div className="content-featured-settings">
-        <Switch
-          checked={draft.enabled}
-          description="Show the promo card on the booking page."
-          label="Show card"
-          name="featuredEnabled"
-          onChange={(event) => update("enabled", event.target.checked)}
-        />
 
         <div className="content-featured-target-settings">
           <div className="content-featured-target-copy">
