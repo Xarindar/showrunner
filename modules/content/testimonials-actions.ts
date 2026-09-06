@@ -1,4 +1,5 @@
 "use server";
+import { requireLegacyContentSite } from "@/clients/cottage616/guard";
 
 import { MediaVariantType, TestimonialStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -64,6 +65,7 @@ export async function createContentTestimonialAction(formData: FormData) {
   const user = await requireAdmin("content:manage");
   const input = await parseForm(contentTestimonialSchema, formData, contentPath);
   const siteId = await getCurrentSiteId();
+  await requireLegacyContentSite(siteId);
 
   const uploadedImageUrl = await uploadTestimonialImageIfPresent(formData, {
     authorName: input.authorName,
@@ -98,6 +100,7 @@ export async function updateContentTestimonialAction(formData: FormData) {
   const user = await requireAdmin("content:manage");
   const input = await parseForm(updateContentTestimonialSchema, formData, contentPath);
   const siteId = await getCurrentSiteId();
+  await requireLegacyContentSite(siteId);
 
   const uploadedImageUrl = await uploadTestimonialImageIfPresent(formData, {
     authorName: input.authorName,
@@ -129,6 +132,7 @@ export async function removeContentTestimonialAction(formData: FormData) {
   await requireAdmin("content:manage");
   const input = await parseForm(removeTestimonialSchema, formData, contentPath);
   const siteId = await getCurrentSiteId();
+  await requireLegacyContentSite(siteId);
 
   await prisma.testimonial.updateMany({
     where: { id: input.id, siteId },

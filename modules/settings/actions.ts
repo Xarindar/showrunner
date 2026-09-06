@@ -45,6 +45,7 @@ async function setLogoImageUrl(siteId: string, logoImageUrl: string) {
 
 export async function updateSettingsAction(formData: FormData) {
   const user = await requireAdmin("settings:update");
+  const existingSettings = await getSiteSettings();
   const input = await parseForm(settingsFormSchema, formData);
 
   const enabledModules = formData.getAll("enabledModules").map(String);
@@ -59,9 +60,7 @@ export async function updateSettingsAction(formData: FormData) {
   await prisma.siteSettings.upsert({
     where: { siteId: site.id },
     update: {
-      businessName: input.businessName,
-      contactEmail: input.contactEmail,
-      timezone: input.timezone,
+      ...(!existingSettings.enabledModuleIds.includes("content") ? { businessName: input.businessName, contactEmail: input.contactEmail, timezone: input.timezone } : {}),
       themePreset,
       themePrimary: input.themePrimary,
       mediaDriver: input.mediaDriver,

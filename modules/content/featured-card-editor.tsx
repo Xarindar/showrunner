@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { Image as ImageIcon, Save } from "lucide-react";
-import { AssetPicker, Button, Card, Field, Select, Switch, type AssetPickerAsset } from "@/components/ui";
+import { Image as ImageIcon, Save, Pencil } from "lucide-react";
+import styles from "./studio/studio.module.css";
+import { AssetPicker, Button, Card, Field, Select, type AssetPickerAsset } from "@/components/ui";
 import type { ContentProfileDraft, ContentProfileKey, FeaturedBookingTargetType } from "./content-profiles";
 
 type FeaturedAction = (formData: FormData) => void | Promise<void>;
@@ -45,8 +46,7 @@ type FeaturedCardEditorProps = {
 const targetTypeOptions: Array<{ label: string; value: FeaturedBookingTargetType }> = [
   { label: "Category", value: "CATEGORY" },
   { label: "Service", value: "SERVICE" },
-  { label: "Package", value: "PACKAGE" },
-  { label: "Hidden", value: "NONE" }
+  { label: "Package", value: "PACKAGE" }
 ];
 
 export function FeaturedCardEditor({
@@ -64,6 +64,7 @@ export function FeaturedCardEditor({
   const [draft, setDraft] = useState(featured);
   const [previewUrl, setPreviewUrl] = useState("");
   const [uploadName, setUploadName] = useState("");
+  const [editingTarget, setEditingTarget] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -154,7 +155,7 @@ export function FeaturedCardEditor({
       bodyClassName="content-featured-editor"
       className="content-featured-editor-card"
       minHeight="none"
-      reservedHeader={toolbar}
+      reservedHeader={<span>Featured booking card</span>}
     >
       <input name="profileKey" type="hidden" value={profileKey} readOnly />
       <input name="featuredTargetType" type="hidden" value={draft.targetType} readOnly />
@@ -168,11 +169,8 @@ export function FeaturedCardEditor({
         type="file"
       />
 
-      <div className="content-featured-preview-panel">
-        <div className="content-featured-preview-heading">
-          <span className="content-compose-label">Booking page preview</span>
-          <span className="muted-text">Edit the words directly on the card.</span>
-        </div>
+      <div className={`content-featured-preview-panel ${styles.contextPanel}`}>
+        <div className={styles.contextTools}>{toolbar}<Button type="button" size="sm" onClick={() => setEditingTarget(!editingTarget)}><Pencil size={14} />Edit destination</Button></div>
         <div
           className="content-promo-preview"
           data-hidden={hidden}
@@ -214,14 +212,7 @@ export function FeaturedCardEditor({
         </p>
       </div>
 
-      <div className="content-featured-settings">
-        <Switch
-          checked={draft.enabled}
-          description="Show the promo card on the booking page."
-          label="Show card"
-          name="featuredEnabled"
-          onChange={(event) => update("enabled", event.target.checked)}
-        />
+      <div className="content-featured-settings" hidden={!editingTarget} style={!editingTarget ? { display: "none" } : undefined}>
 
         <div className="content-featured-target-settings">
           <div className="content-featured-target-copy">

@@ -73,10 +73,16 @@
     "typescript": "^6.0.3"
   },
   "overrides": {
-    "@prisma/dev": "0.24.14",
+    "@prisma/dev": "0.24.17",
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    },
+    "prisma": {
+      "mysql2": "3.24.3"
+    },
     "esbuild": "0.28.1",
-    "postcss": "8.5.15",
+    "postcss": "8.5.28",
     "sharp": "$sharp",
-    "undici": "6.27.0"
+    "undici": "6.28.1"
   }
 }

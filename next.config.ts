@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            value: "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.cloudflarestorage.com https://imagedelivery.net;"
+            value: "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.cloudflarestorage.com https://imagedelivery.net https://cottage616-production.up.railway.app;"
           }
         ]
       }
