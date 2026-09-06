@@ -738,7 +738,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
           />
         </div>
 
-        <div className="ui-data-table-stats" aria-label="Client summary">
+        <div className="ui-data-table-stats" role="region" aria-label="Client summary" tabIndex={0}>
           <div className="ui-data-table-stat-pill ui-data-table-stat-pill-primary">
             <UsersRound size={16} />
             <strong>{baseClientCount}</strong>

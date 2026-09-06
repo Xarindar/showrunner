@@ -30,6 +30,7 @@ export default async function AdminLayout({
 
   return (
     <div className="admin-root">
+      <a className="admin-skip-link" href="#admin-main">Skip to content</a>
       <AdminSidebar
         initialCollapsed={(await cookies()).get("showrunner-sidebar-collapsed")?.value === "true"}
         businessName={settings.businessName}
@@ -39,7 +40,7 @@ export default async function AdminLayout({
         userEmail={user.email}
         userRole={user.role}
       />
-      <main className="admin-main">{children}</main>
+      <main className="admin-main" id="admin-main" tabIndex={-1}>{children}</main>
     </div>
   );
 }

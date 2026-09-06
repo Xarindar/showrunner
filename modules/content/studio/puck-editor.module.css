@@ -31,3 +31,12 @@
 .statusbar label { display: flex; align-items: center; gap: 8px; }
 @media (max-width: 1050px) { .toolbar { gap: 8px; padding: 8px 12px; } .saveState { display: none; } .toolbar .publish { margin-left: auto; } .inspector { width: 310px; } }
 @media (max-width: 860px) { .workspace { height: calc(100dvh - 65px); } .toolbar h1 { width: 100%; } .history { display: none; } .inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(340px, 92%); z-index: 2; box-shadow: -6px 0 24px #0002; } .statusbar > span { display: none; } .statusbar label, .statusbar select { width: 100%; } }
+
+.toolbar > a { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 36px; color: inherit; }
+.toolbar > a:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+.statusbar label { min-width: 0; }
+.statusbar select { min-width: 0; }
+@media (max-width: 860px), (pointer: coarse) {
+  .toolbar button, .toolbar > a, .inspectorHeader button, .workspace select { min-width: 44px; min-height: 44px; }
+  .workspace select { max-width: 100%; }
+}

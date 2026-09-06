@@ -41,6 +41,11 @@ export function OnboardingModal({
 }: OnboardingModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const startedOutside = useRef(false);
+  function isOutside(event: React.MouseEvent<HTMLDialogElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom;
+  }
 
   useEffect(() => {
     const dialog = ref.current;
@@ -68,8 +73,10 @@ export function OnboardingModal({
     <dialog
       aria-labelledby={titleId}
       className={cx("ui-dialog", "ui-onboarding-modal", className)}
+      onPointerDown={event => { startedOutside.current = event.target === ref.current && isOutside(event); }}
       onClick={(event) => {
-        if (event.target === ref.current) onClose();
+        if (startedOutside.current && event.target === ref.current && isOutside(event)) onClose();
+        startedOutside.current = false;
       }}
       ref={ref}>
       <div className="ui-onboarding-shell">

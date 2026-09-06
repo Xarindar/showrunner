@@ -194,6 +194,39 @@ function SidebarNavGroup({
 export function AdminSidebar({ businessName, enabledModules, logoUrl, navigationLayout, userEmail, userRole, initialCollapsed }: AdminSidebarProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const sidebar = document.getElementById("admin-sidebar");
+    const main = document.querySelector<HTMLElement>(".admin-main");
+    const header = document.querySelector<HTMLElement>(".admin-mobile-bar");
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    const mobile = window.matchMedia("(max-width: 860px)");
+    if (!mobile.matches || !sidebar) return;
+    if (main) main.inert = true;
+    if (header) header.inert = true;
+    document.body.style.overflow = "hidden";
+    sidebar.querySelector<HTMLButtonElement>(".admin-sidebar-close")?.focus();
+    const resized = () => { if (!mobile.matches) setMenuOpen(false); };
+    const keydown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setMenuOpen(false); }
+      if (event.key !== "Tab") return;
+      const controls = Array.from(sidebar.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex="0"]')).filter(node => node.getClientRects().length);
+      const first = controls[0], last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    sidebar.addEventListener("keydown", keydown);
+    mobile.addEventListener("change", resized);
+    return () => {
+      if (main) main.inert = false;
+      if (header) header.inert = false;
+      document.body.style.overflow = previousOverflow;
+      sidebar.removeEventListener("keydown", keydown);
+      mobile.removeEventListener("change", resized);
+      previousFocus?.focus();
+    };
+  }, [menuOpen]);
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   function toggleCollapsed() {
     setCollapsed(!collapsed);

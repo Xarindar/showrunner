@@ -35,6 +35,9 @@ test("website bridge authenticates the parent and limits preview updates to safe
   assert.equal(text.textContent, "After");
   assert.equal(link.href, "");
   assert.equal(section.dataset.srSection, "hero");
+  window.showrunnerContentReady = Promise.reject(new Error("Public content offline"));
+  await listeners.message(connect);
+  assert.equal(messages.length, 2, "draft editing can connect even when published content fails to load");
 });
 
 test("preview clicks keep menus interactive, route navigation to the editor, and select content", async () => {

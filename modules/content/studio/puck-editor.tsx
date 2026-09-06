@@ -42,12 +42,22 @@ function Workspace({ manifest, entries }: Props) {
   const [error, setError] = useState(false);
   const [saved, setSaved] = useState(Object.fromEntries(entries.map(entry => [entry.block.id, { payload: entry.payload, revision: entry.revision }])));
   const frame = useRef<HTMLIFrameElement>(null);
+  const sectionSelector = useRef<HTMLSelectElement>(null);
+  const inspector = useRef<HTMLElement>(null);
   const page = manifest.pages.find(item => item.id === pageId)!;
   const pageEntries = useMemo(() => entries.filter(entry => entry.pageIds.includes(pageId) || entry.block.type === "business"), [entries, pageId]);
   const content = appState.data.content;
   const changed = content.filter(item => JSON.stringify(item.props.payload) !== JSON.stringify(saved[item.props.id]?.payload));
   const dirty = changed.length > 0;
   const selected = entries.find(entry => entry.block.id === selectedItem?.props.id);
+  const selectedId = selected?.block.id;
+  useEffect(() => {
+    if (selectedId) inspector.current?.querySelector<HTMLButtonElement>("button")?.focus();
+  }, [selectedId]);
+  function closeInspector() {
+    dispatch({ type: "setUi", ui: { itemSelector: null } });
+    sectionSelector.current?.focus();
+  }
   const siteUrl = manifest.previewUrl ? new URL(pageLocation || page.path, manifest.previewUrl).toString() : "";
   const preview = siteUrl ? new URL(siteUrl) : null;
   preview?.searchParams.set("showrunner-editor", "1");
@@ -64,10 +74,18 @@ function Workspace({ manifest, entries }: Props) {
 
   useEffect(() => {
     if (!dirty) return;
-    const leave = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    const leave = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    const followLink = (event: MouseEvent) => {
+      const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!(link instanceof HTMLAnchorElement) || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target === "_blank" || link.hasAttribute("download")) return;
+      const url = new URL(link.href);
+      if (url.origin === location.origin && url.pathname === location.pathname && url.search === location.search) return;
+      if (pending || !window.confirm("Leave without publishing? Your unpublished changes will be lost.")) { event.preventDefault(); event.stopImmediatePropagation(); }
+    };
     window.addEventListener("beforeunload", leave);
-    return () => window.removeEventListener("beforeunload", leave);
-  }, [dirty]);
+    document.addEventListener("click", followLink, true);
+    return () => { window.removeEventListener("beforeunload", leave); document.removeEventListener("click", followLink, true); };
+  }, [dirty, pending]);
   useEffect(() => {
     if (ready) return;
     // The iframe can finish loading before React hydrates and attaches onLoad.
@@ -135,8 +153,8 @@ function Workspace({ manifest, entries }: Props) {
           <iframe ref={frame} key={previewUrl} src={previewUrl} title={`${page.label} website preview`} className={mobile ? styles.mobileFrame : styles.frame} onLoad={() => frame.current?.contentWindow?.postMessage({ channel: "showrunner-editor-v1", type: "connect" }, previewOrigin)} />
         </> : <div className={styles.loading}>Your website preview has not been connected. Your site administrator can connect it in the content manifest.</div>}
       </div>
-      {selected ? <aside key={selected.block.id} className={styles.inspector} aria-label="Section settings"><div className={styles.inspectorHeader}><h2>{selected.block.label}</h2><button aria-label="Close section settings" onClick={() => dispatch({ type: "setUi", ui: { itemSelector: null } })}><X size={18} /></button></div><fieldset disabled={pending}><Puck.Fields /></fieldset></aside> : null}
+      {selected ? <aside ref={inspector} key={selected.block.id} className={styles.inspector} aria-label="Section settings" onKeyDown={event => { if (event.key === "Escape" && !(event.target as Element).closest("dialog")) { event.stopPropagation(); closeInspector(); } }}><div className={styles.inspectorHeader}><h2>{selected.block.label}</h2><button aria-label="Close section settings" onClick={closeInspector}><X size={18} /></button></div><fieldset disabled={pending}><Puck.Fields /></fieldset></aside> : null}
     </div>
-    <footer className={styles.statusbar}><span>Click a section to edit its content</span><label>Section<select aria-label="Select section" value={selected?.block.id || ""} onChange={event => { const index = content.findIndex(item => item.props.id === event.target.value); dispatch({ type: "setUi", ui: { itemSelector: index < 0 ? null : { index } } }); }}><option value="">Choose a section</option>{pageEntries.map(entry => <option key={entry.block.id} value={entry.block.id}>{entry.block.label}</option>)}</select></label></footer>
+    <footer className={styles.statusbar}><span>Click a section to edit its content</span><label>Section<select ref={sectionSelector} aria-label="Select section" value={selected?.block.id || ""} onChange={event => { const index = content.findIndex(item => item.props.id === event.target.value); dispatch({ type: "setUi", ui: { itemSelector: index < 0 ? null : { index } } }); }}><option value="">Choose a section</option>{pageEntries.map(entry => <option key={entry.block.id} value={entry.block.id}>{entry.block.label}</option>)}</select></label></footer>
   </div>;
 }

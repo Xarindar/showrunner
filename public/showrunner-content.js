@@ -51,7 +51,8 @@
     if (event.data.type === "connect") {
       parentOrigin = event.origin;
       await documentReady;
-      await (window.showrunnerContentReady || Promise.resolve());
+      // A failed public-content request must not prevent draft recovery in the editor.
+      await Promise.resolve(window.showrunnerContentReady).catch(() => {});
       send("ready");
     }
     if (event.data.type !== "update" || event.origin !== parentOrigin || !Array.isArray(event.data.blocks)) return;
