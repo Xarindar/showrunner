@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            value: "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.cloudflarestorage.com https://imagedelivery.net https://cottage616-production.up.railway.app;"
+            value: "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.cloudflarestorage.com https://imagedelivery.net https://cottage616-production.up.railway.app https://www.cottage616.com https://showrunner-beta-production.up.railway.app;"
           }
         ]
       }
