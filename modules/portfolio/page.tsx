@@ -117,7 +117,9 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
   function coverUrl(gallery: typeof galleries[number]) {
     const coverId = mediaAssetIdFromUrl(gallery.coverImageUrl);
     const asset = coverId ? mediaById.get(coverId) : null;
-    return asset ? mediaAssetDisplayUrl(asset, MediaVariantType.CARD) : gallery.items[0] ? itemUrl(gallery.items[0], MediaVariantType.CARD) : coverId ? "" : gallery.coverImageUrl;
+    if (coverId) return asset ? mediaAssetDisplayUrl(asset, MediaVariantType.CARD) : "";
+    if (gallery.coverImageUrl && !gallery.coverImageUrl.startsWith("/galleries/")) return gallery.coverImageUrl;
+    return gallery.items[0] ? itemUrl(gallery.items[0], MediaVariantType.CARD) : "";
   }
   const photos = (selectedGallery?.items || []).filter(item => item.type === PortfolioItemType.IMAGE).map(item => ({ id: item.id, title: item.title, alt: item.altText || item.title || selectedGallery!.title, thumbnail: itemUrl(item, MediaVariantType.CARD), url: itemUrl(item, MediaVariantType.FULL) })).filter(item => item.url);
   const latestProofRound = selectedGallery?.proofRounds[0] || null;
@@ -243,7 +245,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
           <h1>{selectedGallery ? selectedGallery.title : "Photo albums"}</h1>
           <p>{selectedGallery ? selectedGallery.items.length + " photos · " + enumLabel(selectedGallery.status) + " · " + enumLabel(selectedGallery.visibility) : "Give your photographs a home. Open an album to browse or add photos."}</p>
         </div>
-        <ModuleActionModals toolbarLabel="Album tools" items={selectedGallery ? [{ id: "rename", label: "Rename album", title: "Rename album", content: <form action={renamePortfolioAlbumAction} className="form-grid"><input type="hidden" name="id" value={selectedGallery.id} /><div className="ui-field"><label htmlFor="album-title">Album title</label><input id="album-title" name="title" defaultValue={selectedGallery.title} required maxLength={180} /></div><Button type="submit">Save title</Button></form> }] : [{ id: "album", label: "New album", title: "New photo album", icon: "plus", variant: "primary", content: createGalleryForm }]} />
+        <ModuleActionModals key={(selectedGallery?.id || "albums") + (selectedGallery?.title || "")} toolbarLabel="Album tools" items={selectedGallery ? [{ id: "rename", label: "Rename album", title: "Rename album", content: <form action={renamePortfolioAlbumAction} className="form-grid"><input type="hidden" name="id" value={selectedGallery.id} /><div className="ui-field"><label htmlFor="album-title">Album title</label><input id="album-title" name="title" defaultValue={selectedGallery.title} required maxLength={180} /></div><Button type="submit">Save title</Button></form> }] : [{ id: "album", label: "New album", title: "New photo album", icon: "plus", variant: "primary", content: createGalleryForm }]} />
       </header>
       {savedMessage && <p role="status" className="success-message">{savedMessage}</p>}
       {errorMessage && <p role="alert" className="error">{errorMessage}</p>}

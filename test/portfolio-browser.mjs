@@ -1,0 +1,92 @@
+// Run against a disposable/beta Showrunner instance. Creates a draft album; prints its ID for cleanup.
+// ALBUM_TEST_URL, ALBUM_TEST_USER and ALBUM_TEST_PASSWORD must be set.
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+const require = createRequire(import.meta.url);
+const sharp = require('sharp');
+const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE).href);
+const base = process.env.ALBUM_TEST_URL;
+assert(base && process.env.ALBUM_TEST_USER && process.env.ALBUM_TEST_PASSWORD);
+const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+const errors = []; page.on('pageerror', error => errors.push(error.message));
+page.setDefaultTimeout(45000);
+try {
+  await page.goto(`${base}/admin/modules/portfolio`);
+  await page.locator('input[name=email]').fill(process.env.ALBUM_TEST_USER);
+  await page.locator('input[name=password]').fill(process.env.ALBUM_TEST_PASSWORD);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.waitForURL(url => !url.pathname.includes('login'));
+  await page.goto(`${base}/admin/modules/portfolio`);
+  await page.getByRole('heading', { name: 'Photo albums', exact: true }).waitFor();
+  await page.locator('section[aria-label="Photo albums"] img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+  await page.screenshot({ path: '.impeccable/review/albums-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: '.impeccable/review/albums-mobile.png', fullPage: true });
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole('link', { name: 'Open Special Occasions', exact: true }).click();
+  await page.getByRole('region', { name: 'Album photos', exact: true }).locator('img').first().waitFor();
+  assert.equal(await page.getByRole('region', { name: 'Album photos', exact: true }).locator('button:has(img)').count(), 9);
+  await page.getByRole('region', { name: 'Album photos', exact: true }).locator('button:has(img)').first().click();
+  await page.getByRole('dialog').waitFor();
+  await page.getByRole('dialog').locator('img').evaluate(image => image.decode());
+  await page.keyboard.press('ArrowRight');
+  await page.getByRole('dialog').getByText('2 / 9', { exact: true }).waitFor();
+  await page.keyboard.press('Escape');
+  await page.getByRole('link', { name: 'All albums', exact: true }).click();
+  await page.getByRole('button', { name: 'New album', exact: true }).click();
+  const title = `Album check ${Date.now()}`;
+  await page.getByLabel('Album title', { exact: true }).fill(title);
+  await page.getByRole('button', { name: 'Create album', exact: true }).click();
+  await page.getByRole('heading', { name: title, exact: true }).waitFor();
+  const id = new URL(page.url()).searchParams.get('gallery');
+  console.log(`TEST_ALBUM_ID=${id}`);
+  assert(id);
+  await page.getByText('0 photos · draft · public', { exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Your album starts here', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Rename album', exact: true }).click();
+  await page.getByLabel('Album title', { exact: true }).fill(`${title} renamed`);
+  await page.getByRole('button', { name: 'Save title', exact: true }).click();
+  await page.getByRole('heading', { name: `${title} renamed`, exact: true }).waitFor();
+  const image = await sharp({ create: { width: 480, height: 320, channels: 3, background: '#116466' } }).png().toBuffer();
+  await page.getByLabel('Choose album photos', { exact: true }).setInputFiles([
+    { name: 'album-check-one.png', mimeType: 'image/png', buffer: image },
+    { name: 'album-check-two.png', mimeType: 'image/png', buffer: image },
+    { name: 'invalid-photo.txt', mimeType: 'text/plain', buffer: Buffer.from('not an image') }
+  ]);
+  await page.getByRole('status').filter({ hasText: '2 photos added; 1 not uploaded.' }).waitFor({ timeout: 120000 });
+  await page.getByRole('alert').filter({ hasText: 'Choose a JPG' }).waitFor();
+  await page.getByRole('region', { name: 'Album photos', exact: true }).locator('img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+  assert.equal(await page.getByRole('region', { name: 'Album photos', exact: true }).locator('button:has(img)').count(), 2);
+  await page.reload();
+  await page.getByText('2 photos · draft · public', { exact: true }).waitFor();
+  await page.getByRole('link', { name: 'All albums', exact: true }).click();
+  const book = page.getByRole('link', { name: `Open ${title} renamed`, exact: true });
+  await book.locator('img').evaluate(image => image.decode());
+  await page.getByRole('button', { name: 'New album', exact: true }).click();
+  await page.getByLabel('Album title', { exact: true }).fill(`${title} private`);
+  await page.getByText('Album options', { exact: true }).click();
+  await page.getByLabel('Visibility', { exact: true }).selectOption('PRIVATE');
+  await page.getByRole('button', { name: 'Create album', exact: true }).click();
+  await page.getByRole('heading', { name: `${title} private`, exact: true }).waitFor();
+  console.log(`TEST_ALBUM_ID=${new URL(page.url()).searchParams.get('gallery')}`);
+  await page.getByLabel('Choose album photos', { exact: true }).setInputFiles({ name: 'album-check-private.png', mimeType: 'image/png', buffer: image });
+  await page.getByRole('status').filter({ hasText: '1 photo added.' }).waitFor({ timeout: 120000 });
+  const privatePhoto = page.getByRole('region', { name: 'Album photos', exact: true }).locator('img').first();
+  await privatePhoto.evaluate(image => image.decode());
+  const privateUrl = new URL(await privatePhoto.getAttribute('src'), base);
+  assert(privateUrl.searchParams.has('signature'));
+  privateUrl.searchParams.delete('signature'); privateUrl.searchParams.delete('expires');
+  assert.equal((await page.request.get(privateUrl.href)).status(), 404);
+  await page.getByRole('link', { name: 'All albums', exact: true }).click();
+  await page.getByRole('link', { name: 'Open Special Occasions', exact: true }).click();
+  await page.getByRole('region', { name: 'Album photos', exact: true }).locator('img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+  await page.screenshot({ path: '.impeccable/review/album-open-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: '.impeccable/review/album-open-mobile.png', fullPage: true });
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  assert.deepEqual(errors, []);
+  console.log('Verified books, existing photos, draft creation, rename, batch upload, invalid-file feedback, automatic cover, persistence, keyboard browsing, desktop/mobile, and zero page errors.');
+} finally { await browser.close(); }
