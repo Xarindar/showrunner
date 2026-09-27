@@ -2,7 +2,6 @@
 
 import { randomUUID } from "crypto";
 import {
-  MediaVariantType,
   PortfolioGalleryLayout,
   PortfolioAccessStatus,
   PortfolioGalleryStatus,
@@ -18,7 +17,9 @@ import { z } from "zod";
 import { parseForm } from "@/lib/admin-validation";
 import { getAccessibleClientWhere, getAccessibleGalleryWhere, getAccessibleMediaWhere, getOwnerStaffIds, requireAdmin, resolveDataScopeMode } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getCurrentSiteId } from "@/lib/site";
+import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
+import { albumPhotoError } from "./album-upload";
+import { deleteMediaAsset, uploadMedia } from "@/lib/media";
 import { slugify } from "@/lib/slug";
 
 const trimmed = z.string().transform((value) => value.trim());
@@ -364,6 +365,10 @@ export async function addPortfolioGalleryItemAction(formData: FormData) {
       })
     : null;
 
+  if (input.mediaAssetId && !asset) {
+    redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=Choose%20an%20accessible%20media%20asset.`);
+  }
+
   if (asset?.deletedAt) {
     redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Choose an active media asset.")}`);
   }
@@ -405,13 +410,11 @@ export async function addPortfolioGalleryItemAction(formData: FormData) {
         where: { galleryId: input.galleryId },
         data: { isCover: false }
       });
-      const created = await tx.portfolioGalleryItem.create({ data: itemData });
+      await tx.portfolioGalleryItem.create({ data: itemData });
       await tx.portfolioGallery.update({
         where: { id: input.galleryId },
         data: {
-          coverImageUrl: input.mediaAssetId
-            ? `/galleries/${encodeURIComponent(gallery.slug)}/media/${encodeURIComponent(created.id)}?variant=${MediaVariantType.HERO}`
-            : imageUrl
+          coverImageUrl: asset?.url || imageUrl
         }
       });
     });
@@ -481,4 +484,68 @@ export async function updatePortfolioAccessStatusAction(formData: FormData) {
 
   refreshPortfolio();
   redirect(`/admin/modules/portfolio?saved=access&gallery=${access.galleryId}`);
+}
+
+export async function renamePortfolioAlbumAction(formData: FormData) {
+  const user = await requireAdmin("portfolio:manage");
+  const input = await parseForm(z.object({ id: requiredText, title: requiredText.pipe(z.string().max(180)) }), formData, "/admin/modules/portfolio");
+  const siteId = await getCurrentSiteId();
+  const result = await prisma.portfolioGallery.updateMany({
+    where: await getAccessibleGalleryWhere(user, siteId, { id: input.id }), data: { title: input.title }
+  });
+  if (!result.count) redirect("/admin/modules/portfolio?error=Album%20not%20found.");
+  refreshPortfolio();
+  galleryRedirect(input.id, "title");
+}
+
+export async function uploadPortfolioPhotoAction(formData: FormData): Promise<{ error?: string }> {
+  const user = await requireAdmin("portfolio:manage");
+  await requireAdmin("media:manage");
+  const settings = await getSiteSettings();
+  const galleryId = String(formData.get("galleryId") || "");
+  const gallery = await prisma.portfolioGallery.findFirst({
+    where: await getAccessibleGalleryWhere(user, settings.siteId, { id: galleryId }),
+    select: { id: true, title: true, visibility: true }
+  });
+  if (!gallery) return { error: "Album not found." };
+  const file = formData.get("file");
+  if (!(file instanceof File)) return { error: "Choose a photo to upload." };
+  const validationError = albumPhotoError(file);
+  if (validationError) return { error: validationError };
+  const staffIds = await getOwnerStaffIds(user, settings.siteId);
+  if ((await resolveDataScopeMode(user, settings.siteId, "media")) === "OWN" && !staffIds.length) {
+    return { error: "Create your staff profile before uploading photos." };
+  }
+  let asset: Awaited<ReturnType<typeof uploadMedia>>;
+  try {
+    asset = await uploadMedia(file, {
+      alt: `${gallery.title} — ${file.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ")}`,
+      folder: "portfolio", tags: [gallery.title], usageContext: "Photo album",
+      isPrivate: gallery.visibility !== PortfolioGalleryVisibility.PUBLIC, uploadedByStaffId: staffIds[0]
+    }, settings.mediaDriver, settings.siteId, { requireImage: true });
+  } catch (error) {
+    console.error("Album photo upload failed", error);
+    return { error: "This photo could not be uploaded. Check the image and media storage settings, then retry." };
+  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      const latest = await tx.portfolioGalleryItem.aggregate({ where: { galleryId }, _max: { sortOrder: true } });
+      const cover = await tx.portfolioGallery.updateMany({
+        where: { id: galleryId, siteId: settings.siteId, coverImageUrl: "" },
+        data: { coverImageUrl: asset.url }
+      });
+      await tx.portfolioGalleryItem.create({ data: {
+        galleryId, mediaAssetId: asset.id, type: PortfolioItemType.IMAGE,
+        title: file.name, altText: asset.alt || gallery.title, imageUrl: asset.url,
+        thumbnailUrl: asset.url, sortOrder: (latest._max.sortOrder ?? -10) + 10, isCover: cover.count > 0
+      } });
+    });
+  } catch (error) {
+    await deleteMediaAsset(asset.id, settings.siteId);
+    console.error("Album attachment failed", error);
+    return { error: "The photo could not be added to this album. Please retry." };
+  }
+  refreshPortfolio();
+  revalidatePath("/admin/modules/media");
+  return {};
 }

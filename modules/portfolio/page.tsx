@@ -1,5 +1,7 @@
-import { Camera, Image as ImageIcon, KeyRound, RotateCcw, Star } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, BookOpen, Image as ImageIcon, RotateCcw } from "lucide-react";
 import {
+  MediaVariantType,
   PortfolioAccessStatus,
   PortfolioGalleryLayout,
   PortfolioGalleryStatus,
@@ -13,6 +15,7 @@ import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
+  renamePortfolioAlbumAction,
   addPortfolioGalleryItemAction,
   createPortfolioAccessAction,
   createPortfolioGalleryAction,
@@ -23,6 +26,10 @@ import {
   updatePortfolioProofRoundStatusAction } from "./actions";
 import { Button, Card, EqualGrid, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
+
+import { mediaAssetDisplayUrl, mediaAssetIdFromUrl } from "@/lib/media";
+import { AlbumPhotos } from "./album-photos";
+import styles from "./albums.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -48,10 +55,10 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
   const galleryWhere: Prisma.PortfolioGalleryWhereInput = await getAccessibleGalleryWhere(user, settings.siteId);
   const activeMediaWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: null });
   const clientWhere: Prisma.ClientWhereInput = await getAccessibleClientWhere(user, settings.siteId);
-  const [galleries, mediaAssets, clients, publishedCount, privateCount, itemCount, favoriteCount] = await Promise.all([
+  const [galleries, mediaAssets, clients] = await Promise.all([
   prisma.portfolioGallery.findMany({
     where: galleryWhere,
-    include: { _count: { select: { items: true, accesses: true, favorites: true } } },
+    include: { _count: { select: { items: true } }, items: { orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }], take: 1 } },
     orderBy: [{ status: "asc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
     take: 30
   }),
@@ -64,18 +71,11 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
     where: clientWhere,
     orderBy: { updatedAt: "desc" },
     take: 50
-  }),
-  prisma.portfolioGallery.count({ where: await getAccessibleGalleryWhere(user, settings.siteId, { status: PortfolioGalleryStatus.PUBLISHED }) }),
-  prisma.portfolioGallery.count({
-    where: await getAccessibleGalleryWhere(user, settings.siteId, {
-      visibility: { in: [PortfolioGalleryVisibility.PRIVATE, PortfolioGalleryVisibility.PASSWORD] }
-    })
-  }),
-  prisma.portfolioGalleryItem.count({ where: { gallery: galleryWhere } }),
-  prisma.portfolioGalleryFavorite.count({ where: { gallery: galleryWhere } })]
+  })]
+
   );
 
-  const selectedGalleryId = params.gallery || galleries[0]?.id;
+  const selectedGalleryId = params.gallery;
   const selectedGallery = selectedGalleryId ?
   await prisma.portfolioGallery.findFirst({
     where: await getAccessibleGalleryWhere(user, settings.siteId, { id: selectedGalleryId }),
@@ -107,6 +107,19 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
     }
   }) :
   null;
+  const albumMediaIds = [...new Set([...galleries.flatMap(gallery => [mediaAssetIdFromUrl(gallery.coverImageUrl), ...gallery.items.map(item => item.mediaAssetId)]), ...(selectedGallery?.items.map(item => item.mediaAssetId) || [])].filter((id): id is string => Boolean(id)))];
+  const albumMedia = albumMediaIds.length ? await prisma.mediaAsset.findMany({ where: await getAccessibleMediaWhere(user, settings.siteId, { id: { in: albumMediaIds }, deletedAt: null }) }) : [];
+  const mediaById = new Map(albumMedia.map(asset => [asset.id, asset]));
+  function itemUrl(item: { mediaAssetId: string | null; imageUrl: string }, type: MediaVariantType) {
+    const asset = item.mediaAssetId ? mediaById.get(item.mediaAssetId) : null;
+    return asset ? mediaAssetDisplayUrl(asset, type) : item.mediaAssetId ? "" : item.imageUrl;
+  }
+  function coverUrl(gallery: typeof galleries[number]) {
+    const coverId = mediaAssetIdFromUrl(gallery.coverImageUrl);
+    const asset = coverId ? mediaById.get(coverId) : null;
+    return asset ? mediaAssetDisplayUrl(asset, MediaVariantType.CARD) : gallery.items[0] ? itemUrl(gallery.items[0], MediaVariantType.CARD) : coverId ? "" : gallery.coverImageUrl;
+  }
+  const photos = (selectedGallery?.items || []).filter(item => item.type === PortfolioItemType.IMAGE).map(item => ({ id: item.id, title: item.title, alt: item.altText || item.title || selectedGallery!.title, thumbnail: itemUrl(item, MediaVariantType.CARD), url: itemUrl(item, MediaVariantType.FULL) })).filter(item => item.url);
   const latestProofRound = selectedGallery?.proofRounds[0] || null;
   const selectedImageExport = selectedGallery ?
   [
@@ -125,20 +138,14 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
 
   [];
   const selectedDownloadableCount = selectedGallery?.items.filter((item) => item.isDownloadable && item.mediaAssetId).length || 0;
-  const savedMessage = params.saved ? "Portfolio changes saved." : null;
+  const savedMessage = params.saved ? "Album changes saved." : null;
   const errorMessage = params.error || null;
   const createGalleryForm = (
     <form action={createPortfolioGalleryAction} className="form-grid">
-      <EqualGrid>
-        <div className="ui-field">
-          <label htmlFor="gallery-title">Title</label>
-          <input id="gallery-title" name="title" required />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="gallery-slug">Slug</label>
-          <input id="gallery-slug" name="slug" placeholder="spring-portraits" />
-        </div>
-      </EqualGrid>
+      <div className="ui-field"><label htmlFor="gallery-title">Album title</label><input id="gallery-title" name="title" required maxLength={180} placeholder="A name for these moments" /></div>
+      <p>Start with a title, then add your photos. New albums are saved as drafts.</p>
+      <details className={styles.options}><summary>Album options</summary><div className="form-grid">
+      <div className="ui-field"><label htmlFor="gallery-slug">Web address name</label><input id="gallery-slug" name="slug" placeholder="Created from the title" /></div>
       <EqualGrid min="220px">
         <div className="ui-field">
           <label htmlFor="gallery-status">Status</label>
@@ -219,110 +226,41 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
           <input id="gallery-seo-description" name="seoDescription" />
         </div>
       </EqualGrid>
+      </div></details>
       <div className="module-modal-actions">
         <Button type="submit">
           <ImageIcon size={18} />
-          Create gallery
+          Create album
         </Button>
       </div>
     </form>
   );
 
   return (
-    <div className="stack">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Portfolio</p>
-          <h1>Portfolio</h1>
-          <p>Create galleries, organize image records, issue access records, and prepare proofing workflows.</p>
+    <div className={styles.workspace}>
+      <header className={styles.heading}>
+        <div>{selectedGallery && <Link className={styles.back} href="/admin/modules/portfolio"><ArrowLeft size={16} />All albums</Link>}
+          <h1>{selectedGallery ? selectedGallery.title : "Photo albums"}</h1>
+          <p>{selectedGallery ? selectedGallery.items.length + " photos · " + enumLabel(selectedGallery.status) + " · " + enumLabel(selectedGallery.visibility) : "Give your photographs a home. Open an album to browse or add photos."}</p>
         </div>
+        <ModuleActionModals toolbarLabel="Album tools" items={selectedGallery ? [{ id: "rename", label: "Rename album", title: "Rename album", content: <form action={renamePortfolioAlbumAction} className="form-grid"><input type="hidden" name="id" value={selectedGallery.id} /><div className="ui-field"><label htmlFor="album-title">Album title</label><input id="album-title" name="title" defaultValue={selectedGallery.title} required maxLength={180} /></div><Button type="submit">Save title</Button></form> }] : [{ id: "album", label: "New album", title: "New photo album", icon: "plus", variant: "primary", content: createGalleryForm }]} />
       </header>
-
-      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-      {errorMessage ? <div className="error">{errorMessage}</div> : null}
-
-      <EqualGrid as="section" min="220px">
-        <Card>
-          <Camera size={22} />
-          <h3>{publishedCount} published galleries</h3>
-          <p className="lead lead-compact">
-            Portfolio collections ready for public gallery and campaign surfaces.
-          </p>
-        </Card>
-        <Card>
-          <KeyRound size={22} />
-          <h3>{privateCount} private galleries</h3>
-          <p className="lead lead-compact">
-            Password or private-link collections for proofing and client delivery.
-          </p>
-        </Card>
-        <Card>
-          <Star size={22} />
-          <h3>{favoriteCount} favorites</h3>
-          <p className="lead lead-compact">
-            Client selections captured for approval, delivery, and future print workflows.
-          </p>
-        </Card>
-      </EqualGrid>
-
-      <EqualGrid as="section">
-        <Card bodyClassName="ui-stack">
-          <div className="page-header compact-header">
-            <div>
-              <h2 className="section-title">Gallery queue</h2>
-              <p>{galleries.length} visible galleries</p>
-            </div>
-            <ModuleActionModals
-              items={[
-                {
-                  content: createGalleryForm,
-                  icon: "image",
-                  id: "gallery",
-                  label: "Gallery",
-                  title: "Create gallery"
-                }
-              ]}
-              toolbarLabel="Gallery queue tools"
-            />
+      {savedMessage && <p role="status" className="success-message">{savedMessage}</p>}
+      {errorMessage && <p role="alert" className="error">{errorMessage}</p>}
+      {params.gallery && !selectedGallery && <p role="alert">That album is not available. Choose another album below.</p>}
+      {!selectedGallery && <section className={styles.shelf} aria-label="Photo albums">
+        {galleries.map(gallery => <Link key={gallery.id} className={styles.album} href={"/admin/modules/portfolio?gallery=" + gallery.id} aria-label={"Open " + gallery.title}>
+          <div className={styles.book}>
+            {coverUrl(gallery) ? <img src={coverUrl(gallery)} alt="" loading="lazy" /> : <div className={styles.blankCover}><BookOpen size={36} aria-hidden="true" /><span>Your next story</span></div>}
+            <span className={styles.binding} aria-hidden="true" />
+            <div className={styles.bookTitle}><span>{gallery.title}</span></div>
           </div>
-          <Table>
-            <thead>
-              <tr>
-                <th>Gallery</th>
-                <th>Assets</th>
-                <th>State</th>
-              </tr>
-            </thead>
-            <tbody>
-              {galleries.map((gallery) =>
-              <tr key={gallery.id}>
-                  <td>
-                    <a href={`/admin/modules/portfolio?gallery=${gallery.id}`}>{gallery.title}</a>
-                    <br />
-                    <span className="muted-text">
-                      {gallery.slug} {gallery.category ? `- ${gallery.category}` : ""}
-                    </span>
-                  </td>
-                  <td>
-                    {gallery._count.items} items
-                    <br />
-                    <span className="muted-text">{gallery._count.accesses} access links</span>
-                  </td>
-                  <td>
-                    <span className={galleryStatusClass(gallery.status)}>{enumLabel(gallery.status)}</span>
-                  </td>
-                </tr>
-              )}
-              {!galleries.length ?
-              <tr>
-                  <td colSpan={3}>No galleries yet.</td>
-                </tr> :
-              null}
-            </tbody>
-          </Table>
-        </Card>
-      </EqualGrid>
-
+          <div className={styles.albumMeta}><span>{gallery._count.items} photo{gallery._count.items === 1 ? "" : "s"}</span><span>{enumLabel(gallery.status)}</span></div>
+        </Link>)}
+        {!galleries.length && <div className={styles.empty}><BookOpen size={40} aria-hidden="true" /><h2>A place for every story</h2><p>Create your first album, give it a title, and fill it with photographs.</p></div>}
+      </section>}
+      {selectedGallery && <AlbumPhotos key={selectedGallery.id} galleryId={selectedGallery.id} photos={photos} />}
+      {selectedGallery && <details className={styles.options}><summary>Album settings, sharing &amp; proofing</summary><div className="stack">
       {selectedGallery ?
       <EqualGrid as="section">
           <Card bodyClassName="ui-stack">
@@ -330,7 +268,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
               <div>
                 <h2 className="section-title">{selectedGallery.title}</h2>
                 <p>
-                  {enumLabel(selectedGallery.visibility)} gallery with {selectedGallery.items.length} of {itemCount} portfolio items
+                  {enumLabel(selectedGallery.visibility)} gallery with {selectedGallery.items.length} photos
                 </p>
               </div>
               <span className={galleryStatusClass(selectedGallery.status)}>{enumLabel(selectedGallery.status)}</span>
@@ -787,6 +725,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
           </Card>
         </EqualGrid> :
       null}
+      </div></details>}
     </div>);
 
 }
