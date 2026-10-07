@@ -62,8 +62,8 @@ export async function updateBookingDetailAction(formData: FormData) {
   await prisma.booking.updateMany({
     where: bookingWhere,
     data: {
-      adminNotes: input.adminNotes,
-      cancellationReason: input.cancellationReason
+      ...(input.adminNotes !== undefined ? { adminNotes: input.adminNotes } : {}),
+      ...(input.cancellationReason !== undefined ? { cancellationReason: input.cancellationReason } : {})
     }
   });
 
@@ -109,6 +109,7 @@ export async function rescheduleBookingAction(formData: FormData) {
   await emitModuleEvent("booking.rescheduled", {
     actorEmail: updated.customerEmail,
     metadata: {
+      notifyCustomer: input.notifyCustomer,
       previousEndsAt: booking.endsAt.toISOString(),
       previousStartsAt: booking.startsAt.toISOString(),
       serviceId: updated.serviceId,
@@ -122,7 +123,7 @@ export async function rescheduleBookingAction(formData: FormData) {
 
   refreshAppointments();
   revalidatePath(detailPath);
-  redirect(`${detailPath}?saved=reschedule`);
+  redirect(`${detailPath}?saved=${input.notifyCustomer ? "reschedule-notify" : "reschedule-silent"}`);
 }
 
 export async function rescheduleBookingFromCalendarAction(input: {

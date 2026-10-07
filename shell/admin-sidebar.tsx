@@ -37,6 +37,7 @@ import { Button } from "@/components/ui";
 import { useEffect, useRef, useState, useTransition, type KeyboardEvent, type PointerEvent } from "react";
 
 type AdminSidebarProps = {
+  publicSiteUrl?: string;
   initialCollapsed: boolean;
   businessName: string;
   enabledModules: ModuleId[];
@@ -191,7 +192,7 @@ function SidebarNavGroup({
   );
 }
 
-export function AdminSidebar({ businessName, enabledModules, logoUrl, navigationLayout, userEmail, userRole, initialCollapsed }: AdminSidebarProps) {
+export function AdminSidebar({ publicSiteUrl, businessName, enabledModules, logoUrl, navigationLayout, userEmail, userRole, initialCollapsed }: AdminSidebarProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
@@ -522,10 +523,10 @@ export function AdminSidebar({ businessName, enabledModules, logoUrl, navigation
           </nav>
         </div>
 
-        <Link className="admin-sidebar-public-link" href="/" onClick={closeMenu}>
+        {publicSiteUrl ? <a className="admin-sidebar-public-link" href={publicSiteUrl} target="_blank" rel="noreferrer" onClick={closeMenu}>
           <ExternalLink size={17} />
           <span>View public site</span>
-        </Link>
+        </a> : null}
 
         <div className="admin-sidebar-account">
           <span className="admin-user-avatar" aria-hidden="true">

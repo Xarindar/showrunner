@@ -12,6 +12,9 @@ import { ServiceCategoryManager, type ServiceCategoryManagerCategory } from "./c
 import { ServiceCatalogTable, type ServiceCatalogTableService } from "./components/service-catalog-table";
 import { ServicePackageTable, type ServicePackageTablePackage } from "./components/service-package-table";
 
+import { catalogMediaUrl } from "@/lib/catalog-media-url";
+import { contentWebsiteUrl, resolveContentManifest } from "@/clients/content-manifests";
+
 export const dynamic = "force-dynamic";
 
 type SchedulingPageProps = {
@@ -77,14 +80,14 @@ function serviceImageUrl(service: ServiceCatalogItem) {
   return service.imageUrl || "";
 }
 
-function toServiceCatalogTableService(service: ServiceCatalogItem): ServiceCatalogTableService {
+function toServiceCatalogTableService(service: ServiceCatalogItem, websiteUrl?: string): ServiceCatalogTableService {
   return {
     bookingPath: "Client booking rebuild pending",
     category: serviceCategory(service) || "Uncategorized",
     description: service.description || "",
     durationMinutes: service.durationMinutes,
     id: service.id,
-    imageUrl: serviceImageUrl(service),
+    imageUrl: catalogMediaUrl(serviceImageUrl(service), websiteUrl),
     isActive: service.isActive,
     location: service.location || "",
     name: service.name,
@@ -184,7 +187,8 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
     { label: "All tags", value: "all" },
     ...packageTags.map((tag) => ({ label: tag, value: tag }))
   ];
-  const serviceRows = services.map(toServiceCatalogTableService);
+  const websiteUrl = contentWebsiteUrl(resolveContentManifest(settings.siteId, settings.publicContentConfig));
+  const serviceRows = services.map(service => toServiceCatalogTableService(service, websiteUrl));
   const statusActionService = serviceRows.find((service) => service.id === params.statusService) || null;
   const categoryServiceCounts = new Map<string, number>();
   services.forEach((service) => {

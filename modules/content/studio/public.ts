@@ -11,10 +11,15 @@ import { blockDependenciesAvailable } from "./manifest";
 import { EmbedRequestError } from "@/lib/embed/gateway";
 import { renderContentRichText } from "./rich-text";
 
+import { catalogMediaUrl } from "@/lib/catalog-media-url";
+import { showcaseCatalog } from "./showcase-catalog";
+import { resolveShowcase, type ShowcaseRow } from "./showcase";
+
 export async function getPublicStudio(siteId: string, pageId: string) {
   const settings = await getSiteSettingsForSite(siteId);
   const manifest = await getEditorManifest(settings);
   if (!manifest.pages.some(page => page.id === pageId)) throw new EmbedRequestError("Unknown content page", 404);
+  const catalog = manifest.blocks.some(block => block.type === "showcase") ? await showcaseCatalog(siteId, settings.enabledModuleIds) : [];
   const state = readStudio(settings.publicContentConfig);
   const business = resolveBusinessInfo(settings, manifest.blocks.find(block => block.type === "business")?.defaults);
   const blocks = await Promise.all(manifest.blocks.filter(block => block.type !== "business" && blockDependenciesAvailable(block, settings.enabledModuleIds)).map(async block => {
@@ -23,6 +28,7 @@ export async function getPublicStudio(siteId: string, pageId: string) {
     if ((!stored && !block.defaults) || !block.pageIds.includes(pageId) || !payloadPages.includes(pageId)) return null;
     if (block.formId && !await prisma.form.findFirst({ where: { id: block.formId, siteId, status: "ACTIVE" }, select: { id: true } })) return null;
     let payload = resolveStudioPayload(block, stored);
+    if (block.type === "showcase") payload = { ...payload, items: resolveShowcase(payload.items as ShowcaseRow[], catalog, manifest).map(item => ({ ...item, imageUrl: publicMediaUrl(catalogMediaUrl(item.imageUrl, manifest.previewUrl)) })) };
     if (block.type === "about") payload = { ...payload, copyHtml: renderContentRichText(String(payload.copy || "")) };
     if (block.type === "faq") payload = { ...payload, items: (payload.items as Record<string, unknown>[]).map(item => ({ ...item, answerHtml: renderContentRichText(String(item.answer || "")) })) };
     if (block.type === "contact") {

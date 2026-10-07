@@ -3,6 +3,59 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 
+test("showcase renderer uses safe semantic cards and selection scrolls once", async () => {
+  class Node {
+    children: Node[] = [];
+    dataset: Record<string, string> = {};
+    textContent = "";
+    className = "";
+    href = "";
+    src = "";
+    alt = "";
+    loading = "";
+    tabIndex = -1;
+    scrolls = 0;
+    constructor(public tag: string) {}
+    append(...nodes: Node[]) { this.children.push(...nodes); }
+    replaceChildren(...nodes: Node[]) { this.children = nodes; }
+    setAttribute() {}
+    scrollIntoView() { this.scrolls++; }
+  }
+  const host = new Node("section");
+  const listeners: Record<string, (event: unknown) => Promise<void>> = {};
+  const parent = { postMessage() {} };
+  const window = { parent, addEventListener(name: string, callback: typeof listeners[string]) { listeners[name] = callback; }, dispatchEvent() {} };
+  const document = {
+    readyState: "complete", currentScript: { dataset: { editorOrigins: "https://editor.example" } },
+    head: { append() {} }, createElement: (tag: string) => new Node(tag), createDocumentFragment: () => new Node("fragment"),
+    addEventListener() {}, querySelectorAll: (selector: string) => selector === ".showcase" ? [host] : [],
+  };
+  runInNewContext(readFileSync("public/showrunner-content.js", "utf8"), { window, document, parent, URL, URLSearchParams, CustomEvent, Intl, location: { href: "https://site.example/", search: "?showrunner-editor=1" } });
+  const message = { source: parent, origin: "https://editor.example", data: { channel: "showrunner-editor-v1", type: "connect" } };
+  await listeners.message(message);
+  const card = { name: "<script>safe text</script>", description: "Catalog description", imageUrl: "javascript:alert(1)", kind: "product", priceCents: 2500, currency: "USD", available: false, ctaHref: "/shop.html", ctaLabel: "View product", variant: "compact" };
+  const blocks = [{ id: "menu", type: "showcase", presentation: { selector: ".showcase" }, payload: { heading: "Menu", items: [card] } }];
+  const update = { ...message, data: { channel: "showrunner-editor-v1", type: "update", blocks, selectedId: "menu" } };
+  await listeners.message(update);
+  assert.equal(host.scrolls, 1);
+  const article = host.children[0].children[1].children[0];
+  assert.equal(article.tag, "article");
+  assert.equal(article.dataset.variant, "compact");
+  assert.equal(article.children[0].src, "");
+  assert.equal(article.children[1].textContent, card.name);
+  assert.ok(article.children.some(node => node.textContent === "$25.00"));
+  assert.ok(!article.children.some(node => node.tag === "a"));
+  await listeners.message(update);
+  assert.equal(host.scrolls, 1, "typing drafts must not reset canvas scroll");
+  card.available = true;
+  card.ctaHref = "javascript:alert(1)";
+  await listeners.message(update);
+  assert.ok(!host.children[0].children[1].children[0].children.some(node => node.tag === "a"));
+  card.ctaHref = "/shop.html?product=kit";
+  await listeners.message(update);
+  assert.equal(host.children[0].children[1].children[0].children.at(-1)?.href, "https://site.example/shop.html?product=kit");
+});
+
 test("website bridge authenticates the parent and limits preview updates to safe content", async () => {
   const listeners: Record<string, (event: unknown) => Promise<void>> = {};
   const messages: unknown[] = [];

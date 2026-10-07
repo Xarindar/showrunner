@@ -1,9 +1,10 @@
-import { blockRegistry, emptyPayload, payloadSchema, type BlockType } from "./registry";
+import { isSafeContentUrl, blockRegistry, emptyPayload, payloadSchema, type BlockType } from "./registry";
 
 export type ContentBlockConfig = {
   id: string; type: BlockType; label: string; editableFields: string[];
   pageIds: string[]; allowPageTargeting?: boolean; limits?: Record<string, number>; minimums?: Record<string, number>;
   presentation?: { assetBaseUrl?: string; variant?: string; selector?: string; bindings?: { path: string; selector: string; attribute?: "src" | "alt" | "href" | "background" }[] }; source?: "services";
+  cardVariants?: { value: string; label: string }[];
   fixedRows?: boolean;
   editorGroups?: { label: string; fields: { path: string; label: string }[] }[];
   sourceCategory?: string;
@@ -13,9 +14,11 @@ export type ContentBlockConfig = {
 export type ContentManifest = {
   version: 1; id: string; pages: { id: string; path: string; label: string }[];
   blocks: ContentBlockConfig[]; legacyProfiles?: boolean; previewUrl?: string;
+  products?: { path: string; slugParameter: string };
   booking?: { path: string; profilesByCategory?: Record<string, string> };
 };
 export function validateManifest(manifest: ContentManifest): ContentManifest {
+  if (manifest.products && (!manifest.products.path || !isSafeContentUrl(manifest.products.path) || /^(mailto:|tel:)/i.test(manifest.products.path) || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(manifest.products.slugParameter))) throw new Error("Invalid product destination");
   const ids = new Set<string>();
   const pages = new Set(manifest.pages.map(page => page.id));
   if (pages.size !== manifest.pages.length) throw new Error("Duplicate page IDs");
@@ -28,6 +31,7 @@ export function validateManifest(manifest: ContentManifest): ContentManifest {
     if (block.pageIds.some(page => !pages.has(page))) throw new Error("Unknown page binding");
     if (block.type === "seo" && block.pageIds.length !== 1) throw new Error("SEO must bind to one page");
     if (block.type === "business" && block.id !== "business-info") throw new Error("Canonical Business Info ID must be business-info");
+    if (block.type === "showcase" && block.source) throw new Error("Showcase cards use catalog bindings, not a section source");
     if (block.type === "featured" && !block.source) throw new Error("Featured items require a source");
     if (block.sourceCategory && block.source !== "services") throw new Error("Source categories require a service source");
     if (block.type === "mailingList" && !block.formId) throw new Error("Mailing-list popup requires a configured form");

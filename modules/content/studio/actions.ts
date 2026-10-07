@@ -12,6 +12,8 @@ import { configRecord, readStudio, resolveStudioPayload, saveRequestSchema, vali
 import { businessInfoExtensions, resolveBusinessInfo, validateBusinessInfo } from "./business-info";
 import { blockDependenciesAvailable } from "./manifest";
 
+import { showcaseCatalog } from "./showcase-catalog";
+
 export async function saveStudioBlock(raw: unknown): Promise<{ error?: string; revision?: number }> {
   const user = await requireAdmin("content:manage");
   const site = await resolveCurrentSite();
@@ -37,6 +39,10 @@ export async function saveStudioBlock(raw: unknown): Promise<{ error?: string; r
       if (block.type === "contact") {
         const locations = resolveBusinessInfo(current).locations as { id: string }[];
         if (payload.locationId && !locations.some(location => location.id === payload.locationId)) throw new Error("Unknown location");
+      }
+      if (block.type === "showcase") {
+        const catalog = await showcaseCatalog(site.id, settings.enabledModuleIds, tx);
+        if ((payload.items as { catalogKey: string }[]).some(row => !catalog.some(item => item.key === row.catalogKey))) throw new Error("A selected catalog item is unavailable for this site");
       }
       if (block.source === "services") {
         const ids = (payload.items as { referenceId: string }[]).map(item => item.referenceId);

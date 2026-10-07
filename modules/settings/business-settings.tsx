@@ -100,7 +100,7 @@ export function BusinessSettings({
         <label htmlFor="timezone">Timezone</label>
         <input id="timezone" name="timezone" defaultValue={settings.timezone} readOnly={contactInContent} required />
       </div>
-      {contactInContent ? <Link href="/admin/modules/content#business-info-title-heading">Edit contact details in Content → Contact / Business Info</Link> : null}
+      {contactInContent ? <Link href="/admin/modules/content?section=business-info">Edit contact details in Content → Contact / Business Info</Link> : null}
     </section>
   );
 }

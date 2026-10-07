@@ -12,6 +12,8 @@ import "@puckeditor/core/puck.css";
 import styles from "./puck-editor.module.css";
 import fieldStyles from "./studio.module.css";
 
+import { resolveShowcase, type ShowcaseRow } from "./showcase";
+
 type Entry = { block: ContentBlockConfig; payload: Record<string, unknown>; revision: number; pageIds: string[]; choices: Choice[] };
 type Props = { manifest: ContentManifest; entries: Entry[]; canUpload: boolean; linkChoices: LinkChoices };
 export function PuckContentEditor(props: Props) {
@@ -47,6 +49,19 @@ function Workspace({ manifest, entries }: Props) {
   const page = manifest.pages.find(item => item.id === pageId)!;
   const pageEntries = useMemo(() => entries.filter(entry => entry.pageIds.includes(pageId) || entry.block.type === "business"), [entries, pageId]);
   const content = appState.data.content;
+  useEffect(() => {
+    const openRequestedSection = () => {
+      const id = new URLSearchParams(window.location.search).get("section") || (window.location.hash === "#business-info-title-heading" ? "business-info" : "");
+      const index = entries.findIndex(entry => entry.block.id === id);
+      const entry = entries.find(entry => entry.block.id === id);
+      if (index < 0 || !entry) return;
+      if (entry.pageIds.length) setPageId(entry.pageIds[0]);
+      dispatch({ type: "setUi", ui: { itemSelector: { index } } });
+    };
+    openRequestedSection();
+    window.addEventListener("hashchange", openRequestedSection);
+    return () => window.removeEventListener("hashchange", openRequestedSection);
+  }, [dispatch, entries]);
   const changed = content.filter(item => JSON.stringify(item.props.payload) !== JSON.stringify(saved[item.props.id]?.payload));
   const dirty = changed.length > 0;
   const selected = entries.find(entry => entry.block.id === selectedItem?.props.id);
@@ -113,6 +128,7 @@ function Workspace({ manifest, entries }: Props) {
     const blocks = pageEntries.map(entry => {
       let payload = content.find(item => item.props.id === entry.block.id)?.props.payload || entry.payload;
       payload = { ...payload, ...(payload.imageUrl ? { imageUrl: mediaUrl(payload.imageUrl) } : {}), ...(Array.isArray(payload.slides) ? { slides: payload.slides.map((slide: Record<string, string>) => ({ ...slide, imageUrl: mediaUrl(slide.imageUrl) })) } : {}), ...(Array.isArray(payload.images) ? { images: payload.images.map((image: Record<string, string>) => ({ ...image, url: mediaUrl(image.url) })) } : {}) };
+      if (entry.block.type === "showcase") payload = { ...payload, items: resolveShowcase(payload.items as ShowcaseRow[], entry.choices.flatMap(choice => choice.catalog ? [choice.catalog] : []), manifest).map(item => ({ ...item, imageUrl: mediaUrl(item.imageUrl) })) };
       if (entry.block.source === "services") payload = { ...payload, items: (payload.items as Record<string, string>[]).map(row => {
         const choice = entry.choices.find(item => item.id === row.referenceId);
         return { id: choice?.id, name: row.title || choice?.label || "", description: row.description || choice?.description || "", imageUrl: mediaUrl(choice?.imageUrl || "") };
@@ -120,7 +136,7 @@ function Workspace({ manifest, entries }: Props) {
       return { id: entry.block.id, type: entry.block.type, payload, presentation: entry.block.presentation || {} };
     });
     frame.current.contentWindow.postMessage({ channel: "showrunner-editor-v1", type: "update", blocks, selectedId: selected?.block.id, assetOrigin: window.location.origin, focusedItem }, previewOrigin);
-  }, [content, ready, pageEntries, previewOrigin, selected?.block.id, focusedItem]);
+  }, [content, ready, pageEntries, previewOrigin, selected?.block.id, focusedItem, manifest]);
 
   async function publish() {
     setPending(true); setMessage(""); setError(false);

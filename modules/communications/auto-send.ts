@@ -49,9 +49,8 @@ function metadataString(envelope: CommunicationsEventEnvelope, key: string) {
 
 async function queueBookingRescheduled(envelope: CommunicationsEventEnvelope) {
   if (!envelope.relatedId) return;
-  // The calendar drag-and-drop flow lets the admin opt out of notifying the
-  // customer; an explicit false suppresses the email. Any other value (including
-  // omitted, e.g. the appointment detail page) keeps the previous send behavior.
+  // Both admin reschedule flows disclose the customer email choice. Explicit
+  // false suppresses it; omitted metadata preserves existing integration behavior.
   if (asRecord(envelope.metadata).notifyCustomer === false) return;
   const siteId = envelope.siteId || (await getCurrentSiteId());
 

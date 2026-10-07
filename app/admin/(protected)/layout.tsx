@@ -7,6 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { MediaVariantType } from "@prisma/client";
 import { getAdminModuleNavigationLayout } from "@/lib/admin-navigation";
 
+import { contentWebsiteUrl, resolveContentManifest } from "@/clients/content-manifests";
+
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({
@@ -32,6 +34,7 @@ export default async function AdminLayout({
     <div className="admin-root">
       <a className="admin-skip-link" href="#admin-main">Skip to content</a>
       <AdminSidebar
+        publicSiteUrl={contentWebsiteUrl(resolveContentManifest(settings.siteId, settings.publicContentConfig))}
         initialCollapsed={(await cookies()).get("showrunner-sidebar-collapsed")?.value === "true"}
         businessName={settings.businessName}
         enabledModules={settings.enabledModuleIds}

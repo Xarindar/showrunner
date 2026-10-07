@@ -6,6 +6,7 @@
   const editing = window.parent !== window && new URLSearchParams(location.search).get("showrunner-editor") === "1";
   let parentOrigin = "";
   let blocks = [];
+  let selectedId = "";
   const rendered = new Map();
   const documentReady = document.readyState === "loading" ? new Promise(resolve => document.addEventListener("DOMContentLoaded", resolve, { once: true })) : Promise.resolve();
   const safeUrl = (value, base) => {
@@ -32,6 +33,28 @@
           }
         });
       });
+      // Opt-in dedicated showcase hosts; client CSS owns the card layout and theme.
+      if (block.type === "showcase" && block.presentation?.selector) {
+        document.querySelectorAll(block.presentation.selector).forEach(host => {
+          const fragment = document.createDocumentFragment();
+          const text = (tag, value, className) => { const node = document.createElement(tag); node.textContent = String(value || ""); if (className) node.className = className; return node; };
+          if (block.payload.heading) fragment.append(text("h2", block.payload.heading));
+          const list = document.createElement("div"); list.className = "showrunner-showcase";
+          (block.payload.items || []).forEach(item => {
+            const card = document.createElement("article"); card.className = "showrunner-showcase-card";
+            if (item.variant) card.dataset.variant = item.variant;
+            card.dataset.kind = item.kind;
+            if (item.imageUrl) { const image = document.createElement("img"); image.src = safeUrl(item.imageUrl, assetOrigin); image.alt = item.name || ""; image.loading = "lazy"; card.append(image); }
+            card.append(text("h3", item.name), text("p", item.description));
+            if (Number.isInteger(item.priceCents)) { let price; try { price = new Intl.NumberFormat(undefined, { style: "currency", currency: item.currency }).format(item.priceCents / 100); } catch { price = `${item.priceCents / 100} ${item.currency || ""}`; } card.append(text("p", price, "showrunner-showcase-price")); }
+            if (item.durationMinutes) card.append(text("p", `${item.durationMinutes} minutes`, "showrunner-showcase-duration"));
+            if (item.available === false) card.append(text("p", "Currently unavailable", "showrunner-showcase-availability"));
+            if (item.ctaHref && item.available !== false) { const href = safeUrl(item.ctaHref); if (href) { const link = text("a", item.ctaLabel); link.href = href; card.append(link); } }
+            list.append(card);
+          });
+          fragment.append(list); host.replaceChildren(fragment);
+        });
+      }
       if (block.type === "seo") {
         if (block.payload.title) document.title = block.payload.title;
         const meta = document.querySelector('meta[name="description"]');
@@ -60,13 +83,18 @@
     apply(blocks, event.origin);
     if (event.data.focusedItem) window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: event.data.focusedItem } }));
     document.querySelectorAll("[data-sr-selected]").forEach(node => node.removeAttribute("data-sr-selected"));
+    const selectionChanged = selectedId !== event.data.selectedId;
+    selectedId = event.data.selectedId || "";
     blocks.forEach(block => {
       if (!block.presentation?.selector) return;
       document.querySelectorAll(block.presentation.selector).forEach(node => {
         node.dataset.srSection = block.id;
         node.tabIndex = 0;
         node.setAttribute("aria-label", `Edit ${block.id.replaceAll("-", " ")}`);
-        if (block.id === event.data.selectedId) node.dataset.srSelected = "";
+        if (block.id === selectedId) {
+          node.dataset.srSelected = "";
+          if (selectionChanged) node.scrollIntoView({ block: "center", behavior: "smooth" });
+        }
       });
     });
   });
