@@ -24,6 +24,11 @@ export function validateBlockUpdate(block: ContentBlockConfig, current: StoredBl
   if ((current?.revision || 0) !== input.revision) throw new Error("This content changed in another session. Reload before saving; keep a copy of your edits.");
   for (const key of Object.keys(input.payload)) if (!block.editableFields.includes(key)) throw new Error(`Field ${key} is locked`);
   const payload = payloadSchema(block.type).parse({ ...emptyPayload(block.type), ...current?.payload, ...input.payload }) as Record<string, unknown>;
+  if (block.type === "showcase") {
+    const rows = payload.items as { catalogKey: string; variant: string }[];
+    if (new Set(rows.map(row => row.catalogKey)).size !== rows.length) throw new Error("Select each item only once");
+    if (rows.some(row => row.variant && !block.cardVariants?.some(variant => variant.value === row.variant))) throw new Error("Unknown card style");
+  }
   // Existing rows retain their deployment order; clients may edit, remove, or append rows.
   for (const [key, value] of Object.entries(payload)) {
     const before = current?.payload[key];

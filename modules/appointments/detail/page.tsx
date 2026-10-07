@@ -74,7 +74,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
         </ButtonLink>
       </header>
 
-      {saved ? <div className="success-message">Appointment updated.</div> : null}
+      {saved ? <div className="success-message">{saved === "reschedule-notify" ? "Appointment rescheduled. Customer notification requested." : saved === "reschedule-silent" ? "Appointment rescheduled without a customer email." : "Appointment updated."}</div> : null}
       {error ? <div className="error">{error}</div> : null}
 
       <section aria-label="Status actions" className="appointment-detail-toolbar">
@@ -203,6 +203,8 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
               required />
 
           </div>
+          <label><input type="checkbox" name="notifyCustomer" defaultChecked /> Email the customer about this new appointment time</label>
+          <p className="ui-help">Uncheck to reschedule without a customer email.</p>
           <div>
             <Button type="submit" variant="secondary">
               <CalendarClock size={18} />
@@ -212,7 +214,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
         </form>
       </details>
 
-      <details className="ui-disclosure" open={Boolean(booking.adminNotes || booking.cancellationReason)}>
+      <details className="ui-disclosure" open={Boolean(booking.adminNotes)}>
         <summary>
           <span>Internal notes</span>
           <small>{booking.adminNotes ? "Notes saved" : "No notes yet"}</small>
@@ -221,12 +223,8 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
         <form action={updateBookingDetailAction} className="form-grid">
           <input type="hidden" name="id" value={booking.id} />
           <div className="ui-field">
-            <label htmlFor="adminNotes">Admin notes</label>
+            <label htmlFor="adminNotes">Admin notes (staff only)</label>
             <textarea id="adminNotes" name="adminNotes" defaultValue={booking.adminNotes || ""} />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="cancellationReason">Cancellation reason</label>
-            <input id="cancellationReason" name="cancellationReason" defaultValue={booking.cancellationReason || ""} />
           </div>
           <div>
             <Button type="submit">
@@ -234,6 +232,15 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
               Save appointment notes
             </Button>
           </div>
+        </form>
+      </details>
+      <details className="ui-disclosure" open={Boolean(booking.cancellationReason)}>
+        <summary><span>Customer-facing cancellation reason</span><small>Included in the cancellation email</small></summary>
+        <form action={updateBookingDetailAction} className="form-grid">
+          <input type="hidden" name="id" value={booking.id} />
+          <div className="ui-field"><label htmlFor="cancellationReason">Reason shared with the customer</label><input id="cancellationReason" name="cancellationReason" defaultValue={booking.cancellationReason || ""} /></div>
+          <p>Save this reason before canceling. Editing it after cancellation does not send another email.</p>
+          <Button type="submit">Save cancellation reason</Button>
         </form>
       </details>
     </div>);

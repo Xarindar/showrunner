@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export type Field = { label: string; kind: "text" | "multiline" | "richtext" | "url" | "email" | "list" | "checkbox"; max?: number; fields?: Record<string, Field> };
+export type Field = { label: string; kind: "text" | "multiline" | "richtext" | "url" | "email" | "list" | "checkbox"; max?: number; options?: { label: string; value: string }[]; fields?: Record<string, Field> };
 const text = (label: string, max = 200): Field => ({ label, kind: "text", max });
 const copy = (label: string): Field => ({ label, kind: "multiline", max: 10000 });
 const url = (label: string): Field => ({ label, kind: "url", max: 2048 });
@@ -14,6 +14,7 @@ const hours = list("Business hours", { day: text("Weekday (Monday–Sunday)"), o
 const checkbox = (label: string): Field => ({ label, kind: "checkbox" });
 
 export const blockRegistry = {
+  showcase: { label: "Service / product showcase", fields: { heading: text("Heading"), items: list("Cards", { catalogKey: text("Service or product"), displayOnly: checkbox("Display only (hide action)"), variant: text("Card style") }, 30) } },
   slideshow: { label: "Header carousel", fields: { slides: list("Header", { imageUrl: url("Image"), imageAlt: text("Alternative text"), title: text("Title"), caption: copy("Caption"), buttonLabel: text("Title"), buttonHref: url("Link to") }, 12) } },
   strip: { label: "Page section", fields: { texts: list("Text", { text: copy("Text") }, 100), images: list("Images", image, 30), links: list("Links", link, 30) } },
   hero: { label: "Header / Hero", fields: { ...section, ...cta, images: list("Images", image, 6) } },
@@ -57,7 +58,7 @@ export function isSafeContentUrl(value: string) {
 
 export function fieldSchema(field: Field): z.ZodType {
   if (field.kind === "checkbox") return z.boolean();
-  if (field.kind === "list") return z.array(z.strictObject({ id: z.string().min(1).max(100), ...schemaFields(field.fields!), ...("referenceId" in (field.fields || {}) ? { title: z.string().max(200).default(""), description: z.string().max(10000).default("") } : {}) }))
+  if (field.kind === "list") return z.array(z.strictObject({ id: z.string().min(1).max(100), ...schemaFields(field.fields!), ...("catalogKey" in (field.fields || {}) ? { catalogKey: z.string().max(200).regex(/^(service|product):[^:]+$/), variant: z.string().max(100) } : {}), ...("referenceId" in (field.fields || {}) ? { title: z.string().max(200).default(""), description: z.string().max(10000).default("") } : {}) }))
     .max(field.max || 12).refine(rows => new Set(rows.map(row => row.id)).size === rows.length, "Item IDs must be unique");
   let schema = z.string().max(field.max || 200);
   if (field.kind === "url") schema = schema.refine(isSafeContentUrl, "Use a safe website, email, phone, or relative link");

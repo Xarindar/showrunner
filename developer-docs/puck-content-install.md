@@ -19,3 +19,5 @@ The inspector groups controls by visual item. Put images first within each group
 Use `slideshow` for a header carousel: clients may append/remove slides within its minimum/maximum limits while the page section remains fixed. The Cottage adapter reads legacy header arrays into the new slide shape until first publication. Button destinations offer registered pages and active services; configure `booking.path` and optional `profilesByCategory` to produce slug-based links. The booking client resolves the slug, then uses its existing earliest-availability lookup without selecting a time or creating a booking.
 
 Client-facing fields omit alternative text and internal location IDs while retaining them in stored payloads and image rendering. SEO blocks remain available to the public renderer but are omitted from the visual editor.
+
+For catalog-bound service/product cards, see [Showcase cards](showcase-cards.md). Configure a dedicated showcase host; owners add cards within that approved section while page sections stay fixed.

@@ -11,7 +11,7 @@ import styles from "./studio.module.css";
 import { renderContentRichText } from "./rich-text";
 import { VisualBlock } from "./visual-block";
 
-export type Choice = { description?: string; id: string; imageUrl?: string; label: string };
+export type Choice = { catalog?: import("./showcase").CatalogCard; description?: string; id: string; imageUrl?: string; label: string };
 export function StudioEditor({ block, canUpload = false, pages, initialPayload, initialRevision, initialPages, choices = [] }: {
   block: ContentBlockConfig; canUpload?: boolean; pages: ContentManifest["pages"]; initialPayload: Record<string, unknown>; initialRevision: number; initialPages: string[]; choices?: Choice[];
 }) {
@@ -73,6 +73,8 @@ export function Fields({ canUpload = false, fixedRows = false, assetBaseUrl, lin
         {!fixedRows && <button className={styles.addContent} type="button" disabled={rows.length >= maximum} onClick={() => update([...rows, { id: crypto.randomUUID(), ...emptyFields(field.fields!) }])}><Plus size={16} aria-hidden="true" />Add {field.label === "Header" ? "header" : field.label.toLowerCase()}</button>}
       </div>;
     }
+    if (field.options) return <label key={key} htmlFor={id}>{field.label}<select id={id} value={String(value[key] || "")} onChange={event => update(event.target.value)}><option value="">Site default</option>{field.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+    if (key === "catalogKey") return <label key={key} htmlFor={id}>Service or product<select id={id} value={String(value[key] || "")} onChange={event => update(event.target.value)}><option value="">Choose a service or product</option>{value[key] && !choices.some(choice => choice.id === value[key]) ? <option value={String(value[key])}>Unavailable item — choose a replacement</option> : null}{choices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select><small>Name, description, media and pricing come from the catalog. Update the record there.</small></label>;
     if (key === "referenceId") return <label key={key} htmlFor={id}>Item<select id={id} value={String(value[key] || "")} onChange={event => update(event.target.value)}><option value="">Select an item</option>{choices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label>;
     const media = key === "imageUrl" || (key === "url" && "alt" in fields);
     const source = String(value[key] || "");

@@ -17,3 +17,5 @@ The editor uses open-source Puck inside Showrunner's existing admin shell. Draft
 
 ## Stack
 Next.js App Router, React, TypeScript, Puck, Prisma and PostgreSQL. Websites consume Showrunner's public content API and the shared preview bridge. Existing hosting is Railway.
+
+Service/product showcase cards are an opt-in reusable block inside an approved page section. Owners add cards and bind them to existing catalog records, with display-only and approved client style choices. Names, descriptions, media, product pricing and service duration stay in the central catalog. Service actions reuse slug-based booking; product actions require a configured existing client product destination. See developer-docs/showcase-cards.md.

@@ -152,12 +152,13 @@ export const bookingStatusFormSchema = z.object({
 
 export const bookingDetailFormSchema = z.object({
   id,
-  adminNotes: optionalStoredText,
-  cancellationReason: optionalStoredText
+  adminNotes: optionalStoredText.optional(),
+  cancellationReason: optionalStoredText.optional()
 });
 
 export const bookingRescheduleFormSchema = z.object({
   id,
+  notifyCustomer: z.enum(["on", "off"]).default("off").transform(value => value === "on"),
   startsAt: requiredText
 });
 
