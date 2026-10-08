@@ -7,6 +7,7 @@ import { generateGiftCardCode } from "@/lib/commerce/gift-cards";
 import { emitModuleEvent } from "@/lib/events/emit";
 import { queueOrderReceiptEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { canSettleCanceledGalleryOrder } from "@/lib/portfolio/selection-policy";
 import { getCurrentSiteId } from "@/lib/site";
 
 type CommerceTx = Prisma.TransactionClient;
@@ -285,6 +286,8 @@ export async function updateOrderStatus(input: {
       where: { id: input.orderId, siteId },
       include: {
         coupon: true,
+        gallerySelectionPurchase: { select: { id: true } },
+        payments: true,
         giftCardRedemptions: true,
         items: {
           include: {
@@ -296,7 +299,8 @@ export async function updateOrderStatus(input: {
     });
 
     if (!order) throw new Error("Order not found.");
-    assertAllowedOrderStatusTransition(order.status, input.status, { providerConfirmed });
+    const verifiedLateGalleryPayment = canSettleCanceledGalleryOrder({ isGallery: Boolean(order.gallerySelectionPurchase), providerConfirmed, targetStatus: input.status, order });
+    if (!verifiedLateGalleryPayment) assertAllowedOrderStatusTransition(order.status, input.status, { providerConfirmed });
 
     const becamePaid = input.status === OrderStatus.PAID && order.status !== OrderStatus.PAID;
     const becameCanceled = input.status === OrderStatus.CANCELED && order.status !== OrderStatus.CANCELED;
@@ -304,7 +308,8 @@ export async function updateOrderStatus(input: {
 
     if (becamePaid) {
       await consumeCouponRedemptionForPaidOrder(tx, order);
-      await decrementInventoryForPaidOrder(tx, order);
+      // Extras select more images from an already purchased package, not new package inventory.
+      if (!order.gallerySelectionPurchase) await decrementInventoryForPaidOrder(tx, order);
     }
 
     if (becameFulfilled && !order.items.some((item) => item.product.requiresShipping || item.product.type === ProductType.PHYSICAL)) {
@@ -315,7 +320,7 @@ export async function updateOrderStatus(input: {
       await restoreGiftCardRedemptionsForCanceledOrder(tx, order.giftCardRedemptions);
     }
 
-    const issuedGiftCards = becamePaid ? await issueGiftCardsForPaidOrder(tx, order) : [];
+    const issuedGiftCards = becamePaid && !order.gallerySelectionPurchase ? await issueGiftCardsForPaidOrder(tx, order) : [];
 
     const updatedOrder = await tx.order.update({
       where: { id: order.id },

@@ -129,3 +129,7 @@ When an admin adds a service, the service slug is generated from the service nam
 Clients are the long-term relationship records. Public bookings automatically create or update a client by email address. The client area stores profile details, private notes, manual timeline notes, and appointment history.
 
 CSV imports, CSV exports, and duplicate merges are recorded through the shared audit log with actor, target, and before/after context where applicable.
+
+## Client photo shoots
+
+Client profiles can create private shoot galleries from purchased service packages, upload/reuse private Media, collect selections, charge configured extras through existing checkout, and authorize selected-original delivery. See [client gallery proofing](developer-docs/client-gallery-proofing.md) for security, migration, payment-state policy and launch prerequisites.

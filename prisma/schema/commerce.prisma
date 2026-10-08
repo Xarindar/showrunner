@@ -98,6 +98,9 @@ model Product {
   description         String              @default("")
   type                ProductType         @default(PHYSICAL)
   status              ProductStatus       @default(DRAFT)
+  photoSelectionAllowance Int?
+  extraPhotoPriceCents Int?
+  shootGalleries PortfolioGallery[]
   basePriceCents      Int                 @default(0)
   compareAtPriceCents Int?
   currency            String              @default("USD")
@@ -446,6 +449,8 @@ model Order {
   updatedAt     DateTime    @updatedAt
   items         OrderItem[]
   payments      Payment[]
+  packageGalleries PortfolioGallery[] @relation("GalleryPackageOrder")
+  gallerySelectionPurchase PortfolioSelectionPurchase? @relation("GallerySelectionOrder")
   giftCardRedemptions GiftCardRedemption[]
 
   @@unique([siteId, orderNumber])
@@ -504,6 +509,7 @@ model Payment {
   provider                PaymentProvider
   status                  PaymentStatus   @default(PENDING)
   amountCents             Int
+  providerVerifiedAt DateTime?
   refundedCents           Int             @default(0)
   currency                String          @default("USD")
   externalPaymentId       String?

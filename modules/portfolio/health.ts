@@ -14,8 +14,8 @@ export const getHealth: ModuleHealthCheck = async ({ settings }) => {
   if (publishedGalleryCount > 0 || activeGalleryAccessCount > 0) {
     warnings.push(
       warning(
-        "Portfolio proofing is partial",
-        "Public gallery, access-token proofing, comments, approvals, signed variants, and delivery routes are live; print/lab workflow and watermark controls are still pending.",
+        "Review gallery delivery setup",
+        "Client shoots support burned-in proofs and selected-original delivery. Verify private storage and sandbox payment/refund webhooks before enabling paid extras; print/lab workflow remains separate.",
         "info",
         "portfolio",
         "/admin/modules/portfolio"

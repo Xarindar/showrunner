@@ -1,4 +1,7 @@
 import "server-only";
+import { persistGalleryHostedCheckout } from "@/lib/portfolio/checkout-persistence";
+import { assertGalleryCheckoutCreation, requireCheckoutIdentity, safeHostedCheckoutUrl, type GalleryCheckoutIdentity, type GalleryCheckoutInspection } from "@/lib/portfolio/checkout-recovery-policy";
+import { revokeGalleryPurchaseForRefund } from "@/lib/portfolio/refunds";
 
 import {
   BillingDocumentStatus,
@@ -64,9 +67,9 @@ function methodsWithoutUnavailable(methodTypes: string[] | undefined, errorMessa
 
 // Create a hosted Checkout session, but never let an optional payment method the seller has not finished
 // activating (Affirm, Cash App Pay, Klarna) block the sale. Retry once with the usable methods.
-async function createResilientCheckoutSession(stripe: Stripe, params: Stripe.Checkout.SessionCreateParams) {
+async function createResilientCheckoutSession(stripe: Stripe, params: Stripe.Checkout.SessionCreateParams, idempotencyKey?: string) {
   try {
-    return await stripe.checkout.sessions.create(params);
+    return await stripe.checkout.sessions.create(params, idempotencyKey ? { idempotencyKey } : undefined);
   } catch (error) {
     if (!isStripePaymentMethodActivationError(error)) throw error;
 
@@ -82,7 +85,7 @@ async function createResilientCheckoutSession(stripe: Stripe, params: Stripe.Che
     return stripe.checkout.sessions.create({
       ...params,
       payment_method_types: fallback as Stripe.Checkout.SessionCreateParams.PaymentMethodType[]
-    });
+    }, idempotencyKey ? { idempotencyKey } : undefined);
   }
 }
 
@@ -213,7 +216,8 @@ function stripeBillingLineItems(input: { amountCents: number; currency: string; 
   ] satisfies Stripe.Checkout.SessionCreateParams.LineItem[];
 }
 
-function publicOrderUrl(orderNumber: string, status: "success" | "cancel") {
+function publicOrderUrl(orderNumber: string, status: "success" | "cancel", galleryPurchase = false) {
+  if (galleryPurchase) return `${publicAppBaseUrl()}/proofs/payment-return?checkout=${status}`;
   const params = new URLSearchParams({
     checkout: status,
     order: orderNumber
@@ -238,6 +242,7 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
       siteId: currentSiteId
     },
     include: {
+      gallerySelectionPurchase: { select: { id: true } },
       items: { orderBy: { createdAt: "asc" } },
       payments: {
         where: { provider: PaymentProvider.STRIPE },
@@ -254,8 +259,12 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
   if (!order.items.length) throw new Error("Add at least one item before creating Stripe Checkout.");
   if (order.totalCents <= 0) throw new Error("Stripe Checkout requires a positive order total.");
 
+  // Ordinary commerce retains its original payment choice; a gallery renewal
+  // has a new immutable payment attempt and must never reuse an older key.
   const payment =
-    order.payments[0] ||
+    (order.gallerySelectionPurchase
+      ? await prisma.payment.findFirst({ where: { orderId: order.id, provider: PaymentProvider.STRIPE }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] })
+      : order.payments[0]) ||
     (await prisma.payment.create({
       data: {
         orderId: order.id,
@@ -265,6 +274,7 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
         currency: order.currency
       }
     }));
+  if (order.gallerySelectionPurchase) assertGalleryCheckoutCreation(payment);
   const orderForMetadata = {
     ...order,
     payments: [payment]
@@ -282,9 +292,9 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
     payment_intent_data: {
       metadata
     },
-    success_url: publicOrderUrl(order.orderNumber, "success"),
-    cancel_url: publicOrderUrl(order.orderNumber, "cancel")
-  });
+    success_url: publicOrderUrl(order.orderNumber, "success", Boolean(order.gallerySelectionPurchase)),
+    cancel_url: publicOrderUrl(order.orderNumber, "cancel", Boolean(order.gallerySelectionPurchase))
+  }, order.gallerySelectionPurchase ? `gallery_${order.id}_${payment.id}` : undefined);
 
   if (!session.url) throw new Error("Stripe did not return a hosted Checkout URL.");
 
@@ -304,27 +314,28 @@ export async function createStripeCheckoutSessionForOrder(orderId: string, siteI
     pciScope: "Hosted/tokenized collection only. No raw card data is stored."
   } satisfies Prisma.InputJsonObject;
 
-  await prisma.$transaction([
-    prisma.order.update({
-      where: { id: order.id },
-      data: {
-        checkoutUrl: session.url,
-        notes: order.notes.includes("Stripe Checkout")
-          ? order.notes
-          : `${order.notes ? `${order.notes}\n` : ""}Stripe Checkout session created.`
-      }
-    }),
-    prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        amountCents: order.totalCents,
-        currency: order.currency,
-        externalCheckoutSession: session.id,
-        rawSummary,
-        status: PaymentStatus.PENDING
-      }
-    })
-  ]);
+  const orderCheckoutData = {
+    checkoutUrl: session.url,
+    notes: order.notes.includes("Stripe Checkout")
+      ? order.notes
+      : `${order.notes ? `${order.notes}\n` : ""}Stripe Checkout session created.`
+  } satisfies Prisma.OrderUpdateManyMutationInput;
+  const paymentCheckoutData = {
+    amountCents: order.totalCents,
+    currency: order.currency,
+    externalCheckoutSession: session.id,
+    rawSummary,
+    status: PaymentStatus.PENDING
+  } satisfies Prisma.PaymentUpdateManyMutationInput;
+  if (order.gallerySelectionPurchase) {
+    await persistGalleryHostedCheckout({ purchaseId: order.gallerySelectionPurchase.id, orderId: order.id, paymentId: payment.id,
+      siteId: order.siteId, orderData: orderCheckoutData, paymentData: paymentCheckoutData });
+  } else {
+    await prisma.$transaction([
+      prisma.order.update({ where: { id: order.id }, data: orderCheckoutData }),
+      prisma.payment.update({ where: { id: payment.id }, data: paymentCheckoutData })
+    ]);
+  }
 
   return prisma.order.findUniqueOrThrow({
     where: { id: order.id },
@@ -614,7 +625,7 @@ async function findStripePayment(input: { checkoutSessionId?: string; orderId?: 
         provider: PaymentProvider.STRIPE,
         ...candidate
       },
-      include: { order: true },
+      include: { order: { include: { gallerySelectionPurchase: { select: { id: true } } } } },
       orderBy: { createdAt: "asc" }
     });
     if (payment) return payment;
@@ -664,6 +675,10 @@ async function handleCheckoutSessionCompleted(event: Stripe.Event, session: Stri
     paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : undefined
   });
   if (!payment) throw new Error("Stripe payment record not found for Checkout Session.");
+  if (payment.order.gallerySelectionPurchase) {
+    requireCheckoutIdentity(session.id === payment.externalCheckoutSession && session.metadata?.paymentId === payment.id &&
+      session.metadata?.orderId === payment.orderId && session.metadata?.siteId === payment.order.siteId);
+  }
   if (session.amount_total !== payment.order.totalCents) {
     throw new Error(
       `Stripe Checkout amount mismatch for order ${payment.order.orderNumber}: expected ${payment.order.totalCents}, received ${session.amount_total ?? "null"}.`
@@ -681,6 +696,7 @@ async function handleCheckoutSessionCompleted(event: Stripe.Event, session: Stri
       externalCheckoutSession: session.id,
       externalPaymentId: typeof session.payment_intent === "string" ? session.payment_intent : payment.externalPaymentId,
       rawSummary: stripeEventSummary(event),
+      providerVerifiedAt: new Date(),
       status: PaymentStatus.PAID
     }
   });
@@ -748,29 +764,38 @@ async function handleCheckoutSessionFailure(event: Stripe.Event, session: Stripe
     paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : undefined
   });
   if (!payment) throw new Error("Stripe payment record not found for failed or expired Checkout Session.");
+  if (payment.order.gallerySelectionPurchase) {
+    requireCheckoutIdentity(session.id === payment.externalCheckoutSession && session.metadata?.paymentId === payment.id &&
+      session.metadata?.orderId === payment.orderId && session.metadata?.siteId === payment.order.siteId);
+  }
 
+  const failureSummary = payment.order.gallerySelectionPurchase && payment.rawSummary && typeof payment.rawSummary === "object" && !Array.isArray(payment.rawSummary)
+    ? { ...payment.rawSummary, ...stripeEventSummary(event) } : stripeEventSummary(event);
   const paymentUpdate =
     payment.status === PaymentStatus.PAID || payment.status === PaymentStatus.REFUNDED
       ? {
           externalCheckoutSession: session.id,
           externalPaymentId:
             typeof session.payment_intent === "string" ? session.payment_intent : payment.externalPaymentId,
-          rawSummary: stripeEventSummary(event)
+          rawSummary: failureSummary
         }
       : {
           externalCheckoutSession: session.id,
           externalPaymentId:
             typeof session.payment_intent === "string" ? session.payment_intent : payment.externalPaymentId,
-          rawSummary: stripeEventSummary(event),
+          rawSummary: failureSummary,
           status: PaymentStatus.FAILED
         };
 
-  await prisma.payment.update({
-    where: { id: payment.id },
-    data: paymentUpdate
-  });
+  if (payment.order.gallerySelectionPurchase) {
+    // A delayed failure must not regress a concurrently verified paid attempt.
+    await prisma.payment.updateMany({ where: { id: payment.id, status: { notIn: [PaymentStatus.PAID, PaymentStatus.REFUNDED] } }, data: paymentUpdate });
+  } else {
+    await prisma.payment.update({ where: { id: payment.id }, data: paymentUpdate });
+  }
 
-  if (payment.order.status === OrderStatus.DRAFT || payment.order.status === OrderStatus.PENDING) {
+  const galleryPurchase = payment.order.gallerySelectionPurchase;
+  if (!galleryPurchase && (payment.order.status === OrderStatus.DRAFT || payment.order.status === OrderStatus.PENDING)) {
     await updateOrderStatus({
       orderId: payment.orderId,
       siteId: payment.order.siteId,
@@ -803,25 +828,34 @@ async function handlePaymentIntentFailure(event: Stripe.Event, intent: Stripe.Pa
     paymentIntentId: intent.id
   });
   if (!payment) throw new Error("Stripe payment record not found for failed PaymentIntent.");
+  if (payment.order.gallerySelectionPurchase) {
+    requireCheckoutIdentity(intent.id === payment.externalPaymentId && intent.metadata.paymentId === payment.id &&
+      intent.metadata.orderId === payment.orderId && intent.metadata.siteId === payment.order.siteId);
+  }
 
+  const failureSummary = payment.order.gallerySelectionPurchase && payment.rawSummary && typeof payment.rawSummary === "object" && !Array.isArray(payment.rawSummary)
+    ? { ...payment.rawSummary, ...stripeEventSummary(event) } : stripeEventSummary(event);
   const paymentUpdate =
     payment.status === PaymentStatus.PAID || payment.status === PaymentStatus.REFUNDED
       ? {
           externalPaymentId: intent.id,
-          rawSummary: stripeEventSummary(event)
+          rawSummary: failureSummary
         }
       : {
           externalPaymentId: intent.id,
-          rawSummary: stripeEventSummary(event),
+          rawSummary: failureSummary,
           status: PaymentStatus.FAILED
         };
 
-  await prisma.payment.update({
-    where: { id: payment.id },
-    data: paymentUpdate
-  });
+  if (payment.order.gallerySelectionPurchase) {
+    // A delayed failure must not regress a concurrently verified paid attempt.
+    await prisma.payment.updateMany({ where: { id: payment.id, status: { notIn: [PaymentStatus.PAID, PaymentStatus.REFUNDED] } }, data: paymentUpdate });
+  } else {
+    await prisma.payment.update({ where: { id: payment.id }, data: paymentUpdate });
+  }
 
-  if (payment.order.status === OrderStatus.DRAFT || payment.order.status === OrderStatus.PENDING) {
+  const galleryPurchase = payment.order.gallerySelectionPurchase;
+  if (!galleryPurchase && (payment.order.status === OrderStatus.DRAFT || payment.order.status === OrderStatus.PENDING)) {
     await updateOrderStatus({
       orderId: payment.orderId,
       siteId: payment.order.siteId,
@@ -858,6 +892,12 @@ async function handleRefundEvent(event: Stripe.Event) {
       }
     });
     return;
+  }
+
+  if ((object.object === "charge" && object.amount_refunded > 0) || (object.object === "refund" && object.status === "succeeded" && object.amount > 0)) {
+    await revokeGalleryPurchaseForRefund({ orderId: payment.orderId, siteId: payment.order.siteId,
+      amountCents: object.object === "charge" ? object.amount_refunded : object.amount,
+      currency: object.currency, paymentCurrency: payment.currency });
   }
 
   await prisma.payment.update({
@@ -904,6 +944,11 @@ async function dispatchStripeEvent(event: Stripe.Event) {
 
   if (event.type === "payment_intent.payment_failed" && object.object === "payment_intent") {
     await handlePaymentIntentFailure(event, object);
+    return;
+  }
+
+  if ((event.type === "refund.created" || event.type === "refund.updated") && object.object === "refund" && object.status === "succeeded") {
+    await handleRefundEvent(event);
     return;
   }
 
@@ -967,6 +1012,8 @@ async function refundStripeGatewayPayment(input: { amountCents?: number; payment
       amount: input.amountCents,
       payment_intent: payment.externalPaymentId
     });
+    if (refund.status === "succeeded") await revokeGalleryPurchaseForRefund({ orderId: payment.orderId, siteId: payment.order.siteId,
+      amountCents: refund.amount, currency: refund.currency, paymentCurrency: payment.currency });
     const isFullRefund = !input.amountCents || input.amountCents >= payment.amountCents;
 
     await prisma.payment.update({
@@ -1051,3 +1098,25 @@ export const stripePaymentGateway: PaymentGateway = {
   },
   verifyWebhook: ({ rawBody, signature }) => constructStripeWebhookEvent(rawBody, signature)
 };
+
+/** Read-only recovery: only a retrieved, unpaid, terminal session permits renewal. */
+export async function inspectStripeGalleryCheckout(input: GalleryCheckoutIdentity): Promise<GalleryCheckoutInspection> {
+  const stripe = await getStripeForSite(input.siteId);
+  const session = await stripe.checkout.sessions.retrieve(input.checkoutSessionId, { expand: ["payment_intent"] });
+  requireCheckoutIdentity(session.id === input.checkoutSessionId && session.mode === "payment" &&
+    session.client_reference_id === input.orderId && session.metadata?.orderId === input.orderId &&
+    session.metadata?.paymentId === input.paymentId && session.metadata?.siteId === input.siteId &&
+    session.amount_total === input.amountCents && session.currency?.toUpperCase() === input.currency.toUpperCase());
+  const intent = typeof session.payment_intent === "object" ? session.payment_intent : null;
+  if (session.payment_intent && !intent) return { state: "WAITING" };
+  if (intent) {
+    requireCheckoutIdentity(intent.amount === input.amountCents && intent.currency.toUpperCase() === input.currency.toUpperCase() &&
+      intent.metadata.orderId === input.orderId && intent.metadata.paymentId === input.paymentId && intent.metadata.siteId === input.siteId &&
+      (!input.externalPaymentId || input.externalPaymentId === intent.id));
+  }
+  if (session.payment_status !== "unpaid" || session.status === "complete" ||
+      (intent && ["processing", "succeeded", "requires_capture"].includes(intent.status))) return { state: "WAITING" };
+  if (session.status === "expired" && (!intent || intent.status === "canceled")) return { state: "TERMINAL", providerState: "expired" };
+  if (session.status === "open") return { state: "OPEN", checkoutUrl: safeHostedCheckoutUrl(session.url) };
+  return { state: "WAITING" };
+}

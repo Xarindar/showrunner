@@ -14,6 +14,7 @@ import {
 import { Button, ButtonLink, Pagination, TableFilterBar, type TableFilterSelect } from "@/components/ui";
 import { CatalogCreateMenu } from "./catalog-create-menu";
 import { ActivateConfirmButton } from "./activate-confirm";
+import { PackageProductFields } from "./package-product-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -153,14 +154,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           <input id="basePrice" inputMode="decimal" name="basePrice" placeholder="125.00" />
         </div>
         <div className="ui-field">
-          <label htmlFor="type">Type</label>
-          <select defaultValue={ProductType.PHYSICAL} id="type" name="type">
-            {Object.values(ProductType).map((type) => (
-              <option key={type} value={type}>
-                {enumLabel(type)}
-              </option>
-            ))}
-          </select>
+          <PackageProductFields id="type" initialType={ProductType.PHYSICAL} />
         </div>
       </div>
       <div className="module-modal-actions">

@@ -21,6 +21,7 @@ import { Button, ButtonLink, Card, EqualGrid, Pagination, Switch, Table, UploadF
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 import { ClientNotesDocumentsCard } from "./client-notes-documents-card";
 import { ClientProfileCard } from "./client-profile-card";
+import { ClientGalleriesSection } from "./client-galleries-section";
 
 export const dynamic = "force-dynamic";
 
@@ -1023,6 +1024,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         />
 
       </section>
+
+      <ClientGalleriesSection clientId={client.id} settings={settings} user={user} />
 
       <Card as="section" bodyClassName="ui-stack">
         <div className="page-header compact-header">
