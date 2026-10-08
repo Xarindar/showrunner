@@ -75,7 +75,7 @@ test("private DOWNLOAD and download flags cannot bypass exact paid entitlement",
   assert.equal(paid.calls.proof, 0);
 });
 
-test("private access, tenant/published query, legacy and storage boundaries fail closed", async () => {
+test("gallery authorization and storage checks reject invalid inputs", async () => {
   const route = routeHarness({ access: false });
   assert.equal((await route.get("access=revoked&variant=CARD")).status, 404);
   assert.equal(route.calls.proof, 0);
