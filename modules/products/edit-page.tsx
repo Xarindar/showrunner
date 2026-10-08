@@ -39,6 +39,7 @@ import {
 import { ProductEditorTabs, type ProductEditorTab } from "./product-editor-tabs";
 import { ProductSlugFields } from "./product-slug-fields";
 import { VariantTable, type VariantRow } from "./variant-table";
+import { PackageProductFields } from "./package-product-fields";
 
 type ProductEditPageProps = {
   productId: string;
@@ -457,14 +458,7 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
                 </p>
               ) : null}
               <div className="ui-field">
-                <label htmlFor={`product-${product.id}-type`}>Type</label>
-                <select defaultValue={product.type} id={`product-${product.id}-type`} name="type">
-                  {Object.values(ProductType).map((type) => (
-                    <option key={type} value={type}>
-                      {enumLabel(type)}
-                    </option>
-                  ))}
-                </select>
+                <PackageProductFields allowance={product.photoSelectionAllowance} extraPhotoPriceCents={product.extraPhotoPriceCents} id={`product-${product.id}-type`} initialType={product.type} />
                 {isBundle || hasBundleContents ? (
                   <ButtonLink href={productBundleHref(product.id)} size="sm" variant="secondary">
                     <Boxes size={15} />

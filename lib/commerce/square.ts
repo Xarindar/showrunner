@@ -1,4 +1,7 @@
 import "server-only";
+import { persistGalleryHostedCheckout } from "@/lib/portfolio/checkout-persistence";
+import { assertGalleryCheckoutCreation, requireCheckoutIdentity, safeHostedCheckoutUrl, type GalleryCheckoutIdentity, type GalleryCheckoutInspection } from "@/lib/portfolio/checkout-recovery-policy";
+import { revokeGalleryPurchaseForRefund } from "@/lib/portfolio/refunds";
 
 import crypto from "node:crypto";
 import {
@@ -66,7 +69,8 @@ type SquarePaymentLinkResponse = {
 
 const squareEventStaleProcessingMs = 5 * 60 * 1000;
 
-function publicOrderUrl(orderNumber: string, status: "success" | "cancel") {
+function publicOrderUrl(orderNumber: string, status: "success" | "cancel", galleryPurchase = false) {
+  if (galleryPurchase) return `${publicAppBaseUrl()}/proofs/payment-return?checkout=${status}`;
   const params = new URLSearchParams({
     checkout: status,
     order: orderNumber
@@ -198,6 +202,7 @@ export async function createSquareCheckoutSessionForOrder(orderId: string, siteI
       siteId: currentSiteId
     },
     include: {
+      gallerySelectionPurchase: { select: { id: true } },
       payments: {
         where: { provider: PaymentProvider.SQUARE },
         orderBy: { createdAt: "asc" },
@@ -212,8 +217,12 @@ export async function createSquareCheckoutSessionForOrder(orderId: string, siteI
   }
   if (order.totalCents <= 0) throw new Error("Square checkout requires a positive order total.");
 
+  // Ordinary commerce retains its original payment choice; a gallery renewal
+  // has a new immutable payment attempt and must never reuse an older key.
   const payment =
-    order.payments[0] ||
+    (order.gallerySelectionPurchase
+      ? await prisma.payment.findFirst({ where: { orderId: order.id, provider: PaymentProvider.SQUARE }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] })
+      : order.payments[0]) ||
     (await prisma.payment.create({
       data: {
         amountCents: order.totalCents,
@@ -223,6 +232,7 @@ export async function createSquareCheckoutSessionForOrder(orderId: string, siteI
         status: PaymentStatus.PENDING
       }
     }));
+  if (order.gallerySelectionPurchase) assertGalleryCheckoutCreation(payment);
   const metadata = squareOrderMetadata({
     ...order,
     payments: [payment]
@@ -231,7 +241,7 @@ export async function createSquareCheckoutSessionForOrder(orderId: string, siteI
     body: JSON.stringify({
       checkout_options: {
         accepted_payment_methods: squareAcceptedPaymentMethods(),
-        redirect_url: publicOrderUrl(order.orderNumber, "success")
+        redirect_url: publicOrderUrl(order.orderNumber, "success", Boolean(order.gallerySelectionPurchase))
       },
       description: `Order ${order.orderNumber}`,
       idempotency_key: `order_${order.id}_${payment.id}`,
@@ -263,28 +273,29 @@ export async function createSquareCheckoutSessionForOrder(orderId: string, siteI
     strategy: "square_payment_link"
   } satisfies Prisma.InputJsonObject;
 
-  await prisma.$transaction([
-    prisma.order.update({
-      where: { id: order.id },
-      data: {
-        checkoutUrl: paymentLink.url,
-        notes: order.notes.includes("Square checkout")
-          ? order.notes
-          : `${order.notes ? `${order.notes}\n` : ""}Square checkout link created.`
-      }
-    }),
-    prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        amountCents: order.totalCents,
-        currency: order.currency,
-        externalCheckoutSession: paymentLink.id,
-        externalPaymentId: paymentLink.order_id || payment.externalPaymentId,
-        rawSummary,
-        status: PaymentStatus.PENDING
-      }
-    })
-  ]);
+  const orderCheckoutData = {
+    checkoutUrl: paymentLink.url,
+    notes: order.notes.includes("Square checkout")
+      ? order.notes
+      : `${order.notes ? `${order.notes}\n` : ""}Square checkout link created.`
+  } satisfies Prisma.OrderUpdateManyMutationInput;
+  const paymentCheckoutData = {
+    amountCents: order.totalCents,
+    currency: order.currency,
+    externalCheckoutSession: paymentLink.id,
+    externalPaymentId: paymentLink.order_id || payment.externalPaymentId,
+    rawSummary,
+    status: PaymentStatus.PENDING
+  } satisfies Prisma.PaymentUpdateManyMutationInput;
+  if (order.gallerySelectionPurchase) {
+    await persistGalleryHostedCheckout({ purchaseId: order.gallerySelectionPurchase.id, orderId: order.id, paymentId: payment.id,
+      siteId: order.siteId, orderData: orderCheckoutData, paymentData: paymentCheckoutData });
+  } else {
+    await prisma.$transaction([
+      prisma.order.update({ where: { id: order.id }, data: orderCheckoutData }),
+      prisma.payment.update({ where: { id: payment.id }, data: paymentCheckoutData })
+    ]);
+  }
 
   return prisma.order.findUniqueOrThrow({
     where: { id: order.id },
@@ -550,7 +561,7 @@ async function findSquarePayment(payment: SquarePayment) {
         { externalCheckoutSession: { in: identifiers } }
       ]
     },
-    include: { order: true },
+    include: { order: { include: { gallerySelectionPurchase: { select: { id: true } } } } },
     orderBy: { createdAt: "asc" }
   });
 }
@@ -590,6 +601,11 @@ async function handleSquarePaymentUpdated(event: SquareWebhookEvent, payment: Sq
 
   const orderPayment = await findSquarePayment(payment);
   if (orderPayment) {
+    const checkoutIdentity = metadataObject(metadataObject(orderPayment.rawSummary).checkoutSession ?? null);
+    if (orderPayment.order.gallerySelectionPurchase) {
+      const savedOrderId = typeof checkoutIdentity.orderId === "string" ? checkoutIdentity.orderId : orderPayment.externalPaymentId;
+      requireCheckoutIdentity(Boolean(payment.id) && Boolean(savedOrderId) && payment.order_id === savedOrderId);
+    }
     const paidAmount = payment.total_money?.amount ?? payment.amount_money?.amount;
     const currency = payment.total_money?.currency ?? payment.amount_money?.currency ?? "";
     if (paidAmount !== orderPayment.amountCents) {
@@ -604,7 +620,8 @@ async function handleSquarePaymentUpdated(event: SquareWebhookEvent, payment: Sq
       data: {
         externalPaymentId: payment.id || orderPayment.externalPaymentId,
         hostedReceiptUrl: payment.receipt_url || orderPayment.hostedReceiptUrl,
-        rawSummary: squareEventSummary(event),
+        rawSummary: orderPayment.order.gallerySelectionPurchase ? { ...squareEventSummary(event), checkoutSession: checkoutIdentity } : squareEventSummary(event),
+        providerVerifiedAt: new Date(),
         status: PaymentStatus.PAID
       }
     });
@@ -645,14 +662,16 @@ async function handleSquareRefundUpdated(event: SquareWebhookEvent, refund: Squa
       externalPaymentId: refund.payment_id,
       provider: PaymentProvider.SQUARE
     },
-    include: { order: true }
+    include: { order: { include: { gallerySelectionPurchase: { select: { id: true } } } } }
   });
   if (orderPayment) {
+    await revokeGalleryPurchaseForRefund({ orderId: orderPayment.orderId, siteId: orderPayment.order.siteId,
+      amountCents: refund.amount_money?.amount || 0, currency: refund.amount_money?.currency || "", paymentCurrency: orderPayment.currency });
     const isFullRefund = (refund.amount_money?.amount || 0) >= orderPayment.amountCents;
     await prisma.payment.update({
       where: { id: orderPayment.id },
       data: {
-        rawSummary: squareEventSummary(event),
+        rawSummary: orderPayment.order.gallerySelectionPurchase ? { ...metadataObject(orderPayment.rawSummary), ...squareEventSummary(event) } : squareEventSummary(event),
         status: isFullRefund ? PaymentStatus.REFUNDED : orderPayment.status
       }
     });
@@ -673,7 +692,9 @@ async function handleSquareRefundUpdated(event: SquareWebhookEvent, refund: Squa
       provider: PaymentProvider.SQUARE
     }
   });
-  if (!billingPayment) return;
+  // Refunds can precede the paid event that binds Square payment ID to the local attempt.
+  // Keep this event retryable rather than acknowledging and losing revocation evidence.
+  if (!billingPayment) throw new Error("Square refund payment record not found; retry after payment reconciliation.");
   const isFullRefund = (refund.amount_money?.amount || 0) >= billingPayment.amountCents;
   await prisma.billingPayment.update({
     where: { id: billingPayment.id },
@@ -757,6 +778,8 @@ async function refundSquareGatewayPayment(input: { amountCents?: number; payment
       }),
       method: "POST"
     });
+    if (response.refund?.status === "COMPLETED") await revokeGalleryPurchaseForRefund({ orderId: payment.orderId, siteId: payment.order.siteId,
+      amountCents: response.refund.amount_money?.amount || 0, currency: response.refund.amount_money?.currency || "", paymentCurrency: payment.currency });
     const isFullRefund = amountCents >= payment.amountCents;
     await prisma.payment.update({
       where: { id: payment.id },
@@ -825,3 +848,22 @@ export const squarePaymentGateway: PaymentGateway = {
   supportedWallets: async () => ["APPLE_PAY", "GOOGLE_PAY", "CASH_APP_PAY"] satisfies PaymentWallet[],
   verifyWebhook: ({ rawBody, signature }) => constructSquareWebhookEvent(rawBody, signature)
 };
+
+/** Never delete/cancel an active Square link just to make another checkout. */
+export async function inspectSquareGalleryCheckout(input: GalleryCheckoutIdentity): Promise<GalleryCheckoutInspection> {
+  const credential = await getConnectedGatewayCredential(input.siteId, PaymentProvider.SQUARE);
+  if (!isSquareCredentialUsable(credential)) throw new Error("Square checkout verification is unavailable.");
+  if (!input.externalPaymentId) throw new Error("Square checkout is missing its original order identity.");
+  const response = await squareFetch<{ order?: {
+    id?: string; location_id?: string; state?: string; total_money?: SquareMoney; tenders?: unknown[];
+  } }>(input.siteId, `/v2/orders/${encodeURIComponent(input.externalPaymentId)}`);
+  const order = response.order;
+  requireCheckoutIdentity(order?.id === input.externalPaymentId && order?.location_id === squareLocationId(credential) &&
+    order?.total_money?.amount === input.amountCents && order.total_money.currency?.toUpperCase() === input.currency.toUpperCase());
+  if (order?.tenders?.length) return { state: "WAITING" };
+  if (order?.state === "CANCELED") return { state: "TERMINAL", providerState: "CANCELED" };
+  if (order?.state !== "OPEN" && order?.state !== "DRAFT") return { state: "WAITING" };
+  const link = (await squareFetch<SquarePaymentLinkResponse>(input.siteId, `/v2/online-checkout/payment-links/${encodeURIComponent(input.checkoutSessionId)}`)).payment_link;
+  requireCheckoutIdentity(link?.id === input.checkoutSessionId && link?.order_id === order.id);
+  return { state: "OPEN", checkoutUrl: safeHostedCheckoutUrl(link?.url) };
+}

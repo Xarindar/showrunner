@@ -9,6 +9,7 @@ import { timeToMinutes } from "@/lib/format";
 import { clientStatusValues, defaultClientStatus } from "@/lib/clients/status";
 import { isSafeExternalHttpsUrl } from "@/lib/security/urls";
 import { normalizeThemePrimary } from "@/lib/theme/tokens";
+import { packageExtraPhotoPriceField, packagePhotoAllowanceField } from "@/lib/products/package-selection";
 
 export const maxIntCents = 2_147_483_647;
 export const trimmed = z.string().transform((value) => value.trim());
@@ -310,6 +311,8 @@ export const productFormSchema = z
     summary: optionalStoredText,
     description: optionalStoredText,
     type: z.enum(ProductType).catch(ProductType.PHYSICAL),
+    photoSelectionAllowance: packagePhotoAllowanceField,
+    extraPhotoPrice: packageExtraPhotoPriceField,
     status: z.enum(ProductStatus).catch(ProductStatus.DRAFT),
     basePrice: moneyCents,
     compareAtPrice: optionalMoneyCents,
@@ -343,6 +346,8 @@ export const productUpdateFormSchema = productFormSchema.and(z.object({ id }));
 export const productQuickCreateFormSchema = z.object({
   name: requiredText,
   basePrice: optionalMoneyCents,
+  photoSelectionAllowance: packagePhotoAllowanceField,
+  extraPhotoPrice: packageExtraPhotoPriceField,
   type: z.enum(ProductType).catch(ProductType.PHYSICAL)
 });
 

@@ -1,4 +1,7 @@
 import "server-only";
+import { persistGalleryHostedCheckout } from "@/lib/portfolio/checkout-persistence";
+import { assertGalleryCheckoutCreation, requireCheckoutIdentity, safeHostedCheckoutUrl, type GalleryCheckoutIdentity, type GalleryCheckoutInspection } from "@/lib/portfolio/checkout-recovery-policy";
+import { payPalRefundCaptureId, revokeGalleryPurchaseForRefund } from "@/lib/portfolio/refunds";
 
 import crypto from "node:crypto";
 import {
@@ -130,6 +133,7 @@ type PayPalWebhookEvent = {
     supplementary_data?: {
       related_ids?: {
         order_id?: string;
+        capture_id?: string;
       };
     };
   };
@@ -145,7 +149,8 @@ type PayPalRefundResponse = {
 
 const payPalEventStaleProcessingMs = 5 * 60 * 1000;
 
-function publicOrderUrl(orderNumber: string, status: "success" | "cancel") {
+function publicOrderUrl(orderNumber: string, status: "success" | "cancel", galleryPurchase = false) {
+  if (galleryPurchase) return `${publicAppBaseUrl()}/proofs/payment-return?checkout=${status}`;
   const params = new URLSearchParams({
     checkout: status,
     order: orderNumber
@@ -256,6 +261,7 @@ export async function createPayPalCheckoutSessionForOrder(orderId: string, siteI
       siteId: currentSiteId
     },
     include: {
+      gallerySelectionPurchase: { select: { id: true } },
       payments: {
         where: { provider: PaymentProvider.PAYPAL },
         orderBy: { createdAt: "asc" },
@@ -270,8 +276,12 @@ export async function createPayPalCheckoutSessionForOrder(orderId: string, siteI
   }
   if (order.totalCents <= 0) throw new Error("PayPal checkout requires a positive order total.");
 
+  // Ordinary commerce retains its original payment choice; a gallery renewal
+  // has a new immutable payment attempt and must never reuse an older key.
   const payment =
-    order.payments[0] ||
+    (order.gallerySelectionPurchase
+      ? await prisma.payment.findFirst({ where: { orderId: order.id, provider: PaymentProvider.PAYPAL }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] })
+      : order.payments[0]) ||
     (await prisma.payment.create({
       data: {
         amountCents: order.totalCents,
@@ -281,43 +291,45 @@ export async function createPayPalCheckoutSessionForOrder(orderId: string, siteI
         status: PaymentStatus.PENDING
       }
     }));
+  if (order.gallerySelectionPurchase) assertGalleryCheckoutCreation(payment);
   const paypalOrder = await createPayPalOrder({
     amountCents: order.totalCents,
-    cancelUrl: publicOrderUrl(order.orderNumber, "cancel"),
+    cancelUrl: publicOrderUrl(order.orderNumber, "cancel", Boolean(order.gallerySelectionPurchase)),
     credentials,
     currency: order.currency,
     customId: payment.id,
     description: `Order ${order.orderNumber}`,
-    returnUrl: publicOrderUrl(order.orderNumber, "success")
+    returnUrl: publicOrderUrl(order.orderNumber, "success", Boolean(order.gallerySelectionPurchase))
   });
   const checkoutUrl = approveUrl(paypalOrder);
   if (!paypalOrder.id || !checkoutUrl) throw new Error("PayPal did not return a hosted checkout URL.");
 
-  await prisma.$transaction([
-    prisma.order.update({
-      where: { id: order.id },
-      data: {
-        checkoutUrl,
-        notes: order.notes.includes("PayPal checkout")
-          ? order.notes
-          : `${order.notes ? `${order.notes}\n` : ""}PayPal checkout order created.`
-      }
+  const orderCheckoutData = {
+    checkoutUrl,
+    notes: order.notes.includes("PayPal checkout")
+      ? order.notes
+      : `${order.notes ? `${order.notes}\n` : ""}PayPal checkout order created.`
+  } satisfies Prisma.OrderUpdateManyMutationInput;
+  const paymentCheckoutData = {
+    amountCents: order.totalCents,
+    currency: order.currency,
+    externalCheckoutSession: paypalOrder.id,
+    rawSummary: orderRawSummary({
+      merchantId: credentials.merchantId,
+      order: paypalOrder,
+      strategy: "paypal_order"
     }),
-    prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        amountCents: order.totalCents,
-        currency: order.currency,
-        externalCheckoutSession: paypalOrder.id,
-        rawSummary: orderRawSummary({
-          merchantId: credentials.merchantId,
-          order: paypalOrder,
-          strategy: "paypal_order"
-        }),
-        status: PaymentStatus.PENDING
-      }
-    })
-  ]);
+    status: PaymentStatus.PENDING
+  } satisfies Prisma.PaymentUpdateManyMutationInput;
+  if (order.gallerySelectionPurchase) {
+    await persistGalleryHostedCheckout({ purchaseId: order.gallerySelectionPurchase.id, orderId: order.id, paymentId: payment.id,
+      siteId: order.siteId, orderData: orderCheckoutData, paymentData: paymentCheckoutData });
+  } else {
+    await prisma.$transaction([
+      prisma.order.update({ where: { id: order.id }, data: orderCheckoutData }),
+      prisma.payment.update({ where: { id: payment.id }, data: paymentCheckoutData })
+    ]);
+  }
 
   return prisma.order.findUniqueOrThrow({
     where: { id: order.id },
@@ -544,7 +556,7 @@ async function findPayPalPayment(input: { captureId?: string; customId?: string;
         provider: PaymentProvider.PAYPAL,
         ...candidate
       },
-      include: { order: true },
+      include: { order: { include: { gallerySelectionPurchase: { select: { id: true } } } } },
       orderBy: { createdAt: "asc" }
     });
     if (payment) return payment;
@@ -586,6 +598,10 @@ async function settlePayPalCapture(event: PayPalWebhookEvent, capture: PayPalCap
     orderId
   });
   if (orderPayment) {
+    if (orderPayment.order.gallerySelectionPurchase) {
+      requireCheckoutIdentity(Boolean(capture.id) && orderId === orderPayment.externalCheckoutSession &&
+        (!capture.custom_id || capture.custom_id === orderPayment.id));
+    }
     if (capturedAmount !== orderPayment.amountCents) throw new Error(`PayPal capture amount mismatch for order ${orderPayment.order.orderNumber}.`);
     if (currency.toUpperCase() !== orderPayment.currency.toUpperCase()) throw new Error(`PayPal capture currency mismatch for order ${orderPayment.order.orderNumber}.`);
 
@@ -595,6 +611,7 @@ async function settlePayPalCapture(event: PayPalWebhookEvent, capture: PayPalCap
         externalPaymentId: capture.id || orderPayment.externalPaymentId,
         hostedReceiptUrl: capture.links?.find((link) => link.rel === "up")?.href || orderPayment.hostedReceiptUrl,
         rawSummary: payPalEventSummary(event),
+        providerVerifiedAt: new Date(),
         status: PaymentStatus.PAID
       }
     });
@@ -646,13 +663,15 @@ async function captureApprovedPayPalOrder(event: PayPalWebhookEvent) {
   });
   const capture = captured.purchase_units?.flatMap((unit) => unit.payments?.captures || [])[0];
   if (capture) {
+    requireCheckoutIdentity(captured.id === orderId);
+    const boundCapture = { ...capture, supplementary_data: { ...capture.supplementary_data, related_ids: { ...capture.supplementary_data?.related_ids, order_id: orderId } } };
     await settlePayPalCapture(
       {
         ...event,
         event_type: "PAYMENT.CAPTURE.COMPLETED",
-        resource: capture
+        resource: boundCapture
       },
-      capture
+      boundCapture
     );
   }
 }
@@ -682,15 +701,20 @@ async function handlePayPalPaymentFailed(event: PayPalWebhookEvent) {
     orderId
   });
   if (!orderPayment) return;
-  await prisma.payment.update({
-    where: { id: orderPayment.id },
-    data: {
-      externalPaymentId: resource.id || orderPayment.externalPaymentId,
-      rawSummary: payPalEventSummary(event),
-      status: orderPayment.status === PaymentStatus.PAID || orderPayment.status === PaymentStatus.REFUNDED ? orderPayment.status : PaymentStatus.FAILED
-    }
-  });
-  if (orderPayment.order.status === OrderStatus.DRAFT || orderPayment.order.status === OrderStatus.PENDING) {
+  const failureData = {
+    externalPaymentId: resource.id || orderPayment.externalPaymentId,
+    rawSummary: orderPayment.order.gallerySelectionPurchase && orderPayment.rawSummary && typeof orderPayment.rawSummary === "object" && !Array.isArray(orderPayment.rawSummary)
+      ? { ...orderPayment.rawSummary, ...payPalEventSummary(event) } : payPalEventSummary(event),
+    status: orderPayment.status === PaymentStatus.PAID || orderPayment.status === PaymentStatus.REFUNDED ? orderPayment.status : PaymentStatus.FAILED
+  };
+  if (orderPayment.order.gallerySelectionPurchase) {
+    requireCheckoutIdentity(orderId === orderPayment.externalCheckoutSession && (!resource.custom_id || resource.custom_id === orderPayment.id));
+    await prisma.payment.updateMany({ where: { id: orderPayment.id, status: { notIn: [PaymentStatus.PAID, PaymentStatus.REFUNDED] } }, data: failureData });
+  } else {
+    await prisma.payment.update({ where: { id: orderPayment.id }, data: failureData });
+  }
+  const galleryPurchase = orderPayment.order.gallerySelectionPurchase;
+  if (!galleryPurchase && (orderPayment.order.status === OrderStatus.DRAFT || orderPayment.order.status === OrderStatus.PENDING)) {
     await updateOrderStatus({
       orderId: orderPayment.orderId,
       siteId: orderPayment.order.siteId,
@@ -699,7 +723,28 @@ async function handlePayPalPaymentFailed(event: PayPalWebhookEvent) {
   }
 }
 
+async function revokeRefundedPayPalGallery(event: PayPalWebhookEvent) {
+  const resource = event.resource;
+  if (!resource || resource.status !== "COMPLETED" || amountValueCents(resource.amount?.value) <= 0) return;
+  // The refund resource id/custom_id is not the original capture/payment id.
+  const captureId = payPalRefundCaptureId(resource);
+  if (!captureId) throw new Error("PayPal refund is missing its original capture identity.");
+  const payment = await prisma.payment.findFirst({ where: { provider: PaymentProvider.PAYPAL, externalPaymentId: captureId }, include: { order: true } });
+  if (!payment) {
+    const billingPayment = await prisma.billingPayment.findFirst({ where: { provider: PaymentProvider.PAYPAL, externalPaymentId: captureId }, select: { id: true } });
+    if (billingPayment) return;
+    throw new Error("PayPal capture payment not yet recorded for refund; retry the event.");
+  }
+  await revokeGalleryPurchaseForRefund({ orderId: payment.orderId, siteId: payment.order.siteId,
+    amountCents: amountValueCents(resource.amount?.value), currency: resource.amount?.currency_code || "", paymentCurrency: payment.currency });
+}
+
 async function dispatchPayPalEvent(event: PayPalWebhookEvent) {
+  if (event.event_type === "PAYMENT.CAPTURE.REFUNDED") {
+    await revokeRefundedPayPalGallery(event);
+    return;
+  }
+
   if (event.event_type === "CHECKOUT.ORDER.APPROVED") {
     await captureApprovedPayPalOrder(event);
     return;
@@ -779,6 +824,8 @@ async function refundPayPalGatewayPayment(input: { amountCents?: number; payment
       method: "POST",
       requestId: `paypal_refund_${payment.id}_${amountCents}`
     });
+    if (refund.status === "COMPLETED") await revokeGalleryPurchaseForRefund({ orderId: payment.orderId, siteId: payment.order.siteId,
+      amountCents: amountValueCents(refund.amount?.value), currency: refund.amount?.currency_code || "", paymentCurrency: payment.currency });
     const isFullRefund = amountCents >= payment.amountCents;
     await prisma.payment.update({
       where: { id: payment.id },
@@ -847,3 +894,25 @@ export const paypalPaymentGateway: PaymentGateway = {
   supportedWallets: async () => [],
   verifyWebhook: ({ headers, rawBody }) => constructPayPalWebhookEvent(rawBody, headers || new Headers())
 };
+
+/** An APPROVED/COMPLETED order may still be captured; never replace it. */
+export async function inspectPayPalGalleryCheckout(input: GalleryCheckoutIdentity): Promise<GalleryCheckoutInspection> {
+  const credentials = await requirePayPalCredentials(input.siteId);
+  const order = await paypalFetch<PayPalOrderResponse & {
+    intent?: string;
+    purchase_units?: Array<{ custom_id?: string; amount?: PayPalMoney; payee?: { merchant_id?: string }; payments?: { captures?: Array<{ status?: string }>; authorizations?: Array<{ status?: string }> } }>;
+  }>(credentials, `/v2/checkout/orders/${encodeURIComponent(input.checkoutSessionId)}`);
+  const unit = order.purchase_units?.[0];
+  requireCheckoutIdentity(order.id === input.checkoutSessionId && order.intent === "CAPTURE" && order.purchase_units?.length === 1 &&
+    unit?.custom_id === input.paymentId && /^\d+\.\d{2}$/.test(unit.amount?.value || "") && amountValueCents(unit.amount?.value) === input.amountCents &&
+    unit.amount?.currency_code?.toUpperCase() === input.currency.toUpperCase() &&
+    (!unit.payee?.merchant_id || unit.payee.merchant_id === credentials.merchantId));
+  const payments = [...(unit?.payments?.captures || []), ...(unit?.payments?.authorizations || [])];
+  // Even a failed capture can leave a reusable approved order. Only VOIDED is terminal.
+  if (payments.some(payment => payment.status !== "VOIDED")) return { state: "WAITING" };
+  if (order.status === "VOIDED") return { state: "TERMINAL", providerState: "VOIDED" };
+  if (["CREATED", "SAVED", "PAYER_ACTION_REQUIRED"].includes(order.status || "")) {
+    return { state: "OPEN", checkoutUrl: safeHostedCheckoutUrl(approveUrl(order)) };
+  }
+  return { state: "WAITING" };
+}

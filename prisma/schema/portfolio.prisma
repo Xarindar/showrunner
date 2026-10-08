@@ -54,6 +54,16 @@ model PortfolioGallery {
   id              String                       @id @default(cuid())
   siteId          String
   site            Site                         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  clientId        String?
+  client          Client? @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  packageProductId String?
+  packageProduct Product? @relation(fields: [packageProductId], references: [id], onDelete: Restrict)
+  purchasedOrderId String?
+  purchasedOrder Order? @relation("GalleryPackageOrder", fields: [purchasedOrderId], references: [id], onDelete: Restrict)
+  selectionAllowance Int?
+  extraPhotoPriceCents Int?
+  selectionCurrency String?
+  purchase PortfolioSelectionPurchase?
   photographerId  String?
   photographer    StaffMember?                 @relation(fields: [photographerId], references: [id], onDelete: SetNull)
   slug            String                       @default(cuid())
@@ -86,6 +96,9 @@ model PortfolioGallery {
 
   @@unique([siteId, slug])
   @@index([siteId, status])
+  @@index([siteId, clientId])
+  @@index([packageProductId])
+  @@index([purchasedOrderId])
   @@index([visibility])
   @@index([category])
   @@index([sortOrder])
@@ -97,6 +110,8 @@ model PortfolioGalleryItem {
   galleryId      String
   gallery        PortfolioGallery             @relation(fields: [galleryId], references: [id], onDelete: Cascade)
   mediaAssetId   String?
+  mediaAsset MediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+  purchasedSelections PortfolioPurchasedSelection[]
   type           PortfolioItemType            @default(IMAGE)
   title          String                       @default("")
   caption        String                       @default("")
@@ -258,4 +273,40 @@ model PortfolioProofItemDecision {
   @@index([siteId, galleryId])
   @@index([itemId])
   @@index([status])
+}
+
+// One immutable selection per client shoot; rotating access links never creates a new purchase.
+model PortfolioSelectionPurchase {
+  id String @id @default(cuid())
+  galleryId String @unique
+  gallery PortfolioGallery @relation(fields: [galleryId], references: [id], onDelete: Restrict)
+  siteId String
+  clientId String
+  packageProductId String
+  packageName String
+  allowance Int
+  extraPriceCents Int
+  currency String
+  extraCount Int
+  selectedCount Int
+  totalCents Int
+  orderId String? @unique
+  order Order? @relation("GallerySelectionOrder", fields: [orderId], references: [id], onDelete: Restrict)
+  checkoutStartedAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  selections PortfolioPurchasedSelection[]
+  @@index([siteId, clientId])
+}
+
+model PortfolioPurchasedSelection {
+  id String @id @default(cuid())
+  purchaseId String
+  purchase PortfolioSelectionPurchase @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  itemId String
+  item PortfolioGalleryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  mediaAssetId String
+  mediaAsset MediaAsset @relation("PurchasedMedia", fields: [mediaAssetId], references: [id], onDelete: Restrict)
+  @@unique([purchaseId, itemId])
+  @@index([mediaAssetId])
 }

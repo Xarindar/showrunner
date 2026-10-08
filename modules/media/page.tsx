@@ -4,6 +4,7 @@ import { nonEmptyStringArrayFromUnknown } from "@/lib/format";
 import { globalMediaAssets } from "@/lib/global-media-assets";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl, mediaAssetIdFromUrl } from "@/lib/media";
 import { summarizeMediaTags } from "@/lib/media-tags";
+import { mediaReferenceCount, mediaReferenceCountSelect } from "@/lib/media-usage";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import {
@@ -167,12 +168,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
         where: visibleWhere,
         include: {
           _count: {
-            select: {
-              clientFiles: true,
-              productMedia: true,
-              serviceCategories: true,
-              services: true
-            }
+            select: mediaReferenceCountSelect
           },
           variants: {
             select: { format: true, height: true, sizeBytes: true, type: true, width: true }
@@ -220,7 +216,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
           asset.variants.find((variant) => variant.type === MediaVariantType.HERO) ||
           asset.variants.find((variant) => variant.type === MediaVariantType.CARD) ||
           asset.variants[0];
-        const usageCount = asset._count.clientFiles + asset._count.productMedia + asset._count.serviceCategories + asset._count.services;
+        const usageCount = mediaReferenceCount(asset._count);
         return {
           alt: asset.alt || "",
           caption: asset.caption,

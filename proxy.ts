@@ -13,8 +13,11 @@ function shouldSkip(pathname: string) {
   return /\.[a-z0-9]{2,8}$/i.test(pathname);
 }
 
-function isSensitiveOAuthPath(pathname: string) {
-  return pathname.startsWith("/api/payments/connect/");
+function isSensitiveCapabilityPath(pathname: string) {
+  return pathname.startsWith("/api/payments/connect/")
+    || pathname === "/proofs"
+    || pathname.startsWith("/proofs/")
+    || pathname.startsWith("/api/portfolio/");
 }
 
 function cleanValue(value: string | null) {
@@ -38,15 +41,15 @@ function setAttributionCookie(response: NextResponse, request: NextRequest, name
 }
 
 export function proxy(request: NextRequest) {
-  if (shouldSkip(request.nextUrl.pathname)) return NextResponse.next();
-
-  if (isSensitiveOAuthPath(request.nextUrl.pathname)) {
+  if (isSensitiveCapabilityPath(request.nextUrl.pathname)) {
     const response = NextResponse.next();
     response.headers.set("Cache-Control", "no-store, max-age=0");
     response.headers.set("Pragma", "no-cache");
     response.headers.set("Referrer-Policy", "no-referrer");
     return response;
   }
+
+  if (shouldSkip(request.nextUrl.pathname)) return NextResponse.next();
 
   const requestHeaders = new Headers(request.headers);
   const consent = request.cookies.get(consentCookie)?.value || "unset";
