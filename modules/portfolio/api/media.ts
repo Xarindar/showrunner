@@ -1,7 +1,8 @@
-import { PortfolioGalleryStatus, PortfolioGalleryVisibility } from "@prisma/client";
+import { MediaVariantType, PortfolioGalleryStatus, PortfolioGalleryVisibility } from "@prisma/client";
 import { NextRequest } from "next/server";
-import { mediaDeliveryResponse, normalizeMediaVariantType } from "@/lib/media";
+import { galleryOriginalDeliveryResponse, galleryProofResponse, mediaDeliveryResponse, normalizeMediaVariantType } from "@/lib/media";
 import { findActiveGalleryAccess } from "@/lib/portfolio/access";
+import { authorizeGalleryOriginal } from "@/lib/portfolio/purchases";
 import { prisma } from "@/lib/prisma";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getSiteSettings } from "@/lib/site";
@@ -11,7 +12,7 @@ type GalleryMediaRouteProps = {
 };
 
 function notFound() {
-  return new Response("Not found", { status: 404 });
+  return new Response("Not found", { status: 404, headers: { "cache-control": "private, no-store", "referrer-policy": "no-referrer" } });
 }
 
 export async function GET(request: NextRequest, { params }: GalleryMediaRouteProps) {
@@ -32,6 +33,8 @@ export async function GET(request: NextRequest, { params }: GalleryMediaRoutePro
       gallery: {
         select: {
           id: true,
+          clientId: true,
+          downloadEnabled: true,
           visibility: true
         }
       }
@@ -42,9 +45,11 @@ export async function GET(request: NextRequest, { params }: GalleryMediaRoutePro
 
   const accessToken = request.nextUrl.searchParams.get("access") || request.nextUrl.searchParams.get("token") || "";
   const access = accessToken ? await findActiveGalleryAccess(accessToken, item.gallery.id, settings.siteId) : null;
-  if (item.gallery.visibility !== PortfolioGalleryVisibility.PUBLIC && !access) return notFound();
+  const privateGallery = item.gallery.visibility !== PortfolioGalleryVisibility.PUBLIC || Boolean(item.gallery.clientId);
+  if (privateGallery && !access) return notFound();
+  if (item.gallery.clientId && access?.clientId !== item.gallery.clientId) return notFound();
 
-  if (item.gallery.visibility === PortfolioGalleryVisibility.PUBLIC && !access) {
+  if (!privateGallery && !access) {
     const rateLimitMessage = await publicRateLimitMessage(`gallery_media:${item.gallery.id}:${item.id}`, {
       limit: 4,
       windowMinutes: 10
@@ -68,14 +73,37 @@ export async function GET(request: NextRequest, { params }: GalleryMediaRoutePro
   });
 
   if (!asset || asset.deletedAt) return notFound();
-  if (asset.isPrivate && !access) return notFound();
+  const type = normalizeMediaVariantType(request.nextUrl.searchParams.get("variant"));
+  const download = request.nextUrl.searchParams.get("download") === "1" || type === MediaVariantType.DOWNLOAD;
+
+  if (privateGallery) {
+    // Unsafe legacy/public objects cannot become secure merely by linking them
+    // to a private gallery. They must be re-uploaded to supported private storage.
+    if (!asset.isPrivate || !access) return notFound();
+    if (download) {
+      if (!item.gallery.downloadEnabled || !item.isDownloadable) return notFound();
+      const entitled = await authorizeGalleryOriginal({ siteId: settings.siteId, galleryId: item.gallery.id, itemId: item.id, mediaAssetId: item.mediaAssetId, accessId: access.id });
+      if (!entitled) return notFound();
+      return (await galleryOriginalDeliveryResponse(asset, request)) || notFound();
+    }
+    return (await galleryProofResponse(asset, type)) || notFound();
+  }
+
+  // A public portfolio must never be used to expose a private source, including
+  // when the caller happens to possess an access link for the public gallery.
+  if (asset.isPrivate) return notFound();
+  const privateUsage = await prisma.portfolioGalleryItem.findFirst({
+    where: { mediaAssetId: asset.id, gallery: { OR: [{ visibility: { not: PortfolioGalleryVisibility.PUBLIC } }, { clientId: { not: null } }] } },
+    select: { id: true }
+  });
+  if (privateUsage) return notFound();
+  if (download && (!item.gallery.downloadEnabled || !item.isDownloadable)) return notFound();
 
   const response = await mediaDeliveryResponse({
     asset,
-    download: request.nextUrl.searchParams.get("download") === "1",
-    privateAccess: Boolean(access),
+    download,
     request,
-    type: normalizeMediaVariantType(request.nextUrl.searchParams.get("variant"))
+    type
   });
 
   return response || notFound();

@@ -57,6 +57,7 @@ model Client {
   messageLogs             MessageLog[]
   emailSubscribers        EmailSubscriber[]
   portfolioGalleryAccesses PortfolioGalleryAccess[]
+  shootGalleries PortfolioGallery[]
 
   @@unique([siteId, email])
   @@index([siteId])

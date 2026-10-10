@@ -22,15 +22,24 @@ const nextConfig: NextConfig = {
     root: process.cwd()
   },
   experimental: {
+    // One 25 MiB gallery original plus bounded multipart/action overhead.
+    proxyClientMaxBodySize: "26mb",
     serverActions: {
-      bodySizeLimit: "16mb"
+      bodySizeLimit: "26mb"
     }
   },
   images: {
+    // The optimizer ignores upstream private/no-store and keeps a public cache.
+    // Authenticated media must only use direct, unoptimized delivery routes.
+    localPatterns: [
+      { pathname: "/hero.svg", search: "" },
+      { pathname: "/_next/static/media/**", search: "" }
+    ],
+    maximumRedirects: 0,
     remotePatterns: [
-      { protocol: "https", hostname: "**.r2.cloudflarestorage.com" },
-      { protocol: "https", hostname: "**.cloudflarestorage.com" },
-      { protocol: "https", hostname: "imagedelivery.net" }
+      { protocol: "https", hostname: "**.r2.cloudflarestorage.com", search: "" },
+      { protocol: "https", hostname: "**.cloudflarestorage.com", search: "" },
+      { protocol: "https", hostname: "imagedelivery.net", search: "" }
     ]
   }
 };

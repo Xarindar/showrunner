@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 function mediaPath(input: { accessToken?: string; itemId: string; slug: string; variant: MediaVariantType }) {
   const params = new URLSearchParams({ variant: input.variant });
   if (input.accessToken) params.set("access", input.accessToken);
-  return `/galleries/${encodeURIComponent(input.slug)}/media/${encodeURIComponent(input.itemId)}?${params.toString()}`;
+  return `/api/portfolio/galleries/${encodeURIComponent(input.slug)}/media/${encodeURIComponent(input.itemId)}?${params.toString()}`;
 }
 
 function publicGallerySummary(gallery: {
@@ -38,7 +38,8 @@ export async function listPublicGalleries(siteId: string) {
     where: {
       siteId,
       status: PortfolioGalleryStatus.PUBLISHED,
-      visibility: PortfolioGalleryVisibility.PUBLIC
+      visibility: PortfolioGalleryVisibility.PUBLIC,
+      clientId: null
     },
     orderBy: [{ sortOrder: "asc" }, { publishedAt: "desc" }, { createdAt: "desc" }],
     select: {
@@ -69,7 +70,8 @@ export async function getPublicGallery(input: { accessToken?: string; siteId: st
       }
     }
   });
-  if (!gallery) throw new EmbedRequestError("Gallery not found.", 404);
+  // Client shoots have a dedicated private proof surface and are never public embed content.
+  if (!gallery || gallery.clientId) throw new EmbedRequestError("Gallery not found.", 404);
 
   const access = input.accessToken ? await findActiveGalleryAccess(input.accessToken, gallery.id, input.siteId) : null;
   if (gallery.visibility !== PortfolioGalleryVisibility.PUBLIC && !access) {

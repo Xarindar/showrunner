@@ -20,7 +20,7 @@
 .frame { width: 100%; }
 .mobileFrame { width: 390px; max-width: 100%; }
 .loading { position: absolute; top: 16px; left: 16px; right: 16px; padding: 14px; background: var(--color-surface); color: var(--color-text); z-index: 1; }
-.inspector { width: 340px; flex-shrink: 0; overflow: auto; border-left: 1px solid var(--color-border); background: var(--color-surface); }
+.inspector { position: absolute; right: 0; top: 0; bottom: 0; z-index: 2; width: 340px; flex-shrink: 0; overflow: auto; border-left: 1px solid var(--color-border); background: var(--color-surface); }
 .inspectorHeader { position: sticky; top: 0; z-index: 1; background: var(--color-surface); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; border-bottom: 1px solid var(--color-border); }
 .inspectorHeader h2 { margin: 0; font-size: 16px; }
 .inspector > fieldset { min-width: 0; border: 0; padding: 8px; margin: 0; }

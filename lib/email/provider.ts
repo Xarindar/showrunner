@@ -1,13 +1,14 @@
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
-import type SMTPTransport from "nodemailer/lib/smtp-transport";
+import type Mail from "nodemailer/lib/mailer";
+import type { SMTPPoolOptions, SMTPPoolSentMessageInfo } from "nodemailer/lib/smtp-pool";
 import { positiveIntegerEnv } from "@/lib/env";
 import type { EmailProvider, SendEmailInput } from "./types";
 
-let transport: nodemailer.Transporter<SMTPTransport.SentMessageInfo> | null = null;
+let transport: Mail<SMTPPoolSentMessageInfo, SMTPPoolOptions> | null = null;
 
-type PooledSmtpOptions = SMTPTransport.Options & {
-  pool: boolean;
+type PooledSmtpOptions = SMTPPoolOptions & {
+  pool: true;
   maxConnections: number;
   maxMessages: number;
   connectionTimeout: number;

@@ -6,7 +6,8 @@ import { z } from "zod";
 import { HeroPresentationMode, HeroSlideElementType } from "@prisma/client";
 import { optionalStoredText, parseForm, requiredText } from "@/lib/admin-validation";
 import { getAccessibleMediaWhere, getOwnerStaffIds, requireAdmin, resolveDataScopeMode } from "@/lib/auth";
-import { ensureMediaAssetVariants, mediaTagsFromInput, normalizeMediaFolder, supportsPrivateMediaDriver, uploadMedia } from "@/lib/media";
+import { ensureMediaAssetVariants, mediaAssetIdFromUrl, mediaTagsFromInput, normalizeMediaFolder, supportsPrivateMediaDriver, uploadMedia } from "@/lib/media";
+import { mediaReferenceCount, mediaReferenceCountSelect, unreferencedMediaWhere } from "@/lib/media-usage";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId, getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
 import { defaultHeroSlideFromSettings, heroElementsArray, type HeroElementType } from "@/modules/content/hero-presentation";
@@ -100,7 +101,16 @@ export async function updateMediaAssetAction(formData: FormData) {
   const accessibleWhere = await getAccessibleMediaWhere(user, siteId, { id: input.id });
   const existingAsset = await prisma.mediaAsset.findFirst({
     where: accessibleWhere,
-    select: { driver: true }
+    select: {
+      driver: true,
+      isPrivate: true,
+      clientFiles: { select: { id: true }, take: 1 },
+      purchasedSelections: { select: { id: true }, take: 1 },
+      portfolioItems: {
+        where: { gallery: { OR: [{ visibility: { not: "PUBLIC" } }, { clientId: { not: null } }] } },
+        select: { id: true }, take: 1
+      }
+    }
   });
 
   if (!existingAsset) {
@@ -111,8 +121,22 @@ export async function updateMediaAssetAction(formData: FormData) {
     redirect(`/admin/modules/media?error=${encodeURIComponent("Private media delivery is currently supported only for server assets, S3, or R2 assets.")}`);
   }
 
-  await prisma.mediaAsset.updateMany({
-    where: accessibleWhere,
+  if (input.isPrivate && !existingAsset.isPrivate) {
+    redirect(`/admin/modules/media?error=${encodeURIComponent("A previously public file may still be available from its old URL or cache. Upload a new private copy for secure client delivery.")}`);
+  }
+
+  if (!input.isPrivate && (existingAsset.clientFiles.length || existingAsset.portfolioItems.length || existingAsset.purchasedSelections.length)) {
+    redirect(`/admin/modules/media?error=${encodeURIComponent("This asset belongs to a private client file, shoot, or purchase. Keep it private; upload a separate curated public copy instead.")}`);
+  }
+
+  const updated = await prisma.mediaAsset.updateMany({
+    where: {
+      AND: [accessibleWhere, ...(!input.isPrivate ? [{
+        clientFiles: { none: {} },
+        purchasedSelections: { none: {} },
+        portfolioItems: { none: { gallery: { OR: [{ visibility: { not: "PUBLIC" as const } }, { clientId: { not: null } }] } } }
+      }] : [])]
+    },
     data: {
       alt: input.isDecorative ? "" : input.alt,
       caption: input.caption,
@@ -126,6 +150,7 @@ export async function updateMediaAssetAction(formData: FormData) {
       isPrivate: input.isPrivate
     }
   });
+  if (updated.count !== 1) redirect(`/admin/modules/media?error=${encodeURIComponent("This asset changed or has protected private references. Refresh the library before saving it.")}`);
   const asset = await prisma.mediaAsset.findFirst({
     where: accessibleWhere,
     select: { driver: true, id: true, isPrivate: true, key: true, storageProviderId: true, url: true }
@@ -144,10 +169,20 @@ export async function archiveMediaAssetAction(formData: FormData) {
   const input = await parseForm(mediaArchiveSchema, formData, "/admin/modules/media");
   const siteId = await getCurrentSiteId();
 
-  await prisma.mediaAsset.updateMany({
-    where: await getAccessibleMediaWhere(user, siteId, { id: input.id }),
+  const accessibleWhere = await getAccessibleMediaWhere(user, siteId, { id: input.id });
+  const [asset, settings] = await Promise.all([
+    prisma.mediaAsset.findFirst({ where: accessibleWhere, select: { id: true, _count: { select: mediaReferenceCountSelect } } }),
+    getSiteSettingsForSite(siteId)
+  ]);
+  if (!asset) redirect(`/admin/modules/media?error=${encodeURIComponent("Media asset not found.")}`);
+  if (mediaReferenceCount(asset._count) || [settings.heroImageUrl, settings.logoImageUrl].some((url) => mediaAssetIdFromUrl(url) === asset.id)) {
+    redirect(`/admin/modules/media?error=${encodeURIComponent("This asset is still in use. Remove its gallery, purchase, client file, catalog, or site references before archiving it.")}`);
+  }
+  const archived = await prisma.mediaAsset.updateMany({
+    where: { AND: [accessibleWhere, unreferencedMediaWhere] },
     data: { deletedAt: new Date() }
   });
+  if (archived.count !== 1) redirect(`/admin/modules/media?error=${encodeURIComponent("This asset changed or is still in use. Refresh the library before archiving it.")}`);
 
   refreshMedia();
   redirect("/admin/modules/media?saved=archive");

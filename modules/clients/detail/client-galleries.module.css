@@ -1,0 +1,51 @@
+.body { display: grid; gap: 20px; min-width: 0; }
+.header, .galleryToolbar, .photosHeader, .actions, .terms, .pickerFooter, .pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.actions { justify-content: flex-start; }
+.header h2, .body h3 { margin: 0; }
+.header p { margin-top: 5px; }
+.body h3 { font-size: 1rem; }
+.field { display: grid; gap: 6px; min-width: 0; font-size: 0.875rem; }
+.field > span { font-weight: 600; }
+.field input, .field select { width: 100%; min-width: 0; }
+.field input:focus-visible, .field select:focus-visible, .photo:focus-within, .openLink:focus-visible { outline: 2px solid var(--color-brand, #116466); outline-offset: 3px; }
+.createForm { display: grid; gap: 16px; padding-top: 20px; border-top: 1px solid var(--color-border, #d9dbd6); }
+.termsFields { display: grid; grid-template-columns: 1fr 1fr minmax(80px, 0.5fr); gap: 16px; }
+.help { margin: 0; color: var(--color-muted, #656a65); font-size: 0.875rem; max-width: 75ch; line-height: 1.5; }
+.empty { display: grid; gap: 12px; justify-items: start; padding: 24px 0; color: var(--color-muted, #656a65); }
+.empty p { margin: 0; max-width: 65ch; }
+.galleryToolbar .field { flex: 1 1 260px; max-width: 600px; }
+.terms { align-items: flex-start; gap: 20px; }
+.terms p { display: grid; gap: 5px; margin: 0; font-size: 0.875rem; }
+.terms p > span { color: var(--color-muted, #656a65); }
+.openLink { display: inline-flex; align-items: center; gap: 6px; font-size: 0.875rem; text-underline-offset: 3px; }
+.photoGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.photo { display: flex; flex-direction: column; gap: 5px; min-width: 0; margin: 0; }
+label.photo { cursor: pointer; border: 1px solid var(--color-border, #d9dbd6); border-radius: 6px; padding: 6px; }
+.photo img { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; background: var(--color-surface-sunken, #ecece9); }
+.photoName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; }
+.photo small { overflow-wrap: anywhere; color: var(--color-muted, #656a65); font-size: 0.7rem; }
+.photoChoice { display: flex; gap: 8px; align-items: center; padding-top: 5px; font-size: 0.8rem; }
+.photoChoice input { width: 16px; height: 16px; accent-color: var(--color-brand, #116466); margin: 0; }
+label.selectedPhoto { border-color: var(--color-brand, #116466); background: var(--color-surface-sunken, #ecece9); }
+label.addedPhoto { cursor: default; }
+.status { margin: 0; padding: 20px 0; }
+.pagination { justify-content: center; font-size: 0.8rem; }
+.pagination span { font-variant-numeric: tabular-nums; }
+.uploadSection { display: grid; gap: 14px; border-top: 1px solid var(--color-border, #d9dbd6); padding-top: 20px; }
+.uploadList { list-style: none; padding: 0; margin: 0; max-height: 240px; overflow-y: auto; scrollbar-color: var(--color-border, #d9dbd6) transparent; }
+.uploadList li { display: flex; gap: 10px; flex-wrap: wrap; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--color-border, #d9dbd6); font-size: 0.8rem; }
+.uploadList li > span:last-of-type { display: inline-flex; align-items: center; gap: 4px; }
+.uploadFilename { overflow-wrap: anywhere; min-width: 0; flex: 1 1 200px; }
+.uploadError { flex-basis: 100%; color: var(--color-danger, #b42318); line-height: 1.5; }
+.picker { width: min(1000px, calc(100vw - 32px)); max-width: 1000px; }
+.pickerBody { display: grid; gap: 20px; }
+.search { display: flex; align-items: flex-end; gap: 12px; }
+.search .field { flex: 1; }
+.pickerFooter { position: sticky; bottom: 0; background: var(--color-surface, #fff); border-top: 1px solid var(--color-border, #d9dbd6); padding: 14px 0 0; font-size: 0.875rem; }
+@media (max-width: 600px) {
+  .termsFields { grid-template-columns: 1fr 1fr; }
+  .termsFields .field:last-child { grid-column: 1 / -1; max-width: 140px; }
+  .photoGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .pickerFooter > span { flex-basis: 100%; }
+  .header { align-items: flex-start; }
+}

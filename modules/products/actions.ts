@@ -30,6 +30,7 @@ import { mediaAssetDisplayUrl, uploadMedia } from "@/lib/media";
 import { refundPaymentGatewayPayment } from "@/lib/payments/refunds";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
+import { packageSelectionData } from "@/lib/products/package-selection";
 
 const orderStatusFormSchema = z.object({
   id: requiredText,
@@ -385,6 +386,7 @@ export async function createProductAction(formData: FormData) {
         summary: input.summary,
         description: input.description,
         type: input.type,
+        ...packageSelectionData(input),
         status: input.status,
         basePriceCents: input.basePrice,
         compareAtPriceCents: input.compareAtPrice,
@@ -451,6 +453,7 @@ export async function createProductQuickAction(formData: FormData) {
       slug,
       name: input.name,
       type: input.type,
+      ...packageSelectionData(input),
       status: ProductStatus.DRAFT,
       basePriceCents,
       currency: "USD",
@@ -530,6 +533,7 @@ export async function updateProductAction(formData: FormData) {
         summary: input.summary,
         description: input.description,
         type: input.type,
+        ...packageSelectionData(input),
         status: input.status,
         basePriceCents: input.basePrice,
         compareAtPriceCents: input.compareAtPrice,

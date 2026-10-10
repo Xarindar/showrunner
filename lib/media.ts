@@ -4,11 +4,14 @@ import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { mkdir, readFile, rm, writeFile } from "fs/promises";
 import path from "path";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { MediaDriver, MediaVariantType, type MediaAsset } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import sharp from "sharp";
 import sanitizeHtml from "sanitize-html";
 import { prisma } from "@/lib/prisma";
+import { galleryProofObjectKey, renderGalleryProof } from "@/lib/media-proofs";
+import { unreferencedMediaWhere } from "@/lib/media-usage";
 import { isSafeExternalHttpsUrl } from "@/lib/security/urls";
 import { getCurrentSiteId } from "@/lib/site";
 import { slugify } from "@/lib/slug";
@@ -58,6 +61,7 @@ export type MediaUploadMetadata = {
 export type MediaUploadValidationOptions = {
   allowedMimeTypes?: readonly string[];
   maxBytes?: number;
+  maxPixels?: number;
   requireImage?: boolean;
 };
 
@@ -173,7 +177,12 @@ export function isMediaUploadDriverConfigured(driver: MediaDriver | string) {
 }
 
 export function supportsPrivateMediaDriver(driver: MediaDriver | string) {
-  return driver === MediaDriver.SERVER_ASSETS || driver === MediaDriver.S3 || driver === MediaDriver.R2;
+  if (driver === MediaDriver.SERVER_ASSETS) {
+    const relative = path.relative(path.join(process.cwd(), "public"), serverAssetStorageRoot());
+    // Next serves public/ without calling our authorization routes.
+    return relative.startsWith(`..${path.sep}`) || relative === ".." || path.isAbsolute(relative);
+  }
+  return driver === MediaDriver.S3 || driver === MediaDriver.R2;
 }
 
 function getObjectStorageClient(config: ObjectStorageConfig) {
@@ -332,6 +341,14 @@ async function assertUploadFile(file: File, metadata: MediaUploadMetadata, valid
     throw new Error("The uploaded file contents do not match the selected file type.");
   }
 
+  if (requireImage && validation.maxPixels) {
+    const maxPixels = Math.min(80_000_000, Math.max(1, validation.maxPixels));
+    const dimensions = await sharp(Buffer.from(await file.arrayBuffer()), { animated: false, limitInputPixels: maxPixels }).metadata();
+    if (!dimensions.width || !dimensions.height || dimensions.width * dimensions.height > maxPixels) {
+      throw new Error("The image exceeds the supported pixel dimensions.");
+    }
+  }
+
   return requireImage ? assertAccessibleAlt(metadata) : metadata.alt?.trim() || file.name;
 }
 
@@ -487,6 +504,7 @@ function objectStorageAdapter(driver: ObjectStorageDriver): MediaAdapter {
           Key: key,
           Body: bytes,
           ContentType: file.type || "application/octet-stream",
+          CacheControl: metadata.isPrivate ? "private, no-store" : undefined,
           Metadata: {
             decorative: metadata.isDecorative ? "true" : "false",
             private: metadata.isPrivate ? "true" : "false"
@@ -619,8 +637,8 @@ export async function uploadMedia(
   const currentSiteId = siteId || (await getCurrentSiteId());
   const uploadFile = await sanitizeSvgUpload(file);
 
-  if (metadata.isPrivate && driver !== MediaDriver.S3 && driver !== MediaDriver.R2 && driver !== MediaDriver.SERVER_ASSETS) {
-    throw new Error("Private media delivery is currently supported only for server assets, S3, or R2 assets.");
+  if (metadata.isPrivate && !supportsPrivateMediaDriver(driver)) {
+    throw new Error("Private media needs S3/R2 private storage or a server asset folder outside the public directory.");
   }
 
   const safeAlt = await assertUploadFile(uploadFile, metadata, validation);
@@ -704,11 +722,17 @@ export async function deleteMediaAsset(assetId: string, siteId?: string) {
     });
     if (!asset) return;
 
+    // Only orphan cleanup is allowed here. Remove the database row first so a
+    // failed reference check never deletes the object behind a shared record.
+    const removed = await prisma.mediaAsset.deleteMany({
+      where: { id: asset.id, ...unreferencedMediaWhere }
+    });
+    if (removed.count !== 1) return;
+
     const adapter = getMediaAdapter(asset.driver);
     if (adapter.delete) {
       await adapter.delete({ key: asset.key, storageProviderId: asset.storageProviderId }).catch(() => {});
     }
-    await prisma.mediaAsset.delete({ where: { id: asset.id } });
   } catch {
     // Swallow — orphan cleanup is best-effort and must not throw over the
     // original control flow (e.g. a validation redirect being re-raised).
@@ -892,7 +916,7 @@ async function transformedObjectStorageVariantResponse(
       Bucket: config.bucket,
       Key: variantKey,
       Body: resized.data,
-      CacheControl: "public, max-age=31536000, immutable",
+      CacheControl: asset.isPrivate ? "private, no-store" : "public, max-age=31536000, immutable",
       ContentType: generatedVariantContentType,
       Metadata: {
         generatedBy,
@@ -1106,6 +1130,84 @@ function downloadFilename(filename: string, contentType: string, type: MediaVari
   return `${withoutExtension || "media-asset"}.webp`;
 }
 
+type DeliverableMediaAsset = Pick<MediaAsset, "deletedAt" | "driver" | "filename" | "id" | "isPrivate" | "key" | "mimeType" | "storageProviderId" | "url">;
+const proofJobs = new Map<string, Promise<Buffer | null>>();
+
+/** Only private storage is read. Unsupported or failed proofs never fall back to the original. */
+export async function galleryProofResponse(asset: DeliverableMediaAsset, type: MediaVariantType) {
+  if (asset.deletedAt || !asset.isPrivate || !supportsPrivateMediaDriver(asset.driver) || !allowedImageTypes.has(asset.mimeType)) return null;
+  const size = type === MediaVariantType.THUMBNAIL ? "thumbnail" : "preview";
+  const proofKey = galleryProofObjectKey(asset, size);
+  const jobKey = `${asset.driver}:${proofKey}`;
+  let job = proofJobs.get(jobKey);
+  if (!job) {
+    job = (async () => {
+      const storageDriver = asset.driver === MediaDriver.S3 || asset.driver === MediaDriver.R2 ? asset.driver : null;
+      const existing = storageDriver
+        ? await safeObjectStorageObjectResponse(storageDriver, { key: proofKey, mimeType: generatedVariantContentType })
+        : await serverAssetObjectResponse({ key: proofKey, mimeType: generatedVariantContentType });
+      if (existing?.ok) return responseToBuffer(existing);
+
+      const original = storageDriver
+        ? await safeObjectStorageObjectResponse(storageDriver, asset)
+        : await serverAssetObjectResponse(asset);
+      if (!original?.ok) return null;
+      const rendered = await renderGalleryProof(await responseToBuffer(original), size);
+
+      if (storageDriver) {
+        const config = getObjectStorageConfig(storageDriver);
+        await getObjectStorageClient(config).send(new PutObjectCommand({
+          Bucket: config.bucket,
+          Key: proofKey,
+          Body: rendered.data,
+          CacheControl: "private, no-store",
+          ContentType: generatedVariantContentType,
+          Metadata: { private: "true", watermarked: "true" }
+        }));
+      } else {
+        const target = serverAssetPath(proofKey);
+        await mkdir(path.dirname(target), { recursive: true });
+        await writeFile(target, rendered.data);
+      }
+      return rendered.data;
+    })().catch(() => null);
+    proofJobs.set(jobKey, job);
+  }
+  const bytes = await job;
+  proofJobs.delete(jobKey);
+  if (!bytes) return null;
+  return new Response(new Uint8Array(bytes), {
+    headers: {
+      "cache-control": "private, no-store",
+      "content-type": generatedVariantContentType,
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
+      "x-media-variant": "WATERMARKED_PROOF"
+    }
+  });
+}
+
+/** Call only after current access and an exact paid item entitlement were checked. */
+export async function galleryOriginalDeliveryResponse(asset: DeliverableMediaAsset, request: NextRequest) {
+  if (asset.deletedAt || !asset.isPrivate || !supportsPrivateMediaDriver(asset.driver)) return null;
+  if (asset.driver === MediaDriver.S3 || asset.driver === MediaDriver.R2) {
+    const config = getObjectStorageConfig(asset.driver);
+    if (!isObjectStorageConfigured(config)) return null;
+    const location = await getSignedUrl(getObjectStorageClient(config), new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: asset.key,
+      ResponseCacheControl: "private, no-store",
+      ResponseContentDisposition: `attachment; filename="${safeFilename(asset.filename)}"`,
+      ResponseContentType: asset.mimeType || "application/octet-stream"
+    }), { expiresIn: 60 });
+    return new Response(null, {
+      status: 307,
+      headers: { location, "cache-control": "private, no-store", "referrer-policy": "no-referrer" }
+    });
+  }
+  return mediaDeliveryResponse({ asset, download: true, privateAccess: true, request, type: MediaVariantType.DOWNLOAD });
+}
+
 export async function mediaDeliveryResponse({
   asset,
   download,
@@ -1130,6 +1232,8 @@ export async function mediaDeliveryResponse({
   const contentType = upstream.headers.get("content-type") || asset.mimeType || "application/octet-stream";
   headers.set("content-type", contentType);
   headers.set("x-media-variant", type);
+  headers.set("x-content-type-options", "nosniff");
+  if (privateAccess || asset.isPrivate) headers.set("referrer-policy", "no-referrer");
 
   if (download) {
     headers.set("content-disposition", `attachment; filename="${downloadFilename(asset.filename, contentType, type)}"`);

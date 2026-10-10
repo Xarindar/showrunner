@@ -23,3 +23,5 @@ Keep module headers to one compact line: the name, relevant icon/count, and esse
 
 ## Portfolio
 Portfolio manages public website photo albums for showcasing work. Client image delivery, private access, proofing, approvals and download workflows belong to the future Clients delivery system, not Portfolio. New Portfolio albums are public galleries saved as drafts. Existing private records remain private; no data migration or deletion is implied.
+
+Service/product showcase cards are an opt-in reusable block inside an approved page section. Owners add cards and bind them to existing catalog records, with display-only and approved client style choices. Names, descriptions, media, product pricing and service duration stay in the central catalog. Service actions reuse slug-based booking; product actions require a configured existing client product destination. See developer-docs/showcase-cards.md.

@@ -318,18 +318,19 @@ function MetadataForm({ asset, onArchive }: { asset: MediaLibraryAsset; onArchiv
         <label className={styles.checkRow}>
           <span>
             <strong>Private delivery</strong>
-            <small>Require signed access instead of a public URL.</small>
+            <small>{asset.isPrivate ? "Require signed access instead of a public URL." : "Upload a new private copy to protect a previously public file."}</small>
           </span>
-          <input defaultChecked={asset.isPrivate} name="isPrivate" type="checkbox" />
+          <input defaultChecked={asset.isPrivate} disabled={!asset.isPrivate} name="isPrivate" type="checkbox" />
         </label>
       </div>
 
       <div className={styles.inspectorActions}>
         <Button size="sm" type="submit">Save changes</Button>
-        <Button onClick={onArchive} size="sm" type="button" variant="ghost">
+        <Button disabled={Boolean(asset.usageCount || asset.isHero || asset.isLogo)} onClick={onArchive} size="sm" type="button" variant="ghost">
           <Archive aria-hidden="true" size={14} /> Archive
         </Button>
       </div>
+      {asset.usageCount || asset.isHero || asset.isLogo ? <p className={styles.sectionCopy}>This asset is in use and is protected from archiving. Gallery and purchased photo references are included.</p> : null}
     </form>
   );
 }
@@ -429,7 +430,7 @@ function AssetInspector({ asset, archived, onClose }: { asset: MediaLibraryAsset
 
           {confirmArchive ? (
             <div className={styles.archiveConfirm} role="alert" aria-label={`Archive ${asset.filename}`}>
-              <div><Trash2 aria-hidden="true" size={18} /><span><strong>Archive this asset?</strong><small>It will disappear from active pickers. Existing uses may still reference it.</small></span></div>
+              <div><Trash2 aria-hidden="true" size={18} /><span><strong>Archive this asset?</strong><small>It will disappear from active pickers. Assets still in use cannot be archived.</small></span></div>
               <div>
                 <Button onClick={() => setConfirmArchive(false)} size="sm" type="button" variant="ghost">Cancel</Button>
                 <form action={archiveMediaAssetAction}>

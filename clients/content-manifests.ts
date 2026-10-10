@@ -28,3 +28,7 @@ export function resolveContentManifest(siteId: string, publicContentConfig: unkn
   const config = publicContentConfig as { profiles?: Record<string, unknown> } | null;
   return config?.profiles?.cottage616 || config?.profiles?.["the-hive"] ? cottageContentManifest : defaultContentManifest;
 }
+
+export function contentWebsiteUrl(manifest: ContentManifest) {
+  return manifest.id === "cottage616" ? process.env.CONTENT_PREVIEW_URL || manifest.previewUrl : manifest.previewUrl;
+}

@@ -1,3 +1,5 @@
+import { catalogMediaUrl } from "@/lib/catalog-media-url";
+import { contentWebsiteUrl, resolveContentManifest } from "@/clients/content-manifests";
 import NextImage from "next/image";
 import { notFound } from "next/navigation";
 import { MediaVariantType, type Prisma } from "@prisma/client";
@@ -363,7 +365,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     id: asset.id,
     thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD)
   }));
-  const serviceImageUrl = serviceMediaUrl(service);
+  const serviceImageUrl = catalogMediaUrl(serviceMediaUrl(service), contentWebsiteUrl(resolveContentManifest(settings.siteId, settings.publicContentConfig)));
   const serviceImageAlt = `${service.name} booking image`;
   const serviceImageUploadFormId = `service-${service.id}-image-upload`;
   const serviceImageAttachFormId = `service-${service.id}-image-attach`;

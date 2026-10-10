@@ -71,11 +71,11 @@ The editor inherits the existing sans stack through `--font-sans` (the base them
 
 The expanded desktop admin navigation occupies (240px). Above (860px), its collapse control reduces it to a (52px) rail containing only the expand control; the preference persists across visits. Mobile retains the existing navigation drawer. The editor fills the remaining viewport height, with a wrapping toolbar of at least (60px), a flexible central canvas, and a compact footer. The website iframe fills the canvas; mobile preview centers a (390px) iframe constrained to the available width.
 
-Selecting a fixed website section opens a right inspector; closing it returns the width to the canvas. The inspector scrolls independently. At (1050px) and below, toolbar spacing tightens, save status hides, and the inspector narrows to (310px). At (860px) and below, the editor accounts for the mobile shell header, the title wraps onto its own row, history controls hide, and the inspector overlays the canvas at `min(340px, 92%)`. The footer section selector remains an alternative to clicking the website.
+Selecting a fixed website section opens a right inspector over the canvas. Opening or closing it preserves the iframe viewport width, so desktop pages keep their desktop layout. The inspector scrolls independently. At (1050px) and below, toolbar spacing tightens, save status hides, and the inspector narrows to (310px). At (860px) and below, the editor accounts for the mobile shell header, the title wraps onto its own row, history controls hide, and the inspector overlays the canvas at `min(340px, 92%)`. The footer section selector remains an alternative to clicking the website.
 
 ## Elevation & Depth
 
-The editor uses white and sunken surfaces separated by thin borders. The canvas and desktop inspector have no decorative card elevation. Only the mobile inspector uses a lateral shadow (`-6px 0 24px #0002`) to distinguish its overlay from the website beneath it.
+The editor uses white and sunken surfaces separated by thin borders. The canvas and desktop inspector have no decorative card elevation. The mobile inspector uses a lateral shadow (`-6px 0 24px #0002`) to distinguish its overlay from the website beneath it.
 
 ## Shapes
 
