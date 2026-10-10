@@ -480,7 +480,7 @@ function objectStorageAdapter(driver: ObjectStorageDriver): MediaAdapter {
       );
     },
     generateVariantUrl: (asset, type) => {
-      if (asset.isPrivate) return appMediaRoute(asset.id, type);
+      if (asset.isPrivate || generatedImageVariantTypes.has(type)) return appMediaRoute(asset.id, type);
       if (asset.url && !asset.url.startsWith("/api/media/assets/")) return asset.url;
       return appMediaRoute(asset.id, type);
     },

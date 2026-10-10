@@ -8,33 +8,29 @@ export const manifest = {
   icon: "Image",
   order: 120,
   navigation: { category: "website" },
-  description: "Photography galleries, proofing records, access links, and image delivery settings.",
+  description: "Photo albums and galleries for showcasing work on the website.",
   layout: "wide",
   status: "active",
   enabledByDefault: true,
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Gallery administration, access records, proofing data, signed image variants, downloads, and ZIP delivery bundles are live.",
-    primaryGap: "The public gallery experience is being rebuilt in the new clients surface."
+    summary: "Website albums, photo uploads, gallery layouts, and image previews are available.",
+    primaryGap: "Website gallery widgets and lightbox integration are still planned."
   },
   capabilities: [
-    { label: "Gallery admin", status: "foundation" },
-    { label: "Access-token delivery", status: "live" },
-    { label: "Proofing favorites", status: "live" },
-    { label: "Comments and approvals", status: "live" },
-    { label: "Gallery widgets and lightbox", status: "planned" },
+    { label: "Website photo albums", status: "live" },
+    { label: "Photo uploads and previews", status: "live" },
     { label: "Selectable gallery layouts", status: "live" },
-    { label: "Signed image variants", status: "live" },
-    { label: "ZIP delivery bundles", status: "live" }
+    { label: "Gallery widgets and lightbox", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/portfolio"],
   publicRoutes: ["/api/public/v1/galleries", "/api/public/v1/galleries/[slug]"],
-  dependencies: ["media", "clients"],
-  dataModels: ["PortfolioGallery", "PortfolioGalleryItem", "PortfolioGalleryAccess", "PortfolioGalleryFavorite", "PortfolioGalleryLayout"],
+  dependencies: ["media"],
+  dataModels: ["PortfolioGallery", "PortfolioGalleryItem", "PortfolioGalleryLayout"],
   permissions: ["portfolio:manage"],
   settingsSections: ["Portfolio", "Media"],
-  healthChecks: ["published-galleries", "private-access-records"],
+  healthChecks: [],
   dataScope: {
     ownerKind: "staff-field",
     ownerField: "photographerId",

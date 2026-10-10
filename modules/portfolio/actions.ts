@@ -1,24 +1,21 @@
 "use server";
 
-import { randomUUID } from "crypto";
 import {
-  MediaVariantType,
   PortfolioGalleryLayout,
-  PortfolioAccessStatus,
   PortfolioGalleryStatus,
   PortfolioGalleryVisibility,
   PortfolioItemType,
-  PortfolioProofRoundStatus,
   Prisma
 } from "@prisma/client";
-import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { parseForm } from "@/lib/admin-validation";
-import { getAccessibleClientWhere, getAccessibleGalleryWhere, getAccessibleMediaWhere, getOwnerStaffIds, requireAdmin, resolveDataScopeMode } from "@/lib/auth";
+import { getAccessibleGalleryWhere, getAccessibleMediaWhere, getOwnerStaffIds, requireAdmin, resolveDataScopeMode } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getCurrentSiteId } from "@/lib/site";
+import { getCurrentSiteId, getSiteSettings } from "@/lib/site";
+import { albumPhotoError } from "./album-upload";
+import { deleteMediaAsset, uploadMedia } from "@/lib/media";
 import { slugify } from "@/lib/slug";
 
 const trimmed = z.string().transform((value) => value.trim());
@@ -47,7 +44,6 @@ const gallerySchema = z.object({
   slug: optionalStoredText,
   description: optionalStoredText,
   status: z.enum(PortfolioGalleryStatus).catch(PortfolioGalleryStatus.DRAFT),
-  visibility: z.enum(PortfolioGalleryVisibility).catch(PortfolioGalleryVisibility.PUBLIC),
   layout: z.enum(PortfolioGalleryLayout).catch(PortfolioGalleryLayout.GRID),
   category: optionalStoredText,
   coverImageUrl: optionalUrlOrPath,
@@ -55,10 +51,6 @@ const gallerySchema = z.object({
   shotAt: optionalDate,
   seoTitle: optionalStoredText,
   seoDescription: optionalStoredText,
-  proofingEnabled: z.literal("on").optional(),
-  downloadEnabled: z.literal("on").optional(),
-  accessCode: optionalStoredText,
-  rightsNotes: optionalStoredText,
   sortOrder: optionalSortOrder
 });
 
@@ -77,48 +69,18 @@ const galleryItemSchema = z
   .object({
     galleryId: requiredText,
     mediaAssetId: optionalStoredText,
-    type: z.enum(PortfolioItemType).catch(PortfolioItemType.IMAGE),
     title: optionalStoredText,
     caption: optionalStoredText,
     altText: optionalStoredText,
     imageUrl: optionalUrlOrPath,
-    thumbnailUrl: optionalUrlOrPath,
+    thumbnailUrl: optionalUrlOrPath.prefault(""),
     sortOrder: optionalSortOrder,
-    isCover: z.literal("on").optional(),
-    isDownloadable: z.literal("on").optional(),
-    isWatermarked: z.literal("on").optional(),
-    licenseNotes: optionalStoredText
+    isCover: z.literal("on").optional()
   })
   .refine((value) => value.mediaAssetId || value.imageUrl, {
     message: "Choose a media asset or provide a URL.",
     path: ["imageUrl"]
   });
-
-const accessSchema = z.object({
-  galleryId: requiredText,
-  clientId: optionalStoredText,
-  recipientEmail: z.email().transform((value) => value.trim().toLowerCase()),
-  accessToken: optionalStoredText,
-  expiresAt: optionalDate
-});
-
-const accessStatusSchema = z.object({
-  id: requiredText,
-  status: z.enum(PortfolioAccessStatus)
-});
-
-const proofRoundSchema = z.object({
-  dueAt: optionalDate,
-  galleryId: requiredText,
-  instructions: optionalStoredText,
-  title: optionalStoredText
-});
-
-const proofRoundStatusSchema = z.object({
-  confirmTransition: z.literal("on").optional(),
-  id: requiredText,
-  status: z.enum(PortfolioProofRoundStatus)
-});
 
 async function generateUniquePortfolioSlug(input: { title: string; slug?: string; siteId: string; exceptId?: string }) {
   const siteId = input.siteId;
@@ -163,23 +125,12 @@ function galleryRedirect(galleryId: string, saved: string) {
   redirect(`/admin/modules/portfolio?saved=${saved}&gallery=${galleryId}`);
 }
 
-async function nextProofRoundNumber(galleryId: string) {
-  const latest = await prisma.portfolioProofRound.findFirst({
-    where: { galleryId },
-    orderBy: { roundNumber: "desc" },
-    select: { roundNumber: true }
-  });
-
-  return (latest?.roundNumber || 0) + 1;
-}
-
 export async function createPortfolioGalleryAction(formData: FormData) {
   const user = await requireAdmin("portfolio:manage");
   const input = await parseForm(gallerySchema, formData, "/admin/modules/portfolio");
   const siteId = await getCurrentSiteId();
   const photographerId = await scopedPortfolioOwnerId(user, siteId);
   const slug = await generateUniquePortfolioSlug({ title: input.title, slug: input.slug, siteId });
-  const accessCodeHash = input.accessCode ? await bcrypt.hash(input.accessCode, 12) : "";
 
   try {
     const gallery = await prisma.portfolioGallery.create({
@@ -190,7 +141,7 @@ export async function createPortfolioGalleryAction(formData: FormData) {
         title: input.title,
         description: input.description,
         status: input.status,
-        visibility: input.visibility,
+        visibility: PortfolioGalleryVisibility.PUBLIC,
         layout: input.layout,
         category: input.category,
         coverImageUrl: input.coverImageUrl,
@@ -198,22 +149,8 @@ export async function createPortfolioGalleryAction(formData: FormData) {
         shotAt: input.shotAt,
         seoTitle: input.seoTitle,
         seoDescription: input.seoDescription,
-        proofingEnabled: input.proofingEnabled === "on",
-        downloadEnabled: input.downloadEnabled === "on",
-        accessCodeHash,
-        rightsNotes: input.rightsNotes,
         sortOrder: input.sortOrder,
-        publishedAt: input.status === PortfolioGalleryStatus.PUBLISHED ? new Date() : undefined,
-        proofRounds:
-          input.proofingEnabled === "on"
-            ? {
-                create: {
-                  siteId,
-                  roundNumber: 1,
-                  title: "Round 1"
-                }
-              }
-            : undefined
+        publishedAt: input.status === PortfolioGalleryStatus.PUBLISHED ? new Date() : undefined
       }
     });
 
@@ -262,88 +199,6 @@ export async function updatePortfolioGalleryLayoutAction(formData: FormData) {
   galleryRedirect(input.id, "layout");
 }
 
-export async function createPortfolioProofRoundAction(formData: FormData) {
-  const user = await requireAdmin("portfolio:manage");
-  const input = await parseForm(proofRoundSchema, formData, "/admin/modules/portfolio");
-  const siteId = await getCurrentSiteId();
-  const gallery = await prisma.portfolioGallery.findFirst({
-    where: await getAccessibleGalleryWhere(user, siteId, { id: input.galleryId }),
-    select: { id: true, proofingEnabled: true }
-  });
-
-  if (!gallery) {
-    redirect(`/admin/modules/portfolio?error=${encodeURIComponent("Gallery not found.")}`);
-  }
-
-  if (!gallery.proofingEnabled) {
-    redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Enable proofing before starting a revision round.")}`);
-  }
-
-  const openRound = await prisma.portfolioProofRound.findFirst({
-    where: {
-      galleryId: gallery.id,
-      status: PortfolioProofRoundStatus.OPEN
-    },
-    select: { id: true }
-  });
-
-  if (openRound) {
-    redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Lock or approve the open round before starting another revision round.")}`);
-  }
-
-  const roundNumber = await nextProofRoundNumber(gallery.id);
-  await prisma.portfolioProofRound.create({
-    data: {
-      siteId,
-      galleryId: gallery.id,
-      roundNumber,
-      title: input.title || `Round ${roundNumber}`,
-      instructions: input.instructions,
-      dueAt: input.dueAt
-    }
-  });
-
-  refreshPortfolio();
-  galleryRedirect(gallery.id, "round");
-}
-
-export async function updatePortfolioProofRoundStatusAction(formData: FormData) {
-  const user = await requireAdmin("portfolio:manage");
-  const input = await parseForm(proofRoundStatusSchema, formData, "/admin/modules/portfolio");
-  const siteId = await getCurrentSiteId();
-  const galleryWhere = await getAccessibleGalleryWhere(user, siteId);
-  const round = await prisma.portfolioProofRound.findFirst({
-    where: { id: input.id, siteId, gallery: galleryWhere },
-    select: { galleryId: true, status: true }
-  });
-
-  if (!round) {
-    redirect(`/admin/modules/portfolio?error=${encodeURIComponent("Proofing round not found.")}`);
-  }
-
-  const confirmStatuses: PortfolioProofRoundStatus[] = [
-    PortfolioProofRoundStatus.APPROVED,
-    PortfolioProofRoundStatus.CHANGES_REQUESTED,
-    PortfolioProofRoundStatus.LOCKED
-  ];
-  const needsConfirm = confirmStatuses.includes(input.status);
-
-  if (needsConfirm && input.confirmTransition !== "on") {
-    redirect(`/admin/modules/portfolio?gallery=${round.galleryId}&error=${encodeURIComponent("Confirm the proofing status change before saving it.")}`);
-  }
-
-  await prisma.portfolioProofRound.updateMany({
-    where: { id: input.id, siteId, gallery: galleryWhere },
-    data: {
-      status: input.status,
-      closedAt: input.status === PortfolioProofRoundStatus.OPEN ? null : new Date()
-    }
-  });
-
-  refreshPortfolio();
-  galleryRedirect(round.galleryId, "round");
-}
-
 export async function addPortfolioGalleryItemAction(formData: FormData) {
   const user = await requireAdmin("portfolio:manage");
   const input = await parseForm(galleryItemSchema, formData, "/admin/modules/portfolio");
@@ -360,12 +215,20 @@ export async function addPortfolioGalleryItemAction(formData: FormData) {
   const asset = input.mediaAssetId
     ? await prisma.mediaAsset.findFirst({
         where: await getAccessibleMediaWhere(user, siteId, { id: input.mediaAssetId }),
-        select: { alt: true, deletedAt: true, filename: true, id: true, isDecorative: true, isPrivate: true, url: true }
+        select: { alt: true, deletedAt: true, filename: true, id: true, isDecorative: true, isPrivate: true, mimeType: true, url: true }
       })
     : null;
 
+  if (input.mediaAssetId && !asset) {
+    redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=Choose%20an%20accessible%20media%20asset.`);
+  }
+
   if (asset?.deletedAt) {
     redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Choose an active media asset.")}`);
+  }
+
+  if (asset && !asset.mimeType.startsWith("image/")) {
+    redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=Choose%20an%20image%20for%20the%20website%20gallery.`);
   }
 
   const imageUrl = input.imageUrl || asset?.url || "";
@@ -380,23 +243,20 @@ export async function addPortfolioGalleryItemAction(formData: FormData) {
   }
 
   if (asset?.isPrivate && gallery.visibility === PortfolioGalleryVisibility.PUBLIC) {
-    redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Private media assets require a private or password gallery.")}`);
+    redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Choose a public image for the website gallery.")}`);
   }
 
   const itemData = {
     galleryId: input.galleryId,
     mediaAssetId: input.mediaAssetId || undefined,
-    type: input.type,
+    type: PortfolioItemType.IMAGE,
     title: input.title,
     caption: input.caption,
     altText,
     imageUrl,
     thumbnailUrl: input.thumbnailUrl || imageUrl,
     sortOrder: input.sortOrder,
-    isCover: input.isCover === "on",
-    isDownloadable: input.isDownloadable === "on",
-    isWatermarked: input.isWatermarked === "on",
-    licenseNotes: input.licenseNotes
+    isCover: input.isCover === "on"
   };
 
   if (itemData.isCover) {
@@ -405,13 +265,11 @@ export async function addPortfolioGalleryItemAction(formData: FormData) {
         where: { galleryId: input.galleryId },
         data: { isCover: false }
       });
-      const created = await tx.portfolioGalleryItem.create({ data: itemData });
+      await tx.portfolioGalleryItem.create({ data: itemData });
       await tx.portfolioGallery.update({
         where: { id: input.galleryId },
         data: {
-          coverImageUrl: input.mediaAssetId
-            ? `/galleries/${encodeURIComponent(gallery.slug)}/media/${encodeURIComponent(created.id)}?variant=${MediaVariantType.HERO}`
-            : imageUrl
+          coverImageUrl: asset?.url || imageUrl
         }
       });
     });
@@ -423,62 +281,92 @@ export async function addPortfolioGalleryItemAction(formData: FormData) {
   galleryRedirect(input.galleryId, "item");
 }
 
-export async function createPortfolioAccessAction(formData: FormData) {
+export async function updatePortfolioGallerySettingsAction(formData: FormData) {
   const user = await requireAdmin("portfolio:manage");
-  const input = await parseForm(accessSchema, formData, "/admin/modules/portfolio");
+  const returnPath = "/admin/modules/portfolio?gallery=" + encodeURIComponent(String(formData.get("id") || ""));
+  const input = await parseForm(z.object({
+    id: requiredText,
+    title: requiredText.pipe(z.string().max(180)),
+    layout: z.enum(PortfolioGalleryLayout),
+    published: z.literal("on").optional()
+  }), formData, returnPath);
   const siteId = await getCurrentSiteId();
-  const gallery = await prisma.portfolioGallery.findFirst({
-    where: await getAccessibleGalleryWhere(user, siteId, { id: input.galleryId }),
-    select: { siteId: true }
-  });
-  if (!gallery) {
-    redirect(`/admin/modules/portfolio?error=${encodeURIComponent("Gallery not found.")}`);
-  }
-  if (input.clientId) {
-    const client = await prisma.client.findFirst({
-      where: await getAccessibleClientWhere(user, siteId, { id: input.clientId }),
-      select: { id: true }
-    });
-    if (!client) {
-      redirect(`/admin/modules/portfolio?gallery=${input.galleryId}&error=${encodeURIComponent("Client not found.")}`);
-    }
-  }
-
-  await prisma.portfolioGalleryAccess.create({
-    data: {
-      siteId: gallery.siteId,
-      galleryId: input.galleryId,
-      clientId: input.clientId || undefined,
-      recipientEmail: input.recipientEmail,
-      accessToken: input.accessToken || randomUUID(),
-      expiresAt: input.expiresAt
-    }
-  });
-
+  const where = await getAccessibleGalleryWhere(user, siteId, { id: input.id });
+  const gallery = await prisma.portfolioGallery.findFirst({ where, select: { status: true, publishedAt: true } });
+  if (!gallery) redirect("/admin/modules/portfolio?error=Album%20not%20found.");
+  const status = gallery.status === PortfolioGalleryStatus.ARCHIVED ? gallery.status
+    : input.published === "on" ? PortfolioGalleryStatus.PUBLISHED : PortfolioGalleryStatus.DRAFT;
+  await prisma.portfolioGallery.updateMany({ where, data: {
+    title: input.title,
+    layout: input.layout,
+    status,
+    publishedAt: status === PortfolioGalleryStatus.PUBLISHED ? gallery.publishedAt || new Date() : undefined
+  } });
   refreshPortfolio();
-  galleryRedirect(input.galleryId, "access");
+  galleryRedirect(input.id, "settings");
 }
 
-export async function updatePortfolioAccessStatusAction(formData: FormData) {
+
+export async function renamePortfolioAlbumAction(formData: FormData) {
   const user = await requireAdmin("portfolio:manage");
-  const input = await parseForm(accessStatusSchema, formData, "/admin/modules/portfolio");
+  const input = await parseForm(z.object({ id: requiredText, title: requiredText.pipe(z.string().max(180)) }), formData, "/admin/modules/portfolio");
   const siteId = await getCurrentSiteId();
-  const galleryWhere = await getAccessibleGalleryWhere(user, siteId);
-
-  const access = await prisma.portfolioGalleryAccess.findFirst({
-    where: { id: input.id, siteId, gallery: galleryWhere },
-    select: { galleryId: true }
+  const result = await prisma.portfolioGallery.updateMany({
+    where: await getAccessibleGalleryWhere(user, siteId, { id: input.id }), data: { title: input.title }
   });
-
-  if (!access) {
-    redirect(`/admin/modules/portfolio?error=${encodeURIComponent("Access link not found.")}`);
-  }
-
-  await prisma.portfolioGalleryAccess.updateMany({
-    where: { id: input.id, siteId, gallery: galleryWhere },
-    data: { status: input.status }
-  });
-
+  if (!result.count) redirect("/admin/modules/portfolio?error=Album%20not%20found.");
   refreshPortfolio();
-  redirect(`/admin/modules/portfolio?saved=access&gallery=${access.galleryId}`);
+  galleryRedirect(input.id, "title");
+}
+
+export async function uploadPortfolioPhotoAction(formData: FormData): Promise<{ error?: string }> {
+  const user = await requireAdmin("portfolio:manage");
+  await requireAdmin("media:manage");
+  const settings = await getSiteSettings();
+  const galleryId = String(formData.get("galleryId") || "");
+  const gallery = await prisma.portfolioGallery.findFirst({
+    where: await getAccessibleGalleryWhere(user, settings.siteId, { id: galleryId }),
+    select: { id: true, title: true, visibility: true }
+  });
+  if (!gallery) return { error: "Album not found." };
+  const file = formData.get("file");
+  if (!(file instanceof File)) return { error: "Choose a photo to upload." };
+  const validationError = albumPhotoError(file);
+  if (validationError) return { error: validationError };
+  const staffIds = await getOwnerStaffIds(user, settings.siteId);
+  if ((await resolveDataScopeMode(user, settings.siteId, "media")) === "OWN" && !staffIds.length) {
+    return { error: "Create your staff profile before uploading photos." };
+  }
+  let asset: Awaited<ReturnType<typeof uploadMedia>>;
+  try {
+    asset = await uploadMedia(file, {
+      alt: `${gallery.title} — ${file.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ")}`,
+      folder: "portfolio", tags: [gallery.title], usageContext: "Photo album",
+      isPrivate: gallery.visibility !== PortfolioGalleryVisibility.PUBLIC, uploadedByStaffId: staffIds[0]
+    }, settings.mediaDriver, settings.siteId, { requireImage: true });
+  } catch (error) {
+    console.error("Album photo upload failed", error);
+    return { error: "This photo could not be uploaded. Check the image and media storage settings, then retry." };
+  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      const latest = await tx.portfolioGalleryItem.aggregate({ where: { galleryId }, _max: { sortOrder: true } });
+      const cover = await tx.portfolioGallery.updateMany({
+        where: { id: galleryId, siteId: settings.siteId, coverImageUrl: "" },
+        data: { coverImageUrl: asset.url }
+      });
+      await tx.portfolioGalleryItem.create({ data: {
+        galleryId, mediaAssetId: asset.id, type: PortfolioItemType.IMAGE,
+        title: file.name, altText: asset.alt || gallery.title, imageUrl: asset.url,
+        thumbnailUrl: asset.url, sortOrder: (latest._max.sortOrder ?? -10) + 10, isCover: cover.count > 0
+      } });
+    });
+  } catch (error) {
+    await deleteMediaAsset(asset.id, settings.siteId);
+    console.error("Album attachment failed", error);
+    return { error: "The photo could not be added to this album. Please retry." };
+  }
+  refreshPortfolio();
+  revalidatePath("/admin/modules/media");
+  return {};
 }

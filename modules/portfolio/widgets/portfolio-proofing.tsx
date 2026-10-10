@@ -3,61 +3,34 @@ import { prisma } from "@/lib/prisma";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
 import { widgetItemLimit, widgetShortDateLabel } from "@/shell/dashboard-widget-utils";
 
-export const portfolioProofingWidget = {
+export const portfolioGalleriesWidget = {
   defaultSize: "md",
-  description: "Open proofing rounds and published gallery coverage.",
+  description: "Published website galleries and albums in progress.",
+  // Keep the stored widget ID so existing dashboard placements continue to work.
   id: "portfolio.proofing",
   moduleId: "portfolio",
   sizes: ["sm", "md", "lg"],
-  title: "Portfolio proofing",
+  title: "Portfolio galleries",
   async render({ preview, siteId, size, timezone }) {
-    if (preview) {
-      return (
-        <>
-          <DashboardMetric detail="14 published galleries" label="Open proof rounds" value={3} />
-          <DashboardSegmentBar
-            items={[
-              { label: "Published", tone: "positive", value: 14 },
-              { label: "In proofing", tone: "attention", value: 3 }
-            ]}
-          />
-        </>
-      );
-    }
-
-    const limit = size === "lg" ? 2 : widgetItemLimit(size);
-    const [publishedGalleries, openRounds, recentRounds] = await Promise.all([
-      prisma.portfolioGallery.count({ where: { siteId, status: "PUBLISHED" } }),
-      prisma.portfolioProofRound.count({ where: { siteId, status: { in: ["OPEN", "CHANGES_REQUESTED"] } } }),
-      prisma.portfolioProofRound.findMany({
-        include: { gallery: true },
-        orderBy: { updatedAt: "desc" },
-        take: limit,
-        where: { siteId, status: { in: ["OPEN", "CHANGES_REQUESTED"] } }
-      })
+    if (preview) return <>
+      <DashboardMetric detail="3 draft albums" label="Published galleries" value={14} />
+      <DashboardSegmentBar items={[{ label: "Published", tone: "positive", value: 14 }, { label: "Draft", tone: "attention", value: 3 }]} />
+    </>;
+    const [published, drafts, recentGalleries] = await Promise.all([
+      prisma.portfolioGallery.count({ where: { siteId, visibility: "PUBLIC", status: "PUBLISHED" } }),
+      prisma.portfolioGallery.count({ where: { siteId, visibility: "PUBLIC", status: "DRAFT" } }),
+      size === "lg" ? prisma.portfolioGallery.findMany({
+        where: { siteId, visibility: "PUBLIC", status: { in: ["DRAFT", "PUBLISHED"] } },
+        orderBy: { updatedAt: "desc" }, take: widgetItemLimit(size),
+        select: { id: true, title: true, status: true, updatedAt: true }
+      }) : []
     ]);
-
-    return (
-      <>
-        <DashboardMetric detail={`${publishedGalleries} published galleries`} label="Open proof rounds" value={openRounds} />
-        <DashboardSegmentBar
-          items={[
-            { label: "Published", tone: "positive", value: publishedGalleries },
-            { label: "In proofing", tone: "attention", value: openRounds }
-          ]}
-        />
-        {size === "lg" ? (
-          <DashboardCardList
-            empty="No proof rounds are open."
-            items={recentRounds.map((round) => ({
-              detail: round.gallery.title,
-              id: round.id,
-              meta: widgetShortDateLabel(round.updatedAt, timezone),
-              title: round.title || `Round ${round.roundNumber}`
-            }))}
-          />
-        ) : null}
-      </>
-    );
+    return <>
+      <DashboardMetric detail={`${drafts} draft albums`} label="Published galleries" value={published} />
+      <DashboardSegmentBar items={[{ label: "Published", tone: "positive", value: published }, { label: "Draft", tone: "attention", value: drafts }]} />
+      {size === "lg" && <DashboardCardList empty="No website galleries yet." items={recentGalleries.map(gallery => ({
+        id: gallery.id, title: gallery.title, detail: gallery.status === "PUBLISHED" ? "Published" : "Draft", meta: widgetShortDateLabel(gallery.updatedAt, timezone)
+      }))} />}
+    </>;
   }
 } satisfies DashboardWidgetDefinition;
