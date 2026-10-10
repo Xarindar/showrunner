@@ -17,3 +17,9 @@ The editor uses open-source Puck inside Showrunner's existing admin shell. Draft
 
 ## Stack
 Next.js App Router, React, TypeScript, Puck, Prisma and PostgreSQL. Websites consume Showrunner's public content API and the shared preview bridge. Existing hosting is Railway.
+
+## Global interface rules
+Keep module headers to one compact line: the name, relevant icon/count, and essential actions. Do not add decorative explanatory subtitles or text rows of status metadata beneath the title. Use accessible icons with hover/focus descriptions for compact states and actions; keep full details in settings. Photos use a regular cursor, and image viewers prevent accidental text selection and image dragging.
+
+## Portfolio
+Portfolio manages public website photo albums for showcasing work. Client image delivery, private access, proofing, approvals and download workflows belong to the future Clients delivery system, not Portfolio. New Portfolio albums are public galleries saved as drafts. Existing private records remain private; no data migration or deletion is implied.
