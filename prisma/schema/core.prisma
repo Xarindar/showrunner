@@ -75,6 +75,7 @@ model Site {
   clientFiles              ClientFile[]
   clientSegments           ClientSegment[]
   mediaAssets              MediaAsset[]
+  uploadRequests           UploadRequest[]
   forms                    Form[]
   formAttachments          FormAttachment[]
   formSignatures           FormSignature[]

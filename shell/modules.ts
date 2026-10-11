@@ -20,6 +20,7 @@ import { manifest as schedulingModule } from "@/modules/scheduling/module";
 import { manifest as settingsModule } from "@/modules/settings/module";
 import { manifest as testimonialsModule } from "@/modules/testimonials/module";
 import { manifest as usersModule } from "@/modules/users/module";
+import { manifest as uploadsModule } from "@/modules/uploads/module";
 
 export { moduleIcons };
 
@@ -31,6 +32,7 @@ const registeredModules = [
   clientsModule,
   schedulingModule,
   mediaModule,
+  uploadsModule,
   portfolioModule,
   formsModule,
   testimonialsModule,
