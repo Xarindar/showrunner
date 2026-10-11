@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, { params }: MediaAssetRouteProps
 
   const belongsToPrivateGallery = asset.portfolioItems.length > 0 || asset.purchasedSelections.length > 0;
   let privateAccess = false;
-  if (belongsToPrivateGallery) {
+  if (belongsToPrivateGallery || (type === "DOWNLOAD" && asset.mimeType.startsWith("image/"))) {
     // General media signatures have no purchaser, selection or revocation
     // context. Client delivery must use the gallery route, even with a signature.
     const user = await getAdminUser();

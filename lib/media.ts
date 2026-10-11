@@ -10,6 +10,7 @@ import type { NextRequest } from "next/server";
 import sharp from "sharp";
 import sanitizeHtml from "sanitize-html";
 import { prisma } from "@/lib/prisma";
+import { photoVariantKey } from "@/lib/photo-variants";
 import { galleryProofObjectKey, renderGalleryProof } from "@/lib/media-proofs";
 import { unreferencedMediaWhere } from "@/lib/media-usage";
 import { isSafeExternalHttpsUrl } from "@/lib/security/urls";
@@ -31,10 +32,10 @@ const generatedVariantContentType = "image/webp";
 export const privateMediaUploadMimeTypes = Array.from(allowedPrivateFileTypes.keys());
 
 export const mediaVariantPresets = {
-  [MediaVariantType.THUMBNAIL]: { width: 320, height: 240, fit: "cover" },
+  [MediaVariantType.THUMBNAIL]: { width: 320, height: 320, fit: "contain" },
   [MediaVariantType.CARD]: { width: 720, height: 540, fit: "cover" },
-  [MediaVariantType.HERO]: { width: 1800, height: 1000, fit: "cover" },
-  [MediaVariantType.FULL]: { width: 2400, height: 1800, fit: "contain" },
+  [MediaVariantType.HERO]: { width: 1920, height: 1920, fit: "contain" },
+  [MediaVariantType.FULL]: { width: 2048, height: 2048, fit: "contain" },
   [MediaVariantType.SOCIAL]: { width: 1200, height: 630, fit: "cover" },
   [MediaVariantType.DOWNLOAD]: { width: 0, height: 0, fit: "original" }
 } satisfies Record<MediaVariantType, { fit: string; height: number; width: number }>;
@@ -44,6 +45,7 @@ const generatedImageVariantTypes = new Set<MediaVariantType>(mediaVariantTypes.f
 type ObjectStorageDriver = Extract<MediaDriver, "R2" | "S3">;
 
 export type MediaUploadMetadata = {
+  assetId?: string;
   alt?: string;
   caption?: string;
   credit?: string;
@@ -445,7 +447,7 @@ const serverAssetsAdapter: MediaAdapter = {
     const sitePrefix = slugify(metadata.siteId || "site") || "site";
     const folder = normalizeMediaFolder(metadata.folder);
     const folderPrefix = folder ? `${folder}/` : "";
-    const key = `sites/${sitePrefix}/uploads/${folderPrefix}${randomUUID()}.${extension}`;
+    const key = metadata.assetId && file.type.startsWith("image/") ? `photos/${metadata.assetId}/original.${extension}` : `sites/${sitePrefix}/uploads/${folderPrefix}${randomUUID()}.${extension}`;
     const target = serverAssetPath(key);
 
     await mkdir(path.dirname(target), { recursive: true });
@@ -495,7 +497,7 @@ function objectStorageAdapter(driver: ObjectStorageDriver): MediaAdapter {
       const folder = normalizeMediaFolder(metadata.folder);
       const folderPrefix = folder ? `${folder}/` : "";
       const sitePrefix = slugify(metadata.siteId || "site") || "site";
-      const key = `sites/${sitePrefix}/uploads/${folderPrefix}${randomUUID()}.${extension}`;
+      const key = metadata.assetId && file.type.startsWith("image/") ? `photos/${metadata.assetId}/original.${extension}` : `sites/${sitePrefix}/uploads/${folderPrefix}${randomUUID()}.${extension}`;
       const bytes = Buffer.from(await file.arrayBuffer());
 
       await getObjectStorageClient(config).send(
@@ -504,10 +506,10 @@ function objectStorageAdapter(driver: ObjectStorageDriver): MediaAdapter {
           Key: key,
           Body: bytes,
           ContentType: file.type || "application/octet-stream",
-          CacheControl: metadata.isPrivate ? "private, no-store" : undefined,
+          CacheControl: metadata.isPrivate || file.type.startsWith("image/") ? "private, no-store" : undefined,
           Metadata: {
             decorative: metadata.isDecorative ? "true" : "false",
-            private: metadata.isPrivate ? "true" : "false"
+            private: metadata.isPrivate || file.type.startsWith("image/") ? "true" : "false"
           }
         })
       );
@@ -515,7 +517,7 @@ function objectStorageAdapter(driver: ObjectStorageDriver): MediaAdapter {
       return {
         driver,
         key,
-        url: metadata.isPrivate ? "" : objectStoragePublicObjectUrl(config, key)
+        url: metadata.isPrivate || file.type.startsWith("image/") ? "" : objectStoragePublicObjectUrl(config, key)
       };
     }
   };
@@ -644,9 +646,9 @@ export async function uploadMedia(
   const safeAlt = await assertUploadFile(uploadFile, metadata, validation);
   const scanResult = await runVirusScanHook(uploadFile);
   const adapter = getMediaAdapter(driver);
-  const stored = await adapter.upload(uploadFile, { ...metadata, siteId: currentSiteId });
-  const folder = normalizeMediaFolder(metadata.folder);
   const assetId = randomUUID();
+  const stored = await adapter.upload(uploadFile, { ...metadata, assetId, siteId: currentSiteId });
+  const folder = normalizeMediaFolder(metadata.folder);
   const isPrivate = Boolean(metadata.isPrivate);
   const assetRoute = appMediaRoute(assetId, MediaVariantType.FULL);
 
@@ -697,8 +699,10 @@ export async function uploadMedia(
       }
     });
 
+    await preparePhotoVariants(asset);
     return asset;
   } catch (error) {
+    await deleteMediaAsset(assetId, currentSiteId);
     if (adapter.delete) {
       await adapter.delete({ key: stored.key, storageProviderId: stored.storageProviderId || "" }).catch(() => {});
     }
@@ -826,17 +830,15 @@ function mediaVariantMetadata(value: unknown) {
 }
 
 function isTransformableImage(asset: Pick<MediaAsset, "mimeType">) {
-  return allowedImageTypes.has(asset.mimeType) && asset.mimeType !== "image/gif";
+  return allowedImageTypes.has(asset.mimeType);
 }
 
-function objectStorageVariantObjectKey(asset: Pick<MediaAsset, "key">, type: MediaVariantType) {
-  const sourceKey = asset.key.replace(/\\/g, "/").replace(/[^A-Za-z0-9._/-]/g, "_").replace(/\.[^./]+$/, "");
-  return `variants/${sourceKey}/${type.toLowerCase()}.webp`;
+function objectStorageVariantObjectKey(asset: Pick<MediaAsset, "id" | "key">, type: MediaVariantType) {
+  return photoVariantKey(asset.id, type);
 }
 
-function serverAssetVariantObjectKey(asset: Pick<MediaAsset, "key">, type: MediaVariantType) {
-  const sourceKey = asset.key.replace(/\\/g, "/").replace(/[^A-Za-z0-9._/-]/g, "_").replace(/\.[^./]+$/, "");
-  return `variants/${sourceKey}/${type.toLowerCase()}.webp`;
+function serverAssetVariantObjectKey(asset: Pick<MediaAsset, "id" | "key">, type: MediaVariantType) {
+  return photoVariantKey(asset.id, type);
 }
 
 function objectStorageVariantMetadataKey(driver: ObjectStorageDriver) {
@@ -873,7 +875,8 @@ function transformFit(type: MediaVariantType) {
 async function transformedObjectStorageVariantResponse(
   driver: ObjectStorageDriver,
   asset: Pick<MediaAsset, "id" | "isPrivate" | "key" | "mimeType">,
-  type: MediaVariantType
+  type: MediaVariantType,
+  sourceBuffer?: Buffer
 ) {
   if (!generatedImageVariantTypes.has(type) || !isTransformableImage(asset)) {
     return objectStorageObjectResponse(driver, asset);
@@ -895,15 +898,17 @@ async function transformedObjectStorageVariantResponse(
   });
   const metadata = mediaVariantMetadata(existingVariant?.metadata);
   const existingKey = typeof metadata[metadataKey] === "string" ? metadata[metadataKey] : "";
-  if (existingKey) {
+  if (existingKey === photoVariantKey(asset.id, type)) {
     const existingResponse = await safeObjectStorageObjectResponse(driver, { key: existingKey, mimeType: generatedVariantContentType });
     if (existingResponse) return existingResponse;
   }
 
-  const original = await objectStorageObjectResponse(driver, asset);
-  if (!original?.ok || !original.body) return null;
-
-  const sourceBytes = await responseToBuffer(original);
+  let sourceBytes = sourceBuffer;
+  if (!sourceBytes) {
+    const original = await objectStorageObjectResponse(driver, asset);
+    if (!original?.ok || !original.body) return null;
+    sourceBytes = await responseToBuffer(original);
+  }
   const resized = await sharp(sourceBytes, { limitInputPixels: 80_000_000 })
     .rotate()
     .resize(transformFit(type))
@@ -1006,7 +1011,7 @@ async function transformedServerAssetVariantResponse(
   });
   const metadata = mediaVariantMetadata(existingVariant?.metadata);
   const existingKey = typeof metadata.serverAssetKey === "string" ? metadata.serverAssetKey : "";
-  if (existingKey) {
+  if (existingKey === photoVariantKey(asset.id, type)) {
     const existingResponse = await serverAssetObjectResponse({ key: existingKey, mimeType: generatedVariantContentType });
     if (existingResponse) return existingResponse;
   }
@@ -1222,6 +1227,7 @@ export async function mediaDeliveryResponse({
   type: MediaVariantType;
 }) {
   if (asset.deletedAt) return null;
+  if (type === MediaVariantType.DOWNLOAD && asset.mimeType.startsWith("image/") && !privateAccess) return null;
   if (asset.isPrivate && !privateAccess) return null;
 
   const upstream = await fetchMediaAssetSource(asset, request, type);
@@ -1243,4 +1249,40 @@ export async function mediaDeliveryResponse({
     headers,
     status: 200
   });
+}
+
+/** Generate approved previews before an upload is attached to an album. */
+export async function preparePhotoVariants(asset: Pick<MediaAsset, "id" | "key" | "driver" | "isPrivate" | "mimeType">) {
+  if (!isTransformableImage(asset)) return;
+  const original = asset.driver === MediaDriver.S3 || asset.driver === MediaDriver.R2 ? await objectStorageObjectResponse(asset.driver, asset) : null;
+  const sourceBuffer = original?.ok ? await responseToBuffer(original) : undefined;
+  for (const type of [MediaVariantType.THUMBNAIL, MediaVariantType.HERO, MediaVariantType.FULL]) {
+    const result = asset.driver === MediaDriver.S3 || asset.driver === MediaDriver.R2
+      ? await transformedObjectStorageVariantResponse(asset.driver, asset, type, sourceBuffer)
+      : asset.driver === MediaDriver.SERVER_ASSETS ? await transformedServerAssetVariantResponse(asset, type) : null;
+    if (supportsPrivateMediaDriver(asset.driver) && !result?.ok) throw new Error("Photo preview generation failed");
+  }
+}
+
+/** Copy before updating the record; a failed backfill keeps the original recoverable. */
+export async function organizeStoredPhoto(asset: MediaAsset) {
+  if (!isTransformableImage(asset) || (asset.driver !== MediaDriver.S3 && asset.driver !== MediaDriver.R2)) return;
+  const config = getObjectStorageConfig(asset.driver);
+  const originalKey = `photos/${asset.id}/original.${mimeTypeExtension(asset.mimeType)}`;
+  const oldVariants = await prisma.mediaAssetVariant.findMany({ where: { assetId: asset.id } });
+  if (asset.key !== originalKey) {
+    const source = await objectStorageObjectResponse(asset.driver, asset);
+    if (!source?.ok) throw new Error(`Missing source for ${asset.id}`);
+    await getObjectStorageClient(config).send(new PutObjectCommand({ Bucket: config.bucket, Key: originalKey, Body: await responseToBuffer(source), ContentType: asset.mimeType, CacheControl: "private, no-store" }));
+    await prisma.mediaAsset.update({ where: { id: asset.id }, data: { key: originalKey, url: appMediaRoute(asset.id, MediaVariantType.FULL) } });
+  }
+  const updated = { ...asset, key: originalKey };
+  await preparePhotoVariants(updated);
+  for (const type of [MediaVariantType.CARD, MediaVariantType.SOCIAL]) {
+    if (oldVariants.some(row => row.type === type && row.sizeBytes > 0)) await transformedObjectStorageVariantResponse(asset.driver, updated, type);
+  }
+  const metadataKey = objectStorageVariantMetadataKey(asset.driver);
+  const obsolete = oldVariants.map(row => mediaVariantMetadata(row.metadata)[metadataKey]).filter((key): key is string => typeof key === "string" && !key.startsWith(`photos/${asset.id}/`));
+  if (asset.key !== originalKey) obsolete.push(asset.key);
+  for (const key of obsolete) await getObjectStorageClient(config).send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));
 }
