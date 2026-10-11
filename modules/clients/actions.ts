@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { recordAuditLog } from "@/lib/audit";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
+import { getClientStatusSettings } from "@/lib/clients/configuration";
+import { isRecord } from "@/lib/objects";
 import { normalizeClientStatus, parseClientStatus } from "@/lib/clients/status";
 import { deleteMediaAsset, privateMediaUploadMimeTypes, uploadMedia } from "@/lib/media";
 import {
@@ -37,7 +39,19 @@ function appendPolicyHistory(existing: Prisma.JsonValue, entries: Prisma.InputJs
   return [...current, ...entries] as Prisma.InputJsonArray;
 }
 
-function clientData(input: Awaited<ReturnType<typeof clientFormSchema.parseAsync>>) {
+async function validateClientChoices(input: { status: string; serviceId: string }, siteId: string, existing?: { status: string; preferences: Prisma.JsonValue }) {
+  const statuses = await getClientStatusSettings(siteId);
+  if (!statuses.options.some((option) => option.value === input.status) && input.status !== normalizeClientStatus(existing?.status)) {
+    throw new Error("Choose an enabled client status.");
+  }
+  if (input.serviceId) {
+    const previousServiceId = isRecord(existing?.preferences) ? existing.preferences.serviceId : "";
+    const service = await prisma.service.findFirst({ where: { id: input.serviceId, siteId, ...(input.serviceId === previousServiceId ? {} : { isActive: true }) }, select: { id: true } });
+    if (!service) throw new Error("Choose an available service from this site's catalog.");
+  }
+}
+
+function clientData(input: Awaited<ReturnType<typeof clientFormSchema.parseAsync>>, existingPreferences?: Prisma.JsonValue) {
   const now = new Date();
 
   return {
@@ -61,7 +75,7 @@ function clientData(input: Awaited<ReturnType<typeof clientFormSchema.parseAsync
     photoUrl: input.photoUrl,
     birthday: input.birthday,
     anniversary: input.anniversary,
-    preferences: preferencesJson(input.preferences),
+    preferences: { ...(isRecord(existingPreferences) ? existingPreferences : {}), notes: input.preferences, serviceId: input.serviceId },
     emailOptIn: input.emailOptIn === "on",
     smsOptIn: input.smsOptIn === "on",
     photoUsageRelease: input.photoUsageRelease === "on",
@@ -281,6 +295,7 @@ export async function createClientAction(formData: FormData) {
     redirect(`/admin/modules/clients?error=${encodeURIComponent("A client with that email already exists.")}`);
   }
 
+  await validateClientChoices(input, siteId);
   const client = await prisma.client.create({
     data: {
       siteId,
@@ -301,19 +316,20 @@ export async function updateClientAction(formData: FormData) {
   const accessibleWhere = await getAccessibleClientWhere(user, siteId, { id: input.id });
   const existing = await prisma.client.findFirst({
     where: accessibleWhere,
-    select: { id: true, policyAcceptanceHistory: true }
+    select: { id: true, status: true, preferences: true, policyAcceptanceHistory: true }
   });
 
   if (!existing) {
     redirect("/admin/modules/clients?error=Client%20not%20found.");
   }
 
+  await validateClientChoices(input, siteId, existing);
   const acceptedPolicy = policyHistory(input);
 
   await prisma.client.updateMany({
     where: accessibleWhere,
     data: {
-      ...clientData(input),
+      ...clientData(input, existing.preferences),
       policyAcceptanceHistory: acceptedPolicy.length ? appendPolicyHistory(existing.policyAcceptanceHistory, acceptedPolicy) : undefined
     }
   });
@@ -648,6 +664,8 @@ export async function importClientsCsvAction(formData: FormData) {
     redirect(`/admin/modules/clients?error=${encodeURIComponent("CSV import needs a header row and at least one client row.")}`);
   }
 
+  const statuses = await getClientStatusSettings(siteId);
+  const services = await prisma.service.findMany({ where: { siteId }, select: { id: true } });
   const headers = rows[0].map(normalizeHeader);
   let imported = 0;
   let skipped = 0;
@@ -679,7 +697,7 @@ export async function importClientsCsvAction(formData: FormData) {
         name,
         email,
         phone: rowValue(row, ["phone", "primary phone", "mobile"]),
-        status: parseClientStatus(rowValue(row, ["status"])),
+        status: statuses.options.find((option) => option.label.toLowerCase() === rowValue(row, ["status"]).toLowerCase())?.value || (rowValue(row, ["status"]) ? parseClientStatus(rowValue(row, ["status"])) : statuses.defaultStatus),
         pipelineStage: parsePipelineStage(rowValue(row, ["pipeline", "pipeline stage", "stage"])),
         companyName: rowValue(row, ["company", "company name", "organization"]),
         familyName: rowValue(row, ["family", "family name", "household"]),
@@ -696,7 +714,7 @@ export async function importClientsCsvAction(formData: FormData) {
         photoUrl: rowValue(row, ["photo", "photo url", "image", "image url", "avatar"]),
         birthday: parseDate(rowValue(row, ["birthday", "birthdate"])),
         anniversary: parseDate(rowValue(row, ["anniversary"])),
-        preferences: preferencesJson(rowValue(row, ["preferences", "preference notes"])),
+        preferences: { ...preferencesJson(rowValue(row, ["preferences", "preference notes"])), serviceId: services.find((service) => service.id === rowValue(row, ["service id"]))?.id || "" },
         emailOptIn: parseBoolean(rowValue(row, ["email opt in", "email consent"])),
         smsOptIn: parseBoolean(rowValue(row, ["sms opt in", "sms consent"])),
         photoUsageRelease: parseBoolean(rowValue(row, ["photo usage release", "photo release"])),

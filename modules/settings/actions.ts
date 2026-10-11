@@ -1,5 +1,6 @@
 "use server";
 
+import { clientStatusSettingsFromForm } from "@/lib/clients/status-settings";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { MediaVariantType } from "@prisma/client";
@@ -230,13 +231,17 @@ export async function updateClientVipSettingsAction(formData: FormData) {
   const user = await requireAdmin("settings:update");
   const site = await resolveCurrentSite();
   const vipSettings = clientVipSettingsFromFormData(formData);
+  let statuses;
+  try { statuses = clientStatusSettingsFromForm(formData); }
+  catch (error) { redirect(`/admin/modules/settings/modules?error=${encodeURIComponent(error instanceof Error ? error.message : "Invalid client statuses.")}`); }
 
   await saveClientVipSettings(site.id, vipSettings);
+  await prisma.moduleSetting.upsert({ where: { siteId_moduleId_key: { siteId: site.id, moduleId: "clients", key: "statuses" } }, update: { value: statuses }, create: { siteId: site.id, moduleId: "clients", key: "statuses", value: statuses } });
 
   await recordAuditLog({
     action: "settings.clients_vip.updated",
     actor: user,
-    metadata: vipSettings,
+    metadata: { vipSettings, statuses },
     siteId: site.id,
     targetId: site.id,
     targetLabel: "Clients VIP settings",

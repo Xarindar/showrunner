@@ -1,10 +1,9 @@
+import { clientServiceId } from "@/lib/clients/service-selection";
+import { getClientStatusSettings } from "@/lib/clients/configuration";
 import Link from "next/link";
 import { ClientPipelineStage, Prisma } from "@prisma/client";
 import {
-  Activity,
-  CalendarCheck,
   Crown,
-  CreditCard,
   Download,
   Plus,
   Save,
@@ -14,7 +13,7 @@ import {
   UsersRound
 } from "lucide-react";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
-import { clientStatusLabel, clientStatusOptions, defaultClientStatus, normalizeClientStatus } from "@/lib/clients/status";
+import { clientStatusLabel, clientStatusOptions as allClientStatusOptions, normalizeClientStatus } from "@/lib/clients/status";
 import { getClientVipSettings, getClientVipSummaries } from "@/lib/clients/vip";
 import { enumLabel, formatDateTime, stringArrayFromUnknown } from "@/lib/format";
 import { isRecord } from "@/lib/objects";
@@ -173,6 +172,9 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
   const params = searchParams ? await searchParams : {};
   const user = await requireAdmin("clients:manage");
   const settings = await getSiteSettings();
+  const { options: configuredStatusOptions, defaultStatus: defaultClientStatus } = await getClientStatusSettings(settings.siteId);
+  const clientStatusOptions = [...configuredStatusOptions];
+  const services = await prisma.service.findMany({ where: { siteId: settings.siteId }, select: { id: true, name: true, isActive: true }, orderBy: { name: "asc" } });
   const page = Math.max(1, Number(params.page || 1) || 1);
   const query = String(params.q || "").trim();
   const selectedStatus = normalizeClientStatus(params.status);
@@ -235,6 +237,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
       _count: { _all: true }
     })
   ]);
+  clientStatusOptions.push(...allClientStatusOptions.filter((option) => statusCounts.some((item) => normalizeClientStatus(item.status) === option.value) && !clientStatusOptions.some((current) => current.value === option.value)));
   const vipSummaries = await getClientVipSummaries({
     clients: clients.map((client) => ({ createdAt: client.createdAt, id: client.id })),
     settings: vipSettings,
@@ -250,12 +253,13 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
       (total, item) => (normalizeClientStatus(item.status) === status ? total + item._count._all : total),
       0
     );
-  const selectedFilterLabel = [selectedSegment?.name, selectedStatus ? clientStatusLabel(selectedStatus) : ""]
+  const selectedFilterLabel = [selectedSegment?.name, selectedStatus ? clientStatusLabel(selectedStatus, configuredStatusOptions) : ""]
     .filter(Boolean)
     .join(" + ");
 
   const addClientForm = (
     <form action={createClientAction} className="form-grid">
+      <input name="tags" type="hidden" value="" />
       {hiddenClientFields.map((name) => (
         <input key={name} name={name} type="hidden" value="" />
       ))}
@@ -283,28 +287,21 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         <div className="ui-field">
           <label htmlFor="client-add-status">Status</label>
           <select id="client-add-status" name="status" defaultValue={defaultClientStatus}>
-            {clientStatusOptions.map((status) => (
+            {configuredStatusOptions.map((status) => (
               <option key={status.value} value={status.value}>
                 {status.label}
               </option>
             ))}
           </select>
         </div>
-        <div className="ui-field">
-          <label htmlFor="client-add-pipeline">Pipeline</label>
-          <select id="client-add-pipeline" name="pipelineStage" defaultValue={ClientPipelineStage.INQUIRY}>
-            {Object.values(ClientPipelineStage).map((stage) => (
-              <option key={stage} value={stage}>
-                {enumLabel(stage)}
-              </option>
-            ))}
+<div className="ui-field">
+          <label htmlFor="client-service">Service</label>
+          <select id="client-service" name="serviceId" defaultValue={""}>
+            <option value="">No service selected</option>
+            {services.filter((service) => service.isActive || service.id === "").map((service) => <option key={service.id} value={service.id}>{service.name}{service.isActive ? "" : " (inactive)"}</option>)}
           </select>
         </div>
       </EqualGrid>
-      <div className="ui-field">
-        <label htmlFor="client-add-tags">Tags</label>
-        <input id="client-add-tags" name="tags" placeholder="vip, wedding, retainer" />
-      </div>
       <div className="ui-field">
         <label htmlFor="client-add-notes">Private notes</label>
         <textarea id="client-add-notes" name="privateNotes" />
@@ -599,7 +596,8 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                   </td>
                   <td>
                     <Link className="clients-row-link clients-status-cell" href={detailHref}>
-                      <span className="ui-badge">{clientStatusLabel(client.status)}</span>
+                      <span className="ui-badge">{clientStatusLabel(client.status, configuredStatusOptions)}</span>
+                      {clientServiceId(client.preferences) ? <span className="muted-text">{services.find((service) => service.id === clientServiceId(client.preferences))?.name || "Service unavailable"}</span> : null}
                     </Link>
                   </td>
                   <td>
@@ -653,7 +651,8 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                     </span>
                     <span className="muted-text">{client.companyName || client.familyName || "Individual client"}</span>
                   </Link>
-                  <span className="ui-badge">{clientStatusLabel(client.status)}</span>
+                  <span className="ui-badge">{clientStatusLabel(client.status, configuredStatusOptions)}</span>
+                      {clientServiceId(client.preferences) ? <span className="muted-text">{services.find((service) => service.id === clientServiceId(client.preferences))?.name || "Service unavailable"}</span> : null}
                 </div>
 
                 <div className="clients-mobile-contact-grid">
@@ -744,26 +743,9 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
             <strong>{baseClientCount}</strong>
             <span>Clients</span>
           </div>
-          <div className="ui-data-table-stat-pill ui-data-table-stat-pill-success">
-            <Activity size={16} />
-            <strong>{statusCount("active_order")}</strong>
-            <span>Active Orders</span>
-          </div>
-          <div className="ui-data-table-stat-pill ui-data-table-stat-pill-warning">
-            <CreditCard size={16} />
-            <strong>{statusCount("order_paid")}</strong>
-            <span>Paid Orders</span>
-          </div>
-          <div className="ui-data-table-stat-pill">
-            <CalendarCheck size={16} />
-            <strong>{statusCount("appointment_booked")}</strong>
-            <span>Booked Appts</span>
-          </div>
-          <div className="ui-data-table-stat-pill">
-            <CreditCard size={16} />
-            <strong>{statusCount("deposit_paid")}</strong>
-            <span>Deposits Paid</span>
-          </div>
+          {configuredStatusOptions.map((status) => <div className="ui-data-table-stat-pill" key={status.value}>
+            <strong>{statusCount(status.value)}</strong><span>{status.label}</span>
+          </div>)}
         </div>
       </section>
     </div>
