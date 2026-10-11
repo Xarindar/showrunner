@@ -495,7 +495,8 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
             siteId: service.siteId,
             email: input.customerEmail,
             name: input.customerName,
-            phone: input.customerPhone
+            phone: input.customerPhone,
+            serviceId: service.id
           });
 
           return tx.booking.create({

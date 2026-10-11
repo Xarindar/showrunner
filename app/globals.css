@@ -6082,7 +6082,7 @@ button.button:disabled,
   align-items: flex-end;
   display: flex;
   gap: 0;
-  margin-bottom: -3px;
+  margin-bottom: -1px;
   min-width: 0;
   overflow-x: auto;
   position: relative;
@@ -6140,7 +6140,7 @@ button.button:disabled,
   background: var(--catalog-panel);
   bottom: 0;
   content: "";
-  height: 5px;
+  height: 1px;
   left: 1px;
   position: absolute;
   right: 1px;

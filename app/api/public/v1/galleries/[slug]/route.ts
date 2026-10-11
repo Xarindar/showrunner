@@ -19,7 +19,8 @@ export async function GET(request: NextRequest, { params }: PublicGalleryRoutePr
     const url = new URL(request.url);
     context = await authorizeEmbedRequest(request, {
       requireModuleId: "portfolio",
-      scope: "galleries:read"
+      scope: "galleries:read",
+      rateLimit: { limit: 60, windowMinutes: 1 }
     });
     return embedJson(
       await getPublicGallery({
