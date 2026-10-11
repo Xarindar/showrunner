@@ -83,7 +83,7 @@ export async function getPublicGallery(input: { accessToken?: string; siteId: st
   const mediaAssets = mediaIds.length
     ? await prisma.mediaAsset.findMany({
         where: { siteId: input.siteId, id: { in: mediaIds } },
-        select: { deletedAt: true, id: true, isPrivate: true }
+        select: { deletedAt: true, id: true, isPrivate: true, variants: { where: { type: MediaVariantType.FULL }, select: { width: true, height: true }, take: 1 } }
       })
     : [];
   const mediaById = new Map(mediaAssets.map((asset) => [asset.id, asset]));
@@ -104,6 +104,8 @@ export async function getPublicGallery(input: { accessToken?: string; siteId: st
         : item.thumbnailUrl || item.imageUrl,
       isDownloadable: item.isDownloadable && gallery.downloadEnabled,
       mediaAssetId: item.mediaAssetId,
+      width: item.mediaAssetId ? mediaById.get(item.mediaAssetId)?.variants[0]?.width || null : null,
+      height: item.mediaAssetId ? mediaById.get(item.mediaAssetId)?.variants[0]?.height || null : null,
       title: item.title
     }));
 
