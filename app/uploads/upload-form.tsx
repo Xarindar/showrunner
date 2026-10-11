@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/field";
 import { maxFileBytes } from "@/lib/uploads/validation";
 import styles from "./uploads.module.css";
 
@@ -81,8 +82,8 @@ export function UploadForm({ token }: { token: string }) {
   }
   const complete = entries.length > 0 && entries.every((entry) => entry.done);
   return <form onSubmit={submit} className={styles.form}>
-    <label className={styles.field}>Your name<input name="name" autoComplete="name" required maxLength={120} disabled={busy} /></label>
-    <label className={styles.field}>Email<input name="email" type="email" autoComplete="email" required maxLength={254} disabled={busy} /></label>
+    <label className={styles.field}>Your name<Input name="name" autoComplete="name" required maxLength={120} disabled={busy} /></label>
+    <label className={styles.field}>Email<Input name="email" type="email" autoComplete="email" required maxLength={254} disabled={busy} /></label>
     <div className={styles.drop} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
       event.preventDefault(); if (!busy) choose(Array.from(event.dataTransfer.files));
     }}>
