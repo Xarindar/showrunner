@@ -1,0 +1,30 @@
+model UploadRequest {
+  id            String       @id @default(cuid())
+  siteId        String
+  site          Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  title         String
+  token         String       @unique
+  expiresAt     DateTime
+  closedAt      DateTime?
+  reservedBytes BigInt       @default(0)
+  fileCount     Int          @default(0)
+  createdAt     DateTime     @default(now())
+  files         ClientUpload[]
+
+  @@index([siteId, createdAt])
+}
+
+model ClientUpload {
+  id          String        @id @default(cuid())
+  requestId   String
+  request     UploadRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  objectKey   String        @unique
+  filename    String
+  sizeBytes   Int
+  senderName  String
+  senderEmail String
+  completedAt DateTime?
+  createdAt   DateTime      @default(now())
+
+  @@index([requestId, createdAt])
+}
