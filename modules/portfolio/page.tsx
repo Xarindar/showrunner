@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, ChevronRight, Image as ImageIcon } from "lucide-react";
+import { ChevronRight, Image as ImageIcon } from "lucide-react";
 import { MediaVariantType, PortfolioGalleryLayout, PortfolioGalleryStatus, PortfolioGalleryVisibility, PortfolioItemType } from "@prisma/client";
 import { getAccessibleGalleryWhere, getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime } from "@/lib/format";
@@ -98,14 +98,13 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
     {params.gallery && !selectedGallery && <p role="alert">That album is not available. Choose another album below.</p>}
     {!selectedGallery && <section className={styles.shelf} aria-label="Photo albums">
       {galleries.map(gallery => <Link key={gallery.id} className={styles.album} href={"/admin/modules/portfolio?gallery=" + gallery.id} aria-label={"Open " + gallery.title}>
-        <div className={styles.book}>
-          {coverUrl(gallery) ? <img src={coverUrl(gallery)} alt="" loading="lazy" /> : <div className={styles.blankCover}><BookOpen size={36} aria-hidden="true" /><span>Your next story</span></div>}
-          <span className={styles.binding} aria-hidden="true" />
-          <div className={styles.bookTitle}><span>{gallery.title}</span></div>
+        <div className={styles.thumbnail}>
+          {coverUrl(gallery) ? <img src={coverUrl(gallery)} alt="" loading="lazy" /> : <div className={styles.blankCover}><ImageIcon size={36} aria-hidden="true" /><span>No cover photo</span></div>}
         </div>
+        <h2 className={styles.albumTitle}>{gallery.title}</h2>
         <div className={styles.albumMeta}><span>{gallery._count.items} photo{gallery._count.items === 1 ? "" : "s"}</span><span>{enumLabel(gallery.status)}</span></div>
       </Link>)}
-      {!galleries.length && <div className={styles.empty}><BookOpen size={40} aria-hidden="true" /><h2>A place for every story</h2><p>Create your first album, give it a title, and fill it with photographs.</p></div>}
+      {!galleries.length && <div className={styles.empty}><ImageIcon size={40} aria-hidden="true" /><h2>A place for every story</h2><p>Create your first album, give it a title, and fill it with photographs.</p></div>}
     </section>}
     {selectedGallery && <AlbumPhotos key={selectedGallery.id} galleryId={selectedGallery.id} title={selectedGallery.title} status={selectedGallery.status} visibility={enumLabel(selectedGallery.visibility)} photos={photos}>
       <div className={styles.settingsScroll}>
