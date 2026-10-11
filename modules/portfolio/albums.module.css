@@ -10,7 +10,7 @@
 .binding { position: absolute; inset: 0 auto 0 10px; width: 1px; background: #ffffff50; box-shadow: -4px 0 8px 3px #0003; }
 .bookTitle { position: absolute; inset: auto 0 0; padding: 32px 20px 24px 28px; color: #fff; background: linear-gradient(transparent, #000d); border-radius: 0 0 10px 3px; }
 .bookTitle span { font-size: 22px; line-height: 1.2; font-weight: 600; overflow-wrap: anywhere; display: block; text-wrap: balance; }
-.blankCover { display: grid; align-content: start; justify-items: center; gap: 16px; height: 100%; padding: 32px 24px; color: #fff; }
+.blankCover { display: grid; align-content: start; justify-items: center; gap: 16px; height: 100%; padding: 32px 24px; color: #fff; background: var(--color-brand, #116466); border-radius: inherit; }
 .blankCover span { font-size: 13px; }
 .albumMeta { display: flex; justify-content: space-between; gap: 12px; padding: 18px 2px 0; font-size: 13px; color: var(--color-muted, #656a65); }
 .album:hover .book { transform: translateY(-4px) rotate(-1deg); box-shadow: 6px 14px 22px #20221f30; }
@@ -39,6 +39,8 @@
 .photo { display: block; width: 100%; min-width: 0; aspect-ratio: 1; overflow: hidden; border: 0; border-radius: 0; background: transparent; padding: 0; cursor: default; }
 .photo img { display: block; width: 100%; height: 100%; object-fit: cover; transition: filter var(--motion-fast) var(--motion-ease); }
 .photo:hover img { filter: brightness(.87); }
+.unavailablePhoto { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 100%; min-height: 120px; padding: 20px; background: #202020; color: #dedcd6; font-size: 14px; text-align: center; }
+.unavailablePhoto p { margin: 0; }
 .photo:focus-visible { outline: 3px solid #fff; outline-offset: -3px; }
 .empty { grid-column: 1 / -1; padding: 64px 24px; display: grid; gap: 16px; justify-items: center; text-align: center; background: var(--color-surface-sunken, #f4f4f0); }
 .empty h2, .empty h3, .empty p { margin: 0; }
