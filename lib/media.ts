@@ -1270,6 +1270,7 @@ export async function organizeStoredPhoto(asset: MediaAsset) {
   const config = getObjectStorageConfig(asset.driver);
   const originalKey = `photos/${asset.id}/original.${mimeTypeExtension(asset.mimeType)}`;
   const oldVariants = await prisma.mediaAssetVariant.findMany({ where: { assetId: asset.id } });
+  if (asset.key === originalKey && [MediaVariantType.THUMBNAIL, MediaVariantType.HERO, MediaVariantType.FULL].every(type => oldVariants.some(row => row.type === type && row.sizeBytes > 0 && mediaVariantMetadata(row.metadata)[objectStorageVariantMetadataKey(asset.driver as ObjectStorageDriver)] === photoVariantKey(asset.id, type)))) return;
   if (asset.key !== originalKey) {
     const source = await objectStorageObjectResponse(asset.driver, asset);
     if (!source?.ok) throw new Error(`Missing source for ${asset.id}`);

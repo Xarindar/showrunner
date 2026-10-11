@@ -6,4 +6,4 @@ Uploads generate the three approved previews before album attachment. Existing C
 
 Public media routes reject DOWNLOAD without scoped administrator access. Client originals use the existing exact paid-selection entitlement and short-lived download route; generic signatures cannot unlock originals. Public FULL means the 2048px preview, never the stored original.
 
-For existing S3/R2 photos, run `PHOTO_SITE_ID=<site-id> node --conditions=react-server --import tsx scripts/organize-photo-storage.ts`. Run inside the service environment. It copies originals before updating their keys, creates previews sequentially, then removes superseded objects. Stop on any failure; rerun to resume. Do not seed or replace client data.
+For existing S3/R2 photos, run `PHOTO_SITE_ID=<site-id> node --import tsx scripts/organize-photo-storage.ts`. Run inside the service environment. It copies originals before updating their keys, creates previews sequentially, then removes superseded objects. Stop on any failure; rerun to resume. Do not seed or replace client data.
