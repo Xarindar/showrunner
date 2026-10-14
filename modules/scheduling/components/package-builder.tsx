@@ -101,7 +101,6 @@ export function PackageBuilder({
       <section className="service-library-panel" aria-labelledby="service-library-title">
         <div className="studio-section-head">
           <div>
-            <p className="catalog-rail-label">Base services</p>
             <h2 id="service-library-title">Service tiles</h2>
           </div>
           <span className="catalog-pill is-blue">
@@ -185,7 +184,6 @@ export function PackageBuilder({
       <section className="service-package-rail" aria-labelledby="service-packages-title">
         <div className="studio-section-head">
           <div>
-            <p className="catalog-rail-label">Packages</p>
             <h2 id="service-packages-title">Package builder</h2>
           </div>
           <span className="catalog-pill is-green">
@@ -214,7 +212,7 @@ export function PackageBuilder({
                       <strong>{servicePackage.name}</strong>
                       <small>/book/packages/{servicePackage.slug}</small>
                     </div>
-                    <span className={servicePackage.isActive ? "catalog-status is-active" : "catalog-status is-draft"}>
+                    <span className={servicePackage.isActive ? "ui-badge ui-badge-success" : "ui-badge"}>
                       {servicePackage.isActive ? "active" : "draft"}
                     </span>
                   </div>

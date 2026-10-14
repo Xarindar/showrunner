@@ -1,9 +1,10 @@
+import styles from "./service-editor.module.css";
 import { catalogMediaUrl } from "@/lib/catalog-media-url";
 import { contentWebsiteUrl, resolveContentManifest } from "@/clients/content-manifests";
 import NextImage from "next/image";
 import { notFound } from "next/navigation";
 import { MediaVariantType, type Prisma } from "@prisma/client";
-import { ArrowLeft, Boxes, CalendarCheck, Clock3, FileText, Save, Tags, Upload, X } from "lucide-react";
+import { ArrowLeft, Boxes, CalendarCheck, Clock3, FileText, Save, Upload, X } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { stringArrayCsv } from "@/lib/format";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
@@ -71,7 +72,7 @@ function serviceMediaUrl(service: ServiceWithBuilderData) {
 }
 
 function serviceStatusClass(isActive: boolean) {
-  return isActive ? "catalog-status is-active" : "catalog-status is-draft";
+  return isActive ? "ui-badge ui-badge-success" : "ui-badge";
 }
 
 function hiddenSchedulingValues(service: ServiceWithBuilderData) {
@@ -128,21 +129,19 @@ function ServiceCreatePage({
   policyOptions: string[];
 }) {
   return (
-    <div className="product-studio-page product-editor-page service-editor-page has-mobile-shell-header">
+    <div className={`${styles.page} stack product-studio-page product-editor-page service-editor-page has-mobile-shell-header`}>
       <AdminMobileHeaderSlot backHref="/admin/modules/services" title="New service" />
-      <header className="product-studio-header service-studio-header">
-        <div className="product-studio-title">
+      <header className="page-header service-studio-header">
+        <div className={styles.heading}>
           <ButtonLink href="/admin/modules/services" size="sm" variant="ghost">
             <ArrowLeft size={15} />
             Services
           </ButtonLink>
           <div>
-            <p className="catalog-kicker">Service builder</p>
             <h1>New service</h1>
-            <p>Set up the customer-facing service details, booking behavior, and scheduling rules before publishing.</p>
           </div>
           <div className="product-studio-badges">
-            <span className="catalog-status is-draft">new</span>
+            <span className="ui-badge">New</span>
           </div>
         </div>
       </header>
@@ -457,7 +456,6 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
           <section className="studio-panel service-image-panel">
             <div className="studio-section-head">
               <div>
-                <p className="catalog-rail-label">Booking image</p>
                 <h2>Card artwork</h2>
               </div>
               {serviceImageUrl ? (
@@ -494,7 +492,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
           </section>
 
           <section className="studio-panel">
-          <p className="catalog-rail-label">Status</p>
+          <h2 className="section-title">Status</h2>
           <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
           <Switch defaultChecked={service.isActive} label="Active" name="isActive" variant="inline" />
           <dl className="service-editor-summary">
@@ -592,25 +590,19 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   ];
 
   return (
-    <div className="product-studio-page product-editor-page service-editor-page has-mobile-shell-header">
+    <div className={`${styles.page} stack product-studio-page product-editor-page service-editor-page has-mobile-shell-header`}>
       <AdminMobileHeaderSlot backHref="/admin/modules/services" title={service.name} />
-      <header className="product-studio-header service-studio-header">
-        <div className="product-studio-title">
+      <header className="page-header service-studio-header">
+        <div className={styles.heading}>
           <ButtonLink href="/admin/modules/services" size="sm" variant="ghost">
             <ArrowLeft size={15} />
             Services
           </ButtonLink>
           <div>
-            <p className="catalog-kicker">Service builder</p>
             <h1>{service.name}</h1>
-            <p>{service.description || service.category || "Build the catalog details customers see before booking."}</p>
           </div>
           <div className="product-studio-badges">
             <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
-            <span className="catalog-pill is-blue">
-              <Tags size={14} />
-              {service.category || "Uncategorized"}
-            </span>
           </div>
         </div>
       </header>

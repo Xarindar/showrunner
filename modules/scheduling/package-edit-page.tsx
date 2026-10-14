@@ -1,9 +1,11 @@
+import styles from "./service-editor.module.css";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
-import { ArrowLeft, Boxes, Plus, Tags } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
+import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
 import { Button, ButtonLink, Switch } from "@/components/ui";
 import {
   addServicePackageItemAction,
@@ -34,7 +36,7 @@ function savedPackageMessage(saved?: string) {
 }
 
 function serviceStatusClass(isActive: boolean) {
-  return isActive ? "catalog-status is-active" : "catalog-status is-draft";
+  return isActive ? "ui-badge ui-badge-success" : "ui-badge";
 }
 
 function toPackageBuilderService(service: {
@@ -75,24 +77,11 @@ function toPackageBuilderPackage(servicePackage: ServicePackageWithItems): Packa
   };
 }
 
-function packageDuration(items: ServicePackageWithItems["items"]) {
-  return items.reduce((total, item) => total + item.quantity * item.service.durationMinutes, 0);
-}
-
-function packageDurationLabel(minutes: number) {
-  if (!minutes) return "No services";
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`;
-}
-
 function newPackageForm() {
   return (
     <section className="studio-panel" aria-labelledby="new-package-title">
       <div className="studio-section-head">
         <div>
-          <p className="catalog-rail-label">Package setup</p>
           <h2 id="new-package-title">Create package</h2>
         </div>
       </div>
@@ -140,17 +129,16 @@ export default async function ServicePackageEditPage({ packageId, searchParams }
 
   if (packageId === "new") {
     return (
-      <div className="product-studio-page product-editor-page service-editor-page">
-        <header className="product-studio-header service-studio-header">
-          <div className="product-studio-title">
+      <div className={`${styles.page} stack product-studio-page product-editor-page service-editor-page has-mobile-shell-header`}>
+        <AdminMobileHeaderSlot backHref="/admin/modules/services?tab=packages" title="New package" />
+        <header className="page-header service-studio-header">
+          <div className={styles.heading}>
             <ButtonLink href="/admin/modules/services?tab=packages" size="sm" variant="ghost">
               <ArrowLeft size={15} />
               Packages
             </ButtonLink>
             <div>
-              <p className="catalog-kicker">Package builder</p>
               <h1>New package</h1>
-              <p>Create the package shell before adding services.</p>
             </div>
           </div>
         </header>
@@ -184,31 +172,20 @@ export default async function ServicePackageEditPage({ packageId, searchParams }
     redirect("/admin/modules/services?tab=packages&error=Package%20not%20found.");
   }
 
-  const totalDuration = packageDuration(servicePackage.items);
-
   return (
-    <div className="product-studio-page product-editor-page service-editor-page">
-      <header className="product-studio-header service-studio-header">
-        <div className="product-studio-title">
+    <div className={`${styles.page} stack product-studio-page product-editor-page service-editor-page has-mobile-shell-header`}>
+      <AdminMobileHeaderSlot backHref="/admin/modules/services?tab=packages" title={servicePackage.name} />
+      <header className="page-header service-studio-header">
+        <div className={styles.heading}>
           <ButtonLink href="/admin/modules/services?tab=packages" size="sm" variant="ghost">
             <ArrowLeft size={15} />
             Packages
           </ButtonLink>
           <div>
-            <p className="catalog-kicker">Package builder</p>
             <h1>{servicePackage.name}</h1>
-            <p>/book/packages/{servicePackage.slug}</p>
           </div>
           <div className="product-studio-badges">
             <span className={serviceStatusClass(servicePackage.isActive)}>{servicePackage.isActive ? "active" : "draft"}</span>
-            <span className="catalog-pill is-blue">
-              <Boxes size={14} />
-              {servicePackage.items.length} service{servicePackage.items.length === 1 ? "" : "s"}
-            </span>
-            <span className="catalog-pill">
-              <Tags size={14} />
-              {packageDurationLabel(totalDuration)}
-            </span>
           </div>
         </div>
       </header>

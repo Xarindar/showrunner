@@ -1,0 +1,104 @@
+.page {
+  --catalog-panel: var(--color-surface);
+  --catalog-panel-soft: var(--color-surface-sunken);
+  --catalog-border: color-mix(in srgb, var(--color-border) 88%, transparent);
+  --product-studio-sidecar-top: var(--space-3);
+  gap: var(--space-3);
+}
+
+.page :global(.studio-panel),
+.page :global(.service-library-panel),
+.page :global(.service-package-rail) {
+  border-radius: var(--radius-card);
+}
+
+.page :global(.studio-section-head) h2 {
+  color: var(--color-text);
+  font-size: 1.22rem;
+  font-weight: 590;
+  text-transform: none;
+}
+
+.page :global(.studio-section-head) > svg {
+  color: var(--color-muted);
+  width: 18px;
+}
+
+.page :global(.studio-action-form) {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.page :global(.catalog-form-grid) {
+  align-items: start;
+}
+
+.page :global(.studio-panel) > :global(.ui-badge) {
+  justify-self: start;
+}
+
+@media (min-width: 1041px) {
+  .page :global(.product-studio-save-grid):not(:global(.service-create-form)) {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
+  }
+}
+
+.page :global(.service-tile) {
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.page :global(.service-package-box) {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+.page :global(.service-package-box) + :global(.service-package-box) {
+  border-top: 1px solid var(--catalog-border);
+  padding-top: var(--space-3);
+}
+
+.page :global(.service-package-box.is-drop-target) {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 6px;
+  box-shadow: none;
+}
+
+.page :global(.service-editor-summary) dt,
+.page :global(.service-package-stats) dt {
+  font-weight: 500;
+  text-transform: none;
+}
+
+.page :global(.product-editor-advanced) {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--catalog-border);
+  border-radius: 0;
+}
+
+.page :global(.product-editor-advanced) > summary {
+  padding-inline: 0;
+}
+
+.heading {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.heading h1 {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .heading {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+}
