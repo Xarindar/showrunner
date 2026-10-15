@@ -13,6 +13,7 @@ import { ServiceCatalogTable, type ServiceCatalogTableService } from "./componen
 import { ServicePackageTable, type ServicePackageTablePackage } from "./components/service-package-table";
 
 import { catalogMediaUrl } from "@/lib/catalog-media-url";
+import { readSessionOffering } from "@/lib/scheduling/session-offering";
 import { contentWebsiteUrl, resolveContentManifest } from "@/clients/content-manifests";
 
 export const dynamic = "force-dynamic";
@@ -91,7 +92,7 @@ function toServiceCatalogTableService(service: ServiceCatalogItem, websiteUrl?: 
     isActive: service.isActive,
     location: service.location || "",
     name: service.name,
-    packageCount: service._count.packageItems,
+    packageCount: readSessionOffering(service.sessionOffering)?.tiers.length ?? 1,
     tags: serviceTags(service)
   };
 }
@@ -133,7 +134,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   redirectLegacyRulesTab(params);
   const [services, servicePackages, serviceCategories, mediaAssets] = await Promise.all([
     prisma.service.findMany({
-      where: { siteId: settings.siteId },
+      where: { siteId: settings.siteId, isOneOff: false },
       include: { _count: { select: { packageItems: true } }, mediaAsset: true },
       orderBy: [{ isActive: "desc" }, { category: "asc" }, { updatedAt: "desc" }]
     }),
@@ -218,7 +219,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       createAction={
         <ButtonLink href="/admin/modules/services/new" size="sm">
           <Plus size={15} />
-          New service
+          New session type
         </ButtonLink>
       }
       emptyCreateAction={
@@ -269,7 +270,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       ),
       icon: <CalendarCheck size={15} />,
       id: "services",
-      label: "Services"
+      label: "Session types"
     },
     {
       content: categoriesContent,
@@ -297,7 +298,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       ),
       icon: <Boxes size={15} />,
       id: "packages",
-      label: "Packages"
+      label: "Service bundles"
     }
   ];
 

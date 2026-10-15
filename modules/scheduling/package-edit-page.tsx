@@ -92,10 +92,6 @@ function newPackageForm() {
             <label htmlFor="package-name">Package name</label>
             <input autoFocus id="package-name" name="name" placeholder="Glow reset package" required />
           </div>
-          <div className="ui-field">
-            <label htmlFor="package-slug">Slug</label>
-            <input id="package-slug" name="slug" placeholder="glow-reset" />
-          </div>
         </div>
         <div className="ui-field">
           <label htmlFor="package-description">Description</label>

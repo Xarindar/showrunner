@@ -1,0 +1,2 @@
+ALTER TABLE "Service" ADD COLUMN "priceCents" INTEGER, ADD COLUMN "isOneOff" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Booking" ADD COLUMN "sessionName" TEXT, ADD COLUMN "sessionLocation" TEXT, ADD COLUMN "priceCents" INTEGER, ADD COLUMN "isManual" BOOLEAN NOT NULL DEFAULT false;

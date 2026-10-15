@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, ListChecks, MoreHorizontal, SlidersHorizontal, Table2 } from "lucide-react";
-import { Modal } from "@/components/ui";
+import { ButtonLink, Modal } from "@/components/ui";
 
 type AppointmentsModalKey = "filters" | "list" | "rules" | "tools" | "waitlist" | null;
 
@@ -71,6 +71,7 @@ export function AppointmentCalendarShell({
         </nav>
 
         <div className="appointments-header-actions" aria-label="Schedule actions">
+          <ButtonLink href="/admin/appointments/new">New session</ButtonLink>
           <button aria-label="Open filters" className="appointments-action-button" onClick={() => setOpenPanel("filters")} title="Filters" type="button">
             <SlidersHorizontal size={16} />
             <span>Filters</span>

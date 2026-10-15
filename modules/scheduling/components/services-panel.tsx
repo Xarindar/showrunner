@@ -1,8 +1,8 @@
 import { Fragment } from "react";
 import type { Resource, Service, ServiceResource, ServiceStaff, StaffMember } from "@prisma/client";
-import { Check, CircleOff, Plus, Save } from "lucide-react";
-import { createServiceAction, toggleServiceAction, updateServiceAction } from "../actions";
-import { Button, Card, EqualGrid, Switch, Table } from "@/components/ui";
+import { Check, CircleOff, Save } from "lucide-react";
+import { toggleServiceAction, updateServiceAction } from "../actions";
+import { Button, ButtonLink, Card, EqualGrid, Switch, Table } from "@/components/ui";
 
 type ServiceWithStaff = Service & {
   resourceAssignments: Array<ServiceResource & {resource: Resource;}>;
@@ -84,74 +84,7 @@ function ResourceSwitches({
 export function ServicesPanel({ resources, services, staff }: ServicesPanelProps) {
   return (
     <EqualGrid as="section">
-      <Card action={createServiceAction} as="form" minHeight="none" bodyClassName="form-grid">
-        <h2 className="section-title">Add service</h2>
-        <div className="ui-field">
-          <label htmlFor="name">Name</label>
-          <input id="name" name="name" required />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="slug">Booking URL slug</label>
-          <input id="slug" name="slug" placeholder="consultation" />
-          <span className="ui-zero">Leave blank to generate one from the service name.</span>
-        </div>
-        <EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="durationMinutes">Duration</label>
-            <input id="durationMinutes" name="durationMinutes" type="number" min="5" step="5" defaultValue="30" required />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="location">Location</label>
-            <input id="location" name="location" placeholder="Online, studio, client location" />
-          </div>
-        </EqualGrid>
-        <EqualGrid min="220px">
-          <div className="ui-field">
-            <label htmlFor="minimumNoticeHours">Minimum notice</label>
-            <input id="minimumNoticeHours" name="minimumNoticeHours" type="number" min="0" defaultValue="12" />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="maxAdvanceDays">Max advance days</label>
-            <input id="maxAdvanceDays" name="maxAdvanceDays" type="number" min="1" defaultValue="60" />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="slotIntervalMinutes">Slot interval</label>
-            <input id="slotIntervalMinutes" name="slotIntervalMinutes" type="number" min="5" step="5" defaultValue="30" />
-          </div>
-        </EqualGrid>
-        <EqualGrid>
-          <div className="ui-field">
-            <label htmlFor="bufferBeforeMinutes">Buffer before</label>
-            <input id="bufferBeforeMinutes" name="bufferBeforeMinutes" type="number" min="0" step="5" defaultValue="0" />
-          </div>
-          <div className="ui-field">
-            <label htmlFor="bufferAfterMinutes">Buffer after</label>
-            <input id="bufferAfterMinutes" name="bufferAfterMinutes" type="number" min="0" step="5" defaultValue="15" />
-          </div>
-        </EqualGrid>
-        <div className="ui-field">
-          <label htmlFor="description">Description</label>
-          <textarea id="description" name="description" />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="intakePrompt">Intake question</label>
-          <input id="intakePrompt" name="intakePrompt" placeholder="What should we know before this appointment?" />
-        </div>
-        <div className="ui-field">
-          <label htmlFor="policyText">Booking policy</label>
-          <textarea id="policyText" name="policyText" placeholder="Cancellation, deposit, or preparation policy" />
-        </div>
-        <Switch defaultChecked label="Require policy acceptance" name="requirePolicy" variant="inline" />
-        <Switch label="Request-only approval" name="requestOnly" variant="inline" />
-        <Switch label="Offer waitlist when full" name="waitlistEnabled" variant="inline" />
-        <Switch defaultChecked label="Active" name="isActive" variant="inline" />
-        <StaffSwitches assignedStaffIds={[]} staff={staff} switchIdPrefix="new-service-staff" />
-        <ResourceSwitches assignedResourceIds={[]} resources={resources} switchIdPrefix="new-service-resource" />
-        <Button type="submit">
-          <Plus size={18} />
-          Add service
-        </Button>
-      </Card>
+      <Card><ButtonLink href="/admin/modules/services/new">New session type</ButtonLink></Card>
 
       <Card>
         <h2 className="section-title">Current services</h2>

@@ -1,3 +1,5 @@
+import { sessionPrice } from "@/lib/scheduling/session-input";
+import { sessionOfferingFormSchema } from "@/lib/scheduling/session-offering";
 import "server-only";
 
 import { AdminRole, BookingStatus, BookingWaitlistStatus, ClientPipelineStage, CouponType, MediaDriver, ProductStatus, ProductType } from "@prisma/client";
@@ -98,8 +100,10 @@ const timeSchema = z
 
 export const serviceFormSchema = z
   .object({
+    price: z.union([z.literal(""), sessionPrice]).optional(),
+    sessionOffering: sessionOfferingFormSchema.optional(),
     name: requiredText,
-    slug: optionalText,
+    slug: optionalText.optional(),
     description: optionalStoredText,
     durationMinutes: z.coerce.number().int().min(1).max(24 * 60),
     location: optionalStoredText,
@@ -119,6 +123,10 @@ export const serviceFormSchema = z
   })
   .transform((value) => ({
     ...value,
+    ...(value.sessionOffering ? {
+      durationMinutes: value.sessionOffering.tiers[0].durationMinutes,
+      price: value.sessionOffering.tiers[0].priceCents ?? "" as const
+    } : {}),
     tags: csvList(value.tags),
     requirePolicy: Boolean(value.requirePolicy && value.policyText.trim()),
     requestOnly: value.requestOnly === "on",
@@ -153,6 +161,7 @@ export const bookingStatusFormSchema = z.object({
 
 export const bookingDetailFormSchema = z.object({
   id,
+  sessionLocation: z.string().trim().max(500).optional(),
   adminNotes: optionalStoredText.optional(),
   cancellationReason: optionalStoredText.optional()
 });

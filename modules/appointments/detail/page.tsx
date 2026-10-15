@@ -6,6 +6,7 @@ import { getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/format";
 import { getSiteSettings } from "@/lib/site";
+import { sessionPackageSnapshotSchema } from "@/lib/scheduling/session-offering";
 import { rescheduleBookingAction, updateBookingDetailAction, updateBookingStatusAction } from "../actions";
 import { Button, ButtonLink, Card, Table } from "@/components/ui";
 
@@ -46,6 +47,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
   });
 
   if (!booking) notFound();
+  const packageSnapshot = sessionPackageSnapshotSchema.safeParse(booking.packageSnapshot);
   const formAttachments = await prisma.formAttachment.findMany({
     where: {
       siteId: settings.siteId,
@@ -66,7 +68,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
           <p className="eyebrow">Appointment</p>
           <h1>{booking.customerName}</h1>
           <p>
-            {booking.service.name} - {formatDateTime(booking.startsAt, settings.timezone)}
+            {(booking.sessionName || booking.service.name)} - {formatDateTime(booking.startsAt, settings.timezone)}
           </p>
         </div>
         <ButtonLink href="/admin/modules/appointments" variant="secondary">
@@ -74,7 +76,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
         </ButtonLink>
       </header>
 
-      {saved ? <div className="success-message">{saved === "reschedule-notify" ? "Appointment rescheduled. Customer notification requested." : saved === "reschedule-silent" ? "Appointment rescheduled without a customer email." : "Appointment updated."}</div> : null}
+      {saved ? <div className="success-message">{saved === "created" ? "Session created. No email or payment request was sent." : saved === "reschedule-notify" ? "Appointment rescheduled. Customer notification requested." : saved === "reschedule-silent" ? "Appointment rescheduled without a customer email." : "Appointment updated."}</div> : null}
       {error ? <div className="error">{error}</div> : null}
 
       <section aria-label="Status actions" className="appointment-detail-toolbar">
@@ -118,7 +120,20 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
               </tr>
               <tr>
                 <td>Service</td>
-                <td>{booking.service.name}</td>
+                <td>{(booking.sessionName || booking.service.name)}</td>
+              </tr>
+                {packageSnapshot.success && <>
+                  <tr><td>Package</td><td>{packageSnapshot.data.name}</td></tr>
+                  <tr><td>Included coverage</td><td>{packageSnapshot.data.coverage.join(" · ") || "No coverage items specified"}</td></tr>
+                  {packageSnapshot.data.extras.length > 0 && <tr><td>Extras</td><td>{packageSnapshot.data.extras.map(item => item.name).join(" · ")}</td></tr>}
+                </>}
+              <tr>
+                <td>Price</td>
+                <td>{booking.priceCents == null ? "Not set" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(booking.priceCents / 100)}</td>
+              </tr>
+              <tr>
+                <td>Location</td>
+                <td>{(booking.sessionLocation ?? booking.service.location) || "To be arranged"}</td>
               </tr>
               <tr>
                 <td>Staff</td>
@@ -149,6 +164,19 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
               </tr>
             </tbody>
           </Table>
+      </Card>
+
+      <Card as="section" bodyClassName="ui-stack">
+        <h2 className="section-title">Session location</h2>
+        <p className="muted-text">Agree on a location with your client, then add or change it here.</p>
+        <form action={updateBookingDetailAction} className="form-grid">
+          <input type="hidden" name="id" value={booking.id} />
+          <div className="ui-field">
+            <label htmlFor="session-location">Location <span className="muted-text">(optional)</span></label>
+            <input id="session-location" name="sessionLocation" defaultValue={booking.sessionLocation ?? booking.service.location ?? ""} maxLength={500} placeholder="To be arranged" />
+          </div>
+          <Button type="submit">Save location</Button>
+        </form>
       </Card>
 
       {formAttachments.length ?

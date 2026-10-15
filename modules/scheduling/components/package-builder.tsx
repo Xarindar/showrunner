@@ -267,10 +267,6 @@ export function PackageBuilder({
                           <label htmlFor={`package-${servicePackage.id}-name`}>Name</label>
                           <input defaultValue={servicePackage.name} id={`package-${servicePackage.id}-name`} name="name" required />
                         </div>
-                        <div className="ui-field">
-                          <label htmlFor={`package-${servicePackage.id}-slug`}>Slug</label>
-                          <input defaultValue={servicePackage.slug} id={`package-${servicePackage.id}-slug`} name="slug" />
-                        </div>
                       </div>
                       <div className="ui-field">
                         <label htmlFor={`package-${servicePackage.id}-description`}>Description</label>

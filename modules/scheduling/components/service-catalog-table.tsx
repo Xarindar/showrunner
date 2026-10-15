@@ -196,7 +196,7 @@ export function ServiceCatalogTable({
               <th>Category</th>
               <th>Tags</th>
               <th>Duration</th>
-              <th>Packages</th>
+              <th>Tiers</th>
               <th>Booking</th>
               <th>Actions</th>
             </tr>
@@ -205,7 +205,7 @@ export function ServiceCatalogTable({
             {pagedServices.map((service) => {
               const category = service.category || "Uncategorized";
               const tagsLabel = service.tags.join(", ") || "No tags";
-              const packageLabel = `${service.packageCount} pkg`;
+              const packageLabel = `${service.packageCount} ${service.packageCount === 1 ? "package" : "tiers"}`;
               return (
                 <tr key={service.id}>
                   <td>

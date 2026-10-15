@@ -1,8 +1,11 @@
 "use server";
 
+import { initialBusinessHoursSchema } from "@/lib/scheduling/session-input";
+import { readSessionOffering } from "@/lib/scheduling/session-offering";
+
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { MediaVariantType } from "@prisma/client";
+import { redirect, unstable_rethrow } from "next/navigation";
+import { MediaVariantType, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import {
@@ -88,7 +91,7 @@ const servicePackageItemDeleteSchema = z.object({
 const serviceCategoryFormSchema = z.object({
   description: optionalStoredText,
   name: requiredText,
-  slug: optionalStoredText,
+  slug: optionalStoredText.optional(),
   sortOrder: z.coerce.number().int().default(0)
 });
 
@@ -336,43 +339,60 @@ async function syncServiceResources(serviceId: string, siteId: string, resourceI
   ]);
 }
 
-export async function createServiceAction(formData: FormData) {
+export async function createServiceAction(_previous: { error: string }, formData: FormData) {
   await requireAdmin("scheduling:manage");
 
-  const input = await parseForm(serviceFormSchema, formData);
+  const parsed = serviceFormSchema.safeParse({ slug: "", category: "", tags: "", location: "", intakePrompt: "", policyText: "", ...Object.fromEntries(formData) });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const input = parsed.data;
   const settings = await getSiteSettings();
-  const slug = await generateUniqueServiceSlug(prisma, {
-    name: input.name,
-    slug: input.slug || "",
-    siteId: settings.siteId
-  });
-
-  const service = await prisma.service.create({
-    data: {
-      siteId: settings.siteId,
-      slug,
+  let service;
+  try {
+    const slug = await generateUniqueServiceSlug(prisma, {
       name: input.name,
-      description: input.description,
-      durationMinutes: input.durationMinutes,
-      location: input.location,
-      category: input.category,
-      tags: input.tags,
-      bufferBeforeMinutes: input.bufferBeforeMinutes,
-      bufferAfterMinutes: input.bufferAfterMinutes,
-      minimumNoticeHours: input.minimumNoticeHours,
-      maxAdvanceDays: input.maxAdvanceDays,
-      slotIntervalMinutes: input.slotIntervalMinutes,
-      intakePrompt: input.intakePrompt,
-      policyText: input.policyText,
-      requirePolicy: input.requirePolicy,
-      requestOnly: input.requestOnly,
-      waitlistEnabled: input.waitlistEnabled,
-      isActive: input.isActive
-    }
-  });
-  await syncServiceStaff(service.id, settings.siteId, selectedStaffIds(formData));
-  await syncServiceResources(service.id, settings.siteId, selectedResourceIds(formData));
-  await ensureServiceCategory(settings.siteId, input.category);
+      slug: input.slug || "",
+      siteId: settings.siteId
+    });
+
+    service = await prisma.$transaction(async tx => {
+      const existingHours = await tx.availabilityRule.count({ where: { siteId: settings.siteId, staffId: null, resourceId: null } });
+      if (input.isActive && !existingHours) {
+        const hours = initialBusinessHoursSchema.safeParse({ weekdays: formData.getAll("weekdays"), start: formData.get("hoursStart"), end: formData.get("hoursEnd") });
+        if (!hours.success) throw new Error(hours.error.issues[0].message);
+        const longestTier = Math.max(input.durationMinutes, ...(input.sessionOffering?.tiers.map(tier => tier.durationMinutes) ?? []));
+        if (hours.data.end - hours.data.start < longestTier) throw new Error("Business hours must be long enough for every package tier.");
+        await tx.availabilityRule.createMany({ data: [...new Set(hours.data.weekdays)].map(weekday => ({ siteId: settings.siteId, weekday, startMinutes: hours.data.start, endMinutes: hours.data.end })) });
+      }
+        return tx.service.create({
+        data: {
+          siteId: settings.siteId,
+          slug,
+          name: input.name,
+          description: input.description,
+          durationMinutes: input.durationMinutes,
+          ...(input.sessionOffering ? { sessionOffering: input.sessionOffering } : {}),
+          ...(input.price !== undefined ? { priceCents: input.price === "" ? null : input.price } : {}),
+          location: input.location,
+          category: input.category,
+          tags: input.tags,
+          bufferBeforeMinutes: input.bufferBeforeMinutes,
+          bufferAfterMinutes: input.bufferAfterMinutes,
+          minimumNoticeHours: input.minimumNoticeHours,
+          maxAdvanceDays: input.maxAdvanceDays,
+          slotIntervalMinutes: input.slotIntervalMinutes,
+          intakePrompt: input.intakePrompt,
+          policyText: input.policyText,
+          requirePolicy: input.requirePolicy,
+          requestOnly: input.requestOnly,
+          waitlistEnabled: input.waitlistEnabled,
+          isActive: input.isActive
+        }
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+  } catch (error) {
+    return { error: error instanceof Error && !("code" in error) ? error.message : "The session type could not be saved. Your details are still here; please try again." };
+  }
 
   refreshScheduling();
   revalidatePath(serviceEditPath(service.id));
@@ -398,6 +418,15 @@ export async function updateServiceAction(formData: FormData) {
   await requireAdmin("scheduling:manage");
   const input = await parseForm(serviceUpdateFormSchema, formData);
   const settings = await getSiteSettings();
+  const current = await prisma.service.findFirst({ where: { id: input.id, siteId: settings.siteId } });
+  if (!current) redirect(servicesAdminPath({ error: "Session type not found." }));
+  const offering = input.sessionOffering ?? readSessionOffering(current.sessionOffering);
+  // Older service forms edit the default package; keep the other tiers and coverage intact.
+  if (offering && !input.sessionOffering) {
+    offering.tiers[0].durationMinutes = input.durationMinutes;
+    if (input.price !== undefined) offering.tiers[0].priceCents = input.price === "" ? null : input.price;
+    if (offering.tiers.length > 1 && offering.tiers[0].priceCents === null) redirect(serviceEditPath(input.id, { error: "Set a price for every tier." }));
+  }
 
   await prisma.service.updateMany({
     where: { id: input.id, siteId: settings.siteId },
@@ -405,6 +434,8 @@ export async function updateServiceAction(formData: FormData) {
       name: input.name,
       description: input.description,
       durationMinutes: input.durationMinutes,
+      ...(offering ? { sessionOffering: offering } : {}),
+      ...(input.price !== undefined ? { priceCents: input.price === "" ? null : input.price } : {}),
       location: input.location,
       category: input.category,
       tags: input.tags,
@@ -432,6 +463,22 @@ export async function updateServiceAction(formData: FormData) {
   refreshScheduling();
   revalidatePath(serviceEditPath(input.id));
   redirect(serviceEditPath(input.id, { saved: "service" }));
+}
+
+export async function updateSessionTypeAction(_previous: { error: string }, formData: FormData) {
+  await requireAdmin("scheduling:manage");
+  const parsed = serviceUpdateFormSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const settings = await getSiteSettings();
+  if (!await prisma.service.findFirst({ where: { id: parsed.data.id, siteId: settings.siteId, isOneOff: false }, select: { id: true } })) {
+    return { error: "This session type is no longer available." };
+  }
+  try { await updateServiceAction(formData); }
+  catch (error) {
+    unstable_rethrow(error);
+    return { error: "The session type could not be saved. Your changes are still here; please try again." };
+  }
+  return { error: "" };
 }
 
 export async function createServiceCategoryAction(formData: FormData) {

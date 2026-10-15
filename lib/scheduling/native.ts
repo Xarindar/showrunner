@@ -55,7 +55,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
   async listActiveServices(options?: { siteId?: string }) {
     const siteId = options?.siteId || (await getCurrentSiteId());
     return prisma.service.findMany({
-      where: { siteId, isActive: true },
+      where: { siteId, isActive: true, isOneOff: false },
       include: {
         mediaAsset: true,
         resourceAssignments: {
@@ -503,6 +503,9 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
               siteId: service.siteId,
               clientId,
               serviceId: input.serviceId,
+              priceCents: service.priceCents,
+              sessionName: service.name,
+              sessionLocation: "",
               staffId: selectedStaff?.id,
               startsAt: input.startsAt,
               endsAt,

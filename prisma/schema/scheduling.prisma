@@ -81,6 +81,9 @@ model Service {
   description         String?
   imageUrl            String    @default("")
   durationMinutes     Int
+  priceCents          Int?
+  sessionOffering     Json?
+  isOneOff            Boolean   @default(false)
   location            String?
   category            String    @default("")
   tags                Json      @default("[]")
@@ -291,6 +294,11 @@ model Booking {
   clientId           String?
   client             Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
   customerName       String
+  sessionName        String?
+  sessionLocation    String?
+  packageSnapshot    Json?
+  priceCents         Int?
+  isManual           Boolean       @default(false)
   customerEmail      String
   customerPhone      String?
   notes              String?

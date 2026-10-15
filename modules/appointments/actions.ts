@@ -62,6 +62,7 @@ export async function updateBookingDetailAction(formData: FormData) {
   await prisma.booking.updateMany({
     where: bookingWhere,
     data: {
+      ...(input.sessionLocation !== undefined ? { sessionLocation: input.sessionLocation } : {}),
       ...(input.adminNotes !== undefined ? { adminNotes: input.adminNotes } : {}),
       ...(input.cancellationReason !== undefined ? { cancellationReason: input.cancellationReason } : {})
     }

@@ -419,7 +419,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
       policyAccepted: booking.policyAccepted,
       resourceIds: booking.resources.map((assignment) => assignment.resourceId),
       resourceNames: booking.resources.map((assignment) => assignment.resource.name),
-      serviceName: booking.service.name,
+      serviceName: booking.sessionName || booking.service.name,
       staffId: booking.staffId || "",
       staffName: booking.staff?.name || "",
       startsAt: booking.startsAt.toISOString(),
