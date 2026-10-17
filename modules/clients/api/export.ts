@@ -1,3 +1,4 @@
+import { getClientStatusSettings } from "@/lib/clients/configuration";
 import { NextResponse } from "next/server";
 import { recordAuditLog } from "@/lib/audit";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
@@ -19,6 +20,7 @@ function isoDate(value: Date | null | undefined) {
 export async function GET(request: Request) {
   const user = await requireAdmin("clients:export");
   const settings = await getSiteSettings();
+  const { options: configuredStatusOptions } = await getClientStatusSettings(settings.siteId);
   const clientWhere = await getAccessibleClientWhere(user, settings.siteId);
   const clients = await prisma.client.findMany({
     where: clientWhere,
@@ -77,6 +79,7 @@ export async function GET(request: Request) {
     "Email",
     "Phone",
     "Status",
+    "Service ID",
     "Pipeline Stage",
     "Company",
     "Family/Household",
@@ -124,7 +127,8 @@ export async function GET(request: Request) {
     client.name,
     client.email,
     client.phone || "",
-    clientStatusLabel(client.status),
+    clientStatusLabel(client.status, configuredStatusOptions),
+    isRecord(client.preferences) && typeof client.preferences.serviceId === "string" ? client.preferences.serviceId : "",
     client.pipelineStage,
     client.companyName,
     client.familyName,

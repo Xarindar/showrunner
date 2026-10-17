@@ -9,6 +9,7 @@ import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import sharp from "sharp";
 import { galleryProofMaxEdge, galleryProofObjectKey, renderGalleryProof } from "../lib/media-proofs";
+import { photoVariantKey } from "../lib/photo-variants";
 import { mediaReferenceCount, unreferencedMediaWhere } from "../lib/media-usage";
 
 function loadMocked(file: string, mocks: Record<string, unknown>, globals: Record<string, unknown> = {}) {
@@ -137,6 +138,7 @@ function mediaHarness(directory: string, extra: Record<string, unknown> = {}, en
   return loadMocked("lib/media.ts", {
     "server-only": {},
     "@/lib/prisma": { prisma: {} },
+    "@/lib/photo-variants": { photoVariantKey },
     "@/lib/media-proofs": { galleryProofObjectKey, renderGalleryProof },
     "@/lib/media-usage": { unreferencedMediaWhere },
     "@/lib/security/urls": { isSafeExternalHttpsUrl: () => false },
@@ -212,8 +214,8 @@ test("generic media signatures cannot bypass gallery entitlement or revoked clie
   assert.equal(calls.signature, 0);
   privateGallery = false;
   user = null;
-  assert.equal((await get()).status, 200, "ordinary signed private media keeps its prior contract");
-  assert.equal(calls.signature, 1);
+  assert.equal((await get()).status, 404, "a generic signature cannot unlock an original download");
+  assert.equal(calls.signature, 0);
 });
 
 function actionHarness(references: number, archiveWriteCount = 1, privacy?: { desired: boolean; existing: boolean; purchased?: boolean }) {
@@ -301,4 +303,30 @@ test("shoot proofs and originals reject active links assigned to a different or 
     assert.equal(route.calls.original, 0);
     assert.equal(route.calls.entitlement.length, 0);
   }
+});
+
+
+test("approved photo previews preserve proportions, strip metadata, and never expose public originals", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "showrunner-photo-sizes-"));
+  try {
+    await writeFile(path.join(directory, "original.jpg"), await sharp({ create: { width: 3000, height: 4500, channels: 3, background: "navy" } }).withExif({ IFD0: { Copyright: "Original metadata" } }).jpeg().toBuffer());
+    const rows = new Map<string, { metadata: object }>();
+    const media = mediaHarness(directory, { "@/lib/prisma": { prisma: { mediaAssetVariant: {
+      findUnique: async (query: { where: { assetId_type: { type: string } } }) => rows.get(query.where.assetId_type.type),
+      upsert: async (query: { create: { type: string; metadata: object } }) => rows.set(query.create.type, query.create)
+    } } } });
+    const source = { ...asset, key: "original.jpg", isPrivate: false };
+    await media.preparePhotoVariants(source);
+    for (const [type, edge] of [["THUMBNAIL", 320], ["HERO", 1920], ["FULL", 2048]] as const) {
+      const bytes = await readFile(path.join(directory, photoVariantKey(source.id, type)));
+      const info = await sharp(bytes).metadata();
+      assert.equal(info.height, edge);
+      assert.ok(Math.abs(info.width! / info.height! - 2 / 3) < .005);
+      assert.equal(info.format, "webp");
+      assert.equal(info.exif, undefined);
+    }
+    assert.equal(rows.has("CARD"), false, "card size remains deferred");
+    assert.equal(await media.mediaDeliveryResponse({ asset: source, type: "DOWNLOAD", request: request() }), null);
+    assert.throws(() => photoVariantKey("../escape", "FULL"));
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });

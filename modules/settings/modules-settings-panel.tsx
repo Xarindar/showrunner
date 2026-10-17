@@ -5,6 +5,9 @@ import { Search } from "lucide-react";
 import { Button, Input, Select, SettingControlGroup, SettingRow, SettingsCategory, SettingsGroup, SettingValueGroup, Switch } from "@/components/ui";
 import { centsToDollarsInput, type ClientVipSettings } from "@/lib/clients/vip-settings";
 
+import { clientStatusOptions } from "@/lib/clients/status";
+import type { ClientStatusSettings } from "@/lib/clients/status-settings";
+
 type SettingItem = {
   description?: string;
   id: string;
@@ -59,11 +62,12 @@ function categoryMatches(category: SettingCategory, query: string) {
 }
 
 type ModulesSettingsPanelProps = {
+  initialClientStatuses: ClientStatusSettings;
   initialVipSettings: ClientVipSettings;
   updateVipSettingsAction: (formData: FormData) => void | Promise<void>;
 };
 
-export function ModulesSettingsPanel({ initialVipSettings, updateVipSettingsAction }: ModulesSettingsPanelProps) {
+export function ModulesSettingsPanel({ initialClientStatuses, initialVipSettings, updateVipSettingsAction }: ModulesSettingsPanelProps) {
   const [query, setQuery] = useState("");
   const [vipEnabled, setVipEnabled] = useState(initialVipSettings.enabled);
   const [vipSpendEnabled, setVipSpendEnabled] = useState(initialVipSettings.spend.enabled);
@@ -83,6 +87,18 @@ export function ModulesSettingsPanel({ initialVipSettings, updateVipSettingsActi
         {
           description: "Client recognition, lifecycle defaults, and client-facing access.",
           groups: [
+            {
+              id: "clients-statuses", title: "Client statuses", items: [{ id: "clients.statuses", title: "Status choices and default", keywords: ["session", "booked", "paid", "order"], render: (
+                <div className="form-grid">
+                  <p>Choose the statuses shown when adding clients and filtering the list. Rename labels to fit your business. Existing client statuses are preserved.</p>
+                  {clientStatusOptions.map((status) => <div className="ui-equal-grid" key={status.value}>
+                    <label><input type="checkbox" name="clientStatusEnabled" value={status.value} defaultChecked={initialClientStatuses.options.some((option) => option.value === status.value)} /> Enable {status.label}</label>
+                    <input aria-label={`${status.label} label`} name={`clientStatusLabel_${status.value}`} maxLength={60} defaultValue={initialClientStatuses.options.find((option) => option.value === status.value)?.label || status.label} />
+                    <label><input type="radio" name="clientDefaultStatus" value={status.value} defaultChecked={initialClientStatuses.defaultStatus === status.value} /> Default</label>
+                  </div>)}
+                </div>
+              ) }]
+            },
             {
               description: "Define how clients become VIPs and which criteria count toward that status.",
               id: "clients-vip",
@@ -378,6 +394,7 @@ export function ModulesSettingsPanel({ initialVipSettings, updateVipSettingsActi
         }
       ] satisfies SettingCategory[],
     [
+      initialClientStatuses,
       adminVipBadgeEnabled,
       bookingApprovalEnabled,
       initialVipSettings.appointments.threshold,

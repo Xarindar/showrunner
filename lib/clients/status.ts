@@ -5,7 +5,9 @@ export const clientStatusValues = [
   "order_shipped",
   "appointment_booked",
   "appointment_paid",
-  "deposit_paid"
+  "deposit_paid",
+  "session_booked",
+  "session_paid"
 ] as const;
 
 export type ClientStatusValue = (typeof clientStatusValues)[number];
@@ -19,7 +21,9 @@ const clientStatusLabels: Record<ClientStatusValue, string> = {
   order_shipped: "Order Shipped",
   appointment_booked: "Appointment Booked",
   appointment_paid: "Appointment Paid",
-  deposit_paid: "Deposit Paid"
+  deposit_paid: "Deposit Paid",
+  session_booked: "Session booked",
+  session_paid: "Session paid"
 };
 
 const legacyClientStatusMap: Record<string, ClientStatusValue> = {
@@ -43,7 +47,7 @@ function normalizeStatusKey(value: string) {
 }
 
 export function normalizeClientStatus(value?: string | null): ClientStatusValue | undefined {
-  if (!value) return undefined;
+  if (!value || typeof value !== "string") return undefined;
   const normalized = normalizeStatusKey(value);
   if ((clientStatusValues as readonly string[]).includes(normalized)) return normalized as ClientStatusValue;
   return legacyClientStatusMap[normalized];
@@ -53,8 +57,10 @@ export function parseClientStatus(value?: string | null): ClientStatusValue {
   return normalizeClientStatus(value) || defaultClientStatus;
 }
 
-export function clientStatusLabel(value: string) {
+export function clientStatusLabel(value: string, options = clientStatusOptions) {
   const normalized = normalizeClientStatus(value);
+  const configured = options.find((option) => option.value === normalized);
+  if (configured) return configured.label;
   if (normalized) return clientStatusLabels[normalized];
 
   return normalizeStatusKey(value)

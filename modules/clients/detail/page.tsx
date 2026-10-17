@@ -1,9 +1,11 @@
+import { clientServiceId } from "@/lib/clients/service-selection";
+import { getClientStatusSettings } from "@/lib/clients/configuration";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BookingStatus, ClientPipelineStage, MediaDriver, MediaVariantType, type Prisma } from "@prisma/client";
 import { GitMerge, Save, Search } from "lucide-react";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
-import { clientStatusLabel, clientStatusOptions, defaultClientStatus, normalizeClientStatus } from "@/lib/clients/status";
+import { clientStatusLabel, clientStatusOptions as allClientStatusOptions, normalizeClientStatus } from "@/lib/clients/status";
 import { prisma } from "@/lib/prisma";
 import { enumLabel, formatDateTime, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl, privateMediaUploadMimeTypes, supportsPrivateMediaDriver } from "@/lib/media";
@@ -300,6 +302,9 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
   const openMergeModal = queryParams.merge === "1" || Boolean(mergeSearch);
   const user = await requireAdmin("clients:manage");
   const settings = await getSiteSettings();
+  const { options: configuredStatusOptions, defaultStatus: defaultClientStatus } = await getClientStatusSettings(settings.siteId);
+  const clientStatusOptions = configuredStatusOptions;
+  const services = await prisma.service.findMany({ where: { siteId: settings.siteId }, select: { id: true, name: true, isActive: true }, orderBy: { name: "asc" } });
   const client = await prisma.client.findFirst({
     where: await getAccessibleClientWhere(user, settings.siteId, { id }),
     include: {
@@ -530,7 +535,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         <div className="ui-field">
           <label htmlFor="status">Status</label>
           <select id="status" name="status" defaultValue={normalizeClientStatus(client.status) || defaultClientStatus}>
-            {clientStatusOptions.map((status) =>
+            {[...clientStatusOptions, ...allClientStatusOptions.filter((option) => option.value === normalizeClientStatus(client.status) && !clientStatusOptions.some((current) => current.value === option.value))].map((status) =>
             <option key={status.value} value={status.value}>
                 {status.label}
               </option>
@@ -538,6 +543,13 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           </select>
         </div>
       </EqualGrid>
+      <div className="ui-field">
+          <label htmlFor="client-service">Service</label>
+          <select id="client-service" name="serviceId" defaultValue={clientServiceId(client.preferences)}>
+            <option value="">No service selected</option>
+            {services.filter((service) => service.isActive || service.id === clientServiceId(client.preferences)).map((service) => <option key={service.id} value={service.id}>{service.name}{service.isActive ? "" : " (inactive)"}</option>)}
+          </select>
+        </div>
       <EqualGrid>
         <div className="ui-field">
           <label htmlFor="pipelineStage">Pipeline</label>
@@ -638,6 +650,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
   );
   const profileDetails = (
     <div className="clients-profile-detail-panel" aria-label="Client profile details">
+      <section className="clients-profile-detail-section"><h3>Service</h3><p>{services.find((service) => service.id === clientServiceId(client.preferences))?.name || "No service selected"}</p></section>
       {profileSections.map((section) => (
         <section className="clients-profile-detail-section" key={section.title}>
           <h3>{section.title}</h3>
@@ -962,7 +975,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           phone={client.phone || ""}
           photoUrl={client.photoUrl}
           pipeline={enumLabel(client.pipelineStage)}
-          status={clientStatusLabel(client.status)}
+          status={clientStatusLabel(client.status, configuredStatusOptions)}
         />
         <Card
           as="section"

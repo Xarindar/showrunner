@@ -12,6 +12,7 @@ import { NextRequest } from "next/server";
 import sharp from "sharp";
 import ts from "typescript";
 import { galleryProofMaxEdge, galleryProofObjectKey, renderGalleryProof } from "../lib/media-proofs";
+import { photoVariantKey } from "../lib/photo-variants";
 import { unreferencedMediaWhere } from "../lib/media-usage";
 import { slugify } from "../lib/slug";
 import * as galleryValidation from "../modules/portfolio/client-gallery-validation";
@@ -51,7 +52,12 @@ function uploadHarness(directory: string) {
     findFirst: async () => ({ id: "gallery-large", title: "High-resolution shoot", slug: "high-resolution-shoot" }),
     updateMany: async () => ({ count: 1 })
   };
+  const variantRows = new Map<string, unknown>();
   const prisma = {
+    mediaAssetVariant: {
+      findUnique: async ({ where }: { where: { assetId_type: { assetId: string; type: string } } }) => variantRows.get(`${where.assetId_type.assetId}:${where.assetId_type.type}`),
+      upsert: async ({ create }: { create: { assetId: string; type: string } }) => variantRows.set(`${create.assetId}:${create.type}`, create)
+    },
     mediaAsset: {
       create: async ({ data }: { data: MediaAsset }) => {
         const asset = { ...data, deletedAt: null };
@@ -71,6 +77,7 @@ function uploadHarness(directory: string) {
   const media = loadMocked<typeof import("../lib/media")>("lib/media.ts", {
     "server-only": {},
     "@/lib/prisma": { prisma },
+    "@/lib/photo-variants": { photoVariantKey },
     "@/lib/media-proofs": { galleryProofObjectKey, renderGalleryProof },
     "@/lib/media-usage": { unreferencedMediaWhere },
     "@/lib/security/urls": { isSafeExternalHttpsUrl: () => false },
@@ -142,7 +149,7 @@ test("large gallery JPEGs roundtrip through the real upload, storage, and proof 
       assert.equal(asset.driver, "SERVER_ASSETS");
       assert.equal(asset.sizeBytes, accepted.length);
       assert.equal(asset.mimeType, "image/jpeg");
-      assert.match(asset.key, /^sites\/site-large\/uploads\/client-shoots\/client-large\/gallery-large\/.+\.jpg$/);
+      assert.equal(asset.key, `photos/${asset.id}/original.jpg`);
       assert.equal(digest(await readFile(path.join(directory, asset.key))), originalHash);
 
       const proof = await harness.media.galleryProofResponse(asset, "FULL");

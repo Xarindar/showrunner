@@ -1,5 +1,6 @@
 import { DashboardCardList, DashboardMetric } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
+import { mediaAssetDisplayUrl } from "@/lib/media";
 import type { DashboardWidgetDefinition } from "@/shell/dashboard-widget-types";
 import { widgetItemLimit } from "@/shell/dashboard-widget-utils";
 
@@ -44,7 +45,7 @@ export const recentMediaWidget = {
         {size !== "sm" && assets.length ? (
           <div className="dashboard-card-media-grid">
             {assets.map((asset) => {
-              const thumbnailUrl = asset.variants[0]?.url || asset.url;
+              const thumbnailUrl = mediaAssetDisplayUrl(asset, "THUMBNAIL");
 
               return (
                 <span
