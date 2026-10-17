@@ -3,12 +3,12 @@
 .fields { display: grid; gap: 16px; border: 0; padding: 0; min-width: 0; }
 .field { display: grid; gap: 6px; }
 .field input, .field textarea, .fields select { width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; padding: 10px 12px; font: inherit; background: #fff; color: #222; }
-.field input:focus-visible, .field textarea:focus-visible, .fields select:focus-visible { outline: 2px solid #116466; outline-offset: 2px; }
+.field input:focus-visible, .field textarea:focus-visible, .fields select:focus-visible { outline: 2px solid var(--sd-color-focus, var(--color-brand)); outline-offset: 2px; }
 .list { display: grid; gap: 12px; min-width: 0; border: 1px solid var(--border, #ddd); border-radius: 8px; padding: 16px; }
 .item { display: grid; gap: 12px; border-bottom: 1px solid var(--border, #ddd); padding-bottom: 16px; }
 .check { display: flex; align-items: center; gap: 8px; }
 .fields button { justify-self: start; border: 1px solid #bbb; border-radius: 6px; padding: 8px 14px; font: inherit; cursor: pointer; background: #f7f7f7; color: #222; }
-.fields button[type="submit"] { background: #116466; border-color: #116466; color: #fff; }
+.fields button[type="submit"] { background: var(--color-brand); border-color: var(--color-brand); color: #fff; }
 .fields button:disabled { opacity: .55; cursor: default; }
 .mediaPicker { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
 .mediaPicker small { color: var(--color-muted, #667085); }
@@ -51,7 +51,7 @@
 .fields .heroImageButton { position: absolute; right: 12px; top: 12px; opacity: 0; display: flex; gap: 6px; }
 .heroSlide:hover .heroImageButton, .heroSlide:focus-within .heroImageButton { opacity: 1; }
 @media (hover: none) { .fields .heroImageButton { opacity: 1; } }
-.editSurface:hover, .editSurface:focus-within { outline-color: #116466; }
+.editSurface:hover, .editSurface:focus-within { outline-color: var(--sd-color-focus, var(--color-brand)); }
 .editOverlay, .fields .editOverlay { position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; gap: 6px; align-items: center; background: #fff; color: #173f5f; box-shadow: 0 2px 8px #0003; opacity: 0; transition: opacity .15s; font-size: 12px; padding: 8px 12px; border: 1px solid #b9c5c4; border-radius: 4px; cursor: pointer; }
 .contextPanel { position: relative; }
 .contextTools { opacity: 0; display: flex; flex-wrap: wrap; gap: 8px; }

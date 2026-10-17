@@ -46,11 +46,12 @@ a live installation.
 ## Session types and package tiers
 
 Create a session type and its package tiers together at `/admin/modules/services/new`.
-One package is shown initially; **Add another tier** copies its price, duration and
-coverage selections. The shared coverage matrix lets owners define a row once,
-then select which tiers include it. Wedding suggestions are opt-in and editable;
-custom coverage names from the same site's saved session types are suggested inline.
-Coverage rows are inclusions within the shoot, not separately scheduled services.
+One package is shown initially; **Add package** creates a blank package, while
+**Duplicate** copies price, duration and coverage selections. The shared coverage matrix lets owners define a row once,
+then select which tiers include it. The **What’s included** table comes before
+Packages. Its **Add item** button opens the reusable service library, with search,
+category/tag filters, multiple selection, and a New service form. Library services
+are parts of a session, not independently scheduled session types.
 Optional extras have independent prices. Existing service bundles remain available
 under **Service bundles** and are not converted or deleted.
 
@@ -68,6 +69,34 @@ The selected package name, coverage, extras and agreed values are copied to
 `Booking.packageSnapshot`. Later catalog edits do not change booked inclusions.
 Legacy session types and bookings with null configuration continue to work.
 
+`ServiceLibraryItem` holds site-scoped reusable names, descriptions, categories and
+tags. Names are unique within a site ignoring case. Library creates/edits save
+immediately; adding a service or changing its package selections remains a session
+draft until Save session type. The existing shared Modal, Field and Button controls
+provide dialog behavior. `service-library-picker.module.css` uses the shared color,
+type, space and radius tokens; the picker is reused by new and existing sessions.
+
+Apply `20261016010000_service_library` after the tiers migration. It adds the library
+table and imports distinct existing included-item names per site without rewriting
+session JSON or existing package references. The editor links legacy rows by name,
+preserving their IDs. New/edited sessions resolve linked records within the current
+site and store authoritative client-facing metadata. Reopening the session reads
+current library details; existing booking snapshots remain unchanged. New booking
+snapshots also preserve descriptions in optional `includedItems`. This stores data
+for later client rendering; the public package-booking rebuild is still pending.
+
 Apply `20261015010000_session_package_tiers` after the simpler-sessions migration.
 It only adds nullable JSON columns and leaves existing services, bundles, bookings,
 and public links intact. Local verification uses the isolated session-check database.
+
+## Builder refinement — October 15, 2026
+
+The Services catalog calls reusable offerings **Session types**, choices within
+one offering **Packages**, and combinations of separate services **Service bundles**.
+The desktop comparison matrix and mobile package cards remain. New packages receive
+keyboard focus; invalid fields reveal their enclosing disclosures before native
+validation focuses them. Create/edit forms warn before following links away from
+changed fields or reloading. This follows the content editor's existing pattern;
+it is not autosave or protection against browser history navigation within the app.
+Saving an edit remounts the form at its persisted revision so the saved values become
+the next clean draft. See `session-builder-research.md` for research and test evidence.

@@ -478,6 +478,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
         <div className="product-editor-stack">
           <AvailabilityPanel availability={availability} resources={resources} staff={staff} />
           <SlotDiagnosticsPanel
+            defaultOpen={Boolean(params.diagnosticServiceId)}
             diagnostics={diagnostics}
             resources={resources}
             selectedDate={selectedDiagnosticDate}

@@ -57,6 +57,7 @@ model Site {
   siteApiKeys              SiteApiKey[]
   services                 Service[]
   serviceCategories        ServiceCategory[]
+  serviceLibraryItems      ServiceLibraryItem[]
   servicePackages          ServicePackage[]
   servicePackageItems      ServicePackageItem[]
   staffMembers             StaffMember[]

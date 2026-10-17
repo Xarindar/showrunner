@@ -320,6 +320,24 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
 
   const filtersModal = (
     <div className="clients-filter-layout">
+      <form action="/admin/modules/clients" className="clients-modal-section form-grid">
+        <h3>Status</h3>
+        {query ? <input type="hidden" name="q" value={query} /> : null}
+        {selectedSegment ? <input type="hidden" name="segment" value={selectedSegment.key} /> : null}
+        {!usesDefaultMetrics(selectedMetricIds) ? selectedMetricIds.length ? selectedMetricIds.map(metric => <input key={metric} type="hidden" name="metrics" value={metric} />) : <input type="hidden" name="metrics" value="none" /> : null}
+        <label className="ui-field" htmlFor="clients-status-filter"><span className="ui-field-label">Client status</span>
+              <select aria-label="Filter clients by status" id="clients-status-filter" name="status" defaultValue={selectedStatus || ""}>
+                <option value="">All statuses</option>
+                {clientStatusOptions.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </select>
+        </label>
+        <Button type="submit" variant="secondary">Apply status</Button>
+      </form>
+
       <section className="clients-modal-section">
         <h3>Saved filters</h3>
         <div className="clients-filter-pills">
@@ -474,7 +492,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         <div className="ui-data-table-header">
           <div className="ui-data-table-titlebar">
             <div>
-              <h2 className="section-title" id="clients-table-title">
+              <h2 className="ui-sr-only" id="clients-table-title">
                 Clients
               </h2>
               <p className="ui-zero">
@@ -494,14 +512,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                   : <input type="hidden" name="metrics" value="none" />
                 : null}
               <input aria-label="Search clients" id="clients-search" name="q" placeholder="Search clients" defaultValue={query} />
-              <select aria-label="Filter clients by status" id="clients-status-filter" name="status" defaultValue={selectedStatus || ""}>
-                <option value="">All statuses</option>
-                {clientStatusOptions.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
+              {selectedStatus ? <input type="hidden" name="status" value={selectedStatus} /> : null}
               <Button size="sm" type="submit" variant="secondary">
                 <Search size={15} />
                 Search

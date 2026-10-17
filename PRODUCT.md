@@ -25,3 +25,6 @@ Keep module headers to one compact line: the name, relevant icon/count, and esse
 Portfolio manages public website photo albums for showcasing work. Client image delivery, private access, proofing, approvals and download workflows belong to the future Clients delivery system, not Portfolio. New Portfolio albums are public galleries saved as drafts. Existing private records remain private; no data migration or deletion is implied.
 
 Service/product showcase cards are an opt-in reusable block inside an approved page section. Owners add cards and bind them to existing catalog records, with display-only and approved client style choices. Names, descriptions, media, product pricing and service duration stay in the central catalog. Service actions reuse slug-based booking; product actions require a configured existing client product destination. See developer-docs/showcase-cards.md.
+
+## Admin design direction
+The Shopify-inspired system in DESIGN.md applies across admin navigation, resource indexes, editors and shared controls. Replace folder-tabbed catalog containers with navigation destinations and continuous editors. Preserve client-facing branding. Track the overhaul in `jazz/shopify-design/SHOWRUNNER-MIGRATION.md`.

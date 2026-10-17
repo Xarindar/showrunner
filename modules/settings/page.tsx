@@ -83,25 +83,10 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </div>
       </header>
 
-      <SettingsNav active="dashboard" />
+      <div className="admin-settings-layout"><SettingsNav active="dashboard" /><div className="stack">
 
       {saved ? <div className="success-message">Settings saved.</div> : null}
       {errorMessage ? <div className="error">{errorMessage}</div> : null}
-
-      <EqualGrid aria-label="Settings structure" as="section" min="220px">
-        <Card>
-          <h2 className="compact-title">Business</h2>
-          <p>Identity, contact email, and timezone for public pages and notifications.</p>
-        </Card>
-        <Card>
-          <h2 className="compact-title">Module enablement</h2>
-          <p>{platformStatus.enabledCount} modules enabled, including required platform modules for the admin shell.</p>
-        </Card>
-        <Card>
-          <h2 className="compact-title">Security and data</h2>
-          <p>{platformFoundationItems.length} foundation items tracked for roles, audit logs, site scoping, and policy controls.</p>
-        </Card>
-      </EqualGrid>
 
       <Card aria-label="Payments" as="section" minHeight="none" bodyClassName="form-grid">
         <div>
@@ -374,6 +359,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           <Button type="submit">Create key</Button>
         </form>
       </Card>
+    </div></div>
     </div>);
 
 }

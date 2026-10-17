@@ -29,9 +29,9 @@ function jsonStringArray(value: Prisma.JsonValue | null | undefined) {
 }
 
 function savedPackageMessage(saved?: string) {
-  if (saved === "created") return "Package created. Add services to finish building it.";
-  if (saved === "package-item") return "Package contents updated.";
-  if (saved === "package") return "Package details saved.";
+  if (saved === "created") return "Bundle created. Add services to finish building it.";
+  if (saved === "package-item") return "Bundle contents updated.";
+  if (saved === "package") return "Bundle details saved.";
   return null;
 }
 
@@ -82,15 +82,15 @@ function newPackageForm() {
     <section className="studio-panel" aria-labelledby="new-package-title">
       <div className="studio-section-head">
         <div>
-          <h2 id="new-package-title">Create package</h2>
+          <h2 id="new-package-title">Create service bundle</h2>
         </div>
       </div>
       <form action={createServicePackageAction} className="studio-action-form">
-        <p className="muted-text">Name the package first. After it is created, you can add services and refine the package details.</p>
+        <p className="muted-text">Combine separate services in one bundle. Name it first, then choose its services.</p>
         <div className="catalog-form-grid is-two">
           <div className="ui-field">
-            <label htmlFor="package-name">Package name</label>
-            <input autoFocus id="package-name" name="name" placeholder="Glow reset package" required />
+            <label htmlFor="package-name">Bundle name</label>
+            <input autoFocus id="package-name" name="name" placeholder="Wedding and engagement" required />
           </div>
         </div>
         <div className="ui-field">
@@ -107,10 +107,10 @@ function newPackageForm() {
             <input defaultValue="0" id="package-sort" name="sortOrder" type="number" />
           </div>
         </div>
-        <Switch defaultChecked label="Active package" name="isActive" variant="inline" />
+        <Switch defaultChecked label="Active bundle" name="isActive" variant="inline" />
         <Button type="submit">
           <Plus size={16} />
-          Create package
+          Create service bundle
         </Button>
       </form>
     </section>
@@ -126,15 +126,15 @@ export default async function ServicePackageEditPage({ packageId, searchParams }
   if (packageId === "new") {
     return (
       <div className={`${styles.page} stack product-studio-page product-editor-page service-editor-page has-mobile-shell-header`}>
-        <AdminMobileHeaderSlot backHref="/admin/modules/services?tab=packages" title="New package" />
+        <AdminMobileHeaderSlot backHref="/admin/modules/services?tab=packages" title="New service bundle" />
         <header className="page-header service-studio-header">
           <div className={styles.heading}>
             <ButtonLink href="/admin/modules/services?tab=packages" size="sm" variant="ghost">
               <ArrowLeft size={15} />
-              Packages
+              Service bundles
             </ButtonLink>
             <div>
-              <h1>New package</h1>
+              <h1>New service bundle</h1>
             </div>
           </div>
         </header>
@@ -165,7 +165,7 @@ export default async function ServicePackageEditPage({ packageId, searchParams }
   ]);
 
   if (!servicePackage) {
-    redirect("/admin/modules/services?tab=packages&error=Package%20not%20found.");
+    redirect("/admin/modules/services?tab=packages&error=Bundle%20not%20found.");
   }
 
   return (
@@ -175,7 +175,7 @@ export default async function ServicePackageEditPage({ packageId, searchParams }
         <div className={styles.heading}>
           <ButtonLink href="/admin/modules/services?tab=packages" size="sm" variant="ghost">
             <ArrowLeft size={15} />
-            Packages
+            Service bundles
           </ButtonLink>
           <div>
             <h1>{servicePackage.name}</h1>

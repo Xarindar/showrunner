@@ -2,6 +2,7 @@
 
 import { initialBusinessHoursSchema } from "@/lib/scheduling/session-input";
 import { readSessionOffering } from "@/lib/scheduling/session-offering";
+import { hydrateSessionServiceLibrary } from "@/lib/scheduling/service-library-store";
 
 import { revalidatePath } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
@@ -348,6 +349,7 @@ export async function createServiceAction(_previous: { error: string }, formData
   const settings = await getSiteSettings();
   let service;
   try {
+    const offering = await hydrateSessionServiceLibrary(input.sessionOffering ?? null, settings.siteId);
     const slug = await generateUniqueServiceSlug(prisma, {
       name: input.name,
       slug: input.slug || "",
@@ -360,7 +362,7 @@ export async function createServiceAction(_previous: { error: string }, formData
         const hours = initialBusinessHoursSchema.safeParse({ weekdays: formData.getAll("weekdays"), start: formData.get("hoursStart"), end: formData.get("hoursEnd") });
         if (!hours.success) throw new Error(hours.error.issues[0].message);
         const longestTier = Math.max(input.durationMinutes, ...(input.sessionOffering?.tiers.map(tier => tier.durationMinutes) ?? []));
-        if (hours.data.end - hours.data.start < longestTier) throw new Error("Business hours must be long enough for every package tier.");
+        if (hours.data.end - hours.data.start < longestTier) throw new Error("Business hours must be long enough for every package.");
         await tx.availabilityRule.createMany({ data: [...new Set(hours.data.weekdays)].map(weekday => ({ siteId: settings.siteId, weekday, startMinutes: hours.data.start, endMinutes: hours.data.end })) });
       }
         return tx.service.create({
@@ -370,7 +372,7 @@ export async function createServiceAction(_previous: { error: string }, formData
           name: input.name,
           description: input.description,
           durationMinutes: input.durationMinutes,
-          ...(input.sessionOffering ? { sessionOffering: input.sessionOffering } : {}),
+          ...(offering ? { sessionOffering: offering } : {}),
           ...(input.price !== undefined ? { priceCents: input.price === "" ? null : input.price } : {}),
           location: input.location,
           category: input.category,
@@ -420,12 +422,12 @@ export async function updateServiceAction(formData: FormData) {
   const settings = await getSiteSettings();
   const current = await prisma.service.findFirst({ where: { id: input.id, siteId: settings.siteId } });
   if (!current) redirect(servicesAdminPath({ error: "Session type not found." }));
-  const offering = input.sessionOffering ?? readSessionOffering(current.sessionOffering);
+  const offering = await hydrateSessionServiceLibrary(input.sessionOffering ?? readSessionOffering(current.sessionOffering), settings.siteId);
   // Older service forms edit the default package; keep the other tiers and coverage intact.
   if (offering && !input.sessionOffering) {
     offering.tiers[0].durationMinutes = input.durationMinutes;
     if (input.price !== undefined) offering.tiers[0].priceCents = input.price === "" ? null : input.price;
-    if (offering.tiers.length > 1 && offering.tiers[0].priceCents === null) redirect(serviceEditPath(input.id, { error: "Set a price for every tier." }));
+    if (offering.tiers.length > 1 && offering.tiers[0].priceCents === null) redirect(serviceEditPath(input.id, { error: "Set a price for every package." }));
   }
 
   await prisma.service.updateMany({

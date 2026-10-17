@@ -113,6 +113,22 @@ model Service {
   @@index([siteId, isActive])
 }
 
+model ServiceLibraryItem {
+  id          String   @id @default(cuid())
+  siteId      String
+  site        Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  name        String
+  nameKey     String
+  description String   @default("")
+  category    String   @default("")
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([siteId, nameKey])
+  @@index([siteId, category])
+}
+
 model ServiceCategory {
   id           String      @id @default(cuid())
   siteId       String

@@ -1,18 +1,8 @@
-import { TabLink, Tabs } from "@/components/ui";
+import Link from "next/link";
 
-type SettingsNavProps = {
-  active: "dashboard" | "modules";
-};
-
-export function SettingsNav({ active }: SettingsNavProps) {
-  return (
-    <Tabs aria-label="Settings sections" className="settings-tabs">
-      <TabLink aria-selected={active === "dashboard"} href="/admin/modules/settings">
-        Dashboard
-      </TabLink>
-      <TabLink aria-selected={active === "modules"} href="/admin/modules/settings/modules">
-        Modules
-      </TabLink>
-    </Tabs>
-  );
+export function SettingsNav({ active }: { active: "dashboard" | "modules" }) {
+  return <nav className="admin-settings-nav" aria-label="Settings sections">
+    <Link aria-current={active === "dashboard" ? "page" : undefined} href="/admin/modules/settings">General</Link>
+    <Link aria-current={active === "modules" ? "page" : undefined} href="/admin/modules/settings/modules">Modules</Link>
+  </nav>;
 }

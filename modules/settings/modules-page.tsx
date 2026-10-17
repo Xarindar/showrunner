@@ -26,10 +26,11 @@ export default async function SettingsModulesPage({ searchParams }: SettingsModu
         </div>
       </header>
 
-      <SettingsNav active="modules" />
+      <div className="admin-settings-layout"><SettingsNav active="modules" /><div className="stack">
       {saved === "clients-vip" ? <div className="success-message">Client VIP settings saved.</div> : null}
       {error ? <div className="error">{error}</div> : null}
       <ModulesSettingsPanel initialVipSettings={vipSettings} updateVipSettingsAction={updateClientVipSettingsAction} />
+    </div></div>
     </div>
   );
 }

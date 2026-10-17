@@ -5,24 +5,33 @@ import { Button, ButtonLink } from "@/components/ui";
 import { createServiceAction } from "../actions";
 import styles from "@/modules/appointments/session-form.module.css";
 import { SessionPackagesEditor } from "./session-packages-editor";
+import editorStyles from "../service-editor.module.css";
 import packageStyles from "./session-packages-editor.module.css";
+import { SessionDraftGuard, revealInvalidSessionField } from "./session-draft-guard";
 
-export function SessionTypeForm({ businessHours, timezone, coverageSuggestions = [] }: { businessHours: string[]; timezone: string; coverageSuggestions?: string[] }) {
+export function SessionTypeForm({ businessHours, timezone }: { businessHours: string[]; timezone: string }) {
   const [state, action, pending] = useActionState(createServiceAction, { error: "" });
   const [values, setValues] = useState({ name: "", description: "", bufferBeforeMinutes: "0", bufferAfterMinutes: "15", minimumNoticeHours: "12", maxAdvanceDays: "60", slotIntervalMinutes: "30" });
   const [active, setActive] = useState(false);
   const field = (name: keyof typeof values) => ({ name, value: values[name], onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setValues({ ...values, [name]: event.target.value }) });
-  return <div className={`${styles.page} ${packageStyles.createPage}`}>
+  return <div className={`${styles.page} ${packageStyles.createPage} ${editorStyles.page}`}>
     <header className={styles.header}><h1>New session type</h1><ButtonLink href="/admin/modules/services" variant="ghost">Cancel</ButtonLink></header>
-    <form action={action} className={styles.form} onReset={event => event.preventDefault()}>
-      <fieldset><legend>Session details</legend>
-        <label>Name<input {...field("name")} required placeholder="Family session" /></label>
+    <form id="new-session-type-form" action={action} className={`${styles.form} ${editorStyles.createGrid}`} onReset={event => event.preventDefault()} onInvalidCapture={revealInvalidSessionField}>
+      <SessionDraftGuard formId="new-session-type-form" />
+      <div className="product-studio-main">
+      <section className="studio-panel"><fieldset><legend>Session details</legend>
+        <p className={styles.hint}>Create a reusable offering, such as Wedding photography. Book a client’s date and time in Appointments.</p>
+        <label>Session type name<input {...field("name")} required placeholder="Family session" /></label>
         <label>Description <small>(optional)</small><textarea {...field("description")} rows={3} /></label>
       </fieldset>
-      <SessionPackagesEditor suggestions={coverageSuggestions} requirePrice />
-      <fieldset><legend>Booking availability</legend>
-        <p className={styles.hint}>{businessHours.length ? `Uses your business hours (${timezone}): ${businessHours.join(" · ")}.` : "Set your business hours below to offer online booking, or save a draft for now."}</p>
-        <label>Allow online booking<select value={active ? "yes" : "no"} onChange={event => setActive(event.target.value === "yes")}><option value="no">Not yet — save as draft</option><option value="yes">Yes — use my business hours</option></select></label>
+      </section>
+      <SessionPackagesEditor requirePrice />
+      </div>
+      <aside className="product-studio-sidecar">
+      <section className="studio-panel"><fieldset><legend>Booking availability</legend>
+        <p className={styles.hint}>{businessHours.length ? `Uses your business hours (${timezone}): ${businessHours.join(" · ")}.` : "Set your business hours below to activate this session type, or save a draft for now."}</p>
+        <label>Session type status<select value={active ? "yes" : "no"} onChange={event => setActive(event.target.value === "yes")}><option value="no">Draft — finish setup later</option><option value="yes">Active — use my business hours</option></select></label>
+        <p className={styles.hint}>Activate this session type to select it when booking a client. Online package selection is not available yet.</p>
         {active && <input type="hidden" name="isActive" value="on" />}
         {!businessHours.length && active && <fieldset><legend>Business hours ({timezone})</legend>
           <p className={styles.hint}>These hours apply to all your session types. You can adjust them later in your calendar.</p>
@@ -30,13 +39,16 @@ export function SessionTypeForm({ businessHours, timezone, coverageSuggestions =
           <div className={styles.row}><label>From<input type="time" name="hoursStart" required /></label><label>Until<input type="time" name="hoursEnd" required /></label></div>
         </fieldset>}
       </fieldset>
-      <details><summary>More scheduling options</summary>
+      </section>
+      <section className="studio-panel"><details><summary>More scheduling options</summary>
         <div className={styles.row}><label>Preparation time <small>(minutes)</small><input {...field("bufferBeforeMinutes")} type="number" min="0" max="1440" /></label><label>Break after session <small>(minutes)</small><input {...field("bufferAfterMinutes")} type="number" min="0" max="1440" /></label></div>
         <label>Offer start times every <small>(minutes)</small><input {...field("slotIntervalMinutes")} type="number" min="1" max="1440" /></label>
         <div className={styles.row}><label>Minimum notice <small>(hours)</small><input {...field("minimumNoticeHours")} type="number" min="0" max="8760" /></label><label>Accept bookings up to <small>(days ahead)</small><input {...field("maxAdvanceDays")} type="number" min="1" max="3650" /></label></div>
       </details>
+      </section>
+      </aside>
       {state.error && <p className="error" role="alert">{state.error}</p>}
-      <footer className={styles.footer}><Button disabled={pending} type="submit">{pending ? "Saving…" : "Save session type"}</Button></footer>
+      <footer className={editorStyles.saveFooter}><Button disabled={pending} type="submit">{pending ? "Saving…" : "Save session type"}</Button></footer>
     </form>
   </div>;
 }

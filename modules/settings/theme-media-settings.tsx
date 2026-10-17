@@ -22,7 +22,7 @@ export function ThemeMediaSettings({ settings }: ThemeMediaSettingsProps) {
     <section className="subpanel form-grid">
       <div>
         <h2 className="compact-title">Theme and media</h2>
-        <p>Choose one brand color. Showrunner owns the neutral surfaces and status colors so the interface stays clear and consistent.</p>
+        <p>Choose the branding for your client-facing website, booking and portal. Showrunner admin uses its own design.</p>
       </div>
 
       <EqualGrid min="220px">

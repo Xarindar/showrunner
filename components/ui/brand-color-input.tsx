@@ -25,7 +25,7 @@ export function BrandColorInput({ defaultValue, id, name }: BrandColorInputProps
         />
         <code>{color}</code>
       </span>
-      <small className="ui-field-hint">Used for the logo mark, primary actions, focus, and progress.</small>
+      <small className="ui-field-hint">Used for actions and accents on client-facing screens.</small>
     </div>
   );
 }

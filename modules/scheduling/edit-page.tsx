@@ -1,20 +1,21 @@
+import { BookingPhotoField } from "./components/booking-photo-field";
 import { SessionTypeForm } from "./components/session-type-form";
 import { SessionPackagesEditor } from "./components/session-packages-editor";
 import { SessionDetailsForm, SessionDetailsSaveButton } from "./components/session-details-form";
 import { readSessionOffering } from "@/lib/scheduling/session-offering";
+import { hydrateSessionServiceLibrary } from "@/lib/scheduling/service-library-store";
 import styles from "./service-editor.module.css";
 import { catalogMediaUrl } from "@/lib/catalog-media-url";
 import { contentWebsiteUrl, resolveContentManifest } from "@/clients/content-manifests";
-import NextImage from "next/image";
 import { notFound } from "next/navigation";
 import { MediaVariantType, type Prisma } from "@prisma/client";
-import { ArrowLeft, Boxes, Clock3, FileText, Upload, X } from "lucide-react";
+import { ArrowLeft, Boxes, Clock3, FileText } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { stringArrayCsv } from "@/lib/format";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { AssetPicker, Button, ButtonLink, Switch, type AssetPickerAsset } from "@/components/ui";
+import { ButtonLink, Switch, type AssetPickerAsset } from "@/components/ui";
 import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
 import { attachServiceImageAction, removeServiceImageAction, uploadServiceImageAction } from "./actions";
 import { ServiceBookingRulesTable } from "./components/service-booking-rules-table";
@@ -63,9 +64,9 @@ function serviceDurationLabel(minutes: number) {
 
 function savedServiceMessage(saved?: string) {
   if (saved === "created") return "Session type saved.";
-  if (saved === "media") return "Service image updated.";
-  if (saved === "service") return "Service changes saved.";
-  if (saved) return "Service updated.";
+  if (saved === "media") return "Session type image updated.";
+  if (saved === "service") return "Session type saved.";
+  if (saved) return "Session type updated.";
   return null;
 }
 
@@ -93,8 +94,6 @@ function hiddenSchedulingValues(service: ServiceWithBuilderData) {
 export default async function ServiceEditPage({ searchParams, serviceId }: ServiceEditPageProps) {
   await requireAdmin("scheduling:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const savedOfferings = await prisma.service.findMany({ where: { siteId: settings.siteId, isOneOff: false }, select: { sessionOffering: true } });
-  const coverageSuggestions = uniqueSortedStrings(savedOfferings.flatMap(service => readSessionOffering(service.sessionOffering)?.coverageItems.map(item => item.name) ?? []));
   const taxonomyServicesPromise = prisma.service.findMany({
     where: { siteId: settings.siteId, isOneOff: false },
     select: { category: true, intakePrompt: true, location: true, policyText: true }
@@ -117,7 +116,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     const rules = await prisma.availabilityRule.findMany({ where: { siteId: settings.siteId, staffId: null, resourceId: null }, orderBy: [{ weekday: "asc" }, { startMinutes: "asc" }] });
     const timeLabel = (minutes: number) => `${Math.floor(minutes / 60).toString().padStart(2, "0")}:${(minutes % 60).toString().padStart(2, "0")}`;
     const businessHours = rules.map(rule => `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][rule.weekday]} ${timeLabel(rule.startMinutes)}–${timeLabel(rule.endMinutes)}`);
-    return <SessionTypeForm businessHours={businessHours} timezone={settings.timezone} coverageSuggestions={coverageSuggestions} />;
+    return <SessionTypeForm businessHours={businessHours} timezone={settings.timezone} />;
   }
 
   const [service, taxonomyServices, intakeFormFields, serviceCategories, mediaAssets] = await Promise.all([
@@ -142,6 +141,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   ]);
 
   if (!service) notFound();
+  const offering = await hydrateSessionServiceLibrary(readSessionOffering(service.sessionOffering), settings.siteId);
 
   const categoryOptions = uniqueSortedStrings([...serviceCategories.map((category) => category.name), ...taxonomyServices.map((item: ServiceTaxonomyOption) => item.category)]);
   const intakeOptions = uniqueSortedStrings([...taxonomyServices.map((item: ServiceTaxonomyOption) => item.intakePrompt), ...intakeFormFields.map((field) => field.label)]);
@@ -159,110 +159,64 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD)
   }));
   const serviceImageUrl = catalogMediaUrl(serviceMediaUrl(service), contentWebsiteUrl(resolveContentManifest(settings.siteId, settings.publicContentConfig)));
-  const serviceImageAlt = `${service.name} booking image`;
+  const serviceImageAlt = `${service.name} session photo`;
   const serviceImageUploadFormId = `service-${service.id}-image-upload`;
   const serviceImageAttachFormId = `service-${service.id}-image-attach`;
   const serviceImageRemoveFormId = `service-${service.id}-image-remove`;
 
   const detailsContent = (
     <>
-      <SessionDetailsForm>
+      <SessionDetailsForm key={service.updatedAt.toISOString()}>
         <input name="id" type="hidden" value={service.id} />
+        <input name="location" type="hidden" value={service.location || ""} />
         {hiddenSchedulingValues(service)}
-          <section className={`studio-panel service-image-panel ${styles.artworkPanel}`}>
-            <div className="studio-section-head">
-              <div>
-                <h2>Card artwork</h2>
-              </div>
-              {serviceImageUrl ? (
-                <Button aria-label="Remove service image" form={serviceImageRemoveFormId} size="sm" title="Remove image" type="submit" variant="ghost">
-                  <X size={15} />
-                </Button>
-              ) : null}
-            </div>
-            <AssetPicker
-              assets={mediaAssetOptions}
-              attachFields={{ serviceId: service.id }}
-              attachFormId={serviceImageAttachFormId}
-              canUpload={canUpload}
-              defaultAlt={serviceImageAlt}
-              emptyLibraryMessage="No reusable service images yet."
-              title="Service booking image"
-              triggerClassName={serviceImageUrl ? "service-image-trigger has-image" : "service-image-trigger"}
-              triggerHint={serviceImageUrl ? "Replace image" : ""}
-              uploadFields={{ serviceId: service.id }}
-              uploadFormId={serviceImageUploadFormId}
-              uploadUnavailableMessage="Uploads need Server asset folder, Railway/S3 bucket, R2, or Cloudflare Images. You can still choose from the library.">
-              <span className="service-image-preview">
-                {serviceImageUrl ? (
-                  <NextImage alt={serviceImageAlt} fill sizes="(max-width: 760px) 100vw, 640px" src={serviceImageUrl} unoptimized />
-                ) : (
-                  <span className="studio-media-empty">
-                    <Upload aria-hidden="true" size={24} />
-                    <span>Pick an image</span>
-                  </span>
-                )}
-              </span>
-            </AssetPicker>
-            <p className="muted-text">Shown on service choices in the public booking flow.</p>
-          </section>
         <main className="product-studio-main">
-        <section className="studio-panel">
+        <section className="studio-panel" aria-labelledby="session-details-title">
           <div className="studio-section-head">
-            <div>
-              <h2>Session details</h2>
-            </div>
-            <FileText size={20} />
+            <h2 id="session-details-title">Session details</h2>
           </div>
+            <div className="catalog-form-grid">
+              <div className="ui-field">
+                <label htmlFor="service-name">Session type name</label>
+                <input defaultValue={service.name} id="service-name" name="name" required />
+              </div>
+            </div>
 
-          <div className="catalog-form-grid">
             <div className="ui-field">
-              <label htmlFor="service-name">Session type name</label>
-              <input defaultValue={service.name} id="service-name" name="name" required />
+              <label htmlFor="service-description">Description</label>
+              <textarea defaultValue={service.description || ""} id="service-description" name="description" rows={3} />
             </div>
-          </div>
 
-          <div className="catalog-form-grid is-two service-details-meta-grid">
-            <input name="location" type="hidden" value={service.location || ""} />
-          </div>
-
-          <div className="ui-field">
-            <label htmlFor="service-description">Description</label>
-            <textarea defaultValue={service.description || ""} id="service-description" name="description" rows={3} />
-          </div>
-
-          <details className={styles.moreOptions}><summary>Organization</summary>
-            <ServicePresetField
-              defaultValue={service.category}
-              emptyLabel="Uncategorized"
-              id="service-category"
-              label="Category"
-              name="category"
-              newLabel="New category"
-              newPlaceholder="Category name"
-              options={categoryOptions}
-            />
-          <div className="ui-field">
-            <label htmlFor="service-tags">Tags</label>
-            <input defaultValue={tagsValue} id="service-tags" name="tags" />
-          </div>
-          </details>
+            <BookingPhotoField assets={mediaAssetOptions} canUpload={canUpload} imageAlt={serviceImageAlt} imageUrl={serviceImageUrl || ""} serviceId={service.id}
+              uploadFormId={serviceImageUploadFormId} attachFormId={serviceImageAttachFormId} removeFormId={serviceImageRemoveFormId} />
+                <ServicePresetField
+                  defaultValue={service.category}
+                  emptyLabel="Uncategorized"
+                  id="service-category"
+                  label="Category"
+                  name="category"
+                  newLabel="New category"
+                  newPlaceholder="Category name"
+                  options={categoryOptions}
+                />
+        </section>
+        <SessionPackagesEditor initialOffering={offering} durationMinutes={service.durationMinutes} priceCents={service.priceCents} />
+        <section className="studio-panel">
+              <details className={styles.moreOptions}><summary>Intake and booking policies</summary>
+                <ServiceBookingRulesTable
+                  defaultIntakePrompt={service.intakePrompt}
+                  defaultPolicyText={service.policyText}
+                  defaultRequirePolicy={service.requirePolicy}
+                  defaultRequestOnly={service.requestOnly}
+                  defaultWaitlistEnabled={service.waitlistEnabled}
+                  idPrefix="service"
+                  intakeOptions={intakeOptions}
+                  policyOptions={policyOptions}
+                />
+              </details>
         </section>
 
 
-        <details className="studio-panel"><summary>Intake and booking policies</summary>
-
-          <ServiceBookingRulesTable
-            defaultIntakePrompt={service.intakePrompt}
-            defaultPolicyText={service.policyText}
-            defaultRequirePolicy={service.requirePolicy}
-            defaultRequestOnly={service.requestOnly}
-            defaultWaitlistEnabled={service.waitlistEnabled}
-            idPrefix="service"
-            intakeOptions={intakeOptions}
-            policyOptions={policyOptions}
-          />
-        </details>
         </main>
 
         <aside className="product-studio-sidecar">
@@ -270,7 +224,6 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
 
           <section className="studio-panel">
           <h2 className="section-title">Status</h2>
-          <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
           <Switch defaultChecked={service.isActive} label="Active" name="isActive" variant="inline" />
           <dl className="service-editor-summary">
             <div>
@@ -278,7 +231,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
               <dd>{serviceDurationLabel(service.durationMinutes)}</dd>
             </div>
             <div>
-              <dt>Package tiers</dt>
+              <dt>Packages</dt>
               <dd>{readSessionOffering(service.sessionOffering)?.tiers.length ?? 1}</dd>
             </div>
             {bookingPath !== "Client booking rebuild pending" && <div><dt>Booking link</dt><dd>{bookingPath}</dd></div>}
@@ -288,16 +241,21 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
             Business hours
           </ButtonLink>
           </section>
+              <section className="studio-panel" aria-labelledby="session-organization-title">
+                <h2 id="session-organization-title" className="section-title">Organization</h2>
+                <div className="ui-field">
+                  <label htmlFor="service-tags">Tags</label>
+                  <input defaultValue={tagsValue} id="service-tags" name="tags" />
+                </div>
+              </section>
         </aside>
-        <section className={`studio-panel ${styles.tiersPanel}`}>
-          <SessionPackagesEditor initialOffering={readSessionOffering(service.sessionOffering)} durationMinutes={service.durationMinutes} priceCents={service.priceCents} suggestions={coverageSuggestions} />
-        </section>
         <footer className={styles.saveFooter}>
           <SessionDetailsSaveButton />
         </footer>
       </SessionDetailsForm>
 
       <form action={uploadServiceImageAction} id={serviceImageUploadFormId} />
+      <form action={uploadServiceImageAction} id={`${serviceImageUploadFormId}-library`} />
       <form action={attachServiceImageAction} id={serviceImageAttachFormId} />
       <form action={removeServiceImageAction} id={serviceImageRemoveFormId}>
         <input name="serviceId" type="hidden" value={service.id} />
@@ -309,7 +267,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     <section className="studio-panel">
       <div className="studio-section-head">
         <div>
-          <h2>Packages</h2>
+          <h2>Service bundles</h2>
         </div>
         <Boxes size={20} />
       </div>
@@ -319,7 +277,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
           <table className="catalog-product-table">
             <thead>
               <tr>
-                <th>Package</th>
+                <th>Bundle</th>
                 <th>Status</th>
                 <th>Quantity</th>
                 <th>Sort</th>
@@ -339,7 +297,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
                   <td>{item.sortOrder}</td>
                   <td>
                     <ButtonLink href={`/admin/modules/services/packages/${item.package.id}`} size="sm" variant="secondary">
-                      Edit package
+                      Edit bundle
                     </ButtonLink>
                   </td>
                 </tr>
@@ -350,10 +308,10 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
       ) : (
         <div className="catalog-empty-state">
           <Boxes size={28} />
-          <h3>No package memberships</h3>
-          <p>Open a package to add this service to its builder.</p>
+          <h3>No service bundles</h3>
+          <p>Open a bundle to combine this session type with other services.</p>
           <ButtonLink href="/admin/modules/services?tab=packages" variant="secondary">
-            Open packages
+            Open service bundles
           </ButtonLink>
         </div>
       )}
@@ -361,7 +319,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   );
 
   const tabs: ServiceWorkspaceTab[] = [
-    { content: detailsContent, icon: <FileText size={15} />, id: "details", label: "Session & tiers" },
+    { content: detailsContent, icon: <FileText size={15} />, id: "details", label: "Session & packages" },
     ...(packageCount ? [{ content: packagesContent, icon: <Boxes size={15} />, id: "packages", label: "Service bundles" }] : [])
   ];
 
