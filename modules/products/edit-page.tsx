@@ -229,10 +229,17 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
             <div className="studio-section-head">
               <div>
                 <p className="catalog-rail-label">Product details</p>
-                <h2>Title, image &amp; description</h2>
+                <h2>Product details</h2>
               </div>
             </div>
             <div className="product-details-grid">
+              <div className="catalog-form-grid">
+                <ProductSlugFields productId={product.id} slug={product.slug} summary={product.summary} title={product.name} />
+                <div className="ui-field">
+                  <label htmlFor={`product-${product.id}-description`}>Description</label>
+                  <textarea defaultValue={product.description} id={`product-${product.id}-description`} name="description" />
+                </div>
+              </div>
               <div className="product-details-media">
                 <p className="catalog-rail-label">Product images</p>
                 <div className="product-image-manager">
@@ -313,13 +320,6 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
                       ))}
                     </div>
                   )}
-                </div>
-              </div>
-              <div className="catalog-form-grid">
-                <ProductSlugFields productId={product.id} slug={product.slug} summary={product.summary} title={product.name} />
-                <div className="ui-field">
-                  <label htmlFor={`product-${product.id}-description`}>Description</label>
-                  <textarea defaultValue={product.description} id={`product-${product.id}-description`} name="description" />
                 </div>
               </div>
             </div>
@@ -742,8 +742,8 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
 
   const tabs: ProductEditorTab[] = [
     { content: detailsContent, icon: <FileText size={15} />, id: "details", label: "Details" },
-    { content: variantsContent, icon: <Layers3 size={15} />, id: "variants", label: "Variants" },
     { content: mediaContent, icon: <Images size={15} />, id: "media", label: "Media" },
+    { content: variantsContent, icon: <Layers3 size={15} />, id: "variants", label: "Variants" },
     { content: organizationContent, icon: <Tags size={15} />, id: "organization", label: "Organization" }
   ];
 

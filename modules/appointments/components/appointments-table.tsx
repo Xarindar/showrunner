@@ -39,7 +39,7 @@ export function AppointmentsTable({ bookings, timezone }: AppointmentsTableProps
                 <span className="muted-text">{booking.customerEmail}</span>
               </td>
               <td>
-                {booking.service.name}
+                {booking.sessionName || booking.service.name}
                 <br />
                 <span className="muted-text">{booking.staff?.name || "Any staff"}</span>
                 {booking.resources.length ?

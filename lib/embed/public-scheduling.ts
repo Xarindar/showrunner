@@ -128,6 +128,8 @@ export function serializePublicService(service: PublicService, categoryRecord?: 
     description: cleanOptionalString(service.description),
     imageUrl: publicServiceImageUrl(service) || (categoryRecord ? publicCategoryImageUrl(categoryRecord) : null),
     durationMinutes: service.durationMinutes,
+    priceCents: service.priceCents,
+    currency: "USD",
     location: cleanOptionalString(service.location),
     minimumNoticeHours: service.minimumNoticeHours,
     maxAdvanceDays: service.maxAdvanceDays,

@@ -240,32 +240,17 @@
 }
 
 .homeHero {
-  align-items: end;
-  background: color-mix(in srgb, var(--color-text) 92%, var(--color-brand));
-  border: 1px solid color-mix(in srgb, var(--color-text) 82%, var(--color-brand));
-  border-radius: calc(var(--radius-card) * 1.4);
-  box-shadow: 0 18px 48px color-mix(in srgb, var(--color-text) 13%, transparent);
-  color: var(--color-surface);
   display: grid;
-  gap: clamp(var(--space-5), 4vw, var(--space-8));
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.82fr);
-  min-height: 238px;
-  overflow: hidden;
-  padding: clamp(var(--space-5), 4vw, var(--space-8));
-  position: relative;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+  padding: var(--space-4);
+  background: var(--sd-color-surface, var(--color-surface));
+  color: var(--color-text);
+  border-radius: var(--sd-radius-container, var(--radius-card));
+  box-shadow: var(--sd-shadow-container);
+  min-width: 0;
 }
 
-.homeHero::after {
-  border: 1px solid color-mix(in srgb, var(--color-surface) 12%, transparent);
-  border-radius: 999px;
-  content: "";
-  height: 290px;
-  pointer-events: none;
-  position: absolute;
-  right: -140px;
-  top: -165px;
-  width: 290px;
-}
 
 .homeHeroCopy {
   display: grid;
@@ -284,65 +269,57 @@
 }
 
 .homeHeroCopy h2 {
-  color: inherit;
-  font-size: clamp(1.7rem, 3vw, 2.6rem);
-  font-weight: 590;
-  letter-spacing: -0.035em;
-  line-height: 1.03;
   margin: 0;
-  max-width: 570px;
+  color: inherit;
+  font-size: var(--sd-type-heading-size, 15px);
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .homeHeroCopy p {
-  color: color-mix(in srgb, var(--color-surface) 70%, transparent);
-  font-size: var(--type-small);
-  line-height: 1.55;
   margin: 0;
-  max-width: 520px;
+  color: var(--color-muted);
+  font-size: var(--type-body);
+  max-width: 65ch;
 }
 
 .homeSearch {
   align-items: center;
-  background: var(--color-surface);
-  border: 1px solid color-mix(in srgb, var(--color-surface) 80%, transparent);
-  border-radius: var(--radius-control);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
-  color: var(--color-muted);
   display: grid;
   gap: var(--space-2);
   grid-template-columns: auto minmax(0, 1fr) auto;
-  min-height: 54px;
-  padding: 0 6px 0 var(--space-3);
-  position: relative;
-  z-index: 1;
+  padding: 0 4px 0 12px;
+  min-height: 36px;
+  border-radius: var(--sd-radius-input, var(--radius-control));
+  background: var(--color-surface);
+  color: var(--color-muted);
+  box-shadow: var(--sd-shadow-input);
 }
 
 .homeSearch:focus-within {
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-brand) 35%, transparent), 0 12px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--sd-shadow-input-focus);
 }
 
 .homeSearch input {
-  background: transparent;
-  border: 0;
-  color: var(--color-text);
-  font-size: var(--type-small);
-  min-height: 50px;
-  min-width: 0;
-  outline: 0;
   width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
 }
 
 .homeSearch button {
+  display: inline-flex;
   align-items: center;
-  background: var(--color-brand);
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   border: 0;
-  border-radius: calc(var(--radius-control) * 0.82);
+  border-radius: var(--sd-radius-pill, 999px);
+  background: var(--color-brand);
   color: white;
   cursor: pointer;
-  display: inline-flex;
-  height: 40px;
-  justify-content: center;
-  width: 40px;
 }
 
 .homeActions {
@@ -361,8 +338,8 @@
   display: grid;
   gap: var(--space-4);
   grid-template-columns: auto minmax(0, 1fr) auto;
-  min-height: 160px;
-  padding: clamp(var(--space-4), 3vw, var(--space-6));
+  min-height: 96px;
+  padding: var(--space-4);
   text-align: left;
   text-decoration: none;
   transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease, transform var(--motion-fast) var(--motion-ease);
@@ -2024,7 +2001,7 @@
   }
 
   .homeHeroCopy h2 {
-    font-size: 1.65rem;
+    font-size: var(--sd-type-heading-size, 15px);
   }
 
   .homeSearch {
@@ -2153,3 +2130,5 @@
     transition: none;
   }
 }
+
+@media (max-width: 860px) { .homeSearch button { min-width:44px; min-height:44px; } }

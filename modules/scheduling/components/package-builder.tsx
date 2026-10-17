@@ -101,7 +101,6 @@ export function PackageBuilder({
       <section className="service-library-panel" aria-labelledby="service-library-title">
         <div className="studio-section-head">
           <div>
-            <p className="catalog-rail-label">Base services</p>
             <h2 id="service-library-title">Service tiles</h2>
           </div>
           <span className="catalog-pill is-blue">
@@ -129,7 +128,7 @@ export function PackageBuilder({
               const alreadyInSelected = Boolean(selectedPackage?.items.some((item) => item.service.id === service.id));
               return (
                 <article
-                  aria-label={`Drag ${service.name} into a package`}
+                  aria-label={`Add ${service.name} to a bundle`}
                   className={cx("service-tile", !service.isActive && "is-muted")}
                   draggable
                   key={service.id}
@@ -177,7 +176,7 @@ export function PackageBuilder({
           <div className="catalog-empty-state">
             <Layers3 size={28} />
             <h3>No services match</h3>
-            <p>Clear filters or add a base service before building packages.</p>
+            <p>Clear filters or add a session type before building a bundle.</p>
           </div>
         )}
       </section>
@@ -185,8 +184,7 @@ export function PackageBuilder({
       <section className="service-package-rail" aria-labelledby="service-packages-title">
         <div className="studio-section-head">
           <div>
-            <p className="catalog-rail-label">Packages</p>
-            <h2 id="service-packages-title">Package builder</h2>
+            <h2 id="service-packages-title">Bundle builder</h2>
           </div>
           <span className="catalog-pill is-green">
             <Boxes size={14} />
@@ -214,7 +212,7 @@ export function PackageBuilder({
                       <strong>{servicePackage.name}</strong>
                       <small>/book/packages/{servicePackage.slug}</small>
                     </div>
-                    <span className={servicePackage.isActive ? "catalog-status is-active" : "catalog-status is-draft"}>
+                    <span className={servicePackage.isActive ? "ui-badge ui-badge-success" : "ui-badge"}>
                       {servicePackage.isActive ? "active" : "draft"}
                     </span>
                   </div>
@@ -254,12 +252,12 @@ export function PackageBuilder({
                       ))}
                     </div>
                   ) : (
-                    <p className="muted-text">Drag a service tile into this package to start composing it.</p>
+                    <p className="muted-text">Use Add beside a service to include it in this bundle. You can also drag it here.</p>
                   )}
 
                   <details className="product-editor-advanced">
                     <summary>
-                      <span>Package details</span>
+                      <span>Bundle details</span>
                       <small>{servicePackage.tags.length ? servicePackage.tags.join(", ") : "No tags"}</small>
                     </summary>
                     <form action={updatePackageAction} className="studio-action-form">
@@ -268,10 +266,6 @@ export function PackageBuilder({
                         <div className="ui-field">
                           <label htmlFor={`package-${servicePackage.id}-name`}>Name</label>
                           <input defaultValue={servicePackage.name} id={`package-${servicePackage.id}-name`} name="name" required />
-                        </div>
-                        <div className="ui-field">
-                          <label htmlFor={`package-${servicePackage.id}-slug`}>Slug</label>
-                          <input defaultValue={servicePackage.slug} id={`package-${servicePackage.id}-slug`} name="slug" />
                         </div>
                       </div>
                       <div className="ui-field">
@@ -288,9 +282,9 @@ export function PackageBuilder({
                           <input defaultValue={servicePackage.sortOrder} id={`package-${servicePackage.id}-sort`} name="sortOrder" type="number" />
                         </div>
                       </div>
-                      <Switch defaultChecked={servicePackage.isActive} label="Active package" name="isActive" variant="inline" />
+                      <Switch defaultChecked={servicePackage.isActive} label="Active bundle" name="isActive" variant="inline" />
                       <Button type="submit" variant="secondary">
-                        Save package
+                        Save bundle
                       </Button>
                     </form>
                   </details>
@@ -307,8 +301,8 @@ export function PackageBuilder({
         ) : (
           <div className="catalog-empty-state">
             <Boxes size={28} />
-            <h3>No packages yet</h3>
-            <p>Create a package, then drag base services into it.</p>
+            <h3>No bundles yet</h3>
+            <p>Create a bundle, then add its services.</p>
           </div>
         )}
       </section>

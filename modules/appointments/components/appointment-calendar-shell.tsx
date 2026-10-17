@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, ListChecks, MoreHorizontal, SlidersHorizontal, Table2 } from "lucide-react";
-import { Modal } from "@/components/ui";
+import { ButtonLink, Modal } from "@/components/ui";
 
 type AppointmentsModalKey = "filters" | "list" | "rules" | "tools" | "waitlist" | null;
 
@@ -71,6 +71,7 @@ export function AppointmentCalendarShell({
         </nav>
 
         <div className="appointments-header-actions" aria-label="Schedule actions">
+          <ButtonLink href="/admin/appointments/new">New session</ButtonLink>
           <button aria-label="Open filters" className="appointments-action-button" onClick={() => setOpenPanel("filters")} title="Filters" type="button">
             <SlidersHorizontal size={16} />
             <span>Filters</span>
@@ -89,8 +90,9 @@ export function AppointmentCalendarShell({
             <CalendarDays size={16} />
             <span>Rules</span>
           </button>
-          <button aria-label="Open schedule tools" className="appointments-action-button icon-only" onClick={() => setOpenPanel("tools")} title="Schedule tools" type="button">
+          <button aria-label="Open schedule tools" className="appointments-action-button" onClick={() => setOpenPanel("tools")} title="Schedule tools" type="button">
             <MoreHorizontal size={18} />
+            <span>Tools</span>
           </button>
         </div>
       </header>
@@ -113,7 +115,7 @@ export function AppointmentCalendarShell({
       <Modal bodyClassName="appointments-modal-body appointments-modal-body-wide" className="appointments-modal wide" onClose={() => setOpenPanel(null)} open={openPanel === "list"} title="Appointment list">
         {appointmentListPanel}
       </Modal>
-      <Modal bodyClassName="appointments-modal-body appointments-modal-body-wide" className="appointments-modal wide" onClose={() => setOpenPanel(null)} open={openPanel === "rules"} title="Scheduling rules">
+      <Modal bodyClassName="appointments-modal-body appointments-modal-body-wide" className="appointments-modal appointments-rules-modal wide" onClose={() => setOpenPanel(null)} open={openPanel === "rules"} title="Scheduling rules">
         {rulesPanel}
       </Modal>
       <Modal bodyClassName="appointments-modal-body" className="appointments-modal" onClose={() => setOpenPanel(null)} open={openPanel === "tools"} title="Schedule tools">

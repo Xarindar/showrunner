@@ -4,7 +4,6 @@ import { useCallback, useState } from "react";
 import { Save } from "lucide-react";
 import { Button, Switch } from "@/components/ui";
 import { cx } from "@/components/ui/utils";
-import { useEditorTabBadge } from "./product-editor-tabs";
 
 export type VariantRow = {
   compareAtPrice: string;
@@ -29,7 +28,6 @@ type VariantTableProps = {
 
 export function VariantTable({ productId, updateAction, variants }: VariantTableProps) {
   const [dirty, setDirty] = useState<Set<string>>(() => new Set());
-  useEditorTabBadge("variants", dirty.size);
 
   const markDirty = useCallback((id: string) => {
     setDirty((prev) => {

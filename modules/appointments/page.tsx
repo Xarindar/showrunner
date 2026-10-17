@@ -1,3 +1,4 @@
+import { getClientStatusSettings } from "@/lib/clients/configuration";
 import Link from "next/link";
 import { BookingStatus, BookingWaitlistStatus, Prisma } from "@prisma/client";
 import { CalendarClock, CalendarDays, ChevronDown, Clock, ListChecks, Plus, Users } from "lucide-react";
@@ -235,6 +236,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
   const params = searchParams ? await searchParams : {};
   const user = await requireAdmin("appointments:manage");
   const settings = await getSiteSettings();
+  const { options: configuredStatusOptions } = await getClientStatusSettings(settings.siteId);
   const canLinkStaffAccounts = hasAdminPermission(user, "users:manage");
   const baseUrl = await requestBaseUrl();
   const page = Math.max(1, Number(params.page || 1) || 1);
@@ -401,7 +403,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
         phone: booking.client.phone || "",
         photoUrl: booking.client.photoUrl,
         pipeline: enumLabel(booking.client.pipelineStage),
-        status: clientStatusLabel(booking.client.status)
+        status: clientStatusLabel(booking.client.status, configuredStatusOptions)
       } :
       null,
       customerEmail: booking.customerEmail,
@@ -419,7 +421,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
       policyAccepted: booking.policyAccepted,
       resourceIds: booking.resources.map((assignment) => assignment.resourceId),
       resourceNames: booking.resources.map((assignment) => assignment.resource.name),
-      serviceName: booking.service.name,
+      serviceName: booking.sessionName || booking.service.name,
       staffId: booking.staffId || "",
       staffName: booking.staff?.name || "",
       startsAt: booking.startsAt.toISOString(),
@@ -478,6 +480,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
         <div className="product-editor-stack">
           <AvailabilityPanel availability={availability} resources={resources} staff={staff} />
           <SlotDiagnosticsPanel
+            defaultOpen={Boolean(params.diagnosticServiceId)}
             diagnostics={diagnostics}
             resources={resources}
             selectedDate={selectedDiagnosticDate}

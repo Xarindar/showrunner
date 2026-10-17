@@ -105,13 +105,14 @@ function SidebarModuleLink({
       {label}
     </span>
   ) : (
-    <Link aria-current={isActive ? "page" : undefined} className={isActive ? "active" : undefined} href={item.href} onClick={closeMenu}>
+    <Link aria-current={isActive ? item.id === "scheduling" ? "location" : "page" : undefined} className={isActive ? "active" : undefined} href={item.href} onClick={closeMenu}>
       {showIcon ? <Icon size={17} /> : null}
       {label}
     </Link>
   );
 
   return (
+    <>
     <div className={`admin-nav-module-row${editing ? " is-editing" : ""}`} data-admin-nav-module-id={item.id}>
       {editing ? (
         <button
@@ -127,6 +128,14 @@ function SidebarModuleLink({
       ) : null}
       {content}
     </div>
+    {item.id === "scheduling" && isActive && enabled && !editing ? <nav className="admin-nav-children" aria-label="Services">
+      {[
+        { href: "/admin/modules/services", label: "Session types", active: !pathname.startsWith("/admin/modules/services/categories") && !pathname.startsWith("/admin/modules/services/packages") },
+        { href: "/admin/modules/services/categories", label: "Categories", active: pathname.startsWith("/admin/modules/services/categories") },
+        { href: "/admin/modules/services/packages", label: "Service bundles", active: pathname.startsWith("/admin/modules/services/packages") }
+      ].map(link => <Link key={link.href} href={link.href} onClick={closeMenu} aria-current={link.active ? "page" : undefined}>{link.label}</Link>)}
+    </nav> : null}
+    </>
   );
 }
 

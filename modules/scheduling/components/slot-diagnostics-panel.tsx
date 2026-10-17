@@ -4,6 +4,7 @@ import type { SlotDiagnostics } from "@/lib/scheduling/types";
 import { Button, Card, EqualGrid, Table } from "@/components/ui";
 
 type SlotDiagnosticsPanelProps = {
+  defaultOpen?: boolean;
   services: Service[];
   resources: Resource[];
   selectedServiceId: string;
@@ -20,6 +21,7 @@ function reasonSummary(slot: SlotDiagnostics["slots"][number]) {
 }
 
 export function SlotDiagnosticsPanel({
+  defaultOpen = false,
   services,
   resources,
   selectedServiceId,
@@ -34,12 +36,10 @@ export function SlotDiagnosticsPanel({
 
   return (
     <Card as="section" bodyClassName="ui-stack">
-      <div className="page-header flush-header">
-        <div>
-          <h2 className="section-title">Slot diagnostics</h2>
+      <details open={defaultOpen} className="admin-slot-diagnostics">
+        <summary>Slot diagnostics</summary>
+        <div className="ui-stack">
           <p className="ui-zero">Trace generated openings and the rules blocking unavailable times.</p>
-        </div>
-      </div>
 
       <form action="/admin/modules/appointments" className="subpanel form-grid">
         <input name="panel" type="hidden" value="rules" />
@@ -142,6 +142,8 @@ export function SlotDiagnosticsPanel({
 
       <p className="empty-state">Choose a service and date to diagnose generated slots.</p>
       }
+        </div>
+      </details>
     </Card>);
 
 }

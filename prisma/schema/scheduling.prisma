@@ -81,6 +81,9 @@ model Service {
   description         String?
   imageUrl            String    @default("")
   durationMinutes     Int
+  priceCents          Int?
+  sessionOffering     Json?
+  isOneOff            Boolean   @default(false)
   location            String?
   category            String    @default("")
   tags                Json      @default("[]")
@@ -108,6 +111,22 @@ model Service {
   @@index([mediaAssetId])
   @@index([siteId, category])
   @@index([siteId, isActive])
+}
+
+model ServiceLibraryItem {
+  id          String   @id @default(cuid())
+  siteId      String
+  site        Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  name        String
+  nameKey     String
+  description String   @default("")
+  category    String   @default("")
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([siteId, nameKey])
+  @@index([siteId, category])
 }
 
 model ServiceCategory {
@@ -291,6 +310,11 @@ model Booking {
   clientId           String?
   client             Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
   customerName       String
+  sessionName        String?
+  sessionLocation    String?
+  packageSnapshot    Json?
+  priceCents         Int?
+  isManual           Boolean       @default(false)
   customerEmail      String
   customerPhone      String?
   notes              String?

@@ -26,9 +26,12 @@ export function AlbumPhotos({ galleryId, title, status, visibility, photos, chil
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
   const [failed, setFailed] = useState<File[]>([]);
+  const [unavailable, setUnavailable] = useState<string[]>([]);
+  const [unavailableFull, setUnavailableFull] = useState<string[]>([]);
   const photo = active === null ? null : photos[active];
   const published = status === "PUBLISHED";
-  const publicationLabel = published ? `Published (${visibility}) — switch to draft` : `${status === "ARCHIVED" ? "Archived" : "Draft"} — publish gallery`;
+  const archived = status === "ARCHIVED";
+  const publicationLabel = archived ? "Archived — restore in Gallery settings" : published ? `Published (${visibility}) — switch to draft` : "Draft — publish gallery";
 
   function togglePublication() {
     const data = new FormData();
@@ -105,7 +108,7 @@ export function AlbumPhotos({ galleryId, title, status, visibility, photos, chil
         <h1 title={title}>{title}</h1>
         <span className={styles.photoCount} role="img" aria-label={`${photos.length} photos`}><ImageIcon size={16} aria-hidden="true" /><span aria-hidden="true">{photos.length}</span></span>
         <Tooltip className={styles.galleryTooltip} content={publicationLabel} focusable={false}>
-          <Button className={styles.galleryIcon} size="sm" variant="ghost" type="button" aria-label={publicationLabel} aria-pressed={published} disabled={publishing} onClick={togglePublication}>
+          <Button className={styles.galleryIcon} size="sm" variant="ghost" type="button" aria-label={publicationLabel} aria-pressed={published} disabled={publishing || archived} onClick={togglePublication}>
             {published ? <Eye size={16} aria-hidden="true" /> : <EyeOff size={16} aria-hidden="true" />}
           </Button>
         </Tooltip>
@@ -126,14 +129,14 @@ export function AlbumPhotos({ galleryId, title, status, visibility, photos, chil
     <p role="status" className={styles.feedback}>{message}</p>
     {errors.length > 0 && <div role="alert" className={styles.errors}><ul>{errors.map((error, index) => <li key={index}>{error}</li>)}</ul>{failed.length > 0 && <Button type="button" variant="secondary" disabled={busy} onClick={() => void upload(failed)}>Retry failed photos</Button>}</div>}
     {photos.length ? <div className={`${styles.photoGrid} ${largeThumbnails ? styles.photoGridLarge : ""}`}>{photos.map((item, index) => <button className={styles.photo} key={item.id} type="button" onClick={() => setActive(index)} aria-label={`View ${item.alt || item.title || `photo ${index + 1}`}`}>
-      <img draggable={false} src={item.thumbnail} srcSet={`${item.thumbnail} 320w, ${item.largeThumbnail} 720w`} sizes={largeThumbnails ? "(max-width: 600px) 50vw, 320px" : "(max-width: 600px) 33vw, 200px"} alt={item.alt} loading={index < 6 ? "eager" : "lazy"} decoding="async" />
+      {unavailable.includes(item.thumbnail) ? <span className={styles.unavailablePhoto}><ImageIcon size={24} aria-hidden="true" /><span>Photo unavailable</span></span> : <img draggable={false} src={item.thumbnail} srcSet={`${item.thumbnail} 320w, ${item.largeThumbnail} 720w`} sizes={largeThumbnails ? "(max-width: 600px) 50vw, 320px" : "(max-width: 600px) 33vw, 200px"} alt={item.alt} loading={index < 24 ? "eager" : "lazy"} decoding="async" onError={() => setUnavailable(urls => urls.includes(item.thumbnail) ? urls : [...urls, item.thumbnail])} />}
     </button>)}</div> : <div className={styles.galleryEmpty}><ImagePlus size={36} aria-hidden="true" /><h2>Your album starts here</h2><p>Drop photos here or choose files.</p><Button size="sm" type="button" disabled={busy} onClick={() => picker.current?.click()}>Choose photos</Button><small>JPG, PNG, WebP or GIF · Up to 12 MB per photo</small></div>}
     <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Gallery settings" className={styles.settingsPanel} bodyClassName={styles.settingsBody}>
       {children}
     </Modal>
     <Modal open={Boolean(photo)} onClose={() => setActive(null)} title={`${title} — photo ${(active ?? 0) + 1}`} closeLabel="Close photo viewer" className={styles.viewer} bodyClassName={styles.viewerBody}>
       {photo && <>
-        <img draggable={false} className={styles.fullPhoto} src={photo.url} alt={photo.alt} />
+        {unavailableFull.includes(photo.url) ? <div className={styles.unavailablePhoto}><ImageIcon size={36} aria-hidden="true" /><p>Photo unavailable</p><p>The original file could not be loaded.</p></div> : <img draggable={false} className={styles.fullPhoto} src={photo.url} alt={photo.alt} onError={() => setUnavailableFull(urls => urls.includes(photo.url) ? urls : [...urls, photo.url])} />}
         <button className={`${styles.viewerArrow} ${styles.previous}`} type="button" aria-label="Previous photo" disabled={photos.length < 2} onClick={() => setActive(((active ?? 0) - 1 + photos.length) % photos.length)}><ArrowLeft size={16} /></button>
         <button className={`${styles.viewerArrow} ${styles.next}`} type="button" aria-label="Next photo" disabled={photos.length < 2} onClick={() => setActive(((active ?? 0) + 1) % photos.length)}><ArrowRight size={16} /></button>
         <div className={styles.viewerCaption}><span>{photo.title || title}</span><span aria-live="polite">{(active ?? 0) + 1} / {photos.length}</span></div>

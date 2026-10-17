@@ -12,6 +12,8 @@ const maxFeedBookings = 1000;
 const feedLookaheadDays = 366;
 
 type CalendarBooking = {
+  sessionName?: string | null;
+  sessionLocation?: string | null;
   id: string;
   siteId: string;
   customerName: string;
@@ -187,9 +189,9 @@ function bookingEventLines(booking: CalendarBooking, now: Date) {
     `LAST-MODIFIED:${icsDate(booking.updatedAt)}`,
     `DTSTART:${icsDate(booking.startsAt)}`,
     `DTEND:${icsDate(booking.endsAt)}`,
-    `SUMMARY:${icsText(`${booking.service.name}: ${booking.customerName}`)}`,
+    `SUMMARY:${icsText(`${booking.sessionName || booking.service.name}: ${booking.customerName}`)}`,
     `DESCRIPTION:${icsText(bookingDescription(booking))}`,
-    booking.service.location ? `LOCATION:${icsText(booking.service.location)}` : "",
+    (booking.sessionLocation ?? booking.service.location) ? `LOCATION:${icsText(booking.sessionLocation ?? booking.service.location ?? "")}` : "",
     `STATUS:${eventStatus(booking.status)}`,
     "TRANSP:OPAQUE",
     "END:VEVENT"

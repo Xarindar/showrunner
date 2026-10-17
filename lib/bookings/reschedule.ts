@@ -1,16 +1,20 @@
 import "server-only";
 
 import { BookingStatus, Prisma } from "@prisma/client";
-import { blockoutConflictWhere, bookingConflictWhere } from "@/lib/bookings/conflicts";
+import { blockoutConflictWhere, bookingConflictWhere, getBufferedWindow } from "@/lib/bookings/conflicts";
 import { prisma } from "@/lib/prisma";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
+import { checkManualSessionTime } from "@/lib/bookings/manual";
+import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
+import { getSiteSettingsForSite } from "@/lib/site";
 
 export async function rescheduleBookingWithAvailability(input: { bookingId: string; siteId: string; startsAt: Date }) {
   const booking = await prisma.booking.findFirst({
     where: { id: input.bookingId, siteId: input.siteId },
     include: {
       service: true,
-      staff: true
+      staff: true,
+      resources: true
     }
   });
 
@@ -23,6 +27,22 @@ export async function rescheduleBookingWithAvailability(input: { bookingId: stri
   }
   if (Number.isNaN(input.startsAt.getTime())) {
     throw new Error("Choose a valid new appointment time.");
+  }
+
+  if (booking.isManual) {
+    if (input.startsAt <= new Date()) throw new Error("Choose a future date and time.");
+    const endsAt = new Date(input.startsAt.getTime() + booking.endsAt.getTime() - booking.startsAt.getTime());
+    const settings = await getSiteSettingsForSite(booking.siteId);
+    const buffered = getBufferedWindow(input.startsAt, endsAt, booking.service.bufferBeforeMinutes, booking.service.bufferAfterMinutes);
+    const busy = await listGoogleBusyWindows({ siteId: booking.siteId, timeZone: settings.timezone, staffIds: booking.staffId ? [booking.staffId] : [], start: buffered.bufferedStart, end: buffered.bufferedEnd });
+    if (busy.busy.some(window => window.start < buffered.bufferedEnd && window.end > buffered.bufferedStart)) throw new Error("That time is busy on your connected calendar.");
+    return prisma.$transaction(async tx => {
+      await checkManualSessionTime(tx, { siteId: booking.siteId, startsAt: input.startsAt, endsAt, staffId: booking.staffId,
+        resourceIds: booking.resources.map(resource => resource.resourceId), bufferBeforeMinutes: booking.service.bufferBeforeMinutes,
+        bufferAfterMinutes: booking.service.bufferAfterMinutes, excludeBookingId: booking.id });
+      return tx.booking.update({ where: { id: booking.id }, data: { startsAt: input.startsAt, endsAt },
+        include: { resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } }, service: true, staff: true } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   const diagnostics = await nativeSchedulingAdapter.getSlotDiagnostics(booking.serviceId, input.startsAt, {

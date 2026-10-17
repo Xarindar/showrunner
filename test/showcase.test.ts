@@ -106,6 +106,12 @@ test("separate notes forms preserve omitted fields and rescheduling requires a d
   const parsed = notes.parse({ id: "booking", adminNotes: "Staff only" }) as Record<string, unknown>;
   assert.equal(parsed.adminNotes, "Staff only");
   assert.equal("cancellationReason" in parsed, false);
+  assert.equal("sessionLocation" in parsed, false);
+  const location = notes.parse({ id: "booking", sessionLocation: "  Client's home  " }) as Record<string, unknown>;
+  assert.equal(location.sessionLocation, "Client's home");
+  assert.equal("adminNotes" in location, false);
+  assert.equal("cancellationReason" in location, false);
+  assert.equal((notes.parse({ id: "booking", sessionLocation: "" }) as Record<string, unknown>).sessionLocation, "");
   const reason = notes.parse({ id: "booking", cancellationReason: "Weather" }) as Record<string, unknown>;
   assert.equal("adminNotes" in reason, false);
   const reschedule = validation.bookingRescheduleFormSchema as unknown as ZodType;

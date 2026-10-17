@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import { Boxes, Pencil, Plus, Search, X } from "lucide-react";
 import Link from "next/link";
 import { Button, ButtonLink, Pagination, SelectMenu, Tooltip, type SelectMenuOption } from "@/components/ui";
@@ -66,14 +66,11 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
   );
   const {
     currentPage,
-    emptyRowCount,
     endIndex,
-    fillerRowCount,
     firstPage,
     nextPage,
     pageCount,
     previousPage,
-    setTableFrameRef,
     startIndex
   } = useCatalogTablePagination(filteredPackages.length);
   const pagedPackages = filteredPackages.slice(startIndex, endIndex);
@@ -92,25 +89,25 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
     <div className="service-catalog-folder-panel" aria-labelledby="packages-board-title">
       <div className="catalog-board-header">
         <div>
-          <p className="catalog-rail-label">Catalog</p>
-          <h2 id="packages-board-title">Package catalog</h2>
+          <h2 id="packages-board-title">Service bundles</h2>
           <p>
             {filteredPackages.length ? `${rangeStart}-${rangeEnd}` : "0"} of {filteredPackages.length || packages.length}
-            {normalizedSearch ? ` matching "${normalizedSearch}"` : " packages"}
+            {normalizedSearch ? ` matching "${normalizedSearch}"` : " bundles"}
           </p>
         </div>
         <div className="catalog-board-actions">
           <ButtonLink href="/admin/modules/services/packages/new" size="sm">
             <Plus size={15} />
-            New package
+            New service bundle
           </ButtonLink>
         </div>
       </div>
 
+      <p className="muted-text">Bundles combine separate services. For package choices within one session type, open Session types and edit its packages.</p>
       <div className="ui-table-filter-bar catalog-board-filters">
         <div className="ui-table-filter-search" role="search">
           <label className="ui-sr-only" htmlFor="packages-search">
-            Search package, service, category, tag
+            Search bundle, service, category, tag
           </label>
           <span className="ui-table-filter-input">
             <Search aria-hidden="true" size={15} />
@@ -120,7 +117,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
                 setSearchQuery(event.currentTarget.value);
                 firstPage();
               }}
-              placeholder="Search package, service, category, tag"
+              placeholder="Search bundle, service, category, tag"
               value={searchQuery}
             />
           </span>
@@ -158,16 +155,15 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
         </div>
       </div>
 
-      <div className="catalog-table-scroll catalog-viewport-table" ref={setTableFrameRef}>
+      <div className="catalog-table-scroll catalog-viewport-table">
         <table className="catalog-product-table service-package-table">
           <thead>
             <tr>
-              <th>Package</th>
+              <th>Bundle</th>
               <th>Status</th>
               <th>Services</th>
               <th>Duration</th>
               <th>Tags</th>
-              <th>Booking</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -177,7 +173,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
               const servicesLabel = servicePackage.serviceNames.join(", ") || "No services";
               return (
                 <tr key={servicePackage.id}>
-                  <td>
+                  <td data-label="Bundle">
                     <div className="catalog-product-cell">
                       <div className="catalog-row-thumb">
                         <span>
@@ -185,39 +181,36 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
                         </span>
                       </div>
                       <div className="catalog-row-copy">
-                        <strong title={servicePackage.name}>{servicePackage.name}</strong>
+                        <Link href={`/admin/modules/services/packages/${servicePackage.id}`} title={servicePackage.name}>{servicePackage.name}</Link>
                         <small title={servicePackage.description || servicesLabel}>{servicePackage.description || servicesLabel}</small>
                       </div>
                     </div>
                   </td>
-                  <td>
+                  <td data-label="Status">
                     <span className={servicePackage.isActive ? "catalog-status is-active" : "catalog-status is-draft"}>
                       {servicePackage.isActive ? "active" : "draft"}
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Services">
                     <span className="catalog-cell-text" title={servicesLabel}>
                       {servicePackage.itemCount} svc
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Duration">
                     <strong className="catalog-price-cell">{packageDurationLabel(servicePackage.durationMinutes)}</strong>
                   </td>
-                  <td>
+                  <td data-label="Tags">
                     <span className="catalog-cell-text" title={tagsLabel}>{tagsLabel}</span>
                   </td>
-                  <td>
-                    <span className="catalog-cell-text" title={servicePackage.bookingPath}>{servicePackage.bookingPath}</span>
-                  </td>
-                  <td>
+                  <td data-label="Actions">
                     <div className="catalog-row-actions">
-                      <Tooltip content="Edit package" focusable={false}>
+                      <Tooltip content="Edit bundle" focusable={false}>
                         <ButtonLink
                           aria-label={`Edit ${servicePackage.name}`}
                           className="catalog-icon-button"
                           href={`/admin/modules/services/packages/${servicePackage.id}`}
                           size="sm"
-                          title="Edit package"
+                          title="Edit bundle"
                           variant="secondary">
                           <Pencil aria-hidden="true" size={15} />
                         </ButtonLink>
@@ -227,31 +220,23 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
                 </tr>
               );
             })}
-            {fillerRowCount ? (
-              <tr
-                aria-hidden="true"
-                className="catalog-table-filler-row"
-                style={{ "--catalog-table-filler-rows": fillerRowCount } as CSSProperties}>
-                <td colSpan={7} />
-              </tr>
-            ) : null}
             {!filteredPackages.length ? (
               <tr
                 className="catalog-table-empty-state-row"
-                style={{ "--catalog-table-empty-rows": emptyRowCount } as CSSProperties}>
-                <td colSpan={7}>
+                >
+                <td colSpan={6}>
                   <div className="catalog-empty-state">
                     {hasPackages ? (
                       <>
-                        <h3>No packages found</h3>
+                        <h3>No bundles found</h3>
                         <p>Adjust the current filters.</p>
                       </>
                     ) : (
                       <>
-                        <h3>No packages made</h3>
+                        <h3>No service bundles yet</h3>
                         <p>
                           <Link className="catalog-empty-state-link" href="/admin/modules/services/packages/new">
-                            Click here to make your first package
+                            Create your first service bundle
                           </Link>
                         </p>
                       </>
@@ -265,7 +250,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
       </div>
       <Pagination
         className="catalog-table-pagination"
-        label="Package catalog pages"
+        label="Service bundle catalog pages"
         onNext={nextPage}
         onPrevious={previousPage}
         page={currentPage}

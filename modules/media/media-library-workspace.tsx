@@ -482,8 +482,7 @@ function LibraryHome({
     <div className={styles.home}>
       <section className={styles.homeHero}>
         <div className={styles.homeHeroCopy}>
-          <span>Asset library</span>
-          <h2>Find the right image without digging.</h2>
+          <h2>Asset library</h2>
           <p>Search everything, return to recent work, or jump directly into a tag or folder.</p>
         </div>
         <form className={styles.homeSearch} onSubmit={onSearch} role="search">

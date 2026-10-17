@@ -1,18 +1,19 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MediaVariantType, type Prisma } from "@prisma/client";
-import { Boxes, CalendarCheck, Images, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { ButtonLink, FolderTabs, type AssetPickerAsset, type FolderTab, type SelectMenuOption } from "@/components/ui";
+import { ButtonLink, type AssetPickerAsset, type SelectMenuOption } from "@/components/ui";
 import { toggleServiceAction } from "./actions";
 import { ServiceCategoryManager, type ServiceCategoryManagerCategory } from "./components/service-category-manager";
 import { ServiceCatalogTable, type ServiceCatalogTableService } from "./components/service-catalog-table";
 import { ServicePackageTable, type ServicePackageTablePackage } from "./components/service-package-table";
 
 import { catalogMediaUrl } from "@/lib/catalog-media-url";
+import { readSessionOffering } from "@/lib/scheduling/session-offering";
 import { contentWebsiteUrl, resolveContentManifest } from "@/clients/content-manifests";
 
 export const dynamic = "force-dynamic";
@@ -69,8 +70,8 @@ function savedServiceMessage(saved?: string) {
   if (saved === "category") return "Service category updated.";
   if (saved === "category-media") return "Category image updated.";
   if (saved === "media") return "Service image updated.";
-  if (saved === "package") return "Package changes saved.";
-  if (saved === "package-item") return "Package contents updated.";
+  if (saved === "package") return "Bundle changes saved.";
+  if (saved === "package-item") return "Bundle contents updated.";
   if (saved) return "Services catalog updated.";
   return null;
 }
@@ -82,7 +83,7 @@ function serviceImageUrl(service: ServiceCatalogItem) {
 
 function toServiceCatalogTableService(service: ServiceCatalogItem, websiteUrl?: string): ServiceCatalogTableService {
   return {
-    bookingPath: "Client booking rebuild pending",
+    bookingPath: "Online booking unavailable",
     category: serviceCategory(service) || "Uncategorized",
     description: service.description || "",
     durationMinutes: service.durationMinutes,
@@ -91,7 +92,7 @@ function toServiceCatalogTableService(service: ServiceCatalogItem, websiteUrl?: 
     isActive: service.isActive,
     location: service.location || "",
     name: service.name,
-    packageCount: service._count.packageItems,
+    packageCount: readSessionOffering(service.sessionOffering)?.tiers.length ?? 1,
     tags: serviceTags(service)
   };
 }
@@ -101,7 +102,7 @@ function toServicePackageTablePackage(servicePackage: ServicePackageWithItems): 
   const durationMinutes = servicePackage.items.reduce((total, item) => total + item.quantity * item.service.durationMinutes, 0);
 
   return {
-    bookingPath: "Client booking rebuild pending",
+    bookingPath: "Online booking unavailable",
     categories: servicePackageCategories(servicePackage),
     description: servicePackage.description,
     durationMinutes,
@@ -127,13 +128,17 @@ function redirectLegacyRulesTab(params: Awaited<SchedulingPageProps["searchParam
   redirect(`/admin/modules/appointments?${query.toString()}`);
 }
 
-export default async function SchedulingPage({ searchParams }: SchedulingPageProps) {
+export default async function SchedulingPage({ searchParams, section }: SchedulingPageProps & { section?: "services" | "categories" | "packages" }) {
   await requireAdmin("scheduling:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
   redirectLegacyRulesTab(params);
+  if (!section && (params.tab === "categories" || params.tab === "packages")) {
+    const query = new URLSearchParams(Object.entries(params).filter(([key, value]) => key !== "tab" && value !== undefined) as [string, string][]);
+    redirect(`/admin/modules/services/${params.tab}${query.size ? `?${query}` : ""}`);
+  }
   const [services, servicePackages, serviceCategories, mediaAssets] = await Promise.all([
     prisma.service.findMany({
-      where: { siteId: settings.siteId },
+      where: { siteId: settings.siteId, isOneOff: false },
       include: { _count: { select: { packageItems: true } }, mediaAsset: true },
       orderBy: [{ isActive: "desc" }, { category: "asc" }, { updatedAt: "desc" }]
     }),
@@ -167,8 +172,6 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   const categoryFilter = categories.includes(params.category || "") ? String(params.category) : "all";
   const tagFilter = tags.includes(params.tag || "") ? String(params.tag) : "all";
 
-  const activeServices = services.filter((service) => service.isActive).length;
-  const activePackages = servicePackages.filter((servicePackage) => servicePackage.isActive).length;
   const savedMessage = savedServiceMessage(params.saved);
   const errorMessage = params.error ? decodeURIComponent(params.error) : null;
   const categoryOptions: SelectMenuOption[] = [
@@ -218,7 +221,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       createAction={
         <ButtonLink href="/admin/modules/services/new" size="sm">
           <Plus size={15} />
-          New service
+          New session type
         </ButtonLink>
       }
       emptyCreateAction={
@@ -252,67 +255,21 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
     />
   );
 
-  const tabs: FolderTab[] = [
-    {
-      content: servicesContent,
-      footer: (
-        <div className="catalog-table-status-strip" aria-label="Service catalog status">
-          <span className="catalog-pill is-green">
-            <CalendarCheck size={15} />
-            {activeServices} active
-          </span>
-          <span className="catalog-pill is-blue">
-            <Boxes size={15} />
-            {activePackages} packages
-          </span>
-        </div>
-      ),
-      icon: <CalendarCheck size={15} />,
-      id: "services",
-      label: "Services"
-    },
-    {
-      content: categoriesContent,
-      footer: (
-        <div className="catalog-table-status-strip" aria-label="Service category catalog status">
-          <span className="catalog-pill is-blue">
-            <Images size={15} />
-            {serviceCategories.length} categories
-          </span>
-        </div>
-      ),
-      icon: <Images size={15} />,
-      id: "categories",
-      label: "Categories"
-    },
-    {
-      content: packagesContent,
-      footer: (
-        <div className="catalog-table-status-strip" aria-label="Package catalog status">
-          <span className="catalog-pill is-blue">
-            <Boxes size={15} />
-            {activePackages} active
-          </span>
-        </div>
-      ),
-      icon: <Boxes size={15} />,
-      id: "packages",
-      label: "Packages"
-    }
-  ];
+  const selectedSection = section || "services";
+  const sectionLabel = selectedSection === "categories" ? "Service categories" : selectedSection === "packages" ? "Service bundles" : "Services";
 
   return (
     <div className="stack products-workspace service-workspace">
       <header className="page-header">
         <div>
-          <h1>Services</h1>
+          <h1>{sectionLabel}</h1>
         </div>
       </header>
 
       {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
       {errorMessage ? <div className="error">{errorMessage}</div> : null}
 
-      <FolderTabs ariaLabel="Service catalog sections" initialTab={params.tab} tabs={tabs} />
+      <section className="admin-index-panel">{selectedSection === "categories" ? categoriesContent : selectedSection === "packages" ? packagesContent : servicesContent}</section>
     </div>
   );
 }

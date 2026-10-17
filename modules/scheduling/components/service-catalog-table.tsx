@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { CalendarCheck, Eye, EyeOff, Pencil, Search, X } from "lucide-react";
+import Link from "next/link";
+import { useMemo, useState, type ReactNode } from "react";
+import { CalendarCheck, Pencil, Search, X } from "lucide-react";
 import { Button, ButtonLink, Pagination, SelectMenu, Tooltip, type SelectMenuOption } from "@/components/ui";
 import { useCatalogTablePagination } from "./use-catalog-table-pagination";
 
@@ -88,14 +89,11 @@ export function ServiceCatalogTable({
   );
   const {
     currentPage,
-    emptyRowCount,
     endIndex,
-    fillerRowCount,
     firstPage,
     nextPage,
     pageCount,
     previousPage,
-    setTableFrameRef,
     startIndex
   } = useCatalogTablePagination(filteredServices.length);
   const pagedServices = filteredServices.slice(startIndex, endIndex);
@@ -103,12 +101,12 @@ export function ServiceCatalogTable({
   const rangeEnd = endIndex;
   const hasServices = Boolean(services.length);
   const statusModalService = statusActionService || null;
-  const nextToggleState = statusModalService?.isActive ? "inactive" : "active";
-  const toggleModalTitle = statusModalService ? `Mark ${statusModalService.name} ${nextToggleState}?` : "Update service status";
+  const nextToggleState = statusModalService?.isActive ? "draft" : "active";
+  const toggleModalTitle = statusModalService ? `Mark ${statusModalService.name} ${nextToggleState}?` : "Update session type status";
   const toggleModalCopy =
     statusModalService?.isActive
-      ? "This service will be removed from public booking, but its catalog details and existing appointments will stay in place."
-      : "This service will become available anywhere active services are shown, including booking surfaces.";
+      ? "This session type will be hidden from new bookings. Its details and existing appointments will stay in place."
+      : "This session type will be available when booking a client. Online package selection is not available yet.";
   const servicesHref = "/admin/modules/services";
 
   const resetFilters = () => {
@@ -122,15 +120,14 @@ export function ServiceCatalogTable({
     <div className="service-catalog-folder-panel" aria-labelledby="services-board-title">
       <div className="catalog-board-header">
         <div>
-          <p className="catalog-rail-label">Catalog</p>
-          <h2 id="services-board-title">Service catalog</h2>
+          <h2 id="services-board-title">Session types</h2>
           <p>
             {filteredServices.length ? `${rangeStart}-${rangeEnd}` : "0"} of {filteredServices.length || services.length}
-            {normalizedSearch ? ` matching "${normalizedSearch}"` : " services"}
+            {normalizedSearch ? ` matching "${normalizedSearch}"` : " session types"}
           </p>
         </div>
         <div className="catalog-board-actions">
-          <span className="ui-badge">Client booking rebuild pending</span>
+          <span className="ui-badge">Online booking unavailable</span>
           {createAction}
         </div>
       </div>
@@ -138,7 +135,7 @@ export function ServiceCatalogTable({
       <div className="ui-table-filter-bar catalog-board-filters">
         <div className="ui-table-filter-search" role="search">
           <label className="ui-sr-only" htmlFor="services-search">
-            Search service, category, tag
+            Search session type, category, tag
           </label>
           <span className="ui-table-filter-input">
             <Search aria-hidden="true" size={15} />
@@ -148,7 +145,7 @@ export function ServiceCatalogTable({
                 setSearchQuery(event.currentTarget.value);
                 firstPage();
               }}
-              placeholder="Search service, category, tag"
+              placeholder="Search session type, category, tag"
               value={searchQuery}
             />
           </span>
@@ -187,17 +184,16 @@ export function ServiceCatalogTable({
         </div>
       </div>
 
-      <div className="catalog-table-scroll catalog-viewport-table" ref={setTableFrameRef}>
+      <div className="catalog-table-scroll catalog-viewport-table">
         <table className="catalog-product-table">
           <thead>
             <tr>
-              <th>Service</th>
+              <th>Session type</th>
               <th>Status</th>
               <th>Category</th>
               <th>Tags</th>
               <th>Duration</th>
               <th>Packages</th>
-              <th>Booking</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -205,10 +201,10 @@ export function ServiceCatalogTable({
             {pagedServices.map((service) => {
               const category = service.category || "Uncategorized";
               const tagsLabel = service.tags.join(", ") || "No tags";
-              const packageLabel = `${service.packageCount} pkg`;
+              const packageLabel = `${service.packageCount} ${service.packageCount === 1 ? "package" : "packages"}`;
               return (
                 <tr key={service.id}>
-                  <td>
+                  <td data-label="Session type">
                     <div className="catalog-product-cell">
                       <div className="catalog-row-thumb">
                         {service.imageUrl ? <img alt="" src={service.imageUrl} /> : (
@@ -218,54 +214,49 @@ export function ServiceCatalogTable({
                         )}
                       </div>
                       <div className="catalog-row-copy">
-                        <strong title={service.name}>{service.name}</strong>
-                        <small title={`${service.bookingPath} · ${service.description || service.location || "No service copy yet."}`}>
-                          {service.bookingPath} · {service.description || service.location || "No service copy yet."}
-                        </small>
+                        <Link href={`/admin/modules/services/${service.id}`} title={service.name}>{service.name}</Link>
+                        {service.description || service.location ? <small title={service.description || service.location}>{service.description || service.location}</small> : null}
                       </div>
                     </div>
                   </td>
-                  <td>
-                    <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "inactive"}</span>
+                  <td data-label="Status">
+                    <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
                   </td>
-                  <td>
+                  <td data-label="Category">
                     <span className="catalog-cell-text" title={category}>{category}</span>
                   </td>
-                  <td>
+                  <td data-label="Tags">
                     <span className="catalog-cell-text" title={tagsLabel}>{tagsLabel}</span>
                   </td>
-                  <td>
+                  <td data-label="Duration">
                     <strong className="catalog-price-cell">{serviceDurationLabel(service.durationMinutes)}</strong>
                   </td>
-                  <td>
+                  <td data-label="Packages">
                     <span className="catalog-cell-text" title={packageLabel}>{packageLabel}</span>
                   </td>
-                  <td>
-                    <span className="catalog-cell-text" title={service.bookingPath}>{service.bookingPath}</span>
-                  </td>
-                  <td>
+                  <td data-label="Actions">
                     <div className="catalog-row-actions">
-                      <Tooltip content="Edit service" focusable={false}>
+                      <Tooltip content="Edit session type" focusable={false}>
                         <ButtonLink
                           aria-label={`Edit ${service.name}`}
                           className="catalog-icon-button"
                           href={`/admin/modules/services/${service.id}`}
                           size="sm"
-                          title="Edit service"
+                          title="Edit session type"
                           variant="secondary">
                           <Pencil aria-hidden="true" size={15} />
                         </ButtonLink>
                       </Tooltip>
-                      <Tooltip content={service.isActive ? "Mark inactive" : "Mark active"} focusable={false}>
+                      <Tooltip content={service.isActive ? "Mark draft" : "Mark active"} focusable={false}>
                         <ButtonLink
                           aria-haspopup="dialog"
-                          aria-label={service.isActive ? `Mark ${service.name} inactive` : `Mark ${service.name} active`}
-                          className={`catalog-icon-button catalog-visibility-toggle ${service.isActive ? "is-live" : "is-muted"}`}
+                          aria-label={service.isActive ? `Mark ${service.name} draft` : `Mark ${service.name} active`}
+                          className="catalog-status-action"
                           href={`${servicesHref}?statusService=${encodeURIComponent(service.id)}`}
                           size="sm"
-                          title={service.isActive ? "Mark inactive" : "Mark active"}
+                          title={service.isActive ? "Mark draft" : "Mark active"}
                           variant="secondary">
-                          {service.isActive ? <Eye aria-hidden="true" size={16} /> : <EyeOff aria-hidden="true" size={16} />}
+                          {service.isActive ? "Mark draft" : "Make active"}
                         </ButtonLink>
                       </Tooltip>
                     </div>
@@ -273,30 +264,22 @@ export function ServiceCatalogTable({
                 </tr>
               );
             })}
-            {fillerRowCount ? (
-              <tr
-                aria-hidden="true"
-                className="catalog-table-filler-row"
-                style={{ "--catalog-table-filler-rows": fillerRowCount } as CSSProperties}>
-                <td colSpan={8} />
-              </tr>
-            ) : null}
             {!filteredServices.length ? (
               <tr
                 className="catalog-table-empty-state-row"
-                style={{ "--catalog-table-empty-rows": emptyRowCount } as CSSProperties}>
-                <td colSpan={8}>
+                >
+                <td colSpan={7}>
                   <div className="catalog-empty-state">
                     {hasServices ? (
                       <>
-                        <h3>No services found</h3>
+                        <h3>No session types found</h3>
                         <p>Adjust the current filters.</p>
                       </>
                     ) : (
                       <>
-                        <h3>No services made</h3>
+                        <h3>No session types yet</h3>
                         <div className="catalog-empty-state-action">
-                          {emptyCreateAction || "Create a service or adjust the current filters."}
+                          {emptyCreateAction || "Create a session type or adjust the current filters."}
                         </div>
                       </>
                     )}
@@ -342,8 +325,7 @@ export function ServiceCatalogTable({
                   Cancel
                 </ButtonLink>
                 <Button type="submit" variant={statusModalService.isActive ? "danger" : "primary"}>
-                  {statusModalService.isActive ? <EyeOff aria-hidden="true" size={15} /> : <Eye aria-hidden="true" size={15} />}
-                  {statusModalService.isActive ? "Mark inactive" : "Mark active"}
+                  {statusModalService.isActive ? "Mark draft" : "Mark active"}
                 </Button>
               </div>
             </form>

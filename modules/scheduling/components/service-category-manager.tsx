@@ -41,10 +41,6 @@ export function ServiceCategoryManager({ canUpload, categories, mediaAssets }: S
               <label htmlFor="service-category-name">Name</label>
               <input id="service-category-name" name="name" placeholder="Events" required />
             </div>
-            <div className="ui-field">
-              <label htmlFor="service-category-slug">Slug</label>
-              <input id="service-category-slug" name="slug" placeholder="events" />
-            </div>
           </div>
           <div className="catalog-form-grid is-two">
             <div className="ui-field">
@@ -100,7 +96,6 @@ export function ServiceCategoryManager({ canUpload, categories, mediaAssets }: S
 
               <div className="service-category-card-copy">
                 <div>
-                  <p className="catalog-rail-label">{category.slug}</p>
                   <h3>{category.name}</h3>
                   <span className="ui-badge">{category.serviceCount} services</span>
                 </div>
