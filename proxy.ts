@@ -14,6 +14,7 @@ function shouldSkip(pathname: string) {
 }
 
 function isSensitiveCapabilityPath(pathname: string) {
+  if (pathname.startsWith("/uploads") || pathname.startsWith("/api/uploads/")) return true;
   return pathname.startsWith("/api/payments/connect/")
     || pathname === "/proofs"
     || pathname.startsWith("/proofs/")

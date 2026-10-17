@@ -15,6 +15,7 @@ const modulePageLoaders = {
   forms: () => import("@/modules/forms/page"),
   help: () => import("@/modules/help/page"),
   media: () => import("@/modules/media/page"),
+  uploads: () => import("@/modules/uploads/page"),
   payments: () => import("@/modules/payments/page"),
   portfolio: () => import("@/modules/portfolio/page"),
   products: () => import("@/modules/products/page"),

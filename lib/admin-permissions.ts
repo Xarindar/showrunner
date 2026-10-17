@@ -21,7 +21,8 @@ export const adminPermissions = [
   "scheduling:manage",
   "settings:update",
   "testimonials:manage",
-  "users:manage"
+  "users:manage",
+  "uploads:manage"
 ] as const;
 
 export type AdminPermission = (typeof adminPermissions)[number];
