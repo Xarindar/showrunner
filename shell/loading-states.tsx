@@ -1,7 +1,9 @@
-import { Card, EqualGrid, SkeletonBlock, SkeletonLine } from "@/components/ui";
+import { SkeletonBlock, SkeletonLine } from "@/components/ui/states";
 
 type AdminSkeletonProps = {
   rows?: number;
+  title?: string;
+  kind?: "workspace" | "editor" | "website" | "gallery";
 };
 
 const appointmentSkeletonEvents = ([
@@ -25,43 +27,44 @@ const appointmentSkeletonEvents = ([
   style: { gridColumn: column, gridRow: `${row} / span ${span}` }
 }));
 
-export function AdminSkeleton({ rows = 6 }: AdminSkeletonProps) {
+export function AdminSkeleton({ rows = 5, title = "", kind = "workspace" }: AdminSkeletonProps) {
   return (
-    <div className="skeleton-screen" aria-busy="true" aria-label="Loading">
-      <div className="skeleton-header">
-        <SkeletonLine width="short" />
-        <SkeletonBlock />
-        <SkeletonLine width="medium" />
-      </div>
-
-      <EqualGrid className="skeleton-grid" min="180px">
-        {Array.from({ length: 4 }, (_, index) => (
-          <Card className="skeleton-card" key={index} minHeight="sm">
+    <section className={`stack admin-loading admin-loading-${kind}`} aria-busy="true" aria-label={title ? `Loading ${title}` : "Loading page"}>
+      <header className="page-header">
+        {title ? <h1>{title}</h1> : <SkeletonLine className="admin-loading-heading" aria-hidden="true" />}
+        <SkeletonBlock className="admin-loading-action" aria-hidden="true" />
+      </header>
+      <p className="ui-sr-only" role="status">{title ? `Loading ${title}…` : "Loading page…"}</p>
+      {kind === "gallery" ? (
+        <div className="admin-loading-gallery" aria-hidden="true">
+          {Array.from({ length: 9 }, (_, index) => <SkeletonBlock key={index} />)}
+        </div>
+      ) : (
+        <div className="admin-loading-body" aria-hidden="true">
+          <div className="admin-loading-fields">
+            {kind === "website" ? <SkeletonBlock className="admin-loading-preview" /> : Array.from({ length: rows }, (_, index) => (
+              <div className="admin-loading-field" key={index}>
+                <SkeletonLine width="short" />
+                <SkeletonBlock />
+              </div>
+            ))}
+          </div>
+          {kind === "editor" || kind === "website" ? <aside className="admin-loading-settings">
+            <SkeletonLine width="medium" />
+            <SkeletonBlock />
             <SkeletonLine width="short" />
             <SkeletonBlock />
-            <SkeletonLine width="medium" />
-          </Card>
-        ))}
-      </EqualGrid>
-
-      <Card className="skeleton-panel" minHeight="lg" reservedHeader={<SkeletonLine width="short" />}>
-        <div className="skeleton-stack">
-          {Array.from({ length: rows }, (_, index) => (
-            <div className="skeleton-row" key={index}>
-              <span className="skeleton-dot" />
-              <SkeletonLine width="long" />
-              <SkeletonLine width="medium" />
-            </div>
-          ))}
+          </aside> : null}
         </div>
-      </Card>
-    </div>
+      )}
+    </section>
   );
 }
 
 export function AppointmentsSkeleton() {
   return (
     <div className="appointments-workspace appointments-skeleton" aria-busy="true" aria-label="Loading appointment calendar">
+      <p className="ui-sr-only" role="status">Loading appointments…</p>
       <section className="appointments-calendar-shell">
         <header className="appointments-subtle-header appointments-skeleton-header" aria-hidden="true">
           <div className="appointments-subtle-title appointments-skeleton-title">

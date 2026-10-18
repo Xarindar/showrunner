@@ -5,6 +5,7 @@ node_modules/
 
 # Next.js and build output
 .next/
+.next-*/
 out/
 build/
 dist/
@@ -49,6 +50,7 @@ codex-bug-notes.md
 # Local tool state
 .claude/
 .tmp/
+.impeccable/review/
 
 # Local dev server captures
 *.out.log

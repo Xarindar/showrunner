@@ -1,5 +1,5 @@
-import { AdminSkeleton } from "@/shell/loading-states";
+import { AdminModuleLoading } from "@/shell/admin-module-loading";
 
 export default function AdminLoading() {
-  return <AdminSkeleton />;
+  return <AdminModuleLoading />;
 }

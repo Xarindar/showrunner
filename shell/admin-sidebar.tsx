@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AdminNavigationPending } from "@/shell/admin-navigation-pending";
 import Image from "next/image";
 import {
   ArrowLeft,
@@ -13,6 +14,7 @@ import {
   Pencil,
   PanelLeftClose,
   PanelLeftOpen,
+  Search,
   Settings,
   UserRound,
   X
@@ -29,6 +31,7 @@ import {
   type MovableModuleNavigationCategory
 } from "@/shell/module-navigation";
 import { groupAdminModuleNavigationLayout, moveAdminModuleNavigationItem } from "@/shell/admin-navigation-layout";
+import { searchAdminNavigation } from "@/shell/admin-navigation-search";
 import type { ModuleStatus, ShellModule } from "@/shell/module-types";
 import { useAdminMobileHeaderContext } from "@/shell/admin-mobile-header";
 import { logoutAction } from "@/app/admin/(protected)/actions";
@@ -108,6 +111,7 @@ function SidebarModuleLink({
     <Link aria-current={isActive ? item.id === "scheduling" ? "location" : "page" : undefined} className={isActive ? "active" : undefined} href={item.href} onClick={closeMenu}>
       {showIcon ? <Icon size={17} /> : null}
       {label}
+      <AdminNavigationPending />
     </Link>
   );
 
@@ -133,7 +137,7 @@ function SidebarModuleLink({
         { href: "/admin/modules/services", label: "Session types", active: !pathname.startsWith("/admin/modules/services/categories") && !pathname.startsWith("/admin/modules/services/packages") },
         { href: "/admin/modules/services/categories", label: "Categories", active: pathname.startsWith("/admin/modules/services/categories") },
         { href: "/admin/modules/services/packages", label: "Service bundles", active: pathname.startsWith("/admin/modules/services/packages") }
-      ].map(link => <Link key={link.href} href={link.href} onClick={closeMenu} aria-current={link.active ? "page" : undefined}>{link.label}</Link>)}
+      ].map(link => <Link key={link.href} href={link.href} onClick={closeMenu} aria-current={link.active ? "page" : undefined}>{link.label}<AdminNavigationPending /></Link>)}
     </nav> : null}
     </>
   );
@@ -219,9 +223,9 @@ export function AdminSidebar({ publicSiteUrl, businessName, enabledModules, logo
     sidebar.querySelector<HTMLButtonElement>(".admin-sidebar-close")?.focus();
     const resized = () => { if (!mobile.matches) setMenuOpen(false); };
     const keydown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); setMenuOpen(false); }
+      if (event.key === "Escape" && !(event.target === navigationSearchRef.current && navigationSearchRef.current?.value)) { event.preventDefault(); setMenuOpen(false); }
       if (event.key !== "Tab") return;
-      const controls = Array.from(sidebar.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex="0"]')).filter(node => node.getClientRects().length);
+      const controls = Array.from(sidebar.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), [tabindex="0"]')).filter(node => node.getClientRects().length);
       const first = controls[0], last = controls.at(-1);
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
@@ -243,6 +247,8 @@ export function AdminSidebar({ publicSiteUrl, businessName, enabledModules, logo
     document.cookie = `showrunner-sidebar-collapsed=${!collapsed}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
   }
   const [editing, setEditing] = useState(false);
+  const [navigationQuery, setNavigationQuery] = useState("");
+  const navigationSearchRef = useRef<HTMLInputElement>(null);
   const [draggedModuleId, setDraggedModuleId] = useState<string | null>(null);
   const [layoutItems, setLayoutItems] = useState(() => groupAdminModuleNavigationLayout(navigationLayout));
   const [saveState, setSaveState] = useState<NavigationSaveState>("idle");
@@ -269,7 +275,12 @@ export function AdminSidebar({ publicSiteUrl, businessName, enabledModules, logo
     .map((item) => modulesById.get(item.moduleId))
     .filter((item): item is ShellModule => Boolean(item));
 
-  const closeMenu = () => setMenuOpen(false);
+  const searchableModules = visibleNavigationItems
+    .map(item => modulesById.get(item.moduleId))
+    .filter((item): item is ShellModule => Boolean(item && enabledModules.includes(item.id as ModuleId) && item.status !== "future"));
+  if (canUpdateSettings) searchableModules.push(modulesById.get("settings")!);
+  const navigationResults = searchAdminNavigation(searchableModules, navigationQuery);
+  const closeMenu = () => { setMenuOpen(false); setNavigationQuery(""); };
 
   useEffect(() => {
     return () => {
@@ -324,6 +335,7 @@ export function AdminSidebar({ publicSiteUrl, businessName, enabledModules, logo
   }
 
   function toggleEditing() {
+    setNavigationQuery("");
     if (editing && keyboardSaveTimerRef.current) persistLayout(layoutRef.current);
     setEditing((current) => !current);
   }
@@ -474,23 +486,19 @@ export function AdminSidebar({ publicSiteUrl, businessName, enabledModules, logo
           </button>
         </div>
 
+        <div className="admin-sidebar-search" role="search" aria-label="Admin navigation">
+          <Search aria-hidden="true" size={16} />
+          <input aria-label="Search admin pages" autoComplete="off" disabled={editing} onChange={event => setNavigationQuery(event.target.value)} onKeyDown={event => {
+            if (event.key === "Escape" && navigationQuery) { event.preventDefault(); event.stopPropagation(); setNavigationQuery(""); }
+          }} placeholder="Search pages" ref={navigationSearchRef} type="search" value={navigationQuery} />
+          {navigationQuery ? <button aria-label="Clear page search" onClick={() => { setNavigationQuery(""); navigationSearchRef.current?.focus(); }} type="button"><X size={14} /></button> : null}
+        </div>
         <div className="admin-sidebar-nav-scroll">
+          {navigationQuery.trim() ? <nav className="admin-nav admin-nav-search-results" aria-label="Page search results">
+            <p aria-live="polite">{navigationResults.length ? `${navigationResults.length} ${navigationResults.length === 1 ? "page" : "pages"}` : "No matching pages"}</p>
+            {navigationResults.map(page => <Link key={page.href} href={page.href} onClick={closeMenu}>{page.label}<AdminNavigationPending /></Link>)}
+          </nav> :
           <nav className={`admin-nav${draggedModuleId ? " is-dragging" : ""}`} aria-label="Admin modules">
-            <div className="admin-nav-customize">
-              <button
-                aria-pressed={editing}
-                onClick={toggleEditing}
-                type="button"
-              >
-                {editing ? <Check aria-hidden="true" size={15} /> : <Pencil aria-hidden="true" size={14} />}
-                <span>{editing ? "Done" : "Customize"}</span>
-              </button>
-              {saveStatus ? (
-                <span className={`admin-navigation-save-state is-${saveState}`} aria-live="polite">
-                  {saveStatus}
-                </span>
-              ) : null}
-            </div>
             {editing ? <p className="admin-navigation-edit-hint">Drag modules between sections, or use the arrow keys on a move handle.</p> : null}
             <div
               className={`admin-nav-primary${editing ? " is-drop-zone" : ""}${draggedModuleId ? " is-dragging" : ""}`}
@@ -529,7 +537,14 @@ export function AdminSidebar({ publicSiteUrl, businessName, enabledModules, logo
                 />
               ))}
             </div>
-          </nav>
+            <div className="admin-nav-customize">
+              <button aria-pressed={editing} onClick={toggleEditing} type="button">
+                {editing ? <Check aria-hidden="true" size={15} /> : <Pencil aria-hidden="true" size={14} />}
+                <span>{editing ? "Done" : "Customize"}</span>
+              </button>
+              {saveStatus ? <span className={`admin-navigation-save-state is-${saveState}`} aria-live="polite">{saveStatus}</span> : null}
+            </div>
+          </nav>}
         </div>
 
         {publicSiteUrl ? <a className="admin-sidebar-public-link" href={publicSiteUrl} target="_blank" rel="noreferrer" onClick={closeMenu}>
