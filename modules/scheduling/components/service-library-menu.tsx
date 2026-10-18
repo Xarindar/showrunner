@@ -59,9 +59,10 @@ export function ServiceLibraryMenu({ selectedItems, onChoose, onCreate, onBrowse
         <Field label="Tag"><Select value={filters.tag} onChange={event => { setLoading(true); setFilters({ ...filters, tag: event.target.value }); }}><option value="">All tags</option>{results?.tags.map(value => <option key={value}>{value}</option>)}</Select></Field>
       </div>
       <div className={styles.menuResults} aria-busy={loading}>
-        {loading ? <p role="status">Loading services…</p> : error ? <><p role="alert">{error}</p><Button type="button" variant="secondary" onClick={() => setRetry(value => value + 1)}>Try again</Button></> : !results?.items.length ? <p>No matching services.</p> : results.items.map(item => {
+        <p role="status">{loading ? "Loading services…" : error || !results?.items.length ? "" : `${results.items.length} services`}</p>
+        {error && !loading ? <><p role="alert">{error}</p><Button type="button" variant="secondary" onClick={() => { setLoading(true); setRetry(value => value + 1); }}>Try again</Button></> : !results?.items.length ? !loading && <p>No matching services.</p> : results.items.map(item => {
           const added = selectedItems.some(selected => selected.libraryItemId === item.id || selected.name.toLowerCase() === item.name.toLowerCase());
-          return <Button key={item.id} type="button" variant="ghost" disabled={added} onClick={() => { close(); onChoose(item); }}>{item.name}{added ? " · Added" : ""}</Button>;
+          return <Button key={item.id} type="button" variant="ghost" disabled={loading || added} onClick={() => { close(); onChoose(item); }}>{item.name}{added ? " · Added" : ""}</Button>;
         })}
       </div>
       <Button type="button" variant="ghost" onClick={() => { close(); onCreate(); }}>+ Create new service</Button>

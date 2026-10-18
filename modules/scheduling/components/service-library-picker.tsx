@@ -98,9 +98,9 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
       </div>
       {error ? <div className={styles.error} role="alert"><p>{error}</p><Button type="button" variant="secondary" onClick={() => { setLoading(true); setReload(value => value + 1); }}>Try again</Button></div> : null}
       <div className={styles.results} aria-busy={loading} aria-label="Library services">
-        {loading ? <p role="status" className={styles.hint}>Loading services…</p> : !error && <>
-          <p className={styles.hint} role="status">{results.total} {results.total === 1 ? "service" : "services"}</p>
-          {results.items.length === 0 ? <div className={styles.empty}>
+        <p className={styles.hint} role="status">{loading ? "Loading services…" : error ? "" : `${results.total} ${results.total === 1 ? "service" : "services"}`}</p>
+        {!error && <>
+          {results.items.length === 0 ? !loading && <div className={styles.empty}>
             <h3>{q || category || tag ? "No matching services" : "Your service library is empty"}</h3>
             <p>{q || category || tag ? "Try another search or clear the filters." : "Create your first reusable service with a name and description."}</p>
             {(q || category || tag) && <Button type="button" variant="ghost" onClick={() => { setQ(""); setCategory(""); setTag(""); setPage(1); setLoading(true); }}>Clear filters</Button>}
@@ -108,7 +108,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
             const added = selectedItems.some(selected => selected.libraryItemId === item.id || selected.name.toLowerCase() === item.name.toLowerCase());
             const checked = picked.some(selected => selected.id === item.id);
             return <label key={item.id} className={styles.option} data-added={added}>
-              <input type="checkbox" aria-label={`Select ${item.name}`} checked={added || checked} disabled={added || (!checked && picked.length >= remaining)} onChange={event => setPicked(current => event.target.checked ? [...current, item] : current.filter(selected => selected.id !== item.id))} />
+              <input type="checkbox" aria-label={`Select ${item.name}`} checked={added || checked} disabled={loading || added || (!checked && picked.length >= remaining)} onChange={event => setPicked(current => event.target.checked ? [...current, item] : current.filter(selected => selected.id !== item.id))} />
               <span className={styles.serviceCopy}><strong>{item.name}</strong><span className={styles.description}>{item.description || "No description yet"}</span>
                 {(item.category || item.tags.length > 0) && <span className={styles.metadata}>{[item.category, ...item.tags.map(value => `#${value}`)].filter(Boolean).join(" · ")}</span>}
               </span>
@@ -116,9 +116,9 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
             </label>;
           })}
           {results.pageCount > 1 && <div className={styles.pagination}>
-            <Button type="button" variant="ghost" disabled={page <= 1} onClick={() => { setPage(value => value - 1); setLoading(true); }}>Previous</Button>
+            <Button type="button" variant="ghost" disabled={loading || page <= 1} onClick={() => { setPage(value => value - 1); setLoading(true); }}>Previous</Button>
             <span className={styles.hint}>Page {results.page} of {results.pageCount}</span>
-            <Button type="button" variant="ghost" disabled={page >= results.pageCount} onClick={() => { setPage(value => value + 1); setLoading(true); }}>Next</Button>
+            <Button type="button" variant="ghost" disabled={loading || page >= results.pageCount} onClick={() => { setPage(value => value + 1); setLoading(true); }}>Next</Button>
           </div>}
         </>}
       </div>

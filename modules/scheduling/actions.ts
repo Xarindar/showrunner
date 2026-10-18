@@ -414,6 +414,7 @@ export async function toggleServiceAction(formData: FormData) {
   });
 
   refreshScheduling();
+  redirect(servicesAdminPath());
 }
 
 export async function updateServiceAction(formData: FormData) {

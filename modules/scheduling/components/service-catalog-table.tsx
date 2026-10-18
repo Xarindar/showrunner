@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
-import { CalendarCheck, Pencil, Search, X } from "lucide-react";
+import { CalendarCheck, MoreHorizontal, Pencil, Search, X } from "lucide-react";
 import { Button, ButtonLink, Pagination, SelectMenu, Tooltip, type SelectMenuOption } from "@/components/ui";
 import { useCatalogTablePagination } from "./use-catalog-table-pagination";
 
@@ -184,7 +184,34 @@ export function ServiceCatalogTable({
         </div>
       </div>
 
-      <div className="catalog-table-scroll catalog-viewport-table">
+      <ul aria-label="Session types" className="service-mobile-list">
+        {pagedServices.map((service) => (
+          <li key={service.id}>
+            <div className="service-mobile-summary">
+              <Link className="service-mobile-name" href={`/admin/modules/services/${service.id}`}>{service.name}</Link>
+              <div className="service-mobile-meta">
+                <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
+                <span>{serviceDurationLabel(service.durationMinutes)}</span>
+                <span>{service.packageCount} {service.packageCount === 1 ? "package" : "packages"}</span>
+              </div>
+            </div>
+            <ButtonLink aria-label={`Edit ${service.name}`} className="service-mobile-edit" href={`/admin/modules/services/${service.id}`} size="sm" variant="secondary">
+              <Pencil aria-hidden="true" size={14} /> Edit
+            </ButtonLink>
+            <details className="service-mobile-actions">
+              <summary aria-label={`More actions for ${service.name}`}><MoreHorizontal aria-hidden="true" size={18} /></summary>
+              <ButtonLink aria-haspopup="dialog" href={`${servicesHref}?statusService=${encodeURIComponent(service.id)}`} size="sm" variant="ghost">
+                {service.isActive ? "Mark draft" : "Mark active"}
+              </ButtonLink>
+            </details>
+          </li>
+        ))}
+        {!filteredServices.length ? <li className="service-mobile-empty">
+          <strong>{hasServices ? "No session types found" : "No session types yet"}</strong>
+          {hasServices ? <p>Adjust the current filters.</p> : emptyCreateAction || <p>Create a session type to get started.</p>}
+        </li> : null}
+      </ul>
+      <div aria-label="Session types table" className="catalog-table-scroll catalog-viewport-table service-desktop-table" role="region" tabIndex={0}>
         <table className="catalog-product-table">
           <thead>
             <tr>
@@ -256,7 +283,7 @@ export function ServiceCatalogTable({
                           size="sm"
                           title={service.isActive ? "Mark draft" : "Mark active"}
                           variant="secondary">
-                          {service.isActive ? "Mark draft" : "Make active"}
+                          {service.isActive ? "Mark draft" : "Mark active"}
                         </ButtonLink>
                       </Tooltip>
                     </div>
