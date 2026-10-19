@@ -6,17 +6,16 @@ import { UploadAssetsModal } from "@/modules/media/upload-assets-modal";
 
 type QuickUploadClientProps = {
   canUpload: boolean;
-  mediaDriver: string;
   preview?: boolean;
 };
 
-export function QuickUploadClient({ canUpload, mediaDriver, preview = false }: QuickUploadClientProps) {
+export function QuickUploadClient({ canUpload, preview = false }: QuickUploadClientProps) {
   const [dragging, setDragging] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [stagedFile, setStagedFile] = useState<File | null>(null);
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
 
-  function openUpload(file: File | null = null) {
-    setStagedFile(file);
+  function openUpload(files: File[] = []) {
+    setStagedFiles(files);
     setModalOpen(true);
   }
 
@@ -24,7 +23,7 @@ export function QuickUploadClient({ canUpload, mediaDriver, preview = false }: Q
     event.preventDefault();
     setDragging(false);
     if (preview) return;
-    openUpload(event.dataTransfer.files[0] || null);
+    openUpload(Array.from(event.dataTransfer.files));
   }
 
   return (
@@ -47,19 +46,18 @@ export function QuickUploadClient({ canUpload, mediaDriver, preview = false }: Q
         </span>
         <span className="dashboard-quick-upload-copy">
           <strong>{dragging ? "Drop to continue" : "Upload media"}</strong>
-          <small>{canUpload ? "Choose an image or drag it here" : "Open upload details and review storage"}</small>
+          <small>{canUpload ? "Choose images or drag them here" : "Uploads are temporarily unavailable"}</small>
         </span>
-        <span className="dashboard-quick-upload-action">Choose file</span>
+        <span className="dashboard-quick-upload-action">Choose images</span>
       </button>
 
       {!preview && modalOpen ? (
         <UploadAssetsModal
           canUpload={canUpload}
-          initialFile={stagedFile}
-          mediaDriver={mediaDriver}
+          initialFiles={stagedFiles}
           onClose={() => {
             setModalOpen(false);
-            setStagedFile(null);
+            setStagedFiles([]);
           }}
           open={modalOpen}
         />

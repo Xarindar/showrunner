@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Puck, usePuck, type Config, type Data } from "@puckeditor/core";
-import { Monitor, Smartphone, Undo2, Redo2, X, ExternalLink } from "lucide-react";
+import { Monitor, Smartphone, Undo2, Redo2, X, ExternalLink, ArrowLeft, PanelsTopLeft, ChevronRight, ChevronUp, ChevronDown, MoreHorizontal } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { contentFieldId, focusContentFieldWhenReady } from "./field-selection";
 import { type Choice } from "./editor";
 import { ContentFields } from "./content-fields";
 import { contentLinkOptions, editorPageDestination, type LinkChoices } from "./field-layout";
@@ -28,6 +30,10 @@ export function PuckContentEditor(props: Props) {
 
 function Workspace({ manifest, entries }: Props) {
   const { appState, dispatch, selectedItem, history } = usePuck();
+  const [editing, setEditing] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [fieldRequest, setFieldRequest] = useState<{ id: string; path: unknown } | null>(null);
   const [pageId, setPageId] = useState(manifest.pages[0].id);
   const [pageLocation, setPageLocation] = useState("");
   const [mobile, setMobile] = useState(false);
@@ -39,12 +45,17 @@ function Workspace({ manifest, entries }: Props) {
   }, []);
   const [ready, setReady] = useState(false);
   const [frameError, setFrameError] = useState(false);
+  const [previewAttempt, setPreviewAttempt] = useState(0);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
   const [saved, setSaved] = useState(Object.fromEntries(entries.map(entry => [entry.block.id, { payload: entry.payload, revision: entry.revision }])));
   const frame = useRef<HTMLIFrameElement>(null);
-  const sectionSelector = useRef<HTMLSelectElement>(null);
+  const sectionSelector = useRef<HTMLButtonElement>(null);
+  const editorEntry = useRef<HTMLButtonElement>(null);
+  const editorExit = useRef<HTMLButtonElement>(null);
+  const mobileHeading = useRef<HTMLHeadingElement>(null);
+  const mobileCardToggle = useRef<HTMLButtonElement>(null);
   const inspector = useRef<HTMLElement>(null);
   const page = manifest.pages.find(item => item.id === pageId)!;
   const pageEntries = useMemo(() => entries.filter(entry => entry.pageIds.includes(pageId) || entry.block.type === "business"), [entries, pageId]);
@@ -55,6 +66,8 @@ function Workspace({ manifest, entries }: Props) {
       const index = entries.findIndex(entry => entry.block.id === id);
       const entry = entries.find(entry => entry.block.id === id);
       if (index < 0 || !entry) return;
+      setEditing(true);
+      setPanelOpen(true);
       if (entry.pageIds.length) setPageId(entry.pageIds[0]);
       dispatch({ type: "setUi", ui: { itemSelector: { index } } });
     };
@@ -67,12 +80,31 @@ function Workspace({ manifest, entries }: Props) {
   const selected = entries.find(entry => entry.block.id === selectedItem?.props.id);
   const selectedId = selected?.block.id;
   useEffect(() => {
-    if (selectedId) inspector.current?.querySelector<HTMLButtonElement>("button")?.focus();
-  }, [selectedId]);
+    if (!editing || !selectedId) return;
+    const entry = entries.find(entry => entry.block.id === selectedId)!;
+    const payload = content.find(item => item.props.id === selectedId)?.props.payload;
+    const id = fieldRequest?.id === selectedId && payload ? contentFieldId(selectedId, payload, fieldRequest.path, entry.block.editableFields) : null;
+    if (!id || !inspector.current) {
+      const close = inspector.current?.querySelector<HTMLButtonElement>("button");
+      if (close?.getClientRects().length) close.focus();
+      else mobileHeading.current?.focus();
+      return;
+    }
+    return focusContentFieldWhenReady(inspector.current, id);
+    // Focus only on an explicit selection, never on each keystroke or draft update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, fieldRequest, editing]);
+  useEffect(() => {
+    if (editing && !selectedId) editorExit.current?.focus();
+    else editorEntry.current?.focus();
+    // Restore the mode entry point only when entering or leaving the editor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
   function closeInspector() {
     dispatch({ type: "setUi", ui: { itemSelector: null } });
-    sectionSelector.current?.focus();
+    requestAnimationFrame(() => sectionSelector.current?.focus());
   }
+  function closePanel() { setPanelOpen(false); mobileCardToggle.current?.focus(); }
   const siteUrl = manifest.previewUrl ? new URL(pageLocation || page.path, manifest.previewUrl).toString() : "";
   const preview = siteUrl ? new URL(siteUrl) : null;
   preview?.searchParams.set("showrunner-editor", "1");
@@ -84,6 +116,7 @@ function Workspace({ manifest, entries }: Props) {
     if (!destination || destination.href === siteUrl) return;
     setPageId(destination.pageId); setPageLocation(destination.href);
     setReady(false); setFrameError(false); setFocusedItem("");
+    setFieldRequest(null);
     dispatch({ type: "setUi", ui: { itemSelector: null } });
   }, [dispatch, manifest.pages, pending, siteUrl]);
 
@@ -102,13 +135,13 @@ function Workspace({ manifest, entries }: Props) {
     return () => { window.removeEventListener("beforeunload", leave); document.removeEventListener("click", followLink, true); };
   }, [dirty, pending]);
   useEffect(() => {
-    if (ready) return;
+    if (!editing || ready || !previewUrl) return;
     // The iframe can finish loading before React hydrates and attaches onLoad.
     const connect = () => frame.current?.contentWindow?.postMessage({ channel: "showrunner-editor-v1", type: "connect" }, previewOrigin);
     const retry = window.setInterval(connect, 1000);
     const timer = window.setTimeout(() => { window.clearInterval(retry); setFrameError(true); }, 20000);
     return () => { window.clearInterval(retry); window.clearTimeout(timer); };
-  }, [previewUrl, ready, previewOrigin]);
+  }, [previewUrl, ready, previewOrigin, editing, previewAttempt]);
   useEffect(() => {
     function receive(event: MessageEvent) {
       if (event.source !== frame.current?.contentWindow || event.origin !== previewOrigin || event.data?.channel !== "showrunner-editor-v1") return;
@@ -116,12 +149,16 @@ function Workspace({ manifest, entries }: Props) {
       if (event.data.type === "navigate" && typeof event.data.href === "string") navigate(event.data.href);
       if (event.data.type === "select") {
         const index = content.findIndex(item => item.props.id === event.data.id);
-        if (index >= 0 && pageEntries.some(entry => entry.block.id === event.data.id)) dispatch({ type: "setUi", ui: { itemSelector: { index } } });
+        if (!pending && index >= 0 && pageEntries.some(entry => entry.block.id === event.data.id)) {
+          setPanelOpen(true);
+          setFieldRequest({ id: event.data.id, path: event.data.field });
+          dispatch({ type: "setUi", ui: { itemSelector: { index } } });
+        }
       }
     }
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [content, dispatch, pageEntries, previewOrigin, navigate]);
+  }, [content, dispatch, pageEntries, previewOrigin, navigate, pending]);
   useEffect(() => {
     if (!ready || !frame.current?.contentWindow) return;
     const mediaUrl = (value: string) => value?.startsWith("/") ? new URL(value, window.location.origin).toString() : value;
@@ -151,26 +188,54 @@ function Workspace({ manifest, entries }: Props) {
     } catch (cause) { setError(true); setMessage(cause instanceof Error ? cause.message : "Unable to publish. Your edits are still here."); }
     finally { setPending(false); }
   }
+  function enterEditor() {
+    setReady(false); setFrameError(false); setEditing(true); setPanelOpen(false); setSheetExpanded(false);
+  }
+  if (!editing) return <div className={styles.overview}>
+    <header className="page-header"><h1>Content</h1><Button ref={editorEntry} onClick={enterEditor}>Edit website</Button></header>
+    {dirty && <p className={styles.saveState} role="status">Your unpublished edits are kept in this visit. The preview below shows the published website.</p>}
+    {siteUrl ? <iframe src={siteUrl} title="Your website preview" className={styles.websitePreview} /> : <p>Your website preview has not been connected. Your site administrator can connect it in the content manifest.</p>}
+  </div>;
   return <div className={`${styles.workspace} showrunner-content-workspace`}>
     <header className={styles.toolbar}>
-      <h1>Content</h1>
-      <label className={styles.pageLabel}>Page<select aria-label="Page" value={pageId} disabled={pending} onChange={event => navigate(manifest.pages.find(page => page.id === event.target.value)!.path)}>{manifest.pages.map(item => <option value={item.id} key={item.id}>{item.label}</option>)}</select></label>
-      <div className={styles.devices} role="group" aria-label="Preview size"><button aria-label="Desktop preview" aria-pressed={!mobile} onClick={() => setMobile(false)}><Monitor size={18} /></button><button aria-label="Mobile preview" aria-pressed={mobile} onClick={() => setMobile(true)}><Smartphone size={18} /></button></div>
-      <div className={styles.history}><button aria-label="Undo" disabled={!history.hasPast || pending} onClick={history.back}><Undo2 size={17} /></button><button aria-label="Redo" disabled={!history.hasFuture || pending} onClick={history.forward}><Redo2 size={17} /></button></div>
+      <Button ref={editorExit} variant="ghost" aria-label="Exit editor" disabled={pending} onClick={() => { setEditing(false); setReady(false); }}><ArrowLeft size={17} aria-hidden="true" /><span>Exit editor</span></Button>
+      <h1 className="ui-sr-only">Website editor</h1>
+      <label className={styles.pageLabel}><span className="ui-sr-only">Page</span><select aria-label="Page" value={pageId} disabled={pending} onChange={event => navigate(manifest.pages.find(page => page.id === event.target.value)!.path)}>{manifest.pages.map(item => <option value={item.id} key={item.id}>{item.label}</option>)}</select></label>
+      <div className={styles.devices} role="group" aria-label="Preview size"><Button variant="ghost" title="Desktop preview" aria-label="Desktop preview" aria-pressed={!mobile} onClick={() => setMobile(false)}><Monitor size={18} /></Button><Button variant="ghost" title="Mobile preview" aria-label="Mobile preview" aria-pressed={mobile} onClick={() => setMobile(true)}><Smartphone size={18} /></Button></div>
+      <div className={styles.history}><Button variant="ghost" title="Undo" aria-label="Undo" disabled={!history.hasPast || pending} onClick={history.back}><Undo2 size={17} /></Button><Button variant="ghost" title="Redo" aria-label="Redo" disabled={!history.hasFuture || pending} onClick={history.forward}><Redo2 size={17} /></Button></div>
       <span className={styles.saveState}>{dirty ? "Unpublished changes" : "Up to date"}</span>
-      {siteUrl && <a href={siteUrl} target="_blank" rel="noreferrer" aria-label="Open website"><ExternalLink size={17} /></a>}
-      <button className={styles.publish} disabled={!dirty || pending} onClick={publish}>{pending ? "Publishing…" : "Publish"}</button>
+      {siteUrl && <a href={siteUrl} target="_blank" rel="noreferrer" title="Open website" aria-label="Open website"><ExternalLink size={17} /></a>}
+      <details className={styles.mobileActions}><summary aria-label="Editor actions"><MoreHorizontal size={20} /></summary><div>
+        <Button variant="ghost" disabled={!history.hasPast || pending} onClick={history.back}><Undo2 size={17} />Undo</Button>
+        <Button variant="ghost" disabled={!history.hasFuture || pending} onClick={history.forward}><Redo2 size={17} />Redo</Button>
+        {siteUrl && <a href={siteUrl} target="_blank" rel="noreferrer"><ExternalLink size={17} />Open website</a>}
+        <span role="status">{dirty ? "Unpublished changes" : "Up to date"}</span>
+      </div></details>
+      <Button disabled={!dirty || pending} onClick={publish}>{pending ? "Publishing…" : "Publish"}</Button>
     </header>
     {message && <div className={styles.notice} role={error ? "alert" : "status"}>{message}</div>}
     <div className={styles.body}>
-      <div className={styles.canvas}>
-        {previewUrl ? <>
-          {!ready && <div className={styles.loading} role="status">{frameError ? "The website editor connection is unavailable. Check that the site integration is deployed, then reload." : "Loading your website…"}</div>}
-          <iframe ref={frame} key={previewUrl} src={previewUrl} title={`${page.label} website preview`} className={mobile ? styles.mobileFrame : styles.frame} onLoad={() => frame.current?.contentWindow?.postMessage({ channel: "showrunner-editor-v1", type: "connect" }, previewOrigin)} />
-        </> : <div className={styles.loading}>Your website preview has not been connected. Your site administrator can connect it in the content manifest.</div>}
+      <aside className={styles.editBar} data-open={panelOpen} data-expanded={sheetExpanded} data-selected={Boolean(selected)} aria-label="Website editing">
+        <div className={styles.mobileSheetHeader}>
+          {selected && <Button className={styles.sheetAction} variant="ghost" aria-label="Back to sections" onClick={closeInspector}><ArrowLeft size={18} /></Button>}
+          <h2 ref={mobileHeading} tabIndex={-1}><Button ref={mobileCardToggle} variant="ghost" aria-expanded={panelOpen} onClick={() => setPanelOpen(value => !value)}><span>{selected?.block.label || "Sections"}</span>{!panelOpen && <ChevronUp size={18} />}</Button></h2>
+          <Button className={styles.sheetAction} variant="ghost" aria-label={sheetExpanded ? "Reduce editing panel" : "Expand editing panel"} aria-expanded={sheetExpanded} onClick={() => setSheetExpanded(value => !value)}>{sheetExpanded ? <ChevronDown size={18} /> : <ChevronUp size={18} />}</Button>
+          <Button className={styles.sheetAction} variant="ghost" aria-label="Close editing panel" onClick={closePanel}><ChevronDown size={18} /></Button>
+        </div>
+        <div className={styles.sectionHeader}><h2>{page.label}</h2><Button variant="ghost" className={styles.mobilePanelButton} aria-label="Show website preview" onClick={() => setPanelOpen(false)}><X size={18} /></Button></div>
+        <nav className={styles.sections} aria-label="Page sections">
+          {pageEntries.map((entry, index) => <button ref={index === 0 ? sectionSelector : undefined} key={entry.block.id} aria-current={selectedId === entry.block.id ? "true" : undefined} disabled={pending} onClick={() => { setFieldRequest(null); dispatch({ type: "setUi", ui: { itemSelector: { index: content.findIndex(item => item.props.id === entry.block.id) } } }); }}><PanelsTopLeft size={16} aria-hidden="true" /><span>{entry.block.label}</span><ChevronRight size={14} aria-hidden="true" /></button>)}
+        </nav>
+        {selected ? <section ref={inspector} key={selected.block.id} className={styles.inspector} aria-label="Section settings" onKeyDown={event => { if (event.key === "Escape" && !(event.target as Element).closest("dialog")) { event.stopPropagation(); closeInspector(); } }}><div className={styles.inspectorHeader}><h2>{selected.block.label}</h2><Button variant="ghost" title="Close section settings" aria-label="Close section settings" onClick={closeInspector}><X size={18} /></Button></div><fieldset disabled={pending}><Puck.Fields /></fieldset></section> : <p className={styles.hint}>Choose a section, or click text or an image in the preview to edit it.</p>}
+      </aside>
+      <div className={styles.previewArea}>
+        <div className={styles.canvas}>
+          {previewUrl ? <>
+            {!ready && <div className={styles.loading} role={frameError ? "alert" : "status"}>{frameError ? <>The website could not connect. <Button variant="secondary" onClick={() => { setFrameError(false); setReady(false); setPreviewAttempt(attempt => attempt + 1); if (frame.current) frame.current.src = previewUrl; }}>Reload preview</Button></> : "Loading your website…"}</div>}
+            <iframe ref={frame} key={previewUrl} src={previewUrl} title={`${page.label} website preview`} className={mobile ? styles.mobileFrame : styles.frame} onLoad={() => frame.current?.contentWindow?.postMessage({ channel: "showrunner-editor-v1", type: "connect" }, previewOrigin)} />
+          </> : <div className={styles.loading}>Your website preview has not been connected. Your site administrator can connect it in the content manifest.</div>}
+        </div>
       </div>
-      {selected ? <aside ref={inspector} key={selected.block.id} className={styles.inspector} aria-label="Section settings" onKeyDown={event => { if (event.key === "Escape" && !(event.target as Element).closest("dialog")) { event.stopPropagation(); closeInspector(); } }}><div className={styles.inspectorHeader}><h2>{selected.block.label}</h2><button aria-label="Close section settings" onClick={closeInspector}><X size={18} /></button></div><fieldset disabled={pending}><Puck.Fields /></fieldset></aside> : null}
     </div>
-    <footer className={styles.statusbar}><span>Click a section to edit its content</span><label>Section<select ref={sectionSelector} aria-label="Select section" value={selected?.block.id || ""} onChange={event => { const index = content.findIndex(item => item.props.id === event.target.value); dispatch({ type: "setUi", ui: { itemSelector: index < 0 ? null : { index } } }); }}><option value="">Choose a section</option>{pageEntries.map(entry => <option key={entry.block.id} value={entry.block.id}>{entry.block.label}</option>)}</select></label></footer>
   </div>;
 }

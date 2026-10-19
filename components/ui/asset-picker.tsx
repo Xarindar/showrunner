@@ -2,12 +2,12 @@
 
 import NextImage from "next/image";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Check, Clock3, ImageIcon, Images, Search, Sparkles, Tag, Upload, X } from "lucide-react";
+import { Check, Clock3, ImageIcon, Images, Search, Sparkles, Tag, Upload, X } from "lucide-react";
 import { summarizeMediaTags, type MediaTagSummary } from "@/lib/media-tags";
 import { Button } from "./button";
 import { Modal } from "./modal";
 import { cx } from "./utils";
-import { UploadField } from "./upload-field";
+import { AssetUploadPanel, type AssetUploadAction } from "./asset-upload-panel";
 import styles from "./asset-picker.module.css";
 
 export type AssetPickerAsset = {
@@ -37,6 +37,7 @@ type AssetPickerFieldMap = Record<string, string>;
 type AssetPickerCommonProps = {
   assets: AssetPickerAsset[];
   canUpload: boolean;
+  uploadAction?: AssetUploadAction;
   children: ReactNode;
   confirmLabel?: string;
   emptyLibraryMessage?: string;
@@ -106,6 +107,7 @@ export function AssetPicker({
   attachFields,
   attachFormId,
   canUpload,
+  uploadAction,
   children,
   confirmLabel = "Use image",
   defaultAlt = "",
@@ -118,7 +120,6 @@ export function AssetPicker({
   title,
   triggerClassName,
   triggerHint = "",
-  uploadFields,
   uploadFormId,
   uploadUnavailableMessage = "Uploads need Server asset folder, S3, R2, or Cloudflare Images."
 }: AssetPickerProps) {
@@ -128,7 +129,7 @@ export function AssetPicker({
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [fileName, setFileName] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [libraryAssets, setLibraryAssets] = useState(assets);
   const [libraryPage, setLibraryPage] = useState(1);
   const [libraryPageCount, setLibraryPageCount] = useState(1);
@@ -144,7 +145,6 @@ export function AssetPicker({
   const [libraryError, setLibraryError] = useState(false);
   const requestIdRef = useRef(0);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fileInputId = useId();
   const searchInputId = useId();
 
   const visibleAssets = useMemo(() => {
@@ -289,8 +289,8 @@ export function AssetPicker({
   }
 
   function closePicker() {
+    if (uploading) return;
     setPickerOpen(false);
-    setFileName("");
     setQuery("");
     setSelectedId(null);
     setSelectedTag(null);
@@ -301,12 +301,12 @@ export function AssetPicker({
 
   function startUpload() {
     if (!canUpload) return;
-    if (onUploadRequest) {
+    if (onUploadRequest && !uploadAction) {
       closePicker();
       onUploadRequest();
       return;
     }
-    if (uploadFormId) setMode("upload");
+    if (uploadFormId || uploadAction) setMode("upload");
   }
 
   function confirmSelection() {
@@ -344,13 +344,13 @@ export function AssetPicker({
               </div>
               <Button
                 className={styles.uploadAction}
-                disabled={!canUpload || (!onUploadRequest && !uploadFormId)}
+                disabled={!canUpload || (!onUploadRequest && !uploadFormId && !uploadAction)}
                 onClick={startUpload}
                 size="sm"
                 type="button"
                 variant="secondary">
                 <Upload aria-hidden="true" size={15} />
-                Add new image
+                Upload images
               </Button>
             </div>
 
@@ -599,7 +599,7 @@ export function AssetPicker({
                     ? "Choose a tag, then select one image"
                     : "Select one asset to continue"}
               </p>
-              <div>
+              <div className="module-modal-actions">
                 <Button onClick={closePicker} size="sm" type="button" variant="ghost">Cancel</Button>
                 {onSelectAsset ? (
                   <Button disabled={!selectedAsset} onClick={confirmSelection} size="sm" type="button">
@@ -620,55 +620,11 @@ export function AssetPicker({
             </footer>
           </div>
         ) : (
-          <div className={styles.uploadView}>
-            <div className={styles.viewHeader}>
-              <div>
-                <span className={styles.kicker}>Upload new</span>
-                <p>Add it once, then reuse it throughout your site.</p>
-              </div>
-              <Button onClick={() => setMode("library")} size="sm" type="button" variant="ghost">
-                <ArrowLeft aria-hidden="true" size={15} />
-                Back to library
-              </Button>
-            </div>
-
-            <div className={styles.uploadCanvas}>
-              <HiddenFields fields={uploadFields} formId={uploadFormId} />
-              {uploadFormId ? <input form={uploadFormId} name="alt" type="hidden" value={defaultAlt} /> : null}
-              <UploadField
-                accept="image/*"
-                description="JPG, PNG, WebP, GIF, or SVG · up to 8 MB"
-                disabled={!canUpload}
-                form={uploadFormId}
-                id={fileInputId}
-                label="Drop an image here, or choose a file"
-                name="file"
-                onChange={(event) => setFileName(event.currentTarget.files?.[0]?.name || "")}
-                required
-              />
-
-              <div className={styles.uploadPromise}>
-                <span><Images aria-hidden="true" size={18} /></span>
-                <div>
-                  <strong>Saved to your library</strong>
-                  <p>The uploaded image will be attached here now and remain available for future pages.</p>
-                </div>
-              </div>
-
-              {!canUpload ? <p className={styles.unavailable} role="status">{uploadUnavailableMessage}</p> : null}
-            </div>
-
-            <footer className={styles.footer}>
-              <p aria-live="polite">{fileName ? `${fileName} is ready to upload` : "Choose one image to continue"}</p>
-              <div>
-                <Button onClick={closePicker} size="sm" type="button" variant="ghost">Cancel</Button>
-                <Button disabled={!canUpload || !fileName} form={uploadFormId} size="sm" type="submit">
-                  <Upload aria-hidden="true" size={15} />
-                  Upload asset
-                </Button>
-              </div>
-            </footer>
-          </div>
+          <AssetUploadPanel canUpload={canUpload} defaultAlt={defaultAlt} uploadAction={uploadAction} onBusyChange={setUploading} onDone={uploaded => {
+            setMode("library"); setLibraryFilter("recent"); setQuery(""); setSelectedTag(null);
+            if (uploaded.length) { setLibraryAssets(current => [...uploaded, ...current]); setSelectedId(uploaded[0].id); }
+            void loadLibrary("", 1, false, "recent", null);
+          }} />
         )}
       </Modal>
     </>

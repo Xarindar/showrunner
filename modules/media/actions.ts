@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { HeroPresentationMode, HeroSlideElementType } from "@prisma/client";
+import { HeroPresentationMode, HeroSlideElementType, MediaVariantType } from "@prisma/client";
 import { optionalStoredText, parseForm, requiredText } from "@/lib/admin-validation";
 import { getAccessibleMediaWhere, getOwnerStaffIds, requireAdmin, resolveDataScopeMode } from "@/lib/auth";
-import { ensureMediaAssetVariants, mediaAssetIdFromUrl, mediaTagsFromInput, normalizeMediaFolder, supportsPrivateMediaDriver, uploadMedia } from "@/lib/media";
+import { ensureMediaAssetVariants, mediaAssetDisplayUrl, mediaAssetIdFromUrl, mediaTagsFromInput, normalizeMediaFolder, supportsPrivateMediaDriver, uploadMedia } from "@/lib/media";
 import { mediaReferenceCount, mediaReferenceCountSelect, unreferencedMediaWhere } from "@/lib/media-usage";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId, getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
@@ -68,30 +68,42 @@ function refreshMedia() {
   revalidatePath("/galleries");
 }
 
-export async function uploadMediaAction(formData: FormData) {
+export async function createMediaFolder(formData: FormData) {
+  const user = await requireAdmin("media:manage");
+  const siteId = await getCurrentSiteId();
+  const parsed = z.string().trim().min(1, "Enter a folder name.").max(200, "Use 200 characters or fewer.").safeParse(formData.get("name"));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const name = normalizeMediaFolder(parsed.data);
+  if (!name) return { error: "Enter a folder name." };
+  try {
+    await prisma.mediaFolder.create({ data: { siteId, name, createdByUserId: user.id } });
+  } catch (error) {
+    if (typeof error === "object" && error && "code" in error && error.code === "P2002") return { error: "A folder with this name already exists." };
+    return { error: "The folder could not be created. Please try again." };
+  }
+  revalidatePath("/admin/modules/media");
+  return { name };
+}
+
+export async function uploadLibraryAsset(formData: FormData) {
   const user = await requireAdmin("media:manage");
   const settings = await getSiteSettings();
   const ownerStaffIds = await getOwnerStaffIds(user, settings.siteId);
   if ((await resolveDataScopeMode(user, settings.siteId, "media")) === "OWN" && !ownerStaffIds.length) {
-    redirect(`/admin/modules/media?error=${encodeURIComponent("Create an active staff profile using this admin email before uploading scoped media.")}`);
+    return { error: "Create an active staff profile using this admin email before uploading scoped media." };
   }
-
   const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
-    redirect("/admin/modules/media?error=missing-file");
-  }
-
-  const metadata = await parseForm(mediaMetadataSchema, formData, "/admin/modules/media");
-
+  if (!(file instanceof File) || !file.size) return { error: "Choose an image to upload." };
+  const parsed = mediaMetadataSchema.safeParse({ alt: "", caption: "", credit: "", focalPointX: "", focalPointY: "", folder: "", tags: "", usageContext: "", ...Object.fromEntries(formData) });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "Check the image details." };
   try {
-    await uploadMedia(file, { ...metadata, uploadedByStaffId: ownerStaffIds[0] }, settings.mediaDriver, settings.siteId);
+    const asset = await uploadMedia(file, { ...parsed.data, uploadedByStaffId: ownerStaffIds[0] }, settings.mediaDriver, settings.siteId);
+    refreshMedia();
+    return { asset: { id: asset.id, filename: asset.filename, alt: asset.alt || "", createdAt: asset.createdAt.toISOString(), folder: asset.folder,
+      thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD), url: mediaAssetDisplayUrl(asset, MediaVariantType.HERO) } };
   } catch (error) {
-    const message = error instanceof Error ? encodeURIComponent(error.message) : "upload-failed";
-    redirect(`/admin/modules/media?error=${message}`);
+    return { error: error instanceof Error ? error.message : "Image upload failed." };
   }
-
-  refreshMedia();
-  redirect("/admin/modules/media?saved=upload");
 }
 
 export async function updateMediaAssetAction(formData: FormData) {

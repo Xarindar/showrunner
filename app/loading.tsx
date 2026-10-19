@@ -1,5 +1,3 @@
-import { PublicSkeleton } from "@/shell/loading-states";
-
 export default function RootLoading() {
-  return <PublicSkeleton />;
+  return <p className="ui-sr-only" role="status">Loading page…</p>;
 }

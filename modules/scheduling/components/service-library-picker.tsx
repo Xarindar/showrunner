@@ -122,7 +122,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
           </div>}
         </>}
       </div>
-      <footer className={styles.footer}><span className={styles.hint}>{picked.length} selected</span><div>
+      <footer className={styles.footer}><span className={styles.hint}>{picked.length} selected</span><div className="module-modal-actions">
         <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
         <Button type="button" disabled={!picked.length} onClick={() => onChoose(picked)}>Add {picked.length || "selected"} {picked.length === 1 ? "service" : "services"}</Button>
       </div></footer>
@@ -136,7 +136,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
         <Field label="Tags" hint="Separate tags with commas."><Input id={`${id}-tags`} value={form.tags} maxLength={1500} disabled={saving} onChange={event => setForm({ ...form, tags: event.target.value })} /></Field>
         {error && <p id={`${id}-error`} tabIndex={-1} role="alert" className={styles.error}>{error}</p>}
       </div>
-      <footer className={styles.footer}><span className={styles.hint}>Library changes are saved immediately.</span><div>
+      <footer className={styles.footer}><span className={styles.hint}>Library changes are saved immediately.</span><div className="module-modal-actions">
         <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>Cancel</Button>
         <Button type="button" disabled={saving} onClick={save}>{saving ? "Saving…" : inline ? "Done" : editingItem ? "Save changes" : "Create and add"}</Button>
       </div></footer>

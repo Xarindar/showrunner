@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState } from "react";
 import { Image as ImageIcon, Plus } from "lucide-react";
 import { destinationKind, imageFirst, type LinkOptions } from "./field-layout";
 import { AssetPicker, type AssetPickerAsset } from "@/components/ui/asset-picker";
@@ -79,7 +79,7 @@ export function Fields({ canUpload = false, fixedRows = false, assetBaseUrl, lin
     const media = key === "imageUrl" || (key === "url" && "alt" in fields);
     const source = String(value[key] || "");
     const preview = media && source && assetBaseUrl && !source.startsWith("/") ? new URL(source, assetBaseUrl).toString() : source;
-    return <div key={key} className={styles.field}>{media ? <span>Image</span> : <label htmlFor={id}>{field.label}</label>}
+    return <div key={key} id={`${id}-field`} className={styles.field}>{media ? <span>Image</span> : <label htmlFor={id}>{field.label}</label>}
       {media ? <StudioMediaPicker canUpload={canUpload} context={prefix} preview={preview} defaultAlt={String(value.alt || value.imageAlt || "Website image")} onSelect={asset => {
         const next: Record<string, unknown> = { ...value, [key]: asset.url || asset.thumbnailUrl };
         if ("alt" in fields && !String(value.alt || "").trim()) next.alt = asset.alt;
@@ -105,51 +105,13 @@ function DestinationField({ id, value, options, onChange }: { id: string; value:
 }
 
 function StudioMediaPicker({ canUpload, context, defaultAlt, preview, onSelect }: { canUpload: boolean; context: string; defaultAlt: string; preview: string; onSelect: (asset: AssetPickerAsset) => void }) {
-  const input = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState("");
-
-  async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
-    const fileInput = event.currentTarget;
-    const file = fileInput.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setMessage("");
-    const formData = new FormData();
-    formData.set("file", file);
-    formData.set("alt", defaultAlt);
-    formData.set("context", context);
-    try {
-      const result = await uploadStudioAsset(formData);
-      if (result.asset) {
-        onSelect(result.asset);
-        setMessage(`${result.asset.filename} uploaded and selected.`);
-      } else {
-        setMessage(result.error || "Image upload failed.");
-      }
-    } catch {
-      setMessage("Image upload failed.");
-    } finally {
-      fileInput.value = "";
-      setUploading(false);
-    }
-  }
-
   return <div className={styles.mediaPicker}>
-    <AssetPicker
-      assets={[]}
-      canUpload={canUpload && !uploading}
-      loadFromServer
-      onSelectAsset={onSelect}
-      onUploadRequest={() => input.current?.click()}
-      title="Choose an image"
-      triggerClassName={styles.imageTrigger}
-    >
+    <AssetPicker assets={[]} canUpload={canUpload} loadFromServer onSelectAsset={onSelect}
+      uploadAction={data => { data.set("context", context); return uploadStudioAsset(data); }} defaultAlt={defaultAlt}
+      title="Choose an image" triggerClassName={styles.imageTrigger}>
       <span className={styles.mediaPreview} style={{ backgroundImage: preview ? `url(${JSON.stringify(preview)})` : undefined }}>{!preview && <ImageIcon aria-hidden="true" size={30} />}</span>
-      <span className={`${styles.imageHint} ${!preview ? styles.emptyImageHint : ""}`}>{uploading ? "Uploading…" : "Choose or upload"}</span>
+      <span className={`${styles.imageHint} ${!preview ? styles.emptyImageHint : ""}`}>Choose or upload</span>
     </AssetPicker>
-    <input accept="image/*" className="ui-hidden" onChange={handleUpload} ref={input} type="file" />
-    {message ? <small aria-live="polite">{message}</small> : null}
   </div>;
 }
 

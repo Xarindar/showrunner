@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import RootLoading from "../app/loading";
 import test from "node:test";
 import { adminLoadingRoute } from "../shell/admin-loading-route";
 import { createElement } from "react";
@@ -32,4 +33,17 @@ test("fallbacks announce the destination without exposing fake controls or old f
     assert.match(html, /Loading Example/);
     assert.doesNotMatch(html, /skeleton-card|<button|<input/);
   }
+});
+
+
+test("initial loading never flashes public branding or retired editor layouts", () => {
+  const root = renderToStaticMarkup(createElement(RootLoading));
+  assert.match(root, /role="status"/);
+  assert.doesNotMatch(root, /site-nav|brand|skeleton/);
+  const gallery = renderToStaticMarkup(createElement(AdminSkeleton, { kind: "gallery", title: "Media" }));
+  assert.match(gallery, /admin-loading-toolbar/);
+  assert.doesNotMatch(gallery, /admin-loading-gallery" aria-hidden|admin-loading-field|<aside/);
+  const website = renderToStaticMarkup(createElement(AdminSkeleton, { kind: "website", title: "Content" }));
+  assert.match(website, /admin-loading-preview/);
+  assert.doesNotMatch(website, /admin-loading-settings|<aside/);
 });

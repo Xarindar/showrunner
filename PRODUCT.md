@@ -7,11 +7,11 @@ Web application.
 Showrunner is the reusable administration product. Client websites integrate with it; Cottage616 is the beta installation used to validate this content editor.
 
 ## Content editing
-Website owners see their actual website in the central canvas. Selecting a section opens that section's content fields in a right sidebar. They can update approved text, images, and featured services. Site designers own the page sections, layout, and order; customers cannot add, remove, duplicate, or move sections.
+The Content module opens directly onto a published-site preview with an Edit website action. Website owners enter an editor mode in the same tab, with their actual website in the canvas and a left editing sidebar replacing dashboard navigation. Exit editor restores navigation and keeps unpublished edits during the current visit. Clicking text or an image opens its section and focuses the matching field; text is selected for replacement. They can update approved text, images, and featured services. Site designers own the page sections, layout, and order; customers cannot add, remove, duplicate, or move sections.
 
 The inspector groups fields by the visual item, with its image first. Each header slide has an accordion containing its image, title, caption, and button. Add header creates a slide inside the existing fixed section. The photo or empty image placeholder opens the media picker. The editor hides alternative text, internal location IDs, and SEO fields; accessibility descriptions remain in the site data. Native menus and links let owners switch between registered pages without losing unpublished edits.
 
-Buttons offer Page, Service (where booking is configured), and Web address destinations. Existing links remain intact until edited; Web address supports custom links. Service destinations use the service slug and open booking at its next available day. The desktop dashboard panel can collapse to a narrow expand-control rail, and its preference persists across visits. Mobile retains the existing navigation drawer.
+Buttons offer Page, Service (where booking is configured), and Web address destinations. Existing links remain intact until edited; Web address supports custom links. Service destinations use the service slug and open booking at its next available day. The desktop dashboard panel can collapse to a narrow expand-control rail, and its preference persists across visits. Mobile opens the existing navigation drawer from a floating menu button, with a single page header instead of a second shell header. Editor mode hides this button.
 
 The editor uses open-source Puck inside Showrunner's existing admin shell. Draft edits preview immediately. Publishing uses the existing authenticated, site-scoped content service, revision checks and media library. Existing Cottage616 content supplies initial values. Cottage616's integration may change to fit the reusable Showrunner workflow.
 
@@ -28,3 +28,6 @@ Service/product showcase cards are an opt-in reusable block inside an approved p
 
 ## Admin design direction
 The Shopify-inspired system in DESIGN.md applies across admin navigation, resource indexes, editors and shared controls. Replace folder-tabbed catalog containers with navigation destinations and continuous editors. Preserve client-facing branding. Track the overhaul in `jazz/shopify-design/SHOWRUNNER-MIGRATION.md`.
+
+## Media
+Media is a standalone module for files reused across the business. Open directly into the library, with upload and a visible toolbar for search, categories, folders, tags, type and sorting. The toolbar wraps on mobile. Show details on selection. Railway bucket storage is managed infrastructure; users are not asked to choose or configure providers. Storage failures are reported as upload availability errors.

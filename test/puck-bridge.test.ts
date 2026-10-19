@@ -62,7 +62,7 @@ test("website bridge authenticates the parent and limits preview updates to safe
   const parent = { postMessage: (message: unknown) => messages.push(message) };
   const section = { dataset: {} as Record<string, string>, tabIndex: -1, setAttribute() {} };
   const text = { textContent: "Before", style: {} };
-  const link = { href: "", setAttribute(key: string, value: string) { this.href = value; } };
+  const link = { href: "", setAttribute(_key: string, value: string) { this.href = value; } };
   const document = {
     readyState: "complete",
     currentScript: { dataset: { editorOrigins: "https://editor.example" }, src: "https://site.example/editor.js" },
@@ -96,21 +96,28 @@ test("website bridge authenticates the parent and limits preview updates to safe
 test("preview clicks keep menus interactive, route navigation to the editor, and select content", async () => {
   const listeners: Record<string, (event: unknown) => Promise<void>> = {};
   const clicks: Record<string, (event: unknown) => void> = {};
-  const messages: { type: string; href?: string; id?: string }[] = [];
+  const messages: { type: string; href?: string; id?: string; field?: string }[] = [];
   const parent = { postMessage: (message: typeof messages[number]) => messages.push(message) };
   class Element {
+    dataset: Record<string, string> = {};
+    parentElement?: Element;
+    attributes = new Set<string>();
+    setAttribute(name: string) { this.attributes.add(name); }
+    removeAttribute(name: string) { this.attributes.delete(name); }
     constructor(public matchesBySelector: Record<string, unknown>) {}
     closest(selector: string) { return this.matchesBySelector[selector]; }
+    matches(selector: string) { return Boolean(this.matchesBySelector[selector]); }
   }
   const document = {
     readyState: "complete", currentScript: { dataset: { editorOrigins: "https://editor.example" } },
     head: { append() {} }, createElement: () => ({}),
     addEventListener(name: string, callback: (event: unknown) => void) { clicks[name] = callback; },
     getElementById: () => ({ matches: () => true }),
+    querySelectorAll: () => [],
   };
-  const window = { parent, addEventListener(name: string, callback: (event: unknown) => Promise<void>) { listeners[name] = callback; } };
+  const window = { parent, dispatchEvent() {}, addEventListener(name: string, callback: (event: unknown) => Promise<void>) { listeners[name] = callback; } };
   runInNewContext(readFileSync("public/showrunner-content.js", "utf8"), {
-    window, document, parent, Element, URL, URLSearchParams,
+    window, document, parent, Element, URL, URLSearchParams, CustomEvent,
     location: { href: "https://site.example/index.html?showrunner-editor=1", pathname: "/index.html", search: "?showrunner-editor=1", origin: "https://site.example" },
   });
   await listeners.message({ source: parent, origin: "https://editor.example", data: { channel: "showrunner-editor-v1", type: "connect" } });
@@ -128,6 +135,27 @@ test("preview clicks keep menus interactive, route navigation to the editor, and
   assert.equal(messages.at(-1)?.href, "https://site.example/the-hive.html");
   assert.equal(click({ "[data-sr-section]": section, "a[href]": { href: "/booking.html" } }).stopped, true);
   assert.equal(messages.at(-1)?.id, "hero");
+  const image = new Element({});
+  image.dataset.srField = "slides.1.imageUrl";
+  const headline = new Element({ "[data-sr-section]": section });
+  headline.dataset.srField = "slides.1.title";
+  headline.parentElement = image;
+  clicks.pointerover({ target: headline });
+  assert.ok(headline.attributes.has("data-sr-hover"), "hover outlines the precise field");
+  assert.ok(!image.attributes.has("data-sr-hover"), "the containing image stays unhighlighted");
+  clicks.pointerout({ relatedTarget: null });
+  assert.ok(!headline.attributes.has("data-sr-hover"), "leaving the preview clears the outline");
+  const navItem = new Element({ "[data-sr-section]": section, 'nav,[role="navigation"]': {} });
+  clicks.pointerover({ target: navItem });
+  assert.ok(!navItem.attributes.has("data-sr-hover"), "navigation remains distinct from editable content");
+  clicks.click({ target: headline, preventDefault() {}, stopImmediatePropagation() {} });
+  assert.equal(messages.at(-1)?.field, "slides.1.title", "the innermost field wins over its image container");
+  delete headline.dataset.srField;
+  clicks.click({ target: headline, preventDefault() {}, stopImmediatePropagation() {} });
+  assert.equal(messages.at(-1)?.field, "slides.1.imageUrl");
+  await listeners.message({ source: parent, origin: "https://editor.example", data: { channel: "showrunner-editor-v1", type: "update", blocks: [{ id: "hero", payload: {}, presentation: { bindings: [{ selector: ".headline", path: "links.0.href", attribute: "href" }, { selector: ".headline", path: "texts.0.text" }] } }] } });
+  click({ "[data-sr-section]": section, ".headline": true });
+  assert.equal(messages.at(-1)?.field, "texts.0.text", "text bindings win over link destinations");
   const submit = { prevented: false, preventDefault() { this.prevented = true; }, stopImmediatePropagation() {} };
   clicks.submit(submit);
   assert.equal(submit.prevented, true);
