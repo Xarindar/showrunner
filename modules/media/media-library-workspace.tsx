@@ -1,11 +1,11 @@
 "use client";
 
 import NextImage from "next/image";
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   Archive,
-  ArrowDownAZ,
+  SlidersHorizontal,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -13,19 +13,18 @@ import {
   File,
   FolderOpen,
   Grid2X2,
-  ImageIcon,
   Info,
   LayoutList,
   Lock,
   RotateCcw,
   Search,
   Star,
-  Tags,
   Trash2,
   Upload,
   X
 } from "lucide-react";
 import { Button } from "@/components/ui";
+import { SelectMenu } from "@/components/ui/select-menu";
 import { Modal } from "@/components/ui/modal";
 import type { MediaTagSummary } from "@/lib/media-tags";
 import {
@@ -400,12 +399,23 @@ export function MediaLibraryWorkspace({
   const [folderOpen, setFolderOpen] = useState(false);
   const [folderError, setFolderError] = useState("");
   const [folderBusy, setFolderBusy] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+  const filterCount = Number(filters.scope !== "all") + Number(Boolean(filters.folder)) + Number(Boolean(filters.tag)) + Number(filters.kind !== "all");
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => {
+      if (!filterRef.current?.contains(event.target as Node)) setFiltersOpen(false);
+    };
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, []);
   const [view, setView] = useState<ViewMode>("grid");
   const selectedAsset = assets.find((asset) => asset.id === selectedId) || null;
 
 
   function navigate(changes: Record<string, string | number | null>) {
     setSelectedId(null);
+    if ("q" in changes) setSearchValue(String(changes.q || ""));
     router.push(hrefWithParams({ page: null, ...changes }, filters));
   }
 
@@ -468,9 +478,21 @@ export function MediaLibraryWorkspace({
               {searchValue ? <button aria-label="Clear search" onClick={() => { setSearchValue(""); navigate({ q: null }); }} type="button"><X size={15} /></button> : null}
             </form>
 
+            <div className={styles.filterMenu} ref={filterRef} onKeyDown={event => {
+              if (event.key === "Escape") {
+                setFiltersOpen(false);
+                filterRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+              }
+            }} onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setFiltersOpen(false);
+            }}>
+              <Button variant="secondary" aria-expanded={filtersOpen} aria-controls="media-filters" onClick={() => setFiltersOpen(!filtersOpen)}>
+                <SlidersHorizontal aria-hidden="true" size={16} /> Filters{filterCount ? ` (${filterCount})` : ""}
+              </Button>
+              {filtersOpen && <div id="media-filters" className={styles.filterPopover} role="region" aria-label="Filter files">
               <label className={styles.selectControl}>
-                <span className="ui-sr-only">Media category</span>
-                <select value={filters.scope} onChange={event => navigate({ scope: event.currentTarget.value, folder: null, tag: null })}>
+                <span >Media category</span>
+                <select aria-label="Media category" value={filters.scope} onChange={event => navigate({ scope: event.currentTarget.value, folder: null, tag: null })}>
                   <option value="all">All files ({activeCount})</option>
                   <option value="recent">Recently added ({recentCount})</option>
                   <option value="private">Private ({privateCount})</option>
@@ -480,8 +502,8 @@ export function MediaLibraryWorkspace({
                 </select>
               </label>
               {folders.length ? <label className={styles.selectControl}>
-                <span className="ui-sr-only">Folder</span>
-                <select value={filters.folder} onChange={event => navigate({ folder: event.currentTarget.value || null })}>
+                <span >Folder</span>
+                <select aria-label="Folder" value={filters.folder} onChange={event => navigate({ folder: event.currentTarget.value || null })}>
                   <option value="">All folders</option>
                   {folders.filter(folder => folder.name).map(folder => <option key={folder.name} value={folder.name}>{folder.name} ({folder.count})</option>)}
                 </select>
@@ -491,9 +513,8 @@ export function MediaLibraryWorkspace({
 
 
             <label className={styles.selectControl}>
-              <span className="ui-sr-only">Asset type</span>
-              <ImageIcon aria-hidden="true" size={15} />
-              <select onChange={(event) => navigate({ kind: event.currentTarget.value })} value={filters.kind}>
+              <span >Asset type</span>
+              <select aria-label="Asset type" onChange={(event) => navigate({ kind: event.currentTarget.value })} value={filters.kind}>
                 <option value="all">All types</option>
                 <option value="image">Images</option>
                 <option value="other">Other files</option>
@@ -502,36 +523,31 @@ export function MediaLibraryWorkspace({
 
             {tags.length ? (
               <label className={styles.selectControl}>
-                <span className="ui-sr-only">Filter by tag</span>
-                <Tags aria-hidden="true" size={15} />
-                <select onChange={(event) => navigate({ tag: event.currentTarget.value || null })} value={filters.tag}>
+                <span >Filter by tag</span>
+                <select aria-label="Filter by tag" onChange={(event) => navigate({ tag: event.currentTarget.value || null })} value={filters.tag}>
                   <option value="">All tags</option>
                   {tags.map((tag) => <option key={tag.name} value={tag.name}>#{tag.name} ({tag.count})</option>)}
                 </select>
               </label>
             ) : null}
 
-            <label className={styles.selectControl}>
-              <span className="ui-sr-only">Sort assets</span>
-              <ArrowDownAZ aria-hidden="true" size={15} />
-              <select onChange={(event) => navigate({ sort: event.currentTarget.value })} value={filters.sort}>
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="name">Filename A–Z</option>
-                <option value="largest">Largest first</option>
-              </select>
-            </label>
+              </div>}
+            </div>
+            <SelectMenu id="media-sort" className={styles.sortMenu} label="Sort assets" name="sort" value={filters.sort}
+              onValueChange={sort => navigate({ sort })}
+              options={[{value: "newest", label: "Newest first"}, {value: "oldest", label: "Oldest first"}, {value: "name", label: "Filename A–Z"}, {value: "largest", label: "Largest first"}]} />
 
           </div>
 
-          {filters.q || filters.folder || filters.tag || filters.kind !== "all" ? (
+          {filters.q || filterCount ? (
             <div className={styles.activeFilters}>
               <span>Filtered by</span>
+              {filters.scope !== "all" ? <button onClick={() => navigate({ scope: "all" })} type="button">{({home: "All files", recent: "Recently added", private: "Private", "needs-alt": "Needs alt text", "built-in": "Built-in", archived: "Archived"})[filters.scope]}<X size={12} /></button> : null}
               {filters.q ? <button onClick={() => navigate({ q: null })} type="button">Search: {filters.q}<X size={12} /></button> : null}
               {filters.folder ? <button onClick={() => navigate({ folder: null })} type="button">Folder: {filters.folder}<X size={12} /></button> : null}
               {filters.tag ? <button onClick={() => navigate({ tag: null })} type="button">Tag: {filters.tag}<X size={12} /></button> : null}
               {filters.kind !== "all" ? <button onClick={() => navigate({ kind: null })} type="button">Type: {filters.kind}<X size={12} /></button> : null}
-              <button className={styles.clearFilters} onClick={() => navigate({ folder: null, kind: null, q: null, tag: null })} type="button">Clear all</button>
+              <button className={styles.clearFilters} onClick={() => navigate({ scope: "all", folder: null, kind: null, q: null, tag: null })} type="button">Clear all</button>
             </div>
           ) : null}
 
@@ -548,7 +564,7 @@ export function MediaLibraryWorkspace({
                 <h3>{filters.q || filters.tag || filters.kind !== "all" ? "No assets match this view" : filters.folder ? "This folder is empty" : filters.scope === "archived" ? "Your archive is empty" : filters.scope === "all" ? "No files yet" : "No files in this category"}</h3>
                 <p>{filters.q || filters.tag || filters.kind !== "all" ? "Try another search or clear your filters." : filters.folder ? "Upload images here, or assign existing files to this folder in their details." : filters.scope === "archived" ? "Assets you archive will stay recoverable here." : filters.scope === "all" ? "Upload images to use across your website and business." : "Choose another category to browse your files."}</p>
                 {filters.q || filters.tag || filters.kind !== "all" ? (
-                  <Button onClick={() => navigate({ folder: null, kind: null, q: null, tag: null })} size="sm" type="button" variant="secondary">Clear filters</Button>
+                  <Button onClick={() => navigate({ scope: "all", folder: null, kind: null, q: null, tag: null })} size="sm" type="button" variant="secondary">Clear filters</Button>
                 ) : filters.scope === "all" ? (
                   <Button onClick={() => setUploadOpen(true)} size="sm" type="button"><Upload size={15} /> Upload images</Button>
                 ) : null}
