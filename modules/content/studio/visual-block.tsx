@@ -59,7 +59,7 @@ export function VisualBlock({ block, choices, payload, fields, canUpload, onChan
     </div>}
     <Modal open={Boolean(selection)} title={selection?.label || "Edit content"} onClose={() => setSelection(null)}>
       {selection ? <div className={styles.fields} onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) { event.preventDefault(); apply(); } }}><Fields canUpload={canUpload} fields={selection.fields} value={selection.draft} prefix={`${block.id}-selected`} choices={choices} onChange={draft => setSelection({ ...selection, draft })} />
-        <div className={styles.dialogActions}>{selection.key && selection.index! < rows(selection.key).length ? <button type="button" disabled={rows(selection.key).length <= (block.minimums?.[selection.key] || 0)} onClick={() => apply(true)}><Trash2 size={14} />Remove</button> : null}<button type="button" onClick={() => setSelection(null)}>Cancel</button><button type="button" onClick={() => apply()}>Apply</button></div>
+        <div className={`module-modal-actions ${styles.dialogActions}`}>{selection.key && selection.index! < rows(selection.key).length ? <button type="button" disabled={rows(selection.key).length <= (block.minimums?.[selection.key] || 0)} onClick={() => apply(true)}><Trash2 size={14} />Remove</button> : null}<button type="button" onClick={() => setSelection(null)}>Cancel</button><button type="button" onClick={() => apply()}>Apply</button></div>
       </div> : null}
     </Modal>
   </>;

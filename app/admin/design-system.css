@@ -120,7 +120,13 @@ html:has(.showrunner-admin) { font-size: 16px; }
 .showrunner-admin .admin-main :is(input,textarea,select):disabled { background: var(--sd-color-surface-subtle); color: var(--sd-color-text-disabled); box-shadow: var(--sd-shadow-input-disabled); }
 .showrunner-admin :is(.ui-field>label,.ui-field-label) { font-size: var(--sd-type-body-size); font-weight: 500; }
 .showrunner-admin :is(.ui-card,.studio-panel,.panel,.subpanel,.catalog-board,.login-card) { border: 0; border-radius: var(--sd-radius-container); box-shadow: var(--sd-shadow-container); }
-.showrunner-admin .ui-dialog { border: 0; border-radius: var(--sd-radius-dialog); box-shadow: var(--sd-shadow-dialog); }
+.showrunner-admin dialog.ui-dialog { border: 0; border-radius: var(--sd-radius-dialog); box-shadow: var(--sd-shadow-dialog); padding: var(--sd-space-16); }
+.showrunner-admin dialog.ui-dialog > :is(.ui-modal-head,.ui-dialog-header) { padding: 0; margin: 0 0 var(--sd-space-12); min-height: 0; gap: var(--sd-space-8); border: 0; }
+.showrunner-admin dialog.ui-dialog > .ui-dialog-body { padding: 0; gap: var(--sd-space-16); }
+.showrunner-admin dialog.ui-dialog > .ui-dialog-body > form { gap: var(--sd-space-16); }
+.showrunner-admin dialog.ui-dialog footer { padding: var(--sd-space-16) 0 0; }
+.showrunner-admin dialog.ui-dialog :is(.module-modal-actions,.dashboard-remove-dialog-actions,.content-modal-actions,.clients-modal-actions,.appointment-confirm-actions,.ui-option-picker-actions,.pay-step-actions) { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sd-space-8); }
+.showrunner-admin dialog.ui-dialog :is(.module-modal-actions,.dashboard-remove-dialog-actions,.content-modal-actions,.clients-modal-actions,.appointment-confirm-actions,.ui-option-picker-actions,.pay-step-actions) > :is(button,a,form) { flex: 0 1 auto; margin: 0; }
 .showrunner-admin :where(.ui-dialog:not(.ui-onboarding-modal)) { min-height: 0; scrollbar-gutter: auto; }
 .showrunner-admin :where(.ui-dialog-header) { min-height: 0; }
 .showrunner-admin .catalog-confirm-modal { max-width: min(460px, calc(100% - var(--space-6))); overflow: auto; }
@@ -133,8 +139,9 @@ html:has(.showrunner-admin) { font-size: 16px; }
 .showrunner-admin :is(.ui-table,.catalog-product-table) thead th { background: var(--sd-color-surface-subtle); color: var(--sd-color-text-secondary); font-size: var(--sd-type-small-size); font-weight: 500; text-transform: none; height: 32px; padding: 6px 12px; }
 .showrunner-admin :is(.ui-table,.catalog-product-table) tbody :is(th,td) { border-color: var(--sd-color-border-subtle); padding: 8px 12px; }
 .showrunner-admin :is(.ui-table,.catalog-product-table) tbody tr:hover { background: var(--sd-color-surface-subtle); }
-.showrunner-admin .admin-main>.stack>.page-header h1 { font-size: var(--sd-type-page-size) !important; line-height: var(--sd-type-page-line); font-weight: 500; }
-.showrunner-admin .admin-main>.stack>.page-header { min-height: 72px; border-bottom: 0; }
+.showrunner-admin .admin-main .page-header:has(h1) h1 { font-size: var(--sd-type-page-size) !important; line-height: var(--sd-type-page-line); font-weight: 500; margin: 0; min-width: 0; }
+.showrunner-admin .admin-main .page-header:has(h1) { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; min-height: 56px; box-sizing: border-box; padding-block: var(--sd-space-4); gap: var(--sd-space-12); margin-bottom: 0; border-bottom: 0; }
+.showrunner-admin .admin-main .page-header:has(h1) > :is(button, a, .button-row) { flex-shrink: 0; }
 .showrunner-admin .catalog-table-scroll { border-color: var(--sd-color-border-subtle); border-radius: var(--sd-radius-input); }
 .showrunner-admin .catalog-board-header h2 { font-size: var(--sd-type-heading-size); font-weight: 500; }
 .showrunner-admin .catalog-table-status-strip { display: none; }
@@ -145,10 +152,16 @@ html:has(.showrunner-admin) { font-size: 16px; }
 .showrunner-admin ::selection { background: var(--sd-color-selected-bg); color: var(--sd-color-text); }
 @media(max-width:860px) {
   .showrunner-admin .admin-root { padding: 0; }
-  .showrunner-admin .admin-main { height: auto; border-radius: 0; }
-  .showrunner-admin .admin-mobile-bar { --admin-sidebar-text: var(--sd-color-text); --admin-sidebar-border: var(--sd-color-border-subtle); background: var(--sd-color-surface); }
-  .showrunner-admin .admin-mobile-context-title { max-width:100%; }
-  .showrunner-admin .admin-main>.stack>.page-header h1 { font-size: 22px !important; }
+  .showrunner-admin .admin-main { height: auto; min-height: 100dvh; border-radius: 0; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .showrunner-admin .admin-mobile-bar { display: contents; }
+  .showrunner-admin .admin-mobile-bar > :not(.admin-menu-toggle) { display: none; }
+  .showrunner-admin .admin-mobile-bar .admin-menu-toggle { position: fixed; right: var(--sd-space-16); bottom: calc(var(--sd-space-16) + env(safe-area-inset-bottom)); z-index: 50; display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; padding: 0; border: 0; border-radius: var(--sd-radius-popover); background: var(--sd-color-primary); color: var(--sd-color-on-primary); box-shadow: var(--sd-shadow-popover); }
+  .showrunner-admin .admin-mobile-bar .admin-menu-toggle:hover { background: var(--sd-color-primary-hover); }
+  .showrunner-admin .admin-mobile-bar .admin-menu-toggle[aria-expanded="true"] { visibility: hidden; }
+  .showrunner-admin .admin-root:has(.product-studio-sticky-footer) .admin-menu-toggle { bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .showrunner-admin .product-studio-page.has-mobile-shell-header > .service-studio-header { display: flex; }
+  .showrunner-admin .appointments-workspace { height: 100dvh; min-height: 100dvh; }
+  .showrunner-admin .admin-main .page-header:has(h1) h1 { font-size: 22px !important; }
   .showrunner-admin :is(.ui-button,.button,.ui-tab,.admin-nav-children a) { min-height: 44px; }
   .showrunner-admin .admin-main :is(input:not([type="checkbox"]):not([type="radio"]):where(:not([type="hidden"]):not([type="file"]):not([type="range"]):not([type="color"])),select,textarea),.showrunner-admin .login-wrap input { min-height:44px; font-size:16px; }
 }

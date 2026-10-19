@@ -7,7 +7,7 @@ export const manifest = {
   href: "/admin/modules/media",
   icon: "Image",
   order: 60,
-  navigation: { category: "website" },
+  navigation: { category: "primary" },
   description: "Adapter-backed asset library with variants and private delivery.",
   layout: "standard",
   status: "active",

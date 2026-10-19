@@ -66,9 +66,33 @@
   window.addEventListener("showrunner:content", event => apply(event.detail.blocks || [], script?.src ? new URL(script.src).origin : location.origin));
   if (!editing) return;
   const style = document.createElement("style");
-  style.textContent = '[data-sr-section]{cursor:pointer;outline-offset:-2px}[data-sr-section]:hover{outline:2px solid #337cba}[data-sr-selected]{outline:2px solid #1561a0!important}[data-sr-section]:focus-visible{outline:3px solid #1561a0}';
+  style.textContent = '[data-sr-section]{cursor:pointer;outline-offset:-2px}[data-sr-hover]{outline:2px solid #5083f0!important;outline-offset:-2px;cursor:pointer}[data-sr-selected]{outline:2px solid #1561a0}[data-sr-section]:focus-visible{outline:3px solid #5083f0}';
   document.head.append(style);
   function send(type, extra) { if (parentOrigin) parent.postMessage({ channel, type, ...extra }, parentOrigin); }
+  function editableTarget(target, section) {
+    const block = blocks.find(block => block.id === section.dataset.srSection);
+    // Use the same innermost field for hover feedback and click selection.
+    for (let node = target; node; node = node.parentElement) {
+      const field = node.dataset?.srField || block?.presentation?.bindings?.find(binding => !["alt", "href"].includes(binding.attribute) && node.matches(binding.selector))?.path;
+      if (field) return { node, field };
+      if (node === section) break;
+    }
+    return { node: section };
+  }
+  let hovered;
+  function showHover(target) {
+    const section = target instanceof Element && target.closest("[data-sr-section]");
+    const button = target instanceof Element && target.closest("button");
+    const controlled = button && button.getAttribute("aria-controls");
+    const navigation = target instanceof Element && (target.closest('nav,[role="navigation"]') || (controlled && document.getElementById(controlled)?.matches('nav,[role="navigation"]')));
+    const next = section && !navigation ? editableTarget(target, section).node : null;
+    if (next === hovered) return;
+    hovered?.removeAttribute("data-sr-hover");
+    hovered = next;
+    hovered?.setAttribute("data-sr-hover", "");
+  }
+  document.addEventListener("pointerover", event => showHover(event.target), true);
+  document.addEventListener("pointerout", event => showHover(event.relatedTarget), true);
   window.addEventListener("message", async event => {
     if (event.source !== parent || !allowedOrigins.includes(event.origin) || event.data?.channel !== channel) return;
     if (event.data.type === "connect") {
@@ -117,7 +141,10 @@
     }
     // Content clicks select a section; live form actions stay disabled.
     if (section || link || button?.type === "submit") { event.preventDefault(); event.stopImmediatePropagation(); }
-    if (section) send("select", { id: section.dataset.srSection });
+    if (section) {
+      const { field } = editableTarget(target, section);
+      send("select", { id: section.dataset.srSection, ...(field ? { field } : {}) });
+    }
   }, true);
   document.addEventListener("submit", event => { event.preventDefault(); event.stopImmediatePropagation(); }, true);
   document.addEventListener("keydown", event => {

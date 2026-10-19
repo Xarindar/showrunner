@@ -36,8 +36,10 @@ export function AdminSkeleton({ rows = 5, title = "", kind = "workspace" }: Admi
       </header>
       <p className="ui-sr-only" role="status">{title ? `Loading ${title}…` : "Loading page…"}</p>
       {kind === "gallery" ? (
-        <div className="admin-loading-gallery" aria-hidden="true">
-          {Array.from({ length: 9 }, (_, index) => <SkeletonBlock key={index} />)}
+        <div className="admin-loading-toolbar" aria-hidden="true">
+          <SkeletonBlock className="admin-loading-search" />
+          <SkeletonBlock className="admin-loading-action" />
+          <SkeletonBlock className="admin-loading-action" />
         </div>
       ) : (
         <div className="admin-loading-body" aria-hidden="true">
@@ -49,7 +51,7 @@ export function AdminSkeleton({ rows = 5, title = "", kind = "workspace" }: Admi
               </div>
             ))}
           </div>
-          {kind === "editor" || kind === "website" ? <aside className="admin-loading-settings">
+          {kind === "editor" ? <aside className="admin-loading-settings">
             <SkeletonLine width="medium" />
             <SkeletonBlock />
             <SkeletonLine width="short" />
@@ -135,73 +137,5 @@ export function AppointmentsSkeleton() {
         </div>
       </section>
     </div>
-  );
-}
-
-export function BookingSkeleton() {
-  return (
-    <main className="site-shell">
-      <section className="booking-page">
-        <div className="booking-intro skeleton-header" aria-busy="true" aria-label="Loading booking page">
-          <span className="skeleton-line short" />
-          <span className="skeleton-block" />
-          <span className="skeleton-line medium" />
-        </div>
-        <div className="booking-main">
-          <div className="booking-progress">
-            {Array.from({ length: 4 }, (_, index) => (
-              <div className="booking-progress-step active" key={index}>
-                <span>{index + 1}</span>
-                <span className="skeleton-line short" />
-              </div>
-            ))}
-          </div>
-          <div className="booking-card">
-            <div className="skeleton-stack">
-              {Array.from({ length: 6 }, (_, index) => (
-                <div className="skeleton-row" key={index}>
-                  <span className="skeleton-dot" />
-                  <span className="skeleton-line long" />
-                  <span className="skeleton-line medium" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-    </main>
-  );
-}
-
-export function PublicSkeleton() {
-  return (
-    <main className="site-shell" aria-busy="true" aria-label="Loading">
-      <nav className="site-nav">
-        <div className="brand">
-          <span className="brand-mark" />
-          <span className="skeleton-line medium" />
-        </div>
-        <div className="site-nav-links">
-          <span className="skeleton-block" />
-          <span className="skeleton-block" />
-        </div>
-      </nav>
-      <section className="section">
-        <div className="skeleton-header">
-          <span className="skeleton-line short" />
-          <span className="skeleton-block" />
-          <span className="skeleton-line long" />
-        </div>
-        <div className="skeleton-panel">
-          {Array.from({ length: 5 }, (_, index) => (
-            <div className="skeleton-row" key={index}>
-              <span className="skeleton-dot" />
-              <span className="skeleton-line long" />
-              <span className="skeleton-line medium" />
-            </div>
-          ))}
-        </div>
-      </section>
-    </main>
   );
 }

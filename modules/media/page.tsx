@@ -1,5 +1,5 @@
 import { MediaVariantType, type Prisma } from "@prisma/client";
-import { getAccessibleMediaWhere, requireAdmin } from "@/lib/auth";
+import { getAccessibleMediaWhere, requireAdmin, resolveDataScopeMode } from "@/lib/auth";
 import { nonEmptyStringArrayFromUnknown } from "@/lib/format";
 import { globalMediaAssets } from "@/lib/global-media-assets";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl, mediaAssetIdFromUrl } from "@/lib/media";
@@ -16,7 +16,6 @@ import {
 export const dynamic = "force-dynamic";
 
 const pageSize = 24;
-const homeRecentSize = 8;
 const recentWindowDays = 30;
 type MediaPageProps = {
   searchParams: Promise<Record<string, string | undefined>>;
@@ -59,16 +58,15 @@ function filtersFromParams(params: Record<string, string | undefined>): MediaLib
   const requestedScope = oneOf(
     params.scope,
     ["home", "all", "recent", "private", "needs-alt", "archived", "built-in"] as const,
-    "home"
+    "all"
   );
-  const hasBrowseFilter = Boolean(params.q || params.folder || params.tag || (params.kind && params.kind !== "all"));
 
   return {
     folder: (params.folder || "").trim().slice(0, 200),
     kind: oneOf(params.kind, ["all", "image", "other"] as const, "all"),
     page: positiveInteger(params.page),
     q: (params.q || "").trim().slice(0, 180),
-    scope: requestedScope === "home" && hasBrowseFilter ? "all" : requestedScope,
+    scope: requestedScope === "home" ? "all" : requestedScope,
     sort: oneOf(params.sort, ["newest", "oldest", "name", "largest"] as const, "newest"),
     tag: (params.tag || "").trim().slice(0, 120)
   };
@@ -89,6 +87,11 @@ function formatFromMime(mimeType: string) {
 export default async function MediaPage({ searchParams }: MediaPageProps) {
   const [user, params, settings] = await Promise.all([requireAdmin("media:manage"), searchParams, getSiteSettings()]);
   const filters = filtersFromParams(params);
+  const ownFolders = (await resolveDataScopeMode(user, settings.siteId, "media")) === "OWN";
+  const savedFolders = await prisma.mediaFolder.findMany({
+    where: { siteId: settings.siteId, ...(ownFolders ? { createdByUserId: user.id } : {}) },
+    select: { name: true }, orderBy: { name: "asc" }
+  });
   const matchingBuiltInAssets = globalMediaAssets.filter((asset) => {
     if (filters.kind === "other") return false;
     if (!filters.q) return true;
@@ -156,7 +159,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
   ]);
 
   const resultCount = filters.scope === "built-in" ? matchingBuiltInAssets.length : databaseResultCount;
-  const pageCount = filters.scope === "home" ? 1 : Math.max(1, Math.ceil(resultCount / pageSize));
+  const pageCount = Math.max(1, Math.ceil(resultCount / pageSize));
   const page = Math.min(filters.page, pageCount);
   const normalizedFilters = { ...filters, page };
   const heroAssetId = mediaAssetIdFromUrl(settings.heroImageUrl);
@@ -175,8 +178,8 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
           }
         },
         orderBy: orderByFor(filters.sort),
-        skip: filters.scope === "home" ? 0 : (page - 1) * pageSize,
-        take: filters.scope === "home" ? homeRecentSize : pageSize
+        skip: (page - 1) * pageSize,
+        take: pageSize
       });
 
   const assets: MediaLibraryAsset[] = filters.scope === "built-in"
@@ -248,6 +251,8 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
         };
       });
 
+  const folderCounts = new Map(savedFolders.map(folder => [folder.name, 0]));
+  for (const group of folderGroups) if (group.folder) folderCounts.set(group.folder, group._count._all);
   return (
     <MediaLibraryWorkspace
       key={`${normalizedFilters.scope}:${normalizedFilters.folder}:${normalizedFilters.tag}:${normalizedFilters.kind}:${normalizedFilters.sort}:${normalizedFilters.q}:${normalizedFilters.page}`}
@@ -258,8 +263,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)}
       errorMessage={params.error === "missing-file" ? "Choose a file before uploading." : safeDecodedMessage(params.error)}
       filters={normalizedFilters}
-      folders={folderGroups.filter((group) => Boolean(group.folder)).map((group) => ({ count: group._count._all, name: group.folder }))}
-      mediaDriver={settings.mediaDriver}
+      folders={Array.from(folderCounts, ([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name))}
       needsAltCount={needsAltCount}
       pageCount={pageCount}
       privateCount={privateCount}

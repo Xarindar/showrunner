@@ -6,6 +6,7 @@ import { cx } from "./utils";
 
 type UploadFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "type"> & {
   description?: string;
+  disabledMessage?: string;
   initialFile?: File | null;
   label?: string;
   variant?: "image" | "document" | "data";
@@ -15,9 +16,11 @@ export function UploadField({
   accept,
   description,
   disabled,
+  disabledMessage = "Uploads are temporarily unavailable. Please try again later.",
   id,
   initialFile,
   label = "Choose a file",
+  multiple,
   onChange,
   variant = "image",
   ...props
@@ -43,8 +46,10 @@ export function UploadField({
     event.preventDefault();
     setDragging(false);
     if (disabled || !event.dataTransfer.files.length || !inputRef.current) return;
-    inputRef.current.files = event.dataTransfer.files;
-    setFileName(event.dataTransfer.files[0]?.name || "");
+    const transfer = new DataTransfer();
+    for (const file of Array.from(event.dataTransfer.files).slice(0, multiple ? undefined : 1)) transfer.items.add(file);
+    inputRef.current.files = transfer.files;
+    setFileName(transfer.files.length > 1 ? `${transfer.files.length} files selected` : transfer.files[0]?.name || "");
     inputRef.current.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
@@ -56,8 +61,10 @@ export function UploadField({
         className="ui-sr-only"
         disabled={disabled}
         id={inputId}
+        multiple={multiple}
         onChange={(event) => {
-          setFileName(event.currentTarget.files?.[0]?.name || "");
+          const files = event.currentTarget.files;
+          setFileName(files && files.length > 1 ? `${files.length} files selected` : files?.[0]?.name || "");
           onChange?.(event);
         }}
         ref={inputRef}
@@ -77,7 +84,7 @@ export function UploadField({
         <span className="ui-upload-icon"><Icon size={22} aria-hidden="true" /></span>
         <span className="ui-upload-copy">
           <strong>{fileName || label}</strong>
-          <span>{disabled ? "Uploads are not available with the current storage settings." : guidance}</span>
+          <span>{disabled ? disabledMessage : guidance}</span>
         </span>
         <span className="ui-upload-action">Browse</span>
       </label>

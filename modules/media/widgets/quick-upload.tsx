@@ -11,13 +11,12 @@ export const quickUploadWidget = {
   sizes: ["sm", "md", "lg"],
   title: "Quick upload",
   async render({ preview, siteId }) {
-    if (preview) return <QuickUploadClient canUpload mediaDriver="SERVER_ASSETS" preview />;
+    if (preview) return <QuickUploadClient canUpload preview />;
 
     const settings = await getSiteSettingsForSite(siteId);
     return (
       <QuickUploadClient
         canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)}
-        mediaDriver={settings.mediaDriver}
       />
     );
   }

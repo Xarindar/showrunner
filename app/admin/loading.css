@@ -1,5 +1,5 @@
 /* Loading stays inside the existing admin canvas and uses its neutral surfaces. */
-.showrunner-admin .admin-loading { display: grid; align-content: start; gap: var(--space-4); min-width: 0; }
+.showrunner-admin .admin-loading { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-4); min-width: 0; width: 100%; }
 .showrunner-admin .admin-loading .page-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .showrunner-admin .admin-loading-section { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 36px; }
 .showrunner-admin .admin-loading-section > div { display: grid; gap: var(--space-2); width: 180px; }
@@ -16,20 +16,20 @@
 .showrunner-admin .admin-loading-item { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .showrunner-admin .admin-loading-thumbnail { width: 40px; height: 40px; flex-shrink: 0; }
 .showrunner-admin .admin-loading-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
-.showrunner-admin :is(.admin-loading-editor, .admin-loading-website) .admin-loading-body { grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); }
+.showrunner-admin .admin-loading-editor .admin-loading-body { grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); }
 .showrunner-admin .admin-loading-fields,
 .showrunner-admin .admin-loading-settings { display: grid; align-content: start; gap: var(--space-5); }
 .showrunner-admin .admin-loading-field { display: grid; gap: var(--space-3); padding-block: var(--space-3); }
 .showrunner-admin .admin-loading-settings { padding: var(--space-5); background: var(--sd-color-surface-subtle); border-radius: var(--sd-radius-container); }
 .showrunner-admin .admin-loading-preview { min-height: 60dvh; }
-.showrunner-admin .admin-loading-gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
-.showrunner-admin .admin-loading-gallery > span { aspect-ratio: 1; border-radius: 0; }
 .showrunner-admin :is(.admin-loading, .appointments-skeleton) :is(.ui-skeleton-line, .ui-skeleton-block) { background: var(--sd-color-fill); }
 .showrunner-admin :is(.admin-loading, .appointments-skeleton) :is(.ui-skeleton-line, .ui-skeleton-block)::after { animation-duration: 2.4s; opacity: .45; }
 .showrunner-admin .admin-navigation-pending { display: block; width: 12px; height: 12px; flex-shrink: 0; margin-left: auto; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; opacity: 0; }
 .showrunner-admin .admin-navigation-pending[data-pending="true"] { opacity: .7; transition: opacity 120ms 150ms; animation: blog-spin 900ms linear infinite; }
 @media (max-width: 700px) {
-  .showrunner-admin :is(.admin-loading-editor, .admin-loading-website) .admin-loading-body { grid-template-columns: minmax(0, 1fr); }
+  .showrunner-admin .admin-loading-gallery .admin-loading-toolbar { flex-wrap: wrap; }
+  .showrunner-admin .admin-loading-gallery .admin-loading-search { flex-basis: 100%; }
+  .showrunner-admin .admin-loading-editor .admin-loading-body { grid-template-columns: minmax(0, 1fr); }
   .showrunner-admin .admin-loading-action,
   .showrunner-admin .admin-loading-search { min-height: 44px; }
   .showrunner-admin .admin-loading-columns,

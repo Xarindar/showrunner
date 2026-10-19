@@ -17,6 +17,17 @@ enum MediaVariantType {
   DOWNLOAD
 }
 
+model MediaFolder {
+  id              String   @id @default(cuid())
+  siteId          String
+  site            Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  name            String
+  createdByUserId  String
+  createdAt       DateTime @default(now())
+
+  @@unique([siteId, name])
+}
+
 model MediaAsset {
   id                String              @id @default(cuid())
   siteId            String
