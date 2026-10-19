@@ -1058,14 +1058,17 @@
   .libraryWorkspace .assetRow .assetMeta { grid-column: 2; }
 }
 
-.libraryHeader .selectControl { display: flex; border: 0; padding: 0; background: transparent; }
 
 .libraryWorkspace .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sd-space-8); }
-.libraryWorkspace .toolbar .librarySearch { flex: 1 1 200px; min-width: 180px; }
-.libraryWorkspace .toolbar .selectControl { display: flex; border: 0; padding: 0; background: transparent; max-width: 100%; }
-.libraryWorkspace .toolbar .selectControl > svg { display: none; }
-.libraryWorkspace .toolbar .selectControl select { appearance: auto; min-width: 0; width: 100%; padding: 6px 10px; font-weight: 400; }
+.libraryWorkspace .toolbar .librarySearch { flex: 1 1 240px; min-width: 0; }
+.filterMenu { position: relative; flex-shrink: 0; }
+.filterPopover { position: absolute; right: 0; top: calc(100% + var(--sd-space-8)); z-index: 20; width: min(300px, calc(100vw - 48px)); padding: var(--sd-space-16); display: grid; gap: var(--sd-space-12); background: var(--sd-color-surface); border-radius: var(--sd-radius-popover); box-shadow: var(--sd-shadow-popover); }
+.filterPopover .selectControl { display: grid; gap: var(--sd-space-4); padding: 0; border: 0; background: transparent; }
+.filterPopover .selectControl select { appearance: auto; width: 100%; min-width: 0; font-weight: 400; }
+.sortMenu { flex-shrink: 0; }
+.sortMenu :global(.ui-select-label) { display: none; }
 @media (max-width: 860px) {
-  .libraryWorkspace .toolbar .selectControl { flex: 1 1 calc(50% - var(--sd-space-8)); }
   .libraryWorkspace .toolbar .librarySearch { flex-basis: 100%; }
+  .filterPopover { left: 0; right: auto; }
+  .sortMenu :global(.ui-select-trigger) { min-height: 44px; }
 }

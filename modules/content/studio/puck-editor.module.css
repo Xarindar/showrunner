@@ -56,6 +56,10 @@
   :global(.showrunner-admin .admin-main):has(.overview) { flex: 1; min-height: 0; height: auto; }
 }
 .mobileActions, .mobileSheetHeader { display: none; }
+@media (min-width: 701px) {
+  .editBar[data-selected="true"] { display: grid; grid-template-rows: auto minmax(0, 1fr) minmax(0, 3fr); }
+  .editBar[data-selected="true"] .sections { min-height: 0; max-height: none; }
+}
 @media (max-width: 1000px) { .toolbar .saveState { display: none; } .toolbar { gap: var(--sd-space-8); } }
 @media (max-width: 700px) {
   .toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; min-height: 56px; padding: var(--sd-space-4) var(--sd-space-8); gap: var(--sd-space-4); }
