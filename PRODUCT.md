@@ -31,3 +31,5 @@ The Shopify-inspired system in DESIGN.md applies across admin navigation, resour
 
 ## Media
 Media is a standalone module for files reused across the business. Open directly into the library, with upload, a wide search field, compact Filters and Sort controls, and removable active-filter chips. Categories, folders, tags and type are available in the Filters popover. Search takes its own row on mobile. Show details on selection. Railway bucket storage is managed infrastructure; users are not asked to choose or configure providers. Storage failures are reported as upload availability errors.
+
+Image selection opens the full authorized image library, with folder and tag filters combined with search. Pickers and upload dialogs use a fixed 640px square on desktop, pinned headers/actions and internal scrolling; mobile fits the viewport. Batch uploads remain available from the picker, including dropping files onto its library view.

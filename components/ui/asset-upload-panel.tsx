@@ -66,6 +66,7 @@ export function AssetUploadPanel({ canUpload, defaultFolder = "", folders = [], 
 
   return <div className={styles.panel} ref={panel}>
     <div className={styles.scroll}>
+      {!showMetadata && defaultFolder && <input form="" type="hidden" name="folder" value={defaultFolder} />}
       <UploadField form="" accept="image/*" disabled={!canUpload || busy} disabledMessage={busy ? "Uploading this batch. You can add more images when it finishes." : undefined} label="Drop images here, or choose files" description="Select multiple images · up to 12 MB per image" multiple name="pickedFiles" onChange={event => { addFiles(event.currentTarget.files); event.currentTarget.value = ""; }} />
       {!canUpload && <p role="status">Uploads are temporarily unavailable. Please try again later or contact support.</p>}
       {notice && <p role="status">{notice}</p>}

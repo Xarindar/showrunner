@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { MediaVariantType, type Prisma } from "@prisma/client";
-import { getAccessibleMediaWhere, requireAuthenticatedAdmin } from "@/lib/auth";
+import { getAccessibleMediaWhere, requireAuthenticatedAdmin, resolveDataScopeMode } from "@/lib/auth";
 import { nonEmptyStringArrayFromUnknown } from "@/lib/format";
 import { mediaAssetDisplayUrl } from "@/lib/media";
 import { summarizeMediaTags } from "@/lib/media-tags";
@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
   const requestedScope = request.nextUrl.searchParams.get("scope");
   const scope = requestedScope === "recent" ? "recent" : "all";
   const tag = (request.nextUrl.searchParams.get("tag") || "").trim().slice(0, 120);
+  const folder = (request.nextUrl.searchParams.get("folder") || "").trim().slice(0, 200);
   const page = positivePage(request.nextUrl.searchParams.get("page"));
   const baseWhere: Prisma.MediaAssetWhereInput = await getAccessibleMediaWhere(user, settings.siteId, {
     deletedAt: null,
@@ -29,7 +30,14 @@ export async function GET(request: NextRequest) {
     mimeType: { startsWith: "image/", mode: "insensitive" }
   });
   const tagRows = await prisma.mediaAsset.findMany({ where: baseWhere, select: { tags: true }, take: 5000 });
+  const ownFolders = (await resolveDataScopeMode(user, settings.siteId, "media")) === "OWN";
+  const [savedFolders, folderGroups] = await Promise.all([
+    prisma.mediaFolder.findMany({ where: { siteId: settings.siteId, ...(ownFolders ? { createdByUserId: user.id } : {}) }, select: { name: true } }),
+    prisma.mediaAsset.groupBy({ by: ["folder"], where: baseWhere })
+  ]);
+  const folders = [...new Set([...savedFolders.map(row => row.name), ...folderGroups.map(row => row.folder).filter((name): name is string => Boolean(name))])].sort((a, b) => a.localeCompare(b));
   const clauses: Prisma.MediaAssetWhereInput[] = [baseWhere];
+  if (folder) clauses.push({ folder });
 
   if (scope === "recent") {
     clauses.push({ createdAt: { gte: new Date(Date.now() - recentWindowDays * 24 * 60 * 60 * 1000) } });
@@ -98,6 +106,7 @@ export async function GET(request: NextRequest) {
       scope,
       tag,
       tagSummaries: summarizeMediaTags(tagRows),
+      folders,
       total
     },
     { headers: { "Cache-Control": "private, no-store" } }
