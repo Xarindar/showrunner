@@ -3,6 +3,11 @@ html:has(.showrunner-admin) { font-size: 16px; }
 @media(min-width:861px) { html:has(.showrunner-admin):has(.admin-root) { overflow:hidden; } }
 .showrunner-admin,
 .showrunner-admin .admin-root {
+  /* Structural rings stay inside controls so scroll containers cannot clip them. */
+  --sd-shadow-input: 0rem .125rem .1875rem -.0625rem rgba(0, 0, 0, .04), 0rem .1875rem .25rem -.09375rem #0000000a, inset 0rem 0rem 0rem .0625rem #00000021;
+  --sd-shadow-input-focus: 0rem .125rem .1875rem -.0625rem rgba(0, 0, 0, .04), 0rem .1875rem .25rem -.09375rem #0000000a, 0rem .25rem .3125rem -.125rem #0000000a, inset 0rem 0rem 0rem .125rem rgba(80, 131, 240, 1), 0rem 0rem 0rem .1875rem #3573f60f, 0rem .25rem 1.25rem .125rem #3573f60f, inset 0rem 0rem .5rem .0625rem #3573f60d;
+  --sd-shadow-input-critical: inset 0rem 0rem 0rem .125rem #eb0014, 0rem .25rem .3125rem -.125rem #0000000a, 0rem .1875rem .25rem -.09375rem #0000000a, 0rem .125rem .1875rem -.0625rem #0000000a, inset 0rem 0rem .5rem .0625rem #e03d500d;
+  --sd-shadow-input-disabled: inset 0rem 0rem 0rem .0625rem rgba(0, 0, 0, .1);
   --admin-canvas: var(--sd-color-canvas);
   --admin-surface: var(--sd-color-surface);
   --admin-surface-raised: var(--sd-color-surface);
@@ -115,9 +120,9 @@ html:has(.showrunner-admin) { font-size: 16px; }
 .showrunner-admin .login-wrap :is(input,select,textarea) {
   min-height: var(--sd-layout-control-height); border: 0; border-radius: var(--sd-radius-input); background: var(--sd-color-surface); color: var(--sd-color-text); padding: 5px 12px; font-family: var(--font-sans); font-size: var(--sd-type-body-size); line-height: var(--sd-type-body-line); box-shadow: var(--sd-shadow-input);
 }
-.showrunner-admin .admin-main :is(input:where(:not([type="checkbox"]):not([type="radio"])),select,textarea):focus-visible { outline: 0; box-shadow: var(--sd-shadow-input-focus); }
-.showrunner-admin .admin-main :is(input,textarea,select)[aria-invalid="true"] { box-shadow: var(--sd-shadow-input-critical); }
-.showrunner-admin .admin-main :is(input,textarea,select):disabled { background: var(--sd-color-surface-subtle); color: var(--sd-color-text-disabled); box-shadow: var(--sd-shadow-input-disabled); }
+.showrunner-admin :is(.admin-main,.login-wrap) :is(input:where(:not([type="checkbox"]):not([type="radio"])),select,textarea):focus-visible { outline: 0; box-shadow: var(--sd-shadow-input-focus); }
+.showrunner-admin :is(.admin-main,.login-wrap) :is(input,textarea,select)[aria-invalid="true"] { box-shadow: var(--sd-shadow-input-critical); }
+.showrunner-admin :is(.admin-main,.login-wrap) :is(input,textarea,select):disabled { background: var(--sd-color-surface-subtle); color: var(--sd-color-text-disabled); box-shadow: var(--sd-shadow-input-disabled); }
 .showrunner-admin :is(.ui-field>label,.ui-field-label) { font-size: var(--sd-type-body-size); font-weight: 500; }
 .showrunner-admin :is(.ui-card,.studio-panel,.panel,.subpanel,.catalog-board,.login-card) { border: 0; border-radius: var(--sd-radius-container); box-shadow: var(--sd-shadow-container); }
 .showrunner-admin dialog.ui-dialog { border: 0; border-radius: var(--sd-radius-dialog); box-shadow: var(--sd-shadow-dialog); padding: var(--sd-space-16); }

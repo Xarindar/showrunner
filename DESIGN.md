@@ -21,3 +21,5 @@ Use the installed font fallback in the exported stack; do not download Shopify's
 
 ## Admin dialogs
 Use the shared dialog shell: 16px outer padding, 12px between header and body, and 16px between form groups. Use `module-modal-actions` for action rows with an 8px gap, aligned right, with Cancel before the primary action in DOM order. Keep scrollable contents and status messages separate from the action group.
+
+Input boundaries use inset rings in the admin adapter for normal, focus, invalid and disabled states. External shadows are decorative only: borders and keyboard focus must remain visible inside clipped or scrolling containers. Preserve container overflow behavior rather than adding per-screen clearance patches.

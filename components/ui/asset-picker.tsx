@@ -2,7 +2,7 @@
 
 import NextImage from "next/image";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, Clock3, ImageIcon, Images, Search, Sparkles, Tag, Upload, X } from "lucide-react";
+import { Check, ImageIcon, Images, Search, Upload, X } from "lucide-react";
 import { summarizeMediaTags, type MediaTagSummary } from "@/lib/media-tags";
 import { Button } from "./button";
 import { Modal } from "./modal";
@@ -22,13 +22,14 @@ export type AssetPickerAsset = {
   url?: string;
 };
 
-type LibraryFilter = "all" | "recent" | "tags";
+type LibraryFilter = "all" | "recent";
 
 type AssetLibraryResponse = {
   assets?: AssetPickerAsset[];
   page?: number;
   pageCount?: number;
   tagSummaries?: MediaTagSummary[];
+  folders?: string[];
   total?: number;
 };
 
@@ -121,11 +122,14 @@ export function AssetPicker({
   triggerClassName,
   triggerHint = "",
   uploadFormId,
-  uploadUnavailableMessage = "Uploads need Server asset folder, S3, R2, or Cloudflare Images."
+  uploadUnavailableMessage = "Uploads are temporarily unavailable. Please try again later."
 }: AssetPickerProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [mode, setMode] = useState<"library" | "upload">("library");
-  const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>("recent");
+  const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>("all");
+  const [folder, setFolder] = useState("");
+  const [folders, setFolders] = useState<string[]>([]);
+  const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -150,22 +154,16 @@ export function AssetPicker({
   const visibleAssets = useMemo(() => {
     const search = normalizedSearchValue(query);
     return libraryAssets.filter((asset) => {
+      if (folder && asset.folder !== folder) return false;
       if (!loadFromServer && libraryFilter === "recent" && !assetWasAddedRecently(asset)) return false;
-      if (libraryFilter === "tags" && selectedTag && !(asset.tags || []).includes(selectedTag)) return false;
+      if (selectedTag && !(asset.tags || []).includes(selectedTag)) return false;
       if (!search) return true;
       return [asset.filename, asset.alt, asset.folder || "", ...(asset.tags || [])]
         .some((value) => normalizedSearchValue(value).includes(search));
     });
-  }, [libraryAssets, libraryFilter, loadFromServer, query, selectedTag]);
-
-  const visibleTagSummaries = useMemo(() => {
-    if (selectedTag) return tagSummaries;
-    const search = normalizedSearchValue(query);
-    return search ? tagSummaries.filter((tag) => normalizedSearchValue(tag.name).includes(search)) : tagSummaries;
-  }, [query, selectedTag, tagSummaries]);
+  }, [libraryAssets, libraryFilter, loadFromServer, query, selectedTag, folder]);
 
   const selectedAsset = libraryAssets.find((asset) => asset.id === selectedId) || null;
-  const browsingTags = libraryFilter === "tags" && !selectedTag;
   const visibleTotal = loadFromServer ? libraryTotal : visibleAssets.length;
   const open = controlledOpen ?? internalOpen;
 
@@ -174,11 +172,12 @@ export function AssetPicker({
     onOpenChange?.(nextOpen);
   }
 
-  function matchingSupplementalAssets(filter: LibraryFilter, tag: string | null, search: string) {
+  function matchingSupplementalAssets(filter: LibraryFilter, tag: string | null, search: string, selectedFolder = folder) {
     if (filter === "recent") return [];
     const normalizedSearch = normalizedSearchValue(search);
     return supplementalAssets.filter((asset) => {
-      if (filter === "tags" && tag && !(asset.tags || []).includes(tag)) return false;
+      if (selectedFolder && asset.folder !== selectedFolder) return false;
+      if (tag && !(asset.tags || []).includes(tag)) return false;
       if (!normalizedSearch) return true;
       return [asset.filename, asset.alt, asset.folder || "", ...(asset.tags || [])]
         .some((value) => normalizedSearchValue(value).includes(normalizedSearch));
@@ -195,7 +194,8 @@ export function AssetPicker({
     page: number,
     append = false,
     filter: LibraryFilter = libraryFilter,
-    tag: string | null = selectedTag
+    tag: string | null = selectedTag,
+    selectedFolder = folder
   ) {
     if (!loadFromServer) return;
     const requestId = requestIdRef.current + 1;
@@ -205,18 +205,20 @@ export function AssetPicker({
 
     try {
       const params = new URLSearchParams({ page: String(page), scope: filter === "recent" ? "recent" : "all" });
+      if (selectedFolder) params.set("folder", selectedFolder);
       if (search.trim()) params.set("q", search.trim());
-      if (filter === "tags" && tag) params.set("tag", tag);
+      if (tag) params.set("tag", tag);
       const response = await fetch(`/api/media/assets?${params.toString()}`, { cache: "no-store" });
       if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) throw new Error("Asset library unavailable");
       const payload = (await response.json()) as AssetLibraryResponse;
       if (requestId !== requestIdRef.current || !Array.isArray(payload.assets)) return;
-      const supplemental = matchingSupplementalAssets(filter, tag, search);
+      const supplemental = matchingSupplementalAssets(filter, tag, search, selectedFolder);
 
       setLibraryAssets((current) => {
         const combined = append ? [...current, ...payload.assets!, ...supplemental] : [...payload.assets!, ...supplemental];
         return Array.from(new Map(combined.map((asset) => [asset.id, asset])).values());
       });
+      if (Array.isArray(payload.folders)) setFolders([...new Set([...payload.folders, ...assets.map(asset => asset.folder).filter((name): name is string => Boolean(name))])].sort());
       setLibraryPage(typeof payload.page === "number" ? payload.page : page);
       setLibraryPageCount(typeof payload.pageCount === "number" ? payload.pageCount : 1);
       setLibraryTotal((typeof payload.total === "number" ? payload.total : payload.assets.length) + supplemental.length);
@@ -234,7 +236,6 @@ export function AssetPicker({
     setQuery(value);
     setSelectedId(null);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    if (browsingTags) return;
     searchTimerRef.current = setTimeout(
       () => void loadLibrary(value, 1, false, libraryFilter, selectedTag),
       260
@@ -245,47 +246,40 @@ export function AssetPicker({
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     setQuery("");
     setSelectedId(null);
-    if (!browsingTags) void loadLibrary("", 1, false, libraryFilter, selectedTag);
+    void loadLibrary("", 1, false, libraryFilter, selectedTag);
   }
 
   function changeLibraryFilter(filter: LibraryFilter) {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    const nextQuery = libraryFilter === "tags" ? "" : query;
+    const nextQuery = query;
     setLibraryFilter(filter);
     setSelectedId(null);
-    setSelectedTag(null);
     setQuery(nextQuery);
-    if (filter !== "tags") void loadLibrary(nextQuery, 1, false, filter, null);
+    void loadLibrary(nextQuery, 1, false, filter, selectedTag);
   }
 
   function chooseTag(tag: string) {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    if (tag === selectedTag) {
-      setSelectedTag(null);
-      setSelectedId(null);
-      setQuery("");
-      return;
-    }
-    setSelectedTag(tag);
-    setSelectedId(null);
-    setQuery("");
-    void loadLibrary("", 1, false, "tags", tag);
+    setSelectedTag(tag || null); setSelectedId(null);
+    void loadLibrary(query, 1, false, libraryFilter, tag || null);
   }
 
   function openPicker() {
     setMode("library");
-    setLibraryFilter("recent");
+    setLibraryFilter("all");
     setSelectedTag(null);
     setSelectedId(null);
     setQuery("");
-    const initialAssets = loadFromServer ? matchingSupplementalAssets("recent", null, "") : assets;
+    setFolder(""); setDroppedFiles([]);
+    setFolders([...new Set(assets.map(asset => asset.folder).filter((name): name is string => Boolean(name)))].sort());
+    const initialAssets = loadFromServer ? matchingSupplementalAssets("all", null, "", "") : assets;
     setLibraryAssets(initialAssets);
     setLibraryPage(1);
     setLibraryPageCount(1);
     setLibraryTotal(initialAssets.length);
     setTagSummaries(initialTagSummaries);
     setPickerOpen(true);
-    void loadLibrary("", 1, false, "recent", null);
+    void loadLibrary("", 1, false, "all", null, "");
   }
 
   function closePicker() {
@@ -294,7 +288,7 @@ export function AssetPicker({
     setQuery("");
     setSelectedId(null);
     setSelectedTag(null);
-    setLibraryFilter("recent");
+    setLibraryFilter("all");
     requestIdRef.current += 1;
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
   }
@@ -336,69 +330,23 @@ export function AssetPicker({
 
       <Modal bodyClassName={styles.body} className={styles.modal} onClose={closePicker} open={open} title={title}>
         {mode === "library" ? (
-          <div className={styles.libraryView}>
-            <div className={styles.viewHeader}>
-              <div>
-                <span className={styles.kicker}>Choose from your library</span>
-                <p>Find the right image without leaving your work.</p>
-              </div>
-              <Button
-                className={styles.uploadAction}
-                disabled={!canUpload || (!onUploadRequest && !uploadFormId && !uploadAction)}
-                onClick={startUpload}
-                size="sm"
-                type="button"
-                variant="secondary">
-                <Upload aria-hidden="true" size={15} />
-                Upload images
-              </Button>
-            </div>
-
+          <div className={styles.libraryView} onDragOver={event => { if (canUpload && (uploadAction || uploadFormId) && event.dataTransfer.types.includes("Files")) event.preventDefault(); }} onDrop={event => {
+            if (!canUpload || !(uploadAction || uploadFormId) || !event.dataTransfer.files.length) return;
+            event.preventDefault(); setDroppedFiles(Array.from(event.dataTransfer.files)); setMode("upload");
+          }}>
             <div className={styles.browser}>
               <section aria-label="Asset results" className={styles.results}>
-                <nav aria-label="Filter asset library" className={styles.filterTabs}>
-                  <button
-                    aria-pressed={libraryFilter === "all"}
-                    className={cx(styles.filterTab, libraryFilter === "all" && styles.filterTabActive)}
-                    onClick={() => changeLibraryFilter("all")}
-                    type="button">
-                    <Images aria-hidden="true" size={16} />
-                    All
-                  </button>
-                  <button
-                    aria-pressed={libraryFilter === "recent"}
-                    className={cx(styles.filterTab, libraryFilter === "recent" && styles.filterTabActive)}
-                    onClick={() => changeLibraryFilter("recent")}
-                    type="button">
-                    <Clock3 aria-hidden="true" size={16} />
-                    Recent
-                  </button>
-                  <button
-                    aria-pressed={libraryFilter === "tags"}
-                    className={cx(styles.filterTab, libraryFilter === "tags" && styles.filterTabActive)}
-                    onClick={() => changeLibraryFilter("tags")}
-                    type="button">
-                    <Tag aria-hidden="true" size={16} />
-                    Tags
-                  </button>
-                </nav>
-
+                <div className={styles.toolbar}>
                 <div className={styles.searchField}>
                   <Search aria-hidden="true" size={17} />
                   <label className="ui-sr-only" htmlFor={searchInputId}>
-                    {browsingTags ? "Find a tag" : "Search assets"}
+                    Search assets
                   </label>
                   <input
                     autoComplete="off"
                     id={searchInputId}
                     onChange={(event) => updateQuery(event.currentTarget.value)}
-                    placeholder={
-                      browsingTags
-                        ? "Find a tag…"
-                        : selectedTag
-                          ? `Search within ${selectedTag}…`
-                          : "Search images, folders, or tags…"
-                    }
+                    placeholder="Search images, folders, or tags…"
                     type="search"
                     value={query}
                   />
@@ -409,45 +357,27 @@ export function AssetPicker({
                   ) : null}
                 </div>
 
-                {libraryFilter === "tags" ? (
-                  <div className={styles.tagRail}>
-                    <div className={styles.tagRailHeading}>
-                      <span><Tag aria-hidden="true" size={14} /> Browse tags</span>
-                      {selectedTag ? (
-                        <button onClick={() => chooseTag(selectedTag)} type="button">View all tags</button>
-                      ) : null}
-                    </div>
-                    {visibleTagSummaries.length ? (
-                      <div aria-label="Asset tags" className={styles.tagChips}>
-                        {visibleTagSummaries.map((tag) => (
-                          <button
-                            aria-pressed={selectedTag === tag.name}
-                            className={cx(styles.tagChip, selectedTag === tag.name && styles.tagChipActive)}
-                            key={tag.name}
-                            onClick={() => chooseTag(tag.name)}
-                            type="button">
-                            <span>{tag.name}</span>
-                            <small>{tag.count}</small>
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-
+                  <Button disabled={!canUpload || (!onUploadRequest && !uploadFormId && !uploadAction)} onClick={startUpload} type="button" variant="secondary"><Upload aria-hidden="true" size={15} /> Upload images</Button>
+                </div>
+                <div className={styles.filters}>
+                  <label><span className="ui-sr-only">Library view</span><select aria-label="Library view" value={libraryFilter} onChange={event => changeLibraryFilter(event.currentTarget.value as LibraryFilter)}><option value="all">All images</option><option value="recent">Recently added</option></select></label>
+                  <label><span className="ui-sr-only">Folder</span><select aria-label="Folder" value={folder} onChange={event => {
+                    const next = event.currentTarget.value;
+                    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+                    setFolder(next); setSelectedId(null);
+                    void loadLibrary(query, 1, false, libraryFilter, selectedTag, next);
+                  }}><option value="">All folders</option>{folders.map(name => <option key={name} value={name}>{name}</option>)}</select></label>
+                  <label><span className="ui-sr-only">Tag</span><select aria-label="Tag" value={selectedTag || ""} onChange={event => chooseTag(event.currentTarget.value)}><option value="">All tags</option>{tagSummaries.map(tag => <option key={tag.name} value={tag.name}>{tag.name} ({tag.count})</option>)}</select></label>
+                </div>
                 <div className={styles.resultMeta} role="status">
                   <span>
                     {loadingLibrary
                       ? "Refreshing library…"
-                      : browsingTags
-                        ? `${visibleTagSummaries.length} ${visibleTagSummaries.length === 1 ? "tag" : "tags"}`
                         : `${visibleTotal} ${visibleTotal === 1 ? "result" : "results"}`}
                   </span>
                   <span>
                     {libraryError
                       ? "Couldn’t refresh — showing saved results"
-                      : browsingTags
-                        ? "Choose one to narrow the library"
                         : libraryFilter === "recent"
                           ? "Added in the last 30 days"
                           : selectedTag
@@ -456,28 +386,7 @@ export function AssetPicker({
                   </span>
                 </div>
 
-                {browsingTags ? (
-                  <div className={styles.tagLanding}>
-                    <span className={styles.tagLandingIcon}><Tag aria-hidden="true" size={24} /></span>
-                    <strong>
-                      {tagSummaries.length
-                        ? visibleTagSummaries.length
-                          ? "Choose a tag to see matching images"
-                          : "No tags match your search"
-                        : "No tagged images yet"}
-                    </strong>
-                    <p>
-                      {tagSummaries.length
-                        ? visibleTagSummaries.length
-                          ? "Tags keep a large library focused. Select one above to browse only the images you need."
-                          : "Try a broader tag name or clear your search."
-                        : "Add tags in Media to create fast, reusable collections here."}
-                    </p>
-                    {query && !visibleTagSummaries.length ? (
-                      <Button onClick={clearQuery} size="sm" type="button" variant="secondary">Clear tag search</Button>
-                    ) : null}
-                  </div>
-                ) : visibleAssets.length ? (
+                {loadingLibrary && !visibleAssets.length ? (<div className={styles.empty} role="status">Loading images…</div>) : visibleAssets.length ? (
                   <div aria-label="Available assets" className={styles.grid}>
                     {visibleAssets.map((asset) => {
                       const selected = asset.id === selectedId;
@@ -541,7 +450,7 @@ export function AssetPicker({
                     {query ? (
                       <Button onClick={clearQuery} size="sm" type="button" variant="secondary">Clear search</Button>
                     ) : selectedTag ? (
-                      <Button onClick={() => chooseTag(selectedTag)} size="sm" type="button" variant="secondary">Browse all tags</Button>
+                      <Button onClick={() => chooseTag("")} size="sm" type="button" variant="secondary">Clear tag filter</Button>
                     ) : libraryFilter === "recent" ? (
                       <Button onClick={() => changeLibraryFilter("all")} size="sm" type="button" variant="secondary">View all assets</Button>
                     ) : canUpload ? (
@@ -554,53 +463,17 @@ export function AssetPicker({
                 )}
               </section>
 
-              <aside aria-label="Selected asset preview" className={styles.inspector}>
-                {selectedAsset ? (
-                  <>
-                    <div className={styles.preview}>
-                      <NextImage alt={selectedAsset.alt || selectedAsset.filename} height={420} src={selectedAsset.thumbnailUrl} unoptimized width={560} />
-                    </div>
-                    <div className={styles.inspectorCopy}>
-                      <span className={styles.readyBadge}><Check aria-hidden="true" size={13} /> Selected</span>
-                      <h3>{selectedAsset.filename}</h3>
-                      <dl>
-                        {selectedAsset.folder ? (
-                          <div>
-                            <dt>Folder</dt>
-                            <dd>{selectedAsset.folder}</dd>
-                          </div>
-                        ) : null}
-                        {selectedAsset.tags?.length ? (
-                          <div>
-                            <dt>Tags</dt>
-                            <dd className={styles.previewTags}>
-                              {selectedAsset.tags.slice(0, 6).map((tag) => <span key={tag}>{tag}</span>)}
-                            </dd>
-                          </div>
-                        ) : null}
-                      </dl>
-                    </div>
-                  </>
-                ) : (
-                  <div className={styles.inspectorEmpty}>
-                    <span><Sparkles aria-hidden="true" size={22} /></span>
-                    <strong>Select an asset to preview</strong>
-                    <p>Nothing is applied until you confirm your choice.</p>
-                  </div>
-                )}
-              </aside>
+
             </div>
 
             <footer className={styles.footer}>
               <p aria-live="polite">
                 {selectedAsset
                   ? `${selectedAsset.filename} selected`
-                  : browsingTags
-                    ? "Choose a tag, then select one image"
-                    : "Select one asset to continue"}
+                  : "Select an image"}
               </p>
               <div className="module-modal-actions">
-                <Button onClick={closePicker} size="sm" type="button" variant="ghost">Cancel</Button>
+                <Button onClick={closePicker} size="sm" type="button" variant="secondary">Cancel</Button>
                 {onSelectAsset ? (
                   <Button disabled={!selectedAsset} onClick={confirmSelection} size="sm" type="button">
                     <Check aria-hidden="true" size={15} />
@@ -620,10 +493,10 @@ export function AssetPicker({
             </footer>
           </div>
         ) : (
-          <AssetUploadPanel canUpload={canUpload} defaultAlt={defaultAlt} uploadAction={uploadAction} onBusyChange={setUploading} onDone={uploaded => {
-            setMode("library"); setLibraryFilter("recent"); setQuery(""); setSelectedTag(null);
+          <AssetUploadPanel initialFiles={droppedFiles} defaultFolder={folder} folders={folders} canUpload={canUpload} defaultAlt={defaultAlt} uploadAction={uploadAction} onBusyChange={setUploading} onDone={uploaded => {
+            setMode("library"); setLibraryFilter("all"); setFolder(""); setDroppedFiles([]); setQuery(""); setSelectedTag(null);
             if (uploaded.length) { setLibraryAssets(current => [...uploaded, ...current]); setSelectedId(uploaded[0].id); }
-            void loadLibrary("", 1, false, "recent", null);
+            void loadLibrary("", 1, false, "all", null, "");
           }} />
         )}
       </Modal>

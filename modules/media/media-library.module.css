@@ -904,20 +904,9 @@
 
 :global(.ui-dialog).uploadModal {
   max-height: min(820px, calc(100svh - 32px));
-  max-width: min(920px, calc(100vw - 32px));
+  max-width: min(640px, calc(100vw - 32px));
   overflow: hidden;
-  padding: 0;
-}
-
-.uploadModal :global(.ui-modal-head) {
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
-  margin: 0;
-  min-height: 64px;
-  padding: 0 var(--space-5);
-}
-
-.uploadModal :global(.ui-modal-head h2) {
-  font-size: 1.08rem;
+  padding: var(--sd-space-16);
 }
 
 .uploadModalBody {
@@ -1046,8 +1035,8 @@
 @media (min-width: 861px) {
   :global(.ui-dialog).folderModal { left: var(--layout-admin-sidebar); right: 4px; max-width: calc(100vw - var(--layout-admin-sidebar) - 36px); margin-inline: auto; }
   :global(.admin-root:has(.admin-sidebar.is-collapsed)) .folderModal { left: 52px; max-width: calc(100vw - 88px); }
-  :global(.ui-dialog).uploadModal { left: var(--layout-admin-sidebar); right: 4px; width: min(920px, calc(100vw - var(--layout-admin-sidebar) - 36px)); max-width: calc(100vw - var(--layout-admin-sidebar) - 36px); margin-inline: auto; }
-  :global(.admin-root:has(.admin-sidebar.is-collapsed)) .uploadModal { left: 52px; width: min(920px, calc(100vw - 88px)); max-width: calc(100vw - 88px); }
+  :global(.ui-dialog).uploadModal { left: var(--layout-admin-sidebar); right: 4px; width: min(640px, calc(100vw - var(--layout-admin-sidebar) - 36px)); max-width: calc(100vw - var(--layout-admin-sidebar) - 36px); margin-inline: auto; }
+  :global(.admin-root:has(.admin-sidebar.is-collapsed)) .uploadModal { left: 52px; width: min(640px, calc(100vw - 88px)); max-width: calc(100vw - 88px); }
 }
 .detailsModal .inspectorScroll { overflow: visible; padding: 0; }
 @media (max-width: 860px) {
@@ -1071,4 +1060,11 @@
   .libraryWorkspace .toolbar .librarySearch { flex-basis: 100%; }
   .filterPopover { left: 0; right: auto; }
   .sortMenu :global(.ui-select-trigger) { min-height: 44px; }
+}
+
+:global(.ui-dialog).uploadModal { width: min(640px, calc(100vw - 32px), calc(100svh - 32px)); height: min(640px, calc(100vw - 32px), calc(100svh - 32px)); }
+:global(.ui-dialog).uploadModal[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.uploadModalBody { overflow: hidden; }
+@media (max-width: 600px) {
+  :global(.ui-dialog).uploadModal { width: calc(100vw - 32px); height: calc(100svh - 32px); border-radius: var(--sd-radius-dialog); }
 }
