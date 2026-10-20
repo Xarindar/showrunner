@@ -34,6 +34,7 @@ export function PuckContentEditor(props: Props) {
 function Workspace({ manifest, entries, onFrameRatios }: Props & { onFrameRatios: (ratios: Record<string, number>) => void }) {
   const { appState, dispatch, selectedItem, history } = usePuck();
   const [editing, setEditing] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [fieldRequest, setFieldRequest] = useState<{ id: string; path: unknown } | null>(null);
@@ -116,6 +117,7 @@ function Workspace({ manifest, entries, onFrameRatios }: Props & { onFrameRatios
   const siteUrl = manifest.previewUrl ? new URL(pageLocation || page.path, manifest.previewUrl).toString() : "";
   const preview = siteUrl ? new URL(siteUrl) : null;
   preview?.searchParams.set("showrunner-editor", "1");
+  preview?.searchParams.set("showrunner-preview", previewVersion);
   const previewUrl = preview?.href || "";
   const previewOrigin = siteUrl ? new URL(siteUrl).origin : "";
   const navigate = useCallback((href: string) => {
@@ -203,6 +205,7 @@ function Workspace({ manifest, entries, onFrameRatios }: Props & { onFrameRatios
     finally { setPending(false); }
   }
   function enterEditor() {
+    setPreviewVersion(Date.now().toString(36));
     setReady(false); setFrameError(false); setEditing(true); setPanelOpen(false); setSheetExpanded(false);
   }
   if (!editing) return <div className={styles.overview}>
