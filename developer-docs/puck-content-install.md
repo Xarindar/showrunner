@@ -22,4 +22,6 @@ Use `slideshow` for a header carousel: clients may append/remove slides within i
 
 Client-facing fields omit alternative text and internal location IDs while retaining them in stored payloads and image rendering. SEO blocks remain available to the public renderer but are omitted from the visual editor.
 
+Header slides store `imagePositionX` and `imagePositionY` (0–100, default 50), and `imageZoom` (1–3, default 1). The framing dialog lets owners drag or keyboard-adjust a crop over the original image. The bridge reports each slideshow's actual preview aspect ratio in trusted `frames` messages so the dialog matches the current viewport. Render the image with cover, matching percentage object-position and transform-origin, and scale by imageZoom inside an overflow-hidden container. Cottage serves FULL previews normally and HERO previews for large screens, high-density screens, or zoomed crops. Source resolution still limits available detail. Publishing confirms success with a toast that expires after 3.5 seconds; errors remain visible.
+
 For catalog-bound service/product cards, see [Showcase cards](showcase-cards.md). Configure a dedicated showcase host; owners add cards within that approved section while page sections stay fixed.

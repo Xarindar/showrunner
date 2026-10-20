@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Puck, usePuck, type Config, type Data } from "@puckeditor/core";
 import { Monitor, Smartphone, Undo2, Redo2, X, ExternalLink, ArrowLeft, PanelsTopLeft, ChevronRight, ChevronUp, ChevronDown, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Toast, ToastRegion } from "@/components/ui/toast";
 import { contentFieldId, focusContentFieldWhenReady } from "./field-selection";
 import { type Choice } from "./editor";
+import { HeaderFrameRatios } from "./image-framing-control";
 import { ContentFields } from "./content-fields";
 import { contentLinkOptions, editorPageDestination, type LinkChoices } from "./field-layout";
 import { saveStudioBlock } from "./actions";
@@ -19,16 +21,17 @@ import { resolveShowcase, type ShowcaseRow } from "./showcase";
 type Entry = { block: ContentBlockConfig; payload: Record<string, unknown>; revision: number; pageIds: string[]; choices: Choice[] };
 type Props = { manifest: ContentManifest; entries: Entry[]; canUpload: boolean; linkChoices: LinkChoices };
 export function PuckContentEditor(props: Props) {
+  const [frameRatios, setFrameRatios] = useState<Record<string, number>>({});
   const config = useMemo<Config>(() => ({ components: Object.fromEntries(props.entries.map(entry => [entry.block.id, {
     label: entry.block.label,
     fields: { payload: { type: "custom", render: ({ value, onChange }: { value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void }) => <div className={fieldStyles.fields}><ContentFields block={entry.block} canUpload={props.canUpload} assetBaseUrl={entry.block.presentation?.assetBaseUrl || props.manifest.previewUrl} value={value} onChange={onChange} choices={entry.choices} linkOptions={contentLinkOptions(props.manifest, props.linkChoices)} /></div> } },
     render: () => <></>
   }])) }), [props.entries, props.canUpload, props.manifest, props.linkChoices]);
   const data = useMemo<Data>(() => ({ root: { props: {} }, content: props.entries.map(entry => ({ type: entry.block.id, props: { id: entry.block.id, payload: entry.payload } })) }), [props.entries]);
-  return <Puck config={config} data={data} permissions={{ insert: false, delete: false, duplicate: false, drag: false, edit: true }}><Workspace {...props} /></Puck>;
+  return <HeaderFrameRatios.Provider value={frameRatios}><Puck config={config} data={data} permissions={{ insert: false, delete: false, duplicate: false, drag: false, edit: true }}><Workspace {...props} onFrameRatios={setFrameRatios} /></Puck></HeaderFrameRatios.Provider>;
 }
 
-function Workspace({ manifest, entries }: Props) {
+function Workspace({ manifest, entries, onFrameRatios }: Props & { onFrameRatios: (ratios: Record<string, number>) => void }) {
   const { appState, dispatch, selectedItem, history } = usePuck();
   const [editing, setEditing] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -49,6 +52,11 @@ function Workspace({ manifest, entries }: Props) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
+  useEffect(() => {
+    if (!message || error) return;
+    const timer = window.setTimeout(() => setMessage(""), 3500);
+    return () => window.clearTimeout(timer);
+  }, [message, error]);
   const [saved, setSaved] = useState(Object.fromEntries(entries.map(entry => [entry.block.id, { payload: entry.payload, revision: entry.revision }])));
   const frame = useRef<HTMLIFrameElement>(null);
   const sectionSelector = useRef<HTMLButtonElement>(null);
@@ -145,6 +153,12 @@ function Workspace({ manifest, entries }: Props) {
   useEffect(() => {
     function receive(event: MessageEvent) {
       if (event.source !== frame.current?.contentWindow || event.origin !== previewOrigin || event.data?.channel !== "showrunner-editor-v1") return;
+      if (event.data.type === "frames" && event.data.ratios && typeof event.data.ratios === "object") {
+        onFrameRatios(Object.fromEntries(pageEntries.filter(entry => entry.block.type === "slideshow").flatMap(entry => {
+          const ratio = event.data.ratios[entry.block.id];
+          return typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0 ? [[entry.block.id, ratio]] : [];
+        })));
+      }
       if (event.data.type === "ready") { setReady(true); setFrameError(false); }
       if (event.data.type === "navigate" && typeof event.data.href === "string") navigate(event.data.href);
       if (event.data.type === "select") {
@@ -158,7 +172,7 @@ function Workspace({ manifest, entries }: Props) {
     }
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [content, dispatch, pageEntries, previewOrigin, navigate, pending]);
+  }, [content, dispatch, pageEntries, previewOrigin, navigate, pending, onFrameRatios]);
   useEffect(() => {
     if (!ready || !frame.current?.contentWindow) return;
     const mediaUrl = (value: string) => value?.startsWith("/") ? new URL(value, window.location.origin).toString() : value;
@@ -213,7 +227,7 @@ function Workspace({ manifest, entries }: Props) {
       </div></details>
       <Button disabled={!dirty || pending} onClick={publish}>{pending ? "Publishing…" : "Publish"}</Button>
     </header>
-    {message && <div className={styles.notice} role={error ? "alert" : "status"}>{message}</div>}
+    {message && (error ? <div className={styles.notice} role="alert">{message}</div> : <ToastRegion><Toast tone="success" title={message} /></ToastRegion>)}
     <div className={styles.body}>
       <aside className={styles.editBar} data-open={panelOpen} data-expanded={sheetExpanded} data-selected={Boolean(selected)} aria-label="Website editing">
         <div className={styles.mobileSheetHeader}>

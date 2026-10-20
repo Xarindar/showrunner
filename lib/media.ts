@@ -34,7 +34,7 @@ export const privateMediaUploadMimeTypes = Array.from(allowedPrivateFileTypes.ke
 export const mediaVariantPresets = {
   [MediaVariantType.THUMBNAIL]: { width: 320, height: 320, fit: "contain" },
   [MediaVariantType.CARD]: { width: 720, height: 540, fit: "cover" },
-  [MediaVariantType.HERO]: { width: 1920, height: 1920, fit: "contain" },
+  [MediaVariantType.HERO]: { width: 3840, height: 3840, fit: "contain" },
   [MediaVariantType.FULL]: { width: 2048, height: 2048, fit: "contain" },
   [MediaVariantType.SOCIAL]: { width: 1200, height: 630, fit: "cover" },
   [MediaVariantType.DOWNLOAD]: { width: 0, height: 0, fit: "original" }
@@ -912,7 +912,7 @@ async function transformedObjectStorageVariantResponse(
   const resized = await sharp(sourceBytes, { limitInputPixels: 80_000_000 })
     .rotate()
     .resize(transformFit(type))
-    .webp({ effort: 4, quality: type === MediaVariantType.THUMBNAIL ? 72 : 82 })
+    .webp({ effort: 4, quality: type === MediaVariantType.THUMBNAIL ? 72 : type === MediaVariantType.HERO ? 88 : 82 })
     .toBuffer({ resolveWithObject: true });
 
   const variantKey = objectStorageVariantObjectKey(asset, type);
@@ -1026,7 +1026,7 @@ async function transformedServerAssetVariantResponse(
   const resized = await sharp(sourceBytes, { limitInputPixels: 80_000_000 })
     .rotate()
     .resize(transformFit(type))
-    .webp({ effort: 4, quality: type === MediaVariantType.THUMBNAIL ? 72 : 82 })
+    .webp({ effort: 4, quality: type === MediaVariantType.THUMBNAIL ? 72 : type === MediaVariantType.HERO ? 88 : 82 })
     .toBuffer({ resolveWithObject: true });
 
   const variantKey = serverAssetVariantObjectKey(asset, type);

@@ -21,7 +21,7 @@ export function imageFirst(fields: Record<string, Field>) {
   const imageKeys = ["imageUrl", "url", "imageAlt", "alt", "images"];
   const priority = (key: string) => imageKeys.includes(key) ? imageKeys.indexOf(key) : imageKeys.length;
   // Preserve hidden descriptions and references in the payload.
-  return Object.entries(fields).filter(([key]) => !["alt", "imageAlt", "locationId"].includes(key)).sort(([a], [b]) => priority(a) - priority(b));
+  return Object.entries(fields).filter(([key]) => !["alt", "imageAlt", "locationId", "imagePositionX", "imagePositionY", "imageZoom"].includes(key)).sort(([a], [b]) => priority(a) - priority(b));
 }
 
 export function editorPageDestination(href: string, currentUrl: string, pages: ContentManifest["pages"]) {

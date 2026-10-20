@@ -69,6 +69,18 @@
   style.textContent = '[data-sr-section]{cursor:pointer;outline-offset:-2px}[data-sr-hover]{outline:2px solid #5083f0!important;outline-offset:-2px;cursor:pointer}[data-sr-selected]{outline:2px solid #1561a0}[data-sr-section]:focus-visible{outline:3px solid #5083f0}';
   document.head.append(style);
   function send(type, extra) { if (parentOrigin) parent.postMessage({ channel, type, ...extra }, parentOrigin); }
+  let frameStamp = "{}";
+  function reportFrames() {
+    const ratios = {};
+    blocks.filter(block => block.type === "slideshow" && block.presentation?.selector).forEach(block => {
+      const node = document.querySelector(block.presentation.selector);
+      const bounds = node?.getBoundingClientRect();
+      if (bounds?.width > 0 && bounds?.height > 0) ratios[block.id] = bounds.width / bounds.height;
+    });
+    const stamp = JSON.stringify(ratios);
+    if (stamp !== frameStamp) { frameStamp = stamp; send("frames", { ratios }); }
+  }
+  const frameObserver = typeof ResizeObserver === "function" ? new ResizeObserver(reportFrames) : null;
   function editableTarget(target, section) {
     const block = blocks.find(block => block.id === section.dataset.srSection);
     // Use the same innermost field for hover feedback and click selection.
@@ -105,6 +117,11 @@
     if (event.data.type !== "update" || event.origin !== parentOrigin || !Array.isArray(event.data.blocks)) return;
     blocks = event.data.blocks;
     apply(blocks, event.origin);
+    frameObserver?.disconnect();
+    blocks.filter(block => block.type === "slideshow" && block.presentation?.selector).forEach(block => {
+      document.querySelectorAll(block.presentation.selector).forEach(node => frameObserver?.observe(node));
+    });
+    reportFrames();
     if (event.data.focusedItem) window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: event.data.focusedItem } }));
     document.querySelectorAll("[data-sr-selected]").forEach(node => node.removeAttribute("data-sr-selected"));
     const selectionChanged = selectedId !== event.data.selectedId;

@@ -9,6 +9,7 @@ import type { ContentBlockConfig, ContentManifest } from "./manifest";
 import { saveStudioBlock, uploadStudioAsset } from "./actions";
 import styles from "./studio.module.css";
 import { renderContentRichText } from "./rich-text";
+import { ImageFramingControl } from "./image-framing-control";
 import { VisualBlock } from "./visual-block";
 
 export type Choice = { catalog?: import("./showcase").CatalogCard; description?: string; id: string; imageUrl?: string; label: string };
@@ -48,7 +49,7 @@ export function StudioEditor({ block, canUpload = false, pages, initialPayload, 
   </section>;
 }
 
-export function Fields({ canUpload = false, fixedRows = false, assetBaseUrl, linkOptions, fields, limits, minimums, value, prefix, onChange, choices = [] }: { canUpload?: boolean; fixedRows?: boolean; assetBaseUrl?: string; linkOptions?: LinkOptions; fields: Record<string, Field>; limits?: Record<string, number>; minimums?: Record<string, number>; value: Record<string, unknown>; prefix: string; onChange: (next: Record<string, unknown>) => void; choices?: Choice[] }) {
+export function Fields({ headerId, canUpload = false, fixedRows = false, assetBaseUrl, linkOptions, fields, limits, minimums, value, prefix, onChange, choices = [] }: { headerId?: string; canUpload?: boolean; fixedRows?: boolean; assetBaseUrl?: string; linkOptions?: LinkOptions; fields: Record<string, Field>; limits?: Record<string, number>; minimums?: Record<string, number>; value: Record<string, unknown>; prefix: string; onChange: (next: Record<string, unknown>) => void; choices?: Choice[] }) {
   return <>{imageFirst(fields).map(([key, field]) => {
     const buttonPairs: Record<string, string> = { buttonLabel: "buttonHref", ctaLabel: "ctaHref", label: "href" };
     if (linkOptions && Object.entries(buttonPairs).some(([label, href]) => key === href && fields[label])) return null;
@@ -67,7 +68,7 @@ export function Fields({ canUpload = false, fixedRows = false, assetBaseUrl, lin
         {key !== "slides" && <h3>{field.label}</h3>}
         {rows.map((row, index) => <details key={String(row.id)} className={styles.contentGroup} open onFocusCapture={() => { if (key === "slides") window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: row.id } })); }} onClick={() => { if (key === "slides") window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: row.id } })); }}>
           <summary>{key === "slides" ? `Header ${index + 1}` : String(row.name || row.title || row.author || row.question || `${field.label === "Images" ? "Image" : "Item"} ${index + 1}`)}</summary>
-          <div className={styles.groupFields}><Fields canUpload={canUpload} assetBaseUrl={assetBaseUrl} linkOptions={linkOptions} fields={field.fields!} value={row} prefix={`${id}-${row.id}`} choices={choices} onChange={next => update(rows.map((current, i) => i === index ? next : current))} />
+          <div className={styles.groupFields}><Fields headerId={headerId} canUpload={canUpload} assetBaseUrl={assetBaseUrl} linkOptions={linkOptions} fields={field.fields!} value={row} prefix={`${id}-${row.id}`} choices={choices} onChange={next => update(rows.map((current, i) => i === index ? next : current))} />
           {!fixedRows && <button className={styles.removeItem} type="button" disabled={rows.length <= minimum} onClick={() => update(rows.filter((_, i) => i !== index))}>Remove {key === "slides" ? "header" : "item"}</button>}</div>
         </details>)}
         {!fixedRows && <button className={styles.addContent} type="button" disabled={rows.length >= maximum} onClick={() => update([...rows, { id: crypto.randomUUID(), ...emptyFields(field.fields!) }])}><Plus size={16} aria-hidden="true" />Add {field.label === "Header" ? "header" : field.label.toLowerCase()}</button>}
@@ -81,11 +82,12 @@ export function Fields({ canUpload = false, fixedRows = false, assetBaseUrl, lin
     const preview = media && source && assetBaseUrl && !source.startsWith("/") ? new URL(source, assetBaseUrl).toString() : source;
     return <div key={key} id={`${id}-field`} className={styles.field}>{media ? <span>Image</span> : <label htmlFor={id}>{field.label}</label>}
       {media ? <StudioMediaPicker canUpload={canUpload} context={prefix} preview={preview} defaultAlt={String(value.alt || value.imageAlt || "Website image")} onSelect={asset => {
-        const next: Record<string, unknown> = { ...value, [key]: asset.url || asset.thumbnailUrl };
+        const next: Record<string, unknown> = { ...value, [key]: asset.url || asset.thumbnailUrl, ...(headerId ? { imagePositionX: 50, imagePositionY: 50, imageZoom: 1 } : {}) };
         if ("alt" in fields && !String(value.alt || "").trim()) next.alt = asset.alt;
         if ("imageAlt" in fields && !String(value.imageAlt || "").trim()) next.imageAlt = asset.alt;
         onChange(next);
       }} /> : field.kind === "richtext" ? <RichText id={id} value={String(value[key] || "")} maxLength={field.max} onChange={update} /> : field.kind === "multiline" ? <textarea id={id} rows={3} maxLength={field.max} value={String(value[key] || "")} onChange={event => update(event.target.value)} /> : <input id={id} type={field.kind === "email" ? "email" : "text"} maxLength={field.max} value={source} onChange={event => update(event.target.value)} />}
+      {media && headerId && <ImageFramingControl source={preview} blockId={headerId} value={value} onChange={framing => onChange({ ...value, ...framing })} />}
     </div>;
   })}</>;
 }

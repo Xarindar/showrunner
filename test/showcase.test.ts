@@ -158,7 +158,7 @@ test("actual inspector renderer offers catalog selection, display-only and appro
   const registry = { blockRegistry, emptyFields };
   const editor = loadMocked("modules/content/studio/editor.tsx", {
     "./field-layout": { imageFirst }, "@/components/ui/asset-picker": {}, "./registry": registry,
-    "./actions": {}, "./studio.module.css": styles, "./rich-text": {}, "./visual-block": {},
+    "./actions": {}, "./studio.module.css": styles, "./rich-text": {}, "./visual-block": {}, "./image-framing-control": {},
   });
   const fields = loadMocked("modules/content/studio/content-fields.tsx", { "./editor": { Fields: editor.Fields }, "./registry": registry, "./studio.module.css": styles });
   const block = configuredBlock("menu", "showcase", ["home"], { cardVariants: [{ label: "Compact", value: "compact" }] });
