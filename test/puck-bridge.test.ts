@@ -160,3 +160,21 @@ test("preview clicks keep menus interactive, route navigation to the editor, and
   clicks.submit(submit);
   assert.equal(submit.prevented, true);
 });
+
+test("bound and custom website photos apply validated crops using stable row identities", () => {
+  const source = readFileSync("public/showrunner-content.js", "utf8");
+  const functions = source.slice(source.indexOf("  function imageTargets("), source.indexOf('  window.addEventListener("showrunner:content"'));
+  const node = { tagName: "IMG", style: {} as Record<string, string>, parentElement: { style: {} as Record<string, string> } };
+  const document = { querySelectorAll: () => [node] };
+  const { imageTargets, applyImageFraming } = runInNewContext(functions + "\n({ imageTargets, applyImageFraming })", { document });
+  const photo = { id: "photo", imagePositionX: 20, imagePositionY: 80, imageZoom: 2 };
+  const block = { id: "team", type: "strip", payload: { images: [photo] }, presentation: { bindings: [{ path: "images.0.url", selector: "img", attribute: "src" }] } };
+  assert.equal(imageTargets(block)[0].key, "team-images-photo");
+  applyImageFraming([block]);
+  assert.equal(node.style.objectPosition, "20% 80%"); assert.equal(node.style.transformOrigin, "20% 80%"); assert.equal(node.style.transform, "scale(2)");
+  assert.equal(node.parentElement.style.overflow, "hidden");
+  applyImageFraming([{ ...block, payload: { images: [{ id: "photo", imageZoom: 20, imagePositionX: -1, imagePositionY: Infinity }] } }]);
+  assert.equal(node.style.transform, "scale(3)"); assert.equal(node.style.objectPosition, "0% 50%");
+  node.style.objectPosition = "50% 25%"; applyImageFraming([{ ...block, payload: { images: [{ id: "photo" }] } }]);
+  assert.equal(node.style.objectPosition, "50% 25%", "legacy CSS framing remains untouched until edited");
+});

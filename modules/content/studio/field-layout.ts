@@ -1,8 +1,8 @@
 import type { Field } from "./registry";
 import type { ContentManifest } from "./manifest";
 
-export type LinkChoices = { id: string; slug: string; label: string; category: string }[];
-export type LinkOptions = { pages: ContentManifest["pages"]; services: { label: string; href: string }[] };
+export type LinkChoices = { id: string; slug: string; label: string; category: string; group?: string; tags?: string[]; imageFraming?: unknown; imageUrl?: string; description?: string }[];
+export type LinkOptions = { pages: ContentManifest["pages"]; services: { label: string; href: string; imageUrl?: string; description?: string; category?: string; group?: string; tags?: string[]; imageFraming?: unknown }[] };
 export function destinationKind(href: string, options: LinkOptions) {
   if (options.services.some(service => service.href === href)) return "service";
   if (!href) return "page";
@@ -14,7 +14,7 @@ export function contentLinkOptions(manifest: ContentManifest, services: LinkChoi
     const params = new URLSearchParams({ service: service.slug, next: "1" });
     const profile = manifest.booking?.profilesByCategory?.[service.category.toLowerCase()];
     if (profile) params.set("profile", profile);
-    return { label: service.label, href: `${manifest.booking!.path}?${params}` };
+    return { label: service.label, imageUrl: service.imageUrl, description: service.description, category: service.category, group: service.group || serviceGroupLabel(manifest, service.category), tags: service.tags, imageFraming: service.imageFraming, href: `${manifest.booking!.path}?${params}` };
   }) };
 }
 export function imageFirst(fields: Record<string, Field>) {
@@ -34,4 +34,12 @@ export function editorPageDestination(href: string, currentUrl: string, pages: C
     url.searchParams.delete("showrunner-editor");
     return { pageId: page.id, href: url.href };
   } catch { return null; }
+}
+
+export function serviceGroupLabel(manifest: ContentManifest, category: string) {
+  const profile = manifest.booking?.profilesByCategory?.[category.toLowerCase()];
+  return (profile && manifest.booking?.profileLabels?.[profile]) || category;
+}
+export function contentFrameKeys(id: string, payload: Record<string, unknown>) {
+  return [id, ...Object.entries(payload).flatMap(([key, rows]) => Array.isArray(rows) ? rows.flatMap(row => typeof row?.id === "string" ? [`${id}-${key}-${row.id}`] : []) : [])];
 }

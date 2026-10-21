@@ -10,6 +10,8 @@
 .grid { position: absolute; inset: 0; background: linear-gradient(to right, transparent calc(33.333% - .5px), rgb(255 255 255 / 50%) 33.333%, transparent calc(33.333% + .5px), transparent calc(66.666% - .5px), rgb(255 255 255 / 50%) 66.666%, transparent calc(66.666% + .5px)), linear-gradient(to bottom, transparent calc(33.333% - .5px), rgb(255 255 255 / 50%) 33.333%, transparent calc(33.333% + .5px), transparent calc(66.666% - .5px), rgb(255 255 255 / 50%) 66.666%, transparent calc(66.666% + .5px)); pointer-events: none; }
 .zoom { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: .875rem; }
 .zoom input { grid-column: 1 / -1; width: 100%; accent-color: var(--color-text); }
+:global(.showrunner-admin) :global(.admin-main) .zoom input[type="range"] { border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 0; }
+:global(.showrunner-admin) :global(.admin-main) .zoom input[type="range"]:focus-visible { outline: 2px solid var(--sd-color-focus); outline-offset: 2px; }
 .zoom output { font-variant-numeric: tabular-nums; }
 .actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 @media (max-width: 480px) { .actions { flex-wrap: wrap; } .actions button { min-height: 44px; } .canvas { padding: 6px; } }

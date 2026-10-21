@@ -68,13 +68,13 @@ test("second deployment can compose different editors without shared code change
   assert.throws(() => validateManifest({ ...manifest, blocks: [...manifest.blocks, faq] }), /duplicate/);
   assert.throws(() => validateManifest({ ...manifest, blocks: [{ ...faq, pageIds: ["missing"] }] }), /page/);
 });
-test("Cottage manifest composes reusable defaults and event-only service sourcing", () => {
+test("Cottage manifest composes reusable defaults and service sourcing across both businesses", () => {
   const events = cottageContentManifest.blocks.find(block => block.id === "home-events");
   const gallery = cottageContentManifest.blocks.find(block => block.id === "home-venue-gallery");
   const vendors = cottageContentManifest.blocks.find(block => block.id === "vendors-directory");
   assert.equal(events?.type, "featured");
   assert.equal(events?.source, "services");
-  assert.equal(events?.sourceCategory, "events");
+  assert.equal(events?.sourceCategory, undefined);
   assert.equal((events?.defaults?.items as unknown[]).length, 3);
   assert.equal(gallery?.type, "gallery");
   assert.equal((gallery?.defaults?.images as unknown[]).length, 10);

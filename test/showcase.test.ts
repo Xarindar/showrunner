@@ -7,7 +7,9 @@ import ts from "typescript";
 import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { blockRegistry, emptyFields } from "../modules/content/studio/registry";
-import { imageFirst } from "../modules/content/studio/field-layout";
+import { centeredFraming, framingImageSource, readImageFraming } from "../modules/content/studio/image-framing";
+import { resolveFeatured } from "../modules/content/studio/featured";
+import { imageFirst, contentLinkOptions } from "../modules/content/studio/field-layout";
 import type { ZodType } from "zod";
 import { resolveShowcase, type CatalogCard } from "../modules/content/studio/showcase";
 import { blockDependenciesAvailable, configuredBlock, validateManifest, type ContentManifest } from "../modules/content/studio/manifest";
@@ -157,8 +159,10 @@ test("actual inspector renderer offers catalog selection, display-only and appro
   const styles = new Proxy({}, { get: (_target, key) => String(key) });
   const registry = { blockRegistry, emptyFields };
   const editor = loadMocked("modules/content/studio/editor.tsx", {
-    "./field-layout": { imageFirst }, "@/components/ui/asset-picker": {}, "./registry": registry,
-    "./actions": {}, "./studio.module.css": styles, "./rich-text": {}, "./visual-block": {}, "./image-framing-control": {},
+    "./field-layout": { imageFirst }, "@/components/ui/asset-picker": { AssetPicker: () => null },
+    "./service-picker": { ServicePicker: ({ value, options }: { value: string; options: { id: string; label: string }[] }) => createElement("button", {}, options.find(option => option.id === value)?.label || "Unavailable service · Choose replacement") },
+    "./image-framing": { centeredFraming, framingImageSource, readImageFraming }, "./registry": registry,
+    "./actions": {}, "./studio.module.css": styles, "./rich-text": {}, "./visual-block": {}, "./image-framing-control": { ImageFramingControl: () => null },
   });
   const fields = loadMocked("modules/content/studio/content-fields.tsx", { "./editor": { Fields: editor.Fields }, "./registry": registry, "./studio.module.css": styles });
   const block = configuredBlock("menu", "showcase", ["home"], { cardVariants: [{ label: "Compact", value: "compact" }] });
@@ -166,12 +170,12 @@ test("actual inspector renderer offers catalog selection, display-only and appro
     block, value: { heading: "Menu", items: [rows[0]] }, onChange() {}, canUpload: false,
     choices: [service, product].map(item => ({ id: item.key, label: `${item.kind}: ${item.name}` })), linkOptions: { pages: [], services: [] },
   }));
-  for (const text of ["Add cards", "Service or product", "service: Head spa", "product: Care kit", "Display only (hide action)", "Compact", "Site default"]) assert.ok(html.includes(text), text);
+  for (const text of ["Add cards", "Service or product", "service: Head spa", "Photo source", "Display only (hide action)", "Compact", "Site default"]) assert.ok(html.includes(text), text);
   assert.ok(!html.includes('name="description"'));
   const stale = renderToStaticMarkup(createElement(fields.ContentFields as unknown as ComponentType<Record<string, unknown>>, {
     block, value: { heading: "Menu", items: [rows[0]] }, onChange() {}, canUpload: false, choices: [], linkOptions: { pages: [], services: [] },
   }));
-  assert.ok(stale.includes("Unavailable item"));
+  assert.ok(stale.includes("Unavailable service"));
 });
 
 test("showcase publication requires content-manage authorization before reading tenant data", async () => {
@@ -197,6 +201,7 @@ test("public studio refreshes catalog bindings on each request without page repu
     "./state": { readStudio, resolveStudioPayload }, "./business-info": { resolveBusinessInfo: () => ({}) }, "./manifest": { blockDependenciesAvailable },
     "@/lib/embed/gateway": {}, "./rich-text": {}, "@/lib/catalog-media-url": { catalogMediaUrl },
     "./showcase-catalog": { showcaseCatalog: async () => catalog }, "./showcase": { resolveShowcase },
+    "./featured": { resolveFeatured }, "./field-layout": { contentLinkOptions },
   });
   const first = await loaded.getPublicStudio("site-a", "home") as { blocks: { payload: { items: { name: string; priceCents: number; catalogKey?: string }[] } }[] };
   assert.equal(first.blocks[0].payload.items[0].name, "Head spa");

@@ -11,11 +11,11 @@ export const defaultContentManifest = validateManifest({
 });
 export const cottageContentManifest = validateManifest({
   version: 1, id: "cottage616", legacyProfiles: true, previewUrl: "https://cottage616-production.up.railway.app/",
-  booking: { path: "/booking.html", profilesByCategory: { events: "cottage616", "the-hive": "the-hive" } },
+  booking: { path: "/booking.html", profileLabels: { cottage616: "Cottage 616", "the-hive": "The Hive" }, profilesByCategory: { events: "cottage616", "the-hive": "the-hive" } },
   pages: [{ id: "home", path: "/index.html", label: "Cottage 616" }, { id: "hive", path: "/the-hive.html", label: "The Hive" }, { id: "booking", path: "/booking.html", label: "Booking" }, { id: "vendors", path: "/vendors.html", label: "Vendors" }],
   blocks: [
     ...pageStrips as ContentBlockConfig[],
-    configuredBlock("home-events", "featured", ["home"], { defaults: cottageEventStripDefaults, label: "Events panel", fixedRows: true, limits: { items: 3 }, minimums: { items: 3 }, presentation: { assetBaseUrl: "https://cottage616-production.up.railway.app/", variant: "event-strip" }, source: "services", sourceCategory: "events" }),
+    configuredBlock("home-events", "featured", ["home"], { defaults: cottageEventStripDefaults, label: "Events panel", fixedRows: true, limits: { items: 3 }, minimums: { items: 3 }, presentation: { assetBaseUrl: "https://cottage616-production.up.railway.app/", variant: "event-strip" }, source: "services" }),
     configuredBlock("home-venue-gallery", "gallery", ["home"], { defaults: cottageVenueGalleryDefaults, label: "Small venue image carousel", limits: { images: 30 }, presentation: { assetBaseUrl: "https://cottage616-production.up.railway.app/", variant: "image-strip" } }),
     configuredBlock("vendors-directory", "directory", ["vendors"], { defaults: cottageVendorDirectoryDefaults, label: "Vendors", limits: { items: 30 }, presentation: { assetBaseUrl: "https://cottage616-production.up.railway.app/", variant: "vendor-directory" } }),
     configuredBlock("business-info", "business", []),

@@ -80,6 +80,7 @@ model Service {
   name                String
   description         String?
   imageUrl            String    @default("")
+  imageFraming        Json?
   durationMinutes     Int
   priceCents          Int?
   sessionOffering     Json?

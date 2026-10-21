@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { contentLinkOptions, destinationKind, editorPageDestination, imageFirst } from "../modules/content/studio/field-layout";
+import { contentLinkOptions, contentFrameKeys, serviceGroupLabel, destinationKind, editorPageDestination, imageFirst } from "../modules/content/studio/field-layout";
 import { blockRegistry, emptyFields, payloadSchema } from "../modules/content/studio/registry";
 import { configuredBlock } from "../modules/content/studio/manifest";
 import { resolveStudioPayload, validateBlockUpdate, type StoredBlock } from "../modules/content/studio/state";
@@ -54,4 +54,12 @@ test("canvas navigation resolves only installed site pages and preserves anchors
   assert.deepEqual(editorPageDestination("/", base, pages), { pageId: "home", href: "https://site.example/" });
   assert.deepEqual(editorPageDestination("booking.html?profile=the-hive&showrunner-editor=1", base, pages), { pageId: "booking", href: "https://site.example/booking.html?profile=the-hive" });
   for (const href of ["https://elsewhere.example/the-hive.html", "javascript:alert(1)", "/not-installed.html", "https://"]) assert.equal(editorPageDestination(href, base, pages), null);
+});
+
+test("business labels and measured image keys preserve booking categories and stable row IDs", () => {
+  assert.equal(serviceGroupLabel(cottageContentManifest, "events"), "Cottage 616");
+  assert.equal(serviceGroupLabel(cottageContentManifest, "the-hive"), "The Hive");
+  const options = contentLinkOptions(cottageContentManifest, [{ id: "hive", slug: "spa", label: "Spa", category: "the-hive", tags: ["Relaxation"] }]);
+  assert.equal(options.services[0].group, "The Hive"); assert.deepEqual(options.services[0].tags, ["Relaxation"]);
+  assert.deepEqual(contentFrameKeys("events", { items: [{ id: "slot" }], heading: "Title" }), ["events", "events-items-slot"]);
 });

@@ -1,3 +1,4 @@
+import { readImageFraming } from "./image-framing";
 import type { ContentManifest } from "./manifest";
 import { contentLinkOptions } from "./field-layout";
 import { isSafeContentUrl } from "./registry";
@@ -5,10 +6,10 @@ import { isSafeContentUrl } from "./registry";
 // Shared by the server and draft preview. Only these public fields cross the iframe boundary.
 export type CatalogCard = {
   key: string; id: string; kind: "service" | "product"; slug: string; name: string;
-  description: string; imageUrl: string; priceCents: number | null; currency: string;
+  description: string; imageUrl: string; imageFraming?: unknown; framingUrl?: string; tags?: string[]; priceCents: number | null; currency: string;
   durationMinutes: number | null; available: boolean; category: string;
 };
-export type ShowcaseRow = { id: string; catalogKey: string; displayOnly: boolean; variant: string };
+export type ShowcaseRow = { id: string; catalogKey: string; displayOnly: boolean; variant: string; imageUrl?: string; imageSource?: "service" | "custom"; useServiceFraming?: boolean; imagePositionX?: number; imagePositionY?: number; imageZoom?: number };
 export function resolveShowcase(rows: ShowcaseRow[], catalog: CatalogCard[], manifest: ContentManifest) {
   return rows.flatMap(row => {
     const item = catalog.find(item => item.key === row.catalogKey);
@@ -25,7 +26,7 @@ export function resolveShowcase(rows: ShowcaseRow[], catalog: CatalogCard[], man
     }
     if (!isSafeContentUrl(href)) href = "";
     return [{ id: row.id, referenceId: item.id, kind: item.kind, name: item.name, description: item.description,
-      imageUrl: item.imageUrl, priceCents: item.priceCents, currency: item.currency,
+      imageUrl: row.imageSource === "custom" ? row.imageUrl || "" : row.imageUrl || (row.useServiceFraming === false ? item.framingUrl || item.imageUrl : item.imageUrl), ...readImageFraming(row.imageSource === "custom" || row.imageUrl || row.useServiceFraming === false ? row : item.imageFraming), priceCents: item.priceCents, currency: item.currency,
       durationMinutes: item.durationMinutes, available: item.available, variant: row.variant,
       ctaHref: href, ctaLabel: href ? (item.kind === "service" ? "Book now" : "View product") : "" }];
   });

@@ -1,5 +1,7 @@
 "use client";
 
+import { resolveFeatured } from "./featured";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Puck, usePuck, type Config, type Data } from "@puckeditor/core";
 import { Monitor, Smartphone, Undo2, Redo2, X, ExternalLink, ArrowLeft, PanelsTopLeft, ChevronRight, ChevronUp, ChevronDown, MoreHorizontal } from "lucide-react";
@@ -9,7 +11,7 @@ import { contentFieldId, focusContentFieldWhenReady } from "./field-selection";
 import { type Choice } from "./editor";
 import { HeaderFrameRatios } from "./image-framing-control";
 import { ContentFields } from "./content-fields";
-import { contentLinkOptions, editorPageDestination, type LinkChoices } from "./field-layout";
+import { contentLinkOptions, contentFrameKeys, editorPageDestination, type LinkChoices } from "./field-layout";
 import { saveStudioBlock } from "./actions";
 import type { ContentBlockConfig, ContentManifest } from "./manifest";
 import "@puckeditor/core/puck.css";
@@ -31,7 +33,7 @@ export function PuckContentEditor(props: Props) {
   return <HeaderFrameRatios.Provider value={frameRatios}><Puck config={config} data={data} permissions={{ insert: false, delete: false, duplicate: false, drag: false, edit: true }}><Workspace {...props} onFrameRatios={setFrameRatios} /></Puck></HeaderFrameRatios.Provider>;
 }
 
-function Workspace({ manifest, entries, onFrameRatios }: Props & { onFrameRatios: (ratios: Record<string, number>) => void }) {
+function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { onFrameRatios: (ratios: Record<string, number>) => void }) {
   const { appState, dispatch, selectedItem, history } = usePuck();
   const [editing, setEditing] = useState(false);
   const [previewVersion, setPreviewVersion] = useState("");
@@ -156,9 +158,9 @@ function Workspace({ manifest, entries, onFrameRatios }: Props & { onFrameRatios
     function receive(event: MessageEvent) {
       if (event.source !== frame.current?.contentWindow || event.origin !== previewOrigin || event.data?.channel !== "showrunner-editor-v1") return;
       if (event.data.type === "frames" && event.data.ratios && typeof event.data.ratios === "object") {
-        onFrameRatios(Object.fromEntries(pageEntries.filter(entry => entry.block.type === "slideshow").flatMap(entry => {
-          const ratio = event.data.ratios[entry.block.id];
-          return typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0 ? [[entry.block.id, ratio]] : [];
+        onFrameRatios(Object.fromEntries(pageEntries.flatMap(entry => contentFrameKeys(entry.block.id, content.find(item => item.props.id === entry.block.id)?.props.payload || entry.payload)).flatMap(key => {
+          const ratio = event.data.ratios[key];
+          return typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0 ? [[key, ratio]] : [];
         })));
       }
       if (event.data.type === "ready") { setReady(true); setFrameError(false); }
@@ -184,12 +186,13 @@ function Workspace({ manifest, entries, onFrameRatios }: Props & { onFrameRatios
       if (entry.block.type === "showcase") payload = { ...payload, items: resolveShowcase(payload.items as ShowcaseRow[], entry.choices.flatMap(choice => choice.catalog ? [choice.catalog] : []), manifest).map(item => ({ ...item, imageUrl: mediaUrl(item.imageUrl) })) };
       if (entry.block.source === "services") payload = { ...payload, items: (payload.items as Record<string, string>[]).map(row => {
         const choice = entry.choices.find(item => item.id === row.referenceId);
-        return { id: choice?.id, name: row.title || choice?.label || "", description: row.description || choice?.description || "", imageUrl: mediaUrl(choice?.imageUrl || "") };
+        const resolved = resolveFeatured(row, { id: choice?.id || "", name: choice?.label || "", description: choice?.description, imageUrl: mediaUrl(choice?.imageUrl || ""), imageFraming: choice?.imageFraming, framingUrl: choice?.framingUrl, href: contentLinkOptions(manifest, linkChoices.filter(service => service.id === choice?.id)).services[0]?.href });
+        return { ...resolved, imageUrl: mediaUrl(resolved.imageUrl) };
       }) };
       return { id: entry.block.id, type: entry.block.type, payload, presentation: entry.block.presentation || {} };
     });
     frame.current.contentWindow.postMessage({ channel: "showrunner-editor-v1", type: "update", blocks, selectedId: selected?.block.id, assetOrigin: window.location.origin, focusedItem }, previewOrigin);
-  }, [content, ready, pageEntries, previewOrigin, selected?.block.id, focusedItem, manifest]);
+  }, [content, ready, pageEntries, previewOrigin, selected?.block.id, focusedItem, manifest, linkChoices]);
 
   async function publish() {
     setPending(true); setMessage(""); setError(false);

@@ -15,7 +15,7 @@ export type ContentManifest = {
   version: 1; id: string; pages: { id: string; path: string; label: string }[];
   blocks: ContentBlockConfig[]; legacyProfiles?: boolean; previewUrl?: string;
   products?: { path: string; slugParameter: string };
-  booking?: { path: string; profilesByCategory?: Record<string, string> };
+  booking?: { path: string; profilesByCategory?: Record<string, string>; profileLabels?: Record<string, string> };
 };
 export function validateManifest(manifest: ContentManifest): ContentManifest {
   if (manifest.products && (!manifest.products.path || !isSafeContentUrl(manifest.products.path) || /^(mailto:|tel:)/i.test(manifest.products.path) || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(manifest.products.slugParameter))) throw new Error("Invalid product destination");
