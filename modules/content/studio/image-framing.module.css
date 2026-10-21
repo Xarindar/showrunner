@@ -1,0 +1,17 @@
+.dialog { width: min(640px, calc(100vw - 32px)); }
+.editor { display: grid; gap: 16px; }
+.editor p { margin: 0; color: var(--color-muted); font-size: .875rem; line-height: 1.5; }
+.canvas { display: flex; justify-content: center; background: var(--color-surface-sunken); padding: 12px; border-radius: 12px; }
+.stage { position: relative; width: fit-content; max-width: 100%; overflow: hidden; line-height: 0; user-select: none; }
+.stage img { display: block; max-width: 100%; max-height: min(48vh, 420px); width: auto; height: auto; }
+.stage .frame { position: absolute; padding: 0; min-height: 0; min-width: 0; border: 2px solid white; border-radius: 0; background: transparent; box-shadow: 0 0 0 999px rgb(0 0 0 / 55%); cursor: grab; touch-action: none; }
+.stage .frame:active { cursor: grabbing; }
+.stage .frame:focus-visible { outline: 3px solid var(--color-focus); outline-offset: -5px; }
+.grid { position: absolute; inset: 0; background: linear-gradient(to right, transparent calc(33.333% - .5px), rgb(255 255 255 / 50%) 33.333%, transparent calc(33.333% + .5px), transparent calc(66.666% - .5px), rgb(255 255 255 / 50%) 66.666%, transparent calc(66.666% + .5px)), linear-gradient(to bottom, transparent calc(33.333% - .5px), rgb(255 255 255 / 50%) 33.333%, transparent calc(33.333% + .5px), transparent calc(66.666% - .5px), rgb(255 255 255 / 50%) 66.666%, transparent calc(66.666% + .5px)); pointer-events: none; }
+.zoom { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: .875rem; }
+.zoom input { grid-column: 1 / -1; width: 100%; accent-color: var(--color-text); }
+:global(.showrunner-admin) :global(.admin-main) .zoom input[type="range"] { border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 0; }
+:global(.showrunner-admin) :global(.admin-main) .zoom input[type="range"]:focus-visible { outline: 2px solid var(--sd-color-focus); outline-offset: 2px; }
+.zoom output { font-variant-numeric: tabular-nums; }
+.actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+@media (max-width: 480px) { .actions { flex-wrap: wrap; } .actions button { min-height: 44px; } .canvas { padding: 6px; } }

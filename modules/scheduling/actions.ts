@@ -1,5 +1,6 @@
 "use server";
 
+import { imageFramingSchema } from "@/modules/content/studio/image-framing";
 import { initialBusinessHoursSchema } from "@/lib/scheduling/session-input";
 import { readSessionOffering } from "@/lib/scheduling/session-offering";
 import { hydrateSessionServiceLibrary } from "@/lib/scheduling/service-library-store";
@@ -526,6 +527,22 @@ export async function updateServiceCategoryAction(formData: FormData) {
   redirect(serviceCategoriesPath({ saved: "category" }));
 }
 
+export async function saveServiceImageFramingAction(raw: unknown) {
+  await requireAdmin("scheduling:manage");
+  const settings = await getSiteSettings();
+  const input = z.object({ id: requiredText, updatedAt: z.iso.datetime(), framing: imageFramingSchema }).safeParse(raw);
+  if (!input.success) return { error: "Choose valid image framing and try again." };
+  try {
+    const result = await prisma.service.updateMany({
+      where: { id: input.data.id, siteId: settings.siteId, updatedAt: new Date(input.data.updatedAt) },
+      data: { imageFraming: input.data.framing }
+    });
+    if (result.count !== 1) return { error: "This service changed. Reload before adjusting its photo." };
+    revalidatePath("/", "layout");
+    return { saved: true };
+  } catch { return { error: "Framing could not be saved. Try again." }; }
+}
+
 export async function uploadServiceImageAction(formData: FormData) {
   await requireAdmin("scheduling:manage");
   const input = await parseForm(serviceImageUploadSchema, formData);
@@ -558,7 +575,8 @@ export async function uploadServiceImageAction(formData: FormData) {
     where: { id: input.serviceId, siteId: settings.siteId },
     data: {
       imageUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
-      mediaAssetId: asset.id
+      mediaAssetId: asset.id,
+      imageFraming: Prisma.DbNull
     }
   });
 
@@ -585,7 +603,8 @@ export async function attachServiceImageAction(formData: FormData) {
     where: { id: input.serviceId, siteId: settings.siteId },
     data: {
       imageUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
-      mediaAssetId: asset.id
+      mediaAssetId: asset.id,
+      imageFraming: Prisma.DbNull
     }
   });
 
@@ -604,7 +623,8 @@ export async function removeServiceImageAction(formData: FormData) {
     where: { id: input.serviceId, siteId: settings.siteId },
     data: {
       imageUrl: "",
-      mediaAssetId: null
+      mediaAssetId: null,
+      imageFraming: Prisma.DbNull
     }
   });
 

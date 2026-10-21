@@ -1,13 +1,17 @@
 "use client";
 
+import { resolveFeatured } from "./featured";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Puck, usePuck, type Config, type Data } from "@puckeditor/core";
 import { Monitor, Smartphone, Undo2, Redo2, X, ExternalLink, ArrowLeft, PanelsTopLeft, ChevronRight, ChevronUp, ChevronDown, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Toast, ToastRegion } from "@/components/ui/toast";
 import { contentFieldId, focusContentFieldWhenReady } from "./field-selection";
 import { type Choice } from "./editor";
+import { HeaderFrameRatios } from "./image-framing-control";
 import { ContentFields } from "./content-fields";
-import { contentLinkOptions, editorPageDestination, type LinkChoices } from "./field-layout";
+import { contentLinkOptions, contentFrameKeys, editorPageDestination, type LinkChoices } from "./field-layout";
 import { saveStudioBlock } from "./actions";
 import type { ContentBlockConfig, ContentManifest } from "./manifest";
 import "@puckeditor/core/puck.css";
@@ -19,18 +23,20 @@ import { resolveShowcase, type ShowcaseRow } from "./showcase";
 type Entry = { block: ContentBlockConfig; payload: Record<string, unknown>; revision: number; pageIds: string[]; choices: Choice[] };
 type Props = { manifest: ContentManifest; entries: Entry[]; canUpload: boolean; linkChoices: LinkChoices };
 export function PuckContentEditor(props: Props) {
+  const [frameRatios, setFrameRatios] = useState<Record<string, number>>({});
   const config = useMemo<Config>(() => ({ components: Object.fromEntries(props.entries.map(entry => [entry.block.id, {
     label: entry.block.label,
     fields: { payload: { type: "custom", render: ({ value, onChange }: { value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void }) => <div className={fieldStyles.fields}><ContentFields block={entry.block} canUpload={props.canUpload} assetBaseUrl={entry.block.presentation?.assetBaseUrl || props.manifest.previewUrl} value={value} onChange={onChange} choices={entry.choices} linkOptions={contentLinkOptions(props.manifest, props.linkChoices)} /></div> } },
     render: () => <></>
   }])) }), [props.entries, props.canUpload, props.manifest, props.linkChoices]);
   const data = useMemo<Data>(() => ({ root: { props: {} }, content: props.entries.map(entry => ({ type: entry.block.id, props: { id: entry.block.id, payload: entry.payload } })) }), [props.entries]);
-  return <Puck config={config} data={data} permissions={{ insert: false, delete: false, duplicate: false, drag: false, edit: true }}><Workspace {...props} /></Puck>;
+  return <HeaderFrameRatios.Provider value={frameRatios}><Puck config={config} data={data} permissions={{ insert: false, delete: false, duplicate: false, drag: false, edit: true }}><Workspace {...props} onFrameRatios={setFrameRatios} /></Puck></HeaderFrameRatios.Provider>;
 }
 
-function Workspace({ manifest, entries }: Props) {
+function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { onFrameRatios: (ratios: Record<string, number>) => void }) {
   const { appState, dispatch, selectedItem, history } = usePuck();
   const [editing, setEditing] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [fieldRequest, setFieldRequest] = useState<{ id: string; path: unknown } | null>(null);
@@ -49,6 +55,11 @@ function Workspace({ manifest, entries }: Props) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
+  useEffect(() => {
+    if (!message || error) return;
+    const timer = window.setTimeout(() => setMessage(""), 3500);
+    return () => window.clearTimeout(timer);
+  }, [message, error]);
   const [saved, setSaved] = useState(Object.fromEntries(entries.map(entry => [entry.block.id, { payload: entry.payload, revision: entry.revision }])));
   const frame = useRef<HTMLIFrameElement>(null);
   const sectionSelector = useRef<HTMLButtonElement>(null);
@@ -108,6 +119,7 @@ function Workspace({ manifest, entries }: Props) {
   const siteUrl = manifest.previewUrl ? new URL(pageLocation || page.path, manifest.previewUrl).toString() : "";
   const preview = siteUrl ? new URL(siteUrl) : null;
   preview?.searchParams.set("showrunner-editor", "1");
+  preview?.searchParams.set("showrunner-preview", previewVersion);
   const previewUrl = preview?.href || "";
   const previewOrigin = siteUrl ? new URL(siteUrl).origin : "";
   const navigate = useCallback((href: string) => {
@@ -145,6 +157,12 @@ function Workspace({ manifest, entries }: Props) {
   useEffect(() => {
     function receive(event: MessageEvent) {
       if (event.source !== frame.current?.contentWindow || event.origin !== previewOrigin || event.data?.channel !== "showrunner-editor-v1") return;
+      if (event.data.type === "frames" && event.data.ratios && typeof event.data.ratios === "object") {
+        onFrameRatios(Object.fromEntries(pageEntries.flatMap(entry => contentFrameKeys(entry.block.id, content.find(item => item.props.id === entry.block.id)?.props.payload || entry.payload)).flatMap(key => {
+          const ratio = event.data.ratios[key];
+          return typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0 ? [[key, ratio]] : [];
+        })));
+      }
       if (event.data.type === "ready") { setReady(true); setFrameError(false); }
       if (event.data.type === "navigate" && typeof event.data.href === "string") navigate(event.data.href);
       if (event.data.type === "select") {
@@ -158,7 +176,7 @@ function Workspace({ manifest, entries }: Props) {
     }
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [content, dispatch, pageEntries, previewOrigin, navigate, pending]);
+  }, [content, dispatch, pageEntries, previewOrigin, navigate, pending, onFrameRatios]);
   useEffect(() => {
     if (!ready || !frame.current?.contentWindow) return;
     const mediaUrl = (value: string) => value?.startsWith("/") ? new URL(value, window.location.origin).toString() : value;
@@ -168,12 +186,13 @@ function Workspace({ manifest, entries }: Props) {
       if (entry.block.type === "showcase") payload = { ...payload, items: resolveShowcase(payload.items as ShowcaseRow[], entry.choices.flatMap(choice => choice.catalog ? [choice.catalog] : []), manifest).map(item => ({ ...item, imageUrl: mediaUrl(item.imageUrl) })) };
       if (entry.block.source === "services") payload = { ...payload, items: (payload.items as Record<string, string>[]).map(row => {
         const choice = entry.choices.find(item => item.id === row.referenceId);
-        return { id: choice?.id, name: row.title || choice?.label || "", description: row.description || choice?.description || "", imageUrl: mediaUrl(choice?.imageUrl || "") };
+        const resolved = resolveFeatured(row, { id: choice?.id || "", name: choice?.label || "", description: choice?.description, imageUrl: mediaUrl(choice?.imageUrl || ""), imageFraming: choice?.imageFraming, framingUrl: choice?.framingUrl, href: contentLinkOptions(manifest, linkChoices.filter(service => service.id === choice?.id)).services[0]?.href });
+        return { ...resolved, imageUrl: mediaUrl(resolved.imageUrl) };
       }) };
       return { id: entry.block.id, type: entry.block.type, payload, presentation: entry.block.presentation || {} };
     });
     frame.current.contentWindow.postMessage({ channel: "showrunner-editor-v1", type: "update", blocks, selectedId: selected?.block.id, assetOrigin: window.location.origin, focusedItem }, previewOrigin);
-  }, [content, ready, pageEntries, previewOrigin, selected?.block.id, focusedItem, manifest]);
+  }, [content, ready, pageEntries, previewOrigin, selected?.block.id, focusedItem, manifest, linkChoices]);
 
   async function publish() {
     setPending(true); setMessage(""); setError(false);
@@ -189,6 +208,7 @@ function Workspace({ manifest, entries }: Props) {
     finally { setPending(false); }
   }
   function enterEditor() {
+    setPreviewVersion(Date.now().toString(36));
     setReady(false); setFrameError(false); setEditing(true); setPanelOpen(false); setSheetExpanded(false);
   }
   if (!editing) return <div className={styles.overview}>
@@ -213,7 +233,7 @@ function Workspace({ manifest, entries }: Props) {
       </div></details>
       <Button disabled={!dirty || pending} onClick={publish}>{pending ? "Publishing…" : "Publish"}</Button>
     </header>
-    {message && <div className={styles.notice} role={error ? "alert" : "status"}>{message}</div>}
+    {message && (error ? <div className={styles.notice} role="alert">{message}</div> : <ToastRegion><Toast tone="success" title={message} /></ToastRegion>)}
     <div className={styles.body}>
       <aside className={styles.editBar} data-open={panelOpen} data-expanded={sheetExpanded} data-selected={Boolean(selected)} aria-label="Website editing">
         <div className={styles.mobileSheetHeader}>

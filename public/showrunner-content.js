@@ -40,11 +40,11 @@
           const text = (tag, value, className) => { const node = document.createElement(tag); node.textContent = String(value || ""); if (className) node.className = className; return node; };
           if (block.payload.heading) fragment.append(text("h2", block.payload.heading));
           const list = document.createElement("div"); list.className = "showrunner-showcase";
-          (block.payload.items || []).forEach(item => {
+          (block.payload.items || []).forEach((item, index) => {
             const card = document.createElement("article"); card.className = "showrunner-showcase-card";
             if (item.variant) card.dataset.variant = item.variant;
             card.dataset.kind = item.kind;
-            if (item.imageUrl) { const image = document.createElement("img"); image.src = safeUrl(item.imageUrl, assetOrigin); image.alt = item.name || ""; image.loading = "lazy"; card.append(image); }
+            if (item.imageUrl) { const image = document.createElement("img"); image.src = safeUrl(item.imageUrl, assetOrigin); image.alt = item.name || ""; image.loading = "lazy"; image.dataset.srField = `items.${index}.imageUrl`; card.append(image); }
             card.append(text("h3", item.name), text("p", item.description));
             if (Number.isInteger(item.priceCents)) { let price; try { price = new Intl.NumberFormat(undefined, { style: "currency", currency: item.currency }).format(item.priceCents / 100); } catch { price = `${item.priceCents / 100} ${item.currency || ""}`; } card.append(text("p", price, "showrunner-showcase-price")); }
             if (item.durationMinutes) card.append(text("p", `${item.durationMinutes} minutes`, "showrunner-showcase-duration"));
@@ -61,7 +61,36 @@
         if (meta) meta.content = block.payload.description || "";
       }
     });
-    if (changed.length) window.dispatchEvent(new CustomEvent("showrunner:render", { detail: { blocks: changed } }));
+    if (changed.length) { window.dispatchEvent(new CustomEvent("showrunner:render", { detail: { blocks: changed } })); applyImageFraming(changed); }
+  }
+  function imageTargets(block) {
+    const targets = [];
+    (block.presentation?.bindings || []).filter(binding => ["src", "background"].includes(binding.attribute)).forEach(binding => {
+      document.querySelectorAll(binding.selector).forEach(node => targets.push({ node, path: binding.path }));
+    });
+    if (block.presentation?.selector) document.querySelectorAll(block.presentation.selector).forEach(host => {
+      host.querySelectorAll?.("[data-sr-field]").forEach(node => {
+        if (node.matches("img") || node.dataset.srImage !== undefined) targets.push({ node, path: node.dataset.srField });
+      });
+    });
+    return targets.map(target => {
+      const parts = target.path.split("."); parts.pop();
+      const row = parts.reduce((value, key) => value?.[key], block.payload);
+      const rowId = row?.editorId || row?.id;
+      const key = rowId ? `${block.id}-${parts[0]}-${rowId}` : block.id;
+      return { ...target, row, key };
+    });
+  }
+  function applyImageFraming(items) {
+    items.filter(block => block.type !== "slideshow").forEach(block => imageTargets(block).forEach(({ node, row }) => {
+      if (!row || !["imagePositionX", "imagePositionY", "imageZoom"].some(key => row[key] !== undefined)) return;
+      const bounded = (value, fallback, min, max) => Number.isFinite(Number(value)) ? Math.max(min, Math.min(max, Number(value))) : fallback;
+      const position = `${bounded(row?.imagePositionX ?? 50, 50, 0, 100)}% ${bounded(row?.imagePositionY ?? 50, 50, 0, 100)}%`;
+      const zoom = bounded(row?.imageZoom ?? 1, 1, 1, 3);
+      if (node.tagName === "IMG") { node.style.objectFit = "cover"; node.style.objectPosition = position; if (node.parentElement) node.parentElement.style.overflow = "hidden"; }
+      else { node.style.backgroundPosition = position; node.style.backgroundSize = "cover"; }
+      node.style.transformOrigin = position; node.style.transform = `scale(${zoom})`;
+    }));
   }
   window.addEventListener("showrunner:content", event => apply(event.detail.blocks || [], script?.src ? new URL(script.src).origin : location.origin));
   if (!editing) return;
@@ -69,6 +98,24 @@
   style.textContent = '[data-sr-section]{cursor:pointer;outline-offset:-2px}[data-sr-hover]{outline:2px solid #5083f0!important;outline-offset:-2px;cursor:pointer}[data-sr-selected]{outline:2px solid #1561a0}[data-sr-section]:focus-visible{outline:3px solid #5083f0}';
   document.head.append(style);
   function send(type, extra) { if (parentOrigin) parent.postMessage({ channel, type, ...extra }, parentOrigin); }
+  let frameStamp = "{}";
+  function reportFrames() {
+    const ratios = {};
+    blocks.filter(block => block.type === "slideshow" && block.presentation?.selector).forEach(block => {
+      const node = document.querySelector(block.presentation.selector);
+      const bounds = node?.getBoundingClientRect();
+      if (bounds?.width > 0 && bounds?.height > 0) ratios[block.id] = bounds.width / bounds.height;
+    });
+    blocks.filter(block => block.type !== "slideshow").forEach(block => imageTargets(block).forEach(({ node, key }) => {
+      const bounds = node.getBoundingClientRect();
+      // offset dimensions exclude the saved zoom transform.
+      const width = node.offsetWidth || bounds.width, height = node.offsetHeight || bounds.height;
+      if (width > 0 && height > 0) ratios[key] = width / height;
+    }));
+    const stamp = JSON.stringify(ratios);
+    if (stamp !== frameStamp) { frameStamp = stamp; send("frames", { ratios }); }
+  }
+  const frameObserver = typeof ResizeObserver === "function" ? new ResizeObserver(reportFrames) : null;
   function editableTarget(target, section) {
     const block = blocks.find(block => block.id === section.dataset.srSection);
     // Use the same innermost field for hover feedback and click selection.
@@ -105,6 +152,12 @@
     if (event.data.type !== "update" || event.origin !== parentOrigin || !Array.isArray(event.data.blocks)) return;
     blocks = event.data.blocks;
     apply(blocks, event.origin);
+    frameObserver?.disconnect();
+    blocks.filter(block => block.presentation?.selector).forEach(block => {
+      document.querySelectorAll(block.presentation.selector).forEach(node => frameObserver?.observe(node));
+    });
+    blocks.forEach(block => imageTargets(block).forEach(({ node }) => frameObserver?.observe(node)));
+    reportFrames();
     if (event.data.focusedItem) window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: event.data.focusedItem } }));
     document.querySelectorAll("[data-sr-selected]").forEach(node => node.removeAttribute("data-sr-selected"));
     const selectionChanged = selectedId !== event.data.selectedId;

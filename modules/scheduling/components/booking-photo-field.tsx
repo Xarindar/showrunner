@@ -1,20 +1,31 @@
 "use client";
 
+import { ImageFramingControl } from "@/modules/content/studio/image-framing-control";
+import { readImageFraming } from "@/modules/content/studio/image-framing";
+import { saveServiceImageFramingAction } from "../actions";
+import { useRouter } from "next/navigation";
 import NextImage from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { AssetPicker, Button, type AssetPickerAsset } from "@/components/ui";
 import styles from "../service-editor.module.css";
 
-export function BookingPhotoField({ assets, canUpload, imageAlt, imageUrl, serviceId, uploadFormId, attachFormId, removeFormId }: {
+export function BookingPhotoField({ assets, canUpload, imageAlt, imageUrl, framingUrl, imageFraming, updatedAt, serviceId, uploadFormId, attachFormId, removeFormId }: {
   assets: AssetPickerAsset[];
   canUpload: boolean;
   imageAlt: string;
   imageUrl: string;
+  framingUrl?: string;
+  imageFraming?: unknown;
+  updatedAt: string;
   serviceId: string;
   uploadFormId: string;
   attachFormId: string;
   removeFormId: string;
 }) {
+  const router = useRouter();
+  const [status, setStatus] = useState("");
+  const [saving, setSaving] = useState(false);
+  const framing = readImageFraming(imageFraming);
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
@@ -46,7 +57,7 @@ export function BookingPhotoField({ assets, canUpload, imageAlt, imageUrl, servi
         input.current.files = transfer.files;
         chooseFile(dropped);
       }}>
-      {preview || imageUrl ? <NextImage alt={file ? "Selected booking photo, not yet uploaded" : imageAlt} className={styles.photoPreview} width={160} height={120} src={preview || imageUrl} unoptimized /> : null}
+      {preview || imageUrl ? <div style={{ width: 160, height: 160, overflow: "hidden", borderRadius: 12 }}><NextImage alt={file ? "Selected booking photo, not yet uploaded" : imageAlt} className={styles.photoPreview} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${framing.imagePositionX}% ${framing.imagePositionY}%`, transformOrigin: `${framing.imagePositionX}% ${framing.imagePositionY}%`, transform: `scale(${framing.imageZoom})` }} width={160} height={160} src={preview || imageUrl} unoptimized /></div> : null}
       <div className={styles.photoActions}>
         <Button disabled={!canUpload} onClick={() => input.current?.click()} size="sm" type="button" variant="secondary">{file ? "Choose another" : "Upload new"}</Button>
         <AssetPicker assets={assets} attachFields={{ serviceId }} attachFormId={attachFormId} canUpload={canUpload} defaultAlt={imageAlt}
@@ -61,6 +72,13 @@ export function BookingPhotoField({ assets, canUpload, imageAlt, imageUrl, servi
         <Button onClick={() => { chooseFile(null); if (input.current) input.current.value = ""; }} size="sm" type="button" variant="ghost">Cancel</Button>
       </div> : null}
     </div>
+    {imageUrl && !file && <fieldset disabled={saving}><ImageFramingControl source={framingUrl || imageUrl} ratio={1} value={framing} onChange={async next => {
+      setSaving(true); setStatus("Saving framing…");
+      try { const result = await saveServiceImageFramingAction({ id: serviceId, updatedAt, framing: next }); setStatus(result.error || "Framing saved."); if (!result.error) router.refresh(); }
+      catch { setStatus("Framing could not be saved. Try again."); }
+      finally { setSaving(false); }
+    }} /></fieldset>}
+    <p role="status" className={styles.photoHelp}>{status}</p>
     {file ? <p className={styles.photoHelp} role="status">This photo is ready to upload. Your current booking photo stays in place until you upload it.</p> : null}
   </section>;
 }

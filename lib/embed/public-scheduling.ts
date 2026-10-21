@@ -1,4 +1,5 @@
 import "server-only";
+import { readImageFraming } from "@/modules/content/studio/image-framing";
 
 import { revalidatePath } from "next/cache";
 import { FormAttachmentTargetType, MediaVariantType } from "@prisma/client";
@@ -53,7 +54,7 @@ function publicAssetUrl(value: string | null) {
 }
 
 function publicServiceImageUrl(service: PublicService) {
-  if (service.mediaAsset) return publicAssetUrl(mediaAssetDisplayUrl(service.mediaAsset, MediaVariantType.CARD));
+  if (service.mediaAsset) return publicAssetUrl(mediaAssetDisplayUrl(service.mediaAsset, service.imageFraming ? MediaVariantType.FULL : MediaVariantType.CARD));
   return publicAssetUrl(cleanOptionalString(service.imageUrl));
 }
 
@@ -126,6 +127,7 @@ export function serializePublicService(service: PublicService, categoryRecord?: 
     categoryName: category,
     name: service.name,
     description: cleanOptionalString(service.description),
+    ...readImageFraming(service.imageFraming),
     imageUrl: publicServiceImageUrl(service) || (categoryRecord ? publicCategoryImageUrl(categoryRecord) : null),
     durationMinutes: service.durationMinutes,
     priceCents: service.priceCents,

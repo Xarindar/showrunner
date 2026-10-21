@@ -134,8 +134,7 @@
     "type": "strip",
     "label": "Vendor partners.",
     "editableFields": [
-      "texts",
-      "images"
+      "texts"
     ],
     "pageIds": [
       "home"
@@ -204,16 +203,6 @@
         {
           "path": "texts.5.text",
           "selector": "#vendor-partners > div:nth-of-type(1) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(4)"
-        },
-        {
-          "path": "images.0.url",
-          "selector": "#vendor-partners > div:nth-of-type(1) > figure:nth-of-type(1) > img:nth-of-type(1)",
-          "attribute": "src"
-        },
-        {
-          "path": "images.0.alt",
-          "selector": "#vendor-partners > div:nth-of-type(1) > figure:nth-of-type(1) > img:nth-of-type(1)",
-          "attribute": "alt"
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
@@ -222,10 +211,6 @@
       {
         "label": "Section content",
         "fields": [
-          {
-            "path": "images.0",
-            "label": "Image"
-          },
           {
             "path": "texts.0.text",
             "label": "Title"
@@ -556,7 +541,6 @@
     "label": "A soft reset for scalp care, stress relief, and shine.",
     "editableFields": [
       "texts",
-      "images",
       "links"
     ],
     "pageIds": [
@@ -623,26 +607,6 @@
           "path": "links.0.href",
           "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(1) > a:nth-of-type(1)",
           "attribute": "href"
-        },
-        {
-          "path": "images.0.url",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(2) > img:nth-of-type(1)",
-          "attribute": "src"
-        },
-        {
-          "path": "images.0.alt",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(2) > img:nth-of-type(1)",
-          "attribute": "alt"
-        },
-        {
-          "path": "images.1.url",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(2) > img:nth-of-type(2)",
-          "attribute": "src"
-        },
-        {
-          "path": "images.1.alt",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(2) > img:nth-of-type(2)",
-          "attribute": "alt"
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
@@ -651,14 +615,6 @@
       {
         "label": "Section content",
         "fields": [
-          {
-            "path": "images.0",
-            "label": "Image"
-          },
-          {
-            "path": "images.1",
-            "label": "Image"
-          },
           {
             "path": "texts.0.text",
             "label": "Label"
@@ -674,6 +630,108 @@
           {
             "path": "links.0",
             "label": "Button"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "hive-treatment-photo",
+    "type": "strip",
+    "label": "Treatment photo",
+    "editableFields": [
+      "images"
+    ],
+    "pageIds": [
+      "hive"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "assets/hive/photos/treatments/head-spa-editorial-v1.png",
+          "alt": "",
+          "caption": ""
+        }
+      ],
+      "links": []
+    },
+    "presentation": {
+      "selector": "#hive-treatment-photo",
+      "bindings": [
+        {
+          "path": "images.0.url",
+          "selector": "#hive-treatment-photo img",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": "#hive-treatment-photo img",
+          "attribute": "alt"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    },
+    "editorGroups": [
+      {
+        "label": "Treatment photo",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Image"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "hive-menu-photo",
+    "type": "strip",
+    "label": "Head spa menu photo",
+    "editableFields": [
+      "images"
+    ],
+    "pageIds": [
+      "hive"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "assets/hive/photos/treatments/head-spa-menu-banner-v1.png",
+          "alt": "",
+          "caption": ""
+        }
+      ],
+      "links": []
+    },
+    "presentation": {
+      "selector": "#hive-menu-photo",
+      "bindings": [
+        {
+          "path": "images.0.url",
+          "selector": "#hive-menu-photo img",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": "#hive-menu-photo img",
+          "attribute": "alt"
+        }
+      ],
+      "assetBaseUrl": "https://cottage616-production.up.railway.app/"
+    },
+    "editorGroups": [
+      {
+        "label": "Head spa menu photo",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Image"
           }
         ]
       }
@@ -725,7 +783,7 @@
       "images": [
         {
           "id": "image-1",
-          "url": "https://www.cottage616.com/wp-content/uploads/go-x/u/e240b829-0633-4bec-aba1-d07d08415dd0/l572,t767,w694,h694/image-455x455.jpg",
+          "url": "assets/employees/jo-lynne-skaggs.png",
           "alt": "Jo Lynne Skaggs",
           "caption": ""
         },
@@ -739,55 +797,47 @@
       "links": []
     },
     "presentation": {
-      "selector": "main:nth-of-type(1) > section:nth-of-type(4)",
+      "selector": "#team",
       "bindings": [
-        {
-          "path": "texts.0.text",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(1) > p:nth-of-type(1)"
-        },
         {
           "path": "texts.1.text",
           "selector": "#hive-team-title"
         },
         {
-          "path": "texts.2.text",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(1) > p:nth-of-type(2)"
-        },
-        {
           "path": "images.0.url",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(1) > img:nth-of-type(1)",
+          "selector": "#team .team-grid > article:nth-child(1) .team-card__media img",
           "attribute": "src"
         },
         {
           "path": "images.0.alt",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(1) > img:nth-of-type(1)",
+          "selector": "#team .team-grid > article:nth-child(1) .team-card__media img",
           "attribute": "alt"
         },
         {
           "path": "texts.3.text",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(1) > div:nth-of-type(1) > h3:nth-of-type(1)"
+          "selector": "#team .team-grid > article:nth-child(1) > h3"
         },
         {
           "path": "texts.4.text",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(1) > div:nth-of-type(1) > p:nth-of-type(1)"
+          "selector": "#team .team-grid > article:nth-child(1) > p"
         },
         {
           "path": "images.1.url",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(2) > img:nth-of-type(1)",
+          "selector": "#team .team-grid > article:nth-child(2) .team-card__media img",
           "attribute": "src"
         },
         {
           "path": "images.1.alt",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(2) > img:nth-of-type(1)",
+          "selector": "#team .team-grid > article:nth-child(2) .team-card__media img",
           "attribute": "alt"
         },
         {
           "path": "texts.5.text",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(2) > div:nth-of-type(1) > h3:nth-of-type(1)"
+          "selector": "#team .team-grid > article:nth-child(2) > h3"
         },
         {
           "path": "texts.6.text",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(4) > div:nth-of-type(2) > article:nth-of-type(2) > div:nth-of-type(1) > p:nth-of-type(1)"
+          "selector": "#team .team-grid > article:nth-child(2) > p"
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
@@ -797,16 +847,8 @@
         "label": "Section content",
         "fields": [
           {
-            "path": "texts.0.text",
-            "label": "Label"
-          },
-          {
             "path": "texts.1.text",
             "label": "Title"
-          },
-          {
-            "path": "texts.2.text",
-            "label": "Caption"
           }
         ]
       },
@@ -2132,8 +2174,7 @@
     "type": "strip",
     "label": "Our preferred partners.",
     "editableFields": [
-      "texts",
-      "images"
+      "texts"
     ],
     "pageIds": [
       "vendors"
@@ -2178,16 +2219,6 @@
         {
           "path": "texts.2.text",
           "selector": "main:nth-of-type(1) > section:nth-of-type(1) > div:nth-of-type(1) > p:nth-of-type(2)"
-        },
-        {
-          "path": "images.0.url",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(1) > figure:nth-of-type(1) > img:nth-of-type(1)",
-          "attribute": "src"
-        },
-        {
-          "path": "images.0.alt",
-          "selector": "main:nth-of-type(1) > section:nth-of-type(1) > figure:nth-of-type(1) > img:nth-of-type(1)",
-          "attribute": "alt"
         }
       ],
       "assetBaseUrl": "https://cottage616-production.up.railway.app/"
@@ -2196,10 +2227,6 @@
       {
         "label": "Section content",
         "fields": [
-          {
-            "path": "images.0",
-            "label": "Image"
-          },
           {
             "path": "texts.0.text",
             "label": "Label"

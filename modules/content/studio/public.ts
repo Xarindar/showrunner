@@ -11,6 +11,8 @@ import { blockDependenciesAvailable } from "./manifest";
 import { EmbedRequestError } from "@/lib/embed/gateway";
 import { renderContentRichText } from "./rich-text";
 
+import { resolveFeatured } from "./featured";
+import { contentLinkOptions } from "./field-layout";
 import { catalogMediaUrl } from "@/lib/catalog-media-url";
 import { showcaseCatalog } from "./showcase-catalog";
 import { resolveShowcase, type ShowcaseRow } from "./showcase";
@@ -48,11 +50,10 @@ export async function getPublicStudio(siteId: string, pageId: string) {
       });
       payload = {
         ...payload,
-        items: (payload.items as { referenceId: string; title?: string; description?: string }[]).flatMap(row => items.filter(item => item.id === row.referenceId).map(item => ({
-          description: row.description?.trim() || item.description || "",
-          id: item.id,
-          imageUrl: publicMediaUrl(item.mediaAsset ? mediaAssetDisplayUrl(item.mediaAsset, MediaVariantType.CARD) : item.imageUrl),
-          name: row.title?.trim() || item.name
+        items: (payload.items as Record<string, unknown>[]).flatMap(row => items.filter(item => item.id === row.referenceId).map(item => resolveFeatured(row, {
+          ...item, imageUrl: publicMediaUrl(item.mediaAsset ? (!item.mediaAsset.isPrivate && !item.mediaAsset.deletedAt && item.mediaAsset.siteId === siteId ? mediaAssetDisplayUrl(item.mediaAsset, item.imageFraming ? MediaVariantType.FULL : MediaVariantType.CARD) : "") : item.imageUrl),
+          framingUrl: publicMediaUrl(item.mediaAsset ? (!item.mediaAsset.isPrivate && !item.mediaAsset.deletedAt && item.mediaAsset.siteId === siteId ? mediaAssetDisplayUrl(item.mediaAsset, MediaVariantType.FULL) : "") : item.imageUrl),
+          href: contentLinkOptions(manifest, [{ id: item.id, slug: item.slug, label: item.name, category: item.category }]).services[0]?.href
         })))
       };
     }
@@ -79,6 +80,7 @@ function absolutizeBlockMedia(type: string, payload: Record<string, unknown>) {
   if (type === "slideshow") return absolutizeRows(payload, "slides", "imageUrl");
   if (type === "strip") return absolutizeRows(payload, "images", "url");
   if (type === "hero" || type === "gallery") return absolutizeRows(payload, "images", "url");
+  if (type === "featured") return { ...absolutizeRows(payload, "items", "imageUrl"), imageUrl: publicMediaUrl(payload.imageUrl) };
   if (type === "team" || type === "directory") return absolutizeRows(payload, "items", "imageUrl");
   if (["about", "coupon", "featured", "mailingList"].includes(type)) return { ...payload, imageUrl: publicMediaUrl(payload.imageUrl) };
   return payload;

@@ -71,7 +71,7 @@ function savedServiceMessage(saved?: string) {
 }
 
 function serviceMediaUrl(service: ServiceWithBuilderData) {
-  if (service.mediaAsset) return mediaAssetDisplayUrl(service.mediaAsset, MediaVariantType.CARD);
+  if (service.mediaAsset) return mediaAssetDisplayUrl(service.mediaAsset, service.imageFraming ? MediaVariantType.FULL : MediaVariantType.CARD);
   return service.imageUrl || "";
 }
 
@@ -158,7 +158,8 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     id: asset.id,
     thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD)
   }));
-  const serviceImageUrl = catalogMediaUrl(serviceMediaUrl(service), contentWebsiteUrl(resolveContentManifest(settings.siteId, settings.publicContentConfig)));
+  const websiteUrl = contentWebsiteUrl(resolveContentManifest(settings.siteId, settings.publicContentConfig));
+  const serviceImageUrl = catalogMediaUrl(serviceMediaUrl(service), websiteUrl);
   const serviceImageAlt = `${service.name} session photo`;
   const serviceImageUploadFormId = `service-${service.id}-image-upload`;
   const serviceImageAttachFormId = `service-${service.id}-image-attach`;
@@ -187,7 +188,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
               <textarea defaultValue={service.description || ""} id="service-description" name="description" rows={3} />
             </div>
 
-            <BookingPhotoField assets={mediaAssetOptions} canUpload={canUpload} imageAlt={serviceImageAlt} imageUrl={serviceImageUrl || ""} serviceId={service.id}
+            <BookingPhotoField framingUrl={catalogMediaUrl(service.mediaAsset ? mediaAssetDisplayUrl(service.mediaAsset, MediaVariantType.FULL) : service.imageUrl, websiteUrl)} imageFraming={service.imageFraming} updatedAt={service.updatedAt.toISOString()} assets={mediaAssetOptions} canUpload={canUpload} imageAlt={serviceImageAlt} imageUrl={serviceImageUrl || ""} serviceId={service.id}
               uploadFormId={serviceImageUploadFormId} attachFormId={serviceImageAttachFormId} removeFormId={serviceImageRemoveFormId} />
                 <ServicePresetField
                   defaultValue={service.category}

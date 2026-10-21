@@ -317,7 +317,7 @@ test("approved photo previews preserve proportions, strip metadata, and never ex
     } } } });
     const source = { ...asset, key: "original.jpg", isPrivate: false };
     await media.preparePhotoVariants(source);
-    for (const [type, edge] of [["THUMBNAIL", 320], ["HERO", 1920], ["FULL", 2048]] as const) {
+    for (const [type, edge] of [["THUMBNAIL", 320], ["HERO", 3840], ["FULL", 2048]] as const) {
       const bytes = await readFile(path.join(directory, photoVariantKey(source.id, type)));
       const info = await sharp(bytes).metadata();
       assert.equal(info.height, edge);
@@ -326,6 +326,10 @@ test("approved photo previews preserve proportions, strip metadata, and never ex
       assert.equal(info.exif, undefined);
     }
     assert.equal(rows.has("CARD"), false, "card size remains deferred");
+    const original = await sharp(await readFile(path.join(directory, "original.jpg"))).metadata();
+    assert.equal(original.width, 3000);
+    assert.equal(original.height, 4500);
+    assert.ok(original.exif, "generating previews must not rewrite the original");
     assert.equal(await media.mediaDeliveryResponse({ asset: source, type: "DOWNLOAD", request: request() }), null);
     assert.throws(() => photoVariantKey("../escape", "FULL"));
   } finally { await rm(directory, { recursive: true, force: true }); }

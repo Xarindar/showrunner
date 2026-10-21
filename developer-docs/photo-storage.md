@@ -1,6 +1,6 @@
 # Photo storage and previews
 
-Photo originals are grouped under `photos/<asset-id>/original.<extension>` in private storage. Generated WebP files live alongside them: `thumbnail-320.webp`, `header-1920.webp`, and `portfolio-2048.webp`. Dimensions are longest-edge limits, preserve proportions, never enlarge, and omit EXIF/location metadata. The original uploaded filename remains on MediaAsset.
+Photo originals are grouped under `photos/<asset-id>/original.<extension>` in private storage. Generated WebP files live alongside them: `thumbnail-320.webp`, `header-3840-q88.webp`, and `portfolio-2048.webp`. Dimensions are longest-edge limits, preserve proportions, never enlarge, and omit EXIF/location metadata. Header previews use quality 88; other previews retain their existing quality. The versioned header key regenerates older previews from the untouched original. The original uploaded filename remains on MediaAsset.
 
 Uploads generate the three approved previews before album attachment. Existing CARD and SOCIAL variants remain compatible; CARD dimensions are intentionally unchanged and not generated eagerly. Previously generated cards are labeled `card-legacy.webp`.
 
