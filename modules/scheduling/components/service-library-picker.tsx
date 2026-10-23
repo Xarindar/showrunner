@@ -7,10 +7,13 @@ import { serviceLibraryInputSchema, type ServiceLibraryItem, type ServiceLibrary
 import type { SessionOffering } from "@/lib/scheduling/session-offering";
 import { saveServiceLibraryItemAction } from "../service-library-actions";
 import styles from "./service-library-picker.module.css";
+import type { HourlyRate, PricingType } from "@/lib/scheduling/pricing";
+import { ServicePricingFields } from "./service-pricing-fields";
 
 type IncludedItem = SessionOffering["coverageItems"][number];
 
-export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onClose, inline = false }: {
+export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onClose, inline = false, rates, onRateSaved }: {
+  rates: HourlyRate[]; onRateSaved: (rate: HourlyRate) => void;
   inline?: boolean;
   selectedItems: IncludedItem[];
   editingItem?: IncludedItem;
@@ -19,7 +22,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
 }) {
   const id = useId();
   const [view, setView] = useState<"library" | "edit">(editingItem ? "edit" : "library");
-  const [form, setForm] = useState({ id: editingItem?.libraryItemId, name: editingItem?.name || "", description: editingItem?.description || "", category: editingItem?.category || "", tags: editingItem?.tags?.join(", ") || "" });
+  const [form, setForm] = useState({ id: editingItem?.libraryItemId, name: editingItem?.name || "", description: editingItem?.description || "", category: editingItem?.category || "", tags: editingItem?.tags?.join(", ") || "", pricingType: (editingItem?.pricingType ?? "FLAT_RATE") as PricingType, hourlyRateId: editingItem?.hourlyRateId ?? "", price: editingItem?.priceCents == null ? "" : (editingItem.priceCents / 100).toFixed(2) });
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [tag, setTag] = useState("");
@@ -90,7 +93,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
     {view === "library" ? <>
       <div className={styles.toolbar}>
         <Field label="Search services"><Input id={`${id}-search`} type="search" value={q} maxLength={120} placeholder="Name, description or tag" onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }} onChange={event => changeFilter(setQ, event.target.value)} /></Field>
-        <Button type="button" variant="secondary" disabled={picked.length >= remaining} onClick={() => { setForm({ id: undefined, name: "", description: "", category: "", tags: "" }); setError(""); setView("edit"); }}><Plus size={16} />New service</Button>
+        <Button type="button" variant="secondary" disabled={picked.length >= remaining} onClick={() => { setForm({ id: undefined, name: "", description: "", category: "", tags: "", pricingType: "FLAT_RATE", hourlyRateId: "", price: "" }); setError(""); setView("edit"); }}><Plus size={16} />New service</Button>
       </div>
       <div className={styles.filters}>
         <Field label="Category"><Select value={category} onChange={event => changeFilter(setCategory, event.target.value)}><option value="">All categories</option>{results.categories.map(value => <option key={value}>{value}</option>)}</Select></Field>
@@ -132,6 +135,9 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
         <p className={styles.hint}>Save a reusable service. Its description can be used in client-facing session and package details.</p>
         <Field label="Service name"><Input id={`${id}-name`} value={form.name} required maxLength={120} disabled={saving} onChange={event => setForm({ ...form, name: event.target.value })} /></Field>
         <Field label="Description" hint="Describe what the client receives. Avoid private or internal notes."><Textarea id={`${id}-description`} value={form.description} maxLength={2000} rows={4} disabled={saving} onChange={event => setForm({ ...form, description: event.target.value })} /></Field>
+        <ServicePricingFields pricingType={form.pricingType} hourlyRateId={form.hourlyRateId} rates={rates} onRateSaved={onRateSaved} onChange={(pricingType, hourlyRateId) => setForm({ ...form, pricingType, hourlyRateId })} />
+        {form.pricingType === "FLAT_RATE" && <Field label="Flat price (USD)" hint="Optional reference price. Package totals are set separately."><Input id={`${id}-price`} type="number" min="0" max="9999999.99" step="0.01" inputMode="decimal" value={form.price} disabled={saving} onChange={event => setForm({ ...form, price: event.target.value })} /></Field>}
+        {form.pricingType === "HOURLY" && <p className={styles.hint}>This service’s rate is saved for reference. Package totals use the session type’s pricing.</p>}
         <Field label="Category" hint="For example, Weddings or Portraits."><Input id={`${id}-category`} value={form.category} maxLength={120} disabled={saving} onChange={event => setForm({ ...form, category: event.target.value })} /></Field>
         <Field label="Tags" hint="Separate tags with commas."><Input id={`${id}-tags`} value={form.tags} maxLength={1500} disabled={saving} onChange={event => setForm({ ...form, tags: event.target.value })} /></Field>
         {error && <p id={`${id}-error`} tabIndex={-1} role="alert" className={styles.error}>{error}</p>}

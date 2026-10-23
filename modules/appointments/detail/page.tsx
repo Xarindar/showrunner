@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarClock, ChevronDown, Save } from "lucide-react";
@@ -76,8 +77,8 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
         </ButtonLink>
       </header>
 
-      {saved ? <div className="success-message">{saved === "created" ? "Session created. No email or payment request was sent." : saved === "reschedule-notify" ? "Appointment rescheduled. Customer notification requested." : saved === "reschedule-silent" ? "Appointment rescheduled without a customer email." : "Appointment updated."}</div> : null}
-      {error ? <div className="error">{error}</div> : null}
+      {saved ? <Notification tone="success" queryKey="saved">{saved === "created" ? "Session created." : saved === "reschedule-notify" || saved === "reschedule-silent" ? "Appointment rescheduled." : "Appointment updated."}</Notification> : null}
+      {error ? <Notification tone="danger" queryKey="error">{error}</Notification> : null}
 
       <section aria-label="Status actions" className="appointment-detail-toolbar">
         <span className="ui-badge">{booking.status.toLowerCase()}</span>
@@ -124,6 +125,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
               </tr>
                 {packageSnapshot.success && <>
                   <tr><td>Package</td><td>{packageSnapshot.data.name}</td></tr>
+                  {packageSnapshot.data.hourlyRate && <tr><td>Hourly rate</td><td>{packageSnapshot.data.hourlyRate.name} · ${(packageSnapshot.data.hourlyRate.amountCents / 100).toFixed(2)} / hour</td></tr>}
                   <tr><td>Included coverage</td><td>{packageSnapshot.data.coverage.join(" · ") || "No coverage items specified"}</td></tr>
                   {packageSnapshot.data.extras.length > 0 && <tr><td>Extras</td><td>{packageSnapshot.data.extras.map(item => item.name).join(" · ")}</td></tr>}
                 </>}

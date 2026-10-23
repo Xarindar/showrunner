@@ -10,6 +10,20 @@ Resource types belong in navigation, rather than folder tabs wrapped around unre
 
 Calendar, media grid, analytics, communications and actual website preview retain the layouts needed for their tasks. Admin design must not recolor client sites, public booking, portals, image contents, charts or the Content iframe.
 
+## Page spacing
+
+The shared admin shell owns page insets through `--admin-page-inset`: `--sd-space-32` on desktop and `--sd-space-16` at 860px and below. Use the same token for the top and horizontal page edges, including full-width sticky headers and footers. Modules must not add their own outer top padding. The calendar subtracts the inset from its viewport height; Content's published-site preview applies it to its header while its iframe and immersive editor keep their full-width canvas.
+
+## Notifications
+
+Keep confirmations to the completed action: “Session created.” or “Changes saved.” Do not narrate things that did not happen or repeat workflow details. Add detail only when the user needs it to act.
+
+The protected admin layout owns one `NotificationProvider`. Use `useNotify()(message, tone)` after client operations and `<Notification queryKey="saved">{message}</Notification>` for redirect feedback (`tone="danger"` and `queryKey="error"` for failures). Import directly from `components/ui/notifications`. The originating query flag is consumed without removing filters or the current selection.
+
+Action feedback appears in a compact bottom-center toast, never a page-header banner. Confirmations expire after at least five seconds, with more time for long messages; errors remain until dismissed. Hover, keyboard focus and hidden tabs pause automatic dismissal. Keep field validation, upload progress and retry controls beside their task, including inside dialogs. The host follows an open native dialog so feedback remains visible and keyboard-accessible. Notifications are session-local, without a persistent inbox or external delivery.
+
+References: [Shopify Toast API](https://shopify.dev/docs/api/app-home/latest/apis/user-interface-and-interactions/toast-api) and [messages and feedback](https://shopify.dev/docs/apps/design/user-experience/alerts). Shopify's design article and current API describe different placements; Showrunner follows the API's bottom placement and the approved requirement to keep feedback out of page headers.
+
 ## Loading
 
 Keep the existing shell visible during navigation. Sidebar links use Next's actual pending state with a short visual delay, so fast navigation does not flash an indicator. Route fallbacks use the destination's table, editor, gallery, website workspace or calendar shape; the protected parent boundary also covers dedicated static routes and nested records. Keep known page headings visible, hide placeholder controls from assistive technology, and announce loading without implying measured progress.

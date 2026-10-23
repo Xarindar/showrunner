@@ -1,4 +1,5 @@
 "use client";
+import { Notification } from "@/components/ui/notifications";
 
 import NextImage from "next/image";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
@@ -13,7 +14,6 @@ import {
   File,
   FolderOpen,
   Grid2X2,
-  Info,
   LayoutList,
   Lock,
   RotateCcw,
@@ -454,8 +454,8 @@ export function MediaLibraryWorkspace({
         </div>
       </form>
       </Modal>
-      {savedMessage ? <div className={styles.feedbackSuccess} role="status"><Check aria-hidden="true" size={17} /> {savedMessage}</div> : null}
-      {errorMessage ? <div className={styles.feedbackError} role="alert"><Info aria-hidden="true" size={17} /> {errorMessage}</div> : null}
+      {savedMessage ? <Notification queryKey="saved">{savedMessage}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
       <div className={styles.libraryWorkspace}>
         <section className={styles.libraryMain} aria-label="Media library">

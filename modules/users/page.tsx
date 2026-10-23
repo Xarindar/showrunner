@@ -1,10 +1,11 @@
+import { Notification } from "@/components/ui/notifications";
 import { AdminRole } from "@prisma/client";
 import { Shield, Trash2, UserPlus } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Badge, Button, Card, EqualGrid, Feedback, Field, Input, Select, StatTile, Switch, Table } from "@/components/ui";
+import { Badge, Button, Card, EqualGrid, Field, Input, Select, StatTile, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 import { createAdminUserAction, deleteAdminUserAction, updateAdminUserRoleAction } from "./actions";
 
@@ -70,8 +71,8 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
         </div>
       </header>
 
-      {params.saved ? <Feedback tone="success">Admin user changes saved.</Feedback> : null}
-      {params.error ? <Feedback tone="danger">{params.error}</Feedback> : null}
+      {params.saved ? <Notification tone="success" queryKey="saved">Admin user changes saved.</Notification> : null}
+      {params.error ? <Notification tone="danger" queryKey="error">{params.error}</Notification> : null}
 
       <EqualGrid min="220px" aria-label="Access summary">
         <StatTile label="Admins" value={users.length} detail="Active admin accounts." />

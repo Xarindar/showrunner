@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import { clientServiceId } from "@/lib/clients/service-selection";
 import { getClientStatusSettings } from "@/lib/clients/configuration";
 import Link from "next/link";
@@ -482,8 +483,8 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         </div>
       </header>
 
-      {message ? <div className="success-message">{message}</div> : null}
-      {params.error ? <div className="error">{params.error}</div> : null}
+      {message ? <Notification tone="success" queryKey="saved">{message}</Notification> : null}
+      {params.error ? <Notification tone="danger" queryKey="error">{params.error}</Notification> : null}
 
       <section aria-labelledby="clients-table-title" className="ui-data-table-shell clients-data-table">
         <div className="ui-data-table-header">

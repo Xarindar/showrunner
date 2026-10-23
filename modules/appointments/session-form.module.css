@@ -1,5 +1,5 @@
-.page { max-width: 760px; margin-inline: auto; width: 100%; padding-bottom: 24px; }
-.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.page { display: grid; gap: var(--sd-space-16); max-width: 760px; margin-inline: auto; width: 100%; padding-bottom: var(--sd-space-24); }
+.header { display: flex; align-items: center; justify-content: space-between; gap: var(--sd-space-16); margin-bottom: 0; }
 .header h1 { margin: 0; font-size: 1.5rem; }
 .form { display: grid; gap: 24px; }
 .form fieldset { min-width: 0; border: 0; padding: 0; margin: 0; display: grid; gap: 16px; }

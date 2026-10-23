@@ -5,8 +5,9 @@ import { Button, ButtonLink } from "@/components/ui";
 import { createSessionAction } from "./create-action";
 import styles from "./session-form.module.css";
 import { selectSessionPackage, type SessionOffering } from "@/lib/scheduling/session-offering";
+import { hourlyPriceCents, type HourlyRate, type PricingType } from "@/lib/scheduling/pricing";
 
-type Service = { id: string; name: string; durationMinutes: number; priceCents: number | null; sessionOffering: SessionOffering | null; staffAssignments: { staffId: string }[] };
+type Service = { id: string; name: string; durationMinutes: number; priceCents: number | null; pricingType: PricingType; hourlyRate: HourlyRate | null; sessionOffering: SessionOffering | null; staffAssignments: { staffId: string }[] };
 type Client = { id: string; name: string; email: string; phone: string | null };
 
 export function SessionForm({ services, clients, staff, timezone }: { services: Service[]; clients: Client[]; staff: { id: string; name: string }[]; timezone: string }) {
@@ -37,8 +38,15 @@ export function SessionForm({ services, clients, staff, timezone }: { services: 
     if (pack && selected) setDetails({ name: selected.name, duration: String(pack.durationMinutes), price: pack.priceCents == null ? "" : (pack.priceCents / 100).toFixed(2) });
   }
   const selectedTier = selected?.sessionOffering?.tiers.find(tier => tier.id === tierId);
+  const hourly = selected?.pricingType === "HOURLY" && selected.hourlyRate;
+  const extrasCents = selected?.sessionOffering?.addOns.filter(item => addOnIds.includes(item.id)).reduce((total, item) => total + item.priceCents, 0) ?? 0;
+  let calculatedPrice = "";
+  if (hourly && details.duration) {
+    try { calculatedPrice = ((hourlyPriceCents(hourly.amountCents, Number(details.duration)) + extrasCents) / 100).toFixed(2); }
+    catch { /* Invalid duration or price is reported by the form and server validation. */ }
+  }
   return <div className={styles.page}>
-    <header className={styles.header}><h1>New session</h1><ButtonLink href="/admin/modules/appointments" variant="ghost">Cancel</ButtonLink></header>
+    <header className={`page-header ${styles.header}`}><h1>New session</h1><ButtonLink href="/admin/modules/appointments" variant="ghost">Cancel</ButtonLink></header>
     <form action={action} className={styles.form} onReset={event => event.preventDefault()}>
       <fieldset><legend>Client</legend>
         {clients.length > 0 && <label>Existing client<select value={clientId} onChange={event => { setClientId(event.target.value); const client = clients.find(item => item.id === event.target.value); setCustomer(client ? { name: client.name, email: client.email, phone: client.phone || "" } : { name: "", email: "", phone: "" }); }}><option value="">New client</option>{clients.map(client => <option key={client.id} value={client.id}>{client.name} · {client.email}</option>)}</select></label>}
@@ -54,7 +62,8 @@ export function SessionForm({ services, clients, staff, timezone }: { services: 
         </>}
         <label>Session name<input name="name" required placeholder="Family photos" value={details.name} onChange={event => setDetails({ ...details, name: event.target.value })} /></label>
         <div className={styles.row}><label>Date<input type="date" name="date" defaultValue={state.date || ""} required /></label><label>Time <small>({timezone})</small><input type="time" name="time" defaultValue={state.time || ""} required /></label></div>
-        <div className={styles.row}><label>Duration <small>(minutes)</small><input type="number" name="durationMinutes" min="1" max="1440" required value={details.duration} onChange={event => setDetails({ ...details, duration: event.target.value })} /></label><label>Price <small>(USD)</small><input inputMode="decimal" type="number" name="price" min="0" max="9999999.99" step="0.01" placeholder="0.00" required value={details.price} onChange={event => setDetails({ ...details, price: event.target.value })} /></label></div>
+        <div className={styles.row}><label>Duration <small>(minutes)</small><input type="number" name="durationMinutes" min="1" max="1440" required value={details.duration} onChange={event => setDetails({ ...details, duration: event.target.value })} /></label><label>Price <small>(USD)</small><input inputMode="decimal" type="number" name="price" min="0" max="9999999.99" step="0.01" placeholder="0.00" required readOnly={Boolean(hourly)} value={hourly ? calculatedPrice : details.price} onChange={event => setDetails({ ...details, price: event.target.value })} /></label></div>
+        {hourly && <p className={styles.hint}>{hourly.name}: ${(hourly.amountCents / 100).toFixed(2)} / hour × booked duration{extrasCents ? " + optional extras" : ""}.</p>}
         <p className={styles.hint}>Arrange the location with your client after booking.</p>
         {team.length > 0 && <label>Team member<select key={serviceId} name="staffId" required={Boolean(selected?.staffAssignments.length)} value={staffId} onChange={event => setStaffId(event.target.value)}><option value="">Choose a team member</option>{team.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}
       </fieldset>

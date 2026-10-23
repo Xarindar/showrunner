@@ -1,3 +1,7 @@
+"use client";
+import { Notification } from "@/components/ui/notifications";
+
+import { useActionState } from "react";
 import type { AvailabilityRule, Resource, StaffMember } from "@prisma/client";
 import { Clock, Trash2 } from "lucide-react";
 import { minutesToTime } from "@/lib/format";
@@ -12,9 +16,10 @@ type AvailabilityPanelProps = {
 };
 
 export function AvailabilityPanel({ availability, resources, staff }: AvailabilityPanelProps) {
+  const [state, action, pending] = useActionState(createAvailabilityAction, { error: "", success: "" });
   return (
     <EqualGrid as="section">
-      <Card action={createAvailabilityAction} as="form" minHeight="none" bodyClassName="form-grid">
+      <Card action={action} as="form" minHeight="none" bodyClassName="form-grid" onReset={event => event.preventDefault()}>
         <h2 className="section-title">Weekly availability</h2>
         <EqualGrid>
           <div className="ui-field">
@@ -63,9 +68,11 @@ export function AvailabilityPanel({ availability, resources, staff }: Availabili
             <input id="endTime" name="endTime" type="time" defaultValue="17:00" required />
           </div>
         </EqualGrid>
-        <Button type="submit">
+        {state.error && <p className="error" role="alert">{state.error}</p>}
+        {state.success && <Notification>{state.success}</Notification>}
+        <Button type="submit" disabled={pending}>
           <Clock size={18} />
-          Add availability
+          {pending ? "Saving…" : "Add availability"}
         </Button>
       </Card>
 

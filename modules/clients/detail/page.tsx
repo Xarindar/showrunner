@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import { clientServiceId } from "@/lib/clients/service-selection";
 import { getClientStatusSettings } from "@/lib/clients/configuration";
 import Link from "next/link";
@@ -962,8 +963,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         </div>
       </header>
 
-      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-      {error ? <div className="error">{error}</div> : null}
+      {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
+      {error ? <Notification tone="danger" queryKey="error">{error}</Notification> : null}
 
       <section className="clients-detail-card-grid">
         <ClientProfileCard

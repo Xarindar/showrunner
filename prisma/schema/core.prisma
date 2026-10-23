@@ -58,6 +58,7 @@ model Site {
   services                 Service[]
   serviceCategories        ServiceCategory[]
   serviceLibraryItems      ServiceLibraryItem[]
+  hourlyRates              HourlyRate[]
   servicePackages          ServicePackage[]
   servicePackageItems      ServicePackageItem[]
   staffMembers             StaffMember[]

@@ -1,4 +1,5 @@
 import "server-only";
+import { servicePriceCents } from "@/lib/scheduling/pricing";
 
 import { BookingStatus, Prisma, SchedulingCalendarOwnerType } from "@prisma/client";
 import { upsertPublicClient } from "@/lib/clients/public-client";
@@ -58,6 +59,8 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
       where: { siteId, isActive: true, isOneOff: false },
       include: {
         mediaAsset: true,
+        rectangularMediaAsset: true,
+        hourlyRate: true,
         resourceAssignments: {
           where: { resource: { isActive: true } },
           include: { resource: true },
@@ -385,6 +388,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     const service = await prisma.service.findFirst({
       where: { id: input.serviceId, siteId },
       include: {
+        hourlyRate: true,
         mediaAsset: true,
         resourceAssignments: {
           where: { resource: { isActive: true } },
@@ -504,7 +508,8 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
               siteId: service.siteId,
               clientId,
               serviceId: input.serviceId,
-              priceCents: service.priceCents,
+              priceCents: servicePriceCents(service),
+              ...(service.pricingType === "HOURLY" && service.hourlyRate ? { packageSnapshot: { tierId: "hourly", name: service.name, durationMinutes: service.durationMinutes, priceCents: servicePriceCents(service), coverage: [], extras: [], pricingType: "HOURLY", hourlyRate: { id: service.hourlyRate.id, name: service.hourlyRate.name, amountCents: service.hourlyRate.amountCents } } } : {}),
               sessionName: service.name,
               sessionLocation: "",
               staffId: selectedStaff?.id,

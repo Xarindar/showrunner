@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import { requireUploadAdmin } from "@/lib/uploads/access";
 import { prisma } from "@/lib/prisma";
 import { uploadsConfigured } from "@/lib/uploads/storage";
@@ -13,8 +14,8 @@ export default async function UploadsPage({ searchParams }: { searchParams: Prom
   const origin = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
   return <div className="stack">
     <header className="page-header"><h1>Client uploads</h1></header>
-    {!uploadsConfigured() && <p className="error" role="alert">Connect the client upload bucket before creating a link.</p>}
-    {params.error && <p className="error" role="alert">{params.error === "title" ? "Enter a project name (up to 120 characters)." : "Could not connect upload storage. Please try again."}</p>}
+    {!uploadsConfigured() && <Notification tone="danger">Connect the client upload bucket before creating a link.</Notification>}
+    {params.error && <Notification tone="danger" queryKey="error">{params.error === "title" ? "Enter a project name (up to 120 characters)." : "Could not connect upload storage. Please try again."}</Notification>}
     <Card as="form" action={createUploadRequest} bodyClassName="stack" minHeight="none">
       <label htmlFor="upload-title">Project name</label>
       <Input id="upload-title" name="title" required maxLength={120} placeholder="e.g. Jasmine — website images" />

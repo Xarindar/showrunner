@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import { AnalyticsEventType, BookingStatus, OrderStatus, PortfolioGalleryStatus, Prisma } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { enforceAnalyticsRetention } from "@/lib/analytics/retention";
@@ -5,7 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
-import { Badge, Button, ButtonLink, Card, EqualGrid, Feedback, Field, Input, Select, Stack, StatTile, Switch, Table } from "@/components/ui";
+import { Badge, Button, ButtonLink, Card, EqualGrid, Field, Input, Select, Stack, StatTile, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 import { createAnalyticsGoalAction, recordAnalyticsEventAction, updateAnalyticsGoalStatusAction } from "./actions";
 
@@ -197,8 +198,8 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </ButtonLink>
       </header>
 
-      {savedMessage ? <Feedback tone="success">{savedMessage}</Feedback> : null}
-      {errorMessage ? <Feedback tone="danger">{errorMessage}</Feedback> : null}
+      {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
       <EqualGrid min="220px" aria-label="Analytics summary">
         <StatTile label="Events" value={eventCount} detail="Captured across public pages, server events, manual records, and widgets." />

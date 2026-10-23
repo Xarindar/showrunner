@@ -2,14 +2,16 @@
 
 import { imageFramingSchema } from "@/modules/content/studio/image-framing";
 import { initialBusinessHoursSchema } from "@/lib/scheduling/session-input";
-import { readSessionOffering } from "@/lib/scheduling/session-offering";
+import { readSessionOffering, type SessionOffering } from "@/lib/scheduling/session-offering";
 import { hydrateSessionServiceLibrary } from "@/lib/scheduling/service-library-store";
+import { hourlyPriceCents, type PricingType } from "@/lib/scheduling/pricing";
 
 import { revalidatePath } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { MediaVariantType, Prisma } from "@prisma/client";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth";
+import { getAccessibleMediaWhere, getOwnerStaffIds, requireAdmin, resolveDataScopeMode } from "@/lib/auth";
+import { serviceMediaSchema, serviceMediaAssetIds } from "@/lib/scheduling/service-media";
 import {
   availabilityFormSchema,
   blockoutFormSchema,
@@ -159,6 +161,14 @@ function refreshScheduling() {
   revalidatePath(APPOINTMENTS_ADMIN_PATH);
   revalidatePath(LEGACY_SCHEDULING_ADMIN_PATH);
   revalidatePath("/book");
+}
+
+async function servicePricingData(input: { pricingType: PricingType; hourlyRateId: string; durationMinutes: number }, siteId: string, offering: SessionOffering | null) {
+  if (input.pricingType !== "HOURLY") return { pricingType: input.pricingType, hourlyRateId: null };
+  const rate = await prisma.hourlyRate.findFirst({ where: { id: input.hourlyRateId, siteId } });
+  if (!rate) throw new Error("Choose an hourly rate from this business.");
+  if (offering) for (const tier of offering.tiers) tier.priceCents = hourlyPriceCents(rate.amountCents, tier.durationMinutes);
+  return { pricingType: input.pricingType, hourlyRateId: rate.id, priceCents: hourlyPriceCents(rate.amountCents, input.durationMinutes) };
 }
 
 async function generateUniqueServicePackageSlug(input: { exceptId?: string; name: string; siteId: string; slug?: string }) {
@@ -342,7 +352,7 @@ async function syncServiceResources(serviceId: string, siteId: string, resourceI
 }
 
 export async function createServiceAction(_previous: { error: string }, formData: FormData) {
-  await requireAdmin("scheduling:manage");
+  const user = await requireAdmin("scheduling:manage");
 
   const parsed = serviceFormSchema.safeParse({ slug: "", category: "", tags: "", location: "", intakePrompt: "", policyText: "", ...Object.fromEntries(formData) });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -350,7 +360,9 @@ export async function createServiceAction(_previous: { error: string }, formData
   const settings = await getSiteSettings();
   let service;
   try {
+    const media = await serviceMediaData(formData, settings.siteId, user);
     const offering = await hydrateSessionServiceLibrary(input.sessionOffering ?? null, settings.siteId);
+    const pricing = await servicePricingData(input, settings.siteId, offering);
     const slug = await generateUniqueServiceSlug(prisma, {
       name: input.name,
       slug: input.slug || "",
@@ -369,12 +381,14 @@ export async function createServiceAction(_previous: { error: string }, formData
         return tx.service.create({
         data: {
           siteId: settings.siteId,
+          ...media,
           slug,
           name: input.name,
           description: input.description,
           durationMinutes: input.durationMinutes,
           ...(offering ? { sessionOffering: offering } : {}),
           ...(input.price !== undefined ? { priceCents: input.price === "" ? null : input.price } : {}),
+          ...pricing,
           location: input.location,
           category: input.category,
           tags: input.tags,
@@ -419,7 +433,7 @@ export async function toggleServiceAction(formData: FormData) {
 }
 
 export async function updateServiceAction(formData: FormData) {
-  await requireAdmin("scheduling:manage");
+  const user = await requireAdmin("scheduling:manage");
   const input = await parseForm(serviceUpdateFormSchema, formData);
   const settings = await getSiteSettings();
   const current = await prisma.service.findFirst({ where: { id: input.id, siteId: settings.siteId } });
@@ -431,15 +445,20 @@ export async function updateServiceAction(formData: FormData) {
     if (input.price !== undefined) offering.tiers[0].priceCents = input.price === "" ? null : input.price;
     if (offering.tiers.length > 1 && offering.tiers[0].priceCents === null) redirect(serviceEditPath(input.id, { error: "Set a price for every package." }));
   }
+  const pricing = await servicePricingData(input, settings.siteId, offering);
 
-  await prisma.service.updateMany({
-    where: { id: input.id, siteId: settings.siteId },
+  const media = await serviceMediaData(formData, settings.siteId, user, current);
+  const revision = formData.has("serviceMedia") ? z.iso.datetime().parse(formData.get("updatedAt")) : undefined;
+  await prisma.service.update({
+    where: { id: input.id, siteId: settings.siteId, ...(revision ? { updatedAt: new Date(revision) } : {}) },
     data: {
+      ...media,
       name: input.name,
       description: input.description,
       durationMinutes: input.durationMinutes,
       ...(offering ? { sessionOffering: offering } : {}),
       ...(input.price !== undefined ? { priceCents: input.price === "" ? null : input.price } : {}),
+      ...pricing,
       location: input.location,
       category: input.category,
       tags: input.tags,
@@ -480,7 +499,7 @@ export async function updateSessionTypeAction(_previous: { error: string }, form
   try { await updateServiceAction(formData); }
   catch (error) {
     unstable_rethrow(error);
-    return { error: "The session type could not be saved. Your changes are still here; please try again." };
+    return { error: error instanceof Error && !("code" in error) ? error.message : "The session type could not be saved or changed in another window. Your changes are still here; reload before trying again." };
   }
   return { error: "" };
 }
@@ -525,6 +544,47 @@ export async function updateServiceCategoryAction(formData: FormData) {
 
   refreshScheduling();
   redirect(serviceCategoriesPath({ saved: "category" }));
+}
+
+async function serviceMediaData(formData: FormData, siteId: string, user: Awaited<ReturnType<typeof requireAdmin>>, current?: { imageUrl: string; mediaAssetId: string | null }) {
+  if (!formData.has("serviceMedia")) return {};
+  let raw;
+  try { raw = JSON.parse(String(formData.get("serviceMedia"))); }
+  catch { throw new Error("Check the service photos and try again."); }
+  const parsed = serviceMediaSchema.safeParse(raw);
+  if (!parsed.success) throw new Error("Check the service photos and their framing. You can keep up to 50 additional images.");
+  const media = parsed.data;
+  const ids = serviceMediaAssetIds(media);
+  const assets = await prisma.mediaAsset.findMany({ where: await getAccessibleMediaWhere(user, siteId, {
+    id: { in: ids }, deletedAt: null, isPrivate: false, mimeType: { startsWith: "image/", mode: "insensitive" }
+  }) });
+  if (assets.length !== ids.length) throw new Error("One of these photos is unavailable. Choose an active public image from your library.");
+  const square = assets.find(asset => asset.id === media.square?.assetId);
+  if (media.rectangular && !media.rectangular.assetId) throw new Error("Choose a rectangular photo.");
+  if (media.square && !square && (!current?.imageUrl || current.mediaAssetId)) throw new Error("Choose a square photo.");
+  return {
+    mediaAssetId: square?.id ?? null,
+    imageUrl: square ? mediaAssetDisplayUrl(square, MediaVariantType.CARD) : media.square ? current!.imageUrl : "",
+    imageFraming: media.square?.framing ?? Prisma.DbNull,
+    rectangularMediaAssetId: media.rectangular?.assetId ?? null,
+    rectangularImageFraming: media.rectangular?.framing ?? Prisma.DbNull,
+    galleryAssets: current ? { set: [...new Set(media.gallery)].map(id => ({ id })) } : { connect: [...new Set(media.gallery)].map(id => ({ id })) }
+  };
+}
+
+export async function uploadServiceMediaAssetAction(formData: FormData) {
+  const user = await requireAdmin("scheduling:manage");
+  const settings = await getSiteSettings();
+  const ownerStaffIds = await getOwnerStaffIds(user, settings.siteId);
+  if ((await resolveDataScopeMode(user, settings.siteId, "media")) === "OWN" && !ownerStaffIds.length) return { error: "Create an active staff profile before uploading scoped media." };
+  const file = formData.get("file");
+  if (!(file instanceof File) || !file.size || !file.type.startsWith("image/")) return { error: "Choose an image to upload." };
+  const alt = String(formData.get("alt") || "").trim();
+  if (!alt) return { error: "Add an image description." };
+  try {
+    const asset = await uploadMedia(file, { alt, uploadedByStaffId: ownerStaffIds[0], usageContext: "service media" }, settings.mediaDriver, settings.siteId);
+    return { asset: { id: asset.id, filename: asset.filename, alt: asset.alt || "", thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD), url: mediaAssetDisplayUrl(asset, MediaVariantType.FULL) } };
+  } catch (error) { return { error: error instanceof Error ? error.message : "Image upload failed. Try again." }; }
 }
 
 export async function saveServiceImageFramingAction(raw: unknown) {
@@ -1050,14 +1110,23 @@ export async function updateReminderSettingsAction(formData: FormData) {
   redirect(appointmentRulesPath("calendar", { saved: "reminders" }));
 }
 
-export async function createAvailabilityAction(formData: FormData) {
+export async function createAvailabilityAction(_state: { error: string; success: string }, formData: FormData) {
   await requireAdmin("scheduling:manage");
-  const input = await parseForm(availabilityFormSchema, formData);
+  const parsed = availabilityFormSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "Check your availability hours.", success: "" };
+  const input = parsed.data;
   const settings = await getSiteSettings();
   const staffId = String(formData.get("staffId") || "");
   const resourceId = String(formData.get("resourceId") || "");
   if (staffId && resourceId) {
-    redirect(appointmentRulesPath("availability", { error: "Choose staff or resource availability, not both." }));
+    return { error: "Choose staff or resource availability, not both.", success: "" };
+  }
+
+  if (staffId && !await prisma.staffMember.findFirst({ where: { id: staffId, siteId: settings.siteId, isActive: true }, select: { id: true } })) {
+    return { error: "Choose an active staff member.", success: "" };
+  }
+  if (resourceId && !await prisma.resource.findFirst({ where: { id: resourceId, siteId: settings.siteId, isActive: true }, select: { id: true } })) {
+    return { error: "Choose an active resource.", success: "" };
   }
 
   await prisma.availabilityRule.create({
@@ -1072,7 +1141,8 @@ export async function createAvailabilityAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(appointmentRulesPath("availability", { saved: "availability" }));
+  revalidatePath("/admin/modules/services/[serviceId]", "page");
+  return { error: "", success: "Availability added." };
 }
 
 export async function deleteAvailabilityAction(formData: FormData) {
@@ -1084,6 +1154,7 @@ export async function deleteAvailabilityAction(formData: FormData) {
   });
 
   refreshScheduling();
+  revalidatePath("/admin/modules/services/[serviceId]", "page");
 }
 
 export async function createBlockoutAction(formData: FormData) {

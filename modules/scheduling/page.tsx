@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MediaVariantType, type Prisma } from "@prisma/client";
@@ -14,6 +15,7 @@ import { ServicePackageTable, type ServicePackageTablePackage } from "./componen
 
 import { catalogMediaUrl } from "@/lib/catalog-media-url";
 import { readSessionOffering } from "@/lib/scheduling/session-offering";
+import { servicePriceCents } from "@/lib/scheduling/pricing";
 import { contentWebsiteUrl, resolveContentManifest } from "@/clients/content-manifests";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +37,7 @@ type SchedulingPageProps = {
 };
 
 type ServiceCatalogItem = Prisma.ServiceGetPayload<{
-  include: { _count: { select: { packageItems: true } }; mediaAsset: true };
+  include: { _count: { select: { packageItems: true } }; mediaAsset: true; hourlyRate: true };
 }>;
 
 type ServicePackageWithItems = Prisma.ServicePackageGetPayload<{
@@ -92,6 +94,7 @@ function toServiceCatalogTableService(service: ServiceCatalogItem, websiteUrl?: 
     isActive: service.isActive,
     location: service.location || "",
     name: service.name,
+    pricing: service.pricingType === "HOURLY" && service.hourlyRate ? `$${(service.hourlyRate.amountCents / 100).toFixed(2)} / hour` : servicePriceCents(service) == null ? "Price not set" : `$${(servicePriceCents(service)! / 100).toFixed(2)}`,
     packageCount: readSessionOffering(service.sessionOffering)?.tiers.length ?? 1,
     tags: serviceTags(service)
   };
@@ -139,7 +142,7 @@ export default async function SchedulingPage({ searchParams, section }: Scheduli
   const [services, servicePackages, serviceCategories, mediaAssets] = await Promise.all([
     prisma.service.findMany({
       where: { siteId: settings.siteId, isOneOff: false },
-      include: { _count: { select: { packageItems: true } }, mediaAsset: true },
+      include: { _count: { select: { packageItems: true } }, mediaAsset: true, hourlyRate: true },
       orderBy: [{ isActive: "desc" }, { category: "asc" }, { updatedAt: "desc" }]
     }),
     prisma.servicePackage.findMany({
@@ -266,8 +269,8 @@ export default async function SchedulingPage({ searchParams, section }: Scheduli
         </div>
       </header>
 
-      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-      {errorMessage ? <div className="error">{errorMessage}</div> : null}
+      {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
       <section className="admin-index-panel">{selectedSection === "categories" ? categoriesContent : selectedSection === "packages" ? packagesContent : servicesContent}</section>
     </div>

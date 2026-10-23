@@ -1,4 +1,5 @@
 "use client";
+import { Notification } from "@/components/ui/notifications";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
@@ -202,8 +203,8 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
         <div><h2 className="section-title">Shoot galleries</h2><p className="ui-zero muted-text">Private photos, package selections, and delivery for this client.</p></div>
         <Button disabled={busy || uploading || creating} onClick={openCreate} size="sm" type="button" variant="secondary"><Plus aria-hidden="true" size={16} /> New shoot</Button>
       </header>
-      {notice ? <p className="success-message" role="status">{notice}</p> : null}
-      {error && !pickerOpen ? <p className="error" role="alert">{error}</p> : null}
+      {notice ? <Notification>{notice}</Notification> : null}
+      {error && !pickerOpen ? <Notification tone="danger">{error}</Notification> : null}
 
       {creating ? <form className={styles.createForm} onSubmit={createGallery}>
         <h3>New private shoot</h3>

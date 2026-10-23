@@ -1,5 +1,6 @@
 import { sessionPrice } from "@/lib/scheduling/session-input";
 import { sessionOfferingFormSchema } from "@/lib/scheduling/session-offering";
+import { pricingTypeSchema } from "@/lib/scheduling/pricing";
 import "server-only";
 
 import { AdminRole, BookingStatus, BookingWaitlistStatus, ClientPipelineStage, CouponType, MediaDriver, ProductStatus, ProductType } from "@prisma/client";
@@ -101,6 +102,8 @@ const timeSchema = z
 export const serviceFormSchema = z
   .object({
     price: z.union([z.literal(""), sessionPrice]).optional(),
+    pricingType: pricingTypeSchema.default("FLAT_RATE"),
+    hourlyRateId: z.string().max(100).default(""),
     sessionOffering: sessionOfferingFormSchema.optional(),
     name: requiredText,
     slug: optionalText.optional(),

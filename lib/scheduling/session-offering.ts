@@ -1,11 +1,15 @@
 import { z } from "zod";
 import { sessionPrice } from "./session-input";
+import { pricingTypeSchema } from "./pricing";
 
 const itemId = z.string().min(1).max(100);
 const itemName = z.string().trim().min(1, "Give each included item, package, and extra a name.").max(120);
 const coverageItem = z.object({
   id: itemId, name: itemName,
   libraryItemId: itemId.optional(),
+  pricingType: pricingTypeSchema.optional(),
+  priceCents: z.number().int().min(0).max(999999999).nullable().optional(),
+  hourlyRateId: itemId.nullable().optional(),
   description: z.string().trim().max(2000).optional(),
   category: z.string().trim().max(120).optional(),
   tags: z.array(z.string().trim().min(1).max(60)).max(20).optional()
@@ -84,8 +88,10 @@ export const sessionPackageSnapshotSchema = z.object({
   name: itemName,
   durationMinutes: z.number().int().positive(),
   priceCents: z.number().int().nonnegative().nullable(),
+  pricingType: pricingTypeSchema.optional(),
+  hourlyRate: z.object({ id: itemId, name: itemName, amountCents: z.number().int().nonnegative() }).optional(),
   coverage: z.array(z.string()),
-  includedItems: z.array(z.object({ name: itemName, description: z.string().max(2000) })).max(100).optional(),
+  includedItems: z.array(coverageItem.omit({ id: true, libraryItemId: true, category: true, tags: true }).extend({ description: z.string().max(2000) })).max(100).optional(),
   extras: z.array(z.object({ name: itemName, priceCents: z.number().int().nonnegative() }))
 });
 
@@ -106,7 +112,7 @@ export function selectSessionPackage(value: unknown, tierId?: string, addOnIds: 
     durationMinutes: tier.durationMinutes,
     priceCents: tier.priceCents == null ? null : tier.priceCents + extras.reduce((total, item) => total + item.priceCents, 0),
     coverage: included.map(item => item.name),
-    ...(included.some(item => item.description !== undefined) ? { includedItems: included.map(item => ({ name: item.name, description: item.description || "" })) } : {}),
+    ...(included.some(item => item.description !== undefined || item.pricingType !== undefined) ? { includedItems: included.map(item => ({ name: item.name, description: item.description || "", ...(item.pricingType ? { pricingType: item.pricingType, priceCents: item.priceCents, hourlyRateId: item.hourlyRateId } : {}) })) } : {}),
     extras: extras.map(item => ({ name: item.name, priceCents: item.priceCents }))
   };
 }

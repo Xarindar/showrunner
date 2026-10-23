@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import Link from "next/link";
 import { ChevronRight, Image as ImageIcon } from "lucide-react";
 import { MediaVariantType, PortfolioGalleryLayout, PortfolioGalleryStatus, PortfolioGalleryVisibility, PortfolioItemType } from "@prisma/client";
@@ -93,9 +94,9 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
       <div><h1>Photo albums</h1></div>
       <ModuleActionModals toolbarLabel="Album tools" items={[{ id: "album", label: "New album", title: "New photo album", icon: "plus", variant: "primary", content: createGalleryForm }]} />
     </header>}
-    {savedMessage && <p role="status" className="success-message">{savedMessage}</p>}
-    {errorMessage && <p role="alert" className="error">{errorMessage}</p>}
-    {params.gallery && !selectedGallery && <p role="alert">That album is not available. Choose another album below.</p>}
+    {savedMessage && <Notification tone="success" queryKey="saved">{savedMessage}</Notification>}
+    {errorMessage && <Notification tone="danger" queryKey="error">{errorMessage}</Notification>}
+    {params.gallery && !selectedGallery && <Notification tone="danger">That album is not available. Choose another album below.</Notification>}
     {!selectedGallery && <section className={styles.shelf} aria-label="Photo albums">
       {galleries.map(gallery => <Link key={gallery.id} className={styles.album} href={"/admin/modules/portfolio?gallery=" + gallery.id} aria-label={"Open " + gallery.title}>
         <div className={styles.thumbnail}>
@@ -108,8 +109,6 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
     </section>}
     {selectedGallery && <AlbumPhotos key={selectedGallery.id} galleryId={selectedGallery.id} title={selectedGallery.title} status={selectedGallery.status} visibility={enumLabel(selectedGallery.visibility)} photos={photos}>
       <div className={styles.settingsScroll}>
-        {errorMessage && <p className="error" role="alert">{errorMessage}</p>}
-        {savedMessage && <p className="success-message" role="status">{savedMessage}</p>}
         <div className={styles.settingsList}>
           <form id="gallery-settings-form" action={updatePortfolioGallerySettingsAction} className="ui-settings-form">
             <input type="hidden" name="id" value={selectedGallery.id} />

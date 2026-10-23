@@ -1,4 +1,5 @@
 "use client";
+import { Notification } from "@/components/ui/notifications";
 
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -9,7 +10,7 @@ import type { EventClickArg, EventDropArg, EventInput } from "@fullcalendar/core
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { AlertTriangle, Ban, CalendarClock, Check, ExternalLink, ListChecks, Mail, X } from "lucide-react";
+import { AlertTriangle, Ban, CalendarClock, Check, ExternalLink, Mail, X } from "lucide-react";
 import { Modal, Tab, Tabs } from "@/components/ui";
 import { rescheduleBookingFromCalendarAction, updateBookingStatusAction } from "../actions";
 import { AppointmentEventChip } from "./appointment-event-chip";
@@ -475,7 +476,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
         return;
       }
 
-      setMessage(notifyCustomer ? "Appointment rescheduled. The client will be emailed." : "Appointment rescheduled.");
+      setMessage("Appointment rescheduled.");
       router.refresh();
     });
   }
@@ -653,13 +654,6 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
 }
 
 function CalendarStatus({ message, pending }: { message: string; pending: boolean }) {
-  if (!message && !pending) return null;
-  const success = message.startsWith("Appointment rescheduled");
-
-  return (
-    <div className={success ? "success-message" : "error"}>
-      {success ? <ListChecks size={18} /> : <AlertTriangle size={18} />}
-      {pending ? "Checking conflicts..." : message}
-    </div>
-  );
+  if (pending) return <p role="status">Checking conflicts...</p>;
+  return message ? <Notification tone={message.startsWith("Appointment rescheduled") ? "success" : "danger"}>{message}</Notification> : null;
 }

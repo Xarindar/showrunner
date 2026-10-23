@@ -17,9 +17,9 @@ function load(path: string, mocks: RecordData): RecordData {
   runInNewContext(code, { exports, require: (id: string) => id === "server-only" ? {} : mocks[id] ?? require(id), Date, console });
   return exports;
 }
-function harness(options: { conflict?: boolean; missingService?: boolean; busy?: boolean } = {}) {
+function harness(options: { conflict?: boolean; missingService?: boolean; busy?: boolean; hourlyRate?: RecordData; offering?: RecordData } = {}) {
   const writes: RecordData[] = [];
-  const service = { id: "type", bufferBeforeMinutes: 0, bufferAfterMinutes: 15, staffAssignments: [], resourceAssignments: [{ resourceId: "room" }] };
+  const service = { id: "type", name: "Family photos", bufferBeforeMinutes: 0, bufferAfterMinutes: 15, staffAssignments: [], resourceAssignments: [{ resourceId: "room" }], sessionOffering: options.offering, ...(options.hourlyRate ? { pricingType: "HOURLY", hourlyRate: options.hourlyRate } : {}) };
   const db = {
     service: { findFirst: async (query: RecordData) => { assert.equal(query.where.siteId, "site-a"); return options.missingService ? null : service; }, create: async ({ data }: RecordData) => { writes.push({ kind: "service", ...data }); return { ...service, id: "private" }; } },
     staffMember: { findFirst: async () => ({ id: "staff" }) },
@@ -64,6 +64,27 @@ test("existing type is reused without rewriting its catalog values", async () =>
   assert.equal(writes.some(write => write.kind === "service"), false);
   assert.equal(booking.serviceId, "type");
   assert.equal(booking.resources.create[0].resourceId, "room");
+});
+
+test("hourly bookings calculate on the server and reject another business's rate", async () => {
+  const hourlyRate = { id: "rate", siteId: "site-a", name: "Photography", amountCents: 12550 };
+  const booking = await harness({ hourlyRate }).api.createManualSession({ ...input, serviceId: "type", priceCents: 18825, durationMinutes: 90 });
+  assert.equal(booking.priceCents, 18825);
+  assert.equal(booking.packageSnapshot.hourlyRate.amountCents, 12550);
+  await assert.rejects(harness({ hourlyRate }).api.createManualSession({ ...input, serviceId: "type", priceCents: 1 }), /price has changed/);
+  hourlyRate.amountCents = 20000;
+  assert.equal(booking.priceCents, 18825);
+  assert.equal(booking.packageSnapshot.hourlyRate.amountCents, 12550);
+  await assert.rejects(harness({ hourlyRate: { ...hourlyRate, siteId: "another-business" } }).api.createManualSession({ ...input, serviceId: "type" }), /from this business/);
+});
+
+test("hourly bookings use the booked duration and add flat extras once", async () => {
+  const hourlyRate = { id: "rate", siteId: "site-a", name: "Photography", amountCents: 12550 };
+  const offering = { coverageItems: [], tiers: [{ id: "standard", name: "Standard", durationMinutes: 60, priceCents: 100, coverageIds: [] }], addOns: [{ id: "album", name: "Album", priceCents: 2500 }] };
+  const booking = await harness({ hourlyRate, offering }).api.createManualSession({ ...input, serviceId: "type", tierId: "standard", addOnIds: ["album"], durationMinutes: 90, priceCents: 21325 });
+  assert.equal(booking.priceCents, 21325);
+  assert.equal(booking.packageSnapshot.durationMinutes, 90);
+  assert.equal(booking.packageSnapshot.extras[0].priceCents, 2500);
 });
 test("conflicts include the existing booking's buffer; failure creates no client or one-off record", async () => {
   const { api, writes } = harness({ conflict: true });

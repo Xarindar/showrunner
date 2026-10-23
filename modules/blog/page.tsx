@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import { MediaDriver } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { globalMediaAssets } from "@/lib/global-media-assets";
@@ -45,8 +46,8 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
         </div>
       </header>
 
-      {params.saved ? <div className="success-message">{savedMessage(params.saved)}</div> : null}
-      {params.error ? <div className="error">{decodeURIComponent(params.error)}</div> : null}
+      {params.saved ? <Notification tone="success" queryKey="saved">{savedMessage(params.saved)}</Notification> : null}
+      {params.error ? <Notification tone="danger" queryKey="error">{decodeURIComponent(params.error)}</Notification> : null}
 
       <BlogEditor
         canUpload={canUploadWithDriver(settings.mediaDriver)}
