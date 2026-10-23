@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import NextImage from "next/image";
 import { notFound } from "next/navigation";
 import { MediaDriver, MediaVariantType, ProductMediaRole, ProductStatus, ProductType, type Prisma } from "@prisma/client";
@@ -773,8 +774,8 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
         </div>
       </header>
 
-      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-      {errorMessage ? <div className="error">{decodeURIComponent(errorMessage)}</div> : null}
+      {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{decodeURIComponent(errorMessage)}</Notification> : null}
 
       <ProductEditorTabs initialTab={params.tab} tabs={tabs} />
     </div>

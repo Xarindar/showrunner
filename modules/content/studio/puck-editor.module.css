@@ -46,9 +46,9 @@
 .workspace .mobilePanelButton { display: none; }
 :global(.showrunner-admin .admin-main):has(.overview) { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
 :global(.Puck):has(> .overview) { height: 100%; }
-.overview { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.overview > :global(.page-header) { flex-shrink: 0; padding-inline: var(--sd-space-16); }
-.overview > p { padding-inline: var(--sd-space-16); }
+.overview { display: flex; flex-direction: column; height: 100%; min-height: 0; padding-top: var(--admin-page-inset); }
+:global(.showrunner-admin .admin-main) .overview > :global(.page-header) { flex-shrink: 0; padding-inline: var(--admin-page-inset); }
+.overview > p { padding-inline: var(--admin-page-inset); }
 .websitePreview { display: block; flex: 1; min-height: 0; width: 100%; border: 0; background: var(--color-surface); }
 @media (max-width: 860px) {
   :global(.showrunner-admin .admin-root):has(.overview) { display: flex; flex-direction: column; height: 100dvh; min-height: 0; }

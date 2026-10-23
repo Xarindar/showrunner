@@ -60,6 +60,8 @@ model MediaAsset {
   productMedia      ProductMedia[]
   serviceCategories ServiceCategory[] @relation("ServiceCategoryMediaAsset")
   services          Service[]         @relation("ServiceMediaAsset")
+  rectangularServices Service[]       @relation("ServiceRectangularMediaAsset")
+  galleryServices   Service[]         @relation("ServiceGalleryAssets")
   variants          MediaAssetVariant[]
 
   @@index([siteId, folder])

@@ -10,7 +10,7 @@ type ToastProps = HTMLAttributes<HTMLDivElement> & {
   tone?: ToastTone;
 };
 
-export function Toast({ className, description, title, tone = "neutral", ...props }: ToastProps) {
+export function Toast({ children, className, description, title, tone = "neutral", ...props }: ToastProps) {
   const Icon = tone === "success" ? CheckCircle2 : tone === "danger" ? AlertTriangle : Info;
 
   return (
@@ -18,12 +18,13 @@ export function Toast({ className, description, title, tone = "neutral", ...prop
       <Icon size={18} aria-hidden="true" />
       <span>
         <strong>{title}</strong>
-        <small>{description || ""}</small>
+        {description ? <small>{description}</small> : null}
       </span>
+      {children}
     </div>
   );
 }
 
 export function ToastRegion({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div aria-live="polite" className={cx("ui-toast-region", className)} {...props} />;
+  return <div className={cx("ui-toast-region", className)} {...props} />;
 }

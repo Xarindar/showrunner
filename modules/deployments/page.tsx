@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import { GitBranch, RefreshCw, Rocket, ShieldOff } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { defaultTemplateRepository, getGithubOAuthConfig } from "@/lib/deployments/github";
@@ -6,7 +7,7 @@ import { deploymentInviteUrl, getAppBaseUrl } from "@/lib/deployments/urls";
 import { formatDateTime, stringArrayFromUnknown } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { resolveCurrentSite } from "@/lib/site";
-import { Badge, Button, ButtonAnchor, Card, EqualGrid, Feedback, Field, Input, OptionPicker, StatTile, Table } from "@/components/ui";
+import { Badge, Button, ButtonAnchor, Card, EqualGrid, Field, Input, OptionPicker, StatTile, Table } from "@/components/ui";
 import { createClientDeploymentAction, regenerateClientDeploymentInviteAction, revokeClientDeploymentInviteAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -96,8 +97,8 @@ export default async function DeploymentsPage({ searchParams }: DeploymentsPageP
         </div>
       </header>
 
-      {params.error ? <Feedback tone="danger">{params.error}</Feedback> : null}
-      {params.saved ? <Feedback tone="success">{savedMessages[params.saved] || "Deployment updated."}</Feedback> : null}
+      {params.error ? <Notification tone="danger" queryKey="error">{params.error}</Notification> : null}
+      {params.saved ? <Notification tone="success" queryKey="saved">{savedMessages[params.saved] || "Deployment updated."}</Notification> : null}
 
       {freshInvite && freshInviteUrl ? (
         <Card as="section" minHeight="none" bodyClassName="form-grid">
@@ -126,9 +127,9 @@ export default async function DeploymentsPage({ searchParams }: DeploymentsPageP
       </EqualGrid>
 
       {!githubConfigured ? (
-        <Feedback tone="danger">
+        <Notification tone="danger">
           GitHub OAuth is not configured. Add `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, and `DEPLOYMENT_TEMPLATE_REPOSITORY` before sending live links.
-        </Feedback>
+        </Notification>
       ) : null}
 
       <Card action={createClientDeploymentAction} as="form" minHeight="none" bodyClassName="form-grid">

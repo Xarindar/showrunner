@@ -12,6 +12,7 @@ export async function saveServiceLibraryItemAction(input: unknown): Promise<{ it
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const { siteId } = await getSiteSettings();
   const { id, ...values } = parsed.data;
+  if (values.hourlyRateId && !await prisma.hourlyRate.findFirst({ where: { id: values.hourlyRateId, siteId }, select: { id: true } })) return { error: "Choose an hourly rate from this business." };
   const data = { ...values, nameKey: values.name.toLowerCase() };
   try {
     if (id) {

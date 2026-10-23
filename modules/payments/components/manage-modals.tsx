@@ -1,4 +1,5 @@
 "use client";
+import { Notification } from "@/components/ui/notifications";
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -356,7 +357,7 @@ export function ManageProviderModal({
       <p className="pay-step-lead">{detail}</p>
 
       {recheckState.status === "success" ? (
-        <p className="success-message ui-zero">{name} is responding. Connection re-checked.</p>
+        <Notification>{`${name} is responding. Connection re-checked.`}</Notification>
       ) : null}
       {recheckState.status === "error" ? <p className="error ui-zero">{recheckState.message}</p> : null}
       {disconnectState.status === "error" ? <p className="error ui-zero">{disconnectState.message}</p> : null}
@@ -382,8 +383,8 @@ export function ManageProviderModal({
           </Button>
         </form>
       ) : null}
-      {webhookKeyState.status === "success" ? (
-        <p className="success-message ui-zero">{webhookKeyState.message}</p>
+      {webhookKeyState.status === "success" && webhookKeyState.message ? (
+        <Notification>{webhookKeyState.message}</Notification>
       ) : null}
 
       <div className="pay-step-actions">

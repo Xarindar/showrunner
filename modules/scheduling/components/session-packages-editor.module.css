@@ -33,8 +33,10 @@
 }
 
 .optionList { min-width:0; border:1px solid var(--color-border); border-radius:var(--radius-control); overflow:hidden; }
+.optionList:empty { display:none; }
+.optionSummary, .optionSummary > * { min-width:0; overflow-wrap:anywhere; }
 .optionRow { min-width:0; padding:var(--space-4); }
-.optionRow + .optionRow,.tierCard + .tierCard { border-top:1px solid var(--color-border); }
+.optionRow + .optionRow,.editor .tierCard + .tierCard { border-top:1px solid var(--color-border); }
 .optionRow:has(>.optionSummary) { padding:0; }
 .optionSummary { display:grid; gap:var(--space-2); width:100%; border:0; border-radius:0; background:transparent; color:var(--color-text); font:inherit; text-align:left; cursor:pointer; padding:var(--space-4); }
 .optionSummary strong { font-weight:500; }
@@ -42,7 +44,7 @@
 .optionSummary:focus-visible { outline:2px solid var(--sd-color-focus,var(--color-brand)); outline-offset:-2px; }
 .chips { display:flex; gap:var(--space-1); flex-wrap:wrap; }
 .chips:empty { display:none; }
-.tierCard { border:0; border-radius:0; }
+.editor details.tierCard { border:0; border-radius:0; padding:0; }
 .tierCard > summary { display:grid; list-style:none; }
 .tierCard > summary::-webkit-details-marker { display:none; }
 .tierCard[open] > summary { display:none; }

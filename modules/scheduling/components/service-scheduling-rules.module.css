@@ -1,0 +1,14 @@
+:global(.ui-dialog).dialog { width: min(960px, calc(100vw - 32px)); height: fit-content; max-width: calc(100vw - 32px); max-height: calc(100svh - 32px); margin: auto; inset: 0; overflow: hidden; }
+:global(.ui-dialog).dialog[open] { display: flex; flex-direction: column; }
+.body { min-height: 0; overflow: auto; }
+.dialog :global(.ui-equal-grid) { align-items: start; }
+.dialog :global(.ui-card) { min-height: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.dialog :global(.ui-card-body) { padding: 0; overflow: visible; align-content: start; gap: var(--sd-space-16); }
+.dialog :global(.ui-card-body) > :global(.ui-equal-grid):has(> :nth-child(2)) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.dialog :global(.ui-card-body) > :global(.ui-button) { justify-self: start; }
+.dialog :global(.ui-table) { min-width: 0; table-layout: auto; }
+.dialog :global(.ui-table) :is(th, td) { padding: var(--sd-space-8); }
+@media (min-width: 861px) {
+  :global(.ui-dialog).dialog { left: var(--layout-admin-sidebar); right: 4px; max-width: calc(100vw - var(--layout-admin-sidebar) - 36px); }
+  :global(.admin-root:has(.admin-sidebar.is-collapsed)) .dialog { left: 52px; max-width: calc(100vw - 88px); }
+}

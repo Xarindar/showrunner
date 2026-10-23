@@ -18,7 +18,7 @@ type PaymentsPageProps = {
   searchParams?: Promise<Record<string, string | undefined>>;
 };
 
-// Banner state for the OAuth connect round-trip: the callback route redirects back
+// Notification state for the OAuth connect round-trip: the callback route redirects back
 // here with ?connected={provider} or ?connectError={message}.
 function connectNotice(params: Record<string, string | undefined>): ConnectNotice | null {
   const connected = (params.connected || "").trim().toLowerCase();

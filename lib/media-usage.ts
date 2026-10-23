@@ -5,6 +5,8 @@ export const mediaReferenceCountSelect = {
   productMedia: true,
   serviceCategories: true,
   services: true,
+  rectangularServices: true,
+  galleryServices: true,
   portfolioItems: true,
   purchasedSelections: true
 } satisfies Prisma.MediaAssetCountOutputTypeSelect;
@@ -19,6 +21,8 @@ export const unreferencedMediaWhere = {
   productMedia: { none: {} },
   serviceCategories: { none: {} },
   services: { none: {} },
+  rectangularServices: { none: {} },
+  galleryServices: { none: {} },
   portfolioItems: { none: {} },
   purchasedSelections: { none: {} }
 } satisfies Prisma.MediaAssetWhereInput;

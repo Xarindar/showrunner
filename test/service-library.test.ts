@@ -6,11 +6,11 @@ import { resolveIncludedServices, serviceLibraryInputSchema } from "../lib/sched
 import { sessionOfferingDraft, sessionOfferingFormSchema, sessionOfferingSchema, selectSessionPackage } from "../lib/scheduling/session-offering";
 
 const offering = { coverageItems: [{ id: "legacy-ceremony", name: "Ceremony" }], tiers: [{ id: "standard", name: "Standard", durationMinutes: 60, priceCents: 10000, coverageIds: ["legacy-ceremony"] }], addOns: [] };
-const item = { id: "library-ceremony", name: "Ceremony", description: "Your ceremony photographed from arrival to your first kiss.", category: "Weddings", tags: ["ceremony"] };
+const item = { id: "library-ceremony", name: "Ceremony", description: "Your ceremony photographed from arrival to your first kiss.", category: "Weddings", tags: ["ceremony"], pricingType: "FLAT_RATE" as const, priceCents: null, hourlyRateId: null };
 
 test("library input trims metadata, normalizes tags, and bounds client-facing descriptions", () => {
   const parsed = serviceLibraryInputSchema.parse({ name: " Ceremony ", description: " For clients. ", category: " Weddings ", tags: "Wedding, ceremony, WEDDING, " });
-  assert.deepEqual(parsed, { name: "Ceremony", description: "For clients.", category: "Weddings", tags: ["wedding", "ceremony"] });
+  assert.deepEqual(parsed, { name: "Ceremony", description: "For clients.", category: "Weddings", tags: ["wedding", "ceremony"], pricingType: "FLAT_RATE", priceCents: null, hourlyRateId: null });
   for (const value of [{ ...parsed, name: " ", tags: "" }, { ...parsed, description: "x".repeat(2001), tags: "" }, { ...parsed, tags: "x".repeat(61) }]) assert.equal(serviceLibraryInputSchema.safeParse(value).success, false);
 });
 
@@ -26,7 +26,7 @@ test("library resolution preserves package references and uses authoritative ser
   assert.equal(sessionOfferingSchema.safeParse({ ...linked, coverageItems: [linked.coverageItems[0], { ...linked.coverageItems[0], id: "another", name: "Another" }] }).success, false);
   assert.deepEqual(sessionOfferingFormSchema.parse(JSON.stringify(sessionOfferingDraft(linked, 60, null))), linked);
   const snapshot = selectSessionPackage(linked, "standard");
-  assert.deepEqual(snapshot?.includedItems, [{ name: item.name, description: item.description }]);
+  assert.deepEqual(snapshot?.includedItems, [{ name: item.name, description: item.description, pricingType: "FLAT_RATE", priceCents: null, hourlyRateId: null }]);
   linked.coverageItems[0].description = "Changed after booking";
   assert.equal(snapshot?.includedItems?.[0].description, item.description);
 });

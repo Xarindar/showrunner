@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import Link from "next/link";
 import { Save } from "lucide-react";
 import { MediaDriver, MediaVariantType } from "@prisma/client";
@@ -85,8 +86,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
       <div className="admin-settings-layout"><SettingsNav active="dashboard" /><div className="stack">
 
-      {saved ? <div className="success-message">Settings saved.</div> : null}
-      {errorMessage ? <div className="error">{errorMessage}</div> : null}
+      {saved ? <Notification tone="success" queryKey="saved">Settings saved.</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
       <Card aria-label="Payments" as="section" minHeight="none" bodyClassName="form-grid">
         <div>

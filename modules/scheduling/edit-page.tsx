@@ -1,4 +1,6 @@
-import { BookingPhotoField } from "./components/booking-photo-field";
+import { Notification } from "@/components/ui/notifications";
+import { ServiceMediaFields } from "./components/service-media-fields";
+import { readImageFraming } from "@/modules/content/studio/image-framing";
 import { SessionTypeForm } from "./components/session-type-form";
 import { SessionPackagesEditor } from "./components/session-packages-editor";
 import { SessionDetailsForm, SessionDetailsSaveButton } from "./components/session-details-form";
@@ -8,8 +10,8 @@ import styles from "./service-editor.module.css";
 import { catalogMediaUrl } from "@/lib/catalog-media-url";
 import { contentWebsiteUrl, resolveContentManifest } from "@/clients/content-manifests";
 import { notFound } from "next/navigation";
-import { MediaVariantType, type Prisma } from "@prisma/client";
-import { ArrowLeft, Boxes, Clock3, FileText } from "lucide-react";
+import { MediaVariantType, type MediaAsset, type Prisma } from "@prisma/client";
+import { ArrowLeft, Boxes, FileText } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { stringArrayCsv } from "@/lib/format";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
@@ -17,10 +19,11 @@ import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { ButtonLink, Switch, type AssetPickerAsset } from "@/components/ui";
 import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
-import { attachServiceImageAction, removeServiceImageAction, uploadServiceImageAction } from "./actions";
 import { ServiceBookingRulesTable } from "./components/service-booking-rules-table";
 import { ServicePresetField } from "./components/service-preset-field";
 import { ServiceWorkspaceTabs, type ServiceWorkspaceTab } from "./components/service-workspace-tabs";
+import { AvailabilityPanel } from "./components/availability-panel";
+import { ServiceSchedulingRules } from "./components/service-scheduling-rules";
 
 type ServiceEditPageProps = {
   searchParams: Promise<{ error?: string; saved?: string; tab?: string }>;
@@ -94,6 +97,13 @@ function hiddenSchedulingValues(service: ServiceWithBuilderData) {
 export default async function ServiceEditPage({ searchParams, serviceId }: ServiceEditPageProps) {
   await requireAdmin("scheduling:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
+  const [availability, staff, resources, rates] = await Promise.all([
+    prisma.availabilityRule.findMany({ where: { siteId: settings.siteId }, include: { resource: true, staff: true }, orderBy: [{ weekday: "asc" }, { startMinutes: "asc" }] }),
+    prisma.staffMember.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
+    prisma.resource.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
+    prisma.hourlyRate.findMany({ where: { siteId: settings.siteId }, orderBy: { name: "asc" }, select: { id: true, name: true, amountCents: true } })
+  ]);
+  const schedulingRules = <ServiceSchedulingRules><AvailabilityPanel availability={availability} resources={resources} staff={staff} /></ServiceSchedulingRules>;
   const taxonomyServicesPromise = prisma.service.findMany({
     where: { siteId: settings.siteId, isOneOff: false },
     select: { category: true, intakePrompt: true, location: true, policyText: true }
@@ -113,17 +123,19 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   });
 
   if (serviceId === "new") {
-    const rules = await prisma.availabilityRule.findMany({ where: { siteId: settings.siteId, staffId: null, resourceId: null }, orderBy: [{ weekday: "asc" }, { startMinutes: "asc" }] });
+    const rules = availability.filter(rule => !rule.staffId && !rule.resourceId);
     const timeLabel = (minutes: number) => `${Math.floor(minutes / 60).toString().padStart(2, "0")}:${(minutes % 60).toString().padStart(2, "0")}`;
     const businessHours = rules.map(rule => `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][rule.weekday]} ${timeLabel(rule.startMinutes)}–${timeLabel(rule.endMinutes)}`);
-    return <SessionTypeForm businessHours={businessHours} timezone={settings.timezone} />;
+    return <SessionTypeForm rates={rates} businessHours={businessHours} timezone={settings.timezone} canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)} schedulingRules={schedulingRules} />;
   }
 
-  const [service, taxonomyServices, intakeFormFields, serviceCategories, mediaAssets] = await Promise.all([
+  const [service, taxonomyServices, intakeFormFields, serviceCategories] = await Promise.all([
     prisma.service.findFirst({
       where: { id: serviceId, siteId: settings.siteId },
       include: {
         mediaAsset: true,
+        rectangularMediaAsset: true,
+        galleryAssets: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
         packageItems: {
           include: { package: true },
           orderBy: [{ package: { sortOrder: "asc" } }, { createdAt: "asc" }]
@@ -132,12 +144,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     }),
     taxonomyServicesPromise,
     intakeFormFieldsPromise,
-    serviceCategoriesPromise,
-    prisma.mediaAsset.findMany({
-      where: { siteId: settings.siteId, deletedAt: null, isPrivate: false },
-      orderBy: { createdAt: "desc" },
-      take: 40
-    })
+    serviceCategoriesPromise
   ]);
 
   if (!service) notFound();
@@ -152,23 +159,22 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   const tagsValue = serviceTags(service);
   const packageCount = service.packageItems.length;
   const canUpload = isMediaUploadDriverConfigured(settings.mediaDriver);
-  const mediaAssetOptions: AssetPickerAsset[] = mediaAssets.map((asset) => ({
+  const toPickerAsset = (asset: MediaAsset): AssetPickerAsset => ({
     alt: asset.alt || asset.filename,
     filename: asset.filename,
     id: asset.id,
-    thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD)
-  }));
+    thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
+    url: mediaAssetDisplayUrl(asset, MediaVariantType.FULL)
+  });
   const websiteUrl = contentWebsiteUrl(resolveContentManifest(settings.siteId, settings.publicContentConfig));
   const serviceImageUrl = catalogMediaUrl(serviceMediaUrl(service), websiteUrl);
   const serviceImageAlt = `${service.name} session photo`;
-  const serviceImageUploadFormId = `service-${service.id}-image-upload`;
-  const serviceImageAttachFormId = `service-${service.id}-image-attach`;
-  const serviceImageRemoveFormId = `service-${service.id}-image-remove`;
 
   const detailsContent = (
     <>
       <SessionDetailsForm key={service.updatedAt.toISOString()}>
         <input name="id" type="hidden" value={service.id} />
+        <input name="updatedAt" type="hidden" value={service.updatedAt.toISOString()} />
         <input name="location" type="hidden" value={service.location || ""} />
         {hiddenSchedulingValues(service)}
         <main className="product-studio-main">
@@ -188,8 +194,6 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
               <textarea defaultValue={service.description || ""} id="service-description" name="description" rows={3} />
             </div>
 
-            <BookingPhotoField framingUrl={catalogMediaUrl(service.mediaAsset ? mediaAssetDisplayUrl(service.mediaAsset, MediaVariantType.FULL) : service.imageUrl, websiteUrl)} imageFraming={service.imageFraming} updatedAt={service.updatedAt.toISOString()} assets={mediaAssetOptions} canUpload={canUpload} imageAlt={serviceImageAlt} imageUrl={serviceImageUrl || ""} serviceId={service.id}
-              uploadFormId={serviceImageUploadFormId} attachFormId={serviceImageAttachFormId} removeFormId={serviceImageRemoveFormId} />
                 <ServicePresetField
                   defaultValue={service.category}
                   emptyLabel="Uncategorized"
@@ -201,7 +205,11 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
                   options={categoryOptions}
                 />
         </section>
-        <SessionPackagesEditor initialOffering={offering} durationMinutes={service.durationMinutes} priceCents={service.priceCents} />
+        <SessionPackagesEditor initialRates={rates} initialPricingType={service.pricingType} initialHourlyRateId={service.hourlyRateId ?? ""} initialOffering={offering} durationMinutes={service.durationMinutes} priceCents={service.priceCents} />
+        <ServiceMediaFields canUpload={canUpload}
+          initialSquare={serviceImageUrl ? { asset: service.mediaAsset ? toPickerAsset(service.mediaAsset) : { id: "", filename: service.name, alt: serviceImageAlt, thumbnailUrl: serviceImageUrl, url: serviceImageUrl }, framing: readImageFraming(service.imageFraming) } : null}
+          initialRectangular={service.rectangularMediaAsset ? { asset: toPickerAsset(service.rectangularMediaAsset), framing: readImageFraming(service.rectangularImageFraming) } : null}
+          initialGallery={service.galleryAssets.map(toPickerAsset)} />
         <section className="studio-panel">
               <details className={styles.moreOptions}><summary>Intake and booking policies</summary>
                 <ServiceBookingRulesTable
@@ -237,10 +245,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
             </div>
             {bookingPath !== "Client booking rebuild pending" && <div><dt>Booking link</dt><dd>{bookingPath}</dd></div>}
           </dl>
-          <ButtonLink href="/admin/modules/appointments?panel=rules&tab=availability" variant="secondary">
-            <Clock3 size={16} />
-            Business hours
-          </ButtonLink>
+          {schedulingRules}
           </section>
               <section className="studio-panel" aria-labelledby="session-organization-title">
                 <h2 id="session-organization-title" className="section-title">Organization</h2>
@@ -255,12 +260,6 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
         </footer>
       </SessionDetailsForm>
 
-      <form action={uploadServiceImageAction} id={serviceImageUploadFormId} />
-      <form action={uploadServiceImageAction} id={`${serviceImageUploadFormId}-library`} />
-      <form action={attachServiceImageAction} id={serviceImageAttachFormId} />
-      <form action={removeServiceImageAction} id={serviceImageRemoveFormId}>
-        <input name="serviceId" type="hidden" value={service.id} />
-      </form>
     </>
   );
 
@@ -342,8 +341,8 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
         </div>
       </header>
 
-      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-      {errorMessage ? <div className="error">{errorMessage}</div> : null}
+      {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
       <ServiceWorkspaceTabs initialTab={params.tab} tabs={tabs} />
     </div>

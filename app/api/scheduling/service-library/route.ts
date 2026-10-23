@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     ] } : {})
   };
   const [items, total, categories] = await Promise.all([
-    prisma.serviceLibraryItem.findMany({ where, select: { id: true, name: true, description: true, category: true, tags: true }, orderBy: { nameKey: "asc" }, skip: (page - 1) * 20, take: 20 }),
+    prisma.serviceLibraryItem.findMany({ where, select: { id: true, name: true, description: true, category: true, tags: true, pricingType: true, priceCents: true, hourlyRateId: true }, orderBy: { nameKey: "asc" }, skip: (page - 1) * 20, take: 20 }),
     prisma.serviceLibraryItem.count({ where }),
     prisma.serviceLibraryItem.findMany({ where: { siteId, category: { not: "" } }, distinct: ["category"], select: { category: true }, orderBy: { category: "asc" } })
   ]);

@@ -18,6 +18,7 @@ export type ServiceCatalogTableService = {
   isActive: boolean;
   location: string;
   name: string;
+  pricing: string;
   packageCount: number;
   tags: string[];
 };
@@ -192,6 +193,7 @@ export function ServiceCatalogTable({
               <div className="service-mobile-meta">
                 <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
                 <span>{serviceDurationLabel(service.durationMinutes)}</span>
+                <span>{service.pricing}</span>
                 <span>{service.packageCount} {service.packageCount === 1 ? "package" : "packages"}</span>
               </div>
             </div>
@@ -242,6 +244,7 @@ export function ServiceCatalogTable({
                       </div>
                       <div className="catalog-row-copy">
                         <Link href={`/admin/modules/services/${service.id}`} title={service.name}>{service.name}</Link>
+                        <small>{service.pricing}</small>
                         {service.description || service.location ? <small title={service.description || service.location}>{service.description || service.location}</small> : null}
                       </div>
                     </div>

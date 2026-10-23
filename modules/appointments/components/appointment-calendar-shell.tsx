@@ -1,5 +1,7 @@
 "use client";
 
+import { Notification } from "@/components/ui/notifications";
+
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, ListChecks, MoreHorizontal, SlidersHorizontal, Table2 } from "lucide-react";
@@ -97,13 +99,8 @@ export function AppointmentCalendarShell({
         </div>
       </header>
 
-      {savedMessage || errorMessage ? (
-        <div className="appointments-workspace-messages">
-          {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-          {errorMessage ? <div className="error">{errorMessage}</div> : null}
-        </div>
-      ) : null}
-
+      {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
       <div className="appointments-calendar-canvas">{children}</div>
 
       <Modal bodyClassName="appointments-modal-body" className="appointments-modal" onClose={() => setOpenPanel(null)} open={openPanel === "filters"} title="Filters">

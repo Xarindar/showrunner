@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import styles from "./service-editor.module.css";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
@@ -139,8 +140,8 @@ export default async function ServicePackageEditPage({ packageId, searchParams }
           </div>
         </header>
 
-        {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-        {errorMessage ? <div className="error">{errorMessage}</div> : null}
+        {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
+        {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
         {newPackageForm()}
       </div>
@@ -186,8 +187,8 @@ export default async function ServicePackageEditPage({ packageId, searchParams }
         </div>
       </header>
 
-      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-      {errorMessage ? <div className="error">{errorMessage}</div> : null}
+      {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
       <PackageBuilder
         addPackageItemAction={addServicePackageItemAction}

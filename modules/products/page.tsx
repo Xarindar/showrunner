@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import NextImage from "next/image";
 import { MediaDriver, MediaVariantType, Prisma, ProductStatus, ProductType } from "@prisma/client";
 import { Camera, ImageIcon, PackagePlus } from "lucide-react";
@@ -220,8 +221,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </div>
       </header>
 
-      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-      {errorMessage ? <div className="error">{decodeURIComponent(errorMessage)}</div> : null}
+      {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{decodeURIComponent(errorMessage)}</Notification> : null}
 
       <main className="catalog-board" aria-labelledby="products-board-title">
           <div className="catalog-board-header">

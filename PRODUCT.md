@@ -17,13 +17,16 @@ Service selection opens a searchable photo dialog with business and tag filters.
 
 Buttons offer Page, Service (where booking is configured), and Web address destinations. Existing links remain intact until edited; Web address supports custom links. Service destinations use the service slug and open booking at its next available day. The desktop dashboard panel can collapse to a narrow expand-control rail, and its preference persists across visits. Mobile opens the existing navigation drawer from a floating menu button, with a single page header instead of a second shell header. Editor mode hides this button.
 
-The editor uses open-source Puck inside Showrunner's existing admin shell. Draft edits preview immediately. Publishing uses the existing authenticated, site-scoped content service, revision checks and media library. Successful publication shows a short toast that clears after 3.5 seconds; errors remain visible. Existing Cottage616 content supplies initial values. Cottage616's integration may change to fit the reusable Showrunner workflow.
+The editor uses open-source Puck inside Showrunner's existing admin shell. Draft edits preview immediately. Publishing uses the existing authenticated, site-scoped content service, revision checks and media library. Successful publication uses the shared admin toast system; confirmations clear after at least five seconds and errors remain until dismissed. Existing Cottage616 content supplies initial values. Cottage616's integration may change to fit the reusable Showrunner workflow.
 
 ## Stack
 Next.js App Router, React, TypeScript, Puck, Prisma and PostgreSQL. Websites consume Showrunner's public content API and the shared preview bridge. Existing hosting is Railway.
 
 ## Global interface rules
 Keep module headers to one compact line: the name, relevant icon/count, and essential actions. Do not add decorative explanatory subtitles or text rows of status metadata beneath the title. Use accessible icons with hover/focus descriptions for compact states and actions; keep full details in settings. Photos use a regular cursor, and image viewers prevent accidental text selection and image dragging.
+
+## Service pricing
+Services → Hourly rates manages reusable named USD rates. Session types and included library services choose Flat rate or Hourly; hourly pricing selects a saved rate, and a new rate can be added without leaving an unsaved service. Hourly session/package totals use the selected rate × duration in minutes, rounded once to cents, plus flat optional extras. Included service prices are references; they do not automatically sum into package totals. Bookings calculate hourly totals on the server and retain the selected rate and agreed total when rates change later. Existing offerings default to flat rate, and existing bookings keep their saved prices. Pricing belongs in Services; Appointments remains the calendar and booking workspace.
 
 ## Portfolio
 Portfolio manages public website photo albums for showcasing work. Client image delivery, private access, proofing, approvals and download workflows belong to the future Clients delivery system, not Portfolio. New Portfolio albums are public galleries saved as drafts. Existing private records remain private; no data migration or deletion is implied.
@@ -33,7 +36,11 @@ Service/product showcase cards are an opt-in reusable block inside an approved p
 ## Admin design direction
 The Shopify-inspired system in DESIGN.md applies across admin navigation, resource indexes, editors and shared controls. Replace folder-tabbed catalog containers with navigation destinations and continuous editors. Preserve client-facing branding. Track the overhaul in `jazz/shopify-design/SHOWRUNNER-MIGRATION.md`.
 
+Business hours on service creation and editing opens the availability controls from Scheduling rules in a dialog on the current page. Adding or removing hours refreshes the rules without navigating away or discarding the service draft; these hours apply across session types.
+
 ## Media
 Media is a standalone module for files reused across the business. Open directly into the library, with upload, a wide search field, compact Filters and Sort controls, and removable active-filter chips. Categories, folders, tags and type are available in the Filters popover. Search takes its own row on mobile. Show details on selection. Railway bucket storage is managed infrastructure; users are not asked to choose or configure providers. Storage failures are reported as upload availability errors.
 
-Image selection opens the full authorized image library, with folder and tag filters combined with search. Pickers and upload dialogs use a fixed 640px square on desktop, pinned headers/actions and internal scrolling; mobile fits the viewport. Batch uploads remain available from the picker, including dropping files onto its library view.
+Image selection opens the full authorized image library, with folder and tag filters combined with search. The image browser has bounded height and internal scrolling. Upload dialogs grow with their contents, centered over the admin working area on desktop and within the viewport on mobile. Use a compact Choose files toolbar, thumbnail rows and clear upload states, without a permanent dashed drop box or separate cards around each file. Batch uploads and drag-and-drop remain available.
+
+Service creation and editing include Media: a 4:3 rectangular photo, a 1:1 square photo (the existing booking photo), and up to 50 additional images held for future use. Each photo has independent framing, with originals preserved. Selections save with the service; uploads are immediately retained in the authorized media library. The public services API exposes the two named photo shapes while additional images stay in admin until a website integration opts to display them.

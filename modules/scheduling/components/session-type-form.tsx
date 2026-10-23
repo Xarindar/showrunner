@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import { Button, ButtonLink } from "@/components/ui";
 import { createServiceAction } from "../actions";
 import styles from "@/modules/appointments/session-form.module.css";
@@ -8,28 +8,31 @@ import { SessionPackagesEditor } from "./session-packages-editor";
 import editorStyles from "../service-editor.module.css";
 import packageStyles from "./session-packages-editor.module.css";
 import { SessionDraftGuard, revealInvalidSessionField } from "./session-draft-guard";
+import { ServiceMediaFields } from "./service-media-fields";
+import type { HourlyRate } from "@/lib/scheduling/pricing";
 
-export function SessionTypeForm({ businessHours, timezone }: { businessHours: string[]; timezone: string }) {
+export function SessionTypeForm({ businessHours, timezone, canUpload, schedulingRules, rates }: { businessHours: string[]; timezone: string; canUpload: boolean; schedulingRules: ReactNode; rates: HourlyRate[] }) {
   const [state, action, pending] = useActionState(createServiceAction, { error: "" });
   const [values, setValues] = useState({ name: "", description: "", bufferBeforeMinutes: "0", bufferAfterMinutes: "15", minimumNoticeHours: "12", maxAdvanceDays: "60", slotIntervalMinutes: "30" });
   const [active, setActive] = useState(false);
   const field = (name: keyof typeof values) => ({ name, value: values[name], onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setValues({ ...values, [name]: event.target.value }) });
   return <div className={`${styles.page} ${packageStyles.createPage} ${editorStyles.page}`}>
-    <header className={styles.header}><h1>New session type</h1><ButtonLink href="/admin/modules/services" variant="ghost">Cancel</ButtonLink></header>
+    <header className={`page-header ${styles.header}`}><h1>New session type</h1><ButtonLink href="/admin/modules/services" variant="ghost">Cancel</ButtonLink></header>
     <form id="new-session-type-form" action={action} className={`${styles.form} ${editorStyles.createGrid}`} onReset={event => event.preventDefault()} onInvalidCapture={revealInvalidSessionField}>
       <SessionDraftGuard formId="new-session-type-form" />
       <div className="product-studio-main">
       <section className="studio-panel"><fieldset><legend>Session details</legend>
-        <p className={styles.hint}>Create a reusable offering, such as Wedding photography. Book a client’s date and time in Appointments.</p>
         <label>Session type name<input {...field("name")} required placeholder="Family session" /></label>
         <label>Description <small>(optional)</small><textarea {...field("description")} rows={3} /></label>
       </fieldset>
       </section>
-      <SessionPackagesEditor requirePrice />
+      <SessionPackagesEditor initialRates={rates} requirePrice />
+      <ServiceMediaFields canUpload={canUpload} />
       </div>
       <aside className="product-studio-sidecar">
       <section className="studio-panel"><fieldset><legend>Booking availability</legend>
         <p className={styles.hint}>{businessHours.length ? `Uses your business hours (${timezone}): ${businessHours.join(" · ")}.` : "Set your business hours below to activate this session type, or save a draft for now."}</p>
+        {schedulingRules}
         <label>Session type status<select value={active ? "yes" : "no"} onChange={event => setActive(event.target.value === "yes")}><option value="no">Draft — finish setup later</option><option value="yes">Active — use my business hours</option></select></label>
         <p className={styles.hint}>Activate this session type to select it when booking a client. Online package selection is not available yet.</p>
         {active && <input type="hidden" name="isActive" value="on" />}

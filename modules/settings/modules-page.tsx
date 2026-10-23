@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import { getClientStatusSettings } from "@/lib/clients/configuration";
 import { requireAdmin } from "@/lib/auth";
 import { getClientVipSettings } from "@/lib/clients/vip";
@@ -29,8 +30,8 @@ export default async function SettingsModulesPage({ searchParams }: SettingsModu
       </header>
 
       <div className="admin-settings-layout"><SettingsNav active="modules" /><div className="stack">
-      {saved === "clients-vip" ? <div className="success-message">Client module settings saved.</div> : null}
-      {error ? <div className="error">{error}</div> : null}
+      {saved === "clients-vip" ? <Notification tone="success" queryKey="saved">Client module settings saved.</Notification> : null}
+      {error ? <Notification tone="danger" queryKey="error">{error}</Notification> : null}
       <ModulesSettingsPanel initialClientStatuses={clientStatuses} initialVipSettings={vipSettings} updateVipSettingsAction={updateClientVipSettingsAction} />
     </div></div>
     </div>

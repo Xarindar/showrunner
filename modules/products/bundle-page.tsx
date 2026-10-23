@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import { notFound } from "next/navigation";
 import { ProductStatus } from "@prisma/client";
 import { ArrowLeft, Boxes, PackagePlus, Plus, Trash2 } from "lucide-react";
@@ -83,8 +84,8 @@ export default async function ProductBundlePage({ productId, searchParams }: Pro
         </div>
       </header>
 
-      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-      {errorMessage ? <div className="error">{decodeURIComponent(errorMessage)}</div> : null}
+      {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{decodeURIComponent(errorMessage)}</Notification> : null}
 
       <main className="bundle-builder-grid">
         <section className="studio-workbench">

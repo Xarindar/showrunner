@@ -1,5 +1,24 @@
 // Scheduling module models and enums.
 
+enum ServicePricingType {
+  FLAT_RATE
+  HOURLY
+}
+
+model HourlyRate {
+  id          String   @id @default(cuid())
+  siteId      String
+  site        Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  name        String
+  amountCents Int
+  services    Service[]
+  libraryItems ServiceLibraryItem[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([siteId, name])
+}
+
 enum BookingStatus {
   PENDING
   CONFIRMED
@@ -81,8 +100,15 @@ model Service {
   description         String?
   imageUrl            String    @default("")
   imageFraming        Json?
+  rectangularMediaAssetId String?
+  rectangularMediaAsset MediaAsset? @relation("ServiceRectangularMediaAsset", fields: [rectangularMediaAssetId], references: [id], onDelete: SetNull)
+  rectangularImageFraming Json?
+  galleryAssets       MediaAsset[] @relation("ServiceGalleryAssets")
   durationMinutes     Int
   priceCents          Int?
+  pricingType         ServicePricingType @default(FLAT_RATE)
+  hourlyRateId        String?
+  hourlyRate          HourlyRate? @relation(fields: [hourlyRateId], references: [id], onDelete: Restrict)
   sessionOffering     Json?
   isOneOff            Boolean   @default(false)
   location            String?
@@ -110,6 +136,7 @@ model Service {
   @@unique([siteId, slug])
   @@index([siteId])
   @@index([mediaAssetId])
+  @@index([rectangularMediaAssetId])
   @@index([siteId, category])
   @@index([siteId, isActive])
 }
@@ -123,6 +150,10 @@ model ServiceLibraryItem {
   description String   @default("")
   category    String   @default("")
   tags        String[] @default([])
+  pricingType ServicePricingType @default(FLAT_RATE)
+  priceCents  Int?
+  hourlyRateId String?
+  hourlyRate  HourlyRate? @relation(fields: [hourlyRateId], references: [id], onDelete: Restrict)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

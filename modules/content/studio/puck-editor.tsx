@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Puck, usePuck, type Config, type Data } from "@puckeditor/core";
 import { Monitor, Smartphone, Undo2, Redo2, X, ExternalLink, ArrowLeft, PanelsTopLeft, ChevronRight, ChevronUp, ChevronDown, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Toast, ToastRegion } from "@/components/ui/toast";
+import { useNotify } from "@/components/ui/notifications";
 import { contentFieldId, focusContentFieldWhenReady } from "./field-selection";
 import { type Choice } from "./editor";
 import { HeaderFrameRatios } from "./image-framing-control";
@@ -53,13 +53,7 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { 
   const [frameError, setFrameError] = useState(false);
   const [previewAttempt, setPreviewAttempt] = useState(0);
   const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState(false);
-  useEffect(() => {
-    if (!message || error) return;
-    const timer = window.setTimeout(() => setMessage(""), 3500);
-    return () => window.clearTimeout(timer);
-  }, [message, error]);
+  const notify = useNotify();
   const [saved, setSaved] = useState(Object.fromEntries(entries.map(entry => [entry.block.id, { payload: entry.payload, revision: entry.revision }])));
   const frame = useRef<HTMLIFrameElement>(null);
   const sectionSelector = useRef<HTMLButtonElement>(null);
@@ -195,7 +189,7 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { 
   }, [content, ready, pageEntries, previewOrigin, selected?.block.id, focusedItem, manifest, linkChoices]);
 
   async function publish() {
-    setPending(true); setMessage(""); setError(false);
+    setPending(true);
     try {
       for (const item of changed) {
         const entry = entries.find(entry => entry.block.id === item.props.id)!;
@@ -203,8 +197,8 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { 
         if (result.error || result.revision === undefined) throw new Error(result.error || "Save failed. Your edits are still here.");
         setSaved(current => ({ ...current, [item.props.id]: { payload: item.props.payload, revision: result.revision! } }));
       }
-      setMessage("Changes published.");
-    } catch (cause) { setError(true); setMessage(cause instanceof Error ? cause.message : "Unable to publish. Your edits are still here."); }
+      notify("Changes published.");
+    } catch (cause) { notify(cause instanceof Error ? cause.message : "Unable to publish. Your edits are still here.", "danger"); }
     finally { setPending(false); }
   }
   function enterEditor() {
@@ -233,7 +227,6 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { 
       </div></details>
       <Button disabled={!dirty || pending} onClick={publish}>{pending ? "Publishing…" : "Publish"}</Button>
     </header>
-    {message && (error ? <div className={styles.notice} role="alert">{message}</div> : <ToastRegion><Toast tone="success" title={message} /></ToastRegion>)}
     <div className={styles.body}>
       <aside className={styles.editBar} data-open={panelOpen} data-expanded={sheetExpanded} data-selected={Boolean(selected)} aria-label="Website editing">
         <div className={styles.mobileSheetHeader}>

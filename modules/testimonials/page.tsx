@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import Link from "next/link";
 import { TestimonialStatus } from "@prisma/client";
 import { MessageSquare, Plus, ShieldCheck, Star } from "lucide-react";
@@ -133,8 +134,8 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
         </div>
       </header>
 
-      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-      {errorMessage ? <div className="error">{errorMessage}</div> : null}
+      {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
       <EqualGrid as="section" min="220px">
         <Card>

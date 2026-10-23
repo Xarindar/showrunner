@@ -1,4 +1,5 @@
 import "server-only";
+import { servicePriceCents } from "@/lib/scheduling/pricing";
 import { readImageFraming } from "@/modules/content/studio/image-framing";
 
 import { revalidatePath } from "next/cache";
@@ -129,8 +130,15 @@ export function serializePublicService(service: PublicService, categoryRecord?: 
     description: cleanOptionalString(service.description),
     ...readImageFraming(service.imageFraming),
     imageUrl: publicServiceImageUrl(service) || (categoryRecord ? publicCategoryImageUrl(categoryRecord) : null),
+    media: {
+      square: publicServiceImageUrl(service) ? { url: publicServiceImageUrl(service), aspectRatio: 1, ...readImageFraming(service.imageFraming) } : null,
+      rectangular: service.rectangularMediaAsset && !service.rectangularMediaAsset.isPrivate && !service.rectangularMediaAsset.deletedAt
+        ? { url: publicAssetUrl(mediaAssetDisplayUrl(service.rectangularMediaAsset, MediaVariantType.FULL)), aspectRatio: 4 / 3, ...readImageFraming(service.rectangularImageFraming) } : null
+    },
     durationMinutes: service.durationMinutes,
-    priceCents: service.priceCents,
+    priceCents: servicePriceCents(service),
+    pricingType: service.pricingType,
+    hourlyRateCents: service.pricingType === "HOURLY" ? service.hourlyRate?.amountCents ?? null : null,
     currency: "USD",
     location: cleanOptionalString(service.location),
     minimumNoticeHours: service.minimumNoticeHours,

@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import type { ReactNode } from "react";
 import { CheckCircle2, Circle } from "lucide-react";
 import { requireAuthenticatedAdmin } from "@/lib/auth";
@@ -10,7 +11,7 @@ import {
   type DashboardCardDefinition,
   type DashboardCardPlacement
 } from "@/shell/dashboard-cards";
-import { ButtonLink, EmptyState, Feedback } from "@/components/ui";
+import { ButtonLink, EmptyState } from "@/components/ui";
 import { DashboardWidgetsBoard } from "./dashboard-board";
 import { getOnboardingChecklist } from "./onboarding";
 import type { DashboardWidgetSettings } from "@/shell/dashboard-widget-types";
@@ -33,8 +34,8 @@ const savedMessages: Record<string, string> = {
 };
 
 function DashboardStatusMessage({ error, saved }: { error?: string; saved?: string }) {
-  if (error) return <Feedback tone="danger">{error}</Feedback>;
-  if (saved) return <Feedback tone="success">{savedMessages[saved] || "Dashboard updated."}</Feedback>;
+  if (error) return <Notification tone="danger" queryKey="error">{error}</Notification>;
+  if (saved) return <Notification tone="success" queryKey="saved">{savedMessages[saved] || "Dashboard updated."}</Notification>;
   return null;
 }
 

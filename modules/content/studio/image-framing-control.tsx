@@ -31,7 +31,7 @@ function FramingEditor({ source, ratio, initial, onCancel, onApply }: { source: 
   const instructions = useId();
   const frame = cropFrame(imageRatio || 1, ratio || 16 / 9, framing);
   return <div className={styles.editor}>
-    <p id={instructions}>Drag the frame to choose what shows. Use arrow keys for small adjustments. The crop follows the current website preview size.</p>
+    <p id={instructions}>Drag the frame to choose what shows. Use arrow keys for small adjustments. The crop matches the photo’s display shape.</p>
     {failed ? <p role="alert">This photo could not load. Close this window and choose the image again.</p> : <div className={styles.canvas}>
       <div ref={stage} className={styles.stage}>
         {/* The editor needs the original dimensions and must display the entire photo. */}

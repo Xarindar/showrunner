@@ -6,6 +6,7 @@ import { upsertPublicClient } from "@/lib/clients/public-client";
 import { blockoutConflictWhere, getBufferedWindow } from "@/lib/bookings/conflicts";
 import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
 import { selectSessionPackage } from "@/lib/scheduling/session-offering";
+import { hourlyPriceCents } from "@/lib/scheduling/pricing";
 
 // Manual sessions use an agreed time, independent of public booking hours.
 // They still reserve staff/resources and respect calendar conflicts and buffers.
@@ -51,20 +52,28 @@ export async function createManualSession(input: {
     staffIds: input.staffId ? [input.staffId] : [], start: buffered.bufferedStart, end: buffered.bufferedEnd });
   if (busy.busy.some(window => window.start < buffered.bufferedEnd && window.end > buffered.bufferedStart)) throw new Error("That time is busy on your connected calendar.");
   return prisma.$transaction(async tx => {
-    let service = input.serviceId ? await tx.service.findFirst({ where: { id: input.serviceId, siteId: input.siteId, isActive: true, isOneOff: false }, include: { staffAssignments: true, resourceAssignments: true } }) : null;
+    let service = input.serviceId ? await tx.service.findFirst({ where: { id: input.serviceId, siteId: input.siteId, isActive: true, isOneOff: false }, include: { staffAssignments: true, resourceAssignments: true, hourlyRate: true } }) : null;
     if (input.serviceId && !service) throw new Error("Choose an available session type.");
-    const packageSnapshot = selectSessionPackage(service?.sessionOffering, input.tierId, input.addOnIds);
+    let packageSnapshot = selectSessionPackage(service?.sessionOffering, input.tierId, input.addOnIds);
+    const hourly = service?.pricingType === "HOURLY";
+    const hourlyRate = hourly ? service?.hourlyRate : null;
+    if (hourly && (!hourlyRate || hourlyRate.siteId !== input.siteId)) throw new Error("Choose an hourly rate from this business.");
+    const priceCents = hourlyRate ? hourlyPriceCents(hourlyRate.amountCents, input.durationMinutes) + (packageSnapshot?.extras.reduce((total, extra) => total + extra.priceCents, 0) ?? 0) : input.priceCents;
+    if (priceCents > 999999999) throw new Error("The session total must be $9,999,999.99 or less.");
+    if (hourly && input.priceCents !== priceCents) throw new Error("The hourly price has changed. Reload the session form and review the current rate before booking.");
+    if (hourly && !packageSnapshot) packageSnapshot = { tierId: "hourly", name: input.name, durationMinutes: input.durationMinutes, priceCents, coverage: [], extras: [] };
     if (input.staffId && !await tx.staffMember.findFirst({ where: { id: input.staffId, siteId: input.siteId, isActive: true } })) throw new Error("Choose an available team member.");
     if (service?.staffAssignments.length && !service.staffAssignments.some(assignment => assignment.staffId === input.staffId)) throw new Error("Choose a team member assigned to this session type.");
     const resourceIds = service?.resourceAssignments.map(assignment => assignment.resourceId) || [];
     await checkManualSessionTime(tx, { siteId: input.siteId, startsAt: input.startsAt, endsAt, staffId: input.staffId, resourceIds,
       bufferBeforeMinutes: service?.bufferBeforeMinutes || 0, bufferAfterMinutes: service?.bufferAfterMinutes || 0 });
     if (!service) service = await tx.service.create({ data: { siteId: input.siteId, slug: `private-${randomUUID()}`, name: input.name,
-      durationMinutes: input.durationMinutes, priceCents: input.priceCents, location: input.location, isActive: false, isOneOff: true }, include: { staffAssignments: true, resourceAssignments: true } });
+      durationMinutes: input.durationMinutes, priceCents: input.priceCents, location: input.location, isActive: false, isOneOff: true }, include: { staffAssignments: true, resourceAssignments: true, hourlyRate: true } });
     const clientId = await upsertPublicClient(tx, { siteId: input.siteId, name: input.customerName, email: input.customerEmail, phone: input.customerPhone });
     return tx.booking.create({ data: { siteId: input.siteId, serviceId: service.id, clientId, isManual: true,
-      sessionName: input.name, sessionLocation: input.location, priceCents: input.priceCents,
-      ...(packageSnapshot ? { packageSnapshot: { ...packageSnapshot, priceCents: input.priceCents, durationMinutes: input.durationMinutes } } : {}),
+      sessionName: input.name, sessionLocation: input.location, priceCents,
+      ...(packageSnapshot ? { packageSnapshot: { ...packageSnapshot, priceCents, durationMinutes: input.durationMinutes,
+        ...(hourlyRate ? { pricingType: "HOURLY", hourlyRate: { id: hourlyRate.id, name: hourlyRate.name, amountCents: hourlyRate.amountCents } } : {}) } } : {}),
       customerName: input.customerName, customerEmail: input.customerEmail, customerPhone: input.customerPhone,
       staffId: input.staffId || null, startsAt: input.startsAt, endsAt, notes: input.notes, status: input.status,
       resources: { create: resourceIds.map(resourceId => ({ resourceId, siteId: input.siteId })) } } });

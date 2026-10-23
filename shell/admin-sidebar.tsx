@@ -134,7 +134,8 @@ function SidebarModuleLink({
     </div>
     {item.id === "scheduling" && isActive && enabled && !editing ? <nav className="admin-nav-children" aria-label="Services">
       {[
-        { href: "/admin/modules/services", label: "Session types", active: !pathname.startsWith("/admin/modules/services/categories") && !pathname.startsWith("/admin/modules/services/packages") },
+        { href: "/admin/modules/services", label: "Session types", active: !["categories", "packages", "rates"].some(section => pathname.startsWith(`/admin/modules/services/${section}`)) },
+        { href: "/admin/modules/services/rates", label: "Hourly rates", active: pathname.startsWith("/admin/modules/services/rates") },
         { href: "/admin/modules/services/categories", label: "Categories", active: pathname.startsWith("/admin/modules/services/categories") },
         { href: "/admin/modules/services/packages", label: "Service bundles", active: pathname.startsWith("/admin/modules/services/packages") }
       ].map(link => <Link key={link.href} href={link.href} onClick={closeMenu} aria-current={link.active ? "page" : undefined}>{link.label}<AdminNavigationPending /></Link>)}

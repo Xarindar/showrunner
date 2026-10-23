@@ -1,7 +1,8 @@
 "use client";
+import { Notification } from "@/components/ui/notifications";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, TicketPlus, TriangleAlert, X, Zap } from "lucide-react";
+import { TicketPlus, Zap } from "lucide-react";
 import { Button, Modal, SettingRow, SettingsGroup, Table } from "@/components/ui";
 import { ProviderMark } from "./brand-marks";
 import { buildConnectWizards, ConnectWizard, type WebhookUrls } from "./connect-wizard";
@@ -118,7 +119,6 @@ export function PaymentsWorkspace({
   webhooks
 }: PaymentsWorkspaceProps) {
   const [active, setActive] = useState<ActiveModal>(null);
-  const [noticeDismissed, setNoticeDismissed] = useState(false);
   const close = () => setActive(null);
   const oneClickAvailable = providers.some((provider) => provider.oauthConnect);
 
@@ -181,15 +181,7 @@ export function PaymentsWorkspace({
         </span>
       </header>
 
-      {notice && !noticeDismissed ? (
-        <div className={`pay-connect-notice ${notice.kind === "success" ? "success-message" : "error"}`} role="status">
-          {notice.kind === "success" ? <CheckCircle2 size={16} /> : <TriangleAlert size={16} />}
-          <span>{notice.message}</span>
-          <Button aria-label="Dismiss" onClick={() => setNoticeDismissed(true)} size="sm" type="button" variant="ghost">
-            <X size={14} />
-          </Button>
-        </div>
-      ) : null}
+      {notice ? <Notification tone={notice.kind === "success" ? "success" : "danger"} queryKey={notice.kind === "success" ? "connected" : "connectError"}>{notice.message}</Notification> : null}
 
       {/* Setup state and next actions; every detail opens in a modal ------- */}
       <SettingsGroup

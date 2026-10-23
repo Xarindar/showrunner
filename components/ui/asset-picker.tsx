@@ -9,6 +9,7 @@ import { Modal } from "./modal";
 import { cx } from "./utils";
 import { AssetUploadPanel, type AssetUploadAction } from "./asset-upload-panel";
 import styles from "./asset-picker.module.css";
+import uploadStyles from "./asset-upload-panel.module.css";
 
 export type AssetPickerAsset = {
   alt: string;
@@ -44,6 +45,7 @@ type AssetPickerCommonProps = {
   emptyLibraryMessage?: string;
   loadFromServer?: boolean;
   onOpenChange?: (open: boolean) => void;
+  onUploadedAssets?: (assets: AssetPickerAsset[]) => void;
   open?: boolean;
   title: string;
   triggerClassName?: string;
@@ -115,6 +117,7 @@ export function AssetPicker({
   emptyLibraryMessage = "No reusable assets yet.",
   loadFromServer = true,
   onOpenChange,
+  onUploadedAssets,
   onSelectAsset,
   onUploadRequest,
   open: controlledOpen,
@@ -328,7 +331,7 @@ export function AssetPicker({
         ) : null}
       </button>
 
-      <Modal bodyClassName={styles.body} className={styles.modal} onClose={closePicker} open={open} title={title}>
+      <Modal bodyClassName={styles.body} className={cx(uploadStyles.dialog, mode === "library" && styles.modal)} onClose={closePicker} open={open} title={mode === "upload" ? "Upload images" : title}>
         {mode === "library" ? (
           <div className={styles.libraryView} onDragOver={event => { if (canUpload && (uploadAction || uploadFormId) && event.dataTransfer.types.includes("Files")) event.preventDefault(); }} onDrop={event => {
             if (!canUpload || !(uploadAction || uploadFormId) || !event.dataTransfer.files.length) return;
@@ -494,6 +497,8 @@ export function AssetPicker({
           </div>
         ) : (
           <AssetUploadPanel initialFiles={droppedFiles} defaultFolder={folder} folders={folders} canUpload={canUpload} defaultAlt={defaultAlt} uploadAction={uploadAction} onBusyChange={setUploading} onDone={uploaded => {
+            onUploadedAssets?.(uploaded);
+            if (uploaded.length && onUploadedAssets) { setPickerOpen(false); return; }
             setMode("library"); setLibraryFilter("all"); setFolder(""); setDroppedFiles([]); setQuery(""); setSelectedTag(null);
             if (uploaded.length) { setLibraryAssets(current => [...uploaded, ...current]); setSelectedId(uploaded[0].id); }
             void loadLibrary("", 1, false, "all", null, "");

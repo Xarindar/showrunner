@@ -1,3 +1,4 @@
+import { Notification } from "@/components/ui/notifications";
 import {
   AutomationAction,
   AutomationRunStatus,
@@ -300,8 +301,8 @@ export default async function AutomationPage({ searchParams }: AutomationPagePro
         </div>
       </header>
 
-      {savedMessage ? <div className="success-message">{savedMessage}</div> : null}
-      {errorMessage ? <div className="error">{errorMessage}</div> : null}
+      {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
       <EqualGrid as="section" min="220px">
         <Card>

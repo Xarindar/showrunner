@@ -18,6 +18,7 @@ export const manifest = {
     primaryGap: "The public booking experience is being rebuilt in the new clients surface."
   },
   capabilities: [
+    { label: "Flat and hourly pricing", status: "live" },
     { label: "Base services", status: "live" },
     { label: "Service builder", status: "live" },
     { label: "Service packages", status: "foundation" },
@@ -26,6 +27,7 @@ export const manifest = {
     { label: "Cal.com calendar sync", status: "planned" }
   ],
   adminRoutes: [
+    "/admin/modules/services/rates",
     "/admin/modules/services",
     "/admin/modules/services/[serviceId]",
     "/admin/modules/scheduling",
@@ -35,6 +37,7 @@ export const manifest = {
   publicRoutes: ["/api/public/v1/services", "/api/public/v1/availability", "/api/public/v1/bookings"],
   dependencies: ["appointments", "clients", "communications"],
   dataModels: [
+    "HourlyRate",
     "Service",
     "ServicePackage",
     "ServicePackageItem",
