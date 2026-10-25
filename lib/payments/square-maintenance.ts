@@ -32,7 +32,8 @@ export async function reconcileSquare(siteId: string) {
       });
       if (!response.ok) throw new Error(`Square ${kind} sync failed (${response.status}).`);
       const body: unknown = await response.json();
-      if (!isRecord(body) || (body[kind] !== undefined && !Array.isArray(body[kind])) || body.errors) {
+      if (!isRecord(body) || (body[kind] !== undefined && !Array.isArray(body[kind])) ||
+          (body.errors !== undefined && (!Array.isArray(body.errors) || body.errors.length > 0))) {
         throw new Error("Square returned an invalid sync response.");
       }
       for (const raw of (body[kind] ?? []) as unknown[]) {

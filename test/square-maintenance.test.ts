@@ -52,7 +52,7 @@ function harness(failRefunds = false, localStatus = "PENDING") {
       ? { payments: [{ id: "unrelated-pos", updated_at: "2026-02-01", location_id: "location-a" }] }
       : { payments: [{ id: "payment-local", order_id: "order-local", status: "COMPLETED", updated_at: "2026-02-01" }], cursor: "page-2" });
     return fail ? new Response("unavailable", { status: 503 })
-      : Response.json({ refunds: [{ id: "refund-local", payment_id: "payment-local", status: "COMPLETED", updated_at: "2026-02-02" }] });
+      : Response.json({ errors: [], refunds: [{ id: "refund-local", payment_id: "payment-local", status: "COMPLETED", updated_at: "2026-02-02" }] });
   };
   const source = ts.transpileModule(readFileSync("lib/payments/square-maintenance.ts", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
