@@ -549,13 +549,14 @@ async function markSquareEventFailed(eventId: string, error: unknown) {
   });
 }
 
-async function findSquarePayment(payment: SquarePayment) {
+async function findSquarePayment(payment: SquarePayment, siteId?: string) {
   const identifiers = [payment.id, payment.order_id].filter(Boolean) as string[];
   if (!identifiers.length) return null;
 
   return prisma.payment.findFirst({
     where: {
       provider: PaymentProvider.SQUARE,
+      ...(siteId ? { order: { siteId } } : {}),
       OR: [
         { externalPaymentId: { in: identifiers } },
         { externalCheckoutSession: { in: identifiers } }
@@ -566,13 +567,14 @@ async function findSquarePayment(payment: SquarePayment) {
   });
 }
 
-async function findSquareBillingPayment(payment: SquarePayment) {
+async function findSquareBillingPayment(payment: SquarePayment, siteId?: string) {
   const identifiers = [payment.id, payment.order_id].filter(Boolean) as string[];
   if (!identifiers.length) return null;
 
   return prisma.billingPayment.findFirst({
     where: {
       provider: PaymentProvider.SQUARE,
+      ...(siteId ? { billingDocument: { siteId } } : {}),
       OR: [
         { externalPaymentId: { in: identifiers } },
         { externalCheckoutSession: { in: identifiers } }
@@ -583,10 +585,10 @@ async function findSquareBillingPayment(payment: SquarePayment) {
   });
 }
 
-async function handleSquarePaymentUpdated(event: SquareWebhookEvent, payment: SquarePayment) {
+async function handleSquarePaymentUpdated(event: SquareWebhookEvent, payment: SquarePayment, siteId?: string) {
   if (payment.status !== "COMPLETED") {
     if (payment.status === "FAILED" || payment.status === "CANCELED") {
-      const billingPayment = await findSquareBillingPayment(payment);
+      const billingPayment = await findSquareBillingPayment(payment, siteId);
       if (billingPayment) {
         await markBillingPaymentFailed({
           billingPaymentId: billingPayment.id,
@@ -599,7 +601,7 @@ async function handleSquarePaymentUpdated(event: SquareWebhookEvent, payment: Sq
     return;
   }
 
-  const orderPayment = await findSquarePayment(payment);
+  const orderPayment = await findSquarePayment(payment, siteId);
   if (orderPayment) {
     const checkoutIdentity = metadataObject(metadataObject(orderPayment.rawSummary).checkoutSession ?? null);
     if (orderPayment.order.gallerySelectionPurchase) {
@@ -634,7 +636,7 @@ async function handleSquarePaymentUpdated(event: SquareWebhookEvent, payment: Sq
     return;
   }
 
-  const billingPayment = await findSquareBillingPayment(payment);
+  const billingPayment = await findSquareBillingPayment(payment, siteId);
   if (!billingPayment) throw new Error("Square payment record not found.");
   const paidAmount = payment.total_money?.amount ?? payment.amount_money?.amount;
   const currency = payment.total_money?.currency ?? payment.amount_money?.currency ?? "";
@@ -654,12 +656,13 @@ async function handleSquarePaymentUpdated(event: SquareWebhookEvent, payment: Sq
   });
 }
 
-async function handleSquareRefundUpdated(event: SquareWebhookEvent, refund: SquareRefund) {
+async function handleSquareRefundUpdated(event: SquareWebhookEvent, refund: SquareRefund, siteId?: string) {
   if (refund.status !== "COMPLETED" || !refund.payment_id) return;
 
   const orderPayment = await prisma.payment.findFirst({
     where: {
       externalPaymentId: refund.payment_id,
+      ...(siteId ? { order: { siteId } } : {}),
       provider: PaymentProvider.SQUARE
     },
     include: { order: { include: { gallerySelectionPurchase: { select: { id: true } } } } }
@@ -689,6 +692,7 @@ async function handleSquareRefundUpdated(event: SquareWebhookEvent, refund: Squa
   const billingPayment = await prisma.billingPayment.findFirst({
     where: {
       externalPaymentId: refund.payment_id,
+      ...(siteId ? { billingDocument: { siteId } } : {}),
       provider: PaymentProvider.SQUARE
     }
   });
@@ -705,25 +709,25 @@ async function handleSquareRefundUpdated(event: SquareWebhookEvent, refund: Squa
   });
 }
 
-async function dispatchSquareEvent(event: SquareWebhookEvent) {
+async function dispatchSquareEvent(event: SquareWebhookEvent, siteId?: string) {
   const payment = event.data?.object?.payment;
   if ((event.type === "payment.updated" || event.type === "payment.created") && payment) {
-    await handleSquarePaymentUpdated(event, payment);
+    await handleSquarePaymentUpdated(event, payment, siteId);
     return;
   }
 
   const refund = event.data?.object?.refund;
   if ((event.type === "refund.updated" || event.type === "refund.created") && refund) {
-    await handleSquareRefundUpdated(event, refund);
+    await handleSquareRefundUpdated(event, refund, siteId);
   }
 }
 
-export async function handleSquareWebhookEvent(event: SquareWebhookEvent) {
+export async function handleSquareWebhookEvent(event: SquareWebhookEvent, siteId?: string) {
   const claim = await claimSquareEvent(event);
   if (!claim.claimed) return { duplicate: true };
 
   try {
-    await dispatchSquareEvent(event);
+    await dispatchSquareEvent(event, siteId);
     await markSquareEventProcessed(claim.eventId);
     return { duplicate: false };
   } catch (error) {

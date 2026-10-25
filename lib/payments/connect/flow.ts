@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import { PaymentGatewayConnectionStatus, PaymentProvider, type Prisma } from "@prisma/client";
 import Stripe from "stripe";
 import { publicAppBaseUrl } from "@/lib/env";
-import { encryptGatewaySecret, upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
+import { decryptGatewaySecret, encryptGatewaySecret, upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { secretHint, squareApiVersion, squareVerify, type SquareEnvironment } from "@/lib/payments/provider-onboarding";
 import { prisma } from "@/lib/prisma";
 import { brokerRequest, revokeStripeOAuthProvider } from "./broker-client";
@@ -195,14 +195,15 @@ export async function completeConnectHandoff(input: {
 // that is the whole point of one-click connect.
 // ---------------------------------------------------------------------------
 
-async function provisionStripeWebhook(stripe: Stripe) {
+async function provisionStripeWebhook(stripe: Stripe, previous: { id: string; secret: string } | null) {
   const url = `${publicAppBaseUrl()}/api/webhooks/stripe`;
-
-  // Re-connecting must not pile up dead endpoints: drop any prior endpoint we
-  // created for this URL (its secret is unrecoverable anyway), then make a fresh one.
-  const existing = await stripe.webhookEndpoints.list({ limit: 100 });
-  for (const endpoint of existing.data) {
-    if (endpoint.url === url) await stripe.webhookEndpoints.del(endpoint.id);
+  if (previous) {
+    try {
+      const endpoint = await stripe.webhookEndpoints.retrieve(previous.id);
+      if (endpoint.url === url && endpoint.status === "enabled") return { ...previous, created: false };
+    } catch (error) {
+      if (!(error instanceof Stripe.errors.StripeError) || error.statusCode !== 404) throw error;
+    }
   }
 
   const endpoint = await stripe.webhookEndpoints.create({
@@ -211,7 +212,7 @@ async function provisionStripeWebhook(stripe: Stripe) {
     url
   });
   if (!endpoint.secret) throw new Error("Stripe did not return a webhook signing secret.");
-  return { id: endpoint.id, secret: endpoint.secret };
+  return { id: endpoint.id, secret: endpoint.secret, created: true };
 }
 
 async function completeStripeHandoff(siteId: string, data: Record<string, unknown>) {
@@ -220,6 +221,14 @@ async function completeStripeHandoff(siteId: string, data: Record<string, unknow
   const refreshToken = typeof data.refreshToken === "string" ? data.refreshToken : "";
   const scope = typeof data.scope === "string" ? data.scope : "";
   const livemode = data.livemode === true;
+  const previous = await prisma.paymentGatewayCredential.findUnique({
+    where: { siteId_provider: { siteId, provider: PaymentProvider.STRIPE } }
+  });
+  const sameAccount = previous?.externalAccountId === stripeUserId;
+  const previousMetadata = isRecord(previous?.metadata) ? previous.metadata : {};
+  const previousWebhook = sameAccount && previous?.encryptedWebhookSecret && typeof previousMetadata.webhookEndpointId === "string"
+    ? { id: previousMetadata.webhookEndpointId, secret: decryptGatewaySecret(previous.encryptedWebhookSecret) }
+    : null;
 
   const stripe = new Stripe(accessToken, { maxNetworkRetries: 2, timeout: 10_000 });
   let webhookEndpointId = "";
@@ -229,8 +238,8 @@ async function completeStripeHandoff(siteId: string, data: Record<string, unknow
       throw new Error("This Stripe account cannot accept charges yet. Finish Stripe's account activation, then connect again.");
     }
 
-    const webhook = await provisionStripeWebhook(stripe);
-    webhookEndpointId = webhook.id;
+    const webhook = await provisionStripeWebhook(stripe, previousWebhook);
+    webhookEndpointId = webhook.created ? webhook.id : "";
     const displayName = account.business_profile?.name || account.settings?.dashboard?.display_name || account.email || stripeUserId;
 
     await upsertConnectedGatewayCredential({
@@ -261,14 +270,15 @@ async function completeStripeHandoff(siteId: string, data: Record<string, unknow
     if (webhookEndpointId) {
       await stripe.webhookEndpoints.del(webhookEndpointId).catch(() => undefined);
     }
-    await revokeStripeOAuthProvider({ siteId, externalAccountId: stripeUserId }).catch((revokeError) => {
+    // Revoking a failed reconnect would also revoke the previously working connection.
+    if (!sameAccount) await revokeStripeOAuthProvider({ siteId, externalAccountId: stripeUserId }).catch((revokeError) => {
       console.error("[payments:connect] Stripe compensation failed", {
         name: revokeError instanceof Error ? revokeError.name : "UnknownError",
         siteId
       });
     });
     const message = error instanceof Stripe.errors.StripeError ? error.message : error instanceof Error ? error.message : "Stripe setup failed.";
-    throw new Error(`Stripe connect could not be completed and was rolled back: ${message}`);
+    throw new Error(`Stripe connect could not be completed: ${message}`);
   }
 }
 
@@ -305,62 +315,46 @@ async function completeSquareHandoff(
     );
     if (!usable.length) throw new Error("Square did not return an active location for the connected account.");
     const pendingLocations = usable.map((location) => ({ id: location.id, name: location.name || location.id }));
+    const previous = await prisma.paymentGatewayCredential.findUnique({
+      where: { siteId_provider: { siteId, provider: PaymentProvider.SQUARE } }
+    });
+    const previousMetadata = isRecord(previous?.metadata) ? previous.metadata : {};
+    const selected = pendingLocations.length === 1 ? pendingLocations[0]
+      : previous?.merchantId === tokenSet.merchantId ? pendingLocations.find((location) => location.id === previousMetadata.locationId) : undefined;
+    const connection = {
+      connectedAt: selected ? new Date() : null,
+      displayName: selected?.name || tokenSet.merchantId,
+      encryptedAccessToken: encryptGatewaySecret(tokenSet.accessToken),
+      encryptedRefreshToken: encryptGatewaySecret(tokenSet.refreshToken),
+      encryptedSecretKey: "",
+      encryptedWebhookSecret: "",
+      webhookSecretHint: "",
+      expiresAt: tokenSet.expiresAt,
+      externalAccountId: tokenSet.merchantId,
+      lastVerifiedAt: new Date(),
+      merchantId: tokenSet.merchantId,
+      metadata: {
+        environment, oauthClientId: clientId, onboarding: "oauth",
+        ...(selected ? { locationId: selected.id } : { pendingLocations }),
+        refreshTokenExpiresAt: tokenSet.refreshTokenExpiresAt.toISOString(),
+        squareVersion: handedOffSquareVersion || squareApiVersion,
+        tokenRefreshedAt: new Date().toISOString(), tokenFlow: "pkce"
+      },
+      status: selected ? PaymentGatewayConnectionStatus.CONNECTED : PaymentGatewayConnectionStatus.PENDING,
+      supportedWallets: stripeWallets
+    };
 
     await prisma.paymentGatewayCredential.upsert({
       where: { siteId_provider: { siteId, provider: PaymentProvider.SQUARE } },
-      update: {
-        connectedAt: null,
-        displayName: tokenSet.merchantId,
-        encryptedAccessToken: encryptGatewaySecret(tokenSet.accessToken),
-        encryptedRefreshToken: encryptGatewaySecret(tokenSet.refreshToken),
-        encryptedSecretKey: "",
-        expiresAt: tokenSet.expiresAt,
-        externalAccountId: tokenSet.merchantId,
-        lastVerifiedAt: new Date(),
-        merchantId: tokenSet.merchantId,
-        metadata: {
-          environment,
-          oauthClientId: clientId,
-          onboarding: "oauth",
-          pendingLocations,
-          refreshTokenExpiresAt: tokenSet.refreshTokenExpiresAt.toISOString(),
-          squareVersion: handedOffSquareVersion || squareApiVersion,
-          tokenRefreshedAt: new Date().toISOString(),
-          tokenFlow: "pkce"
-        },
-        status: PaymentGatewayConnectionStatus.PENDING,
-        supportedWallets: stripeWallets
-      },
-      create: {
-        displayName: tokenSet.merchantId,
-        encryptedAccessToken: encryptGatewaySecret(tokenSet.accessToken),
-        encryptedRefreshToken: encryptGatewaySecret(tokenSet.refreshToken),
-        expiresAt: tokenSet.expiresAt,
-        externalAccountId: tokenSet.merchantId,
-        lastVerifiedAt: new Date(),
-        merchantId: tokenSet.merchantId,
-        metadata: {
-          environment,
-          oauthClientId: clientId,
-          onboarding: "oauth",
-          pendingLocations,
-          refreshTokenExpiresAt: tokenSet.refreshTokenExpiresAt.toISOString(),
-          squareVersion: handedOffSquareVersion || squareApiVersion,
-          tokenRefreshedAt: new Date().toISOString(),
-          tokenFlow: "pkce"
-        },
-        provider: PaymentProvider.SQUARE,
-        siteId,
-        status: PaymentGatewayConnectionStatus.PENDING,
-        supportedWallets: stripeWallets
-      }
+      update: connection,
+      create: { ...connection, provider: PaymentProvider.SQUARE, siteId }
     });
 
     return {
-      displayName: tokenSet.merchantId,
+      displayName: connection.displayName,
       provider: PaymentProvider.SQUARE,
       webhookAutoCreated: false,
-      pendingLocationSelection: true
+      pendingLocationSelection: !selected
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Square setup failed.";
