@@ -13,7 +13,6 @@ import {
   clearBillingCheckoutLinkAction,
   createBillingDocumentAction,
   deleteBillingLineItemAction,
-  queueBillingDocumentEmailAction,
   refundBillingPaymentAction,
   setBillingCheckoutLinkAction,
   updateBillingDocumentAction,
@@ -452,24 +451,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
               <EqualGrid>
                 <div>
                   <p className="ui-zero">Client document</p>
-                  {selectedDocument.publicAccessToken && !selectedDocumentIsDraft ?
-                <span className="ui-badge">Client view rebuild pending</span> :
-
-                <span className="ui-badge">Available after send</span>
-                }
-                </div>
-                <div>
-                  <p className="ui-zero">Customer notice</p>
-                  {!selectedDocumentIsDraft ?
-                <form action={queueBillingDocumentEmailAction}>
-                      <input type="hidden" name="id" value={selectedDocument.id} />
-                      <Button type="submit" variant="secondary">
-                        Queue email
-                      </Button>
-                    </form> :
-
-                <span className="ui-badge">Send first</span>
-                }
+                  <span className="ui-badge">Customer document links are unavailable</span>
                 </div>
               </EqualGrid>
               <div className="subpanel form-grid">

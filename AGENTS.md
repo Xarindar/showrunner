@@ -7,3 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Admin design system
+
+Before changing admin UI, read [the token developer guide](developer-docs/admin-design-system.md), [DESIGN.md](DESIGN.md), and the relevant module styles. Admin tokens live in `app/admin/design-tokens.css`; shared component recipes live in `components/ui/styles/`. Modules own task layout, not separate control skins. Keep tenant presets and client website styling outside the admin boundary. Update the guide when changing the token contract; historical UI plans are not current styling instructions.

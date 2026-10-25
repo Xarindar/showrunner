@@ -5,6 +5,19 @@ import path from "node:path";
 import test from "node:test";
 import nodemailer from "nodemailer";
 
+test("patched DOM dependency preserves rich-text HTML round trips", async () => {
+  const require = createRequire(import.meta.url);
+  const { generateHTML, generateJSON } = require("@tiptap/html/server");
+  const { StarterKit } = require("@tiptap/starter-kit");
+  const document = {
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text: "Customer & service", marks: [{ type: "bold" }] }] }]
+  };
+  const html = await generateHTML(document, [StarterKit]);
+  assert.equal(html, "<p><strong>Customer &amp; service</strong></p>");
+  assert.deepEqual(await generateJSON(html, [StarterKit]), document);
+});
+
 test("Next lint root discovery retains directory-only glob behavior", () => {
   const require = createRequire(import.meta.url);
   const pluginRequire = createRequire(require.resolve("@next/eslint-plugin-next"));

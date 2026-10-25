@@ -5,7 +5,7 @@ description: Shopify-inspired administrative workspaces with dark navigation, co
 
 # Showrunner admin design
 
-Use the approved Shopify-inspired system for all admin routes. The canonical implementation is `app/admin/design-tokens.css` plus `app/admin/design-system.css`; the extracted reference and migration log live in `jazz/shopify-design`. See `developer-docs/admin-design-system.md` for component and scope rules.
+Use the approved Shopify-inspired system for all admin routes. `app/admin/design-tokens.css` is the sole source of admin appearance tokens. `app/admin/design-system.css` imports the foundation, shared component recipes and module-owned layouts. See the [admin token developer guide](developer-docs/admin-design-system.md) for ownership, scales, component examples, extension rules and regression checks.
 
 Client-facing websites, booking and portals preserve their own branding. The Content editor continues to show the actual client website in an iframe, with designer-owned sections and approved fields described in PRODUCT.md. The iframe's layout, typography and imagery remain website-owned; only admin controls and chrome adopt this system.
 
@@ -22,4 +22,4 @@ Use the installed font fallback in the exported stack; do not download Shopify's
 ## Admin dialogs
 Use the shared dialog shell: 16px outer padding, 12px between header and body, and 16px between form groups. Use `module-modal-actions` for action rows with an 8px gap, aligned right, with Cancel before the primary action in DOM order. Keep scrollable contents and status messages separate from the action group.
 
-Input boundaries use inset rings in the admin adapter for normal, focus, invalid and disabled states. External shadows are decorative only: borders and keyboard focus must remain visible inside clipped or scrolling containers. Preserve container overflow behavior rather than adding per-screen clearance patches.
+Input boundaries use inset rings in the shared control recipe and token source for normal, focus, invalid and disabled states. External shadows are decorative only: borders and keyboard focus must remain visible inside clipped or scrolling containers. Preserve container overflow behavior rather than adding per-screen clearance patches.

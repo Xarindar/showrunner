@@ -1,0 +1,119 @@
+.showrunner-admin .clients-mobile-list { display: none; }
+.showrunner-admin .clients-mobile-card {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--sd-color-border);
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+}
+.showrunner-admin .clients-mobile-card-head {
+  align-items: start;
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+}
+.showrunner-admin .clients-mobile-card-head > .ui-badge {
+  align-self: start;
+  justify-self: end;
+  max-width: min(190px, 46vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.showrunner-admin .clients-mobile-title,
+.showrunner-admin .clients-mobile-summary {
+  color: inherit;
+  display: grid;
+  gap: var(--sd-space-4);
+  min-width: 0;
+}
+.showrunner-admin .clients-mobile-title:focus-visible,
+.showrunner-admin .clients-mobile-summary:focus-visible,
+.showrunner-admin .clients-mobile-contact-grid a:focus-visible {
+  border-radius: var(--radius-control);
+  box-shadow: var(--sd-shadow-focus);
+  outline: 0;
+}
+.showrunner-admin .clients-mobile-title strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.showrunner-admin .clients-mobile-contact-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+.showrunner-admin .clients-mobile-contact-grid a,
+.showrunner-admin .clients-mobile-contact-grid > span,
+.showrunner-admin .clients-mobile-summary {
+  background: var(--sd-color-surface-subtle);
+  border: 1px solid var(--sd-color-border);
+  border-radius: var(--radius-control);
+  min-width: 0;
+  padding: var(--sd-space-8) var(--sd-space-8);
+}
+.showrunner-admin .clients-mobile-contact-grid a,
+.showrunner-admin .clients-mobile-contact-grid > span {
+  color: inherit;
+  display: grid;
+  gap: var(--sd-space-2);
+}
+.showrunner-admin .clients-mobile-contact-grid a > span,
+.showrunner-admin .clients-mobile-contact-grid > span > span,
+.showrunner-admin .clients-mobile-summary small,
+.showrunner-admin .clients-mobile-metrics small {
+  color: var(--color-muted);
+  font-size: var(--type-caption);
+  font-weight: var(--sd-type-weight-strong);
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+.showrunner-admin .clients-mobile-contact-grid strong,
+.showrunner-admin .clients-mobile-summary strong {
+  display: block;
+  font-size: var(--type-small);
+  font-weight: var(--sd-type-weight-strong);
+  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.showrunner-admin .clients-mobile-metrics {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+.showrunner-admin .clients-mobile-metrics > span { align-items: center; display: flex; gap: var(--sd-space-6); min-width: 0; }
+.showrunner-admin .clients-mobile-metrics strong { font-family: var(--font-mono); font-size: var(--sd-type-heading-size); }
+.showrunner-admin .clients-mobile-card > .clients-row-actions { justify-content: stretch; }
+.showrunner-admin .clients-mobile-card > .clients-row-actions .clients-action-icon { flex: 1 1 0; min-height: 40px; width: auto; }
+.showrunner-admin .clients-mobile-empty { color: var(--color-muted); margin: 0; padding: var(--space-4); }
+@media (max-width: 700px) {
+  .showrunner-admin .clients-mobile-list { border-top: 1px solid var(--sd-color-border); display: grid; min-width: 0; }
+}
+@media (max-width: 560px) {
+  .showrunner-admin .clients-mobile-contact-grid { grid-template-columns: 1fr; }
+}
+@media(max-width:860px) {
+  .showrunner-admin .clients-mobile-contact-grid :is(a,span),
+.showrunner-admin .clients-mobile-summary {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+  }
+  .showrunner-admin :is(.clients-mobile-contact-grid a > span,.clients-mobile-contact-grid > span > span,.clients-mobile-summary small,.clients-mobile-metrics small) {
+    text-transform: none;
+    font-weight: var(--sd-type-weight-regular);
+    line-height: 1.5;
+  }
+  .showrunner-admin :is(.clients-mobile-contact-grid strong,.clients-mobile-summary strong) {
+    font-size: var(--sd-type-body-size);
+    font-weight: var(--sd-type-weight-regular);
+    line-height: 1.5;
+  }
+  .showrunner-admin .clients-mobile-metrics strong { font-family: var(--font-sans); }
+  .showrunner-admin .clients-mobile-card > .clients-row-actions .clients-action-icon { min-height: 44px; gap: var(--sd-space-8); }
+}

@@ -7,32 +7,29 @@
   max-width: min(560px, calc(100vw - 32px));
   max-height: 50dvh;
   overflow-y: auto;
-  gap: 8px;
+  gap: var(--sd-space-8);
   z-index: 1000;
   pointer-events: none;
 }
-
 .showrunner-admin .admin-notifications .ui-toast {
-  background: color-mix(in srgb, var(--sd-color-primary) 86%, var(--sd-color-surface));
+  background: var(--sd-color-surface-subtle);
   color: var(--sd-color-on-primary);
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--sd-radius-input);
   box-shadow: var(--shadow-raised);
   grid-template-columns: 18px minmax(0, 1fr) 32px;
-  gap: 12px;
+  gap: var(--sd-space-12);
   min-height: 52px;
-  padding: 10px 12px 10px 16px;
+  padding: var(--sd-space-8) var(--sd-space-12) var(--sd-space-8) var(--sd-space-16);
   pointer-events: auto;
   animation: admin-notification-enter 160ms ease-out;
 }
-
 .showrunner-admin .admin-notifications .ui-toast strong {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--sd-type-body-size);
+  font-weight: var(--sd-type-weight-medium);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
-
 .showrunner-admin .admin-notifications .ui-toast-danger > svg { color: var(--sd-color-critical-bg); }
 .showrunner-admin .admin-notifications .admin-notification-dismiss {
   color: inherit;
@@ -44,12 +41,19 @@
   min-height: 32px;
 }
 .showrunner-admin .admin-notifications .admin-notification-dismiss:hover { background: var(--sd-color-nav-selected); }
-.showrunner-admin .admin-notifications .admin-notification-dismiss:focus-visible { outline: 2px solid var(--sd-color-on-primary); outline-offset: -2px; }
-
-@keyframes admin-notification-enter { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.showrunner-admin .admin-notifications .admin-notification-dismiss:focus-visible {
+  outline: 2px solid var(--sd-color-on-primary);
+  outline-offset: -2px;
+}
+@keyframes admin-notification-enter {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
 @media (max-width: 700px), (pointer: coarse) {
   .showrunner-admin .admin-notifications { bottom: max(76px, calc(env(safe-area-inset-bottom) + 60px)); }
   .showrunner-admin .admin-notifications .ui-toast { grid-template-columns: 18px minmax(0, 1fr) 44px; }
   .showrunner-admin .admin-notifications .admin-notification-dismiss { min-width: 44px; min-height: 44px; }
 }
-@media (prefers-reduced-motion: reduce) { .showrunner-admin .admin-notifications .ui-toast { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .showrunner-admin .admin-notifications .ui-toast { animation: none; }
+}

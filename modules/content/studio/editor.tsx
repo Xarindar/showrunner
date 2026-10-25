@@ -1,56 +1,19 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Image as ImageIcon, Plus } from "lucide-react";
 import { destinationKind, imageFirst, type LinkOptions } from "./field-layout";
 import { AssetPicker, type AssetPickerAsset } from "@/components/ui/asset-picker";
-import { blockRegistry, emptyFields, type Field } from "./registry";
-import type { ContentBlockConfig, ContentManifest } from "./manifest";
-import { saveStudioBlock, uploadStudioAsset } from "./actions";
+import { emptyFields, type Field } from "./registry";
+import { uploadStudioAsset } from "./actions";
 import styles from "./studio.module.css";
 import { renderContentRichText } from "./rich-text";
 import { ImageFramingControl } from "./image-framing-control";
 import { ServicePicker } from "./service-picker";
 import { centeredFraming, framingImageSource, readImageFraming } from "./image-framing";
-import { VisualBlock } from "./visual-block";
 
 export type Choice = { group?: string; tags?: string[]; framingUrl?: string; imageFraming?: unknown; catalog?: import("./showcase").CatalogCard; description?: string; id: string; imageUrl?: string; label: string };
-export function StudioEditor({ block, canUpload = false, pages, initialPayload, initialRevision, initialPages, choices = [] }: {
-  block: ContentBlockConfig; canUpload?: boolean; pages: ContentManifest["pages"]; initialPayload: Record<string, unknown>; initialRevision: number; initialPages: string[]; choices?: Choice[];
-}) {
-  const [payload, setPayload] = useState(initialPayload);
-  const [revision, setRevision] = useState(initialRevision);
-  const [pageIds, setPageIds] = useState(initialPages);
-  const [savedPages, setSavedPages] = useState(initialPages);
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState(false);
-  const [savedPayload, setSavedPayload] = useState(initialPayload);
-  const dirty = JSON.stringify(payload) !== JSON.stringify(savedPayload) || JSON.stringify(pageIds) !== JSON.stringify(savedPages);
-  const fields = Object.fromEntries(Object.entries(blockRegistry[block.type].fields).filter(([key]) => block.editableFields.includes(key)).map(([key, value]) => [key, { ...value, ...(block.limits?.[key] !== undefined ? { max: block.limits[key] } : {}) }]));
-  return <section className={styles.card} aria-labelledby={`${block.id}-title-heading`}>
-    <h2 id={`${block.id}-title-heading`}>{block.label}</h2>
-    {block.type === "contact" || block.type === "footer" ? <p>Contact details and social links come from Contact / Business Info.</p> : null}
-    {block.type === "coupon" ? <p>The code is displayed on your site. Configure redemption with your store provider.</p> : null}
-    <form onSubmit={async event => {
-      event.preventDefault(); setPending(true); setMessage("");
-      try {
-        const result = await saveStudioBlock({ id: block.id, revision, payload: Object.fromEntries(block.editableFields.map(key => [key, payload[key]])), pageIds });
-        setError(Boolean(result.error)); setMessage(result.error || "Saved.");
-        if (result.revision !== undefined) { setRevision(result.revision); setSavedPayload(payload); setSavedPages(pageIds); }
-      } catch { setError(true); setMessage("Could not save. Your edits are still here."); }
-      finally { setPending(false); }
-    }}>
-      <fieldset disabled={pending} className={styles.fields}>
-        <VisualBlock block={block} choices={choices} payload={payload} fields={fields} canUpload={canUpload} onChange={setPayload} />
-        {block.allowPageTargeting ? <fieldset><legend>Show on pages</legend>{pages.filter(page => block.pageIds.includes(page.id)).map(page => <label key={page.id} className={styles.check}><input type="checkbox" checked={pageIds.includes(page.id)} onChange={event => setPageIds(current => event.target.checked ? [...current, page.id] : current.filter(id => id !== page.id))} />{page.label}</label>)}</fieldset> : null}
-        {dirty ? <div className={styles.saveBar}><span>Unpublished changes</span><button type="button" onClick={() => { setPayload(savedPayload); setPageIds(savedPages); setMessage(""); }}>Discard</button><button type="submit">{pending ? "Publishing…" : "Publish changes"}</button></div> : null}
-      </fieldset>
-      <p role={error ? "alert" : "status"} aria-live="polite">{message}</p>
-    </form>
-  </section>;
-}
-
 export function Fields({ headerId, canUpload = false, fixedRows = false, assetBaseUrl, linkOptions, fields, limits, minimums, value, prefix, onChange, choices = [] }: { headerId?: string; canUpload?: boolean; fixedRows?: boolean; assetBaseUrl?: string; linkOptions?: LinkOptions; fields: Record<string, Field>; limits?: Record<string, number>; minimums?: Record<string, number>; value: Record<string, unknown>; prefix: string; onChange: (next: Record<string, unknown>) => void; choices?: Choice[] }) {
   return <>{imageFirst(fields).map(([key, field]) => {
     const buttonPairs: Record<string, string> = { buttonLabel: "buttonHref", ctaLabel: "ctaHref", label: "href" };
@@ -71,9 +34,9 @@ export function Fields({ headerId, canUpload = false, fixedRows = false, assetBa
         {rows.map((row, index) => <details key={String(row.id)} className={styles.contentGroup} open onFocusCapture={() => { if (key === "slides") window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: row.id } })); }} onClick={() => { if (key === "slides") window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: row.id } })); }}>
           <summary>{key === "slides" ? `Header ${index + 1}` : String(row.name || row.title || row.author || row.question || `${field.label === "Images" ? "Image" : "Item"} ${index + 1}`)}</summary>
           <div className={styles.groupFields}><Fields headerId={headerId} canUpload={canUpload} assetBaseUrl={assetBaseUrl} linkOptions={linkOptions} fields={field.fields!} value={row} prefix={`${id}-${row.id}`} choices={choices} onChange={next => update(rows.map((current, i) => i === index ? next : current))} />
-          {!fixedRows && <button className={styles.removeItem} type="button" disabled={rows.length <= minimum} onClick={() => update(rows.filter((_, i) => i !== index))}>Remove {key === "slides" ? "header" : "item"}</button>}</div>
+          {!fixedRows && <Button variant="secondary" className={styles.removeItem} type="button" disabled={rows.length <= minimum} onClick={() => update(rows.filter((_, i) => i !== index))}>Remove {key === "slides" ? "header" : "item"}</Button>}</div>
         </details>)}
-        {!fixedRows && <button className={styles.addContent} type="button" disabled={rows.length >= maximum} onClick={() => update([...rows, { id: crypto.randomUUID(), ...emptyFields(field.fields!) }])}><Plus size={16} aria-hidden="true" />Add {field.label === "Header" ? "header" : field.label.toLowerCase()}</button>}
+        {!fixedRows && <Button variant="secondary" className={styles.addContent} type="button" disabled={rows.length >= maximum} onClick={() => update([...rows, { id: crypto.randomUUID(), ...emptyFields(field.fields!) }])}><Plus size={16} aria-hidden="true" />Add {field.label === "Header" ? "header" : field.label.toLowerCase()}</Button>}
       </div>;
     }
     if (field.options) return <label key={key} htmlFor={id}>{field.label}<select id={id} value={String(value[key] || "")} onChange={event => update(event.target.value)}><option value="">Site default</option>{field.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
@@ -130,7 +93,7 @@ function RichText({ id, value, maxLength, onChange }: { id: string; value: strin
     onChange(value.slice(0, start) + before + (value.slice(start, end) || "text") + after + value.slice(end));
     input.current?.focus();
   };
-  return <><div role="group" aria-label="Text formatting"><button type="button" onClick={() => format("**", "**")}>Bold</button> <button type="button" onClick={() => format("_", "_")}>Italic</button> <button type="button" onClick={() => format("\n\n- ", "\n\n")}>Bullet</button></div>
+  return <><div role="group" aria-label="Text formatting"><Button variant="secondary" type="button" onClick={() => format("**", "**")}>Bold</Button> <Button variant="secondary" type="button" onClick={() => format("_", "_")}>Italic</Button> <Button variant="secondary" type="button" onClick={() => format("\n\n- ", "\n\n")}>Bullet</Button></div>
     <textarea ref={input} id={id} rows={5} maxLength={maxLength} value={value} onChange={event => onChange(event.target.value)} />
     <details><summary>Preview formatted text</summary><div dangerouslySetInnerHTML={{ __html: renderContentRichText(value) }} /></details></>;
 }

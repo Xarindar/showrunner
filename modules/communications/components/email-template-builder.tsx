@@ -1,5 +1,7 @@
 "use client";
 
+import "@react-email/editor/themes/default.css";
+
 import { EmailEditor, type EmailEditorRef } from "@react-email/editor";
 import type { Content } from "@tiptap/core";
 import { CheckCircle2, Copy, Eye, FileText, Heading1, Image as ImageIcon, Link as LinkIcon, List, Minus, Plus, Save, Settings, Type, X } from "lucide-react";

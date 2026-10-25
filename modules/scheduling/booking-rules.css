@@ -1,0 +1,221 @@
+
+
+.showrunner-admin .booking-rules-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.showrunner-admin .booking-rules-toolbar h3 {
+  font-size: var(--type-h3);
+  line-height: 1.2;
+  margin: var(--sd-space-2) 0 0;
+}
+
+.showrunner-admin .booking-rules-table-scroll {
+  background: var(--color-surface);
+}
+
+.showrunner-admin .booking-rules-table {
+  min-width: 640px;
+}
+
+.showrunner-admin .booking-rules-table th:nth-child(1) { width: 30%; }
+.showrunner-admin .booking-rules-table th:nth-child(2) { width: 40%; }
+.showrunner-admin .booking-rules-table th:nth-child(3) { width: 20%; }
+.showrunner-admin .booking-rules-table th:nth-child(4) { width: 10%; }
+
+.showrunner-admin .booking-rule-type-cell {
+  align-items: center;
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: 34px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.showrunner-admin .booking-rule-type-cell strong,
+.showrunner-admin .booking-rule-type-cell small,
+.showrunner-admin .booking-rule-copy {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.showrunner-admin .booking-rule-type-cell small {
+  color: var(--color-muted);
+  font-size: var(--type-caption);
+}
+
+.showrunner-admin .booking-rule-icon {
+  align-items: center;
+  background: var(--sd-color-fill);
+  border: 1px solid var(--sd-color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.showrunner-admin .booking-rule-icon-button {
+  min-width: 34px;
+  padding: 0;
+  width: 34px;
+}
+
+.showrunner-admin .booking-rules-empty-row td {
+  height: 68px;
+}
+
+.showrunner-admin .booking-rules-empty {
+  color: var(--color-muted);
+  font-size: var(--type-small);
+  text-align: center;
+}
+
+.showrunner-admin .booking-rules-toggle-strip .ui-switch {
+  flex: 1 1 190px;
+}
+
+.showrunner-admin .booking-rule-modal {
+  max-width: min(720px, calc(100vw - var(--space-6)));
+}
+
+.showrunner-admin .booking-rule-modal:not([open]) {
+  display: none;
+}
+
+.showrunner-admin .booking-rule-modal-body {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.showrunner-admin .booking-rule-search {
+  min-width: 0;
+}
+
+.showrunner-admin .booking-rule-option-list {
+  border: 1px solid var(--catalog-border);
+  border-radius: var(--sd-radius-tag);
+  display: grid;
+  max-height: min(280px, 42vh);
+  min-height: 72px;
+  min-width: 0;
+  overflow: auto;
+}
+
+.showrunner-admin .booking-rule-option {
+  align-items: center;
+  background: var(--color-surface);
+  border: 0;
+  border-bottom: 1px solid var(--sd-color-border);
+  color: var(--color-text);
+  cursor: pointer;
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: minmax(132px, auto) minmax(0, 1fr);
+  min-height: 52px;
+  padding: var(--sd-space-8) var(--space-3);
+  text-align: left;
+  width: 100%;
+}
+
+.showrunner-admin .booking-rule-option:last-child {
+  border-bottom: 0;
+}
+
+.showrunner-admin .booking-rule-option:hover {
+  background: var(--sd-color-fill);
+}
+
+.showrunner-admin .booking-rule-option strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.showrunner-admin .booking-rule-no-results {
+  align-items: center;
+  color: var(--color-muted);
+  display: flex;
+  justify-content: center;
+  min-height: 72px;
+  padding: var(--space-4);
+  text-align: center;
+}
+
+.showrunner-admin .booking-rule-create-panel {
+  border-top: 1px solid var(--sd-color-border);
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding-top: var(--space-4);
+}
+
+.showrunner-admin .booking-rule-create-panel h3 {
+  font-size: var(--type-h3);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.showrunner-admin .booking-rule-kind-toggle {
+  background: var(--sd-color-fill);
+  border: 1px solid var(--catalog-border);
+  border-radius: var(--radius-control);
+  display: grid;
+  gap: var(--sd-space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: var(--sd-space-4);
+}
+
+.showrunner-admin .booking-rule-kind-toggle button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius-input);
+  color: var(--color-muted);
+  cursor: pointer;
+  min-height: var(--sd-layout-touch-target);
+  padding: 0 var(--space-2);
+}
+
+.showrunner-admin .booking-rule-kind-toggle button.is-active,
+.showrunner-admin .booking-rule-kind-toggle button:hover {
+  background: var(--color-surface);
+  border-color: var(--sd-color-border);
+  color: var(--color-text);
+}
+
+.showrunner-admin .booking-rule-create-panel textarea {
+  min-height: 96px;
+  resize: none;
+}
+
+@media (max-width: 560px) {
+
+  .showrunner-admin .booking-rules-toolbar {
+    align-items: stretch;
+    display: grid;
+  }
+}
+
+@media (max-width: 560px) {
+
+  .showrunner-admin .booking-rules-toolbar .ui-button {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 560px) {
+
+  .showrunner-admin .booking-rule-option {
+    grid-template-columns: 1fr;
+  }
+}

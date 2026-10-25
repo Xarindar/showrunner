@@ -18,16 +18,16 @@ export function Card({
   children,
   className,
   density = "normal",
-  minHeight = "md",
+  minHeight = "none",
   reservedFooter,
   reservedHeader,
   ...props
 }: CardProps) {
   return (
     <Component className={cx("ui-card", `ui-card-density-${density}`, `ui-card-min-${minHeight}`, className)} {...props}>
-      {reservedHeader ? <div className="ui-card-slot ui-card-slot-header">{reservedHeader}</div> : <div className="ui-card-slot ui-card-slot-header" aria-hidden="true" />}
+      {reservedHeader ? <div className="ui-card-slot ui-card-slot-header">{reservedHeader}</div> : null}
       <div className={cx("ui-card-body", bodyClassName)}>{children}</div>
-      {reservedFooter ? <div className="ui-card-slot ui-card-slot-footer">{reservedFooter}</div> : <div className="ui-card-slot ui-card-slot-footer" aria-hidden="true" />}
+      {reservedFooter ? <div className="ui-card-slot ui-card-slot-footer">{reservedFooter}</div> : null}
     </Component>
   );
 }

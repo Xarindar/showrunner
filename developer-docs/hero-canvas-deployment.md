@@ -1,5 +1,7 @@
 # Hero Canvas Deployment
 
+> Compatibility reference for the retained legacy hero JSON endpoint, not the current admin authoring workflow. The canvas editor described below was retired. New integrations use the Puck website bridge and approved manifest fields documented in [content installation](puck-content-install.md); do not rebuild a fixed six-by-four admin canvas from this document.
+
 The content module now saves the homepage hero as a canvas-style JSON contract. The admin UI stores the data in the existing `HeroPresentation`, `HeroSlide`, and `HeroSlideElement` tables, then exposes it to front ends as `backgrounds` plus positioned `canvasLayers`.
 
 ## Public API

@@ -1,4 +1,12 @@
-:global(.ui-dialog).dialog { width: min(600px, calc(100vw - 32px)); height: var(--media-dialog-height, fit-content); max-width: calc(100vw - 32px); max-height: calc(100svh - 32px); overflow: hidden; margin: auto; inset: 0; }
+:global(.ui-dialog).dialog {
+  width: min(600px, calc(100vw - 32px));
+  height: var(--media-dialog-height, fit-content);
+  max-width: calc(100vw - 32px);
+  max-height: calc(100svh - 32px);
+  overflow: hidden;
+  margin: auto;
+  inset: 0;
+}
 :global(.ui-dialog).dialog[open] { display: flex; flex-direction: column; }
 .body { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .panel { display: flex; flex-direction: column; min-height: 0; gap: var(--sd-space-16); }
@@ -7,25 +15,63 @@
 .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sd-space-12); }
 .toolbar p, .footer p { margin: 0; color: var(--color-muted); font-size: var(--type-small); }
 .toolbar > button { flex-shrink: 0; }
-.settings summary { cursor: pointer; font-size: var(--type-small); font-weight: 500; }
-.metadata { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--sd-space-12); border: 0; padding: var(--sd-space-12) 0 0; margin: 0; }
+.settings summary { cursor: pointer; font-size: var(--type-small); font-weight: var(--sd-type-weight-medium); }
+.metadata {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: var(--sd-space-12);
+  border: 0;
+  padding: var(--sd-space-12) 0 0;
+  margin: 0;
+}
 .panel label { display: grid; gap: var(--sd-space-4); font-size: var(--type-small); }
 .panel input:not([type="checkbox"]):not([type="file"]) { width: 100%; min-width: 0; }
 .metadata .check { display: flex; align-items: center; gap: var(--sd-space-8); }
 .queue { list-style: none; margin: 0; padding: 0; display: grid; }
 .queue:empty { display: none; }
-.queue li { display: grid; grid-template-columns: 64px minmax(0,1fr); gap: var(--sd-space-12); padding-block: var(--sd-space-12); min-width: 0; border-top: 1px solid var(--color-border); }
-.thumbnail { display: grid; place-items: center; width: 64px; height: 64px; overflow: hidden; border-radius: var(--sd-radius-element); background: var(--sd-color-surface-subtle); }
+.queue li {
+  display: grid;
+  grid-template-columns: 64px minmax(0,1fr);
+  gap: var(--sd-space-12);
+  padding-block: var(--sd-space-12);
+  min-width: 0;
+  border-top: 1px solid var(--color-border);
+}
+.thumbnail {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: var(--sd-radius-element);
+  background: var(--sd-color-surface-subtle);
+}
 .thumbnail img { width: 100%; height: 100%; object-fit: cover; }
 .fileDetails { display: grid; align-content: start; gap: var(--sd-space-8); min-width: 0; }
 .rowHead { display: flex; align-items: center; gap: var(--sd-space-8); min-width: 0; }
-.rowHead strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--type-small); font-weight: 500; }
+.rowHead strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--type-small);
+  font-weight: var(--sd-type-weight-medium);
+}
 .rowHead span { white-space: nowrap; font-size: var(--type-small); color: var(--color-muted); }
 .rowHead button { flex-shrink: 0; }
 .fileStatus { display: flex; align-items: center; gap: var(--sd-space-4); color: var(--color-muted); }
 .fileStatus svg { color: var(--color-success); }
 .error { color: var(--color-danger); }
-.footer { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sd-space-12); border-top: 1px solid var(--color-border); }
+.footer {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sd-space-12);
+  border-top: 1px solid var(--color-border);
+}
 .footer > div { margin-left: auto; }
 @media (min-width: 861px) {
   :global(.ui-dialog).dialog { left: var(--layout-admin-sidebar); right: 4px; max-width: calc(100vw - var(--layout-admin-sidebar) - 36px); }

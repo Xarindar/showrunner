@@ -17,7 +17,7 @@ type ProductBundlePageProps = {
 function statusClass(status: ProductStatus) {
   if (status === ProductStatus.ACTIVE) return "catalog-status is-active";
   if (status === ProductStatus.ARCHIVED) return "catalog-status is-archived";
-  return "catalog-status is-draft";
+  return "catalog-status";
 }
 
 export default async function ProductBundlePage({ productId, searchParams }: ProductBundlePageProps) {

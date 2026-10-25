@@ -46,7 +46,7 @@ function canUploadWithDriver(driver: MediaDriver) {
 function productStatusClass(status: ProductStatus) {
   if (status === ProductStatus.ACTIVE) return "catalog-status is-active";
   if (status === ProductStatus.ARCHIVED) return "catalog-status is-archived";
-  return "catalog-status is-draft";
+  return "catalog-status";
 }
 
 function productInventoryLabel(product: {
@@ -235,7 +235,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               </p>
             </div>
             <div className="catalog-board-actions">
-              <span className="catalog-pill is-blue">
+              <span className="catalog-pill">
                 <Camera size={15} />
                 {canUpload ? "Uploads ready" : "Storage setup needed"}
               </span>

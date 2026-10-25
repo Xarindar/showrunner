@@ -44,7 +44,7 @@ function serviceDurationLabel(minutes: number) {
 }
 
 function serviceStatusClass(isActive: boolean) {
-  return isActive ? "catalog-status is-active" : "catalog-status is-inactive";
+  return isActive ? "catalog-status is-active" : "catalog-status";
 }
 
 function serviceMatchesSearch(service: ServiceCatalogTableService, searchQuery: string) {

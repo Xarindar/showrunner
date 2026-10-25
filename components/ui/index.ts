@@ -6,7 +6,6 @@ export * from "./card";
 export * from "./dashboard-card";
 export * from "./dialog";
 export * from "./field";
-export * from "./folder-tabs";
 export * from "./layout";
 export * from "./modal";
 export * from "./onboarding-modal";

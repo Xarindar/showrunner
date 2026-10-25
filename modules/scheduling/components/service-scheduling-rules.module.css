@@ -1,4 +1,12 @@
-:global(.ui-dialog).dialog { width: min(960px, calc(100vw - 32px)); height: fit-content; max-width: calc(100vw - 32px); max-height: calc(100svh - 32px); margin: auto; inset: 0; overflow: hidden; }
+:global(.ui-dialog).dialog {
+  width: min(960px, calc(100vw - 32px));
+  height: fit-content;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100svh - 32px);
+  margin: auto;
+  inset: 0;
+  overflow: hidden;
+}
 :global(.ui-dialog).dialog[open] { display: flex; flex-direction: column; }
 .body { min-height: 0; overflow: auto; }
 .dialog :global(.ui-equal-grid) { align-items: start; }

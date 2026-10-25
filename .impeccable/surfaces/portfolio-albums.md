@@ -13,19 +13,21 @@ Direction contract
 
 Required states: empty gallery, upload progress, partial failures/retry, public and private photos, keyboard viewer navigation, desktop/mobile, settings rename/save. All existing advanced forms stay inside the settings panel.
 
-System boundary: PRODUCT.md and DESIGN.md describe the Content editor. This gallery is a separate local composition; preserve those documents and global tokens. The book shelf retains its current visual treatment. The open gallery owns its neutral photographic palette and fullscreen viewer in albums.module.css.
+System boundary: PRODUCT.md and DESIGN.md apply across admin. The gallery retains its photographic composition; appearance values come from the shared `--sd-color-media-*` tokens in `app/admin/design-tokens.css`. `albums.module.css` owns layout and viewer geometry. Follow `developer-docs/admin-design-system.md`; do not introduce a separate gallery palette.
 
 Reference: jazz/src/pages/PortfolioAlbumPage.jsx and jazz/src/styles/global.css; captured local reference at .tmp/jazzr-gallery-reference.png. Existing sample photos are reused, no shipping raster created or replaced.
 
 Finish: browser flow verification, desktop/mobile captures, independent finish review, and documentation of the final local surface.
 
-## Final implementation and evidence
+## Historical implementation evidence
+
+The measurements and browser checks below record the original gallery pass, not a fresh verification of the token migration. Current token values and shared controls take precedence over the historical literal values.
 
 The open album adapts Jazzr's photographic composition locally: a near-black canvas (#0b0b0b), charcoal toolbar (#131313), ivory text and upload action (#f6f5f2), and muted warm-gray metadata (#bdbbb7). The fullscreen viewer uses a deeper black (#080808). Typography inherits the shared sans family; album titles use medium weight at 20px (16px on mobile), icon counts and controls 13px. No global palette, font, or identity was introduced.
 
 Uncropped photos flow through three masonry columns with 6px gutters, changing to two columns at 900px and 4px gutters at 600px. The toolbar stays on one line on desktop and mobile. Photo count uses an image icon and number. Eye/EyeOff toggles the existing published/draft state with a hover/focus tooltip; private visibility is preserved. Upload is an icon-only button, and the settings cog has no visible button box. Gallery settings opens the user-selected right-side panel, up to 840px wide and full width on smaller screens, retaining shared form components and the existing administrative functions. The native-dialog viewer contains the full image and provides previous/next controls, arrow-key navigation, Escape dismissal, a position count, and shared focus restoration. Visible focus, 44px minimum action heights, and reduced-motion handling remain in place.
 
-The album shelf, shared admin shell, tenant tokens, root DESIGN.md and .impeccable/design.json remain the established shared system; PRODUCT.md now records the user-requested global rule against decorative header subtitles. These gallery-specific values belong only to this surface. Existing photos were reused; no new raster assets were created.
+The admin shell and album shelf use the shared admin token system. The dark canvas/viewer use shared media roles; tenant tokens belong to public routes. PRODUCT.md retains the rule against decorative header subtitles. Existing photos were reused; no new raster assets were created.
 
 Verification covered album creation and rename, file-picker and drag-and-drop uploads with partial failures, private asset signing, publish/draft toggling and tooltip state, preserved image proportions, fullscreen keyboard navigation and rapid Next clicks without text selection, desktop/mobile behavior, and absence of page errors. Gallery photos keep the regular cursor; gallery/viewer images disable native dragging and the viewer disables selection. Fresh evidence is in .impeccable/review/album-open-{desktop,900,mobile}.png, album-settings-{desktop,mobile}.png, and album-viewer-{desktop,mobile}.png. The final independent follow-up review returned **SHIP**, with no material findings, for the user-requested compact single-row controls, drag-and-drop uploads, and viewer selection fix.
 

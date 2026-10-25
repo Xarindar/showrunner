@@ -1,5 +1,7 @@
 # Legacy code audit — 2026-10-18
 
+> Historical audit of the October 18 cleanup. The subsequent admin token overhaul also removed the folder-tab and synthetic Studio preview components and moved admin styling out of `app/globals.css`. See the [current ownership and migration guide](admin-design-system.md); the evidence below retains its original scope.
+
 ## Scope and evidence
 
 Scanned 573 application, client integration, configuration, script and test source files with TypeScript's module resolver, including literal dynamic imports and re-exports. Followed newly orphaned dependencies after removing disconnected entry points. Cross-checked symbols and paths with repository searches, checked the convention-based health loader, and reviewed loading boundaries and global styles. Generated dependencies, build output, database migrations and persisted records are not deletion candidates.

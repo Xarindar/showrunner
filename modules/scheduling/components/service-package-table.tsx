@@ -187,7 +187,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
                     </div>
                   </td>
                   <td data-label="Status">
-                    <span className={servicePackage.isActive ? "catalog-status is-active" : "catalog-status is-draft"}>
+                    <span className={servicePackage.isActive ? "catalog-status is-active" : "catalog-status"}>
                       {servicePackage.isActive ? "active" : "draft"}
                     </span>
                   </td>

@@ -17,7 +17,7 @@ export const manifest = {
     mode: "live",
     summary:
       "Client records, notes, linked bookings/forms/testimonials, timeline, segments, pipeline stages, preferences, documents, CSV import/export, and duplicate merge are live.",
-    primaryGap: "The tokenized client portal is being rebuilt in the new clients surface."
+    primaryGap: "Private shoot galleries and tokenized proofing are available; a general client account portal is not implemented."
   },
   capabilities: [
     { label: "Client records", status: "live" },
@@ -28,7 +28,8 @@ export const manifest = {
     { label: "Consent and preferences", status: "live" },
     { label: "CSV import/export", status: "live" },
     { label: "Duplicate merge", status: "live" },
-    { label: "Tokenized client portal", status: "planned" }
+    { label: "Private shoot proofing", status: "live" },
+    { label: "General client account portal", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/clients", "/admin/clients/[id]"],
   dependencies: ["appointments", "forms"],
