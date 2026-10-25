@@ -199,6 +199,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
         </section>
       ) : null}
       <PaymentsWorkspace
+      timezone={settings.timezone}
       checkout={{
         active: activeCheckoutProvider,
         anyConnected,
