@@ -2,6 +2,16 @@
 
 Showrunner's payment integration is implemented in `lib/payments/` and `modules/payments/`. Open `/admin/modules/payments` to configure a site. Credentials are stored encrypted in the database; do not put merchant API credentials in frontend code or commit them.
 
+## Required independence and automatic setup
+
+Product decision, 2026-10-25: normal client setup must be sign-in-and-approve, with no copied API keys or webhook secrets. After setup, Showrunner must operate without Admit One Connect. Removing HTTP calls to the broker alone does not establish independence from the provider application's authority.
+
+The deployed flow is not yet proof of that final contract. Stripe OAuth disconnect calls `revokeStripeOAuthProvider`; Square renews directly but still uses the shared OAuth application ID. Stripe's checkout and payment-method helpers also fall back to `STRIPE_SECRET_KEY` when a site credential is absent; the independent design must fail closed for that site instead. Existing credential-entry support is an advanced/manual path, not the accepted normal onboarding experience.
+
+Stripe's [managed API keys preview](https://docs.stripe.com/stripe-apps/api-authentication/managed-api-keys) is a candidate for automatic delivery of merchant-specific keys encrypted to each Showrunner. It requires preview access and explicit `api_key_write` app approval. Stripe documents a merchant choice to [retain managed keys on uninstall](https://docs.stripe.com/keys/managed-api-keys), but automatic removal of the provisioning app's authority and subsequent independent rotation remain unverified. Ordinary Stripe Apps OAuth requires the app developer's key for renewal and does not resolve this requirement. Do not advertise the candidate flow as implemented.
+
+Cottage616 acceptance must include an isolated sandbox run with Connect unreachable and its config removed, a Showrunner restart, payment/refund settlement, renewal or replacement, and disconnect. Removing provisioning authority while retaining functional credentials is a separate required check. Live charges or deleting production apps are not acceptable outage tests.
+
 ## Configuration
 
 Set `PAYMENT_CREDENTIAL_ENCRYPTION_KEY` to a strong dedicated value, distinct from `AUTH_SECRET` in production. Preserve it across releases or existing credentials cannot be decrypted. Set `NEXT_PUBLIC_APP_URL` to the canonical application origin.
