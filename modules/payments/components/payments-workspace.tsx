@@ -31,8 +31,7 @@ export type ProviderCard = {
   oauthConnect?: boolean;
   // Rendered as the de-emphasized "paste your own keys" option (PayPal when OAuth is on).
   advanced?: boolean;
-  // Connected but no webhook secret stored: Square OAuth needs a signature key pasted
-  // once; Stripe only hits this when automatic webhook creation failed (fix = reconnect).
+  // Manual Square connections need a signing key; Stripe repairs missing webhooks on reconnect.
   webhookMissing?: boolean;
 };
 

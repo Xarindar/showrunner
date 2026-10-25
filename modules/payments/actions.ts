@@ -261,8 +261,7 @@ export async function connectSquareAction(
   return { status: "success" };
 }
 
-// Companion to one-click Square connect: OAuth stores the tokens, but the webhook signature key
-// still has to be pasted once (Square webhook subscriptions cannot be created with merchant tokens).
+// Retained for manually configured Square connections; OAuth connections use automatic checks.
 export async function saveSquareWebhookKeyAction(
   _prev: PaymentActionState,
   formData: FormData
