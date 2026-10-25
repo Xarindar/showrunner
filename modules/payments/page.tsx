@@ -202,7 +202,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
       checkout={{
         active: activeCheckoutProvider,
         anyConnected,
-        disconnected: selectedDisconnected,
+        disconnected: selectedDisconnected && !anyConnected,
         providers: checkoutProviders
       }}
       checkoutTotals={{
