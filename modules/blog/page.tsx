@@ -47,7 +47,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
       </header>
 
       {params.saved ? <Notification tone="success" queryKey="saved">{savedMessage(params.saved)}</Notification> : null}
-      {params.error ? <Notification tone="danger" queryKey="error">{decodeURIComponent(params.error)}</Notification> : null}
+      {params.error ? <Notification tone="danger" queryKey="error">{params.error}</Notification> : null}
 
       <BlogEditor
         canUpload={canUploadWithDriver(settings.mediaDriver)}

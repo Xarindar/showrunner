@@ -610,5 +610,5 @@
 @media (max-width: 860px) {
   .libraryWorkspace .toolbar .librarySearch { flex-basis: 100%; }
   .filterPopover { left: 0; right: auto; }
-  .sortMenu :global(.ui-select-trigger) { min-height: 44px; }
+  .sortMenu :global(.ui-select-trigger) { min-height: var(--sd-layout-touch-target); }
 }

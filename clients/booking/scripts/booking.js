@@ -973,12 +973,6 @@
     return state.services.find((service) => service.id === state.serviceId) || null;
   }
 
-  function selectedStaffName() {
-    const service = selectedService();
-    if (!service || !state.staffId) return "";
-    return service.staff?.find((member) => member.id === state.staffId)?.name || "";
-  }
-
   function selectedStaffId(service) {
     if (state.staffId) return state.staffId;
     if (config.features?.autoSelectFirstStaff === false) return "";

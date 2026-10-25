@@ -1,3 +1,4 @@
+import { formatTime } from "../lib/format";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
@@ -143,7 +144,7 @@ test("reschedule notifications use the explicit-false gate without sending real 
 test("customer cancellation email tokens include the disclosed reason and omit internal notes", async () => {
   const calls: Record<string, unknown>[] = [];
   const loaded = loadMocked("lib/email/events.ts", {
-    "@/lib/format": { formatDateTime: () => "October 20", formatMoney: () => "$25" },
+    "@/lib/format": { formatTime, formatDateTime: () => "October 20", formatMoney: () => "$25" },
     "@/lib/site": { getSiteSettingsForSite: async () => ({ businessName: "Test site", timezone: "UTC" }) },
     "./queue": { queueEmail: async (input: Record<string, unknown>) => { calls.push(input); }, queueAdminEmail: async () => {} },
   });

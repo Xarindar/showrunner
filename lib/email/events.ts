@@ -1,6 +1,6 @@
 import { BookingStatus, EmailCategory } from "@prisma/client";
 import type { BillingDocumentEmailInput } from "@/lib/billing/documents";
-import { formatDateTime, formatMoney } from "@/lib/format";
+import { formatTime, formatDateTime, formatMoney } from "@/lib/format";
 import { getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
 import { queueAdminEmail, queueEmail } from "./queue";
 import type { EmailTokens } from "./types";
@@ -52,10 +52,7 @@ type BookingStatusEmailOptions = {
 };
 
 function endTime(value: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en", {
-    timeStyle: "short",
-    timeZone
-  }).format(value);
+  return formatTime(value, timeZone);
 }
 
 function appointmentTime(booking: BookingForEmail, timeZone: string) {

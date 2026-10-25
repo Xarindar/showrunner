@@ -63,9 +63,7 @@
   outline: 3px solid var(--color-brand);
   outline-offset: 6px;
 }
-.options { border-top: 1px solid var(--color-border); padding-top: var(--sd-space-20); }
-.options > summary { cursor: pointer; font-weight: var(--sd-type-weight-medium); padding: var(--sd-space-8) 0 var(--sd-space-20); }
-.options > div { padding-top: var(--sd-space-12); }
+.options { border-top: 1px solid var(--color-border); }
 /* Open albums borrow Jazzr's quiet, dark photographic canvas. */
 :global(.admin-main):has(> .galleryWorkspace) { padding: 0; background: var(--sd-color-media-canvas); scrollbar-gutter: auto; }
 .galleryWorkspace { min-height: 100%; background: var(--sd-color-media-canvas); color: var(--sd-color-media-text); }
@@ -251,7 +249,7 @@
 }
 .viewer :global(.ui-dialog-close) {
   min-width: 44px;
-  min-height: 44px;
+  min-height: var(--sd-layout-touch-target);
   color: var(--sd-color-media-text);
   background: var(--sd-color-media-surface);
   border-radius: var(--sd-radius-checkbox);
@@ -341,7 +339,7 @@
   font-size: var(--sd-type-heading-size);
 }
 @media (pointer: coarse) {
-  .galleryIcon.galleryIcon { min-width: 44px; width: 44px; min-height: 44px; }
+  .galleryIcon.galleryIcon { min-width: 44px; width: 44px; min-height: var(--sd-layout-touch-target); }
 }
 .settingsList :global(.ui-settings-group) { box-shadow: none; }
 .settingsList :global(.ui-setting-row) { grid-template-columns: minmax(0, 1fr) auto; overflow-wrap: anywhere; }
@@ -362,7 +360,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  min-height: 44px;
+  min-height: var(--sd-layout-touch-target);
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
   font-size: var(--type-body);

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Field, Select } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Field, Select } from "@/components/ui/field";
 import type { HourlyRate, PricingType } from "@/lib/scheduling/pricing";
 import { HourlyRateEditor } from "./hourly-rates";
 

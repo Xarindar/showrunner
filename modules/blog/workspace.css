@@ -367,19 +367,6 @@
 }
 .showrunner-admin .blog-emoji-popover button:hover { background: var(--color-hover); }
 .showrunner-admin .blog-spin { animation: blog-spin 800ms linear infinite; }
-.showrunner-admin .blog-inline-error {
-  align-items: center;
-  background: var(--sd-color-critical-bg);
-  border: 1px solid var(--sd-color-critical-text);
-  border-radius: var(--radius-control);
-  color: var(--color-danger);
-  display: flex;
-  font-size: var(--type-caption);
-  gap: var(--sd-space-6);
-  margin: 0 auto var(--space-3);
-  max-width: 790px;
-  padding: var(--space-2) var(--space-3);
-}
 .showrunner-admin .blog-prose {
   color: var(--blog-ink);
   font-family: var(--font-sans);

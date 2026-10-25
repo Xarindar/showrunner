@@ -138,5 +138,5 @@
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .footer p { display: none; }
   .resultMeta span:last-child { display: none; }
-  .searchField > button { min-width: 44px; min-height: 44px; }
+  .searchField > button { min-width: 44px; min-height: var(--sd-layout-touch-target); }
 }

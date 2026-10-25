@@ -3,7 +3,8 @@
 import { useId, useState } from "react";
 import { flushSync } from "react-dom";
 import { Copy, Plus, X } from "lucide-react";
-import { Button, Modal } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { sessionOfferingDraft, type SessionOffering, type SessionOfferingDraft } from "@/lib/scheduling/session-offering";
 import type { ServiceLibraryItem } from "@/lib/scheduling/service-library";
 import { ServiceLibraryMenu } from "./service-library-menu";
@@ -11,6 +12,7 @@ import { ServiceLibraryPicker } from "./service-library-picker";
 import styles from "./session-packages-editor.module.css";
 import { hourlyPriceCents, type HourlyRate, type PricingType } from "@/lib/scheduling/pricing";
 import { ServicePricingFields } from "./service-pricing-fields";
+import { useNotify } from "@/components/ui/notifications";
 
 export function SessionPackagesEditor({ initialOffering = null, durationMinutes = 60, priceCents = null, requirePrice = false, initialRates = [], initialPricingType = "FLAT_RATE", initialHourlyRateId = "" }: {
   initialOffering?: SessionOffering | null; durationMinutes?: number; priceCents?: number | null; requirePrice?: boolean;
@@ -23,7 +25,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
   const [expandedService, setExpandedService] = useState<string | null>(null);
   const [removal, setRemoval] = useState<{ kind: "service" | "package" | "extra"; id: string; name: string } | null>(null);
   const [newTiers, setNewTiers] = useState(() => new Set<string>());
-  const [message, setMessage] = useState("");
+  const notify = useNotify();
   const [rates, setRates] = useState(initialRates);
   const [pricingType, setPricingType] = useState(initialPricingType);
   const [hourlyRateId, setHourlyRateId] = useState(initialHourlyRateId);
@@ -60,7 +62,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
       setNewTiers(current => new Set([...current, id]));
     });
     document.getElementById(`${listId}-${id}`)?.focus();
-    setMessage(source ? `Duplicated ${source.name}. Rename it and adjust what is included.` : "Added a blank package. Enter its name, price, duration, and what's included.");
+    notify(source ? `Package duplicated. Save the session type to keep it.` : "Package added to this draft.");
   }
 
   function chooseLibraryItems(items: ServiceLibraryItem[], candidate = inlineService?.id || libraryPicker?.editingItem?.id || null) {
@@ -73,7 +75,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
       };
     });
     closeLibrary();
-    setMessage(editingId ? "Service updated. Save the session type to keep these details." : "Services added. Choose which packages include them, then save the session type.");
+    notify(editingId ? "Service updated in this draft." : "Services added to this draft.");
   }
 
   return <div className={styles.editor}>
@@ -129,7 +131,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
           </div><Button type="button" onClick={event => {
             const fields = event.currentTarget.closest("details")?.querySelectorAll<HTMLInputElement>("input");
             if (fields && [...fields].some(field => !field.reportValidity())) return;
-            if (draft.tiers.some(item => item.id !== tier.id && item.name.trim().toLowerCase() === tier.name.trim().toLowerCase())) { setMessage("Use a different name for each package."); return; }
+            if (draft.tiers.some(item => item.id !== tier.id && item.name.trim().toLowerCase() === tier.name.trim().toLowerCase())) { notify("Use a different name for each package.", "danger"); return; }
             setExpandedTiers(new Set()); setNewTiers(current => new Set([...current].filter(id => id !== tier.id)));
           }}>Done</Button></div>
         </div>
@@ -147,12 +149,11 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
       <Button type="button" variant="secondary" size="sm" disabled={draft.addOns.length >= 50} onClick={() => setDraft({ ...draft, addOns: [...draft.addOns, { id: crypto.randomUUID(), name: "", price: "" }] })}><Plus size={16} />Add optional extra</Button>
     </details>
     </section>
-    <p role="status" className={styles.hint}>{message}</p>
     {removal && <Modal open title={`Remove "${removal.name}"?`} onClose={() => setRemoval(null)}>
       <p>{removal.kind === "service" ? `This removes the service from this session and its package selections. It stays in your library.` : removal.kind === "package" ? "This removes the package and its selections. Your included services stay in this session and the library." : "This removes the optional extra from this session."}</p>
       <div className="module-modal-actions"><Button type="button" variant="secondary" autoFocus onClick={() => setRemoval(null)}>Cancel</Button><Button type="button" variant="danger" onClick={() => {
         setDraft(current => removal.kind === "service" ? { ...current, coverageItems: current.coverageItems.filter(item => item.id !== removal.id), tiers: current.tiers.map(tier => ({ ...tier, coverageIds: tier.coverageIds.filter(id => id !== removal.id) })) } : removal.kind === "package" ? { ...current, tiers: current.tiers.length > 1 ? current.tiers.filter(tier => tier.id !== removal.id) : current.tiers } : { ...current, addOns: current.addOns.filter(item => item.id !== removal.id) });
-        setInlineService(null); setExpandedService(null); setRemoval(null); setMessage(`Removed ${removal.name} from this draft. Save the session type to keep the change.`);
+        setInlineService(null); setExpandedService(null); setRemoval(null); notify(`${removal.name} removed from this draft.`);
       }}>Remove {removal.kind}</Button></div>
     </Modal>}
   </div>;

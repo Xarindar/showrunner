@@ -1,4 +1,3 @@
-.showrunner-admin .ui-reserved-slot { min-height: var(--ui-slot-size, 24px); min-width: 0; }
 .showrunner-admin .ui-card {
   background: var(--color-surface);
   border: 0;
@@ -20,12 +19,12 @@
 .showrunner-admin .ui-card-slot-footer { align-self: end; border-top: 1px solid var(--sd-color-border); padding-top: var(--space-2); }
 .showrunner-admin .ui-card-body {
   display: grid;
-  gap: var(--space-2);
   min-height: 0;
   min-width: 0;
   overflow: auto;
   scrollbar-gutter: stable;
 }
+.showrunner-admin :where(.ui-card-body) { gap: var(--space-2); }
 .showrunner-admin .ui-card:not(:has(.ui-card-body)) { gap: var(--space-2); grid-template-rows: none; }
 .showrunner-admin .ui-progress {
   background: var(--color-surface-sunken);

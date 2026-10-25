@@ -19,7 +19,7 @@ type Hours = { day: string; opens: string; closes: string }[];
 function validateHours(hours: Hours) {
   const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
   for (const row of hours) {
-    if (!days.includes(row.day.toLowerCase()) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(row.opens) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(row.closes) || row.opens >= row.closes) throw new Error("Hours need a weekday and opening/closing times in HH:mm order. Omitted days are closed.");
+    if (!days.includes(row.day.toLowerCase()) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(row.opens) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(row.closes) || row.opens >= row.closes) throw new Error("Hours need a weekday and valid opening and closing times, with closing after opening. Omitted days are closed.");
     if (hours.some(other => other !== row && other.day.toLowerCase() === row.day.toLowerCase() && other.opens < row.closes && other.closes > row.opens)) throw new Error("Business hours cannot overlap");
   }
 }

@@ -1,5 +1,5 @@
 "use client";
-import { Notification } from "@/components/ui/notifications";
+import { Notification, useNotify } from "@/components/ui/notifications";
 
 import NextImage from "next/image";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
@@ -23,7 +23,7 @@ import {
   Upload,
   X
 } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { SelectMenu } from "@/components/ui/select-menu";
 import { Modal } from "@/components/ui/modal";
 import type { MediaTagSummary } from "@/lib/media-tags";
@@ -397,7 +397,7 @@ export function MediaLibraryWorkspace({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [folderOpen, setFolderOpen] = useState(false);
-  const [folderError, setFolderError] = useState("");
+  const notify = useNotify();
   const [folderBusy, setFolderBusy] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
@@ -429,7 +429,7 @@ export function MediaLibraryWorkspace({
       <header className="page-header">
         <h1>Media</h1>
         <div className={styles.pageActions}>
-          <Button variant="secondary" onClick={() => { setFolderOpen(true); setFolderError(""); }}>New folder</Button>
+          <Button variant="secondary" onClick={() => setFolderOpen(true)}>New folder</Button>
           <Button onClick={() => setUploadOpen(true)} type="button"><Upload aria-hidden="true" size={16} /> Upload</Button>
         </div>
       </header>
@@ -438,16 +438,15 @@ export function MediaLibraryWorkspace({
       <form className={styles.newFolder} onSubmit={async event => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
-        setFolderBusy(true); setFolderError("");
+        setFolderBusy(true);
         try {
           const result = await createMediaFolder(data);
-          if (result.error) setFolderError(result.error);
-          else { setFolderOpen(false); navigate({ scope: "all", folder: result.name!, q: null, tag: null, kind: null }); }
-        } catch { setFolderError("The folder could not be created. Please try again."); }
+          if (result.error) notify(result.error, "danger");
+          else { notify("Folder created."); setFolderOpen(false); navigate({ scope: "all", folder: result.name!, q: null, tag: null, kind: null }); }
+        } catch { notify("The folder could not be created. Please try again.", "danger"); }
         finally { setFolderBusy(false); }
       }}>
         <label>Folder name<input autoFocus name="name" required maxLength={200} placeholder="e.g. Events" disabled={folderBusy} /></label>
-        {folderError && <p role="alert">{folderError}</p>}
         <div className="module-modal-actions">
           <Button variant="secondary" disabled={folderBusy} onClick={() => setFolderOpen(false)}>Cancel</Button>
           <Button type="submit" disabled={folderBusy}>{folderBusy ? "Creating…" : "Create folder"}</Button>

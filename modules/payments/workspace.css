@@ -83,12 +83,4 @@
   margin: 0;
 }
 .showrunner-admin .pay-step-actions { display: flex; flex-wrap: wrap; gap: var(--sd-space-8); justify-content: space-between; }
-.showrunner-admin .pay-wizard-success {
-  display: grid;
-  gap: var(--sd-space-12);
-  justify-items: center;
-  padding: var(--sd-space-12) 0 var(--sd-space-4);
-  text-align: center;
-}
-.showrunner-admin .pay-success-mark { color: var(--color-success); }
 .showrunner-admin .pay-spin { animation: pay-spin 0.8s linear infinite; }

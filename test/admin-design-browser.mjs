@@ -21,6 +21,12 @@ await build({
     import {Badge} from './components/ui/badge';
     import {Modal} from './components/ui/modal';
     import {Switch} from './components/ui/switch';
+    import {NotificationProvider} from './components/ui/notifications';
+    import {AvailabilityPanel} from './modules/scheduling/components/availability-panel';
+    import {BlockoutsPanel} from './modules/scheduling/components/blockouts-panel';
+    import scheduleStyles from './modules/appointments/schedule.module.css';
+    import serviceStyles from './modules/scheduling/service-editor.module.css';
+    import packageStyles from './modules/scheduling/components/session-packages-editor.module.css';
     import {ImageFramingControl} from './modules/content/studio/image-framing-control';
     import {ServiceBookingRulesTable} from './modules/scheduling/components/service-booking-rules-table';
     import './app/globals.css';
@@ -28,7 +34,7 @@ await build({
     import './app/admin/design-system.css';
     function Fixture() {
       const [open,setOpen]=useState(false);
-      return <div className="showrunner-admin"><main className="admin-main">
+      return <div className="showrunner-admin"><NotificationProvider><main className="admin-main" style={{height:'auto'}}>
         <div className="stack"><header className="page-header"><h1>Shared controls</h1><Button onClick={()=>setOpen(true)}>Open dialog</Button></header>
         <Card bodyClassName="form-grid"><Field label="Name"><Input placeholder="Name" /></Field>
           <Field label="Invalid"><Input aria-invalid="true" defaultValue="Needs correction" /></Field>
@@ -39,12 +45,24 @@ await build({
           <ImageFramingControl source="/photo.svg" ratio={1} value={{}} onChange={value=>window.appliedCrop=value} />
           <ServiceBookingRulesTable idPrefix="fixture" intakeOptions={["What should we prepare?"]} policyOptions={[]} />
         </Card></div>
+        <section aria-label="Schedule fixture" className={scheduleStyles.page}>
+          <h1>Schedule</h1>
+          <AvailabilityPanel availability={[]} staff={[{id:'staff-1',name:'Staff member',isActive:true}]} resources={[]} timezone="America/Chicago" />
+          <BlockoutsPanel blockouts={[]} resources={[]} timezone="America/Chicago" />
+          <section className={scheduleStyles.settings}><details open><summary>Staff & resources <span>1 staff</span></summary><div className={scheduleStyles.section}><details><summary>Nested schedule settings</summary><p>Settings content</p></details></div></details></section>
+          <Card bodyClassName="ui-stack" data-testid="stack-card"><p>First group</p><p>Second group</p></Card>
+          <div className={serviceStyles.page}><div className={serviceStyles.createGrid}><section className="studio-panel"><div className={packageStyles.editor}><label>Package price<input aria-label="Package price" type="number" /></label></div></section></div></div>
+        </section>
         <Modal title="Shared dialog" open={open} onClose={()=>setOpen(false)}><Field label="Dialog field"><Input /></Field><div className="module-modal-actions"><Button variant="secondary" onClick={()=>setOpen(false)}>Cancel dialog</Button><Button>Confirm</Button></div></Modal>
-      </main></div>;
+      </main></NotificationProvider></div>;
     }
     createRoot(document.getElementById('root')).render(<Fixture />);
   ` },
   bundle: true, outfile: `${output}.js`,
+  plugins: [{ name: "schedule-actions-fixture", setup(build) {
+    build.onResolve({ filter: /^\.\.\/actions$/ }, args => args.importer.includes("scheduling") ? { path: "schedule-actions", namespace: "fixture" } : undefined);
+    build.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({ contents: "export async function saveWeeklyHoursAction() { return { error: '', success: 'Hours saved.' }; } export async function createBlockoutAction() {} export async function deleteBlockoutAction() {}", loader: "js" }));
+  } }],
   define: { "process.env.NODE_ENV": '"production"', "process.env": "{}" }, logLevel: "silent"
 });
 const js = readFileSync(`${output}.js`, "utf8");
@@ -67,6 +85,25 @@ try {
   await page.evaluate(() => { document.body.style.cssText = "--color-surface:magenta;--color-brand:red;--space-4:999px;--radius-control:0;--font-sans:serif"; });
   assert.deepEqual(await geometry(), baseline, "Tenant values must not alter admin controls");
   assert.equal(await page.locator(".ui-card-slot[aria-hidden]").count(), 0);
+  const scopeSummary = page.locator("summary").filter({ hasText: /^Staff & resource hours$/ });
+  const closureSummary = page.locator("summary").filter({ hasText: /^Add closure$/ });
+  const summaryGeometry = locator => locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return [style.paddingTop, style.paddingBottom, style.minHeight, style.fontWeight];
+  });
+  assert.deepEqual(await summaryGeometry(scopeSummary), ["12px", "12px", "44px", "500"]);
+  assert.deepEqual(await summaryGeometry(closureSummary), await summaryGeometry(scopeSummary));
+  assert.deepEqual(await summaryGeometry(page.locator("summary").filter({ hasText: /^Nested schedule settings$/ })), await summaryGeometry(scopeSummary));
+  const closureCard = await page.getByRole("region", { name: "Closures", exact: true }).locator(".ui-card").first().boundingBox();
+  const closureHeading = await closureSummary.boundingBox();
+  assert.equal(closureHeading.y - closureCard.y - closureCard.height, 16, "Closures and Add closure use the shared stack gap");
+  assert.equal(await page.getByTestId("stack-card").locator(".ui-card-body").evaluate(element => getComputedStyle(element).gap), "16px");
+  const packageInput = page.getByRole("spinbutton", { name: "Package price" });
+  assert.equal(await packageInput.evaluate(element => getComputedStyle(element).minHeight), "30px", "Service editors reuse shared desktop controls");
+  await closureSummary.focus();
+  await page.keyboard.press("Space");
+  assert.equal(await closureSummary.evaluate(element => element.parentElement.open), true, "Native disclosure remains keyboard operable");
+  await page.getByRole("region", { name: "Schedule fixture" }).screenshot({ path: `${captures}/schedule-desktop.png` });
   await input.focus();
   assert.match(await input.evaluate(element => getComputedStyle(element).boxShadow), /inset/);
   await page.screenshot({ path: `${captures}/controls-desktop.png` });
@@ -86,7 +123,10 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.deepEqual((await geometry()).slice(0, 3), ["12px", "44px", "16px"]);
   assert.equal(await page.getByRole("button", { name: "Save", exact: true }).evaluate(element => getComputedStyle(element).minHeight), "44px");
+  assert.deepEqual(await packageInput.evaluate(element => { const style = getComputedStyle(element); return [style.minHeight, style.fontSize]; }), ["44px", "16px"], "Service editors reuse shared mobile controls");
+  assert.deepEqual(await summaryGeometry(closureSummary), await summaryGeometry(scopeSummary));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.getByRole("region", { name: "Schedule fixture" }).screenshot({ path: `${captures}/schedule-mobile.png` });
   await page.screenshot({ path: `${captures}/controls-mobile.png` });
   await page.getByRole("button", { name: "Add rule", exact: true }).click();
   await page.getByRole("button", { name: /What should we prepare/ }).click();
@@ -94,5 +134,5 @@ try {
   assert.equal(await page.locator(".booking-rule-type-cell").evaluate(element => getComputedStyle(element).display), "grid");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.deepEqual(errors, []);
-  console.log("Passed: tenant isolation, shared field sizes, focus rings, dialog dismissal/focus return, crop mask/keyboard framing, mobile targets and overflow.");
+  console.log("Passed: tenant isolation, shared field sizes, disclosure spacing/keyboard access, stack gaps, dialog dismissal/focus return, crop mask/keyboard framing, mobile targets and overflow.");
 } finally { await browser.close(); }

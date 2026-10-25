@@ -8,7 +8,7 @@ import { GitMerge, Save, Search } from "lucide-react";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
 import { clientStatusLabel, clientStatusOptions as allClientStatusOptions, normalizeClientStatus } from "@/lib/clients/status";
 import { prisma } from "@/lib/prisma";
-import { enumLabel, formatDateTime, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
+import { formatTime, enumLabel, formatDateTime, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl, privateMediaUploadMimeTypes, supportsPrivateMediaDriver } from "@/lib/media";
 import { isRecord } from "@/lib/objects";
 import { getSiteSettings } from "@/lib/site";
@@ -176,7 +176,7 @@ function formatDateOnly(value: Date | null | undefined) {
 }
 
 function formatTimeOnly(value: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en", { timeStyle: "short", timeZone }).format(value);
+  return formatTime(value, timeZone);
 }
 
 function formatAppointmentActivityDate(value: Date, now: Date, timeZone: string) {

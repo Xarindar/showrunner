@@ -1,5 +1,7 @@
 "use server";
 
+import { hoursRevision, weeklyHoursSchema } from "@/lib/scheduling/weekly-hours";
+
 import { imageFramingSchema } from "@/modules/content/studio/image-framing";
 import { initialBusinessHoursSchema } from "@/lib/scheduling/session-input";
 import { readSessionOffering, type SessionOffering } from "@/lib/scheduling/session-offering";
@@ -151,14 +153,15 @@ function serviceCategoriesPath(params?: Record<string, string>) {
 }
 
 function appointmentRulesPath(tab: "availability" | "team" | "calendar", params?: Record<string, string>) {
-  const query = new URLSearchParams({ panel: "rules", tab, ...params }).toString();
-  return `${APPOINTMENTS_ADMIN_PATH}?${query}`;
+  const query = new URLSearchParams({ tab, ...params }).toString();
+  return `${APPOINTMENTS_ADMIN_PATH}/schedule?${query}`;
 }
 
 function refreshScheduling() {
   revalidatePath("/admin");
   revalidatePath(SERVICES_ADMIN_PATH);
   revalidatePath(APPOINTMENTS_ADMIN_PATH);
+  revalidatePath(`${APPOINTMENTS_ADMIN_PATH}/schedule`);
   revalidatePath(LEGACY_SCHEDULING_ADMIN_PATH);
   revalidatePath("/book");
 }
@@ -1108,6 +1111,42 @@ export async function updateReminderSettingsAction(formData: FormData) {
 
   refreshScheduling();
   redirect(appointmentRulesPath("calendar", { saved: "reminders" }));
+}
+
+export async function saveWeeklyHoursAction(_state: { error: string; success: string }, formData: FormData) {
+  await requireAdmin("scheduling:manage");
+  let payload: unknown;
+  try { payload = JSON.parse(String(formData.get("hours"))); }
+  catch { return { error: "Check your hours and try again.", success: "" }; }
+  const parsed = weeklyHoursSchema.safeParse(payload);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "Check your hours.", success: "" };
+  const { staffId, resourceId, days, ranges, revision } = parsed.data;
+  const { siteId } = await getSiteSettings();
+  if (staffId && !await prisma.staffMember.findFirst({ where: { id: staffId, siteId, isActive: true }, select: { id: true } })) {
+    return { error: "Choose an active staff member.", success: "" };
+  }
+  if (resourceId && !await prisma.resource.findFirst({ where: { id: resourceId, siteId, isActive: true }, select: { id: true } })) {
+    return { error: "Choose an active resource.", success: "" };
+  }
+  const where = { siteId, staffId: staffId || null, resourceId: resourceId || null };
+  try {
+    await prisma.$transaction(async tx => {
+      const current = await tx.availabilityRule.findMany({ where });
+      if (hoursRevision(current) !== revision) throw new Error("HOURS_CHANGED");
+      await tx.availabilityRule.deleteMany({ where: { ...where, weekday: { in: days } } });
+      if (ranges.length) await tx.availabilityRule.createMany({ data: [...new Set(days)].flatMap(weekday =>
+        ranges.map(range => ({ ...where, weekday, startMinutes: range.start, endMinutes: range.end }))
+      ) });
+    }, { isolationLevel: "Serializable" });
+  } catch (error) {
+    if (error instanceof Error && (error.message === "HOURS_CHANGED" || ("code" in error && error.code === "P2034"))) {
+      return { error: "These hours changed in another session. Close this editor and refresh before trying again.", success: "" };
+    }
+    return { error: "Hours could not be saved. Your existing hours are unchanged; please try again.", success: "" };
+  }
+  refreshScheduling();
+  revalidatePath("/admin/modules/services/[serviceId]", "page");
+  return { error: "", success: "Hours saved." };
 }
 
 export async function createAvailabilityAction(_state: { error: string; success: string }, formData: FormData) {

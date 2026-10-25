@@ -160,11 +160,7 @@
   width: 100%;
 }
 .public-theme .ui-dialog::backdrop { background: rgba(12, 20, 18, 0.46); }
-.public-theme .ui-dialog-header,
 .public-theme .ui-dialog-body { display: grid; gap: var(--space-3); min-width: 0; }
-.public-theme .ui-dialog-header { margin-bottom: var(--space-4); min-height: 64px; }
-.public-theme .ui-dialog-header h2 { margin-bottom: 0; }
-.public-theme .ui-dialog-header p { color: var(--color-muted); }
 .public-theme .ui-dialog-close { height: 34px; justify-self: end; min-height: 34px; min-width: 34px; padding: 0; width: 34px; }
 .public-theme .ui-modal-head {
   align-items: center;

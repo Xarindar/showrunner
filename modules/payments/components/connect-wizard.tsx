@@ -1,9 +1,8 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
 import {
   Check,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -11,7 +10,10 @@ import {
   Loader2,
   ShieldCheck
 } from "lucide-react";
-import { Button, Field, Input, OnboardingModal, Select } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Field, Input, Select } from "@/components/ui/field";
+import { OnboardingModal } from "@/components/ui/onboarding-modal";
+import { Notification, useNotify } from "@/components/ui/notifications";
 import {
   connectPayPalAction,
   connectStripeAction,
@@ -34,15 +36,14 @@ export function LinkOutButton({ children, href }: { children: ReactNode; href: s
 }
 
 export function CopyValue({ hint, label, value }: { hint?: string; label: string; value: string }) {
-  const [copied, setCopied] = useState(false);
+  const notify = useNotify();
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(value);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
+      notify("Copied to clipboard.");
     } catch {
-      setCopied(false);
+      notify("Could not copy. Select the value and copy it manually.", "danger");
     }
   }
 
@@ -52,8 +53,8 @@ export function CopyValue({ hint, label, value }: { hint?: string; label: string
       <div className="pay-copy-row">
         <code>{value}</code>
         <Button onClick={copy} size="sm" type="button" variant="secondary">
-          {copied ? <Check size={15} /> : <Copy size={15} />}
-          {copied ? "Copied" : "Copy"}
+          <Copy size={15} />
+          Copy
         </Button>
       </div>
       {hint ? <small className="pay-copy-hint">{hint}</small> : null}
@@ -93,7 +94,7 @@ type WizardStep =
       events?: string[];
       field: WizardField;
     }
-  | { kind: "review"; title: string; lead: string; submitLabel: string; successTitle: string; successBody: string };
+  | { kind: "review"; title: string; lead: string; submitLabel: string };
 
 export type WizardConfig = {
   provider: "STRIPE" | "SQUARE" | "PAYPAL";
@@ -177,9 +178,7 @@ export function buildConnectWizards(webhooks: WebhookUrls): Record<WizardConfig[
           kind: "review",
           title: "Connect Stripe",
           lead: "We'll verify these with Stripe and store them encrypted. You can replace them any time.",
-          submitLabel: "Connect & verify Stripe",
-          successTitle: "Stripe is connected",
-          successBody: "Cash App Pay and Affirm are now available to switch on under \"Ways customers pay.\""
+          submitLabel: "Connect & verify Stripe"
         }
       ]
     },
@@ -266,9 +265,7 @@ export function buildConnectWizards(webhooks: WebhookUrls): Record<WizardConfig[
           kind: "review",
           title: "Connect Square",
           lead: "We'll verify these with Square and store them encrypted.",
-          submitLabel: "Connect & verify Square",
-          successTitle: "Square is connected",
-          successBody: "You can now make Square the account that runs checkout."
+          submitLabel: "Connect & verify Square"
         }
       ]
     },
@@ -359,9 +356,7 @@ export function buildConnectWizards(webhooks: WebhookUrls): Record<WizardConfig[
           kind: "review",
           title: "Connect PayPal",
           lead: "We'll verify these with PayPal and store them encrypted.",
-          submitLabel: "Connect & verify PayPal",
-          successTitle: "PayPal is connected",
-          successBody: "You can now make PayPal the account that runs checkout."
+          submitLabel: "Connect & verify PayPal"
         }
       ]
     }
@@ -393,6 +388,12 @@ export function ConnectWizard({
   open: boolean;
 }) {
   const [state, formAction, pending] = useActionState(config.action, initialPaymentActionState);
+  const notify = useNotify();
+  useEffect(() => {
+    if (state.status !== "success") return;
+    notify(`${config.name} connected.`);
+    onClose();
+  }, [state.status, config.name, notify, onClose]);
   const [stepIndex, setStepIndex] = useState(0);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>(() => {
@@ -403,8 +404,6 @@ export function ConnectWizard({
 
   const step = config.steps[stepIndex];
   const stepCount = config.steps.length;
-  const isLast = stepIndex === stepCount - 1;
-  const connected = state.status === "success";
   const hasStartStep = config.steps[0]?.kind === "intro";
   const numberedStepCount = hasStartStep ? Math.max(stepCount - 1, 0) : stepCount;
   const progressLabel =
@@ -448,19 +447,7 @@ export function ConnectWizard({
     setStepIndex(index);
   }
 
-  const body =
-    connected && isLast && step.kind === "review" ? (
-      <div className="pay-wizard pay-wizard-success">
-        <div className="pay-success-mark">
-          <CheckCircle2 size={42} />
-        </div>
-        <h3 className="ui-zero">{step.successTitle}</h3>
-        <p className="pay-step-lead">{step.successBody}</p>
-        <Button onClick={onClose} type="button">
-          Done
-        </Button>
-      </div>
-    ) : (
+  const body = (
       <div className="pay-wizard">
         <p className="pay-progress-count">{progressLabel}</p>
 
@@ -543,7 +530,7 @@ export function ConnectWizard({
               {fieldSteps(config.steps).map((field) => (
                 <input key={field.name} name={field.name} type="hidden" value={values[field.name] ?? ""} />
               ))}
-              {state.status === "error" ? <p className="error ui-zero">{state.message}</p> : null}
+              {state.status === "error" ? <Notification tone="danger" eventKey={state}>{state.message}</Notification> : null}
               <p className="pay-secure-note">
                 <ShieldCheck size={14} /> Verified live with {config.name}, then stored encrypted.
               </p>
@@ -555,7 +542,6 @@ export function ConnectWizard({
           ) : null}
         </div>
 
-        {step.kind !== "review" || !connected ? (
           <div className="pay-step-actions">
             <Button disabled={stepIndex === 0} onClick={goBack} type="button" variant="secondary">
               <ChevronLeft size={16} />
@@ -568,17 +554,16 @@ export function ConnectWizard({
               </Button>
             ) : null}
           </div>
-        ) : null}
       </div>
     );
 
   return (
     <OnboardingModal
-      activeStepIndex={connected && isLast ? null : stepIndex}
-      completedStepIndex={connected && isLast ? stepCount - 1 : stepIndex - 1}
+      activeStepIndex={stepIndex}
+      completedStepIndex={stepIndex - 1}
       maxNavigableStepIndex={stepIndex}
       onClose={onClose}
-      onStepSelect={connected ? undefined : goToStep}
+      onStepSelect={goToStep}
       open={open}
       steps={modalSteps}
       title={`Connect ${config.name}`}>

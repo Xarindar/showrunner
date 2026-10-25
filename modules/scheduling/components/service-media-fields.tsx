@@ -3,7 +3,9 @@
 import { useState } from "react";
 import Image from "next/image";
 import { ImageIcon } from "lucide-react";
-import { AssetPicker, Button, type AssetPickerAsset } from "@/components/ui";
+import { AssetPicker, type AssetPickerAsset } from "@/components/ui/asset-picker";
+import { Button } from "@/components/ui/button";
+import { useNotify } from "@/components/ui/notifications";
 import { ImageFramingControl } from "@/modules/content/studio/image-framing-control";
 import { centeredFraming, type ImageFraming } from "@/modules/content/studio/image-framing";
 import { uploadServiceMediaAssetAction } from "../actions";
@@ -17,14 +19,14 @@ export function ServiceMediaFields({ canUpload, initialSquare = null, initialRec
   const [square, setSquare] = useState(initialSquare);
   const [rectangular, setRectangular] = useState(initialRectangular);
   const [gallery, setGallery] = useState(initialGallery);
-  const [notice, setNotice] = useState("");
+  const notify = useNotify();
   const encode = (photo: Photo | null) => photo ? { assetId: photo.asset.id || null, framing: photo.framing } : null;
   function addImages(assets: AssetPickerAsset[]) {
     setGallery(current => {
       const combined = [...new Map([...current, ...assets].map(asset => [asset.id, asset])).values()];
       return combined.slice(0, 50);
     });
-    setNotice("Images added. Save the session type to keep your choices. Up to 50 additional images can be attached; all uploads remain in the media library.");
+    notify("Images added to this draft. Save the session type to keep your choices.");
   }
   return <section className="studio-panel" aria-labelledby="service-media-title">
     <h2 id="service-media-title" className="section-title">Media</h2>
@@ -50,7 +52,7 @@ export function ServiceMediaFields({ canUpload, initialSquare = null, initialRec
     </div>
     <div className={styles.additional}>
       <h3>Additional images</h3>
-      <p className={styles.help}>Keep photos with this service for future website use. Removing a photo here keeps the original in your media library.</p>
+      <p className={styles.help}>Attach up to 50 photos for future website use. Removing a photo here keeps the original in your media library.</p>
       {gallery.length > 0 && <ul className={styles.gallery} aria-label="Additional service images">{gallery.map(asset => <li key={asset.id}>
         <Image width={160} height={160} unoptimized src={asset.thumbnailUrl} alt={asset.alt} draggable={false} />
         <Button type="button" variant="ghost" size="sm" aria-label={`Remove ${asset.filename}`} onClick={() => setGallery(current => current.filter(item => item.id !== asset.id))}>Remove</Button>
@@ -58,7 +60,6 @@ export function ServiceMediaFields({ canUpload, initialSquare = null, initialRec
       <AssetPicker assets={gallery} canUpload={canUpload} uploadAction={uploadServiceMediaAssetAction} onUploadedAssets={addImages}
         title="Add service images" confirmLabel="Add image" onSelectAsset={asset => addImages([asset])}>Add images</AssetPicker>
       <p className={styles.help}>Photos and framing save with the session type. Original uploads are preserved.</p>
-      {notice && <p role="status" className={styles.help}>{notice}</p>}
     </div>
   </section>;
 }

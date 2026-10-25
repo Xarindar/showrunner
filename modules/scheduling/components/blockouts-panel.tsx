@@ -1,8 +1,12 @@
+import { DateTimeInput } from "@/components/ui/time-input";
 import type { BlockedTime, Resource } from "@prisma/client";
 import { Plus, Trash2 } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import { createBlockoutAction, deleteBlockoutAction } from "../actions";
-import { Button, Card, EqualGrid, Table } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { EqualGrid } from "@/components/ui/layout";
+import { Table } from "@/components/ui/table";
 
 type BlockoutsPanelProps = {
   blockouts: Array<BlockedTime & {resource: Resource | null;}>;
@@ -12,17 +16,51 @@ type BlockoutsPanelProps = {
 
 export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPanelProps) {
   return (
-    <EqualGrid as="section">
+    <section className="ui-stack" aria-label="Closures">
+
+      <Card>
+        <h2 className="section-title">Upcoming closures</h2>
+        <Table>
+          <tbody>
+            {blockouts.map((block) =>
+            <tr key={block.id}>
+                <td>
+                  {formatDateTime(block.startsAt, timezone)}
+                  <br />
+                  <span className="muted-text">
+                    {block.resource ? `${block.resource.name} - ` : ""}
+                    {block.reason || "No reason"}
+                  </span>
+                </td>
+                <td>
+                  <form action={deleteBlockoutAction}>
+                    <input type="hidden" name="id" value={block.id} />
+                    <Button type="submit" title="Remove closure" variant="secondary">
+                      <Trash2 size={16} />
+                    </Button>
+                  </form>
+                </td>
+              </tr>
+            )}
+            {!blockouts.length ?
+            <tr>
+                <td>No upcoming closures.</td>
+              </tr> :
+            null}
+          </tbody>
+        </Table>
+      </Card>
+      <details><summary>Add closure</summary>
       <Card action={createBlockoutAction} as="form" minHeight="none" bodyClassName="form-grid">
-        <h2 className="section-title">Manual blockout</h2>
+
         <EqualGrid>
           <div className="ui-field">
             <label htmlFor="startsAt">Starts</label>
-            <input id="startsAt" name="startsAt" type="datetime-local" required />
+            <DateTimeInput aria-label="Closure start" id="startsAt" name="startsAt"  required />
           </div>
           <div className="ui-field">
             <label htmlFor="endsAt">Ends</label>
-            <input id="endsAt" name="endsAt" type="datetime-local" required />
+            <DateTimeInput aria-label="Closure end" id="endsAt" name="endsAt"  required />
           </div>
         </EqualGrid>
         <div className="ui-field">
@@ -42,42 +80,11 @@ export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPane
         </div>
         <Button type="submit">
           <Plus size={18} />
-          Add blockout
+          Save closure
         </Button>
       </Card>
 
-      <Card>
-        <h2 className="section-title">Upcoming blockouts</h2>
-        <Table>
-          <tbody>
-            {blockouts.map((block) =>
-            <tr key={block.id}>
-                <td>
-                  {formatDateTime(block.startsAt, timezone)}
-                  <br />
-                  <span className="muted-text">
-                    {block.resource ? `${block.resource.name} - ` : ""}
-                    {block.reason || "No reason"}
-                  </span>
-                </td>
-                <td>
-                  <form action={deleteBlockoutAction}>
-                    <input type="hidden" name="id" value={block.id} />
-                    <Button type="submit" title="Delete blockout" variant="secondary">
-                      <Trash2 size={16} />
-                    </Button>
-                  </form>
-                </td>
-              </tr>
-            )}
-            {!blockouts.length ?
-            <tr>
-                <td>No blockouts yet.</td>
-              </tr> :
-            null}
-          </tbody>
-        </Table>
-      </Card>
-    </EqualGrid>);
+      </details>
+    </section>);
 
 }

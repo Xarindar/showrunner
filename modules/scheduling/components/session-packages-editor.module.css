@@ -7,17 +7,13 @@
   display: block;
   width: 100%;
   min-width: 0;
-  min-height: var(--session-control-height, 44px);
   margin-top: var(--sd-space-6);
-  font-size: var(--session-input-size, 1rem);
   scroll-margin-block: 80px;
 }
-.editor button, .editor summary { min-height: var(--session-control-height, 44px); }
 .actions { justify-content: space-between; margin-top: var(--sd-space-8); }
 .hint { margin: 0; color: var(--color-muted); font-size: var(--sd-type-body-size); }
 .hint:empty { display: none; }
-.extras { border-top: 1px solid var(--color-border); padding-top: var(--sd-space-12); }
-.extras summary { cursor: pointer; padding-block: var(--sd-space-8); font-weight: var(--sd-type-weight-medium); }
+.extras { border-top: 1px solid var(--color-border); }
 .extraRow {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(100px, 1fr) auto;
@@ -27,14 +23,7 @@
 }
 .extraRow > button { width: 44px; min-width: 44px; padding-inline: var(--sd-space-8); }
 .tierCards, .tierBody { display: grid; gap: var(--sd-space-12); min-width: 0; }
-.tierCard { min-width: 0; border: 1px solid var(--color-border); border-radius: var(--sd-radius-tag); }
-.tierCard summary {
-  padding: var(--sd-space-16);
-  min-height: 44px;
-  cursor: pointer;
-  overflow-wrap: anywhere;
-  font-weight: var(--sd-type-weight-medium);
-}
+.tierCard { min-width: 0; }
 .tierCard summary span { display: inline; }
 .tierCard summary small {
   display: block;
@@ -42,8 +31,6 @@
   color: var(--color-muted);
   font-weight: var(--sd-type-weight-regular);
 }
-.tierCard summary:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
-.tierBody { padding: 0 var(--sd-space-16) var(--sd-space-16); }
 .tierNumbers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sd-space-12); }
 .tierNumbers label { min-width: 0; }
 .tierCoverage { min-width: 0; border: 0; padding: 0; margin: 0; }
@@ -52,7 +39,7 @@
   display: flex;
   align-items: center;
   gap: var(--sd-space-12);
-  min-height: 44px;
+  min-height: var(--sd-layout-touch-target);
   cursor: pointer;
   overflow-wrap: anywhere;
 }
@@ -87,7 +74,6 @@
 .optionSummary:focus-visible { outline: 2px solid var(--sd-color-focus); outline-offset: -2px; }
 .chips { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 .chips:empty { display: none; }
-.editor details.tierCard { border: 0; border-radius: 0; padding: 0; }
 .tierCard > summary { display: grid; list-style: none; }
 .tierCard > summary::-webkit-details-marker { display: none; }
 .tierCard[open] > summary { display: none; }
@@ -111,6 +97,5 @@
 .menuResults button { justify-content: flex-start; white-space: normal; text-align: left; }
 .libraryMenu > button { display: flex; width: 100%; justify-content: flex-start; }
 @media(max-width:760px) {
-  .libraryMenu button,.libraryMenu input,.libraryMenu select { min-height: 44px; }
-  .libraryMenu input,.libraryMenu select { font-size: var(--sd-type-heading-size); }
+  .libraryMenu button,.libraryMenu input,.libraryMenu select { min-height: var(--sd-layout-touch-target); }
 }

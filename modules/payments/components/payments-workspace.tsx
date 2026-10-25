@@ -3,7 +3,10 @@ import { Notification } from "@/components/ui/notifications";
 
 import { useMemo, useState } from "react";
 import { TicketPlus, Zap } from "lucide-react";
-import { Button, Modal, SettingRow, SettingsGroup, Table } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { SettingRow, SettingsGroup } from "@/components/ui/settings";
+import { Table } from "@/components/ui/table";
 import { ProviderMark } from "./brand-marks";
 import { buildConnectWizards, ConnectWizard, type WebhookUrls } from "./connect-wizard";
 import {

@@ -2,13 +2,16 @@
 
 import { useEffect, useId, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
-import { Button, Field, Input, Modal, Select, Textarea } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import { Modal } from "@/components/ui/modal";
 import { serviceLibraryInputSchema, type ServiceLibraryItem, type ServiceLibraryResults } from "@/lib/scheduling/service-library";
 import type { SessionOffering } from "@/lib/scheduling/session-offering";
 import { saveServiceLibraryItemAction } from "../service-library-actions";
 import styles from "./service-library-picker.module.css";
 import type { HourlyRate, PricingType } from "@/lib/scheduling/pricing";
 import { ServicePricingFields } from "./service-pricing-fields";
+import { useNotify } from "@/components/ui/notifications";
 
 type IncludedItem = SessionOffering["coverageItems"][number];
 
@@ -21,6 +24,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
   onClose: () => void;
 }) {
   const id = useId();
+  const notify = useNotify();
   const [view, setView] = useState<"library" | "edit">(editingItem ? "edit" : "library");
   const [form, setForm] = useState({ id: editingItem?.libraryItemId, name: editingItem?.name || "", description: editingItem?.description || "", category: editingItem?.category || "", tags: editingItem?.tags?.join(", ") || "", pricingType: (editingItem?.pricingType ?? "FLAT_RATE") as PricingType, hourlyRateId: editingItem?.hourlyRateId ?? "", price: editingItem?.priceCents == null ? "" : (editingItem.priceCents / 100).toFixed(2) });
   const [q, setQ] = useState("");
@@ -66,11 +70,6 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
     setLoading(true);
   }
 
-  function showSaveError(message: string) {
-    setError(message);
-    requestAnimationFrame(() => document.getElementById(`${id}-error`)?.focus());
-  }
-
   async function save() {
     const parsed = serviceLibraryInputSchema.safeParse(form);
     if (!parsed.success) {
@@ -82,10 +81,10 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
     setError("");
     try {
       const result = await saveServiceLibraryItemAction(form);
-      if (result.error) { showSaveError(result.error); return; }
+      if (result.error) { notify(result.error, "danger"); return; }
       if (result.item) onChoose([...picked.filter(item => item.id !== result.item.id), result.item]);
     } catch {
-      showSaveError("The service could not be saved. Your details are still here; please try again.");
+      notify("The service could not be saved. Your details are still here; please try again.", "danger");
     } finally { setSaving(false); }
   }
 

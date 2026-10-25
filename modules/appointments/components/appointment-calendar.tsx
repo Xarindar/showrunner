@@ -1,5 +1,7 @@
 "use client";
-import { Notification } from "@/components/ui/notifications";
+
+import { formatTime } from "@/lib/format";
+import { useNotify } from "@/components/ui/notifications";
 
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -11,7 +13,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { AlertTriangle, Ban, CalendarClock, Check, ExternalLink, Mail, X } from "lucide-react";
-import { Modal, Tab, Tabs } from "@/components/ui";
+import { Modal } from "@/components/ui/modal";
+import { Tab, Tabs } from "@/components/ui/tabs";
 import { rescheduleBookingFromCalendarAction, updateBookingStatusAction } from "../actions";
 import { AppointmentEventChip } from "./appointment-event-chip";
 
@@ -158,7 +161,7 @@ function addMinutes(date: Date, minutes: number) {
 }
 
 function formatCalendarClockLabel(date: Date) {
-  return new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(date);
+  return formatTime(date, "UTC");
 }
 
 function formatCalendarDateLabel(date: Date) {
@@ -366,7 +369,7 @@ function AppointmentFloatingDetails({
 export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, view }: AppointmentCalendarProps) {
   const router = useRouter();
   const calendarRef = useRef<FullCalendar | null>(null);
-  const [message, setMessage] = useState("");
+  const notify = useNotify();
   const [selectedBookingId, setSelectedBookingId] = useState("");
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(null);
   const [confirmStage, setConfirmStage] = useState<ConfirmStage>("");
@@ -435,7 +438,6 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
 
   function changeView(nextView: (typeof calendarViews)[number]) {
     setSelectedBookingId("");
-    setMessage("");
     setConfirmStage("");
     setPendingReschedule(null);
 
@@ -458,33 +460,33 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
     const pending = pendingReschedule;
     if (!pending) return;
     setConfirmStage("");
-    setMessage("");
 
     startTransition(async () => {
-      const result = await rescheduleBookingFromCalendarAction({
-        bookingId: pending.booking.id,
-        dateKey: pending.dateKey,
-        hour: pending.hour,
-        minute: pending.minute,
-        notifyCustomer
-      });
-
-      setPendingReschedule(null);
-
-      if (!result.ok) {
-        setMessage(result.error || "Unable to reschedule appointment.");
-        return;
+      try {
+        const result = await rescheduleBookingFromCalendarAction({
+          bookingId: pending.booking.id,
+          dateKey: pending.dateKey,
+          hour: pending.hour,
+          minute: pending.minute,
+          notifyCustomer
+        });
+        if (!result.ok) {
+          notify(result.error || "Unable to reschedule appointment.", "danger");
+          return;
+        }
+        notify("Appointment rescheduled.");
+        router.refresh();
+      } catch {
+        notify("The update could not be confirmed. Refresh the calendar before trying again.", "danger");
+      } finally {
+        setPendingReschedule(null);
       }
-
-      setMessage("Appointment rescheduled.");
-      router.refresh();
     });
   }
 
   function handleEventClick(info: EventClickArg) {
     info.jsEvent.preventDefault();
     setSelectedBookingId(info.event.id);
-    setMessage("");
   }
 
   function handleEventDrop(info: EventDropArg) {
@@ -498,7 +500,6 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
     const end = info.event.end || addMinutes(start, booking.durationMinutes);
     const parts = calendarDateParts(start);
     setSelectedBookingId("");
-    setMessage("");
     setPendingReschedule({
       booking,
       dateKey: parts.dateKey,
@@ -598,10 +599,12 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
 
   return (
     <div className="appointment-calendar">
-      <CalendarStatus message={message} pending={isPending} />
+      {isPending && <p role="status">Checking conflicts…</p>}
       {viewControls}
       <div className="appointment-fullcalendar">
         <FullCalendar
+          slotLabelFormat={{ hour: "numeric", minute: "2-digit", hour12: true, meridiem: true }}
+          eventTimeFormat={{ hour: "numeric", minute: "2-digit", hour12: true, meridiem: true }}
           ref={calendarRef}
           allDaySlot={false}
           dayMaxEvents
@@ -651,9 +654,4 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
       {rescheduleModals}
     </div>
   );
-}
-
-function CalendarStatus({ message, pending }: { message: string; pending: boolean }) {
-  if (pending) return <p role="status">Checking conflicts...</p>;
-  return message ? <Notification tone={message.startsWith("Appointment rescheduled") ? "success" : "danger"}>{message}</Notification> : null;
 }

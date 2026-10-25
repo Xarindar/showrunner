@@ -1,7 +1,10 @@
 "use client";
 
+import { TimeInput } from "@/components/ui/time-input";
+import { Notification } from "@/components/ui/notifications";
+
 import { useActionState, useState, type ReactNode } from "react";
-import { Button, ButtonLink } from "@/components/ui";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { createServiceAction } from "../actions";
 import styles from "@/modules/appointments/session-form.module.css";
 import { SessionPackagesEditor } from "./session-packages-editor";
@@ -39,7 +42,7 @@ export function SessionTypeForm({ businessHours, timezone, canUpload, scheduling
         {!businessHours.length && active && <fieldset><legend>Business hours ({timezone})</legend>
           <p className={styles.hint}>These hours apply to all your session types. You can adjust them later in your calendar.</p>
           <div className={styles.days}>{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => <label key={day}><input type="checkbox" name="weekdays" value={index} />{day}</label>)}</div>
-          <div className={styles.row}><label>From<input type="time" name="hoursStart" required /></label><label>Until<input type="time" name="hoursEnd" required /></label></div>
+          <div className={styles.row}><label>From<TimeInput name="hoursStart" required /></label><label>Until<TimeInput name="hoursEnd" required /></label></div>
         </fieldset>}
       </fieldset>
       </section>
@@ -50,7 +53,7 @@ export function SessionTypeForm({ businessHours, timezone, canUpload, scheduling
       </details>
       </section>
       </aside>
-      {state.error && <p className="error" role="alert">{state.error}</p>}
+      {state.error && <Notification tone="danger" eventKey={state}>{state.error}</Notification>}
       <footer className={editorStyles.saveFooter}><Button disabled={pending} type="submit">{pending ? "Saving…" : "Save session type"}</Button></footer>
     </form>
   </div>;

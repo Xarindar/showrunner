@@ -1,5 +1,5 @@
 import type { HTMLAttributes } from "react";
-import { AlertTriangle, Inbox } from "lucide-react";
+import { Inbox } from "lucide-react";
 import { cx } from "./utils";
 
 type SkeletonProps = HTMLAttributes<HTMLSpanElement> & {
@@ -28,19 +28,6 @@ export function EmptyState({ children, className, description, title, ...props }
         <small>{description || ""}</small>
       </span>
       {children}
-    </div>
-  );
-}
-
-type FeedbackProps = HTMLAttributes<HTMLDivElement> & {
-  tone?: "danger" | "success" | "neutral";
-};
-
-export function Feedback({ className, tone = "neutral", ...props }: FeedbackProps) {
-  return (
-    <div className={cx("ui-feedback", `ui-feedback-${tone}`, className)} role={tone === "danger" ? "alert" : "status"} {...props}>
-      {tone === "danger" ? <AlertTriangle size={18} aria-hidden="true" /> : null}
-      {props.children}
     </div>
   );
 }

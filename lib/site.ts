@@ -123,8 +123,7 @@ export async function getSiteSettingsForSite(siteId: string): Promise<SiteSettin
     settings = existingSettings;
   }
 
-  // Enablement now comes from ModuleInstallation records, seeded from (and falling back to) the legacy
-  // SiteSettings.enabledModules JSON so the app keeps working whether or not the install table exists.
+  // Existing settings seed a site's first installation rows; subsequent reads use those rows only.
   const enabledModuleIds = await resolveEnabledModuleIds(normalizeModules(settings.enabledModules), settings.siteId);
 
   return {

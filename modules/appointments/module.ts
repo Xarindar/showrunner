@@ -3,7 +3,7 @@ import type { ShellModule } from "@/shell/module-types";
 
 export const manifest = {
   id: "appointments",
-  label: "Appointments",
+  label: "Bookings",
   href: "/admin/modules/appointments",
   icon: "CalendarCheck",
   order: 30,

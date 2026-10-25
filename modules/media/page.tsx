@@ -34,14 +34,6 @@ function positiveInteger(value: string | undefined, fallback = 1) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function safeDecodedMessage(value: string | undefined) {
-  if (!value) return "";
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
 
 function savedMessage(value: string | undefined) {
   const messages: Record<string, string> = {
@@ -261,7 +253,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       assets={assets}
       builtInCount={globalMediaAssets.length}
       canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)}
-      errorMessage={params.error === "missing-file" ? "Choose a file before uploading." : safeDecodedMessage(params.error)}
+      errorMessage={params.error === "missing-file" ? "Choose a file before uploading." : params.error || ""}
       filters={normalizedFilters}
       folders={Array.from(folderCounts, ([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name))}
       needsAltCount={needsAltCount}

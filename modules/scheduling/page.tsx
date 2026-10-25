@@ -176,7 +176,7 @@ export default async function SchedulingPage({ searchParams, section }: Scheduli
   const tagFilter = tags.includes(params.tag || "") ? String(params.tag) : "all";
 
   const savedMessage = savedServiceMessage(params.saved);
-  const errorMessage = params.error ? decodeURIComponent(params.error) : null;
+  const errorMessage = params.error || null;
   const categoryOptions: SelectMenuOption[] = [
     { label: "All categories", value: "all" },
     ...categories.map((category) => ({ label: category, value: category }))

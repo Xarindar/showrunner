@@ -2,7 +2,10 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Search } from "lucide-react";
-import { Button, Input, Select, SettingControlGroup, SettingRow, SettingsCategory, SettingsGroup, SettingValueGroup, Switch } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Input, Select } from "@/components/ui/field";
+import { SettingControlGroup, SettingRow, SettingsCategory, SettingsGroup, SettingValueGroup } from "@/components/ui/settings";
+import { Switch } from "@/components/ui/switch";
 import { centsToDollarsInput, type ClientVipSettings } from "@/lib/clients/vip-settings";
 
 import { clientStatusOptions } from "@/lib/clients/status";

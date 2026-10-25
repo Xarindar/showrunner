@@ -1,3 +1,4 @@
+import { formatTime } from "@/lib/format";
 import "server-only";
 import { servicePriceCents } from "@/lib/scheduling/pricing";
 
@@ -15,11 +16,7 @@ function overlaps(startA: Date, endA: Date, startB: Date, endB: Date) {
 }
 
 function makeSlotLabel(date: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en", {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone
-  }).format(date);
+  return formatTime(date, timeZone);
 }
 
 function getBufferedWindow(startsAt: Date, endsAt: Date, beforeMinutes: number, afterMinutes: number) {

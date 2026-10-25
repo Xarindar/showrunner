@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, type KeyboardEvent } from "react";
-import { Button, Modal } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 
 const newValue = "__new__";
 

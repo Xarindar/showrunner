@@ -21,7 +21,7 @@ import {
   type SquareEnvironment
 } from "@/lib/payments/provider-onboarding";
 import { prisma } from "@/lib/prisma";
-import { normalizeModules } from "@/shell/modules";
+import { defaultEnabledModules } from "@/shell/modules";
 import { resolveCurrentSite } from "@/lib/site";
 import type { PaymentActionState } from "./state";
 
@@ -366,7 +366,7 @@ export async function setCheckoutProviderAction(
     await prisma.siteSettings.upsert({
       where: { siteId: site.id },
       update: { checkoutProvider: provider },
-      create: { checkoutProvider: provider, enabledModules: normalizeModules([]), siteId: site.id }
+      create: { checkoutProvider: provider, enabledModules: defaultEnabledModules, siteId: site.id }
     });
   } catch (error) {
     return errorState(error, "Could not update the checkout account.");

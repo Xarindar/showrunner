@@ -1,3 +1,4 @@
+import { formatTimeValue, minutesToTime } from "@/lib/format";
 import { Notification } from "@/components/ui/notifications";
 import { ServiceMediaFields } from "./components/service-media-fields";
 import { readImageFraming } from "@/modules/content/studio/image-framing";
@@ -124,7 +125,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
 
   if (serviceId === "new") {
     const rules = availability.filter(rule => !rule.staffId && !rule.resourceId);
-    const timeLabel = (minutes: number) => `${Math.floor(minutes / 60).toString().padStart(2, "0")}:${(minutes % 60).toString().padStart(2, "0")}`;
+    const timeLabel = (minutes: number) => formatTimeValue(minutesToTime(minutes));
     const businessHours = rules.map(rule => `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][rule.weekday]} ${timeLabel(rule.startMinutes)}–${timeLabel(rule.endMinutes)}`);
     return <SessionTypeForm rates={rates} businessHours={businessHours} timezone={settings.timezone} canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)} schedulingRules={schedulingRules} />;
   }
@@ -154,7 +155,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   const intakeOptions = uniqueSortedStrings([...taxonomyServices.map((item: ServiceTaxonomyOption) => item.intakePrompt), ...intakeFormFields.map((field) => field.label)]);
   const policyOptions = uniqueSortedStrings(taxonomyServices.map((item: ServiceTaxonomyOption) => item.policyText));
   const savedMessage = savedServiceMessage(params.saved);
-  const errorMessage = params.error ? decodeURIComponent(params.error) : null;
+  const errorMessage = params.error || null;
   const bookingPath = "Client booking rebuild pending";
   const tagsValue = serviceTags(service);
   const packageCount = service.packageItems.length;

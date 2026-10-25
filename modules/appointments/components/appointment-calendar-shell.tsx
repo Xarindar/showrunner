@@ -5,9 +5,10 @@ import { Notification } from "@/components/ui/notifications";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, ListChecks, MoreHorizontal, SlidersHorizontal, Table2 } from "lucide-react";
-import { ButtonLink, Modal } from "@/components/ui";
+import { ButtonLink } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 
-type AppointmentsModalKey = "filters" | "list" | "rules" | "tools" | "waitlist" | null;
+type AppointmentsModalKey = "filters" | "list" | "tools" | "waitlist" | null;
 
 type AppointmentCalendarShellProps = {
   appointmentCount: number;
@@ -20,7 +21,6 @@ type AppointmentCalendarShellProps = {
   nextHref: string;
   previousHref: string;
   rangeLabel: string;
-  rulesPanel: ReactNode;
   savedMessage?: string;
   todayHref: string;
   toolsPanel: ReactNode;
@@ -40,7 +40,6 @@ export function AppointmentCalendarShell({
   nextHref,
   previousHref,
   rangeLabel,
-  rulesPanel,
   savedMessage,
   todayHref,
   toolsPanel,
@@ -55,7 +54,7 @@ export function AppointmentCalendarShell({
       <input id="appointment-calendar-view-input" form="appointments-filter-form" name="view" type="hidden" defaultValue={view} />
       <header className="appointments-subtle-header">
         <div className="appointments-subtle-title">
-          <span>Schedule</span>
+          <span>Appointments</span>
           <strong>{rangeLabel}</strong>
           <small>{appointmentCount} appointments</small>
         </div>
@@ -88,10 +87,6 @@ export function AppointmentCalendarShell({
             <span>List</span>
             <b>{bookingCount}</b>
           </button>
-          <button aria-label="Open scheduling rules" className="appointments-action-button" onClick={() => setOpenPanel("rules")} title="Scheduling rules" type="button">
-            <CalendarDays size={16} />
-            <span>Rules</span>
-          </button>
           <button aria-label="Open schedule tools" className="appointments-action-button" onClick={() => setOpenPanel("tools")} title="Schedule tools" type="button">
             <MoreHorizontal size={18} />
             <span>Tools</span>
@@ -111,9 +106,6 @@ export function AppointmentCalendarShell({
       </Modal>
       <Modal bodyClassName="appointments-modal-body appointments-modal-body-wide" className="appointments-modal wide" onClose={() => setOpenPanel(null)} open={openPanel === "list"} title="Appointment list">
         {appointmentListPanel}
-      </Modal>
-      <Modal bodyClassName="appointments-modal-body appointments-modal-body-wide" className="appointments-modal appointments-rules-modal wide" onClose={() => setOpenPanel(null)} open={openPanel === "rules"} title="Scheduling rules">
-        {rulesPanel}
       </Modal>
       <Modal bodyClassName="appointments-modal-body" className="appointments-modal" onClose={() => setOpenPanel(null)} open={openPanel === "tools"} title="Schedule tools">
         <div className="appointments-tools-heading">

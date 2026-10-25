@@ -1,3 +1,4 @@
+import { DateTimeInput } from "@/components/ui/time-input";
 import { Notification } from "@/components/ui/notifications";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -5,7 +6,7 @@ import { CalendarClock, ChevronDown, Save } from "lucide-react";
 import { FormAttachmentTargetType } from "@prisma/client";
 import { getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { formatDateTime } from "@/lib/format";
+import { formatTime, formatDateTime } from "@/lib/format";
 import { getSiteSettings } from "@/lib/site";
 import { sessionPackageSnapshotSchema } from "@/lib/scheduling/session-offering";
 import { rescheduleBookingAction, updateBookingDetailAction, updateBookingStatusAction } from "../actions";
@@ -149,7 +150,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
                 <td>Time</td>
                 <td>
                   {formatDateTime(booking.startsAt, settings.timezone)} -{" "}
-                  {new Intl.DateTimeFormat("en", { timeStyle: "short", timeZone: settings.timezone }).format(booking.endsAt)}
+                  {formatTime(booking.endsAt, settings.timezone)}
                 </td>
               </tr>
               <tr>
@@ -225,10 +226,10 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
           <input type="hidden" name="id" value={booking.id} />
           <div className="ui-field">
             <label htmlFor="startsAt">New start time</label>
-            <input
+            <DateTimeInput aria-label="New start"
               id="startsAt"
               name="startsAt"
-              type="datetime-local"
+
               defaultValue={formatDateTimeLocalInput(booking.startsAt, settings.timezone)}
               required />
 

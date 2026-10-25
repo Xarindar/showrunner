@@ -1,5 +1,7 @@
 "use client";
 
+import { TimeInput } from "@/components/ui/time-input";
+
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Image as ImageIcon, Plus } from "lucide-react";
@@ -54,7 +56,7 @@ export function Fields({ headerId, canUpload = false, fixedRows = false, assetBa
         if ("alt" in fields && !String(value.alt || "").trim()) next.alt = asset.alt;
         if ("imageAlt" in fields && !String(value.imageAlt || "").trim()) next.imageAlt = asset.alt;
         onChange(next);
-      }} /> : field.kind === "richtext" ? <RichText id={id} value={String(value[key] || "")} maxLength={field.max} onChange={update} /> : field.kind === "multiline" ? <textarea id={id} rows={3} maxLength={field.max} value={String(value[key] || "")} onChange={event => update(event.target.value)} /> : <input id={id} type={field.kind === "email" ? "email" : "text"} maxLength={field.max} value={source} onChange={event => update(event.target.value)} />}
+      }} /> : field.kind === "time" ? <TimeInput id={id} value={String(value[key] || "")} onValueChange={update} /> : field.kind === "richtext" ? <RichText id={id} value={String(value[key] || "")} maxLength={field.max} onChange={update} /> : field.kind === "multiline" ? <textarea id={id} rows={3} maxLength={field.max} value={String(value[key] || "")} onChange={event => update(event.target.value)} /> : <input id={id} type={field.kind === "email" ? "email" : "text"} maxLength={field.max} value={source} onChange={event => update(event.target.value)} />}
       {media && <ImageFramingControl source={inherited ? choice?.framingUrl || choice?.catalog?.framingUrl || preview : preview} blockId={headerId || prefix} value={inherited && value.useServiceFraming !== false ? readImageFraming(choice?.imageFraming || choice?.catalog?.imageFraming) : value} onChange={framing => onChange({ ...value, [key]: inherited ? "" : framingImageSource(source), ...(servicePhoto ? { useServiceFraming: false } : {}), ...framing })} />}
     </div>;
   })}</>;

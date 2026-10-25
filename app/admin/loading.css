@@ -81,7 +81,7 @@
   .showrunner-admin .admin-loading-gallery .admin-loading-search { flex-basis: 100%; }
   .showrunner-admin .admin-loading-editor .admin-loading-body { grid-template-columns: minmax(0, 1fr); }
   .showrunner-admin .admin-loading-action,
-  .showrunner-admin .admin-loading-search { min-height: 44px; }
+  .showrunner-admin .admin-loading-search { min-height: var(--sd-layout-touch-target); }
   .showrunner-admin .admin-loading-columns,
   .showrunner-admin .admin-loading-table-row {
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);

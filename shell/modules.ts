@@ -90,7 +90,5 @@ export function normalizeModules(value: unknown): ModuleId[] {
 
   const knownIds = new Set(shellModules.filter((item) => item.status === "active").map((item) => item.id));
   const modules = value.filter((item): item is ModuleId => typeof item === "string" && knownIds.has(item as ModuleId));
-  const selectedModules = modules.length ? modules : defaultEnabledModules;
-
-  return Array.from(new Set([...requiredModuleIds, ...selectedModules]));
+  return Array.from(new Set([...requiredModuleIds, ...modules]));
 }

@@ -47,6 +47,6 @@
 .actions { display: flex; justify-content: space-between; align-items: center; gap: var(--sd-space-8); }
 @media (max-width: 480px) {
   .actions { flex-wrap: wrap; }
-  .actions button { min-height: 44px; }
+  .actions button { min-height: var(--sd-layout-touch-target); }
   .canvas { padding: var(--sd-space-6); }
 }

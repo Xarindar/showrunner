@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export type Field = { label: string; kind: "text" | "multiline" | "richtext" | "url" | "email" | "list" | "checkbox" | "number"; min?: number; max?: number; default?: number; optional?: boolean; options?: { label: string; value: string }[]; fields?: Record<string, Field> };
+export type Field = { label: string; kind: "time" | "text" | "multiline" | "richtext" | "url" | "email" | "list" | "checkbox" | "number"; min?: number; max?: number; default?: number; optional?: boolean; options?: { label: string; value: string }[]; fields?: Record<string, Field> };
 const text = (label: string, max = 200): Field => ({ label, kind: "text", max });
 const copy = (label: string): Field => ({ label, kind: "multiline", max: 10000 });
 const url = (label: string): Field => ({ label, kind: "url", max: 2048 });
@@ -11,7 +11,7 @@ const image = { ...framing, url: url("Image URL"), alt: text("Alternative text")
 const section = { heading: text("Heading"), copy: copy("Copy") };
 const cta = { ctaLabel: text("Button label"), ctaHref: url("Button destination") };
 const address = { line1: text("Street address"), line2: text("Address line 2"), city: text("City"), region: text("State / region"), postalCode: text("Postal code"), country: text("Country") };
-const hours = list("Business hours", { day: text("Weekday (Monday–Sunday)"), opens: text("Opens (HH:mm)"), closes: text("Closes (HH:mm)") }, 28);
+const hours = list("Business hours", { day: text("Weekday (Monday–Sunday)"), opens: { label: "Opens", kind: "time", max: 5 }, closes: { label: "Closes", kind: "time", max: 5 } }, 28);
 const checkbox = (label: string): Field => ({ label, kind: "checkbox" });
 
 export const blockRegistry = {

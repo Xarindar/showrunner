@@ -20,3 +20,10 @@ test("navigation search stays within the caller's available modules", () => {
   assert.deepEqual(searchAdminNavigation(available, "settings"), []);
   assert.deepEqual(searchAdminNavigation(available, "not a page"), []);
 });
+
+test("booking navigation finds both appointment and schedule destinations", () => {
+  const modules = [{ id: "appointments", label: "Bookings", href: "/admin/modules/appointments" }];
+  assert.equal(searchAdminNavigation(modules, "bookings").length, 2);
+  assert.equal(searchAdminNavigation(modules, "appointments")[0].href, "/admin/modules/appointments");
+  assert.equal(searchAdminNavigation(modules, "schedule")[0].href, "/admin/modules/appointments/schedule");
+});

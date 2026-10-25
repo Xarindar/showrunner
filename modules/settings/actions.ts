@@ -58,43 +58,40 @@ export async function updateSettingsAction(formData: FormData) {
     ? applyDataScopePreset(dataScopePreset as DataScopePreset)
     : dataScopeConfigFromFormData(formData);
 
-  await prisma.siteSettings.upsert({
-    where: { siteId: site.id },
-    update: {
-      ...(!existingSettings.enabledModuleIds.includes("content") ? { businessName: input.businessName, contactEmail: input.contactEmail, timezone: input.timezone } : {}),
-      themePreset,
-      themePrimary: input.themePrimary,
-      mediaDriver: input.mediaDriver,
-      ga4MeasurementId: input.ga4MeasurementId,
-      googleAdsTagId: input.googleAdsTagId,
-      metaPixelId: input.metaPixelId,
-      searchConsoleVerification: input.searchConsoleVerification,
-      analyticsRetentionDays: input.analyticsRetentionDays,
-      dataScopeConfig,
-      enabledModules: safeModules
-    },
-    create: {
-      siteId: site.id,
-      businessName: input.businessName,
-      contactEmail: input.contactEmail,
-      timezone: input.timezone,
-      themePreset,
-      themePrimary: input.themePrimary,
-      mediaDriver: input.mediaDriver,
-      ga4MeasurementId: input.ga4MeasurementId,
-      googleAdsTagId: input.googleAdsTagId,
-      metaPixelId: input.metaPixelId,
-      searchConsoleVerification: input.searchConsoleVerification,
-      analyticsRetentionDays: input.analyticsRetentionDays,
-      dataScopeConfig,
-      enabledModules: safeModules
-    }
-  });
-
-  // ModuleInstallation records are the forward source of truth; the JSON column above stays in sync as a
-  // backward-compatible fallback. Tolerate the install table being absent so saving never hard-fails.
-  await setModuleEnablement(safeModules, site.id).catch((error) => {
-    console.error("[settings:module-enablement-failed]", error);
+  await prisma.$transaction(async (tx) => {
+    await tx.siteSettings.upsert({
+      where: { siteId: site.id },
+      update: {
+        ...(!existingSettings.enabledModuleIds.includes("content") ? { businessName: input.businessName, contactEmail: input.contactEmail, timezone: input.timezone } : {}),
+        themePreset,
+        themePrimary: input.themePrimary,
+        mediaDriver: input.mediaDriver,
+        ga4MeasurementId: input.ga4MeasurementId,
+        googleAdsTagId: input.googleAdsTagId,
+        metaPixelId: input.metaPixelId,
+        searchConsoleVerification: input.searchConsoleVerification,
+        analyticsRetentionDays: input.analyticsRetentionDays,
+        dataScopeConfig,
+        enabledModules: safeModules
+      },
+      create: {
+        siteId: site.id,
+        businessName: input.businessName,
+        contactEmail: input.contactEmail,
+        timezone: input.timezone,
+        themePreset,
+        themePrimary: input.themePrimary,
+        mediaDriver: input.mediaDriver,
+        ga4MeasurementId: input.ga4MeasurementId,
+        googleAdsTagId: input.googleAdsTagId,
+        metaPixelId: input.metaPixelId,
+        searchConsoleVerification: input.searchConsoleVerification,
+        analyticsRetentionDays: input.analyticsRetentionDays,
+        dataScopeConfig,
+        enabledModules: safeModules
+      }
+    });
+    await setModuleEnablement(tx, safeModules, site.id);
   });
 
   await recordAuditLog({
