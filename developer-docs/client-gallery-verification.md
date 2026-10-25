@@ -15,7 +15,11 @@ Verified locally against source base `8d6799396816dd064be6bbd50450ddaa4e218dc0`,
 - Sharp tests inspect rendered watermark pixels, reduction, source preservation, metadata stripping and fail-closed missing/corrupt sources. Security tests exercise the actual Next optimizer admission validator and private generic-media route.
 - React DOM/SSR and API tests cover visual-picker pagination beyond 60 assets, search, cross-page selections, cancel/reopen, package defaults, explicit blank/zero semantics, count/overage confirmation, stale terms, duplicate submission, CSRF/origin/body bounds, selected-only downloads and checkout recovery permissions.
 
-## Limits and required launch checks
+## Subsequent release verification
+
+The October 2026 codebase pass reran the suite under the pinned Node 22.22.3 runtime and passed the repeatable `portfolio-proof-browser.mjs` desktop/mobile fixture, including selections, payment-return handling and revoked-link behavior. These checks supersede the earlier runtime/browser limitations below for those synthetic checks only. They do not establish live provider settlement, bucket policy or deployed large-upload capacity. See [the release verification record](codebase-verification.md).
+
+## Original limits and required launch checks
 
 - Runtime was **Node 24.19.0 / npm 11.9.0**, not the repository-pinned Node 22.22.3 / npm 10.x. Rerun the suite/build in the pinned deployment runtime.
 - Actual browser interaction/layout QA is **not verified**. Chromium was blocked by sandbox socket permissions; the separate cloud browser could not reach the isolated executor's localhost. Synthetic DOM/HTTP checks are not a substitute. `test/portfolio-proof-browser.mjs` is an opt-in repeatable browser fixture for a capable environment.

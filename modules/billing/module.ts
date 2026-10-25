@@ -14,14 +14,14 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "mixed",
-    summary: "Quote, invoice, contract, line-item, attachment, totals, status admin, public accept/pay, PDFs, and partial payments are live.",
-    primaryGap: "Recurring billing, refunds, and contract signing/versioning are pending."
+    summary: "Document administration, line items, attachments, totals, status, hosted checkout-link handoff, payment records and refunds are available.",
+    primaryGap: "Public document pages, PDF routes, customer document emails, recurring billing and contract signing/versioning are unavailable."
   },
   capabilities: [
     { label: "Document admin", status: "foundation" },
     { label: "Server-side totals", status: "live" },
-    { label: "Public accept/pay", status: "live" },
-    { label: "PDF document rendering", status: "live" },
+    { label: "Public document accept/pay", status: "planned" },
+    { label: "PDF document rendering", status: "planned" },
     { label: "Contract signing", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/billing"],

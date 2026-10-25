@@ -100,3 +100,7 @@ changed fields or reloading. This follows the content editor's existing pattern;
 it is not autosave or protection against browser history navigation within the app.
 Saving an edit remounts the form at its persisted revision so the saved values become
 the next clean draft. See `session-builder-research.md` for research and test evidence.
+
+## Admin styling
+
+Session editors, dialogs and pickers follow the [admin token developer guide](admin-design-system.md). Shared controls own appearance; scheduling styles own task layout, including `modules/scheduling/booking-rules.css`. Tenant presets do not style these screens.

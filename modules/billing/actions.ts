@@ -3,14 +3,11 @@
 import { randomBytes } from "crypto";
 import { BillingDocumentStatus, BillingDocumentType, PaymentProvider, PaymentStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { recordAuditLog } from "@/lib/audit";
 import {
-  ensureBillingPublicToken,
   generateBillingPublicToken,
-  publicBillingUrl,
   snapshotBillingDocument
 } from "@/lib/billing/documents";
 import { isRejectedCapturedPayment } from "@/lib/billing/payments";
@@ -27,7 +24,6 @@ import {
   zeroableMoneyCents
 } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
-import { queueBillingDocumentEmail } from "@/lib/email";
 import { refundPaymentGatewayPayment } from "@/lib/payments/refunds";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
@@ -133,10 +129,6 @@ const billingCheckoutClearSchema = z.object({
   confirmClear: z.literal("on", { error: "Confirm before clearing the hosted checkout link." })
 });
 
-const billingEmailSchema = z.object({
-  id: requiredText
-});
-
 const billingRefundSchema = z.object({
   paymentId: requiredText,
   amount: moneyCents
@@ -167,13 +159,6 @@ async function generateDocumentNumber(type: BillingDocumentType, siteId: string)
   }
 
   throw new Error("Could not generate a unique document number.");
-}
-
-async function requestOrigin() {
-  const headerStore = await headers();
-  const host = headerStore.get("host") || "localhost:3000";
-  const protocol = headerStore.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
-  return `${protocol}://${host}`;
 }
 
 async function recomputeDocumentTotals(tx: Prisma.TransactionClient, billingDocumentId: string, siteId: string) {
@@ -408,63 +393,6 @@ export async function clearBillingCheckoutLinkAction(formData: FormData) {
 
   refreshBilling();
   redirect(`/admin/modules/billing?saved=checkout-clear&document=${input.id}`);
-}
-
-export async function queueBillingDocumentEmailAction(formData: FormData) {
-  await requireAdmin("billing:manage");
-  const input = await parseForm(billingEmailSchema, formData, "/admin/modules/billing");
-  const siteId = await getCurrentSiteId();
-
-  try {
-    const origin = await requestOrigin();
-    const document = await prisma.$transaction(async (tx) => {
-      const owned = await tx.billingDocument.findFirst({
-        where: { id: input.id, siteId },
-        select: { id: true }
-      });
-
-      if (!owned) return null;
-
-      const publicAccessToken = await ensureBillingPublicToken(tx, input.id);
-      await snapshotBillingDocument(tx, input.id);
-
-      return tx.billingDocument.findUnique({
-        where: { id: input.id },
-        select: {
-          id: true,
-          documentNumber: true,
-          type: true,
-          status: true,
-          customerName: true,
-          customerEmail: true,
-          currency: true,
-          totalCents: true,
-          dueAt: true,
-          publicMemo: true,
-          checkoutProvider: true,
-          checkoutUrl: true,
-          publicAccessToken: true
-        }
-      }).then((row) => (row ? { ...row, publicAccessToken } : null));
-    });
-
-    if (!document) throw new Error("Billing document not found.");
-    if (document.status === BillingDocumentStatus.DRAFT) {
-      throw new Error("Send the document before emailing the customer link.");
-    }
-
-    await queueBillingDocumentEmail({
-      document,
-      publicUrl: publicBillingUrl(origin, document.publicAccessToken),
-      idempotencyKey: `billing:${document.id}:notice:${document.status}:${Date.now()}`
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not queue that billing email.";
-    redirect(`/admin/modules/billing?document=${input.id}&error=${encodeURIComponent(message)}`);
-  }
-
-  refreshBilling();
-  redirect(`/admin/modules/billing?saved=email&document=${input.id}`);
 }
 
 export async function addBillingLineItemAction(formData: FormData) {

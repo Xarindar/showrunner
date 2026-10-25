@@ -14,8 +14,8 @@ export const manifest = {
   readiness: {
     level: "partial",
     mode: "live",
-    summary: "Manifest-driven content editors, media-backed galleries, directories, canonical business info, page SEO, and scoped JSON delivery.",
-    primaryGap: "Additional client manifests and presentation previews are added as sites are onboarded."
+    summary: "Manifest-driven Puck editing over the real website iframe, media framing, approved fields, publication and scoped JSON delivery.",
+    primaryGap: "Additional client manifests and website integrations are added as sites are onboarded."
   },
   capabilities: [
     { label: "Configured hero content", status: "live" },
@@ -26,7 +26,7 @@ export const manifest = {
     { label: "Contact / Business Info and page SEO", status: "live" }
   ],
   adminRoutes: ["/admin/modules/content"],
-  publicRoutes: ["/", "/api/public/v1/content/profile", "/api/public/v1/content/studio"],
+  publicRoutes: [ "/api/public/v1/content/profile", "/api/public/v1/content/studio"],
   dependencies: ["settings", "media"],
   dataModels: ["SiteSettings.publicContentConfig", "HeroPresentation", "HeroSlide", "HeroSlideElement"],
   permissions: ["content:manage"],

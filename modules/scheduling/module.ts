@@ -15,16 +15,16 @@ export const manifest = {
     level: "partial",
     mode: "live",
     summary: "Service administration, packages, catalog metadata, availability, and booking operations are live.",
-    primaryGap: "The public booking experience is being rebuilt in the new clients surface."
+    primaryGap: "Public booking APIs and standalone client source exist; production website integration and general client self-service remain deployment work."
   },
   capabilities: [
     { label: "Flat and hourly pricing", status: "live" },
     { label: "Base services", status: "live" },
     { label: "Service builder", status: "live" },
     { label: "Service packages", status: "foundation" },
-    { label: "Public booking", status: "planned" },
+    { label: "Public booking API", status: "live" },
     { label: "Client self-service", status: "planned" },
-    { label: "Cal.com calendar sync", status: "planned" }
+    { label: "Google Calendar free/busy", status: "live" }
   ],
   adminRoutes: [
     "/admin/modules/services/rates",

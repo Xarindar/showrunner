@@ -15,7 +15,7 @@ export const manifest = {
   readiness: {
     level: "live",
     mode: "live",
-    summary: "Guided bring-your-own-credentials setup for Stripe, Square, and PayPal, with checkout, coupon, tax, shipping, and payment-method controls.",
+    summary: "Stripe/Square OAuth onboarding, credential fallback, PayPal setup, and checkout, coupon, tax, shipping and payment-method controls.",
     primaryGap: "Cash App Pay and Affirm ride along with Stripe; both unlock once Stripe is connected."
   },
   capabilities: [

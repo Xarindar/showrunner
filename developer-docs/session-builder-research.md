@@ -1,5 +1,7 @@
 # Session and package builder: research and first refinement
 
+> Research and implementation history. Dated visual measurements below are historical; use the [current admin token guide](admin-design-system.md) for new styling. Product behavior remains governed by PRODUCT.md and the current implementation.
+
 Research date: October 15, 2026. Scope: creating and editing reusable session
 types and their packages, including the catalog entry point and the distinction
 from service bundles. The owner requested one module at a time, followed by
@@ -250,7 +252,7 @@ targeted ESLint and Prisma schema validation pass. The migration was applied onl
 the local review database; this iteration has not been deployed.
 
 
-## Shopify visual reference — 16 October 2026
+## Shopify visual reference ï¿½ 16 October 2026
 
 Inspected the signed-in Add product page at desktop and narrow widths without editing Shopify data. Applied its continuous editing column, compact field rhythm, quieter section headings, rounded bordered panels and separate supporting settings to the existing session editor and new-session form. Organization now sits beside Status on desktop; included services and packages follow Session details in the main column. The existing Save action floats without a full-width opaque footer. Mobile keeps 44px controls, single-column panels and package cards; the long contextual title is constrained within its grid cell. No Shopify commerce options or new capabilities were added.
 

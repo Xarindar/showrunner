@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { ClipboardCheck, FileQuestion, Plus, Search, Trash2 } from "lucide-react";
-import { Button, Modal, Switch } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { Switch } from "@/components/ui/switch";
 
 type BookingRuleKind = "intake" | "policy";
 
@@ -181,7 +183,7 @@ export function ServiceBookingRulesTable({
                   </span>
                 </td>
                 <td>
-                  <span className="catalog-status is-draft">{statusLabel(row.kind, requirePolicy)}</span>
+                  <span className="catalog-status">{statusLabel(row.kind, requirePolicy)}</span>
                 </td>
                 <td>
                   <Button
@@ -264,7 +266,7 @@ export function ServiceBookingRulesTable({
               key={`${option.kind}-${option.value}`}
               onClick={() => applyOption(option.kind, option.value)}
               type="button">
-              <span className="catalog-status is-draft">{ruleLabels[option.kind].label}</span>
+              <span className="catalog-status">{ruleLabels[option.kind].label}</span>
               <strong>{option.value}</strong>
             </button>
           ))}

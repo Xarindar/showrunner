@@ -1,0 +1,94 @@
+.showrunner-admin .pay-row-title { align-items: center; display: inline-flex; flex-wrap: wrap; gap: var(--sd-space-8); min-width: 0; }
+.showrunner-admin .pay-row-title svg { flex: none; }
+.showrunner-admin .payments-coupons-table { min-height: 0; }
+.showrunner-admin .payments-coupons-index-table th,
+.showrunner-admin .payments-coupons-index-table td { white-space: nowrap; }
+.showrunner-admin .payments-coupon-thumb { color: var(--color-brand-dark); }
+.showrunner-admin .payments-coupons-col-code { width: 210px; }
+.showrunner-admin .payments-coupons-col-value { width: 120px; }
+.showrunner-admin .payments-coupons-col-redemptions { width: 132px; }
+.showrunner-admin .payments-coupons-col-availability { width: 210px; }
+.showrunner-admin .payments-coupons-col-created { width: 110px; }
+.showrunner-admin .pay-dialog { max-width: min(600px, calc(100vw - var(--space-6))); }
+.showrunner-admin .pay-wizard { display: grid; gap: var(--sd-space-16); }
+.showrunner-admin .pay-progress-count {
+  color: var(--muted);
+  font-size: var(--sd-type-body-size);
+  font-weight: var(--sd-type-weight-medium);
+  margin: 0;
+}
+.showrunner-admin .pay-step { display: grid; gap: var(--sd-space-12); }
+.showrunner-admin .pay-step-lead { color: var(--muted); line-height: 1.5; margin: 0; }
+.showrunner-admin .pay-checklist { display: grid; gap: var(--sd-space-8); list-style: none; margin: 0; padding: 0; }
+.showrunner-admin .pay-checklist li {
+  align-items: flex-start;
+  display: grid;
+  gap: var(--sd-space-8);
+  grid-template-columns: 16px minmax(0, 1fr);
+}
+.showrunner-admin .pay-checklist li svg { color: var(--color-success); margin-top: var(--sd-space-2); }
+.showrunner-admin .pay-linkout { align-self: flex-start; gap: var(--sd-space-8); width: 100%; }
+.showrunner-admin .pay-linkout-tab {
+  color: var(--muted);
+  font-size: var(--sd-type-small-size);
+  font-weight: var(--sd-type-weight-medium);
+}
+.showrunner-admin .pay-copy,
+.showrunner-admin .pay-events {
+  background: var(--sd-color-surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  display: grid;
+  gap: var(--sd-space-8);
+  padding: var(--sd-space-12);
+}
+.showrunner-admin .pay-copy-label { color: var(--ink); font-size: var(--sd-type-body-size); font-weight: var(--sd-type-weight-medium); }
+.showrunner-admin .pay-copy-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sd-space-8);
+  justify-content: space-between;
+}
+.showrunner-admin .pay-copy-row code {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--sd-radius-tag);
+  flex: 1 1 220px;
+  font-size: var(--sd-type-body-size);
+  min-width: 0;
+  padding: var(--sd-space-6) var(--sd-space-8);
+  word-break: break-all;
+}
+.showrunner-admin .pay-copy-hint { color: var(--muted); }
+.showrunner-admin .pay-event-list { display: flex; flex-wrap: wrap; gap: var(--sd-space-6); }
+.showrunner-admin .pay-event-list code {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--sd-radius-tag);
+  font-size: var(--sd-type-small-size);
+  padding: var(--sd-space-4) var(--sd-space-8);
+}
+.showrunner-admin .pay-review { display: grid; gap: var(--sd-space-12); }
+.showrunner-admin .pay-review-list { display: grid; gap: var(--sd-space-8); margin: 0; }
+.showrunner-admin .pay-review-list > div { align-items: baseline; display: flex; gap: var(--sd-space-12); justify-content: space-between; }
+.showrunner-admin .pay-review-list dt { color: var(--muted); font-size: var(--sd-type-body-size); }
+.showrunner-admin .pay-review-list dd { font-weight: var(--sd-type-weight-medium); margin: 0; text-align: right; word-break: break-all; }
+.showrunner-admin .pay-secure-note {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: var(--sd-type-body-size);
+  gap: var(--sd-space-6);
+  margin: 0;
+}
+.showrunner-admin .pay-step-actions { display: flex; flex-wrap: wrap; gap: var(--sd-space-8); justify-content: space-between; }
+.showrunner-admin .pay-wizard-success {
+  display: grid;
+  gap: var(--sd-space-12);
+  justify-items: center;
+  padding: var(--sd-space-12) 0 var(--sd-space-4);
+  text-align: center;
+}
+.showrunner-admin .pay-success-mark { color: var(--color-success); }
+.showrunner-admin .pay-spin { animation: pay-spin 0.8s linear infinite; }

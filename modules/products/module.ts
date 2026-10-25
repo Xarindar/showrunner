@@ -15,7 +15,7 @@ export const manifest = {
     level: "partial",
     mode: "mixed",
     summary: "Catalog admin, product media, categories, variants, bundles, and abandoned-cart recovery are live.",
-    primaryGap: "The public storefront is being rebuilt in the new clients surface."
+    primaryGap: "Public product and checkout APIs are implemented; this checkout does not include a complete hosted storefront."
   },
   capabilities: [
     { label: "Catalog admin", status: "live" },
@@ -23,7 +23,7 @@ export const manifest = {
     { label: "Categories", status: "live" },
     { label: "Variant options", status: "live" },
     { label: "Bundles", status: "foundation" },
-    { label: "Checkout/storefront", status: "planned" },
+    { label: "Public checkout API", status: "live" },
     { label: "Abandoned-cart recovery", status: "live" }
   ],
   adminRoutes: ["/admin/modules/products", "/admin/modules/products/[productId]"],

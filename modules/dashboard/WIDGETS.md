@@ -202,6 +202,10 @@ The shell validates real dates, requires both endpoints together, and rejects an
 
 The direction combines Shopify-style dashboard restraint with the authored composition found in Wigggle UI. The frame stays consistent and neutral; personality comes from the information design inside it, not gradients, arbitrary palettes, or decorative copy. Do not repeat the same internal composition across every module simply because it is available.
 
+## Styling source
+
+Use the [admin token system](../../developer-docs/admin-design-system.md) for all widget appearance. The shared frame recipe lives in `components/ui/styles/dashboard.css` and builds on the card surface in `surfaces.css`; placement and chart layouts live in `modules/dashboard/workspace.css` and `charts.css`. Widget dimensions describe the dashboard grid contract, not a global requirement for fixed-height cards. Keep data-driven chart measurements local and use shared tokens for colors, type, spacing and elevation.
+
 ## Ownership Rules
 
 - Domain queries and links belong in `modules/<id>/widgets/`.

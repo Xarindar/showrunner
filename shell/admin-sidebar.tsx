@@ -442,7 +442,7 @@ export function AdminSidebar({ publicSiteUrl, businessName, enabledModules, logo
 
   return (
     <>
-      <header className={`admin-mobile-bar ${resolvedMobileHeader ? "is-contextual" : ""}`}>
+      <header className="admin-mobile-bar">
         <Link href="/admin" className="brand" onClick={closeMenu}>
           <SidebarBrand businessName={businessName} logoUrl={logoUrl} />
         </Link>

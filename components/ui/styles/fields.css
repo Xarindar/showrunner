@@ -1,0 +1,121 @@
+.showrunner-admin .ui-logo-field {
+  align-items: center;
+  background: var(--sd-color-surface-subtle);
+  border: 1px solid var(--sd-color-border);
+  border-radius: var(--radius-card);
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(148px, 210px) minmax(0, 1fr) auto;
+  min-width: 0;
+  padding: var(--space-3);
+}
+.showrunner-admin .ui-logo-picker-trigger {
+  background: var(--sd-color-surface-subtle);
+  border: 1px dashed var(--sd-color-border);
+  border-radius: var(--radius-card);
+  color: var(--color-muted);
+  cursor: pointer;
+  display: grid;
+  min-height: 112px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+  width: 100%;
+}
+.showrunner-admin .ui-logo-picker-trigger:hover,
+.showrunner-admin .ui-logo-picker-trigger:focus-visible {
+  border-color: var(--sd-color-border);
+  box-shadow: var(--sd-shadow-focus);
+  outline: 0;
+}
+.showrunner-admin .ui-logo-picker-trigger.has-logo { border-style: solid; }
+.showrunner-admin .ui-logo-picker-trigger .asset-picker-trigger-hint {
+  bottom: var(--space-2);
+  font-size: var(--type-caption);
+  min-height: 28px;
+}
+.showrunner-admin .ui-logo-preview { display: grid; min-height: 112px; min-width: 0; overflow: hidden; position: relative; }
+.showrunner-admin .ui-logo-preview img { object-fit: contain; padding: var(--space-4); }
+.showrunner-admin .ui-logo-preview-empty {
+  align-items: center;
+  color: var(--color-muted);
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+}
+.showrunner-admin .ui-logo-copy { display: grid; gap: var(--space-1); min-width: 0; }
+.showrunner-admin .ui-logo-copy strong { color: var(--color-text); font-weight: var(--sd-type-weight-strong); }
+.showrunner-admin .ui-logo-copy small { color: var(--color-muted); line-height: 1.4; }
+.showrunner-admin .ui-logo-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+.showrunner-admin .ui-logo-field > .ui-button { align-self: start; min-width: 40px; }
+@media (max-width: 700px) {
+  .showrunner-admin .ui-logo-field { grid-template-columns: 1fr; }
+  .showrunner-admin .ui-logo-field > .ui-button { justify-self: start; }
+}
+.showrunner-admin .ui-check-row {
+  min-height: var(--control-height);
+  align-items: flex-start;
+  display: flex;
+  gap: var(--space-2);
+  line-height: var(--leading-normal);
+}
+.showrunner-admin .ui-upload-field { min-width: 0; width: 100%; }
+.showrunner-admin .ui-upload-target {
+  align-items: center;
+  background: var(--sd-color-surface-subtle);
+  border: 1.5px dashed var(--sd-color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  cursor: pointer;
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 92px;
+  padding: var(--space-4);
+  transition: border-color var(--motion-fast) ease, background-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+.showrunner-admin .ui-upload-target:hover,
+.showrunner-admin .ui-upload-target.is-dragging {
+  background: var(--sd-color-fill-hover);
+  border-color: var(--color-brand);
+  box-shadow: var(--sd-shadow-container);
+}
+.showrunner-admin .ui-upload-target.is-disabled { cursor: not-allowed; opacity: 0.58; }
+.showrunner-admin .ui-upload-icon {
+  align-items: center;
+  background: var(--sd-color-surface-subtle);
+  border: 1px solid var(--sd-color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-brand);
+  display: inline-flex;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+.showrunner-admin .ui-upload-copy { display: grid; gap: var(--sd-space-4); min-width: 0; }
+.showrunner-admin .ui-upload-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.showrunner-admin .ui-upload-copy span { color: var(--color-muted); font-size: var(--type-small); }
+.showrunner-admin .ui-upload-action {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-size: var(--type-small);
+  font-weight: var(--sd-type-weight-strong);
+  padding: var(--sd-space-8) var(--sd-space-12);
+}
+@media (max-width: 560px) {
+  .showrunner-admin .ui-upload-target { grid-template-columns: auto minmax(0, 1fr); }
+  .showrunner-admin .ui-upload-action { display: none; }
+}
+.showrunner-admin .field-end { justify-content: end; }
+.showrunner-admin .form-grid { align-content: start; display: grid; gap: var(--space-4); }
+.showrunner-admin :is(.ui-field,.ui-field-label,.ui-field-hint) { min-width: 0; overflow-wrap: anywhere; }
+.showrunner-admin :is(.ui-field>label,.ui-field-label) { font-size: var(--sd-type-body-size); font-weight: var(--sd-type-weight-medium); }
+.showrunner-admin .ui-field-hint:empty { display: none; }

@@ -8,6 +8,6 @@ The Add client form uses Status and Service, without Pipeline or Tags controls. 
 
 Manual service or status choices do not create an appointment, collect money, or verify payment. A successful public session booking creates a client with its collected name, normalized email, optional phone, configured default status, and validated booked service. Repeat bookings match the site's existing email record, preserve saved contact details, status, and other preferences, and update the booked service. The profile and booking are written in the same serializable transaction; a failed booking leaves no partial profile. Payment and automation behavior is unchanged. No database migration is required for these fields.
 
-The shared folder-tab styling joins the tab strip to its panel at a one-pixel seam, preserving the folder shape and horizontal scrolling without overlapping the panel by several pixels.
+Client pages use the shared admin controls and module-owned layouts. The legacy folder-tab component has been removed; resource navigation and status filters must follow the [admin design system](admin-design-system.md).
 
 Checks: `npm test`, TypeScript, targeted ESLint, and the deployed Add client / Module settings flow.

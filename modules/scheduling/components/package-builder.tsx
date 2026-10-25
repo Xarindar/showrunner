@@ -103,7 +103,7 @@ export function PackageBuilder({
           <div>
             <h2 id="service-library-title">Service tiles</h2>
           </div>
-          <span className="catalog-pill is-blue">
+          <span className="catalog-pill">
             <Layers3 size={14} />
             {services.length} available
           </span>
@@ -186,7 +186,7 @@ export function PackageBuilder({
           <div>
             <h2 id="service-packages-title">Bundle builder</h2>
           </div>
-          <span className="catalog-pill is-green">
+          <span className="catalog-pill">
             <Boxes size={14} />
             {packages.length} package{packages.length === 1 ? "" : "s"}
           </span>
