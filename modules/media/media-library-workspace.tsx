@@ -553,7 +553,6 @@ export function MediaLibraryWorkspace({
     current.active = true;
     suppressClick.current = true;
     if (current.kind === "files") {
-      setSelectedIds(current.ids);
       setDrag({ ids: current.ids, x: event.clientX, y: event.clientY });
       const folder = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-folder-path]");
       setDropFolder(folder?.dataset.folderPath ?? null);
