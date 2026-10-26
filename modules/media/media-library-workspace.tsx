@@ -684,13 +684,17 @@ export function MediaLibraryWorkspace({
           <section aria-label="Asset results" className={styles.resultArea} ref={resultsRef}
             onPointerDown={beginGesture} onPointerMove={updateGesture} onPointerUp={event => finishGesture(event)}
             onPointerCancel={event => finishGesture(event, true)} onLostPointerCapture={event => { if (gesture.current) finishGesture(event, true); }} onDragStart={event => event.preventDefault()}>
-            {filters.folder && <nav aria-label="Folder path" className={styles.folderPath}>
-              <Button type="button" variant="ghost" data-folder-path="" data-drop-active={dropFolder === ""} onClick={() => navigate({ folder: null })}>Media home</Button>
-              {filters.folder.split("/").map((part, index, parts) => {
-                const path = parts.slice(0, index + 1).join("/");
-                return <Button type="button" variant="ghost" key={path} data-folder-path={path} data-drop-active={dropFolder === path} aria-current={path === filters.folder ? "page" : undefined} onClick={() => navigate({ folder: path })}><ChevronRight size={14} aria-hidden="true" />{part}</Button>;
-              })}
-            </nav>}
+            <nav aria-label="Folder path" className={styles.folderPath}>
+              <Button type="button" variant="secondary" aria-label="Back to parent folder" disabled={!filters.folder || moveBusy}
+                onClick={() => navigate({ folder: filters.folder.split("/").slice(0, -1).join("/") || null })}><ChevronLeft size={16} aria-hidden="true" />Back</Button>
+              <ol>
+                <li><Button type="button" variant="ghost" className={styles.breadcrumb} data-folder-path="" data-drop-active={dropFolder === ""} aria-current={!filters.folder ? "page" : undefined} onClick={() => navigate({ folder: null })}>Media home</Button></li>
+                {filters.folder.split("/").filter(Boolean).map((part, index, parts) => {
+                  const path = parts.slice(0, index + 1).join("/");
+                  return <li key={path}><ChevronRight size={14} aria-hidden="true" /><Button type="button" variant="ghost" className={styles.breadcrumb} data-folder-path={path} data-drop-active={dropFolder === path} aria-current={path === filters.folder ? "page" : undefined} onClick={() => navigate({ folder: path })}>{part}</Button></li>;
+                })}
+              </ol>
+            </nav>
             <div className={view === "grid" ? styles.assetGrid : styles.assetList}>
             {childFolders.length > 0 && <nav aria-label="Media folders" className={styles.folderBrowser} aria-busy={moveBusy}>
               {childFolders.map(folder => (

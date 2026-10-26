@@ -5,6 +5,11 @@
 .folderThumb > svg { max-width: 80%; max-height: 80%; fill: var(--color-surface-sunken); }
 .folderTarget .assetCopy strong { white-space: normal; overflow-wrap: anywhere; }
 .folderPath, .selectionActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-block: var(--space-3); }
+.folderPath ol { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); list-style: none; padding: 0; margin: 0; min-width: 0; }
+.folderPath li { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; }
+.folderPath li > svg { flex-shrink: 0; color: var(--color-muted); }
+.libraryWorkspace .folderPath .breadcrumb { padding-inline: var(--space-1); font-size: var(--type-body); font-weight: var(--sd-type-weight-regular); color: var(--sd-color-link); }
+.libraryWorkspace .folderPath .breadcrumb[aria-current="page"] { font-weight: var(--sd-type-weight-strong); color: var(--color-text); }
 .selectionActions label { display: flex; align-items: center; gap: var(--space-2); }
 .folderPath [data-drop-active="true"] { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .assetTile { position: relative; min-width: 0; }
