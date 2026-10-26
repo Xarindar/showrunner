@@ -24,7 +24,7 @@ test("media opens the full library and preserves bookmarked categories and filte
   assert.equal(filters({ kind: "script" }).kind, "all");
 });
 
-test("home shows unfiled media, nested views use the full path, and search still spans folders", async () => {
+test("home includes all media regardless of folder, while nested views use the full path", async () => {
   const queries: unknown[] = [];
   const mocks: Record<string, unknown> = {
     "react/jsx-runtime": { jsx: (_type: unknown, props: unknown) => props },
@@ -41,11 +41,15 @@ test("home shows unfiled media, nested views use the full path, and search still
   runInNewContext(ts.transpileModule(readFileSync(new URL("../modules/media/page.tsx", import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX }
   }).outputText, { exports, require: (id: string) => mocks[id] || {} });
-  for (const [params, expected] of [[{}, '"folder":""'], [{ folder: "Family Photos/Summer" }, '"folder":"Family Photos/Summer"'], [{ q: "Garden" }, null]] as const) {
+  for (const [params, expected] of [[{}, null], [{ folder: "Family Photos/Summer" }, '"folder":"Family Photos/Summer"'], [{ q: "Garden" }, null]] as const) {
     queries.length = 0;
     await exports.default!({ searchParams: Promise.resolve(params) });
     const visible = JSON.stringify(queries.at(-1));
     if (expected) assert(visible.includes(expected));
-    else { assert(!visible.includes('"folder":""')); assert(visible.includes('"contains":"Garden"')); }
+    else {
+      assert(!visible.includes('"folder":""'));
+      if ("q" in params) assert(visible.includes('"contains":"Garden"'));
+      else assert(!visible.includes('"folder"'), "Media home must include both filed and unfiled assets");
+    }
   }
 });
