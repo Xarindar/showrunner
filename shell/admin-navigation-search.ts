@@ -8,7 +8,10 @@ export function searchAdminNavigation(modules: Pick<ShellModule, "id" | "label" 
       { label: "Categories", href: "/admin/modules/services/categories" },
       { label: "Service bundles", href: "/admin/modules/services/packages" }
     );
-    if (item.id === "appointments") pages.push({ label: "Schedule", href: "/admin/modules/appointments/schedule" });
+    if (item.id === "appointments") pages.push(
+      { label: "Schedule", href: "/admin/modules/appointments/schedule" },
+      { label: "Staff", href: "/admin/modules/appointments/staff" }
+    );
     return pages.filter(page => words.every(word => `${item.label} ${page.label}`.toLowerCase().includes(word)));
   });
 }

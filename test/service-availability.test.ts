@@ -33,12 +33,12 @@ function harness() {
         deleteMany: async (query: typeof writes[number]) => writes.push(query),
         createMany: async (query: typeof writes[number]) => writes.push(query)
       } });
-    }, staffMember: owner, resource: owner, availabilityRule: {
+    }, staffMember: { ...owner, create: async (query: typeof writes[number]) => writes.push(query), updateMany: async (query: typeof writes[number]) => writes.push(query) }, resource: owner, availabilityRule: {
       create: async (query: typeof writes[number]) => writes.push(query),
       deleteMany: async (query: typeof writes[number]) => writes.push(query)
     } } },
     "next/cache": { revalidatePath: (path: string) => refreshed.push(path) },
-    "next/navigation": { redirect: () => { throw Error("Unexpected navigation"); } }
+    "next/navigation": { redirect: (path: string) => { throw Error(`Redirect:${path}`); } }
   };
   const actions: Record<string, (...args: unknown[]) => Promise<{ error: string; success: string }>> = {};
   const source = ts.transpileModule(readFileSync("modules/scheduling/actions.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -99,6 +99,7 @@ test("weekly hours replace only selected days and owner, preserving split shifts
   assert.equal(data.length, 4);
   assert.equal(data[1].startMinutes, 780);
   assert.ok(h.refreshed.includes("/admin/modules/appointments/schedule"));
+  assert.ok(h.refreshed.includes("/admin/modules/appointments/staff"));
 });
 
 test("weekly closure removes selected hours without creating a replacement", async () => {
@@ -116,4 +117,33 @@ test("stale weekly hours, overlaps, invalid times and forbidden users cannot wri
   h.state.allowed = false;
   await assert.rejects(h.actions.saveWeeklyHoursAction({}, weeklyForm()), /Forbidden/);
   assert.equal(h.writes.length, 0);
+});
+
+
+test("staff weekly hours keep the employee scope and refresh Staff", async () => {
+  const h = harness();
+  const form = weeklyForm();
+  const hours = JSON.parse(String(form.get("hours")));
+  form.set("hours", JSON.stringify({ ...hours, staffId: "employee" }));
+  assert.equal((await h.actions.saveWeeklyHoursAction({}, form)).error, "");
+  assert.equal(h.writes[0].where?.staffId, "employee");
+  assert.equal(h.writes[0].where?.resourceId, null);
+  assert.ok(h.refreshed.includes("/admin/modules/appointments/staff"));
+});
+
+
+test("staff profile saves and validation return to Staff, with site-scoped writes", async () => {
+  const h = harness();
+  const form = new FormData();
+  form.set("name", "Alex");
+  form.set("isActive", "on");
+  await assert.rejects(h.actions.createStaffMemberAction(form), /Redirect:\/admin\/modules\/appointments\/staff\?saved=staff/);
+  assert.equal(h.writes[0].data?.siteId, "site");
+  form.set("id", "employee");
+  await assert.rejects(h.actions.updateStaffMemberAction(form), /Redirect:\/admin\/modules\/appointments\/staff\?saved=staff/);
+  assert.equal(h.writes[1].where?.siteId, "site");
+  assert.equal(h.writes[1].where?.id, "employee");
+  form.set("email", "invalid");
+  await assert.rejects(h.actions.createStaffMemberAction(form), /Redirect:\/admin\/modules\/appointments\/staff\?error=/);
+  assert.equal(h.writes.length, 2);
 });

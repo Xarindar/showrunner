@@ -18,6 +18,7 @@ type Props = {
   resources: Resource[];
   staff: StaffMember[];
   timezone?: string;
+  fixedStaffId?: string;
 };
 
 function DayEditor({ day, rules, staffId, resourceId, onClose }: {
@@ -53,26 +54,26 @@ function DayEditor({ day, rules, staffId, resourceId, onClose }: {
   </form>;
 }
 
-export function AvailabilityPanel({ availability, resources, staff, timezone }: Props) {
+export function AvailabilityPanel({ availability, resources, staff, timezone, fixedStaffId }: Props) {
   const [scope, setScope] = useState("");
   const [editing, setEditing] = useState<{ day: number; rules: Props["availability"]; staffId: string; resourceId: string } | null>(null);
-  const staffId = scope.startsWith("staff:") ? scope.slice(6) : "";
+  const staffId = fixedStaffId || (scope.startsWith("staff:") ? scope.slice(6) : "");
   const resourceId = scope.startsWith("resource:") ? scope.slice(9) : "";
   const rules = availability.filter(rule => (rule.staffId || "") === staffId && (rule.resourceId || "") === resourceId);
   const owner = staff.find(member => member.id === staffId) || resources.find(resource => resource.id === resourceId);
   return <section className={styles.week} aria-label="Weekly hours">
     <div className={styles.heading}><h2>Weekly hours</h2>{timezone && <span className="muted-text">{timezone.replaceAll("_", " ")}</span>}</div>
-    {scope && <div className={styles.heading}><strong>{owner?.name}</strong><Button type="button" variant="secondary" onClick={() => setScope("")}>Back to business hours</Button></div>}
+    {scope && !fixedStaffId && <div className={styles.heading}><strong>{owner?.name}</strong><Button type="button" variant="secondary" onClick={() => setScope("")}>Back to business hours</Button></div>}
     <Card bodyClassName={styles.rows}>
       {weekdays.map((name, day) => <div className={styles.row} key={name}>
         <strong>{name}</strong>
-        <span>{rules.filter(rule => rule.weekday === day).sort((a, b) => a.startMinutes - b.startMinutes).map(rule => `${formatTimeValue(minutesToTime(rule.startMinutes))} – ${formatTimeValue(minutesToTime(rule.endMinutes))}`).join(", ") || (scope ? "No hours set" : "Closed")}</span>
+        <span>{rules.filter(rule => rule.weekday === day).sort((a, b) => a.startMinutes - b.startMinutes).map(rule => `${formatTimeValue(minutesToTime(rule.startMinutes))} – ${formatTimeValue(minutesToTime(rule.endMinutes))}`).join(", ") || (staffId || resourceId ? "No hours set" : "Closed")}</span>
         <Button type="button" variant="ghost" aria-label={`Edit ${name} hours`} disabled={owner?.isActive === false} onClick={() => setEditing({ day, rules: rules.map(rule => ({ ...rule })), staffId, resourceId })}>Edit</Button>
       </div>)}
     </Card>
-    {(staff.length > 0 || resources.length > 0) && <details>
-      <summary>Staff & resource hours</summary>
-      <p className="muted-text">Staff and resources use their own hours. Business hours do not replace these schedules.</p>
+    {!fixedStaffId && (staff.length > 0 || resources.length > 0) && <details>
+      <summary>{staff.length ? "Staff & resource hours" : "Resource hours"}</summary>
+      <p className="muted-text">{staff.length ? "Staff and resources use" : "Resources use"} their own hours. Business hours do not replace these schedules.</p>
       {[...staff.map(member => ({ ...member, scope: `staff:${member.id}`, kind: "Staff" })), ...resources.map(resource => ({ ...resource, scope: `resource:${resource.id}`, kind: "Resource" }))].map(owner => <div className={styles.row} key={owner.scope}>
         <strong>{owner.name}</strong><span className="muted-text">{owner.kind}{!owner.isActive ? " · Inactive" : ""}</span>
         <Button type="button" variant="ghost" onClick={() => setScope(owner.scope)}>View hours</Button>

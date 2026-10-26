@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSiteSettings } from "@/lib/site";
-import { requireAdmin, hasAdminPermission } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { absoluteCalendarUrl, icsCalendarAdapter, requestBaseUrl } from "@/lib/scheduling/calendar";
 import { getGoogleCalendarConnections } from "@/lib/scheduling/google-calendar";
@@ -14,16 +14,14 @@ import { CalendarFeedsPanel } from "@/modules/scheduling/components/calendar-fee
 import { RemindersPanel } from "@/modules/scheduling/components/reminders-panel";
 import { ResourcesPanel } from "@/modules/scheduling/components/resources-panel";
 import { SlotDiagnosticsPanel } from "@/modules/scheduling/components/slot-diagnostics-panel";
-import { StaffPanel } from "@/modules/scheduling/components/staff-panel";
 
 export default async function SchedulePage({ searchParams }: { searchParams?: Promise<Record<string, string | undefined>> }) {
-  const user = await requireAdmin("scheduling:manage");
+  await requireAdmin("scheduling:manage");
   const settings = await getSiteSettings();
   if (!settings.enabledModuleIds.includes("appointments")) notFound();
   const params = await searchParams || {};
-  const canLinkStaffAccounts = hasAdminPermission(user, "users:manage");
   const baseUrl = await requestBaseUrl();
-  const [staff, resources, services, availability, blockouts, schedulingSettings, googleCalendarConnections, adminUsers] = await Promise.all([
+  const [staff, resources, services, availability, blockouts, schedulingSettings, googleCalendarConnections] = await Promise.all([
   prisma.staffMember.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
   prisma.resource.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
   prisma.service.findMany({
@@ -42,14 +40,7 @@ export default async function SchedulePage({ searchParams }: { searchParams?: Pr
   }),
   prisma.blockedTime.findMany({ where: { siteId: settings.siteId, endsAt: { gte: new Date() } }, include: { resource: true }, orderBy: { startsAt: "asc" }, take: 20 }),
   prisma.schedulingSettings.findUnique({ where: { siteId: settings.siteId } }),
-  getGoogleCalendarConnections(settings.siteId),
-  canLinkStaffAccounts
-    ? prisma.adminUser.findMany({
-        where: { tenantId: user.tenantId },
-        select: { id: true, email: true, role: true },
-        orderBy: { email: "asc" }
-      })
-    : Promise.resolve([])]
+  getGoogleCalendarConnections(settings.siteId)]
   );
   const selectedDiagnosticServiceId = services.some((service) => service.id === params.diagnosticServiceId)
     ? String(params.diagnosticServiceId)
@@ -67,8 +58,6 @@ export default async function SchedulePage({ searchParams }: { searchParams?: Pr
           staffId: selectedDiagnosticStaffId || undefined
         })
       : null;
-  const staffIdsWithAvailability = new Set(availability.flatMap((rule) => (rule.staffId ? [rule.staffId] : [])));
-  const assignedStaffIds = new Set(services.flatMap((service) => service.staffAssignments.map((assignment) => assignment.staffId)));
   const resourceIdsWithAvailability = new Set(availability.flatMap((rule) => (rule.resourceId ? [rule.resourceId] : [])));
   const assignedResourceIds = new Set(services.flatMap((service) => service.resourceAssignments.map((assignment) => assignment.resourceId)));
 
@@ -76,13 +65,12 @@ export default async function SchedulePage({ searchParams }: { searchParams?: Pr
     <h1>Schedule</h1>
     {params.saved && <Notification tone="success" queryKey="saved">Schedule updated.</Notification>}
     {params.error && <Notification tone="danger" queryKey="error">{params.error}</Notification>}
-    <AvailabilityPanel availability={availability} resources={resources} staff={staff} timezone={settings.timezone} />
+    <AvailabilityPanel availability={availability} resources={resources} staff={[]} timezone={settings.timezone} />
     <BlockoutsPanel blockouts={blockouts} resources={resources} timezone={settings.timezone} />
     <section aria-label="Schedule settings" className={styles.settings}>
       <details open={params.tab === "team"}>
-        <summary>Staff & resources <span>{staff.length} staff · {resources.length} resources</span></summary>
+        <summary>Resources <span>{resources.length} resources</span></summary>
         <div className={styles.section}>
-          <StaffPanel adminUsers={adminUsers} assignedStaffIds={assignedStaffIds} canLinkStaffAccounts={canLinkStaffAccounts} staff={staff} staffIdsWithAvailability={staffIdsWithAvailability} />
           <ResourcesPanel resources={resources} assignedResourceIds={assignedResourceIds} resourceIdsWithAvailability={resourceIdsWithAvailability} />
         </div>
       </details>
