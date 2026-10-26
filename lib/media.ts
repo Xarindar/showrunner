@@ -16,6 +16,8 @@ import { unreferencedMediaWhere } from "@/lib/media-usage";
 import { isSafeExternalHttpsUrl } from "@/lib/security/urls";
 import { getCurrentSiteId } from "@/lib/site";
 import { slugify } from "@/lib/slug";
+import { normalizeMediaFolder } from "@/lib/media-folders";
+export { normalizeMediaFolder } from "@/lib/media-folders";
 
 const allowedImageTypes = new Map([
   ["image/jpeg", "jpg"],
@@ -214,17 +216,6 @@ export function mediaTagsFromInput(value?: string | string[]) {
         .slice(0, 20)
     )
   );
-}
-
-export function normalizeMediaFolder(value?: string) {
-  const folder = (value || "")
-    .split("/")
-    .map((part) => slugify(part))
-    .filter(Boolean)
-    .slice(0, 4)
-    .join("/");
-
-  return folder;
 }
 
 export function normalizeMediaVariantType(value?: string | null) {
@@ -445,7 +436,7 @@ const serverAssetsAdapter: MediaAdapter = {
   upload: async (file, metadata) => {
     const extension = mimeTypeExtension(file.type);
     const sitePrefix = slugify(metadata.siteId || "site") || "site";
-    const folder = normalizeMediaFolder(metadata.folder);
+    const folder = normalizeMediaFolder(metadata.folder).split("/").map(slugify).filter(Boolean).join("/");
     const folderPrefix = folder ? `${folder}/` : "";
     const key = metadata.assetId && file.type.startsWith("image/") ? `photos/${metadata.assetId}/original.${extension}` : `sites/${sitePrefix}/uploads/${folderPrefix}${randomUUID()}.${extension}`;
     const target = serverAssetPath(key);
@@ -494,7 +485,7 @@ function objectStorageAdapter(driver: ObjectStorageDriver): MediaAdapter {
       }
 
       const extension = mimeTypeExtension(file.type);
-      const folder = normalizeMediaFolder(metadata.folder);
+      const folder = normalizeMediaFolder(metadata.folder).split("/").map(slugify).filter(Boolean).join("/");
       const folderPrefix = folder ? `${folder}/` : "";
       const sitePrefix = slugify(metadata.siteId || "site") || "site";
       const key = metadata.assetId && file.type.startsWith("image/") ? `photos/${metadata.assetId}/original.${extension}` : `sites/${sitePrefix}/uploads/${folderPrefix}${randomUUID()}.${extension}`;

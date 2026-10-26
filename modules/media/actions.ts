@@ -9,6 +9,7 @@ import { getAccessibleMediaWhere, getOwnerStaffIds, requireAdmin, resolveDataSco
 import { ensureMediaAssetVariants, mediaAssetDisplayUrl, mediaAssetIdFromUrl, mediaTagsFromInput, normalizeMediaFolder, supportsPrivateMediaDriver, uploadMedia } from "@/lib/media";
 import { mediaReferenceCount, mediaReferenceCountSelect, unreferencedMediaWhere } from "@/lib/media-usage";
 import { prisma } from "@/lib/prisma";
+import { validMediaFolderPath } from "@/lib/media-folders";
 import { getCurrentSiteId, getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
 import { defaultHeroSlideFromSettings, heroElementsArray, type HeroElementType } from "@/modules/content/hero-presentation";
 
@@ -31,7 +32,7 @@ const mediaMetadataSchema = z
     credit: optionalStoredText,
     focalPointX: focalPoint,
     focalPointY: focalPoint,
-    folder: optionalStoredText,
+    folder: optionalStoredText.refine(validMediaFolderPath, "Use a folder path under 200 characters without backslashes or dot segments."),
     tags: optionalStoredText,
     usageContext: optionalStoredText,
     isDecorative: z.literal("on").optional(),
@@ -73,9 +74,13 @@ export async function createMediaFolder(formData: FormData) {
   const siteId = await getCurrentSiteId();
   const parsed = z.string().trim().min(1, "Enter a folder name.").max(200, "Use 200 characters or fewer.").safeParse(formData.get("name"));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-  const name = normalizeMediaFolder(parsed.data);
-  if (!name) return { error: "Enter a folder name." };
+  const parent = formData.get("parent") || "";
+  if (typeof parent !== "string" || !validMediaFolderPath(parent)) return { error: "Choose a valid parent folder." };
+  if (parsed.data.includes("/") || !validMediaFolderPath(parsed.data)) return { error: "Use a folder name without slashes or dot segments." };
+  const name = normalizeMediaFolder([parent, parsed.data].filter(Boolean).join("/"));
+  if (!validMediaFolderPath(name)) return { error: "The full folder path must be 200 characters or fewer." };
   try {
+    if (parent && !await accessibleMediaFolder(user, siteId, parent)) return { error: "Parent folder not found. Refresh the library and try again." };
     await prisma.mediaFolder.create({ data: { siteId, name, createdByUserId: user.id } });
   } catch (error) {
     if (typeof error === "object" && error && "code" in error && error.code === "P2002") return { error: "A folder with this name already exists." };
@@ -85,27 +90,37 @@ export async function createMediaFolder(formData: FormData) {
   return { name };
 }
 
+async function accessibleMediaFolder(user: Awaited<ReturnType<typeof requireAdmin>>, siteId: string, folder: string) {
+  if (!folder) return true;
+  const ownFolders = (await resolveDataScopeMode(user, siteId, "media")) === "OWN";
+  const savedFolder = await prisma.mediaFolder.findFirst({
+    where: { siteId, OR: [{ name: folder }, { name: { startsWith: `${folder}/` } }], ...(ownFolders ? { createdByUserId: user.id } : {}) }, select: { id: true }
+  });
+  if (savedFolder) return true;
+  return Boolean(await prisma.mediaAsset.findFirst({
+    where: await getAccessibleMediaWhere(user, siteId, { deletedAt: null, OR: [{ folder }, { folder: { startsWith: `${folder}/` } }] }), select: { id: true }
+  }));
+}
+
 export async function moveMediaAssetToFolder(formData: FormData) {
   const user = await requireAdmin("media:manage");
-  const parsed = z.object({ id: requiredText, folder: z.string().trim().min(1).max(200) }).safeParse(Object.fromEntries(formData));
+  const parsed = z.object({ ids: z.array(requiredText).min(1).max(100), folder: z.string().trim().refine(validMediaFolderPath) })
+    .safeParse({ ids: formData.getAll("id"), folder: formData.get("folder") });
   if (!parsed.success) return { error: "Choose a file and an existing folder." };
   const siteId = await getCurrentSiteId();
   const folder = normalizeMediaFolder(parsed.data.folder);
-  if (!folder) return { error: "Choose an existing folder." };
-  const ownFolders = (await resolveDataScopeMode(user, siteId, "media")) === "OWN";
+  const ids = [...new Set(parsed.data.ids)];
   const accessibleWhere = await getAccessibleMediaWhere(user, siteId, { deletedAt: null });
   try {
-    const savedFolder = await prisma.mediaFolder.findFirst({
-      where: { siteId, name: folder, ...(ownFolders ? { createdByUserId: user.id } : {}) }, select: { id: true }
-    });
-    // Older folders exist only as names on accessible assets.
-    if (!savedFolder && !await prisma.mediaAsset.findFirst({ where: { AND: [accessibleWhere, { folder }] }, select: { id: true } })) {
+    if (!await accessibleMediaFolder(user, siteId, folder)) {
       return { error: "Folder not found. Refresh the library and try again." };
     }
-    const moved = await prisma.mediaAsset.updateMany({
-      where: { AND: [accessibleWhere, { id: parsed.data.id }] }, data: { folder }
+    await prisma.$transaction(async tx => {
+      const moved = await tx.mediaAsset.updateMany({
+        where: { AND: [accessibleWhere, { id: { in: ids } }] }, data: { folder }
+      });
+      if (moved.count !== ids.length) throw new Error("Unavailable media selection");
     });
-    if (moved.count !== 1) return { error: "File not found or no longer available. Refresh the library and try again." };
   } catch {
     return { error: "The file could not be moved. Please try again." };
   }

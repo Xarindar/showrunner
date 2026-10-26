@@ -29,9 +29,10 @@ await build({
         <form method="dialog"><button>Native close</button></form>
         <Modal open={nested && kind!==''} onClose={()=>setNested(false)} title="Nested dialog"><button onClick={()=>setNested(false)}>Done</button></Modal></>;
       return <div className="showrunner-admin"><main className="admin-main">
-        {['standard','onboarding','custom'].map(name=><button key={name} onClick={()=>setKind(name)}>Open {name}</button>)}
+        {['standard','onboarding','custom','long'].map(name=><button key={name} onClick={()=>setKind(name)}>Open {name}</button>)}
         <output aria-label="Close count">{closed}</output>
         <Modal open={kind==='standard'} onClose={close} title="Standard dialog">{body}</Modal>
+        <Modal open={kind==='long'} onClose={close} title="Long dialog"><div>{Array.from({length:40},(_,i)=><p key={i}>Scrollable row {i}</p>)}<button>Last action</button></div></Modal>
         <OnboardingModal open={kind==='onboarding'} onClose={close} title="Onboarding dialog" steps={[{id:'one',label:'Connect'}]} activeStepIndex={0}>{body}</OnboardingModal>
         <Dialog open={kind==='custom'} onClose={close} className="ui-dialog" aria-label="Custom dialog">{kind==='custom'?body:null}</Dialog>
       </main></div>;
@@ -97,5 +98,22 @@ try {
     await close.click();
   }
   assert.deepEqual(errors, []);
+  for (const viewport of [{width:1440,height:1000},{width:390,height:844}]) {
+    await page.setViewportSize(viewport);
+    await page.getByRole('button',{name:'Open long',exact:true}).click();
+    const dialog=page.getByRole('dialog',{name:'Long dialog',exact:true});
+    const body=dialog.locator(':scope > .ui-dialog-body');
+    const shell=await dialog.boundingBox(),inside=await body.boundingBox();
+    assert(inside.x>shell.x && inside.x+inside.width<shell.x+shell.width, 'Scrollbar stays inset from the rounded shell');
+    assert(inside.y>shell.y && inside.y+inside.height<shell.y+shell.height);
+    assert.equal(await dialog.evaluate(el=>getComputedStyle(el).overflow),'hidden');
+    assert(await body.evaluate(el=>el.scrollHeight>el.clientHeight),'The body must scroll');
+    const head=await dialog.getByRole('heading').boundingBox();
+    await body.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+    assert.deepEqual(await dialog.getByRole('heading').boundingBox(),head,'The header stays visible while the body scrolls');
+    await dialog.getByRole('button',{name:'Last action',exact:true}).click();
+    assert.equal(await dialog.evaluate(el=>el.scrollTop),0);
+    await page.keyboard.press('Escape');
+  }
   console.log("Passed: all dialog layouts share focus, guarded Escape, nested focus return, padding/backdrop and drag dismissal, native close synchronization.");
 } finally { await browser.close(); }

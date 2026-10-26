@@ -30,7 +30,7 @@ export function Modal({
   return (
     <Dialog
       aria-labelledby={titleId}
-      className={cx("ui-dialog", className)}
+      className={cx("ui-dialog", "ui-modal", className)}
       onClose={onClose}
       open={open}>
       <div className="ui-modal-head">

@@ -106,6 +106,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
   }
   if (filters.scope === "built-in") clauses.push({ id: "__built_in_asset__" });
   if (filters.folder) clauses.push({ folder: filters.folder });
+  else if (filters.scope === "all" && !filters.q && !filters.tag && filters.kind === "all") clauses.push({ folder: "" });
   if (filters.tag) clauses.push({ tags: { array_contains: [filters.tag] } });
   if (filters.kind === "image") clauses.push({ mimeType: { startsWith: "image/", mode: "insensitive" } });
   if (filters.kind === "other") clauses.push({ NOT: { mimeType: { startsWith: "image/", mode: "insensitive" } } });
@@ -139,8 +140,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       by: ["folder"],
       where: activeAccess,
       _count: { _all: true },
-      orderBy: { folder: "asc" },
-      take: 24
+      orderBy: { folder: "asc" }
     }),
     prisma.mediaAsset.findMany({
       where: activeAccess,

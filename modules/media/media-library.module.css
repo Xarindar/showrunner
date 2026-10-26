@@ -1,10 +1,23 @@
 .page { gap: var(--space-3); max-width: none; min-height: 100%; }
 .pageActions { display: flex; align-items: center; gap: var(--sd-space-8); }
-.folderBrowser { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 144px)); gap: var(--space-3); margin-bottom: var(--space-5); align-items: start; }
-.libraryWorkspace .folderBrowser .folderTarget { flex-direction: column; gap: var(--space-2); width: 100%; min-height: 120px; padding: var(--space-3); border-radius: var(--radius-control); }
-.folderTarget > svg { flex-shrink: 0; fill: var(--color-surface-sunken); }
-.folderTarget span { overflow-wrap: anywhere; white-space: normal; }
-.folderTarget small { color: var(--color-muted); }
+.folderBrowser { display: contents; }
+.libraryWorkspace .folderThumb { display: grid; place-items: center; background: transparent; border-color: transparent; }
+.folderThumb > svg { max-width: 80%; max-height: 80%; fill: var(--color-surface-sunken); }
+.folderTarget .assetCopy strong { white-space: normal; overflow-wrap: anywhere; }
+.folderPath, .selectionActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-block: var(--space-3); }
+.selectionActions label { display: flex; align-items: center; gap: var(--space-2); }
+.folderPath [data-drop-active="true"] { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.assetTile { position: relative; min-width: 0; }
+.assetTile > button { width: 100%; height: 100%; }
+.assetCheckbox { position: absolute; top: var(--space-1); right: var(--space-1); width: 44px; height: 44px; display: grid; place-items: center; z-index: 1; }
+.assetCheckbox input { width: 20px; height: 20px; accent-color: var(--color-focus); }
+.resultArea { user-select: none; }
+.page[data-dragging="true"] .resultArea, .page[data-dragging="true"] .resultArea * { cursor: grabbing; }
+.dragPreview { position: fixed; z-index: 100; pointer-events: none; width: 180px; padding: var(--space-2); display: grid; gap: var(--space-1); background: var(--color-surface); border-radius: var(--radius-control); box-shadow: var(--sd-shadow-dialog); transform: rotate(-3deg); }
+.dragPreview .thumb { height: 100px; }
+.dragPreview strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dragPreview small { color: var(--color-muted); }
+.selectionBox { position: fixed; z-index: 90; pointer-events: none; border: 1px solid var(--color-focus); background: color-mix(in srgb, var(--color-focus) 12%, transparent); }
 .libraryWorkspace .folderTarget[aria-pressed="true"] { background: var(--color-active); }
 .libraryWorkspace .folderTarget[data-drop-active="true"] { outline: 2px solid var(--color-focus); outline-offset: -2px; background: var(--color-active); }
 .feedbackSuccess,
@@ -567,6 +580,7 @@
 .libraryWorkspace .assetCard:hover { transform: none; box-shadow: none; background: var(--sd-color-surface-subtle); }
 .libraryWorkspace .assetMeta { justify-content: flex-start; }
 .libraryWorkspace .assetRow { grid-template-columns: 64px minmax(0, 1fr) auto; }
+.libraryWorkspace .assetTile .assetRow { padding-inline-end: calc(var(--sd-layout-touch-target) + var(--space-2)); }
 .libraryWorkspace .assetRow .thumb { grid-column: auto; }
 .libraryWorkspace .emptyState { min-height: 300px; padding: var(--sd-space-24) var(--sd-space-16); }
 .libraryWorkspace .emptyState > span { display: none; }
@@ -575,7 +589,7 @@
 .newFolder { display: grid; gap: var(--sd-space-16); }
 .newFolder label { display: grid; gap: var(--sd-space-4); }
 .newFolder p { margin: 0; color: var(--color-danger); }
-.folderModal { width: min(440px, calc(100vw - 32px)); }
+.page :global(dialog.ui-dialog).folderModal { width: min(440px, calc(100vw - 32px)); }
 @media (min-width: 861px) {
   :global(.ui-dialog).folderModal {
     left: var(--layout-admin-sidebar);

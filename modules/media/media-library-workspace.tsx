@@ -2,12 +2,11 @@
 import { Notification, useNotify } from "@/components/ui/notifications";
 
 import NextImage from "next/image";
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   Archive,
   SlidersHorizontal,
-  Check,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -27,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { SelectMenu } from "@/components/ui/select-menu";
 import { Modal } from "@/components/ui/modal";
 import type { MediaTagSummary } from "@/lib/media-tags";
+import { childMediaFolders } from "@/lib/media-folders";
 import {
   archiveMediaAssetAction,
   createMediaFolder,
@@ -148,7 +148,7 @@ function AssetThumbnail({ asset, priority = false }: { asset: MediaLibraryAsset;
   return (
     <span className={styles.thumb}>
       {isImage ? (
-        <NextImage alt="" fill priority={priority} sizes="(max-width: 760px) 45vw, (max-width: 1280px) 25vw, 220px" src={asset.displayUrl} unoptimized />
+        <NextImage alt="" draggable={false} fill priority={priority} sizes="(max-width: 760px) 45vw, (max-width: 1280px) 25vw, 220px" src={asset.displayUrl} unoptimized />
       ) : (
         <span className={styles.fileFallback}><File aria-hidden="true" size={26} /><small>{asset.format || "FILE"}</small></span>
       )}
@@ -156,24 +156,21 @@ function AssetThumbnail({ asset, priority = false }: { asset: MediaLibraryAsset;
   );
 }
 
-function AssetCard({ asset, index, onSelect, selected, view, draggable }: {
+function AssetCard({ asset, index, onSelect, onToggle, selected, view, movable }: {
   asset: MediaLibraryAsset;
   index: number;
-  onSelect: () => void;
+  onSelect: (event: MouseEvent<HTMLButtonElement>) => void;
+  onToggle: () => void;
   selected: boolean;
   view: ViewMode;
-  draggable: boolean;
+  movable: boolean;
 }) {
   return (
+    <div className={styles.assetTile} data-media-id={asset.id} data-movable={movable}>
     <button
       aria-label={`View details for ${asset.filename}`}
       aria-pressed={selected}
-      draggable={draggable}
-      onDragStart={event => {
-        if (!draggable) { event.preventDefault(); return; }
-        event.dataTransfer.setData("application/x-showrunner-media", asset.id);
-        event.dataTransfer.effectAllowed = "move";
-      }}
+      draggable={false}
       className={`${styles.assetCard} ${selected ? styles.assetCardSelected : ""} ${view === "list" ? styles.assetRow : ""}`}
       onClick={onSelect}
       type="button">
@@ -186,8 +183,9 @@ function AssetCard({ asset, index, onSelect, selected, view, draggable }: {
         <AssetStatus asset={asset} />
         {asset.usageCount ? <small>{asset.usageCount} {asset.usageCount === 1 ? "use" : "uses"}</small> : null}
       </span>
-      <span aria-hidden="true" className={styles.selectedMark}><Check size={14} strokeWidth={3} /></span>
     </button>
+    {movable && <label className={styles.assetCheckbox}><input type="checkbox" aria-label={`Select ${asset.filename}`} checked={selected} onChange={onToggle} /></label>}
+    </div>
   );
 }
 
@@ -410,6 +408,38 @@ export function MediaLibraryWorkspace({
   const [moveBusy, setMoveBusy] = useState(false);
   const movePending = useRef(false);
   const [dropFolder, setDropFolder] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [movedIds, setMovedIds] = useState<string[]>([]);
+  const [drag, setDrag] = useState<{ ids: string[]; x: number; y: number } | null>(null);
+  const [selectionBox, setSelectionBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const resultsRef = useRef<HTMLElement>(null);
+  const gesture = useRef<{ kind: "files" | "box"; id?: string; ids: string[]; x: number; y: number; active: boolean } | null>(null);
+  const suppressClick = useRef(false);
+  const previousRects = useRef(new Map<string, DOMRect>());
+  const childFolders = childMediaFolders(folders, filters.folder);
+  const hiddenIds = [...movedIds, ...(drag?.ids || [])];
+  const visibleAssets = assets.filter(asset => !hiddenIds.includes(asset.id));
+  const layoutKey = visibleAssets.map(asset => asset.id).join(",");
+  useLayoutEffect(() => {
+    const next = new Map<string, DOMRect>();
+    resultsRef.current?.querySelectorAll<HTMLElement>("[data-media-id]").forEach(element => {
+      const id = element.dataset.mediaId!;
+      const bounds = element.getBoundingClientRect();
+      const before = previousRects.current.get(id);
+      if (before && !window.matchMedia("(prefers-reduced-motion: reduce)").matches && (before.x !== bounds.x || before.y !== bounds.y)) {
+        element.animate([{ transform: `translate(${before.x - bounds.x}px, ${before.y - bounds.y}px)` }, { transform: "translate(0, 0)" }], { duration: 180, easing: "ease-out" });
+      }
+      next.set(id, bounds);
+    });
+    previousRects.current = next;
+  }, [layoutKey]);
+  useEffect(() => {
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { gesture.current = null; setDrag(null); setSelectionBox(null); setDropFolder(null); }
+    };
+    window.addEventListener("keydown", cancel);
+    return () => window.removeEventListener("keydown", cancel);
+  }, []);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
   const filterCount = Number(filters.scope !== "all") + Number(Boolean(filters.folder)) + Number(Boolean(filters.tag)) + Number(filters.kind !== "all");
@@ -426,6 +456,7 @@ export function MediaLibraryWorkspace({
 
   function navigate(changes: Record<string, string | number | null>) {
     setSelectedId(null);
+    setSelectedIds([]);
     if ("q" in changes) setSearchValue(String(changes.q || ""));
     router.push(hrefWithParams({ page: null, ...changes }, filters));
   }
@@ -435,25 +466,83 @@ export function MediaLibraryWorkspace({
     navigate({ q: searchValue.trim() || null });
   }
 
-  async function moveToFolder(id: string, folder: string) {
+  async function moveToFolder(ids: string[], folder: string) {
     if (movePending.current) return;
-    const asset = assets.find(asset => asset.id === id && !asset.builtIn);
-    if (!asset || asset.folder === folder || filters.scope === "archived") return;
+    const moving = assets.filter(asset => ids.includes(asset.id) && !asset.builtIn && asset.folder !== folder);
+    if (!moving.length || filters.scope === "archived") return;
     movePending.current = true;
     setMoveBusy(true);
+    setMovedIds(current => [...current, ...moving.map(asset => asset.id)]);
     try {
       const data = new FormData();
-      data.set("id", id);
+      moving.forEach(asset => data.append("id", asset.id));
       data.set("folder", folder);
       const result = await moveMediaAssetToFolder(data);
-      if (result.error) notify(result.error, "danger");
-      else { notify(`Moved ${asset.filename} to ${folder}.`); router.refresh(); }
-    } catch { notify("The file could not be moved. Please try again.", "danger"); }
+      if (result.error) throw new Error(result.error);
+      notify(`Moved ${moving.length === 1 ? moving[0].filename : `${moving.length} files`} to ${folder || "Media home"}.`);
+      setSelectedIds([]);
+      router.refresh();
+    } catch (error) {
+      setMovedIds(current => current.filter(id => !moving.some(asset => asset.id === id)));
+      notify(error instanceof Error ? error.message : "The files could not be moved. Please try again.", "danger");
+    }
     finally { movePending.current = false; setMoveBusy(false); }
   }
 
+  function beginGesture(event: ReactPointerEvent<HTMLElement>) {
+    if (event.button !== 0 || event.pointerType !== "mouse" || moveBusy) return;
+    suppressClick.current = false;
+    const target = event.target as HTMLElement;
+    if (target.closest("input, label, select, [data-folder-path], nav")) return;
+    const tile = target.closest<HTMLElement>("[data-media-id]");
+    if (tile && tile.dataset.movable !== "true") return;
+    if (!tile && target.closest("button, a")) return;
+    if (tile && (event.ctrlKey || event.metaKey || event.shiftKey)) return;
+    const id = tile?.dataset.mediaId;
+    gesture.current = { kind: id ? "files" : "box", id, ids: id ? (selectedIds.includes(id) ? selectedIds : [id]) : (event.ctrlKey || event.metaKey || event.shiftKey ? selectedIds : []), x: event.clientX, y: event.clientY, active: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+
+  function updateGesture(event: ReactPointerEvent<HTMLElement>) {
+    const current = gesture.current;
+    if (!current) return;
+    if (!current.active && Math.hypot(event.clientX - current.x, event.clientY - current.y) < 6) return;
+    current.active = true;
+    suppressClick.current = true;
+    if (current.kind === "files") {
+      setSelectedIds(current.ids);
+      setDrag({ ids: current.ids, x: event.clientX, y: event.clientY });
+      const folder = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-folder-path]");
+      setDropFolder(folder?.dataset.folderPath ?? null);
+    } else {
+      const box = { left: Math.min(current.x, event.clientX), top: Math.min(current.y, event.clientY), width: Math.abs(event.clientX - current.x), height: Math.abs(event.clientY - current.y) };
+      setSelectionBox(box);
+      const ids = [...current.ids];
+      resultsRef.current?.querySelectorAll<HTMLElement>('[data-media-id][data-movable="true"]').forEach(tile => {
+        const rect = tile.getBoundingClientRect();
+        if (rect.right > box.left && rect.left < box.left + box.width && rect.bottom > box.top && rect.top < box.top + box.height) ids.push(tile.dataset.mediaId!);
+      });
+      setSelectedIds([...new Set(ids)]);
+    }
+  }
+
+  function finishGesture(event: ReactPointerEvent<HTMLElement>, cancelled = false) {
+    const current = gesture.current;
+    gesture.current = null;
+    if (current?.active && current.kind === "files" && !cancelled && dropFolder !== null) void moveToFolder(current.ids, dropFolder);
+    if (current?.kind === "box" && !current.active && !cancelled) setSelectedIds(current.ids);
+    if (current?.kind === "files" && !current.active && !cancelled) { setSelectedId(current.id!); suppressClick.current = true; }
+    setDrag(null); setSelectionBox(null); setDropFolder(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+
+  function toggleSelection(id: string) {
+    setSelectedIds(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id]);
+  }
+
   return (
-    <div className={`stack ${styles.page}`}>
+    <div className={`stack ${styles.page}`} data-dragging={Boolean(drag)}>
       <header className="page-header">
         <h1>Media</h1>
         <div className={styles.pageActions}>
@@ -470,13 +559,14 @@ export function MediaLibraryWorkspace({
         try {
           const result = await createMediaFolder(data);
           if (result.error) notify(result.error, "danger");
-          else { notify("Folder created. Drag a file into it below."); setFolderOpen(false); navigate({ scope: "all", folder: null, q: null, tag: null, kind: null }); router.refresh(); }
+          else { notify("Folder created. Drag files into it below."); setFolderOpen(false); navigate({ scope: "all", folder: filters.folder || null, q: null, tag: null, kind: null }); router.refresh(); }
         } catch { notify("The folder could not be created. Please try again.", "danger"); }
         finally { setFolderBusy(false); }
       }}>
+        <input name="parent" type="hidden" value={filters.folder} />
         <label>Folder name<input autoFocus name="name" required maxLength={200} placeholder="e.g. Events" disabled={folderBusy} /></label>
         <div className="module-modal-actions">
-          <Button variant="secondary" disabled={folderBusy} onClick={() => setFolderOpen(false)}>Cancel</Button>
+          <Button type="button" variant="secondary" disabled={folderBusy} onClick={() => setFolderOpen(false)}>Cancel</Button>
           <Button type="submit" disabled={folderBusy}>{folderBusy ? "Creating…" : "Create folder"}</Button>
         </div>
       </form>
@@ -516,7 +606,7 @@ export function MediaLibraryWorkspace({
               <label className={styles.selectControl}>
                 <span >Media category</span>
                 <select aria-label="Media category" value={filters.scope} onChange={event => navigate({ scope: event.currentTarget.value, folder: null, tag: null })}>
-                  <option value="all">All files ({activeCount})</option>
+                  <option value="all">Library ({activeCount})</option>
                   <option value="recent">Recently added ({recentCount})</option>
                   <option value="private">Private ({privateCount})</option>
                   <option value="needs-alt">Needs alt text ({needsAltCount})</option>
@@ -579,34 +669,52 @@ export function MediaLibraryWorkspace({
             </div>
           ) : null}
 
-          <section aria-label="Asset results" className={styles.resultArea}>
-            {folders.length > 0 && <nav aria-label="Media folders" className={styles.folderBrowser} aria-busy={moveBusy}>
-              {filters.folder && <Button variant="ghost" className={styles.folderTarget} onClick={() => navigate({ folder: null })}><ChevronLeft aria-hidden="true" size={48} strokeWidth={1.5} /><span>All folders</span></Button>}
-              {folders.filter(folder => folder.name).map(folder => (
-                <Button key={folder.name} variant="ghost" className={styles.folderTarget}
+          {selectedIds.length > 0 && <div className={styles.selectionActions}>
+            <span role="status">{selectedIds.length} selected</span>
+            <label>Move to <select aria-label="Move selected files to folder" disabled={moveBusy} value="" onChange={event => {
+              if (event.currentTarget.value) void moveToFolder(selectedIds, event.currentTarget.value.slice(7));
+            }}>
+              <option value="">Choose folder</option>
+              <option value="folder:">Media home</option>
+              {folders.map(folder => <option key={folder.name} value={`folder:${folder.name}`}>{folder.name}</option>)}
+            </select></label>
+            <Button type="button" variant="ghost" onClick={() => setSelectedIds([])} disabled={moveBusy}>Clear selection</Button>
+          </div>}
+
+          <section aria-label="Asset results" className={styles.resultArea} ref={resultsRef}
+            onPointerDown={beginGesture} onPointerMove={updateGesture} onPointerUp={event => finishGesture(event)}
+            onPointerCancel={event => finishGesture(event, true)} onLostPointerCapture={event => { if (gesture.current) finishGesture(event, true); }} onDragStart={event => event.preventDefault()}>
+            {filters.folder && <nav aria-label="Folder path" className={styles.folderPath}>
+              <Button type="button" variant="ghost" data-folder-path="" data-drop-active={dropFolder === ""} onClick={() => navigate({ folder: null })}>Media home</Button>
+              {filters.folder.split("/").map((part, index, parts) => {
+                const path = parts.slice(0, index + 1).join("/");
+                return <Button type="button" variant="ghost" key={path} data-folder-path={path} data-drop-active={dropFolder === path} aria-current={path === filters.folder ? "page" : undefined} onClick={() => navigate({ folder: path })}><ChevronRight size={14} aria-hidden="true" />{part}</Button>;
+              })}
+            </nav>}
+            <div className={view === "grid" ? styles.assetGrid : styles.assetList}>
+            {childFolders.length > 0 && <nav aria-label="Media folders" className={styles.folderBrowser} aria-busy={moveBusy}>
+              {childFolders.map(folder => (
+                <button key={folder.name} className={`${styles.assetCard} ${styles.folderTarget} ${view === "list" ? styles.assetRow : ""}`}
+                  type="button" data-folder-path={folder.name}
                   aria-pressed={filters.folder === folder.name} data-drop-active={dropFolder === folder.name}
                   disabled={moveBusy} title={`Open ${folder.name}, or drop a file here`}
                   onClick={() => navigate({ folder: folder.name })}
-                  onDragOver={event => {
-                    if (moveBusy || filters.scope === "archived" || !event.dataTransfer.types.includes("application/x-showrunner-media")) return;
-                    event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDropFolder(folder.name);
-                  }}
-                  onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropFolder(null); }}
-                  onDrop={event => {
-                    event.preventDefault(); setDropFolder(null);
-                    void moveToFolder(event.dataTransfer.getData("application/x-showrunner-media"), folder.name);
-                  }}>
-                  <FolderOpen aria-hidden="true" size={48} strokeWidth={1.5} /><span>{folder.name}</span><small>{folder.count}</small>
-                </Button>
+                  >
+                  <span className={`${styles.thumb} ${styles.folderThumb}`}><FolderOpen aria-hidden="true" size={64} strokeWidth={1.5} /></span>
+                  <span className={styles.assetCopy}><strong title={folder.label}>{folder.label}</strong><small>{folder.count} {folder.count === 1 ? "file" : "files"}</small></span>
+                </button>
               ))}
             </nav>}
-            {assets.length ? (
-              <div className={view === "grid" ? styles.assetGrid : styles.assetList}>
-                {assets.map((asset, index) => (
-                  <AssetCard asset={asset} draggable={!asset.builtIn && filters.scope !== "archived" && !moveBusy} index={index + (filters.page - 1) * 24} key={asset.id} onSelect={() => setSelectedId(asset.id)} selected={asset.id === selectedId} view={view} />
+                {visibleAssets.map((asset, index) => (
+                  <AssetCard asset={asset} movable={!asset.builtIn && filters.scope !== "archived" && !moveBusy} index={index + (filters.page - 1) * 24} key={asset.id}
+                    onSelect={event => {
+                      if (suppressClick.current && event.detail > 0) { suppressClick.current = false; return; }
+                      if (!asset.builtIn && filters.scope !== "archived" && (event.ctrlKey || event.metaKey || event.shiftKey)) toggleSelection(asset.id);
+                      else setSelectedId(asset.id);
+                    }} onToggle={() => toggleSelection(asset.id)} selected={selectedIds.includes(asset.id)} view={view} />
                 ))}
               </div>
-            ) : (
+            {!assets.length && !childFolders.length && (
               <div className={styles.emptyState}>
                 <span><FolderOpen aria-hidden="true" size={25} /></span>
                 <h3>{filters.q || filters.tag || filters.kind !== "all" ? "No assets match this view" : filters.folder ? "This folder is empty" : filters.scope === "archived" ? "Your archive is empty" : filters.scope === "all" ? "No files yet" : "No files in this category"}</h3>
@@ -619,6 +727,12 @@ export function MediaLibraryWorkspace({
               </div>
             )}
           </section>
+          {selectionBox && <div aria-hidden="true" className={styles.selectionBox} style={selectionBox} />}
+          {drag && <div className={styles.dragPreview} style={{ left: drag.x + 16, top: drag.y + 16 }} role="status">
+            <AssetThumbnail asset={assets.find(asset => asset.id === drag.ids[0])!} />
+            <strong>{drag.ids.length === 1 ? assets.find(asset => asset.id === drag.ids[0])?.filename : `${drag.ids.length} files`}</strong>
+            <small>{dropFolder !== null ? `Move to ${dropFolder || "Media home"}` : "Drop onto a folder · Esc to cancel"}</small>
+          </div>}
 
           {pageCount > 1 ? (
             <nav aria-label="Asset pages" className={styles.pagination}>
