@@ -85,6 +85,34 @@ export async function createMediaFolder(formData: FormData) {
   return { name };
 }
 
+export async function moveMediaAssetToFolder(formData: FormData) {
+  const user = await requireAdmin("media:manage");
+  const parsed = z.object({ id: requiredText, folder: z.string().trim().min(1).max(200) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Choose a file and an existing folder." };
+  const siteId = await getCurrentSiteId();
+  const folder = normalizeMediaFolder(parsed.data.folder);
+  if (!folder) return { error: "Choose an existing folder." };
+  const ownFolders = (await resolveDataScopeMode(user, siteId, "media")) === "OWN";
+  const accessibleWhere = await getAccessibleMediaWhere(user, siteId, { deletedAt: null });
+  try {
+    const savedFolder = await prisma.mediaFolder.findFirst({
+      where: { siteId, name: folder, ...(ownFolders ? { createdByUserId: user.id } : {}) }, select: { id: true }
+    });
+    // Older folders exist only as names on accessible assets.
+    if (!savedFolder && !await prisma.mediaAsset.findFirst({ where: { AND: [accessibleWhere, { folder }] }, select: { id: true } })) {
+      return { error: "Folder not found. Refresh the library and try again." };
+    }
+    const moved = await prisma.mediaAsset.updateMany({
+      where: { AND: [accessibleWhere, { id: parsed.data.id }] }, data: { folder }
+    });
+    if (moved.count !== 1) return { error: "File not found or no longer available. Refresh the library and try again." };
+  } catch {
+    return { error: "The file could not be moved. Please try again." };
+  }
+  revalidatePath("/admin/modules/media");
+  return { success: true };
+}
+
 export async function uploadLibraryAsset(formData: FormData) {
   const user = await requireAdmin("media:manage");
   const settings = await getSiteSettings();

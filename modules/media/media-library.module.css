@@ -1,5 +1,10 @@
 .page { gap: var(--space-3); max-width: none; min-height: 100%; }
 .pageActions { display: flex; align-items: center; gap: var(--sd-space-8); }
+.folderBrowser { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.folderBrowser .folderTarget { min-height: var(--sd-layout-touch-target); max-width: 100%; }
+.folderTarget span { overflow-wrap: anywhere; white-space: normal; }
+.folderTarget small { color: var(--color-muted); }
+.folderTarget[data-drop-active="true"] { outline: 2px solid var(--color-focus); outline-offset: -2px; background: var(--color-active); }
 .feedbackSuccess,
 .feedbackError {
   align-items: center;

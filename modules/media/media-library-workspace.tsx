@@ -30,6 +30,7 @@ import type { MediaTagSummary } from "@/lib/media-tags";
 import {
   archiveMediaAssetAction,
   createMediaFolder,
+  moveMediaAssetToFolder,
   restoreMediaAssetAction,
   setHeroImageAction,
   updateMediaAssetAction
@@ -155,17 +156,24 @@ function AssetThumbnail({ asset, priority = false }: { asset: MediaLibraryAsset;
   );
 }
 
-function AssetCard({ asset, index, onSelect, selected, view }: {
+function AssetCard({ asset, index, onSelect, selected, view, draggable }: {
   asset: MediaLibraryAsset;
   index: number;
   onSelect: () => void;
   selected: boolean;
   view: ViewMode;
+  draggable: boolean;
 }) {
   return (
     <button
       aria-label={`View details for ${asset.filename}`}
       aria-pressed={selected}
+      draggable={draggable}
+      onDragStart={event => {
+        if (!draggable) { event.preventDefault(); return; }
+        event.dataTransfer.setData("application/x-showrunner-media", asset.id);
+        event.dataTransfer.effectAllowed = "move";
+      }}
       className={`${styles.assetCard} ${selected ? styles.assetCardSelected : ""} ${view === "list" ? styles.assetRow : ""}`}
       onClick={onSelect}
       type="button">
@@ -399,6 +407,9 @@ export function MediaLibraryWorkspace({
   const [folderOpen, setFolderOpen] = useState(false);
   const notify = useNotify();
   const [folderBusy, setFolderBusy] = useState(false);
+  const [moveBusy, setMoveBusy] = useState(false);
+  const movePending = useRef(false);
+  const [dropFolder, setDropFolder] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
   const filterCount = Number(filters.scope !== "all") + Number(Boolean(filters.folder)) + Number(Boolean(filters.tag)) + Number(filters.kind !== "all");
@@ -424,6 +435,23 @@ export function MediaLibraryWorkspace({
     navigate({ q: searchValue.trim() || null });
   }
 
+  async function moveToFolder(id: string, folder: string) {
+    if (movePending.current) return;
+    const asset = assets.find(asset => asset.id === id && !asset.builtIn);
+    if (!asset || asset.folder === folder || filters.scope === "archived") return;
+    movePending.current = true;
+    setMoveBusy(true);
+    try {
+      const data = new FormData();
+      data.set("id", id);
+      data.set("folder", folder);
+      const result = await moveMediaAssetToFolder(data);
+      if (result.error) notify(result.error, "danger");
+      else { notify(`Moved ${asset.filename} to ${folder}.`); router.refresh(); }
+    } catch { notify("The file could not be moved. Please try again.", "danger"); }
+    finally { movePending.current = false; setMoveBusy(false); }
+  }
+
   return (
     <div className={`stack ${styles.page}`}>
       <header className="page-header">
@@ -442,7 +470,7 @@ export function MediaLibraryWorkspace({
         try {
           const result = await createMediaFolder(data);
           if (result.error) notify(result.error, "danger");
-          else { notify("Folder created."); setFolderOpen(false); navigate({ scope: "all", folder: result.name!, q: null, tag: null, kind: null }); }
+          else { notify("Folder created. Drag a file into it below."); setFolderOpen(false); navigate({ scope: "all", folder: null, q: null, tag: null, kind: null }); router.refresh(); }
         } catch { notify("The folder could not be created. Please try again.", "danger"); }
         finally { setFolderBusy(false); }
       }}>
@@ -551,10 +579,30 @@ export function MediaLibraryWorkspace({
           ) : null}
 
           <section aria-label="Asset results" className={styles.resultArea}>
+            {folders.length > 0 && <nav aria-label="Media folders" className={styles.folderBrowser} aria-busy={moveBusy}>
+              {filters.folder && <Button variant="secondary" onClick={() => navigate({ folder: null })}><ChevronLeft size={16} /> All folders</Button>}
+              {folders.filter(folder => folder.name).map(folder => (
+                <Button key={folder.name} variant="secondary" className={styles.folderTarget}
+                  aria-pressed={filters.folder === folder.name} data-drop-active={dropFolder === folder.name}
+                  disabled={moveBusy} title={`Open ${folder.name}, or drop a file here`}
+                  onClick={() => navigate({ folder: folder.name })}
+                  onDragOver={event => {
+                    if (moveBusy || filters.scope === "archived" || !event.dataTransfer.types.includes("application/x-showrunner-media")) return;
+                    event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDropFolder(folder.name);
+                  }}
+                  onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropFolder(null); }}
+                  onDrop={event => {
+                    event.preventDefault(); setDropFolder(null);
+                    void moveToFolder(event.dataTransfer.getData("application/x-showrunner-media"), folder.name);
+                  }}>
+                  <FolderOpen aria-hidden="true" size={20} /><span>{folder.name}</span><small>{folder.count}</small>
+                </Button>
+              ))}
+            </nav>}
             {assets.length ? (
               <div className={view === "grid" ? styles.assetGrid : styles.assetList}>
                 {assets.map((asset, index) => (
-                  <AssetCard asset={asset} index={index + (filters.page - 1) * 24} key={asset.id} onSelect={() => setSelectedId(asset.id)} selected={asset.id === selectedId} view={view} />
+                  <AssetCard asset={asset} draggable={!asset.builtIn && filters.scope !== "archived" && !moveBusy} index={index + (filters.page - 1) * 24} key={asset.id} onSelect={() => setSelectedId(asset.id)} selected={asset.id === selectedId} view={view} />
                 ))}
               </div>
             ) : (
