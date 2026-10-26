@@ -490,10 +490,6 @@ export function MediaLibraryWorkspace({
             <div>
               <p>{resultCount} {resultCount === 1 ? "file" : "files"}{filters.q ? ` matching “${filters.q}”` : ""}</p>
             </div>
-            <div className={styles.viewToggle} aria-label="Asset view">
-              <button aria-label="Grid view" aria-pressed={view === "grid"} onClick={() => setView("grid")} type="button"><Grid2X2 size={16} /></button>
-              <button aria-label="List view" aria-pressed={view === "list"} onClick={() => setView("list")} type="button"><LayoutList size={16} /></button>
-            </div>
           </div>
 
           <div className={styles.toolbar}>
@@ -564,6 +560,11 @@ export function MediaLibraryWorkspace({
               onValueChange={sort => navigate({ sort })}
               options={[{value: "newest", label: "Newest first"}, {value: "oldest", label: "Oldest first"}, {value: "name", label: "Filename A–Z"}, {value: "largest", label: "Largest first"}]} />
 
+            <div className={styles.viewToggle} aria-label="Asset view">
+              <button aria-label="Grid view" aria-pressed={view === "grid"} onClick={() => setView("grid")} type="button"><Grid2X2 size={16} /></button>
+              <button aria-label="List view" aria-pressed={view === "list"} onClick={() => setView("list")} type="button"><LayoutList size={16} /></button>
+            </div>
+
           </div>
 
           {filters.q || filterCount ? (
@@ -580,9 +581,9 @@ export function MediaLibraryWorkspace({
 
           <section aria-label="Asset results" className={styles.resultArea}>
             {folders.length > 0 && <nav aria-label="Media folders" className={styles.folderBrowser} aria-busy={moveBusy}>
-              {filters.folder && <Button variant="secondary" onClick={() => navigate({ folder: null })}><ChevronLeft size={16} /> All folders</Button>}
+              {filters.folder && <Button variant="ghost" className={styles.folderTarget} onClick={() => navigate({ folder: null })}><ChevronLeft aria-hidden="true" size={48} strokeWidth={1.5} /><span>All folders</span></Button>}
               {folders.filter(folder => folder.name).map(folder => (
-                <Button key={folder.name} variant="secondary" className={styles.folderTarget}
+                <Button key={folder.name} variant="ghost" className={styles.folderTarget}
                   aria-pressed={filters.folder === folder.name} data-drop-active={dropFolder === folder.name}
                   disabled={moveBusy} title={`Open ${folder.name}, or drop a file here`}
                   onClick={() => navigate({ folder: folder.name })}
@@ -595,7 +596,7 @@ export function MediaLibraryWorkspace({
                     event.preventDefault(); setDropFolder(null);
                     void moveToFolder(event.dataTransfer.getData("application/x-showrunner-media"), folder.name);
                   }}>
-                  <FolderOpen aria-hidden="true" size={20} /><span>{folder.name}</span><small>{folder.count}</small>
+                  <FolderOpen aria-hidden="true" size={48} strokeWidth={1.5} /><span>{folder.name}</span><small>{folder.count}</small>
                 </Button>
               ))}
             </nav>}

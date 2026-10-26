@@ -1,10 +1,12 @@
 .page { gap: var(--space-3); max-width: none; min-height: 100%; }
 .pageActions { display: flex; align-items: center; gap: var(--sd-space-8); }
-.folderBrowser { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
-.folderBrowser .folderTarget { min-height: var(--sd-layout-touch-target); max-width: 100%; }
+.folderBrowser { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 144px)); gap: var(--space-3); margin-bottom: var(--space-5); align-items: start; }
+.libraryWorkspace .folderBrowser .folderTarget { flex-direction: column; gap: var(--space-2); width: 100%; min-height: 120px; padding: var(--space-3); border-radius: var(--radius-control); }
+.folderTarget > svg { flex-shrink: 0; fill: var(--color-surface-sunken); }
 .folderTarget span { overflow-wrap: anywhere; white-space: normal; }
 .folderTarget small { color: var(--color-muted); }
-.folderTarget[data-drop-active="true"] { outline: 2px solid var(--color-focus); outline-offset: -2px; background: var(--color-active); }
+.libraryWorkspace .folderTarget[aria-pressed="true"] { background: var(--color-active); }
+.libraryWorkspace .folderTarget[data-drop-active="true"] { outline: 2px solid var(--color-focus); outline-offset: -2px; background: var(--color-active); }
 .feedbackSuccess,
 .feedbackError {
   align-items: center;
@@ -131,13 +133,12 @@
 }
 .activeFilters {
   align-items: center;
-  background: var(--sd-color-fill-active);
-  border-bottom: 1px solid var(--sd-color-border);
+  background: transparent;
   display: flex;
   flex-wrap: wrap;
   gap: var(--sd-space-6);
   min-height: 46px;
-  padding: var(--space-2) var(--space-5);
+  padding: var(--space-2) 0;
 }
 .activeFilters > span { color: var(--color-muted); font-size: var(--type-caption); margin-right: var(--sd-space-2); }
 .activeFilters button {
@@ -160,7 +161,7 @@
   font-weight: var(--sd-type-weight-strong);
 }
 .resultArea {
-  background: var(--sd-color-surface-subtle);
+  background: transparent;
   min-height: 0;
   overflow: auto;
   padding: var(--space-4) var(--space-5);
@@ -613,7 +614,8 @@
 .sortMenu { flex-shrink: 0; }
 .sortMenu :global(.ui-select-label) { display: none; }
 @media (max-width: 860px) {
-  .libraryWorkspace .toolbar .librarySearch { flex-basis: 100%; }
+  .libraryWorkspace .toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
+  .libraryWorkspace .toolbar .librarySearch { grid-column: 1 / -1; }
   .filterPopover { left: 0; right: auto; }
-  .sortMenu :global(.ui-select-trigger) { min-height: var(--sd-layout-touch-target); }
+  .sortMenu :global(.ui-select-trigger) { min-height: var(--sd-layout-touch-target); min-width: 0; width: 100%; }
 }
