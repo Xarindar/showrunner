@@ -185,7 +185,7 @@ function CardMenu({ name, onAction, disabled }: { name: string; onAction: (opera
   </details>;
 }
 
-function AssetCard({ asset, index, onSelect, onToggle, onAction, selected, view, movable }: {
+function AssetCard({ asset, index, onSelect, onToggle, onAction, selected, view, movable, pickedUp }: {
   asset: MediaLibraryAsset;
   index: number;
   onSelect: (event: MouseEvent<HTMLButtonElement>) => void;
@@ -194,9 +194,10 @@ function AssetCard({ asset, index, onSelect, onToggle, onAction, selected, view,
   selected: boolean;
   view: ViewMode;
   movable: boolean;
+  pickedUp: boolean;
 }) {
   return (
-    <div className={styles.assetTile} data-media-id={asset.id} data-movable={movable}>
+    <div className={styles.assetTile} data-media-id={asset.id} data-movable={movable} data-picked-up={pickedUp}>
     <button
       aria-label={`View details for ${asset.filename}`}
       aria-pressed={selected}
@@ -433,6 +434,12 @@ export function MediaLibraryWorkspace({
   const [searchValue, setSearchValue] = useState(filters.q);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadFolder, setUploadFolder] = useState("");
+  const [externalDropFolder, setExternalDropFolder] = useState<string | null>(null);
+  function openUpload(files: File[] = [], folder = filters.folder) {
+    setUploadFiles(files); setUploadFolder(folder); setUploadOpen(true);
+  }
   const [folderOpen, setFolderOpen] = useState(false);
   const [cardAction, setCardAction] = useState<CardAction | null>(null);
   const [cardBusy, setCardBusy] = useState(false);
@@ -445,6 +452,7 @@ export function MediaLibraryWorkspace({
   const [dropFolder, setDropFolder] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [movedIds, setMovedIds] = useState<string[]>([]);
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
   const [drag, setDrag] = useState<{ ids: string[]; x: number; y: number } | null>(null);
   const [selectionBox, setSelectionBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const resultsRef = useRef<HTMLElement>(null);
@@ -452,8 +460,7 @@ export function MediaLibraryWorkspace({
   const suppressClick = useRef(false);
   const previousRects = useRef(new Map<string, DOMRect>());
   const childFolders = childMediaFolders(folders, filters.folder);
-  const hiddenIds = [...movedIds, ...(drag?.ids || [])];
-  const visibleAssets = assets.filter(asset => !hiddenIds.includes(asset.id));
+  const visibleAssets = assets.filter(asset => !movedIds.includes(asset.id));
   const layoutKey = visibleAssets.map(asset => asset.id).join(",");
   useLayoutEffect(() => {
     const next = new Map<string, DOMRect>();
@@ -507,21 +514,21 @@ export function MediaLibraryWorkspace({
     if (!moving.length || filters.scope === "archived") return;
     movePending.current = true;
     setMoveBusy(true);
-    setMovedIds(current => [...current, ...moving.map(asset => asset.id)]);
+    setPendingIds(moving.map(asset => asset.id));
     try {
       const data = new FormData();
       moving.forEach(asset => data.append("id", asset.id));
       data.set("folder", folder);
       const result = await moveMediaAssetToFolder(data);
       if (result.error) throw new Error(result.error);
+      setMovedIds(current => [...current, ...moving.map(asset => asset.id)]);
       notify(`Moved ${moving.length === 1 ? moving[0].filename : `${moving.length} files`} to ${folder || "Media home"}.`);
       setSelectedIds([]);
       router.refresh();
     } catch (error) {
-      setMovedIds(current => current.filter(id => !moving.some(asset => asset.id === id)));
       notify(error instanceof Error ? error.message : "The files could not be moved. Please try again.", "danger");
     }
-    finally { movePending.current = false; setMoveBusy(false); }
+    finally { movePending.current = false; setMoveBusy(false); setPendingIds([]); }
   }
 
   function beginGesture(event: ReactPointerEvent<HTMLElement>) {
@@ -577,12 +584,29 @@ export function MediaLibraryWorkspace({
   }
 
   return (
-    <div className={`stack ${styles.page}`} data-dragging={Boolean(drag)}>
+    <div className={`stack ${styles.page}`} data-dragging={Boolean(drag)}
+      onDragOver={event => {
+        if (!event.dataTransfer.types.includes("Files") || (event.target as HTMLElement).closest("dialog")) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = canUpload ? "copy" : "none";
+        setExternalDropFolder((event.target as HTMLElement).closest<HTMLElement>("[data-folder-path]")?.dataset.folderPath ?? filters.folder);
+      }}
+      onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setExternalDropFolder(null); }}
+      onDrop={event => {
+        if ((event.target as HTMLElement).closest("dialog")) return;
+        event.preventDefault(); setExternalDropFolder(null);
+        if (!canUpload) { notify("Uploads are temporarily unavailable.", "danger"); return; }
+        const files = Array.from(event.dataTransfer.files);
+        if (!files.length) return;
+        const folder = (event.target as HTMLElement).closest<HTMLElement>("[data-folder-path]")?.dataset.folderPath ?? filters.folder;
+        openUpload(files, folder);
+      }}>
+      {externalDropFolder !== null && <div className={styles.uploadDropNotice} role="status"><Upload size={20} aria-hidden="true" />{canUpload ? `Drop to upload to ${externalDropFolder || "Media home"}` : "Uploads are temporarily unavailable"}</div>}
       <header className="page-header">
         <h1>Media</h1>
         <div className={styles.pageActions}>
           <Button variant="secondary" onClick={() => setFolderOpen(true)}>New folder</Button>
-          <Button onClick={() => setUploadOpen(true)} type="button"><Upload aria-hidden="true" size={16} /> Upload</Button>
+          <Button onClick={() => openUpload()} type="button"><Upload aria-hidden="true" size={16} /> Upload</Button>
         </div>
       </header>
 
@@ -759,20 +783,20 @@ export function MediaLibraryWorkspace({
               <Button type="button" variant="secondary" aria-label="Back to parent folder" disabled={!filters.folder || moveBusy}
                 onClick={() => navigate({ folder: filters.folder.split("/").slice(0, -1).join("/") || null })}><ChevronLeft size={16} aria-hidden="true" />Back</Button>
               <ol>
-                <li><Button type="button" variant="ghost" className={styles.breadcrumb} data-folder-path="" data-drop-active={dropFolder === ""} aria-current={!filters.folder ? "page" : undefined} onClick={() => navigate({ folder: null })}>Media home</Button></li>
+                <li><Button type="button" variant="ghost" className={styles.breadcrumb} data-folder-path="" data-drop-active={dropFolder === "" || externalDropFolder === ""} aria-current={!filters.folder ? "page" : undefined} onClick={() => navigate({ folder: null })}>Media home</Button></li>
                 {filters.folder.split("/").filter(Boolean).map((part, index, parts) => {
                   const path = parts.slice(0, index + 1).join("/");
-                  return <li key={path}><ChevronRight size={14} aria-hidden="true" /><Button type="button" variant="ghost" className={styles.breadcrumb} data-folder-path={path} data-drop-active={dropFolder === path} aria-current={path === filters.folder ? "page" : undefined} onClick={() => navigate({ folder: path })}>{part}</Button></li>;
+                  return <li key={path}><ChevronRight size={14} aria-hidden="true" /><Button type="button" variant="ghost" className={styles.breadcrumb} data-folder-path={path} data-drop-active={dropFolder === path || externalDropFolder === path} aria-current={path === filters.folder ? "page" : undefined} onClick={() => navigate({ folder: path })}>{part}</Button></li>;
                 })}
               </ol>
             </nav>
             <div className={view === "grid" ? styles.assetGrid : styles.assetList}>
             {childFolders.length > 0 && <nav aria-label="Media folders" className={styles.folderBrowser} aria-busy={moveBusy}>
               {childFolders.map(folder => (
-                <div key={folder.name} className={styles.assetTile}>
+                <div key={folder.name} className={styles.assetTile} data-folder-path={folder.name}>
                 <button className={`${styles.assetCard} ${styles.folderTarget} ${view === "list" ? styles.assetRow : ""}`}
                   type="button" data-folder-path={folder.name}
-                  aria-pressed={filters.folder === folder.name} data-drop-active={dropFolder === folder.name}
+                  aria-pressed={filters.folder === folder.name} data-drop-active={dropFolder === folder.name || externalDropFolder === folder.name}
                   disabled={moveBusy} title={`Open ${folder.name}, or drop a file here`}
                   onClick={() => navigate({ folder: folder.name })}
                   >
@@ -784,7 +808,7 @@ export function MediaLibraryWorkspace({
               ))}
             </nav>}
                 {visibleAssets.map((asset, index) => (
-                  <AssetCard asset={asset} movable={!asset.builtIn && filters.scope !== "archived" && !moveBusy} index={index + (filters.page - 1) * 24} key={asset.id}
+                  <AssetCard asset={asset} pickedUp={Boolean(drag?.ids.includes(asset.id) || pendingIds.includes(asset.id))} movable={!asset.builtIn && filters.scope !== "archived" && !moveBusy} index={index + (filters.page - 1) * 24} key={asset.id}
                     onSelect={event => {
                       if (suppressClick.current && event.detail > 0) { suppressClick.current = false; return; }
                       if (!asset.builtIn && filters.scope !== "archived" && (event.ctrlKey || event.metaKey || event.shiftKey)) toggleSelection(asset.id);
@@ -800,7 +824,7 @@ export function MediaLibraryWorkspace({
                 {filters.q || filters.tag || filters.kind !== "all" ? (
                   <Button onClick={() => navigate({ scope: "all", folder: null, kind: null, q: null, tag: null })} size="sm" type="button" variant="secondary">Clear filters</Button>
                 ) : filters.scope === "all" ? (
-                  <Button onClick={() => setUploadOpen(true)} size="sm" type="button"><Upload size={15} /> Upload images</Button>
+                  <Button onClick={() => openUpload()} size="sm" type="button"><Upload size={15} /> Upload images</Button>
                 ) : null}
               </div>
             )}
@@ -824,7 +848,7 @@ export function MediaLibraryWorkspace({
         {selectedAsset ? <AssetInspector folders={folders} archived={filters.scope === "archived"} asset={selectedAsset} key={selectedAsset?.id || filters.scope} onClose={() => setSelectedId(null)} /> : null}
       </div>
 
-      <UploadAssetsModal folders={folders.map(folder => folder.name)} defaultFolder={filters.folder} canUpload={canUpload} onClose={() => setUploadOpen(false)} open={uploadOpen} />
+      <UploadAssetsModal folders={folders.map(folder => folder.name)} defaultFolder={uploadFolder} initialFiles={uploadFiles} canUpload={canUpload} onClose={() => { setUploadOpen(false); setUploadFiles([]); }} open={uploadOpen} />
     </div>
   );
 }

@@ -17,7 +17,7 @@ type UploadAssetsModalProps = {
 
 export function UploadAssetsModal({ canUpload, defaultFolder, folders, initialFile, initialFiles, onClose, open }: UploadAssetsModalProps) {
   const [busy, setBusy] = useState(false);
-  return <Modal bodyClassName={styles.body} className={styles.dialog} onClose={() => { if (!busy) onClose(); }} open={open} title="Upload images">
+  return <Modal bodyClassName={styles.body} className={styles.dialog} onClose={() => { if (!busy) onClose(); }} open={open} title={defaultFolder ? `Upload images to ${defaultFolder}` : "Upload images"}>
     <AssetUploadPanel defaultFolder={defaultFolder} folders={folders} canUpload={canUpload} initialFiles={initialFiles || (initialFile ? [initialFile] : [])} showMetadata onBusyChange={setBusy} onDone={() => onClose()} />
   </Modal>;
 }

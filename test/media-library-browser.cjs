@@ -18,14 +18,13 @@ fs.mkdirSync('.tmp', {recursive:true});
     window.render=()=>root.render(<MediaLibraryWorkspace key={window.filters.folder} assets={window.assets.filter(a=>a.folder===window.filters.folder)} folders={window.folders} filters={window.filters} activeCount={3} archivedCount={0} builtInCount={0} canUpload={true} errorMessage="" needsAltCount={0} pageCount={1} privateCount={0} recentCount={3} resultCount={window.assets.filter(a=>a.folder===window.filters.folder).length} savedMessage="" tags={[]}/>);
     window.render();`, resolveDir: process.cwd(), loader: 'tsx' },
     bundle:true, outfile:output, jsx:'automatic', plugins:[{name:'fixture',setup(b){
-      b.onResolve({filter:/^(next\/navigation|next\/image|next\/link|.*notifications|\.\/actions|\.\/upload-assets-modal)$/}, a=>({path:a.path,namespace:'fixture'}));
+      b.onResolve({filter:/^(next\/navigation|next\/image|next\/link|.*notifications|\.\/actions|@\/modules\/media\/actions)$/}, a=>({path:a.path,namespace:'fixture'}));
       b.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({loader:'jsx',resolveDir:process.cwd(),contents:
         path==='next/navigation'?`export const useRouter=()=>({push(url){window.filters={...window.filters,folder:new URL(url,'http://localhost').searchParams.get('folder')||''};window.render()},refresh(){window.render()}});`:
         path==='next/image'?`import React from 'react';export default function Image({fill,priority,unoptimized,...props}){return <img {...props} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}`:
         path==='next/link'?`import React from 'react';export default function Link(props){return <a {...props}/>}`:
         path.includes('notifications')?`export const useNotify=()=>message=>{window.lastNotice=message};export const Notification=()=>null;`:
-        path.includes('upload-assets')?`export const UploadAssetsModal=()=>null;`:
-        `export async function createMediaFolder(data){const name=[data.get('parent'),data.get('name')].filter(Boolean).join('/');window.folders.push({name,count:0});return {name}};export async function moveMediaAssetToFolder(data){window.moves=(window.moves||0)+1;if(window.failMove)return {error:'The file could not be moved. Please try again.'};window.assets.filter(a=>data.getAll('id').includes(a.id)).forEach(a=>a.folder=data.get('folder'));window.folders.forEach(f=>f.count=window.assets.filter(a=>a.folder===f.name).length);return {success:true}};export async function renameMediaAsset(data){window.assets.find(a=>a.id===data.get('id')).filename=data.get('name');return {success:true}};export async function changeMediaFolder(data){const folder=data.get('folder');const operation=data.get('operation');const value=data.get('value');if(operation==='delete'){if(window.assets.some(a=>a.folder===folder)||window.folders.some(f=>f.name.startsWith(folder+'/')))return {error:'This folder is not empty.'};window.folders=window.folders.filter(f=>f.name!==folder)}else{const parent=folder.split('/').slice(0,-1).join('/');const destination=operation==='rename'?[parent,value].filter(Boolean).join('/'):[value,folder.split('/').at(-1)].filter(Boolean).join('/');window.folders.forEach(f=>{if(f.name===folder||f.name.startsWith(folder+'/'))f.name=destination+f.name.slice(folder.length)});window.assets.forEach(a=>{if(a.folder===folder||a.folder.startsWith(folder+'/'))a.folder=destination+a.folder.slice(folder.length)})}return {success:true}};export async function deleteMediaAsset(data){window.assets=window.assets.filter(a=>a.id!==data.get('id'));return {success:true}};export const archiveMediaAssetAction=()=>{};export const restoreMediaAssetAction=()=>{};export const setHeroImageAction=()=>{};export const updateMediaAssetAction=()=>{};`
+        `export async function uploadLibraryAsset(data){window.uploads=(window.uploads||[]);window.uploads.push({name:data.get('file').name,folder:data.get('folder')||'',alt:data.get('alt')});return {asset:{id:'uploaded',filename:data.get('file').name}}};export async function createMediaFolder(data){const name=[data.get('parent'),data.get('name')].filter(Boolean).join('/');window.folders.push({name,count:0});return {name}};export async function moveMediaAssetToFolder(data){window.moves=(window.moves||0)+1;if(window.failMove)return {error:'The file could not be moved. Please try again.'};window.assets.filter(a=>data.getAll('id').includes(a.id)).forEach(a=>a.folder=data.get('folder'));window.folders.forEach(f=>f.count=window.assets.filter(a=>a.folder===f.name).length);return {success:true}};export async function renameMediaAsset(data){window.assets.find(a=>a.id===data.get('id')).filename=data.get('name');return {success:true}};export async function changeMediaFolder(data){const folder=data.get('folder');const operation=data.get('operation');const value=data.get('value');if(operation==='delete'){if(window.assets.some(a=>a.folder===folder)||window.folders.some(f=>f.name.startsWith(folder+'/')))return {error:'This folder is not empty.'};window.folders=window.folders.filter(f=>f.name!==folder)}else{const parent=folder.split('/').slice(0,-1).join('/');const destination=operation==='rename'?[parent,value].filter(Boolean).join('/'):[value,folder.split('/').at(-1)].filter(Boolean).join('/');window.folders.forEach(f=>{if(f.name===folder||f.name.startsWith(folder+'/'))f.name=destination+f.name.slice(folder.length)});window.assets.forEach(a=>{if(a.folder===folder||a.folder.startsWith(folder+'/'))a.folder=destination+a.folder.slice(folder.length)})}return {success:true}};export async function deleteMediaAsset(data){window.assets=window.assets.filter(a=>a.id!==data.get('id'));return {success:true}};export const archiveMediaAssetAction=()=>{};export const restoreMediaAssetAction=()=>{};export const setHeroImageAction=()=>{};export const updateMediaAssetAction=()=>{};`
       }));
     }}] });
   const server=createServer((req,res)=>{if(req.url.endsWith('.js')||req.url.endsWith('.css')){res.setHeader('Content-Type',req.url.endsWith('.js')?'text/javascript':'text/css');res.end(fs.readFileSync(output.replace(/\.js$/,req.url.endsWith('.js')?'.js':'.css')))}else res.end('<html><head><link rel="stylesheet" href="/fixture.css"></head><body class="showrunner-admin" style="padding:24px"><main id="root"></main><script src="/fixture.js"></script></body></html>')});
@@ -53,9 +52,10 @@ fs.mkdirSync('.tmp', {recursive:true});
     assert.equal(await page.getByRole('checkbox',{checked:true}).count(),2);
     await page.mouse.move(a.x+50,a.y+50);await page.mouse.down();await page.mouse.move(a.x+65,a.y+65,{steps:3});
     await page.getByRole('status').filter({hasText:'2 files'}).waitFor();
-    assert.equal(await page.locator('[data-media-id]').count(),1);
+    assert.equal(await page.locator('[data-media-id]').count(),3);
+    assert.equal(await page.locator('[data-media-id][data-picked-up="true"]').count(),2);
     await page.waitForTimeout(220);
-    assert(Math.abs((await page.locator('[data-media-id="third"]').boundingBox()).x-a.x)<2);
+    assert((await page.locator('[data-media-id="third"]').boundingBox()).x>b.x);
     await page.screenshot({path:'.tmp/media-folder-picked-up.png',fullPage:true});
     await page.mouse.move(f.x+f.width/2,f.y+f.height/2,{steps:8});await page.mouse.up();
     await page.waitForFunction(()=>window.assets[0].folder==='Family Photos' && window.assets[1].folder==='Family Photos');
@@ -160,6 +160,37 @@ fs.mkdirSync('.tmp', {recursive:true});
     await page.screenshot({path:'.tmp/media-card-menu-mobile.png',fullPage:true});
     await page.keyboard.press('Escape');
     assert.equal(await page.getByRole('group',{name:'Actions for Garden.jpg'}).count(),0);
-    assert.deepEqual(errors,[]); console.log('PASS: compact modal, Enter confirms, names preserved, same-size folder/file grid, marquee multi-selection, styled pickup, immediate removal/reflow, batch drop, nested folders, failed move rollback, Escape cancellation, mobile keyboard navigation and overflow.');
+    await page.setViewportSize({width:1280,height:900});
+    const transfer=await page.evaluateHandle(()=>{const data=new DataTransfer();data.items.add(new File(['<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"></svg>'],'Dropped.svg',{type:'image/svg+xml'}));return data;});
+    const uploadTarget=page.locator('button[data-folder-path="Family Photos/Other Photos"]');
+    await uploadTarget.dispatchEvent('dragover',{dataTransfer:transfer});
+    assert.equal(await uploadTarget.getAttribute('data-drop-active'),'true');
+    await page.getByRole('status').filter({hasText:'Drop to upload to Family Photos/Other Photos'}).waitFor();
+    await page.screenshot({path:'.tmp/media-external-drop-folder.png',fullPage:true});
+    await uploadTarget.dispatchEvent('drop',{dataTransfer:transfer});
+    const uploader=page.getByRole('dialog',{name:'Upload images to Family Photos/Other Photos',exact:true});
+    await uploader.waitFor();
+    await uploader.getByLabel('Image description for Dropped.svg').fill('Test image');
+    await uploader.getByRole('button',{name:'Upload 1 image',exact:true}).click();
+    await page.waitForFunction(()=>window.uploads?.length===1);
+    assert.deepEqual(await page.evaluate(()=>window.uploads[0]),{name:'Dropped.svg',folder:'Family Photos/Other Photos',alt:'Test image'});
+    await uploader.getByRole('button',{name:'Done',exact:true}).click();
+    await page.getByRole('heading',{name:'Media',exact:true}).dispatchEvent('drop',{dataTransfer:transfer});
+    const currentUploader=page.getByRole('dialog',{name:'Upload images to Family Photos',exact:true});await currentUploader.waitFor();
+    await currentUploader.getByLabel('Image description for Dropped.svg').fill('Current folder');
+    await currentUploader.getByRole('button',{name:'Upload 1 image',exact:true}).click();
+    await page.waitForFunction(()=>window.uploads?.length===2);
+    assert.equal(await page.evaluate(()=>window.uploads[1].folder),'Family Photos');
+    await currentUploader.getByRole('button',{name:'Done',exact:true}).click();
+    await page.getByRole('button',{name:'Media home',exact:true}).click();
+    await page.getByRole('heading',{name:'Media',exact:true}).dispatchEvent('drop',{dataTransfer:transfer});
+    const homeUploader=page.getByRole('dialog',{name:'Upload images',exact:true});await homeUploader.waitFor();
+    await homeUploader.getByLabel('Image description for Dropped.svg').fill('Home folder');
+    await homeUploader.getByRole('button',{name:'Upload 1 image',exact:true}).click();
+    await page.waitForFunction(()=>window.uploads?.length===3);
+    assert.equal(await page.evaluate(()=>window.uploads[2].folder),'');
+    await homeUploader.getByRole('button',{name:'Done',exact:true}).click();
+    await transfer.dispose();
+    assert.deepEqual(errors,[]); console.log('PASS: compact modal, Enter confirms, names preserved, same-size folder/file grid, marquee multi-selection, styled pickup, reserved drag spaces and reflow after drop, batch drop, nested folders, failed move rollback, Escape cancellation, card menus, external uploads to hovered/current/home folders, mobile keyboard navigation and overflow.');
   } finally {await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
