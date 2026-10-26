@@ -14,7 +14,14 @@
 .folderPath [data-drop-active="true"] { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .assetTile { position: relative; min-width: 0; }
 .assetTile > button { width: 100%; height: 100%; }
-.assetCheckbox { position: absolute; top: var(--space-1); right: var(--space-1); width: 44px; height: 44px; display: grid; place-items: center; z-index: 1; }
+.assetCheckbox { position: absolute; top: var(--space-1); left: var(--space-1); width: 44px; height: 44px; display: grid; place-items: center; z-index: 1; }
+.cardMenu { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 2; }
+.cardMenu[open] { z-index: 5; }
+.cardMenu summary { display: grid; place-items: center; width: 32px; height: 32px; list-style: none; cursor: pointer; border-radius: var(--radius-control); background: var(--color-surface); box-shadow: var(--sd-shadow-input); }
+.cardMenu summary::-webkit-details-marker { display: none; }
+.cardMenu > div { position: absolute; right: 0; top: calc(100% + var(--space-1)); display: grid; gap: var(--space-1); min-width: 152px; padding: var(--space-1); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-control); box-shadow: var(--sd-shadow-dialog); }
+.cardMenu > div > button { justify-content: flex-start; }
+@media (pointer: coarse) { .cardMenu summary { width: 44px; height: 44px; } }
 .assetCheckbox input { width: 20px; height: 20px; accent-color: var(--color-focus); }
 .resultArea { user-select: none; }
 .page[data-dragging="true"] .resultArea, .page[data-dragging="true"] .resultArea * { cursor: grabbing; }

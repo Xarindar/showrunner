@@ -40,6 +40,8 @@ Business hours on service creation and editing opens the availability controls f
 
 ## Media
 
+File and folder cards offer Rename, Move, and Delete through a three-dot menu. Renaming files preserves their storage keys and links. Folder rename and move carry the complete nested tree, reject conflicting destinations and require access to every affected item. Delete asks for confirmation: files go to the recoverable archive and files still in use are protected; folders must be empty before removal.
+
 Media home shows folders alongside the full authorized file library in one consistent grid; opening a folder filters to its contents. Folders preserve capitals and spaces, open into their direct children, and create new folders within the current path. Search and category filters can find files across folders. Dragging a selection box or using file checkboxes selects multiple files; picking them up shows a floating preview and closes their old gaps. Drop on a folder or breadcrumb to move the selection atomically, or use Move to with the keyboard. Cancelled or failed moves restore the files. Grid/list controls sit beside Filters and Sort. Folder creation uses a compact dialog where Enter confirms.
 Media is a standalone module for files reused across the business. Open directly into the library, with upload, a wide search field, compact Filters and Sort controls, and removable active-filter chips. Categories, folders, tags and type are available in the Filters popover. Search takes its own row on mobile. Show details on selection. Railway bucket storage is managed infrastructure; users are not asked to choose or configure providers. Storage failures are reported as upload availability errors.
 

@@ -241,14 +241,15 @@ function actionHarness(references: number, archiveWriteCount = 1, privacy?: { de
 }
 
 test("archive actions reject referenced media and recheck usage in the write", async () => {
+  const form = new FormData(); form.set("id", "asset-a"); form.set("confirmArchive", "on");
   const linked = actionHarness(1);
-  await assert.rejects(linked.actions.archiveMediaAssetAction(new FormData()), /still%20in%20use/);
+  await assert.rejects(linked.actions.archiveMediaAssetAction(form), /still%20in%20use/);
   assert.equal(linked.writes.length, 0);
   const changed = actionHarness(0, 0);
-  await assert.rejects(changed.actions.archiveMediaAssetAction(new FormData()), /changed%20or%20is%20still%20in%20use/);
+  await assert.rejects(changed.actions.archiveMediaAssetAction(form), /changed%20or%20is%20still%20in%20use/);
   assert.equal(changed.writes.length, 1);
   const clean = actionHarness(0);
-  await assert.rejects(clean.actions.archiveMediaAssetAction(new FormData()), /saved=archive/);
+  await assert.rejects(clean.actions.archiveMediaAssetAction(form), /saved=archive/);
   const query = clean.writes[0] as { where: { AND: unknown[] } };
   assert.equal(query.where.AND[1], unreferencedMediaWhere);
 });

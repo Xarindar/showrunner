@@ -128,6 +128,69 @@ export async function moveMediaAssetToFolder(formData: FormData) {
   return { success: true };
 }
 
+export async function renameMediaAsset(formData: FormData) {
+  const user = await requireAdmin("media:manage");
+  const parsed = z.object({ id: requiredText, name: z.string().trim().min(1).max(200).regex(/^[^/\\\u0000-\u001f\u007f]+$/) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Enter a filename under 200 characters without slashes." };
+  const siteId = await getCurrentSiteId();
+  const updated = await prisma.mediaAsset.updateMany({
+    where: await getAccessibleMediaWhere(user, siteId, { id: parsed.data.id, deletedAt: null }),
+    data: { filename: parsed.data.name }
+  });
+  if (updated.count !== 1) return { error: "File not found. Refresh the library and try again." };
+  revalidatePath("/admin/modules/media");
+  return { success: true };
+}
+
+export async function changeMediaFolder(formData: FormData) {
+  const user = await requireAdmin("media:manage");
+  const parsed = z.object({ folder: z.string().min(1).refine(validMediaFolderPath), operation: z.enum(["rename", "move", "delete"]), value: z.string().trim() }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Choose a valid folder action." };
+  const { folder, operation, value } = parsed.data;
+  const parent = folder.split("/").slice(0, -1).join("/");
+  if (operation === "rename" && (!value || value.includes("/") || !validMediaFolderPath(value))) return { error: "Enter a folder name without slashes or dot segments." };
+  const destination = operation === "rename" ? [parent, value].filter(Boolean).join("/") : [value, folder.split("/").at(-1)].filter(Boolean).join("/");
+  if (operation !== "delete" && (!validMediaFolderPath(destination) || destination.startsWith(`${folder}/`))) return { error: "A folder cannot be moved inside itself, and its path must fit within 200 characters." };
+  const siteId = await getCurrentSiteId();
+  if (operation === "move" && !await accessibleMediaFolder(user, siteId, value)) return { error: "Destination folder not found." };
+  const own = (await resolveDataScopeMode(user, siteId, "media")) === "OWN";
+  const assetAccess = await getAccessibleMediaWhere(user, siteId, {});
+  try {
+    await prisma.$transaction(async tx => {
+      const tree = { siteId, OR: [{ name: folder }, { name: { startsWith: `${folder}/` } }] };
+      const files = { siteId, OR: [{ folder }, { folder: { startsWith: `${folder}/` } }] };
+      const saved = await tx.mediaFolder.findMany({ where: tree });
+      const assets = await tx.mediaAsset.findMany({ where: { AND: [files, assetAccess] }, select: { id: true, folder: true, deletedAt: true } });
+      if ((!saved.length && !assets.length) || saved.some(item => own && item.createdByUserId !== user.id) || assets.length !== await tx.mediaAsset.count({ where: files })) throw new Error("This folder is unavailable or contains files managed by another user.");
+      if (operation === "delete") {
+        if (assets.some(asset => !asset.deletedAt) || saved.some(item => item.name !== folder)) throw new Error("This folder is not empty. Move or delete its files and subfolders first.");
+        // Archived files stay recoverable without recreating a deleted folder on restore.
+        await tx.mediaAsset.updateMany({ where: { AND: [files, assetAccess] }, data: { folder: parent } });
+        await tx.mediaFolder.deleteMany({ where: tree });
+        return;
+      }
+      if (destination === folder) return;
+      const occupied = await tx.mediaFolder.count({ where: { siteId, OR: [{ name: destination }, { name: { startsWith: `${destination}/` } }] } });
+      const occupiedFiles = await tx.mediaAsset.count({ where: { siteId, OR: [{ folder: destination }, { folder: { startsWith: `${destination}/` } }] } });
+      if (occupied || occupiedFiles) throw new Error("A folder with that name already exists at the destination.");
+      for (const item of saved) {
+        const name = destination + item.name.slice(folder.length);
+        if (!validMediaFolderPath(name)) throw new Error("A nested folder path would exceed 200 characters.");
+        await tx.mediaFolder.update({ where: { id: item.id }, data: { name } });
+      }
+      for (const asset of assets) {
+        const path = destination + asset.folder.slice(folder.length);
+        if (!validMediaFolderPath(path)) throw new Error("A nested folder path would exceed 200 characters.");
+        await tx.mediaAsset.update({ where: { id: asset.id }, data: { folder: path } });
+      }
+    }, { isolationLevel: "Serializable" });
+  } catch (error) {
+    return { error: error instanceof Error && !("code" in error) ? error.message : "The folder changed or its name is already taken. Refresh and try again." };
+  }
+  revalidatePath("/admin/modules/media");
+  return { success: true };
+}
+
 export async function uploadLibraryAsset(formData: FormData) {
   const user = await requireAdmin("media:manage");
   const settings = await getSiteSettings();
@@ -220,8 +283,16 @@ export async function updateMediaAssetAction(formData: FormData) {
 }
 
 export async function archiveMediaAssetAction(formData: FormData) {
+  const result = await deleteMediaAsset(formData);
+  if (result.error) redirect(`/admin/modules/media?error=${encodeURIComponent(result.error)}`);
+  redirect("/admin/modules/media?saved=archive");
+}
+
+export async function deleteMediaAsset(formData: FormData) {
   const user = await requireAdmin("media:manage");
-  const input = await parseForm(mediaArchiveSchema, formData, "/admin/modules/media");
+  const parsed = mediaArchiveSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Confirm deletion before removing this file." };
+  const input = parsed.data;
   const siteId = await getCurrentSiteId();
 
   const accessibleWhere = await getAccessibleMediaWhere(user, siteId, { id: input.id });
@@ -229,18 +300,18 @@ export async function archiveMediaAssetAction(formData: FormData) {
     prisma.mediaAsset.findFirst({ where: accessibleWhere, select: { id: true, _count: { select: mediaReferenceCountSelect } } }),
     getSiteSettingsForSite(siteId)
   ]);
-  if (!asset) redirect(`/admin/modules/media?error=${encodeURIComponent("Media asset not found.")}`);
+  if (!asset) return { error: "Media asset not found." };
   if (mediaReferenceCount(asset._count) || [settings.heroImageUrl, settings.logoImageUrl].some((url) => mediaAssetIdFromUrl(url) === asset.id)) {
-    redirect(`/admin/modules/media?error=${encodeURIComponent("This asset is still in use. Remove its gallery, purchase, client file, catalog, or site references before archiving it.")}`);
+    return { error: "This file is still in use. Remove its gallery, purchase, client file, catalog, or site references before deleting it." };
   }
   const archived = await prisma.mediaAsset.updateMany({
     where: { AND: [accessibleWhere, unreferencedMediaWhere] },
     data: { deletedAt: new Date() }
   });
-  if (archived.count !== 1) redirect(`/admin/modules/media?error=${encodeURIComponent("This asset changed or is still in use. Refresh the library before archiving it.")}`);
+  if (archived.count !== 1) return { error: "This file changed or is still in use. Refresh the library before deleting it." };
 
   refreshMedia();
-  redirect("/admin/modules/media?saved=archive");
+  return { success: true };
 }
 
 export async function restoreMediaAssetAction(formData: FormData) {

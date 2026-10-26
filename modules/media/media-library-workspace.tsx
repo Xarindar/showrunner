@@ -15,6 +15,8 @@ import {
   Grid2X2,
   LayoutList,
   Lock,
+  MoreHorizontal,
+  Pencil,
   RotateCcw,
   Search,
   Star,
@@ -30,6 +32,9 @@ import { childMediaFolders } from "@/lib/media-folders";
 import {
   archiveMediaAssetAction,
   createMediaFolder,
+  changeMediaFolder,
+  renameMediaAsset,
+  deleteMediaAsset,
   moveMediaAssetToFolder,
   restoreMediaAssetAction,
   setHeroImageAction,
@@ -156,11 +161,36 @@ function AssetThumbnail({ asset, priority = false }: { asset: MediaLibraryAsset;
   );
 }
 
-function AssetCard({ asset, index, onSelect, onToggle, selected, view, movable }: {
+type CardOperation = "rename" | "move" | "delete";
+type CardAction = { kind: "file" | "folder"; id: string; name: string; folder: string; operation: CardOperation };
+
+function CardMenu({ name, onAction, disabled }: { name: string; onAction: (operation: CardOperation) => void; disabled: boolean }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (event: globalThis.PointerEvent) => { if (ref.current && !ref.current.contains(event.target as Node)) ref.current.open = false; };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, []);
+  return <details ref={ref} className={styles.cardMenu} onPointerDown={event => event.stopPropagation()}
+    onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }}
+    onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
+    <summary aria-label={`More actions for ${name}`}><MoreHorizontal size={18} aria-hidden="true" /></summary>
+    <div role="group" aria-label={`Actions for ${name}`}>
+      {(["rename", "move", "delete"] as const).map(operation => <Button key={operation} type="button" variant={operation === "delete" ? "danger" : "ghost"} disabled={disabled}
+        onClick={() => { if (ref.current) { ref.current.open = false; ref.current.querySelector("summary")?.focus(); } onAction(operation); }}>
+        {operation === "rename" ? <Pencil size={16} /> : operation === "move" ? <FolderOpen size={16} /> : <Trash2 size={16} />}
+        {operation === "rename" ? "Rename" : operation === "move" ? "Move" : "Delete"}
+      </Button>)}
+    </div>
+  </details>;
+}
+
+function AssetCard({ asset, index, onSelect, onToggle, onAction, selected, view, movable }: {
   asset: MediaLibraryAsset;
   index: number;
   onSelect: (event: MouseEvent<HTMLButtonElement>) => void;
   onToggle: () => void;
+  onAction: (operation: CardOperation) => void;
   selected: boolean;
   view: ViewMode;
   movable: boolean;
@@ -185,6 +215,7 @@ function AssetCard({ asset, index, onSelect, onToggle, selected, view, movable }
       </span>
     </button>
     {movable && <label className={styles.assetCheckbox}><input type="checkbox" aria-label={`Select ${asset.filename}`} checked={selected} onChange={onToggle} /></label>}
+    {movable && <CardMenu name={asset.filename} onAction={onAction} disabled={false} />}
     </div>
   );
 }
@@ -403,6 +434,10 @@ export function MediaLibraryWorkspace({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [folderOpen, setFolderOpen] = useState(false);
+  const [cardAction, setCardAction] = useState<CardAction | null>(null);
+  const [cardBusy, setCardBusy] = useState(false);
+  const [cardError, setCardError] = useState("");
+  function openCardAction(action: CardAction) { setCardError(""); setCardAction(action); }
   const notify = useNotify();
   const [folderBusy, setFolderBusy] = useState(false);
   const [moveBusy, setMoveBusy] = useState(false);
@@ -493,7 +528,7 @@ export function MediaLibraryWorkspace({
     if (event.button !== 0 || event.pointerType !== "mouse" || moveBusy) return;
     suppressClick.current = false;
     const target = event.target as HTMLElement;
-    if (target.closest("input, label, select, [data-folder-path], nav")) return;
+    if (target.closest("input, label, select, details, [data-folder-path], nav")) return;
     const tile = target.closest<HTMLElement>("[data-media-id]");
     if (tile && tile.dataset.movable !== "true") return;
     if (!tile && target.closest("button, a")) return;
@@ -550,6 +585,42 @@ export function MediaLibraryWorkspace({
           <Button onClick={() => setUploadOpen(true)} type="button"><Upload aria-hidden="true" size={16} /> Upload</Button>
         </div>
       </header>
+
+      <Modal open={Boolean(cardAction)} onClose={() => { if (!cardBusy) setCardAction(null); }} title={cardAction ? `${cardAction.operation === "rename" ? "Rename" : cardAction.operation === "move" ? "Move" : "Delete"} ${cardAction.kind === "file" ? "file" : "folder"}` : "Card actions"} className={styles.folderModal}>
+        {cardAction && <form key={`${cardAction.kind}:${cardAction.id}:${cardAction.operation}`} className={styles.newFolder}
+          onSubmit={async event => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            setCardBusy(true); setCardError("");
+            try {
+              const result = cardAction.kind === "folder" ? await changeMediaFolder(data) : cardAction.operation === "rename" ? await renameMediaAsset(data) : cardAction.operation === "delete" ? await deleteMediaAsset(data) : await moveMediaAssetToFolder(data);
+              if (result.error) { setCardError(result.error); return; }
+              notify(cardAction.operation === "rename" ? "Name updated." : cardAction.operation === "move" ? "Moved successfully." : cardAction.kind === "folder" ? "Folder deleted." : "File moved to Archived.");
+              setCardAction(null); setSelectedIds([]); router.refresh();
+            } catch { setCardError("The change could not be saved. Please try again."); }
+            finally { setCardBusy(false); }
+          }}>
+          <input type="hidden" name="id" value={cardAction.id} />
+          <input type="hidden" name="operation" value={cardAction.operation} />
+          {cardAction.kind === "folder" && <input type="hidden" name="folder" value={cardAction.id} />}
+          {cardAction.operation === "rename" && <label>Name<input autoFocus name={cardAction.kind === "folder" ? "value" : "name"} defaultValue={cardAction.name} required maxLength={200} disabled={cardBusy} /></label>}
+          {cardAction.operation === "move" && <label>Destination folder<select autoFocus name={cardAction.kind === "folder" ? "value" : "folder"} defaultValue={cardAction.folder} disabled={cardBusy}>
+            <option value="">Media home</option>
+            {[...new Set(folders.flatMap(folder => folder.name.split("/").map((_, index, parts) => parts.slice(0, index + 1).join("/"))))]
+              .filter(folder => cardAction.kind !== "folder" || (folder !== cardAction.id && !folder.startsWith(`${cardAction.id}/`)))
+              .sort((a, b) => a.localeCompare(b)).map(folder => <option key={folder} value={folder}>{folder}</option>)}
+          </select></label>}
+          {cardAction.operation === "delete" && <>
+            <input type="hidden" name="confirmArchive" value="on" /><input type="hidden" name="value" value="" />
+            <p>Delete “{cardAction.name}”? {cardAction.kind === "file" ? "You can restore it from Archived. Files still in use cannot be deleted." : "The folder must be empty. Move or delete its files and subfolders first."}</p>
+          </>}
+          {cardError && <p role="alert">{cardError}</p>}
+          <div className="module-modal-actions">
+            <Button type="button" variant="secondary" disabled={cardBusy} onClick={() => setCardAction(null)}>Cancel</Button>
+            <Button type="submit" variant={cardAction.operation === "delete" ? "danger" : "primary"} disabled={cardBusy}>{cardBusy ? "Saving…" : cardAction.operation === "rename" ? "Save name" : cardAction.operation === "move" ? "Move" : "Delete"}</Button>
+          </div>
+        </form>}
+      </Modal>
 
       <Modal open={folderOpen} onClose={() => { if (!folderBusy) setFolderOpen(false); }} title="New folder" className={styles.folderModal}>
       <form className={styles.newFolder} onSubmit={async event => {
@@ -698,7 +769,8 @@ export function MediaLibraryWorkspace({
             <div className={view === "grid" ? styles.assetGrid : styles.assetList}>
             {childFolders.length > 0 && <nav aria-label="Media folders" className={styles.folderBrowser} aria-busy={moveBusy}>
               {childFolders.map(folder => (
-                <button key={folder.name} className={`${styles.assetCard} ${styles.folderTarget} ${view === "list" ? styles.assetRow : ""}`}
+                <div key={folder.name} className={styles.assetTile}>
+                <button className={`${styles.assetCard} ${styles.folderTarget} ${view === "list" ? styles.assetRow : ""}`}
                   type="button" data-folder-path={folder.name}
                   aria-pressed={filters.folder === folder.name} data-drop-active={dropFolder === folder.name}
                   disabled={moveBusy} title={`Open ${folder.name}, or drop a file here`}
@@ -707,6 +779,8 @@ export function MediaLibraryWorkspace({
                   <span className={`${styles.thumb} ${styles.folderThumb}`}><FolderOpen aria-hidden="true" size={64} strokeWidth={1.5} /></span>
                   <span className={styles.assetCopy}><strong title={folder.label}>{folder.label}</strong><small>{folder.count} {folder.count === 1 ? "file" : "files"}</small></span>
                 </button>
+                <CardMenu name={folder.label} disabled={moveBusy || cardBusy} onAction={operation => openCardAction({ kind: "folder", id: folder.name, name: folder.label, folder: filters.folder, operation })} />
+                </div>
               ))}
             </nav>}
                 {visibleAssets.map((asset, index) => (
@@ -715,7 +789,7 @@ export function MediaLibraryWorkspace({
                       if (suppressClick.current && event.detail > 0) { suppressClick.current = false; return; }
                       if (!asset.builtIn && filters.scope !== "archived" && (event.ctrlKey || event.metaKey || event.shiftKey)) toggleSelection(asset.id);
                       else setSelectedId(asset.id);
-                    }} onToggle={() => toggleSelection(asset.id)} selected={selectedIds.includes(asset.id)} view={view} />
+                    }} onToggle={() => toggleSelection(asset.id)} onAction={operation => openCardAction({ kind: "file", id: asset.id, name: asset.filename, folder: asset.folder, operation })} selected={selectedIds.includes(asset.id)} view={view} />
                 ))}
               </div>
             {!assets.length && !childFolders.length && (

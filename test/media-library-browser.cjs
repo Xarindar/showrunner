@@ -25,7 +25,7 @@ fs.mkdirSync('.tmp', {recursive:true});
         path==='next/link'?`import React from 'react';export default function Link(props){return <a {...props}/>}`:
         path.includes('notifications')?`export const useNotify=()=>message=>{window.lastNotice=message};export const Notification=()=>null;`:
         path.includes('upload-assets')?`export const UploadAssetsModal=()=>null;`:
-        `export async function createMediaFolder(data){const name=[data.get('parent'),data.get('name')].filter(Boolean).join('/');window.folders.push({name,count:0});return {name}};export async function moveMediaAssetToFolder(data){window.moves=(window.moves||0)+1;if(window.failMove)return {error:'The file could not be moved. Please try again.'};window.assets.filter(a=>data.getAll('id').includes(a.id)).forEach(a=>a.folder=data.get('folder'));window.folders.forEach(f=>f.count=window.assets.filter(a=>a.folder===f.name).length);return {success:true}};export const archiveMediaAssetAction=()=>{};export const restoreMediaAssetAction=()=>{};export const setHeroImageAction=()=>{};export const updateMediaAssetAction=()=>{};`
+        `export async function createMediaFolder(data){const name=[data.get('parent'),data.get('name')].filter(Boolean).join('/');window.folders.push({name,count:0});return {name}};export async function moveMediaAssetToFolder(data){window.moves=(window.moves||0)+1;if(window.failMove)return {error:'The file could not be moved. Please try again.'};window.assets.filter(a=>data.getAll('id').includes(a.id)).forEach(a=>a.folder=data.get('folder'));window.folders.forEach(f=>f.count=window.assets.filter(a=>a.folder===f.name).length);return {success:true}};export async function renameMediaAsset(data){window.assets.find(a=>a.id===data.get('id')).filename=data.get('name');return {success:true}};export async function changeMediaFolder(data){const folder=data.get('folder');const operation=data.get('operation');const value=data.get('value');if(operation==='delete'){if(window.assets.some(a=>a.folder===folder)||window.folders.some(f=>f.name.startsWith(folder+'/')))return {error:'This folder is not empty.'};window.folders=window.folders.filter(f=>f.name!==folder)}else{const parent=folder.split('/').slice(0,-1).join('/');const destination=operation==='rename'?[parent,value].filter(Boolean).join('/'):[value,folder.split('/').at(-1)].filter(Boolean).join('/');window.folders.forEach(f=>{if(f.name===folder||f.name.startsWith(folder+'/'))f.name=destination+f.name.slice(folder.length)});window.assets.forEach(a=>{if(a.folder===folder||a.folder.startsWith(folder+'/'))a.folder=destination+a.folder.slice(folder.length)})}return {success:true}};export async function deleteMediaAsset(data){window.assets=window.assets.filter(a=>a.id!==data.get('id'));return {success:true}};export const archiveMediaAssetAction=()=>{};export const restoreMediaAssetAction=()=>{};export const setHeroImageAction=()=>{};export const updateMediaAssetAction=()=>{};`
       }));
     }}] });
   const server=createServer((req,res)=>{if(req.url.endsWith('.js')||req.url.endsWith('.css')){res.setHeader('Content-Type',req.url.endsWith('.js')?'text/javascript':'text/css');res.end(fs.readFileSync(output.replace(/\.js$/,req.url.endsWith('.js')?'.js':'.css')))}else res.end('<html><head><link rel="stylesheet" href="/fixture.css"></head><body class="showrunner-admin" style="padding:24px"><main id="root"></main><script src="/fixture.js"></script></body></html>')});
@@ -110,6 +110,56 @@ fs.mkdirSync('.tmp', {recursive:true});
     await page.getByRole('button',{name:'New folder',exact:true}).click();
     assert((await page.getByRole('dialog',{name:'New folder',exact:true}).boundingBox()).width<=358);
     await page.screenshot({path:'.tmp/media-folder-modal-mobile.png',fullPage:true});
+    await page.keyboard.press('Escape');
+    await page.getByRole('button',{name:'Media home',exact:true}).click();
+    await page.setViewportSize({width:1280,height:900});
+    async function menu(name,action){
+      await page.getByLabel('More actions for '+name,{exact:true}).click();
+      assert.equal(await page.getByRole('dialog').count(),0);
+      await page.getByRole('group',{name:'Actions for '+name,exact:true}).getByRole('button',{name:action,exact:true}).click();
+    }
+    await menu('Third.jpg','Rename');
+    await page.getByRole('dialog',{name:'Rename file'}).getByLabel('Name',{exact:true}).fill('Third Photo.jpg');
+    await page.getByRole('dialog',{name:'Rename file'}).getByLabel('Name',{exact:true}).press('Enter');
+    await page.getByRole('button',{name:'View details for Third Photo.jpg'}).waitFor();
+    await menu('Third Photo.jpg','Move');
+    await page.getByLabel('Destination folder').selectOption('empty folder');
+    await page.getByRole('dialog',{name:'Move file'}).getByRole('button',{name:'Move',exact:true}).click();
+    await page.getByRole('alert').waitFor();
+    await page.evaluate(()=>window.failMove=false);
+    await page.getByRole('dialog',{name:'Move file'}).getByRole('button',{name:'Move',exact:true}).click();
+    await page.getByRole('button',{name:'empty folder 1 file',exact:true}).waitFor();
+    await menu('empty folder','Rename');
+    await page.getByRole('dialog',{name:'Rename folder'}).getByLabel('Name',{exact:true}).fill('Other Photos');
+    await page.getByRole('button',{name:'Save name',exact:true}).click();
+    await page.getByRole('button',{name:'Other Photos 1 file',exact:true}).waitFor();
+    await menu('Other Photos','Delete');
+    await page.getByRole('dialog',{name:'Delete folder'}).getByRole('button',{name:'Delete',exact:true}).click();
+    await page.getByRole('alert').filter({hasText:'not empty'}).waitFor();
+    await page.getByRole('button',{name:'Cancel',exact:true}).click();
+    await menu('Other Photos','Move');
+    assert.equal(await page.getByLabel('Destination folder').locator('option[value="Other Photos"]').count(),0);
+    await page.getByLabel('Destination folder').selectOption('Family Photos');
+    await page.getByRole('dialog',{name:'Move folder'}).getByRole('button',{name:'Move',exact:true}).click();
+    await page.waitForFunction(()=>window.assets.find(a=>a.id==='third').folder==='Family Photos/Other Photos');
+    await page.getByRole('button',{name:'Family Photos 3 files',exact:true}).click();
+    await page.getByRole('button',{name:'Other Photos 1 file',exact:true}).click();
+    await menu('Third Photo.jpg','Delete');
+    await page.getByRole('button',{name:'Cancel',exact:true}).click();
+    await page.getByRole('button',{name:'View details for Third Photo.jpg'}).waitFor();
+    await menu('Third Photo.jpg','Delete');
+    await page.getByRole('dialog',{name:'Delete file'}).getByRole('button',{name:'Delete',exact:true}).click();
+    await page.waitForFunction(()=>!window.assets.some(a=>a.id==='third'));
+    await page.getByRole('button',{name:'Back to parent folder',exact:true}).click();
+    await menu('Summer Memories','Delete');
+    await page.getByRole('dialog',{name:'Delete folder'}).getByRole('button',{name:'Delete',exact:true}).click();
+    await page.waitForFunction(()=>!window.folders.some(f=>f.name.endsWith('/Summer Memories')));
+    await page.setViewportSize({width:390,height:844});
+    await page.getByLabel('More actions for Garden.jpg',{exact:true}).focus();await page.keyboard.press('Enter');
+    const menuBounds=await page.getByRole('group',{name:'Actions for Garden.jpg'}).boundingBox();assert(menuBounds.x>=0 && menuBounds.x+menuBounds.width<=390);
+    await page.screenshot({path:'.tmp/media-card-menu-mobile.png',fullPage:true});
+    await page.keyboard.press('Escape');
+    assert.equal(await page.getByRole('group',{name:'Actions for Garden.jpg'}).count(),0);
     assert.deepEqual(errors,[]); console.log('PASS: compact modal, Enter confirms, names preserved, same-size folder/file grid, marquee multi-selection, styled pickup, immediate removal/reflow, batch drop, nested folders, failed move rollback, Escape cancellation, mobile keyboard navigation and overflow.');
   } finally {await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
