@@ -6,6 +6,8 @@ This is the maintained implementation guide for the Shopify-inspired Showrunner 
 
 Shared `Modal` dialogs keep the rounded outer shell and header stationary. The inset `.ui-dialog-body` owns vertical scrolling, with `min-height: 0` so long content fits inside the viewport. Keep task-specific content inside that body; do not put scrolling back on the outer `.ui-modal` shell or add another competing scroller.
 
+Workspaces with a shared module or product studio header have no top padding on `.admin-main`. The opaque sticky header starts at the workspace edge so scrolling content cannot show through a gap above it. Side and bottom page insets remain unchanged.
+
 1. Reuse a component from `components/ui/` before writing a control or panel.
 2. Use the semantic tokens in `app/admin/design-tokens.css` for appearance.
 3. Put task-specific layout beside its module, preferably in a CSS Module.

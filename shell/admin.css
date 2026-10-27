@@ -562,6 +562,10 @@
   height: calc(100dvh - 8px);
   padding: var(--admin-page-inset);
 }
+.showrunner-admin .admin-main:has(> .stack > .page-header),
+.showrunner-admin .admin-main:has(> .product-studio-page > .product-studio-header) {
+  padding-top: 0;
+}
 .showrunner-admin .admin-main > .stack > .page-header,
 .showrunner-admin .admin-main > .product-studio-page > .product-studio-header {
   margin-inline: calc(-1 * var(--admin-page-inset));

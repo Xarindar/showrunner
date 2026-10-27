@@ -106,6 +106,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
   }
   if (filters.scope === "built-in") clauses.push({ id: "__built_in_asset__" });
   if (filters.folder) clauses.push({ folder: filters.folder });
+  else if (filters.scope === "all" && !filters.q && !filters.tag && filters.kind === "all") clauses.push({ folder: "" });
   if (filters.tag) clauses.push({ tags: { array_contains: [filters.tag] } });
   if (filters.kind === "image") clauses.push({ mimeType: { startsWith: "image/", mode: "insensitive" } });
   if (filters.kind === "video") clauses.push({ mimeType: { startsWith: "video/", mode: "insensitive" } });

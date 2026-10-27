@@ -367,6 +367,7 @@ export function MediaLibraryWorkspace({
   const suppressClick = useRef(false);
   const previousRects = useRef(new Map<string, DOMRect>());
   const childFolders = childMediaFolders(folders, filters.folder);
+  const browsingHome = filters.scope === "all" && !filters.folder && !filters.q && !filters.tag && filters.kind === "all";
   const visibleAssets = assets.filter(asset => !movedIds.includes(asset.id));
   const layoutKey = visibleAssets.map(asset => asset.id).join(",");
   useLayoutEffect(() => {
@@ -579,7 +580,7 @@ export function MediaLibraryWorkspace({
         <section className={styles.libraryMain} aria-label="Media library">
           <div className={styles.libraryHeader}>
             <div>
-              <p>{resultCount} {resultCount === 1 ? "file" : "files"}{filters.q ? ` matching “${filters.q}”` : ""}</p>
+              <p>{browsingHome ? activeCount : resultCount} {(browsingHome ? activeCount : resultCount) === 1 ? "file" : "files"}{filters.q ? ` matching “${filters.q}”` : ""}</p>
             </div>
           </div>
 
