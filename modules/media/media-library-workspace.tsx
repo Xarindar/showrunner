@@ -240,7 +240,9 @@ function MetadataForm({ asset, folders, tags, onDelete }: { asset: MediaLibraryA
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const notify = useNotify();
-  return <form action={async data => {
+  return <form onSubmit={async event => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
     setSaving(true); setError("");
     try {
       const result = await updateMediaAssetAction(data);
