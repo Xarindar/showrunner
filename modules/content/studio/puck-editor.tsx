@@ -10,7 +10,7 @@ import { useNotify } from "@/components/ui/notifications";
 import { contentFieldId, focusContentFieldWhenReady } from "./field-selection";
 import { type Choice } from "./editor";
 import { HeaderFrameRatios } from "./image-framing-control";
-import { ContentFields } from "./content-fields";
+import { ContentFields, MobileContentEditing } from "./content-fields";
 import { contentLinkOptions, contentFrameKeys, editorPageDestination, type LinkChoices } from "./field-layout";
 import { saveStudioBlock } from "./actions";
 import type { ContentBlockConfig, ContentManifest } from "./manifest";
@@ -20,9 +20,12 @@ import fieldStyles from "./studio.module.css";
 
 import { resolveShowcase, type ShowcaseRow } from "./showcase";
 
+import { resolveMobilePayload } from "./mobile-overrides";
+
 type Entry = { block: ContentBlockConfig; payload: Record<string, unknown>; revision: number; pageIds: string[]; choices: Choice[] };
 type Props = { manifest: ContentManifest; entries: Entry[]; canUpload: boolean; linkChoices: LinkChoices };
 export function PuckContentEditor(props: Props) {
+  const [mobile, setMobile] = useState(false);
   const [frameRatios, setFrameRatios] = useState<Record<string, number>>({});
   const config = useMemo<Config>(() => ({ components: Object.fromEntries(props.entries.map(entry => [entry.block.id, {
     label: entry.block.label,
@@ -30,10 +33,10 @@ export function PuckContentEditor(props: Props) {
     render: () => <></>
   }])) }), [props.entries, props.canUpload, props.manifest, props.linkChoices]);
   const data = useMemo<Data>(() => ({ root: { props: {} }, content: props.entries.map(entry => ({ type: entry.block.id, props: { id: entry.block.id, payload: entry.payload } })) }), [props.entries]);
-  return <HeaderFrameRatios.Provider value={frameRatios}><Puck config={config} data={data} permissions={{ insert: false, delete: false, duplicate: false, drag: false, edit: true }}><Workspace {...props} onFrameRatios={setFrameRatios} /></Puck></HeaderFrameRatios.Provider>;
+  return <MobileContentEditing.Provider value={mobile}><HeaderFrameRatios.Provider value={frameRatios}><Puck config={config} data={data} permissions={{ insert: false, delete: false, duplicate: false, drag: false, edit: true }}><Workspace {...props} mobile={mobile} setMobile={setMobile} onFrameRatios={setFrameRatios} /></Puck></HeaderFrameRatios.Provider></MobileContentEditing.Provider>;
 }
 
-function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { onFrameRatios: (ratios: Record<string, number>) => void }) {
+function Workspace({ manifest, entries, linkChoices, onFrameRatios, mobile, setMobile }: Props & { mobile: boolean; setMobile: (mobile: boolean) => void; onFrameRatios: (ratios: Record<string, number>) => void }) {
   const { appState, dispatch, selectedItem, history } = usePuck();
   const [editing, setEditing] = useState(false);
   const [previewVersion, setPreviewVersion] = useState("");
@@ -42,7 +45,13 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { 
   const [fieldRequest, setFieldRequest] = useState<{ id: string; path: unknown } | null>(null);
   const [pageId, setPageId] = useState(manifest.pages[0].id);
   const [pageLocation, setPageLocation] = useState("");
-  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const screen = window.matchMedia("(max-width: 700px)");
+    const update = () => setMobile(screen.matches);
+    update(); screen.addEventListener("change", update);
+    return () => screen.removeEventListener("change", update);
+  }, [setMobile]);
+  const [revealRequest, setRevealRequest] = useState(0);
   const [focusedItem, setFocusedItem] = useState("");
   useEffect(() => {
     const focus = (event: Event) => setFocusedItem((event as CustomEvent<{ id: string }>).detail.id);
@@ -57,6 +66,7 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { 
   const [saved, setSaved] = useState(Object.fromEntries(entries.map(entry => [entry.block.id, { payload: entry.payload, revision: entry.revision }])));
   const frame = useRef<HTMLIFrameElement>(null);
   const sectionSelector = useRef<HTMLButtonElement>(null);
+  const sections = useRef<HTMLElement>(null);
   const editorEntry = useRef<HTMLButtonElement>(null);
   const editorExit = useRef<HTMLButtonElement>(null);
   const mobileHeading = useRef<HTMLHeadingElement>(null);
@@ -85,9 +95,13 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { 
   const selected = entries.find(entry => entry.block.id === selectedItem?.props.id);
   const selectedId = selected?.block.id;
   useEffect(() => {
+    if (editing && selectedId) sections.current?.querySelector<HTMLElement>('[aria-current="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [editing, selectedId, fieldRequest]);
+  useEffect(() => {
     if (!editing || !selectedId) return;
     const entry = entries.find(entry => entry.block.id === selectedId)!;
-    const payload = content.find(item => item.props.id === selectedId)?.props.payload;
+    const storedPayload = content.find(item => item.props.id === selectedId)?.props.payload;
+    const payload = mobile && storedPayload ? resolveMobilePayload(storedPayload) : storedPayload;
     const id = fieldRequest?.id === selectedId && payload ? contentFieldId(selectedId, payload, fieldRequest.path, entry.block.editableFields) : null;
     if (!id || !inspector.current) {
       const close = inspector.current?.querySelector<HTMLButtonElement>("button");
@@ -98,7 +112,7 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { 
     return focusContentFieldWhenReady(inspector.current, id);
     // Focus only on an explicit selection, never on each keystroke or draft update.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, fieldRequest, editing]);
+  }, [selectedId, fieldRequest, editing, mobile]);
   useEffect(() => {
     if (editing && !selectedId) editorExit.current?.focus();
     else editorEntry.current?.focus();
@@ -152,7 +166,7 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { 
     function receive(event: MessageEvent) {
       if (event.source !== frame.current?.contentWindow || event.origin !== previewOrigin || event.data?.channel !== "showrunner-editor-v1") return;
       if (event.data.type === "frames" && event.data.ratios && typeof event.data.ratios === "object") {
-        onFrameRatios(Object.fromEntries(pageEntries.flatMap(entry => contentFrameKeys(entry.block.id, content.find(item => item.props.id === entry.block.id)?.props.payload || entry.payload)).flatMap(key => {
+        onFrameRatios(Object.fromEntries(pageEntries.flatMap(entry => contentFrameKeys(entry.block.id, mobile ? resolveMobilePayload(content.find(item => item.props.id === entry.block.id)?.props.payload || entry.payload) : content.find(item => item.props.id === entry.block.id)?.props.payload || entry.payload)).flatMap(key => {
           const ratio = event.data.ratios[key];
           return typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0 ? [[key, ratio]] : [];
         })));
@@ -170,12 +184,13 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { 
     }
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [content, dispatch, pageEntries, previewOrigin, navigate, pending, onFrameRatios]);
+  }, [content, dispatch, pageEntries, previewOrigin, navigate, pending, onFrameRatios, mobile]);
   useEffect(() => {
     if (!ready || !frame.current?.contentWindow) return;
     const mediaUrl = (value: string) => value?.startsWith("/") ? new URL(value, window.location.origin).toString() : value;
     const blocks = pageEntries.map(entry => {
       let payload = content.find(item => item.props.id === entry.block.id)?.props.payload || entry.payload;
+      if (mobile) payload = resolveMobilePayload(payload);
       payload = { ...payload, ...(payload.imageUrl ? { imageUrl: mediaUrl(payload.imageUrl) } : {}), ...(Array.isArray(payload.slides) ? { slides: payload.slides.map((slide: Record<string, string>) => ({ ...slide, imageUrl: mediaUrl(slide.imageUrl) })) } : {}), ...(Array.isArray(payload.images) ? { images: payload.images.map((image: Record<string, string>) => ({ ...image, url: mediaUrl(image.url) })) } : {}) };
       if (entry.block.type === "showcase") payload = { ...payload, items: resolveShowcase(payload.items as ShowcaseRow[], entry.choices.flatMap(choice => choice.catalog ? [choice.catalog] : []), manifest).map(item => ({ ...item, imageUrl: mediaUrl(item.imageUrl) })) };
       if (entry.block.source === "services") payload = { ...payload, items: (payload.items as Record<string, string>[]).map(row => {
@@ -185,15 +200,15 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { 
       }) };
       return { id: entry.block.id, type: entry.block.type, payload, presentation: entry.block.presentation || {} };
     });
-    frame.current.contentWindow.postMessage({ channel: "showrunner-editor-v1", type: "update", blocks, selectedId: selected?.block.id, assetOrigin: window.location.origin, focusedItem }, previewOrigin);
-  }, [content, ready, pageEntries, previewOrigin, selected?.block.id, focusedItem, manifest, linkChoices]);
+    frame.current.contentWindow.postMessage({ channel: "showrunner-editor-v1", type: "update", blocks, selectedId: selected?.block.id, assetOrigin: window.location.origin, focusedItem, revealRequest }, previewOrigin);
+  }, [content, ready, pageEntries, previewOrigin, selected?.block.id, focusedItem, manifest, linkChoices, mobile, revealRequest]);
 
   async function publish() {
     setPending(true);
     try {
       for (const item of changed) {
         const entry = entries.find(entry => entry.block.id === item.props.id)!;
-        const result = await saveStudioBlock({ id: item.props.id, revision: saved[item.props.id].revision, pageIds: entry.pageIds, payload: Object.fromEntries(entry.block.editableFields.map(key => [key, item.props.payload[key]])) });
+        const result = await saveStudioBlock({ id: item.props.id, revision: saved[item.props.id].revision, pageIds: entry.pageIds, payload: Object.fromEntries([...entry.block.editableFields, "mobileOverrides"].map(key => [key, item.props.payload[key]])) });
         if (result.error || result.revision === undefined) throw new Error(result.error || "Save failed. Your edits are still here.");
         setSaved(current => ({ ...current, [item.props.id]: { payload: item.props.payload, revision: result.revision! } }));
       }
@@ -236,8 +251,8 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios }: Props & { 
           <Button className={styles.sheetAction} variant="ghost" aria-label="Close editing panel" onClick={closePanel}><ChevronDown size={18} /></Button>
         </div>
         <div className={styles.sectionHeader}><h2>{page.label}</h2><Button variant="ghost" className={styles.mobilePanelButton} aria-label="Show website preview" onClick={() => setPanelOpen(false)}><X size={18} /></Button></div>
-        <nav className={styles.sections} aria-label="Page sections">
-          {pageEntries.map((entry, index) => <button ref={index === 0 ? sectionSelector : undefined} key={entry.block.id} aria-current={selectedId === entry.block.id ? "true" : undefined} disabled={pending} onClick={() => { setFieldRequest(null); dispatch({ type: "setUi", ui: { itemSelector: { index: content.findIndex(item => item.props.id === entry.block.id) } } }); }}><PanelsTopLeft size={16} aria-hidden="true" /><span>{entry.block.label}</span><ChevronRight size={14} aria-hidden="true" /></button>)}
+        <nav ref={sections} className={styles.sections} aria-label="Page sections">
+          {pageEntries.map((entry, index) => <button ref={index === 0 ? sectionSelector : undefined} key={entry.block.id} aria-current={selectedId === entry.block.id ? "true" : undefined} disabled={pending} onClick={() => { setFieldRequest(null); setPanelOpen(true); setRevealRequest(request => request + 1); dispatch({ type: "setUi", ui: { itemSelector: { index: content.findIndex(item => item.props.id === entry.block.id) } } }); }}><PanelsTopLeft size={16} aria-hidden="true" /><span>{entry.block.label}</span><ChevronRight size={14} aria-hidden="true" /></button>)}
         </nav>
         {selected ? <section ref={inspector} key={selected.block.id} className={styles.inspector} aria-label="Section settings" onKeyDown={event => { if (event.key === "Escape" && !(event.target as Element).closest("dialog")) { event.stopPropagation(); closeInspector(); } }}><div className={styles.inspectorHeader}><h2>{selected.block.label}</h2><Button variant="ghost" title="Close section settings" aria-label="Close section settings" onClick={closeInspector}><X size={18} /></Button></div><fieldset disabled={pending}><Puck.Fields /></fieldset></section> : <p className={styles.hint}>Choose a section, or click text or an image in the preview to edit it.</p>}
       </aside>

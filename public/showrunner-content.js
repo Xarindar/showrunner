@@ -7,7 +7,15 @@
   let parentOrigin = "";
   let blocks = [];
   let selectedId = "";
+  let revealRequest = 0;
   const rendered = new Map();
+  const mobileScreen = window.matchMedia?.("(max-width: 720px)");
+  let publishedBlocks = [];
+  const publishedOrigin = script?.src ? new URL(script.src).origin : location.origin;
+  function applyPublished() {
+    apply(publishedBlocks.map(block => mobileScreen?.matches && block.mobilePayload ? { ...block, payload: block.mobilePayload } : block), publishedOrigin);
+  }
+  mobileScreen?.addEventListener("change", () => { if (!editing) applyPublished(); });
   const documentReady = document.readyState === "loading" ? new Promise(resolve => document.addEventListener("DOMContentLoaded", resolve, { once: true })) : Promise.resolve();
   const safeUrl = (value, base) => {
     try { const url = new URL(String(value || ""), base || location.href); return ["http:", "https:", "mailto:", "tel:"].includes(url.protocol) ? url.href : ""; } catch { return ""; }
@@ -92,7 +100,7 @@
       node.style.transformOrigin = position; node.style.transform = `scale(${zoom})`;
     }));
   }
-  window.addEventListener("showrunner:content", event => apply(event.detail.blocks || [], script?.src ? new URL(script.src).origin : location.origin));
+  window.addEventListener("showrunner:content", event => { publishedBlocks = event.detail.blocks || []; applyPublished(); });
   if (!editing) return;
   const style = document.createElement("style");
   style.textContent = '[data-sr-section]{cursor:pointer;outline-offset:-2px}[data-sr-hover]{outline:2px solid #5083f0!important;outline-offset:-2px;cursor:pointer}[data-sr-selected]{outline:2px solid #1561a0}[data-sr-section]:focus-visible{outline:3px solid #5083f0}';
@@ -161,6 +169,8 @@
     if (event.data.focusedItem) window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: event.data.focusedItem } }));
     document.querySelectorAll("[data-sr-selected]").forEach(node => node.removeAttribute("data-sr-selected"));
     const selectionChanged = selectedId !== event.data.selectedId;
+    const revealRequested = Number.isSafeInteger(event.data.revealRequest) && event.data.revealRequest !== revealRequest;
+    if (revealRequested) revealRequest = event.data.revealRequest;
     selectedId = event.data.selectedId || "";
     blocks.forEach(block => {
       if (!block.presentation?.selector) return;
@@ -170,7 +180,7 @@
         node.setAttribute("aria-label", `Edit ${block.id.replaceAll("-", " ")}`);
         if (block.id === selectedId) {
           node.dataset.srSelected = "";
-          if (selectionChanged) node.scrollIntoView({ block: "center", behavior: "smooth" });
+          if (selectionChanged || revealRequested) node.scrollIntoView({ block: "center", behavior: "instant" });
         }
       });
     });

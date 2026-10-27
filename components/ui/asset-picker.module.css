@@ -1,6 +1,6 @@
 .trigger { position: relative; }
 .triggerHint { gap: var(--sd-space-8); }
-.modal { --media-dialog-height: min(640px, calc(100svh - 32px)); }
+.modal { --media-dialog-width: min(1100px, calc(100vw - 32px)); --media-dialog-height: min(840px, calc(100svh - 32px)); }
 .body { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .libraryView { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .browser { flex: 1; min-height: 0; }
@@ -51,7 +51,7 @@
 }
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(144px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(164px, 1fr));
   align-content: start;
   gap: var(--sd-space-12);
   flex: 1;
@@ -99,8 +99,9 @@
 .optionCopy strong, .optionCopy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .optionCopy strong { font-size: var(--type-small); font-weight: var(--sd-type-weight-medium); }
 .optionCopy small { color: var(--color-muted); }
-.loadMore { grid-column: 1/-1; display: flex; justify-content: center; padding: var(--sd-space-8); }
+.loadMore { grid-column: 1/-1; display: flex; align-items: center; gap: var(--sd-space-8); justify-content: center; padding: var(--sd-space-8); }
 .empty {
+  grid-column: 1/-1;
   display: grid;
   justify-items: center;
   align-content: center;
@@ -140,3 +141,8 @@
   .resultMeta span:last-child { display: none; }
   .searchField > button { min-width: 44px; min-height: var(--sd-layout-touch-target); }
 }
+
+.breadcrumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sd-space-4); margin-top: var(--sd-space-8); }
+.breadcrumbs > span { display: flex; align-items: center; min-width: 0; }
+.breadcrumbs button { overflow-wrap: anywhere; white-space: normal; }
+.folderIcon { display: grid; place-items: center; aspect-ratio: 4/3; color: var(--color-muted); }

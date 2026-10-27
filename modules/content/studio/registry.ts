@@ -68,7 +68,11 @@ export function fieldSchema(field: Field): z.ZodType {
   return field.optional ? schema.default("") : schema;
 }
 function schemaFields(fields: Record<string, Field>) { return Object.fromEntries(Object.entries(fields).map(([key, field]) => [key, fieldSchema(field)])); }
-export function payloadSchema(type: BlockType) { return z.strictObject(schemaFields(blockRegistry[type].fields)); }
+export const mobileOverridesSchema = z.array(z.strictObject({
+  path: z.array(z.string().min(1).max(100).refine(key => !["__proto__", "prototype", "constructor", "mobileOverrides"].includes(key))).min(1).max(12),
+  value: z.unknown(),
+})).max(2000);
+export function payloadSchema(type: BlockType) { return z.strictObject({ ...schemaFields(blockRegistry[type].fields), mobileOverrides: mobileOverridesSchema.optional() }); }
 export function emptyFields(fields: Record<string, Field>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(fields).map(([key, field]) => [key, field.kind === "list" ? [] : field.kind === "checkbox" ? false : field.kind === "number" ? field.default ?? 0 : ""]));
 }

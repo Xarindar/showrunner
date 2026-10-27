@@ -27,13 +27,19 @@ await build({
     import scheduleStyles from './modules/appointments/schedule.module.css';
     import serviceStyles from './modules/scheduling/service-editor.module.css';
     import packageStyles from './modules/scheduling/components/session-packages-editor.module.css';
-    import {ImageFramingControl} from './modules/content/studio/image-framing-control';
+    import {Fields} from './modules/content/studio/editor';
+    import {ContentFields,MobileContentEditing} from './modules/content/studio/content-fields';
+    import studioStyles from './modules/content/studio/studio.module.css';
+    import {ImageFramingControl, HeaderFrameRatios} from './modules/content/studio/image-framing-control';
     import {ServiceBookingRulesTable} from './modules/scheduling/components/service-booking-rules-table';
     import './app/globals.css';
     import './app/admin/design-tokens.css';
     import './app/admin/design-system.css';
     function Fixture() {
       const [open,setOpen]=useState(false);
+      const [mobile,setMobile]=useState(false);
+      const [content,setContent]=useState({heading:"Desktop heading",copy:"Shared copy",imageUrl:"/photo.svg",imageAlt:"Photo",imagePositionX:50,imagePositionY:50,imageZoom:1});
+      const [photo,setPhoto]=useState({url:"/photo.svg",alt:"Photo",imagePositionX:75,imagePositionY:30,imageZoom:2});
       return <div className="showrunner-admin"><NotificationProvider><main className="admin-main" style={{height:'auto'}}>
         <div className="stack"><header className="page-header"><h1>Shared controls</h1><Button onClick={()=>setOpen(true)}>Open dialog</Button></header>
         <Card bodyClassName="form-grid"><Field label="Name"><Input placeholder="Name" /></Field>
@@ -42,9 +48,16 @@ await build({
           <div className="ui-cluster ui-gap-2"><Button>Save</Button><Button variant="secondary">Cancel</Button><Button variant="danger">Delete</Button><Button disabled>Disabled action</Button></div>
           <div className="ui-cluster ui-gap-2"><Badge>Neutral</Badge><Badge tone="success">Active</Badge><Badge tone="warning">Warning</Badge><Badge tone="danger">Error</Badge></div>
           <Switch label="Published" defaultChecked />
-          <ImageFramingControl source="/photo.svg" ratio={1} value={{}} onChange={value=>window.appliedCrop=value} />
+          <ImageFramingControl source="/slow-photo.svg" ratio={1} value={{}} onChange={value=>window.appliedCrop=value} />
           <ServiceBookingRulesTable idPrefix="fixture" intakeOptions={["What should we prepare?"]} policyOptions={[]} />
         </Card></div>
+        <HeaderFrameRatios.Provider value={{portrait: 9/16}}><section aria-label="Image inspector" className={studioStyles.fields} style={{width:240}}><Fields fields={{url:{kind:'text',label:'Image'},alt:{kind:'text',label:'Alt'}}} prefix="portrait" value={photo} onChange={setPhoto} /></section></HeaderFrameRatios.Provider>
+        <section aria-label="Responsive inspector" className={studioStyles.fields} style={{width:240}}>
+          <button onClick={()=>setMobile(false)}>Edit desktop</button><button onClick={()=>setMobile(true)}>Edit mobile</button>
+          <MobileContentEditing.Provider value={mobile}><HeaderFrameRatios.Provider value={{responsive:9/16}}><ContentFields block={{id:'responsive',type:'about',editableFields:['heading','copy','imageUrl'],pageIds:['home']}} value={content} onChange={setContent} canUpload choices={[]} linkOptions={{pages:[],services:[]}} /></HeaderFrameRatios.Provider></MobileContentEditing.Provider>
+        </section>
+        <section aria-label="Button settings fixture" className={studioStyles.fields} style={{width:240}}><Fields fields={{buttonLabel:{kind:'text',label:'Title'},buttonHref:{kind:'url',label:'Link'}}} prefix="button" value={{buttonLabel:'Book The Hive',buttonHref:'/booking'}} onChange={()=>{}} linkOptions={{pages:[{path:'/booking',label:'Booking'}],services:[]}} /></section>
+        <section aria-label="Plain fields fixture" style={{width:240,display:'grid',gap:16}}><label>Plain name<input /></label><label>Plain notes<textarea /></label><label><input type="checkbox" />Keep checked</label></section>
         <section aria-label="Schedule fixture" className={scheduleStyles.page}>
           <h1>Schedule</h1>
           <AvailabilityPanel availability={[]} staff={[{id:'staff-1',name:'Staff member',isActive:true}]} resources={[]} timezone="America/Chicago" />
@@ -60,6 +73,9 @@ await build({
   ` },
   bundle: true, outfile: `${output}.js`,
   plugins: [{ name: "schedule-actions-fixture", setup(build) {
+    build.onResolve({ filter: /asset-picker$/ }, args => args.importer.endsWith("editor.tsx") ? {path:"asset-picker",namespace:"image-fixture"} : undefined);
+    build.onResolve({ filter: /^\.\/actions$/ }, args => args.importer.endsWith("editor.tsx") ? {path:"actions",namespace:"image-fixture"} : undefined);
+    build.onLoad({filter: /.*/, namespace:"image-fixture"}, args => ({contents: args.path === "actions" ? "export async function uploadStudioAsset() {}" : `import React from 'react'; export function AssetPicker({children,triggerClassName,onSelectAsset,onUploadedAssets}) {return <><button className={triggerClassName} onClick={()=>onSelectAsset({url:'/replacement-photo.svg',alt:'Selected photo'})}>{children}</button><button onClick={()=>onUploadedAssets([{url:'/uploaded-photo.svg',alt:'Uploaded photo'}])}>Complete upload</button></>}`,loader:"tsx",resolveDir:process.cwd()}));
     build.onResolve({ filter: /^\.\.\/actions$/ }, args => args.importer.includes("scheduling") ? { path: "schedule-actions", namespace: "fixture" } : undefined);
     build.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({ contents: "export async function saveWeeklyHoursAction() { return { error: '', success: 'Hours saved.' }; } export async function createBlockoutAction() {} export async function deleteBlockoutAction() {}", loader: "js" }));
   } }],
@@ -103,6 +119,18 @@ try {
   await closureSummary.focus();
   await page.keyboard.press("Space");
   assert.equal(await closureSummary.evaluate(element => element.parentElement.open), true, "Native disclosure remains keyboard operable");
+  const buttonSettings = page.getByRole('region',{name:'Button settings fixture'});
+  async function checkLabelSpacing() {
+    for (const name of ['Link to','Page']) {
+      const control=buttonSettings.locator(name==='Link to'?'select[id="button-buttonHref-type"]':'select[id="button-buttonHref"]');
+      assert.deepEqual(await control.evaluate(element=>{const label=element.closest('label');const style=getComputedStyle(label);return [style.display,style.rowGap,Math.round(element.getBoundingClientRect().width),Math.round(label.getBoundingClientRect().width)]}),['grid','8px',240,240]);
+    }
+    const plain=page.getByRole('region',{name:'Plain fields fixture'});
+    assert.equal(await plain.getByLabel('Plain name',{exact:true}).evaluate(element=>getComputedStyle(element.parentElement).rowGap),'8px');
+    assert.equal(await plain.getByLabel('Keep checked').evaluate(element=>getComputedStyle(element.parentElement).display),'block');
+  }
+  await checkLabelSpacing();
+  await buttonSettings.screenshot({path: `${captures}/button-spacing-desktop.png`});
   await page.getByRole("region", { name: "Schedule fixture" }).screenshot({ path: `${captures}/schedule-desktop.png` });
   await input.focus();
   assert.match(await input.evaluate(element => getComputedStyle(element).boxShadow), /inset/);
@@ -112,16 +140,60 @@ try {
   assert.equal(await dialog.evaluate(element => getComputedStyle(element).borderRadius), "24px");
   await page.keyboard.press("Escape");
   assert.equal(await page.getByRole("button", { name: "Open dialog", exact: true }).evaluate(element => document.activeElement === element), true);
-  await page.getByRole("button", { name: "Adjust framing", exact: true }).click();
+  let releasePhoto;
+  const photoReady = new Promise(resolve => { releasePhoto = resolve; });
+  await page.route("**/slow-photo.svg", async route => { await photoReady; await route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#789"/></svg>' }); });
+  await page.getByRole("button", { name: "Adjust framing", exact: true }).first().click();
+  const cropDialog = page.getByRole("dialog", { name: "Adjust image framing" });
+  const beforePhoto = await cropDialog.boundingBox();
+  assert(beforePhoto.height > 480, "Reserve the photo canvas before the image arrives");
+  assert.equal(await cropDialog.locator('img').evaluate(image => image.complete), false, "Image is still loading during the reserved-space check");
+  releasePhoto();
   const frame = page.getByRole("button", { name: "Move crop frame" });
   await frame.waitFor();
+  assert.equal((await cropDialog.boundingBox()).height, beforePhoto.height, "Loading the image must not grow the dialog");
+  assert.equal(await cropDialog.locator('.ui-dialog-body').evaluate(element => element.scrollWidth > element.clientWidth), false, "Full-width slider must not cause horizontal scrolling");
+  await cropDialog.screenshot({ path: `${captures}/crop-desktop.png` });
   assert.match(await frame.evaluate(element => getComputedStyle(element).boxShadow), /999px/, "Crop mask must shade outside the selected region");
   await frame.focus();
   await page.keyboard.press("ArrowRight");
   await page.getByRole("button", { name: "Apply framing", exact: true }).click();
   assert((await page.evaluate(() => window.appliedCrop.imagePositionX)) > 50);
+  const inspector = page.getByRole('region', {name:'Image inspector'});
+  const thumbnail = inspector.locator('img');
+  assert.deepEqual(await thumbnail.evaluate(image => {const style=getComputedStyle(image); const box=image.parentElement.getBoundingClientRect(); return [Math.round(box.width/box.height*1000),style.objectPosition,style.transform];}), [563,'75% 30%','matrix(2, 0, 0, 2, 0, 0)']);
+  await inspector.getByRole('button', {name:'Choose or upload'}).click();
+  await cropDialog.waitFor();
+  await frame.waitFor();
+  assert.equal(await cropDialog.getByRole('slider').inputValue(), '1', 'Selecting a photo opens a centered fresh crop, even when selecting the same source');
+  await cropDialog.getByRole('slider').fill('1.5');
+  await cropDialog.getByRole('button', {name:'Apply framing'}).click();
+  assert.equal(await thumbnail.evaluate(image => getComputedStyle(image).transform), 'matrix(1.5, 0, 0, 1.5, 0, 0)', 'Inspector reflects applied framing');
+  await inspector.getByRole('button', {name:'Complete upload'}).click();
+  await cropDialog.waitFor();
+  assert.equal(await cropDialog.getByRole('slider').inputValue(), '1', 'Completed uploads open fresh framing automatically');
+  await page.keyboard.press('Escape');
+  const responsive = page.getByRole('region', {name:'Responsive inspector'});
+  await responsive.getByRole('button', {name:'Edit mobile',exact:true}).click();
+  await responsive.getByLabel('Heading',{exact:true}).fill('Mobile heading');
+  await responsive.getByRole('button', {name:'Choose or upload'}).click();
+  await cropDialog.waitFor(); await frame.waitFor();
+  await cropDialog.getByRole('button',{name:'Apply framing'}).click();
+  assert.match(await responsive.locator('img').getAttribute('src'), /replacement-photo/);
+  await responsive.getByRole('button',{name:'Edit desktop',exact:true}).click();
+  assert.equal(await responsive.getByLabel('Heading',{exact:true}).inputValue(),'Desktop heading');
+  assert.equal(await responsive.locator('img').getAttribute('src'),'/photo.svg');
+  await responsive.getByLabel('Copy',{exact:true}).fill('New shared copy');
+  await responsive.getByRole('button',{name:'Edit mobile',exact:true}).click();
+  assert.equal(await responsive.getByLabel('Heading',{exact:true}).inputValue(),'Mobile heading');
+  assert.equal(await responsive.getByLabel('Copy',{exact:true}).inputValue(),'New shared copy');
+  await responsive.getByRole('button',{name:'Use desktop content for this section'}).click();
+  assert.equal(await responsive.getByLabel('Heading',{exact:true}).inputValue(),'Desktop heading');
+  assert.equal(await responsive.locator('img').getAttribute('src'),'/photo.svg');
   await page.setViewportSize({ width: 390, height: 844 });
   assert.deepEqual((await geometry()).slice(0, 3), ["12px", "44px", "16px"]);
+  await checkLabelSpacing();
+  await buttonSettings.screenshot({path: `${captures}/button-spacing-mobile.png`});
   assert.equal(await page.getByRole("button", { name: "Save", exact: true }).evaluate(element => getComputedStyle(element).minHeight), "44px");
   assert.deepEqual(await packageInput.evaluate(element => { const style = getComputedStyle(element); return [style.minHeight, style.fontSize]; }), ["44px", "16px"], "Service editors reuse shared mobile controls");
   assert.deepEqual(await summaryGeometry(closureSummary), await summaryGeometry(scopeSummary));
@@ -133,6 +205,24 @@ try {
   assert.equal(await page.locator('input[name="intakePrompt"]').inputValue(), "What should we prepare?");
   assert.equal(await page.locator(".booking-rule-type-cell").evaluate(element => getComputedStyle(element).display), "grid");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.getByRole("button", { name: "Adjust framing", exact: true }).first().click();
+  await frame.waitFor();
+  assert.equal(await cropDialog.locator('.ui-dialog-body').evaluate(element => element.scrollWidth > element.clientWidth), false, "Mobile crop dialog must not scroll horizontally");
+  await cropDialog.screenshot({ path: `${captures}/crop-mobile.png` });
+  await page.keyboard.press("Escape");
+  const live = await browser.newPage({viewport:{width:1200,height:800}});
+  await live.setContent('<h1 id="heading"></h1><div><img id="photo"></div>');
+  await live.addScriptTag({content:readFileSync('public/showrunner-content.js','utf8')});
+  await live.evaluate(() => window.dispatchEvent(new CustomEvent('showrunner:content',{detail:{blocks:[{id:'responsive',type:'strip',presentation:{bindings:[{path:'heading',selector:'#heading'},{path:'imageUrl',selector:'#photo',attribute:'src'}]},payload:{heading:'Desktop live',imageUrl:'https://example.com/desktop.jpg',imagePositionX:50,imagePositionY:50,imageZoom:1},mobilePayload:{heading:'Mobile live',imageUrl:'https://example.com/mobile.jpg',imagePositionX:25,imagePositionY:70,imageZoom:2}}]}})));
+  assert.equal(await live.locator('h1').textContent(),'Desktop live');
+  await live.setViewportSize({width:390,height:844});
+  await live.waitForFunction(()=>document.querySelector('h1').textContent==='Mobile live');
+  assert.match(await live.locator('img').getAttribute('src'),/mobile.jpg/);
+  assert.equal(await live.locator('img').evaluate(image=>image.style.transform),'scale(2)');
+  await live.setViewportSize({width:1200,height:800});
+  await live.waitForFunction(()=>document.querySelector('h1').textContent==='Desktop live');
+  assert.match(await live.locator('img').getAttribute('src'),/desktop.jpg/);
+  await live.close();
   assert.deepEqual(errors, []);
   console.log("Passed: tenant isolation, shared field sizes, disclosure spacing/keyboard access, stack gaps, dialog dismissal/focus return, crop mask/keyboard framing, mobile targets and overflow.");
 } finally { await browser.close(); }

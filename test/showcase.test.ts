@@ -1,3 +1,4 @@
+import { desktopPayload, mobileOverrides, updateMobileOverrides, resolveMobilePayload } from "../modules/content/studio/mobile-overrides";
 import { formatTime } from "../lib/format";
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -5,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
-import { createElement, type ComponentType } from "react";
+import { createContext, createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { blockRegistry, emptyFields } from "../modules/content/studio/registry";
 import { centeredFraming, framingImageSource, readImageFraming } from "../modules/content/studio/image-framing";
@@ -66,7 +67,7 @@ function loadMocked(file: string, mocks: Record<string, unknown>) {
   const output = ts.transpileModule(readFileSync(file, "utf8"), { fileName: file, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const exports: Record<string, (...args: unknown[]) => unknown> = {};
   const require = createRequire(import.meta.url);
-  runInNewContext(output, { exports, console, require: (name: string) => name in mocks ? mocks[name] : require(name) });
+  runInNewContext(output, { exports, console, URL, require: (name: string) => name === "./mobile-overrides" ? { desktopPayload, mobileOverrides, updateMobileOverrides, resolveMobilePayload } : name in mocks ? mocks[name] : require(name) });
   return exports;
 }
 
@@ -163,7 +164,7 @@ test("actual inspector renderer offers catalog selection, display-only and appro
     "./field-layout": { imageFirst }, "@/components/ui/asset-picker": { AssetPicker: () => null },
     "./service-picker": { ServicePicker: ({ value, options }: { value: string; options: { id: string; label: string }[] }) => createElement("button", {}, options.find(option => option.id === value)?.label || "Unavailable service · Choose replacement") },
     "./image-framing": { centeredFraming, framingImageSource, readImageFraming }, "./registry": registry,
-    "./actions": {}, "./studio.module.css": styles, "./rich-text": {}, "./visual-block": {}, "./image-framing-control": { ImageFramingControl: () => null },
+    "./actions": {}, "./studio.module.css": styles, "./rich-text": {}, "./visual-block": {}, "./image-framing-control": { HeaderFrameRatios: createContext({}), ImageFramingControl: () => null },
   });
   const fields = loadMocked("modules/content/studio/content-fields.tsx", { "./editor": { Fields: editor.Fields }, "./registry": registry, "./studio.module.css": styles });
   const block = configuredBlock("menu", "showcase", ["home"], { cardVariants: [{ label: "Compact", value: "compact" }] });
@@ -206,6 +207,12 @@ test("public studio refreshes catalog bindings on each request without page repu
   });
   const first = await loaded.getPublicStudio("site-a", "home") as { blocks: { payload: { items: { name: string; priceCents: number; catalogKey?: string }[] } }[] };
   assert.equal(first.blocks[0].payload.items[0].name, "Head spa");
+  block.defaults!.mobileOverrides = [{ path: ["heading"], value: "Mobile menu" }, { path: ["items", rows[0].id, "imageUrl"], value: "/api/media/assets/mobile" }];
+  const responsive = await loaded.getPublicStudio("site-a", "home") as { blocks: { payload: { heading: string; items: { imageUrl: string }[] }; mobilePayload: { heading: string; items: { imageUrl: string }[] } }[] };
+  assert.equal(responsive.blocks[0].payload.heading, "Menu");
+  assert.equal(responsive.blocks[0].mobilePayload.heading, "Mobile menu");
+  assert.equal(responsive.blocks[0].payload.items[0].imageUrl, service.imageUrl);
+  assert.equal(responsive.blocks[0].mobilePayload.items[0].imageUrl, "https://admin.example/api/media/assets/mobile");
   catalog = [{ ...product, name: "New kit", priceCents: 3200 }];
   const second = await loaded.getPublicStudio("site-a", "home") as typeof first;
   assert.equal(second.blocks[0].payload.items.length, 1);

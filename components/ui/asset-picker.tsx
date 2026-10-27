@@ -1,8 +1,9 @@
 "use client";
 
 import NextImage from "next/image";
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, ImageIcon, Images, Search, Upload, X } from "lucide-react";
+import { useEffect, useEffectEvent, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { Check, Folder, ChevronRight, ImageIcon, Images, Search, Upload, X } from "lucide-react";
+import { childMediaFolders } from "@/lib/media-folders";
 import { summarizeMediaTags, type MediaTagSummary } from "@/lib/media-tags";
 import { Button } from "./button";
 import { Modal } from "./modal";
@@ -151,6 +152,9 @@ export function AssetPicker({
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [libraryError, setLibraryError] = useState(false);
   const requestIdRef = useRef(0);
+  const loadingRef = useRef(false);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputId = useId();
 
@@ -166,6 +170,7 @@ export function AssetPicker({
     });
   }, [libraryAssets, libraryFilter, loadFromServer, query, selectedTag, folder]);
 
+  const childFolders = childMediaFolders(folders.map(name => ({ name, count: 0 })), folder).filter(item => !query.trim() || normalizedSearchValue(item.name).includes(normalizedSearchValue(query)));
   const selectedAsset = libraryAssets.find((asset) => asset.id === selectedId) || null;
   const visibleTotal = loadFromServer ? libraryTotal : visibleAssets.length;
   const open = controlledOpen ?? internalOpen;
@@ -200,7 +205,9 @@ export function AssetPicker({
     tag: string | null = selectedTag,
     selectedFolder = folder
   ) {
-    if (!loadFromServer) return;
+    if (!loadFromServer || (append && loadingRef.current)) return;
+    loadingRef.current = true;
+    if (!append) { gridRef.current?.scrollTo({ top: 0 }); setLibraryPage(1); setLibraryPageCount(1); }
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
     setLoadingLibrary(true);
@@ -231,11 +238,30 @@ export function AssetPicker({
     } catch {
       if (requestId === requestIdRef.current) setLibraryError(true);
     } finally {
-      if (requestId === requestIdRef.current) setLoadingLibrary(false);
+      if (requestId === requestIdRef.current) { loadingRef.current = false; setLoadingLibrary(false); }
     }
   }
 
+  const loadNextPage = useEffectEvent(() => {
+    if (!loadingLibrary && !libraryError && libraryPage < libraryPageCount) void loadLibrary(query, libraryPage + 1, true);
+  });
+  useEffect(() => {
+    if (!open || mode !== "library" || !loadFromServer || loadingLibrary || libraryError || libraryPage >= libraryPageCount || !moreRef.current) return;
+    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) loadNextPage(); }, { root: gridRef.current, rootMargin: "200px" });
+    observer.observe(moreRef.current);
+    return () => observer.disconnect();
+  }, [open, mode, loadFromServer, loadingLibrary, libraryError, libraryPage, libraryPageCount]);
+
+  function chooseFolder(next: string) {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    setFolder(next); setSelectedId(null);
+    void loadLibrary(query, 1, false, libraryFilter, selectedTag, next);
+  }
+
   function updateQuery(value: string) {
+    requestIdRef.current += 1;
+    loadingRef.current = true;
+    setLoadingLibrary(loadFromServer);
     setQuery(value);
     setSelectedId(null);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -364,14 +390,12 @@ export function AssetPicker({
                 </div>
                 <div className={styles.filters}>
                   <label><span className="ui-sr-only">Library view</span><select aria-label="Library view" value={libraryFilter} onChange={event => changeLibraryFilter(event.currentTarget.value as LibraryFilter)}><option value="all">All images</option><option value="recent">Recently added</option></select></label>
-                  <label><span className="ui-sr-only">Folder</span><select aria-label="Folder" value={folder} onChange={event => {
-                    const next = event.currentTarget.value;
-                    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-                    setFolder(next); setSelectedId(null);
-                    void loadLibrary(query, 1, false, libraryFilter, selectedTag, next);
-                  }}><option value="">All folders</option>{folders.map(name => <option key={name} value={name}>{name}</option>)}</select></label>
                   <label><span className="ui-sr-only">Tag</span><select aria-label="Tag" value={selectedTag || ""} onChange={event => chooseTag(event.currentTarget.value)}><option value="">All tags</option>{tagSummaries.map(tag => <option key={tag.name} value={tag.name}>{tag.name} ({tag.count})</option>)}</select></label>
                 </div>
+                <nav aria-label="Folder path" className={styles.breadcrumbs}>
+                  <Button type="button" variant="ghost" onClick={() => chooseFolder("")} aria-current={!folder ? "page" : undefined}>All images</Button>
+                  {folder.split("/").filter(Boolean).map((part, index, parts) => <span key={index}><ChevronRight size={14} aria-hidden="true" /><Button type="button" variant="ghost" aria-current={index === parts.length - 1 ? "page" : undefined} onClick={() => chooseFolder(parts.slice(0, index + 1).join("/"))}>{part}</Button></span>)}
+                </nav>
                 <div className={styles.resultMeta} role="status">
                   <span>
                     {loadingLibrary
@@ -389,8 +413,10 @@ export function AssetPicker({
                   </span>
                 </div>
 
+                <div ref={gridRef} aria-label="Available assets" className={styles.grid}>
+                  {childFolders.map(item => <button type="button" key={item.name} className={styles.option} aria-label={`Open folder ${item.label}`} onClick={() => chooseFolder(item.name)}><span className={styles.folderIcon}><Folder size={56} aria-hidden="true" /></span><span className={styles.optionCopy}><strong title={item.label}>{item.label}</strong><small>Folder</small></span></button>)}
                 {loadingLibrary && !visibleAssets.length ? (<div className={styles.empty} role="status">Loading images…</div>) : visibleAssets.length ? (
-                  <div aria-label="Available assets" className={styles.grid}>
+                  <>
                     {visibleAssets.map((asset) => {
                       const selected = asset.id === selectedId;
                       return (
@@ -414,19 +440,7 @@ export function AssetPicker({
                         </button>
                       );
                     })}
-                    {libraryPage < libraryPageCount ? (
-                      <div className={styles.loadMore}>
-                        <Button
-                          disabled={loadingLibrary}
-                          onClick={() => void loadLibrary(query, libraryPage + 1, true, libraryFilter, selectedTag)}
-                          size="sm"
-                          type="button"
-                          variant="secondary">
-                          {loadingLibrary ? "Loading…" : "Load more assets"}
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
+                  </>
                 ) : (
                   <div className={styles.empty}>
                     <span className={styles.emptyIcon}><ImageIcon aria-hidden="true" size={24} /></span>
@@ -464,6 +478,8 @@ export function AssetPicker({
                     ) : null}
                   </div>
                 )}
+                  {libraryError ? <div className={styles.loadMore} role="alert"><span>Images could not load.</span><Button type="button" variant="secondary" onClick={() => void loadLibrary(query, libraryPage < libraryPageCount ? libraryPage + 1 : 1, libraryPage < libraryPageCount)}>Try again</Button></div> : libraryPage < libraryPageCount ? <div ref={moreRef} className={styles.loadMore} role="status">{loadingLibrary ? "Loading more images…" : "Scroll for more images"}</div> : null}
+                </div>
               </section>
 
 

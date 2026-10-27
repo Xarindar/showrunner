@@ -47,6 +47,10 @@ test("showcase renderer uses safe semantic cards and selection scrolls once", as
   assert.ok(!article.children.some(node => node.tag === "a"));
   await listeners.message(update);
   assert.equal(host.scrolls, 1, "typing drafts must not reset canvas scroll");
+  await listeners.message({ ...update, data: { ...update.data, revealRequest: 1 } });
+  assert.equal(host.scrolls, 2, "Clicking the selected sidebar section must reveal it again");
+  await listeners.message({ ...update, data: { ...update.data, revealRequest: 1 } });
+  assert.equal(host.scrolls, 2, "Further draft updates must not repeat the reveal");
   card.available = true;
   card.ctaHref = "javascript:alert(1)";
   await listeners.message(update);

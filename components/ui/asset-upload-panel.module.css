@@ -1,5 +1,5 @@
-:global(.ui-dialog).dialog {
-  width: min(600px, calc(100vw - 32px));
+:global(.ui-dialog.ui-modal).dialog {
+  width: var(--media-dialog-width, min(600px, calc(100vw - 32px)));
   height: var(--media-dialog-height, fit-content);
   max-width: calc(100vw - 32px);
   max-height: calc(100svh - 32px);

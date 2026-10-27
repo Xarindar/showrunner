@@ -2,7 +2,7 @@
 
 import { TimeInput } from "@/components/ui/time-input";
 
-import { useRef, useState } from "react";
+import { useContext, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Image as ImageIcon, Plus } from "lucide-react";
 import { destinationKind, imageFirst, type LinkOptions } from "./field-layout";
@@ -11,12 +11,14 @@ import { emptyFields, type Field } from "./registry";
 import { uploadStudioAsset } from "./actions";
 import styles from "./studio.module.css";
 import { renderContentRichText } from "./rich-text";
-import { ImageFramingControl } from "./image-framing-control";
+import { HeaderFrameRatios, ImageFramingControl } from "./image-framing-control";
 import { ServicePicker } from "./service-picker";
 import { centeredFraming, framingImageSource, readImageFraming } from "./image-framing";
 
 export type Choice = { group?: string; tags?: string[]; framingUrl?: string; imageFraming?: unknown; catalog?: import("./showcase").CatalogCard; description?: string; id: string; imageUrl?: string; label: string };
 export function Fields({ headerId, canUpload = false, fixedRows = false, assetBaseUrl, linkOptions, fields, limits, minimums, value, prefix, onChange, choices = [] }: { headerId?: string; canUpload?: boolean; fixedRows?: boolean; assetBaseUrl?: string; linkOptions?: LinkOptions; fields: Record<string, Field>; limits?: Record<string, number>; minimums?: Record<string, number>; value: Record<string, unknown>; prefix: string; onChange: (next: Record<string, unknown>) => void; choices?: Choice[] }) {
+  const ratios = useContext(HeaderFrameRatios);
+  const [framingField, setFramingField] = useState<string | null>(null);
   return <>{imageFirst(fields).map(([key, field]) => {
     const buttonPairs: Record<string, string> = { buttonLabel: "buttonHref", ctaLabel: "ctaHref", label: "href" };
     if (linkOptions && Object.entries(buttonPairs).some(([label, href]) => key === href && fields[label])) return null;
@@ -51,13 +53,14 @@ export function Fields({ headerId, canUpload = false, fixedRows = false, assetBa
     const preview = media && source && assetBaseUrl && !source.startsWith("/") ? new URL(source, assetBaseUrl).toString() : source;
     return <div key={key} id={`${id}-field`} className={styles.field}>{media ? <span>Image</span> : <label htmlFor={id}>{field.label}</label>}
       {media && ("referenceId" in fields || "catalogKey" in fields) && <label htmlFor={`${id}-source`}>Photo source<select id={`${id}-source`} value={inherited ? "service" : "custom"} onChange={event => onChange({ ...value, imageSource: event.target.value, useServiceFraming: true, [key]: "", ...centeredFraming })}><option value="service">Booking card photo</option><option value="custom">Choose or upload a photo</option></select></label>}
-      {media ? <StudioMediaPicker canUpload={canUpload} context={prefix} preview={preview} defaultAlt={String(value.alt || value.imageAlt || "Website image")} onSelect={asset => {
-        const next: Record<string, unknown> = { ...value, [key]: framingImageSource(asset.url || asset.thumbnailUrl), ...(servicePhoto ? { imageSource: "custom" } : {}), ...centeredFraming };
+      {media ? <StudioMediaPicker canUpload={canUpload} context={prefix} preview={inherited && value.useServiceFraming === false ? choice?.framingUrl || choice?.catalog?.framingUrl || preview : preview} ratio={ratios[headerId || prefix]} framing={readImageFraming(inherited && value.useServiceFraming !== false ? choice?.imageFraming || choice?.catalog?.imageFraming : value)} defaultAlt={String(value.alt || value.imageAlt || "Website image")} onSelect={asset => {
+        const next: Record<string, unknown> = { ...value, [key]: framingImageSource(asset.url || asset.thumbnailUrl), ...(servicePhoto ? { imageSource: "custom", useServiceFraming: false } : {}), ...centeredFraming };
         if ("alt" in fields && !String(value.alt || "").trim()) next.alt = asset.alt;
         if ("imageAlt" in fields && !String(value.imageAlt || "").trim()) next.imageAlt = asset.alt;
         onChange(next);
+        setFramingField(id);
       }} /> : field.kind === "time" ? <TimeInput id={id} value={String(value[key] || "")} onValueChange={update} /> : field.kind === "richtext" ? <RichText id={id} value={String(value[key] || "")} maxLength={field.max} onChange={update} /> : field.kind === "multiline" ? <textarea id={id} rows={3} maxLength={field.max} value={String(value[key] || "")} onChange={event => update(event.target.value)} /> : <input id={id} type={field.kind === "email" ? "email" : "text"} maxLength={field.max} value={source} onChange={event => update(event.target.value)} />}
-      {media && <ImageFramingControl source={inherited ? choice?.framingUrl || choice?.catalog?.framingUrl || preview : preview} blockId={headerId || prefix} value={inherited && value.useServiceFraming !== false ? readImageFraming(choice?.imageFraming || choice?.catalog?.imageFraming) : value} onChange={framing => onChange({ ...value, [key]: inherited ? "" : framingImageSource(source), ...(servicePhoto ? { useServiceFraming: false } : {}), ...framing })} />}
+      {media && <ImageFramingControl open={framingField === id} onOpenChange={open => setFramingField(open ? id : null)} source={inherited ? choice?.framingUrl || choice?.catalog?.framingUrl || preview : preview} blockId={headerId || prefix} value={inherited && value.useServiceFraming !== false ? readImageFraming(choice?.imageFraming || choice?.catalog?.imageFraming) : value} onChange={framing => onChange({ ...value, [key]: inherited ? "" : framingImageSource(source), ...(servicePhoto ? { useServiceFraming: false } : {}), ...framing })} />}
     </div>;
   })}</>;
 }
@@ -76,12 +79,15 @@ function DestinationField({ id, value, options, onChange }: { id: string; value:
   </>;
 }
 
-function StudioMediaPicker({ canUpload, context, defaultAlt, preview, onSelect }: { canUpload: boolean; context: string; defaultAlt: string; preview: string; onSelect: (asset: AssetPickerAsset) => void }) {
+function StudioMediaPicker({ canUpload, context, defaultAlt, preview, ratio, framing, onSelect }: { canUpload: boolean; context: string; defaultAlt: string; preview: string; ratio?: number; framing: ReturnType<typeof readImageFraming>; onSelect: (asset: AssetPickerAsset) => void }) {
   return <div className={styles.mediaPicker}>
-    <AssetPicker assets={[]} canUpload={canUpload} loadFromServer onSelectAsset={onSelect}
+    <AssetPicker assets={[]} canUpload={canUpload} loadFromServer onSelectAsset={onSelect} onUploadedAssets={assets => { if (assets[0]) onSelect(assets[0]); }}
       uploadAction={data => { data.set("context", context); return uploadStudioAsset(data); }} defaultAlt={defaultAlt}
       title="Choose an image" triggerClassName={styles.imageTrigger}>
-      <span className={styles.mediaPreview} style={{ backgroundImage: preview ? `url(${JSON.stringify(preview)})` : undefined }}>{!preview && <ImageIcon aria-hidden="true" size={30} />}</span>
+      <span className={styles.mediaPreview} style={{ aspectRatio: ratio }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {preview ? <img src={preview} alt="" style={{ objectPosition: `${framing.imagePositionX}% ${framing.imagePositionY}%`, transformOrigin: `${framing.imagePositionX}% ${framing.imagePositionY}%`, transform: `scale(${framing.imageZoom})` }} /> : <ImageIcon aria-hidden="true" size={30} />}
+      </span>
       <span className={`${styles.imageHint} ${!preview ? styles.emptyImageHint : ""}`}>Choose or upload</span>
     </AssetPicker>
   </div>;
