@@ -109,9 +109,21 @@ fs.mkdirSync('.tmp', {recursive:true});
     await dragFile();await page.keyboard.press('Escape');await page.mouse.up();
     await page.getByRole('button',{name:'View details for Garden.jpg'}).waitFor();
     assert.equal(await page.evaluate(()=>window.moves),2);
-    await page.getByRole('button',{name:'View details for Garden.jpg'}).focus();await page.keyboard.press('Enter');
+    assert.equal(await page.getByRole('button',{name:'Information about Garden.jpg',exact:true}).count(),0);
+    await page.getByLabel('More actions for Garden.jpg',{exact:true}).click();
+    const fileActions=page.getByRole('group',{name:'Actions for Garden.jpg',exact:true});
+    assert.deepEqual(await fileActions.getByRole('button').allTextContents(),['Rename','Move','Details','Delete']);
+    await fileActions.getByRole('button',{name:'Details',exact:true}).click();
     const details=page.getByRole('dialog',{name:'File details',exact:true});await details.waitFor();
     assert.equal(await details.getByLabel('Filename',{exact:true}).inputValue(),'Garden.jpg');
+    const previewBottom=await details.locator('img').first().evaluate(node=>node.parentElement.getBoundingClientRect().bottom);
+    const saveBounds=await details.getByRole('button',{name:'Save changes',exact:true}).boundingBox();
+    assert(Math.abs(saveBounds.y+saveBounds.height-previewBottom)<2,'Actions align with the preview bottom');
+    for(const label of ['Editorial details','Accessibility']) {
+      const disclosure=details.locator('details').filter({has:page.locator('summary').filter({hasText:label})});
+      assert.equal(await disclosure.evaluate(node=>getComputedStyle(node).borderTopWidth),'0px');
+      assert((await disclosure.boundingBox()).height<=44,'Collapsed details stay compact');
+    }
     await details.screenshot({path:'.tmp/media-inspector-collapsed.png'});
     assert.equal(await details.locator('dl').count(),0);
     assert.equal(await details.getByText('Usage context',{exact:true}).count(),0);
@@ -154,6 +166,13 @@ fs.mkdirSync('.tmp', {recursive:true});
     const deleteDialog=page.getByRole('dialog',{name:'Delete file',exact:true});await deleteDialog.waitFor();
     await deleteDialog.getByRole('button',{name:'Cancel',exact:true}).click();
     assert(await details.isVisible());
+    await page.evaluate(()=>{window.assets.find(asset=>asset.id==='test-file').usageCount=2;window.render()});
+    assert.equal(await details.getByText('This file is in use. Remove its references before deleting it.',{exact:true}).count(),0);
+    await details.getByRole('button',{name:'Delete',exact:true}).click();
+    await deleteDialog.getByText('This file is in use. Remove its references before deleting it.',{exact:true}).waitFor();
+    assert(await deleteDialog.getByRole('button',{name:'Delete',exact:true}).isDisabled());
+    await deleteDialog.getByRole('button',{name:'Cancel',exact:true}).click();
+    await page.evaluate(()=>{window.assets.find(asset=>asset.id==='test-file').usageCount=0;window.render()});
     await details.screenshot({path:'.tmp/media-inspector-updated.png'});
 
     const body=details.locator(':scope > .ui-dialog-body');

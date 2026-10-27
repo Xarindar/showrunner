@@ -162,7 +162,7 @@ function AssetThumbnail({ asset, priority = false }: { asset: MediaLibraryAsset;
 type CardOperation = "rename" | "move" | "delete";
 type CardAction = { kind: "file" | "folder"; id: string; name: string; folder: string; operation: CardOperation };
 
-function CardMenu({ name, onAction, disabled }: { name: string; onAction: (operation: CardOperation) => void; disabled: boolean }) {
+function CardMenu({ name, onAction, onDetails, disabled }: { name: string; onAction: (operation: CardOperation) => void; onDetails?: () => void; disabled: boolean }) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const close = (event: globalThis.PointerEvent) => { if (ref.current && !ref.current.contains(event.target as Node)) ref.current.open = false; };
@@ -174,19 +174,20 @@ function CardMenu({ name, onAction, disabled }: { name: string; onAction: (opera
     onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
     <summary aria-label={`More actions for ${name}`}><MoreHorizontal size={18} aria-hidden="true" /></summary>
     <div role="group" aria-label={`Actions for ${name}`}>
-      {(["rename", "move", "delete"] as const).map(operation => <Button key={operation} type="button" variant={operation === "delete" ? "danger" : "ghost"} disabled={disabled}
-        onClick={() => { if (ref.current) { ref.current.open = false; ref.current.querySelector("summary")?.focus(); } onAction(operation); }}>
-        {operation === "rename" ? <Pencil size={16} /> : operation === "move" ? <FolderOpen size={16} /> : <Trash2 size={16} />}
-        {operation === "rename" ? "Rename" : operation === "move" ? "Move" : "Delete"}
+      {(["rename", "move", ...(onDetails ? ["details" as const] : []), "delete"] as const).map(operation => <Button key={operation} type="button" variant={operation === "delete" ? "danger" : "ghost"} disabled={disabled}
+        onClick={() => { if (ref.current) { ref.current.open = false; ref.current.querySelector("summary")?.focus(); } if (operation === "details") onDetails?.(); else onAction(operation); }}>
+        {operation === "rename" ? <Pencil size={16} /> : operation === "move" ? <FolderOpen size={16} /> : operation === "details" ? <Info size={16} /> : <Trash2 size={16} />}
+        {operation === "rename" ? "Rename" : operation === "move" ? "Move" : operation === "details" ? "Details" : "Delete"}
       </Button>)}
     </div>
   </details>;
 }
 
-function AssetCard({ asset, index, onSelect, onToggle, onAction, selected, view, movable, pickedUp }: {
+function AssetCard({ asset, index, onSelect, onDetails, onToggle, onAction, selected, view, movable, pickedUp }: {
   asset: MediaLibraryAsset;
   index: number;
   onSelect: (event: MouseEvent<HTMLButtonElement>) => void;
+  onDetails: () => void;
   onToggle: () => void;
   onAction: (operation: CardOperation) => void;
   selected: boolean;
@@ -194,7 +195,6 @@ function AssetCard({ asset, index, onSelect, onToggle, onAction, selected, view,
   movable: boolean;
   pickedUp: boolean;
 }) {
-  const [infoOpen, setInfoOpen] = useState(false);
   return (
     <div className={styles.assetTile} data-media-id={asset.id} data-movable={movable} data-picked-up={pickedUp}>
     <button
@@ -215,9 +215,7 @@ function AssetCard({ asset, index, onSelect, onToggle, onAction, selected, view,
       </span>
     </button>
     {movable && <label className={styles.assetCheckbox}><input type="checkbox" aria-label={`Select ${asset.filename}`} checked={selected} onChange={onToggle} /></label>}
-    {movable && <CardMenu name={asset.filename} onAction={onAction} disabled={false} />}
-    <Button className={styles.infoButton} aria-label={`Information about ${asset.filename}`} type="button" variant="secondary" onPointerDown={event => event.stopPropagation()} onClick={() => setInfoOpen(true)}><Info size={16} aria-hidden="true" /></Button>
-    <MediaInfoDialog asset={asset} open={infoOpen} onClose={() => setInfoOpen(false)} />
+    {movable && <CardMenu name={asset.filename} onAction={onAction} onDetails={onDetails} disabled={false} />}
     </div>
   );
 }
@@ -272,12 +270,11 @@ function MetadataForm({ asset, folders, tags, onDelete }: { asset: MediaLibraryA
         <small>{decorative ? "Alt text is cleared when the image is decorative." : "Describe the image’s purpose, not every visual detail."}</small></label>
       <label className={styles.checkRow}><span><strong>Decorative image</strong><small>Screen readers will skip this asset.</small></span><input checked={decorative} name="isDecorative" onChange={event => setDecorative(event.currentTarget.checked)} type="checkbox" /></label>
     </details>
+    {error && <p role="alert">{error}</p>}
     <div className={`module-modal-actions ${styles.inspectorActions}`}>
-      <Button disabled={Boolean(asset.usageCount || asset.isHero || asset.isLogo)} onClick={onDelete} size="sm" type="button" variant="danger"><Trash2 aria-hidden="true" size={14} />Delete</Button>
+      <Button onClick={onDelete} size="sm" type="button" variant="danger"><Trash2 aria-hidden="true" size={14} />Delete</Button>
       <Button disabled={saving} size="sm" type="submit">{saving ? "Saving…" : "Save changes"}</Button>
     </div>
-    {error && <p role="alert">{error}</p>}
-    {asset.usageCount || asset.isHero || asset.isLogo ? <p className={styles.sectionCopy}>This file is in use. Remove its references before deleting it.</p> : null}
   </form>;
 }
 
@@ -286,6 +283,7 @@ function AssetInspector({ asset, archived, folders, tags, onClose }: { asset: Me
   const [infoOpen, setInfoOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+  const inUse = Boolean(asset.usageCount || asset.isHero || asset.isLogo);
   const router = useRouter();
   const notify = useNotify();
   return <Modal open onClose={onClose} title="File details" closeLabel="Close asset details" className={styles.detailsModal}>
@@ -304,10 +302,10 @@ function AssetInspector({ asset, archived, folders, tags, onClose }: { asset: Me
     </div>
     <MediaInfoDialog asset={asset} open={infoOpen} onClose={() => setInfoOpen(false)} />
     <Modal open={confirmDelete} onClose={() => { if (!deleting) setConfirmDelete(false); }} title="Delete file" className={styles.folderModal}>
-      <p>Delete “{asset.filename}”? You can restore it from Archived. Files still in use cannot be deleted.</p>
+      <p>{inUse ? "This file is in use. Remove its references before deleting it." : `Delete “${asset.filename}”? You can restore it from Archived.`}</p>
       {error && <p role="alert">{error}</p>}
       <div className="module-modal-actions"><Button type="button" variant="secondary" disabled={deleting} onClick={() => setConfirmDelete(false)}>Cancel</Button>
-        <Button type="button" variant="danger" disabled={deleting} onClick={async () => {
+        <Button type="button" variant="danger" disabled={deleting || inUse} onClick={async () => {
           setDeleting(true); setError("");
           try { const data = new FormData(); data.set("id", asset.id); data.set("confirmArchive", "on"); const result = await deleteMediaAsset(data);
             if (result.error) { setError(result.error); return; }
@@ -347,6 +345,8 @@ export function MediaLibraryWorkspace({
   }
   const [folderOpen, setFolderOpen] = useState(false);
   const [cardAction, setCardAction] = useState<CardAction | null>(null);
+  const actionAsset = cardAction?.kind === "file" ? assets.find(asset => asset.id === cardAction.id) : null;
+  const actionInUse = Boolean(actionAsset && (actionAsset.usageCount || actionAsset.isHero || actionAsset.isLogo));
   const [cardBusy, setCardBusy] = useState(false);
   const [cardError, setCardError] = useState("");
   const [needsDestination, setNeedsDestination] = useState(false);
@@ -543,12 +543,12 @@ export function MediaLibraryWorkspace({
           </select></label>}
           {cardAction.operation === "delete" && <>
             <input type="hidden" name="confirmArchive" value="on" /><input type="hidden" name="value" value="" />
-            <p>Delete “{cardAction.name}”? {cardAction.kind === "file" ? "You can restore it from Archived. Files still in use cannot be deleted." : migrateContents ? "Its files and subfolders will be moved to the destination you choose." : ""}</p>
+            <p>{actionInUse ? "This file is in use. Remove its references before deleting it." : `Delete “${cardAction.name}”? ${cardAction.kind === "file" ? "You can restore it from Archived." : migrateContents ? "Its files and subfolders will be moved to the destination you choose." : ""}`}</p>
           </>}
           {cardError && <p role="alert">{cardError}</p>}
           <div className="module-modal-actions">
             <Button type="button" variant="secondary" disabled={cardBusy} onClick={() => setCardAction(null)}>Cancel</Button>
-            <Button type="submit" variant={cardAction.operation === "delete" ? "danger" : "primary"} disabled={cardBusy}>{cardBusy ? "Saving…" : cardAction.operation === "rename" ? "Save name" : cardAction.operation === "move" ? "Move" : "Delete"}</Button>
+            <Button type="submit" variant={cardAction.operation === "delete" ? "danger" : "primary"} disabled={cardBusy || (cardAction.operation === "delete" && actionInUse)}>{cardBusy ? "Saving…" : cardAction.operation === "rename" ? "Save name" : cardAction.operation === "move" ? "Move" : "Delete"}</Button>
           </div>
         </form>}
       </Modal>
@@ -717,7 +717,7 @@ export function MediaLibraryWorkspace({
             </nav>}
                 {visibleAssets.map((asset, index) => (
                   <AssetCard asset={asset} pickedUp={Boolean(drag?.ids.includes(asset.id) || pendingIds.includes(asset.id))} movable={!asset.builtIn && filters.scope !== "archived" && !moveBusy} index={index + (filters.page - 1) * 24} key={asset.id}
-                    onSelect={event => {
+                    onDetails={() => setSelectedId(asset.id)} onSelect={event => {
                       if (suppressClick.current && event.detail > 0) { suppressClick.current = false; return; }
                       if (!asset.builtIn && filters.scope !== "archived" && (event.ctrlKey || event.metaKey || event.shiftKey)) toggleSelection(asset.id);
                       else setSelectedId(asset.id);
