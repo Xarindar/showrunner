@@ -35,14 +35,27 @@ if(url.pathname==='/api/media/assets') {
  if(query==='old'){markStaleStarted();await staleGate;}
  if(failNext&&number===2){failNext=false;await route.fulfill({status:503,body:'Unavailable'});return;}
  const total=folder==='Empty'?0:folder||query?1:72;
- const assets=Array.from({length:Math.min(24,Math.max(0,total-(number-1)*24))},(_,index)=>({id:folder+query+((number-1)*24+index),filename:(query||folder||'Image')+' '+((number-1)*24+index)+'.jpg',folder,alt:'Photo',thumbnailUrl:'/photo.svg'}));
- await route.fulfill({json:{assets,page:number,pageCount:Math.max(1,Math.ceil(total/24)),total,folders:['Trips/Family','Events','Empty'],tagSummaries:[]}});return;
+ const assets=Array.from({length:Math.min(24,Math.max(0,total-(number-1)*24))},(_,index)=>({id:folder+query+((number-1)*24+index),filename:(query||folder||'Image')+' '+((number-1)*24+index)+'.jpg',folder,tags:['venue'],alt:'Photo',thumbnailUrl:'/photo.svg'}));
+ await route.fulfill({json:{assets,page:number,pageCount:Math.max(1,Math.ceil(total/24)),total,folders:['Trips/Family','Events','Empty'],tagSummaries:[{name:'venue',count:72}]}});return;
 }
 if(url.pathname==='/photo.svg'){await route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180"><rect width="240" height="180" fill="#8eaa9d"/></svg>'});return;}
 await route.fulfill({contentType:'text/html',body:'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+'</style></head><body><div id="root"></div><script>'+js+'</script></body></html>'});
 });
 await page.goto('http://picker.example');await page.getByRole('button',{name:'Choose an image',exact:true}).click();
 const dialog=page.getByRole('dialog',{name:'Choose an image'}),grid=dialog.getByLabel('Available assets');
+await dialog.getByRole('button',{name:'Open folder Trips',exact:true}).waitFor();
+await dialog.getByRole('combobox',{name:'Tag',exact:true}).selectOption('venue');
+await page.waitForFunction(()=>document.querySelectorAll('[aria-label^="Open folder "]').length===0);
+await dialog.getByRole('button',{name:'Select Image 0.jpg',exact:true}).waitFor();
+await dialog.getByRole('combobox',{name:'Tag',exact:true}).selectOption('');
+await dialog.getByRole('button',{name:'Open folder Trips',exact:true}).waitFor();
+await dialog.getByRole('combobox',{name:'Library view',exact:true}).selectOption('recent');
+await page.waitForFunction(()=>document.querySelectorAll('[aria-label^="Open folder "]').length===0);
+await dialog.getByRole('combobox',{name:'Library view',exact:true}).selectOption('all');
+await dialog.getByRole('button',{name:'Open folder Trips',exact:true}).waitFor();
+await dialog.getByRole('searchbox',{name:'Search assets'}).fill('Trips');
+await page.waitForFunction(()=>document.querySelectorAll('[aria-label^="Open folder "]').length===0);
+await dialog.getByRole('button',{name:'Clear asset search',exact:true}).click();
 await dialog.getByRole('button',{name:'Open folder Trips',exact:true}).waitFor();
 assert((await dialog.boundingBox()).width>=1000);assert((await dialog.boundingBox()).height>=800);
 assert.equal(await dialog.getByRole('button',{name:'Load more assets'}).count(),0);

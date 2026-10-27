@@ -170,7 +170,7 @@ export function AssetPicker({
     });
   }, [libraryAssets, libraryFilter, loadFromServer, query, selectedTag, folder]);
 
-  const childFolders = childMediaFolders(folders.map(name => ({ name, count: 0 })), folder).filter(item => !query.trim() || normalizedSearchValue(item.name).includes(normalizedSearchValue(query)));
+  const childFolders = libraryFilter === "all" && !selectedTag && !query.trim() ? childMediaFolders(folders.map(name => ({ name, count: 0 })), folder) : [];
   const selectedAsset = libraryAssets.find((asset) => asset.id === selectedId) || null;
   const visibleTotal = loadFromServer ? libraryTotal : visibleAssets.length;
   const open = controlledOpen ?? internalOpen;
