@@ -25,7 +25,12 @@ try{
   const website=new URL(route.request().url()).hostname==='site.example';
   return route.fulfill({contentType:'text/html',body:website?'<html><head><style>body{margin:0}section{height:600px;padding:20px;box-sizing:border-box}h2{margin:0}</style></head><body>'+Array.from({length:20},(_,i)=>'<section id="section-'+i+'"><h2>Section '+(i+1)+'</h2></section>').join('')+'<script data-editor-origins="http://editor.example">'+bridge+'</script></body></html>':'<html><head><style>'+css+'</style></head><body><div id="root"></div><script>'+js+'</script></body></html>'});
  });
- await page.goto('http://editor.example');await page.getByRole('button',{name:'Edit website',exact:true}).click();
+ await page.goto('http://editor.example');
+ await page.getByRole('button',{name:'Edit website',exact:true}).waitFor();
+ const overview=await page.locator('main > div').first().boundingBox();
+ const publishedPreview=await page.getByTitle('Your website preview',{exact:true}).boundingBox();
+ assert(publishedPreview.y-overview.y<=64,'Content overview keeps its toolbar compact above the preview');
+ await page.getByRole('button',{name:'Edit website',exact:true}).click();
  const preview=page.frameLocator('iframe[title="Home website preview"]');
  await preview.locator('#section-19[data-sr-section]').waitFor();
  const sections=page.getByRole('navigation',{name:'Page sections'});

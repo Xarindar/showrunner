@@ -19,6 +19,8 @@ Buttons offer Page, Service (where booking is configured), and Web address desti
 
 The editor uses open-source Puck inside Showrunner's existing admin shell. Draft edits preview immediately. Mobile editor changes create overrides for only the changed content, including text, links, photos, framing, and editable lists. Desktop values remain unchanged; untouched mobile fields inherit desktop updates. The inspector identifies mobile editing and can restore a section to desktop content. Public sites switch at 720px, including when resized. Publishing uses the existing authenticated, site-scoped content service, revision checks and media library. Successful publication uses the shared admin toast system; confirmations clear after at least five seconds and errors remain until dismissed. Existing Cottage616 content supplies initial values. Cottage616's integration may change to fit the reusable Showrunner workflow.
 
+Header Button settings offer Left, Center, and Right alignment. Mobile edits use the existing overrides so desktop alignment stays independent. The Content overview uses a compact toolbar above its website preview.
+
 ## Stack
 Next.js App Router, React, TypeScript, Puck, Prisma and PostgreSQL. Websites consume Showrunner's public content API and the shared preview bridge. Existing hosting is Railway.
 

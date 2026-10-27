@@ -22,9 +22,10 @@ export function Fields({ headerId, canUpload = false, fixedRows = false, assetBa
   return <>{imageFirst(fields).map(([key, field]) => {
     const buttonPairs: Record<string, string> = { buttonLabel: "buttonHref", ctaLabel: "ctaHref", label: "href" };
     if (linkOptions && Object.entries(buttonPairs).some(([label, href]) => key === href && fields[label])) return null;
+    if (linkOptions && key === "buttonAlignment" && fields.buttonLabel && fields.buttonHref) return null;
     if (linkOptions && buttonPairs[key] && fields[buttonPairs[key]]) {
       const href = buttonPairs[key];
-      return <div className={styles.buttonSettings} key={key}><h3>Button</h3><Fields fields={{ [key]: { ...field, label: "Title" } }} prefix={prefix} value={value} onChange={onChange} /><DestinationField id={`${prefix}-${href}`} value={String(value[href] || "")} options={linkOptions} onChange={next => onChange({ ...value, [href]: next })} /></div>;
+      return <div className={styles.buttonSettings} key={key}><h3>Button</h3><Fields fields={{ [key]: { ...field, label: "Title" }, ...(key === "buttonLabel" && fields.buttonAlignment ? { buttonAlignment: fields.buttonAlignment } : {}) }} prefix={prefix} value={value} onChange={onChange} /><DestinationField id={`${prefix}-${href}`} value={String(value[href] || "")} options={linkOptions} onChange={next => onChange({ ...value, [href]: next })} /></div>;
     }
     const id = `${prefix}-${key}`;
     const update = (next: unknown) => onChange({ ...value, [key]: next });
