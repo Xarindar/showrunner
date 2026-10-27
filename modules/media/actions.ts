@@ -50,7 +50,7 @@ const mediaMetadataSchema = z
     path: ["alt"]
   });
 
-const mediaUpdateSchema = mediaMetadataSchema.and(z.object({ id: requiredText }));
+const mediaUpdateSchema = mediaMetadataSchema.and(z.object({ id: requiredText, filename: z.string().trim().min(1).max(200).regex(/^[^/\\\u0000-\u001f\u007f]+$/).optional() }));
 
 const mediaArchiveSchema = z.object({
   id: requiredText,
@@ -90,14 +90,14 @@ export async function createMediaFolder(formData: FormData) {
   return { name };
 }
 
-async function accessibleMediaFolder(user: Awaited<ReturnType<typeof requireAdmin>>, siteId: string, folder: string) {
+async function accessibleMediaFolder(user: Awaited<ReturnType<typeof requireAdmin>>, siteId: string, folder: string, database: Pick<typeof prisma, "mediaFolder" | "mediaAsset"> = prisma) {
   if (!folder) return true;
   const ownFolders = (await resolveDataScopeMode(user, siteId, "media")) === "OWN";
-  const savedFolder = await prisma.mediaFolder.findFirst({
+  const savedFolder = await database.mediaFolder.findFirst({
     where: { siteId, OR: [{ name: folder }, { name: { startsWith: `${folder}/` } }], ...(ownFolders ? { createdByUserId: user.id } : {}) }, select: { id: true }
   });
   if (savedFolder) return true;
-  return Boolean(await prisma.mediaAsset.findFirst({
+  return Boolean(await database.mediaAsset.findFirst({
     where: await getAccessibleMediaWhere(user, siteId, { deletedAt: null, OR: [{ folder }, { folder: { startsWith: `${folder}/` } }] }), select: { id: true }
   }));
 }
@@ -144,13 +144,14 @@ export async function renameMediaAsset(formData: FormData) {
 
 export async function changeMediaFolder(formData: FormData) {
   const user = await requireAdmin("media:manage");
-  const parsed = z.object({ folder: z.string().min(1).refine(validMediaFolderPath), operation: z.enum(["rename", "move", "delete"]), value: z.string().trim() }).safeParse(Object.fromEntries(formData));
+  const parsed = z.object({ folder: z.string().min(1).refine(validMediaFolderPath), operation: z.enum(["rename", "move", "delete"]), value: z.string().trim(), migrateTo: z.string().refine(validMediaFolderPath).optional() }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: "Choose a valid folder action." };
-  const { folder, operation, value } = parsed.data;
+  const { folder, operation, value, migrateTo } = parsed.data;
   const parent = folder.split("/").slice(0, -1).join("/");
   if (operation === "rename" && (!value || value.includes("/") || !validMediaFolderPath(value))) return { error: "Enter a folder name without slashes or dot segments." };
   const destination = operation === "rename" ? [parent, value].filter(Boolean).join("/") : [value, folder.split("/").at(-1)].filter(Boolean).join("/");
   if (operation !== "delete" && (!validMediaFolderPath(destination) || destination.startsWith(`${folder}/`))) return { error: "A folder cannot be moved inside itself, and its path must fit within 200 characters." };
+  if (operation === "delete" && migrateTo !== undefined && (migrateTo === folder || migrateTo.startsWith(`${folder}/`))) return { error: "Choose a destination outside this folder." };
   const siteId = await getCurrentSiteId();
   if (operation === "move" && !await accessibleMediaFolder(user, siteId, value)) return { error: "Destination folder not found." };
   const own = (await resolveDataScopeMode(user, siteId, "media")) === "OWN";
@@ -163,9 +164,29 @@ export async function changeMediaFolder(formData: FormData) {
       const assets = await tx.mediaAsset.findMany({ where: { AND: [files, assetAccess] }, select: { id: true, folder: true, deletedAt: true } });
       if ((!saved.length && !assets.length) || saved.some(item => own && item.createdByUserId !== user.id) || assets.length !== await tx.mediaAsset.count({ where: files })) throw new Error("This folder is unavailable or contains files managed by another user.");
       if (operation === "delete") {
-        if (assets.some(asset => !asset.deletedAt) || saved.some(item => item.name !== folder)) throw new Error("This folder is not empty. Move or delete its files and subfolders first.");
-        // Archived files stay recoverable without recreating a deleted folder on restore.
-        await tx.mediaAsset.updateMany({ where: { AND: [files, assetAccess] }, data: { folder: parent } });
+        if (migrateTo !== undefined && !await accessibleMediaFolder(user, siteId, migrateTo, tx)) throw new Error("Destination folder not found.");
+        if (migrateTo === undefined && (assets.some(asset => !asset.deletedAt) || saved.some(item => item.name !== folder))) {
+          throw Object.assign(new Error("Choose where to move this folder’s contents before deleting it."), { needsDestination: true });
+        }
+        const target = migrateTo ?? parent;
+        const relocate = (path: string) => [target, path.slice(folder.length + 1)].filter(Boolean).join("/");
+        const childRoots = new Set([...saved.map(item => item.name), ...assets.map(asset => asset.folder)]
+          .filter(path => path !== folder).map(path => [target, path.slice(folder.length + 1).split("/")[0]].filter(Boolean).join("/")));
+        for (const name of childRoots) {
+          const occupied = await tx.mediaFolder.count({ where: { siteId, OR: [{ name }, { name: { startsWith: `${name}/` } }] } });
+          const occupiedFiles = await tx.mediaAsset.count({ where: { siteId, OR: [{ folder: name }, { folder: { startsWith: `${name}/` } }] } });
+          if (occupied || occupiedFiles) throw new Error("The destination already has a subfolder with the same name. Choose another destination.");
+        }
+        for (const item of saved.filter(item => item.name !== folder)) {
+          const name = relocate(item.name);
+          if (!validMediaFolderPath(name)) throw new Error("A nested folder path would exceed 200 characters.");
+          await tx.mediaFolder.update({ where: { id: item.id }, data: { name } });
+        }
+        for (const asset of assets) {
+          const path = relocate(asset.folder);
+          if (!validMediaFolderPath(path)) throw new Error("A nested folder path would exceed 200 characters.");
+          await tx.mediaAsset.update({ where: { id: asset.id }, data: { folder: path } });
+        }
         await tx.mediaFolder.deleteMany({ where: tree });
         return;
       }
@@ -185,7 +206,7 @@ export async function changeMediaFolder(formData: FormData) {
       }
     }, { isolationLevel: "Serializable" });
   } catch (error) {
-    return { error: error instanceof Error && !("code" in error) ? error.message : "The folder changed or its name is already taken. Refresh and try again." };
+    return { error: error instanceof Error && !("code" in error) ? error.message : "The folder changed or its name is already taken. Refresh and try again.", needsDestination: error instanceof Error && "needsDestination" in error };
   }
   revalidatePath("/admin/modules/media");
   return { success: true };
@@ -199,22 +220,24 @@ export async function uploadLibraryAsset(formData: FormData) {
     return { error: "Create an active staff profile using this admin email before uploading scoped media." };
   }
   const file = formData.get("file");
-  if (!(file instanceof File) || !file.size) return { error: "Choose an image to upload." };
-  const parsed = mediaMetadataSchema.safeParse({ alt: "", caption: "", credit: "", focalPointX: "", focalPointY: "", folder: "", tags: "", usageContext: "", ...Object.fromEntries(formData) });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "Check the image details." };
+  if (!(file instanceof File) || !file.size) return { error: "Choose an image or video to upload." };
+  const parsed = mediaMetadataSchema.safeParse({ alt: "", caption: "", credit: "", focalPointX: "", focalPointY: "", folder: "", tags: "", usageContext: "", ...Object.fromEntries(formData), ...(file.type.startsWith("video/") ? { alt: file.name, isDecorative: undefined } : {}) });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "Check the file details." };
   try {
-    const asset = await uploadMedia(file, { ...parsed.data, uploadedByStaffId: ownerStaffIds[0] }, settings.mediaDriver, settings.siteId);
+    const asset = await uploadMedia(file, { ...parsed.data, uploadedByStaffId: ownerStaffIds[0] }, settings.mediaDriver, settings.siteId, { allowVideo: true });
     refreshMedia();
     return { asset: { id: asset.id, filename: asset.filename, alt: asset.alt || "", createdAt: asset.createdAt.toISOString(), folder: asset.folder,
       thumbnailUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD), url: mediaAssetDisplayUrl(asset, MediaVariantType.HERO) } };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Image upload failed." };
+    return { error: error instanceof Error ? error.message : "File upload failed." };
   }
 }
 
 export async function updateMediaAssetAction(formData: FormData) {
   const user = await requireAdmin("media:manage");
-  const input = await parseForm(mediaUpdateSchema, formData, "/admin/modules/media");
+  const parsed = mediaUpdateSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "Check the file details." };
+  const input = parsed.data;
   const siteId = await getCurrentSiteId();
   const accessibleWhere = await getAccessibleMediaWhere(user, siteId, { id: input.id });
   const existingAsset = await prisma.mediaAsset.findFirst({
@@ -232,19 +255,19 @@ export async function updateMediaAssetAction(formData: FormData) {
   });
 
   if (!existingAsset) {
-    redirect(`/admin/modules/media?error=${encodeURIComponent("Media asset not found.")}`);
+    return { error: "Media asset not found." };
   }
 
   if (input.isPrivate && !supportsPrivateMediaDriver(existingAsset.driver)) {
-    redirect(`/admin/modules/media?error=${encodeURIComponent("Private media delivery is currently supported only for server assets, S3, or R2 assets.")}`);
+    return { error: "Private media delivery is currently supported only for server assets, S3, or R2 assets." };
   }
 
   if (input.isPrivate && !existingAsset.isPrivate) {
-    redirect(`/admin/modules/media?error=${encodeURIComponent("A previously public file may still be available from its old URL or cache. Upload a new private copy for secure client delivery.")}`);
+    return { error: "A previously public file may still be available from its old URL or cache. Upload a new private copy for secure client delivery." };
   }
 
   if (!input.isPrivate && (existingAsset.clientFiles.length || existingAsset.portfolioItems.length || existingAsset.purchasedSelections.length)) {
-    redirect(`/admin/modules/media?error=${encodeURIComponent("This asset belongs to a private client file, shoot, or purchase. Keep it private; upload a separate curated public copy instead.")}`);
+    return { error: "This asset belongs to a private client file, shoot, or purchase. Keep it private; upload a separate curated public copy instead." };
   }
 
   const updated = await prisma.mediaAsset.updateMany({
@@ -256,6 +279,7 @@ export async function updateMediaAssetAction(formData: FormData) {
       }] : [])]
     },
     data: {
+      filename: input.filename,
       alt: input.isDecorative ? "" : input.alt,
       caption: input.caption,
       credit: input.credit,
@@ -268,7 +292,7 @@ export async function updateMediaAssetAction(formData: FormData) {
       isPrivate: input.isPrivate
     }
   });
-  if (updated.count !== 1) redirect(`/admin/modules/media?error=${encodeURIComponent("This asset changed or has protected private references. Refresh the library before saving it.")}`);
+  if (updated.count !== 1) return { error: "This asset changed or has protected private references. Refresh the library before saving it." };
   const asset = await prisma.mediaAsset.findFirst({
     where: accessibleWhere,
     select: { driver: true, id: true, isPrivate: true, key: true, storageProviderId: true, url: true }
@@ -279,7 +303,7 @@ export async function updateMediaAssetAction(formData: FormData) {
   }
 
   refreshMedia();
-  redirect("/admin/modules/media?saved=metadata");
+  return { success: true };
 }
 
 export async function archiveMediaAssetAction(formData: FormData) {

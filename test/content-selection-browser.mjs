@@ -48,6 +48,7 @@ try{
  await page.getByRole('region',{name:'Section settings'}).locator('textarea').fill('Updated text');
  await preview.locator('#section-0 h2').filter({hasText:'Updated text'}).waitFor();
  assert.equal(await website.evaluate(()=>scrollY),before,'Typing must not move the preview');
+ assert((await page.locator('textarea').evaluateAll(nodes=>nodes.map(node=>getComputedStyle(node).resize))).every(value=>value==='none'),'Puck textareas must not resize');
  assert.deepEqual(errors,[]);
  console.log('Passed: actual Puck sidebar/iframe selection, repeated section reveal, sidebar visibility, and stable preview while editing.');
 }finally{await browser.close()}

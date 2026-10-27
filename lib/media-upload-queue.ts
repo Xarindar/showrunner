@@ -8,7 +8,7 @@ export async function uploadImageQueue<T>(
     if (!shouldContinue()) break;
     let error: string | undefined;
     try { error = (await upload(item)).error; }
-    catch { error = "Upload interrupted. Try this image again."; }
+    catch { error = "Upload interrupted. Try this file again."; }
     onResult(item, error);
   }
 }

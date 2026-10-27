@@ -1,4 +1,5 @@
 import "server-only";
+import { cottageTeamBlock } from "./cottage616/team-blocks";
 import { resolveContentManifest } from "@/clients/content-manifests";
 import { getPublicContentProfilePayload } from "@/clients/cottage616/content-profiles";
 import { readStudio } from "@/modules/content/studio/state";
@@ -44,7 +45,7 @@ export async function getEditorManifest(settings: SiteSettingsWithModules) {
     ];
   });
   const selectors: Record<string, string> = { "home-events": "#events", "home-venue-gallery": ".venue-strip", "vendors-directory": ".vendors-directory", "business-info": ".site-footer address" };
-  return { ...manifest, previewUrl: process.env.CONTENT_PREVIEW_URL || manifest.previewUrl, blocks: [...dynamic, ...manifest.blocks.map(block => ({ ...block,
+  return { ...manifest, previewUrl: process.env.CONTENT_PREVIEW_URL || manifest.previewUrl, blocks: [...dynamic, ...manifest.blocks.map(block => ({ ...cottageTeamBlock(block, readStudio(settings.publicContentConfig).blocks[block.id]?.payload || block.defaults),
     ...(block.type === "business" ? { defaults: { phone: "(870) 219-6982", line1: "3773 County Road 616", city: "Bay", region: "AR", postalCode: "72411" } } : {}),
     ...(selectors[block.id] ? { presentation: { ...block.presentation, selector: selectors[block.id] } } : {})
   }))] };

@@ -2,15 +2,15 @@
 import { Notification, useNotify } from "@/components/ui/notifications";
 
 import NextImage from "next/image";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Archive,
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
-  Eye,
+  Info,
   File,
+  Film,
   FolderOpen,
   Grid2X2,
   LayoutList,
@@ -19,7 +19,6 @@ import {
   Pencil,
   RotateCcw,
   Search,
-  Star,
   Trash2,
   Upload,
   X
@@ -30,16 +29,15 @@ import { Modal } from "@/components/ui/modal";
 import type { MediaTagSummary } from "@/lib/media-tags";
 import { childMediaFolders } from "@/lib/media-folders";
 import {
-  archiveMediaAssetAction,
   createMediaFolder,
   changeMediaFolder,
   renameMediaAsset,
   deleteMediaAsset,
   moveMediaAssetToFolder,
   restoreMediaAssetAction,
-  setHeroImageAction,
   updateMediaAssetAction
 } from "./actions";
+import { MediaTagPicker } from "./media-tag-picker";
 import { UploadAssetsModal } from "./upload-assets-modal";
 import styles from "./media-library.module.css";
 
@@ -76,7 +74,7 @@ export type MediaLibraryAsset = {
 
 export type MediaLibraryFilters = {
   folder: string;
-  kind: "all" | "image" | "other";
+  kind: "all" | "image" | "video" | "other";
   page: number;
   q: string;
   scope: "home" | "all" | "recent" | "private" | "needs-alt" | "archived" | "built-in";
@@ -155,7 +153,7 @@ function AssetThumbnail({ asset, priority = false }: { asset: MediaLibraryAsset;
       {isImage ? (
         <NextImage alt="" draggable={false} fill priority={priority} sizes="(max-width: 760px) 45vw, (max-width: 1280px) 25vw, 220px" src={asset.displayUrl} unoptimized />
       ) : (
-        <span className={styles.fileFallback}><File aria-hidden="true" size={26} /><small>{asset.format || "FILE"}</small></span>
+        <span className={styles.fileFallback}>{asset.mimeType.startsWith("video/") ? <Film aria-hidden="true" size={26} /> : <File aria-hidden="true" size={26} />}<small>{asset.format || "FILE"}</small></span>
       )}
     </span>
   );
@@ -196,6 +194,7 @@ function AssetCard({ asset, index, onSelect, onToggle, onAction, selected, view,
   movable: boolean;
   pickedUp: boolean;
 }) {
+  const [infoOpen, setInfoOpen] = useState(false);
   return (
     <div className={styles.assetTile} data-media-id={asset.id} data-movable={movable} data-picked-up={pickedUp}>
     <button
@@ -217,200 +216,104 @@ function AssetCard({ asset, index, onSelect, onToggle, onAction, selected, view,
     </button>
     {movable && <label className={styles.assetCheckbox}><input type="checkbox" aria-label={`Select ${asset.filename}`} checked={selected} onChange={onToggle} /></label>}
     {movable && <CardMenu name={asset.filename} onAction={onAction} disabled={false} />}
+    <Button className={styles.infoButton} aria-label={`Information about ${asset.filename}`} type="button" variant="secondary" onPointerDown={event => event.stopPropagation()} onClick={() => setInfoOpen(true)}><Info size={16} aria-hidden="true" /></Button>
+    <MediaInfoDialog asset={asset} open={infoOpen} onClose={() => setInfoOpen(false)} />
     </div>
   );
 }
 
-function MetadataForm({ asset, folders, onArchive }: { asset: MediaLibraryAsset; folders: FolderSummary[]; onArchive: () => void }) {
-  const [decorative, setDecorative] = useState(asset.isDecorative);
-  const [focalX, setFocalX] = useState(asset.focalPointX);
-  const [focalY, setFocalY] = useState(asset.focalPointY);
-
-  return (
-    <form action={updateMediaAssetAction} className={styles.metadataForm}>
-      <input name="id" type="hidden" value={asset.id} />
-
-      <div className={styles.inspectorSection}>
-        <div className={styles.sectionLabel}>
-          <span>Accessibility</span>
-          {!decorative && !asset.alt ? <small className={styles.attentionText}>Needs attention</small> : null}
-        </div>
-        <label className={styles.field}>
-          <span>Alt text</span>
-          <textarea defaultValue={asset.alt} name="alt" placeholder="Describe what matters in this image" rows={3} />
-          <small>{decorative ? "Alt text is cleared when the image is decorative." : "Describe the image’s purpose, not every visual detail."}</small>
-        </label>
-        <label className={styles.checkRow}>
-          <span>
-            <strong>Decorative image</strong>
-            <small>Screen readers will skip this asset.</small>
-          </span>
-          <input checked={decorative} name="isDecorative" onChange={(event) => setDecorative(event.currentTarget.checked)} type="checkbox" />
-        </label>
-      </div>
-
-      <div className={styles.inspectorSection}>
-        <div className={styles.sectionLabel}><span>Organization</span></div>
-        <label className={styles.field}>
-          <span>Folder</span>
-          <input defaultValue={asset.folder} name="folder" list="media-folder-options" placeholder="Choose or enter a folder" />
-        </label>
-        <datalist id="media-folder-options">{folders.map(folder => <option key={folder.name} value={folder.name} />)}</datalist>
-        <label className={styles.field}>
-          <span>Tags</span>
-          <input defaultValue={asset.tags.join(", ")} name="tags" placeholder="portrait, homepage, campaign" />
-        </label>
-        <label className={styles.field}>
-          <span>Usage context</span>
-          <input defaultValue={asset.usageContext} name="usageContext" placeholder="homepage, proofing, product" />
-        </label>
-      </div>
-
-      <div className={styles.inspectorSection}>
-        <div className={styles.sectionLabel}><span>Editorial details</span></div>
-        <label className={styles.field}>
-          <span>Caption</span>
-          <textarea defaultValue={asset.caption} name="caption" rows={2} />
-        </label>
-        <label className={styles.field}>
-          <span>Credit</span>
-          <input defaultValue={asset.credit} name="credit" placeholder="Photographer or source" />
-        </label>
-      </div>
-
-      {asset.mimeType.startsWith("image/") ? (
-        <div className={styles.inspectorSection}>
-          <div className={styles.sectionLabel}>
-            <span>Focal point</span>
-            <small>{focalX.toFixed(2)}, {focalY.toFixed(2)}</small>
-          </div>
-          <div className={styles.focalPreview}>
-            <NextImage alt="" fill sizes="300px" src={asset.displayUrl} unoptimized />
-            <span aria-hidden="true" className={styles.focalMarker} style={{ "--focal-x": `${focalX * 100}%`, "--focal-y": `${focalY * 100}%` } as CSSProperties} />
-          </div>
-          <label className={styles.rangeField}>
-            <span>Horizontal</span>
-            <input max="1" min="0" name="focalPointX" onChange={(event) => setFocalX(Number(event.currentTarget.value))} step="0.01" type="range" value={focalX} />
-          </label>
-          <label className={styles.rangeField}>
-            <span>Vertical</span>
-            <input max="1" min="0" name="focalPointY" onChange={(event) => setFocalY(Number(event.currentTarget.value))} step="0.01" type="range" value={focalY} />
-          </label>
-        </div>
-      ) : (
-        <>
-          <input name="focalPointX" type="hidden" value={asset.focalPointX} />
-          <input name="focalPointY" type="hidden" value={asset.focalPointY} />
-        </>
-      )}
-
-      <div className={styles.inspectorSection}>
-        <label className={styles.checkRow}>
-          <span>
-            <strong>Private delivery</strong>
-            <small>{asset.isPrivate ? "Require signed access instead of a public URL." : "Upload a new private copy to protect a previously public file."}</small>
-          </span>
-          <input defaultChecked={asset.isPrivate} disabled={!asset.isPrivate} name="isPrivate" type="checkbox" />
-        </label>
-      </div>
-
-      <div className={`module-modal-actions ${styles.inspectorActions}`}>
-        <Button disabled={Boolean(asset.usageCount || asset.isHero || asset.isLogo)} onClick={onArchive} size="sm" type="button" variant="ghost">
-          <Archive aria-hidden="true" size={14} /> Archive
-        </Button>
-        <Button size="sm" type="submit">Save changes</Button>
-      </div>
-      {asset.usageCount || asset.isHero || asset.isLogo ? <p className={styles.sectionCopy}>This asset is in use and is protected from archiving. Gallery and purchased photo references are included.</p> : null}
-    </form>
-  );
+function MediaInfoDialog({ asset, open, onClose }: { asset: MediaLibraryAsset; open: boolean; onClose: () => void }) {
+  return <Modal open={open} onClose={onClose} title="File information" className={styles.folderModal}>
+    <dl className={styles.factGrid}>
+      <div><dt>Type</dt><dd>{asset.format || asset.mimeType || "Asset"}</dd></div>
+      <div><dt>Dimensions</dt><dd>{asset.width && asset.height ? `${asset.width} × ${asset.height}` : "—"}</dd></div>
+      <div><dt>File size</dt><dd>{bytesLabel(asset.sizeBytes)}</dd></div>
+      <div><dt>Added</dt><dd>{dateLabel(asset.createdAt)}</dd></div>
+      <div><dt>Variants</dt><dd>{asset.variantCount || "—"}</dd></div>
+    </dl>
+  </Modal>;
 }
 
-function AssetInspector({ asset, archived, folders, onClose }: { asset: MediaLibraryAsset; archived: boolean; folders: FolderSummary[]; onClose: () => void }) {
-  const [confirmArchive, setConfirmArchive] = useState(false);
+function MetadataForm({ asset, folders, tags, onDelete }: { asset: MediaLibraryAsset; folders: FolderSummary[]; tags: MediaTagSummary[]; onDelete: () => void }) {
+  const [decorative, setDecorative] = useState(asset.isDecorative);
+  const [selectedTags, setSelectedTags] = useState(asset.tags);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const notify = useNotify();
+  return <form action={async data => {
+    setSaving(true); setError("");
+    try {
+      const result = await updateMediaAssetAction(data);
+      if (result.error) { setError(result.error); return; }
+      notify("File details saved.");
+    } catch { setError("The file could not be saved. Try again."); }
+    finally { setSaving(false); }
+  }} className={styles.metadataForm}>
+    <input name="id" type="hidden" value={asset.id} />
+    <input name="tags" type="hidden" value={selectedTags.join(",")} />
+    <input name="usageContext" type="hidden" value={asset.usageContext} />
+    <input name="focalPointX" type="hidden" value={asset.focalPointX} />
+    <input name="focalPointY" type="hidden" value={asset.focalPointY} />
+    {asset.isPrivate && <input name="isPrivate" type="hidden" value="on" />}
+    <label className={`${styles.field} ${styles.filenameField}`}><span>Filename</span><input name="filename" defaultValue={asset.filename} required maxLength={200} /></label>
+    <label className={styles.field}><span>Folder</span><input defaultValue={asset.folder} name="folder" list="media-folder-options" placeholder="Choose or enter a folder" /></label>
+    <datalist id="media-folder-options">{folders.map(folder => <option key={folder.name} value={folder.name} />)}</datalist>
+    <MediaTagPicker tags={tags.map(tag => tag.name)} selected={selectedTags} onChange={setSelectedTags} />
+    <details className={styles.inspectorSection}>
+      <summary>Editorial details</summary>
+      <label className={styles.field}><span>Caption</span><textarea defaultValue={asset.caption} name="caption" rows={2} /></label>
+      <label className={styles.field}><span>Credit</span><input defaultValue={asset.credit} name="credit" placeholder="Photographer or source" /></label>
+    </details>
+    <details className={styles.inspectorSection}>
+      <summary>Accessibility{!decorative && !asset.alt ? " — needs attention" : ""}</summary>
+      <label className={styles.field}><span>Alt text</span><textarea defaultValue={asset.alt} name="alt" placeholder="Describe what matters in this image" rows={3} />
+        <small>{decorative ? "Alt text is cleared when the image is decorative." : "Describe the image’s purpose, not every visual detail."}</small></label>
+      <label className={styles.checkRow}><span><strong>Decorative image</strong><small>Screen readers will skip this asset.</small></span><input checked={decorative} name="isDecorative" onChange={event => setDecorative(event.currentTarget.checked)} type="checkbox" /></label>
+    </details>
+    <div className={`module-modal-actions ${styles.inspectorActions}`}>
+      <Button disabled={Boolean(asset.usageCount || asset.isHero || asset.isLogo)} onClick={onDelete} size="sm" type="button" variant="danger"><Trash2 aria-hidden="true" size={14} />Delete</Button>
+      <Button disabled={saving} size="sm" type="submit">{saving ? "Saving…" : "Save changes"}</Button>
+    </div>
+    {error && <p role="alert">{error}</p>}
+    {asset.usageCount || asset.isHero || asset.isLogo ? <p className={styles.sectionCopy}>This file is in use. Remove its references before deleting it.</p> : null}
+  </form>;
+}
 
-  const totalUsageCount = asset.usageCount + (asset.isHero ? 1 : 0) + (asset.isLogo ? 1 : 0);
-
-  return (
-    <Modal open onClose={onClose} title={asset.filename} closeLabel="Close asset details" className={styles.detailsModal}>
-        <div className={styles.inspectorScroll}>
-          <div className={styles.heroPreview}>
-            {asset.mimeType.startsWith("image/") || asset.builtIn ? (
-              <NextImage alt={asset.alt || asset.filename} fill sizes="340px" src={asset.fullUrl} unoptimized />
-            ) : (
-              <span className={styles.fileFallback}><File aria-hidden="true" size={32} /><small>{asset.format || "FILE"}</small></span>
-            )}
-          </div>
-
-          <div className={styles.inspectorSummary}>
-            <div>
-              <AssetStatus asset={asset} />
-              {asset.isHero ? <span className={styles.statusHero}><Star aria-hidden="true" size={12} /> Hero</span> : null}
-              {asset.isLogo ? <span className={styles.statusNeutral}>Site logo</span> : null}
-            </div>
-            <h2>{asset.filename}</h2>
-            <p>{asset.caption || asset.alt || "No description added yet."}</p>
-          </div>
-
-          <dl className={styles.factGrid}>
-            <div><dt>Type</dt><dd>{asset.format || asset.mimeType || "Asset"}</dd></div>
-            <div><dt>Dimensions</dt><dd>{asset.width && asset.height ? `${asset.width} × ${asset.height}` : "—"}</dd></div>
-            <div><dt>File size</dt><dd>{bytesLabel(asset.sizeBytes)}</dd></div>
-            <div><dt>Added</dt><dd>{dateLabel(asset.createdAt)}</dd></div>
-            <div><dt>Variants</dt><dd>{asset.variantCount || "—"}</dd></div>
-          </dl>
-
-          {totalUsageCount ? (
-            <div className={styles.usageCard}>
-              <Eye aria-hidden="true" size={17} />
-              <div>
-                <strong>Used in {totalUsageCount} {totalUsageCount === 1 ? "place" : "places"}</strong>
-                <p>{[asset.isHero ? "homepage hero" : "", asset.isLogo ? "site logo" : "", asset.usageCount ? `${asset.usageCount} linked record${asset.usageCount === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ")}.</p>
-              </div>
-            </div>
-          ) : null}
-
-          {archived ? (
-            <div className={styles.restoreCard}>
-              <Trash2 aria-hidden="true" size={19} />
-              <div><strong>This asset is archived</strong><p>Restore it to make it available in pickers and active views again.</p></div>
-              <form action={restoreMediaAssetAction}>
-                <input name="id" type="hidden" value={asset.id} />
-                <Button size="sm" type="submit" variant="secondary"><RotateCcw size={14} /> Restore asset</Button>
-              </form>
-            </div>
-          ) : asset.builtIn ? (
-            <div className={styles.inspectorSection}>
-              <div className={styles.sectionLabel}><span>Global asset</span></div>
-              <p className={styles.sectionCopy}>Built-in assets ship with the app and are always available. They cannot be edited or archived.</p>
-            </div>
-          ) : (
-            <MetadataForm folders={folders} asset={asset} onArchive={() => setConfirmArchive(true)} />
-          )}
-
-          {!archived && !asset.isPrivate && (asset.mimeType.startsWith("image/") || asset.builtIn) ? (
-            <form action={setHeroImageAction} className={styles.heroAction}>
-              <input name="url" type="hidden" value={asset.heroUrl} />
-              <div><Star aria-hidden="true" size={17} /><span><strong>Homepage hero</strong><small>Use this asset in the primary hero presentation.</small></span></div>
-              <Button size="sm" type="submit" variant="secondary">{asset.isHero ? "Refresh hero" : "Use as hero"}</Button>
-            </form>
-          ) : null}
-
-          {confirmArchive ? (
-            <div className={styles.archiveConfirm} role="alert" aria-label={`Archive ${asset.filename}`}>
-              <div><Trash2 aria-hidden="true" size={18} /><span><strong>Archive this asset?</strong><small>It will disappear from active pickers. Assets still in use cannot be archived.</small></span></div>
-              <div>
-                <Button onClick={() => setConfirmArchive(false)} size="sm" type="button" variant="ghost">Cancel</Button>
-                <form action={archiveMediaAssetAction}>
-                  <input name="id" type="hidden" value={asset.id} />
-                  <input name="confirmArchive" type="hidden" value="on" />
-                  <Button size="sm" type="submit" variant="danger">Archive asset</Button>
-                </form>
-              </div>
-            </div>
-          ) : null}
-        </div>
+function AssetInspector({ asset, archived, folders, tags, onClose }: { asset: MediaLibraryAsset; archived: boolean; folders: FolderSummary[]; tags: MediaTagSummary[]; onClose: () => void }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
+  const notify = useNotify();
+  return <Modal open onClose={onClose} title="File details" closeLabel="Close asset details" className={styles.detailsModal}>
+    <div className={styles.inspectorScroll}>
+      <div className={styles.heroPreview}>
+        {asset.mimeType.startsWith("image/") || asset.builtIn ? <NextImage alt={asset.alt || asset.filename} fill sizes="(max-width: 760px) 90vw, 65vw" src={asset.fullUrl} unoptimized />
+          : asset.mimeType.startsWith("video/") ? <video src={asset.fullUrl} controls playsInline preload="metadata" aria-label={asset.filename} />
+          : <span className={styles.fileFallback}><File aria-hidden="true" size={32} /><small>{asset.format || "FILE"}</small></span>}
+        <Button className={styles.infoButton} aria-label={`Information about ${asset.filename}`} type="button" variant="secondary" onClick={() => setInfoOpen(true)}><Info size={18} aria-hidden="true" /></Button>
+      </div>
+      <div className={styles.inspectorOptions}>
+        {archived ? <div className={styles.restoreCard}><h2>{asset.filename}</h2><p>This file is archived.</p><form action={restoreMediaAssetAction}><input name="id" type="hidden" value={asset.id} /><Button size="sm" type="submit" variant="secondary"><RotateCcw size={14} />Restore asset</Button></form></div>
+          : asset.builtIn ? <div><h2>{asset.filename}</h2><p>Built-in assets cannot be edited or deleted.</p></div>
+          : <MetadataForm folders={folders} tags={tags} asset={asset} onDelete={() => { setError(""); setConfirmDelete(true); }} />}
+      </div>
+    </div>
+    <MediaInfoDialog asset={asset} open={infoOpen} onClose={() => setInfoOpen(false)} />
+    <Modal open={confirmDelete} onClose={() => { if (!deleting) setConfirmDelete(false); }} title="Delete file" className={styles.folderModal}>
+      <p>Delete “{asset.filename}”? You can restore it from Archived. Files still in use cannot be deleted.</p>
+      {error && <p role="alert">{error}</p>}
+      <div className="module-modal-actions"><Button type="button" variant="secondary" disabled={deleting} onClick={() => setConfirmDelete(false)}>Cancel</Button>
+        <Button type="button" variant="danger" disabled={deleting} onClick={async () => {
+          setDeleting(true); setError("");
+          try { const data = new FormData(); data.set("id", asset.id); data.set("confirmArchive", "on"); const result = await deleteMediaAsset(data);
+            if (result.error) { setError(result.error); return; }
+            notify("File moved to Archived."); onClose(); router.refresh();
+          } catch { setError("The file could not be deleted. Try again."); } finally { setDeleting(false); }
+        }}>{deleting ? "Deleting…" : "Delete"}</Button></div>
     </Modal>
-  );
+  </Modal>;
 }
 
 export function MediaLibraryWorkspace({
@@ -444,7 +347,9 @@ export function MediaLibraryWorkspace({
   const [cardAction, setCardAction] = useState<CardAction | null>(null);
   const [cardBusy, setCardBusy] = useState(false);
   const [cardError, setCardError] = useState("");
-  function openCardAction(action: CardAction) { setCardError(""); setCardAction(action); }
+  const [needsDestination, setNeedsDestination] = useState(false);
+  const migrateContents = cardAction?.kind === "folder" && cardAction.operation === "delete" && (needsDestination || folders.some(folder => (folder.name === cardAction.id && folder.count > 0) || folder.name.startsWith(`${cardAction.id}/`)));
+  function openCardAction(action: CardAction) { setCardError(""); setNeedsDestination(false); setCardAction(action); }
   const notify = useNotify();
   const [folderBusy, setFolderBusy] = useState(false);
   const [moveBusy, setMoveBusy] = useState(false);
@@ -535,7 +440,7 @@ export function MediaLibraryWorkspace({
     if (event.button !== 0 || event.pointerType !== "mouse" || moveBusy) return;
     suppressClick.current = false;
     const target = event.target as HTMLElement;
-    if (target.closest("input, label, select, details, [data-folder-path], nav")) return;
+    if (target.closest("input, label, select, details, dialog, [data-folder-path], nav")) return;
     const tile = target.closest<HTMLElement>("[data-media-id]");
     if (tile && tile.dataset.movable !== "true") return;
     if (!tile && target.closest("button, a")) return;
@@ -617,7 +522,7 @@ export function MediaLibraryWorkspace({
             setCardBusy(true); setCardError("");
             try {
               const result = cardAction.kind === "folder" ? await changeMediaFolder(data) : cardAction.operation === "rename" ? await renameMediaAsset(data) : cardAction.operation === "delete" ? await deleteMediaAsset(data) : await moveMediaAssetToFolder(data);
-              if (result.error) { setCardError(result.error); return; }
+              if (result.error) { setCardError(result.error); if ("needsDestination" in result && result.needsDestination) setNeedsDestination(true); return; }
               notify(cardAction.operation === "rename" ? "Name updated." : cardAction.operation === "move" ? "Moved successfully." : cardAction.kind === "folder" ? "Folder deleted." : "File moved to Archived.");
               setCardAction(null); setSelectedIds([]); router.refresh();
             } catch { setCardError("The change could not be saved. Please try again."); }
@@ -627,7 +532,7 @@ export function MediaLibraryWorkspace({
           <input type="hidden" name="operation" value={cardAction.operation} />
           {cardAction.kind === "folder" && <input type="hidden" name="folder" value={cardAction.id} />}
           {cardAction.operation === "rename" && <label>Name<input autoFocus name={cardAction.kind === "folder" ? "value" : "name"} defaultValue={cardAction.name} required maxLength={200} disabled={cardBusy} /></label>}
-          {cardAction.operation === "move" && <label>Destination folder<select autoFocus name={cardAction.kind === "folder" ? "value" : "folder"} defaultValue={cardAction.folder} disabled={cardBusy}>
+          {(cardAction.operation === "move" || migrateContents) && <label>{migrateContents ? "Move contents to" : "Destination folder"}<select autoFocus name={migrateContents ? "migrateTo" : cardAction.kind === "folder" ? "value" : "folder"} defaultValue={migrateContents ? "" : cardAction.folder} disabled={cardBusy}>
             <option value="">Media home</option>
             {[...new Set(folders.flatMap(folder => folder.name.split("/").map((_, index, parts) => parts.slice(0, index + 1).join("/"))))]
               .filter(folder => cardAction.kind !== "folder" || (folder !== cardAction.id && !folder.startsWith(`${cardAction.id}/`)))
@@ -635,7 +540,7 @@ export function MediaLibraryWorkspace({
           </select></label>}
           {cardAction.operation === "delete" && <>
             <input type="hidden" name="confirmArchive" value="on" /><input type="hidden" name="value" value="" />
-            <p>Delete “{cardAction.name}”? {cardAction.kind === "file" ? "You can restore it from Archived. Files still in use cannot be deleted." : "The folder must be empty. Move or delete its files and subfolders first."}</p>
+            <p>Delete “{cardAction.name}”? {cardAction.kind === "file" ? "You can restore it from Archived. Files still in use cannot be deleted." : migrateContents ? "Its files and subfolders will be moved to the destination you choose." : ""}</p>
           </>}
           {cardError && <p role="alert">{cardError}</p>}
           <div className="module-modal-actions">
@@ -724,6 +629,7 @@ export function MediaLibraryWorkspace({
               <select aria-label="Asset type" onChange={(event) => navigate({ kind: event.currentTarget.value })} value={filters.kind}>
                 <option value="all">All types</option>
                 <option value="image">Images</option>
+                <option value="video">Videos</option>
                 <option value="other">Other files</option>
               </select>
             </label>
@@ -751,8 +657,8 @@ export function MediaLibraryWorkspace({
 
           </div>
 
-          {filters.q || filterCount ? (
-            <div className={styles.activeFilters}>
+          <div className={styles.activeFilters}>
+            {filters.q || filterCount ? (<>
               <span>Filtered by</span>
               {filters.scope !== "all" ? <button onClick={() => navigate({ scope: "all" })} type="button">{({home: "All files", recent: "Recently added", private: "Private", "needs-alt": "Needs alt text", "built-in": "Built-in", archived: "Archived"})[filters.scope]}<X size={12} /></button> : null}
               {filters.q ? <button onClick={() => navigate({ q: null })} type="button">Search: {filters.q}<X size={12} /></button> : null}
@@ -760,8 +666,8 @@ export function MediaLibraryWorkspace({
               {filters.tag ? <button onClick={() => navigate({ tag: null })} type="button">Tag: {filters.tag}<X size={12} /></button> : null}
               {filters.kind !== "all" ? <button onClick={() => navigate({ kind: null })} type="button">Type: {filters.kind}<X size={12} /></button> : null}
               <button className={styles.clearFilters} onClick={() => navigate({ scope: "all", folder: null, kind: null, q: null, tag: null })} type="button">Clear all</button>
-            </div>
-          ) : null}
+            </>) : null}
+          </div>
 
           {selectedIds.length > 0 && <div className={styles.selectionActions}>
             <span role="status">{selectedIds.length} selected</span>
@@ -819,11 +725,11 @@ export function MediaLibraryWorkspace({
               <div className={styles.emptyState}>
                 <span><FolderOpen aria-hidden="true" size={25} /></span>
                 <h3>{filters.q || filters.tag || filters.kind !== "all" ? "No assets match this view" : filters.folder ? "This folder is empty" : filters.scope === "archived" ? "Your archive is empty" : filters.scope === "all" ? "No files yet" : "No files in this category"}</h3>
-                <p>{filters.q || filters.tag || filters.kind !== "all" ? "Try another search or clear your filters." : filters.folder ? "Upload images here, or assign existing files to this folder in their details." : filters.scope === "archived" ? "Assets you archive will stay recoverable here." : filters.scope === "all" ? "Upload images to use across your website and business." : "Choose another category to browse your files."}</p>
+                <p>{filters.q || filters.tag || filters.kind !== "all" ? "Try another search or clear your filters." : filters.folder ? "Upload media here, or assign existing files to this folder in their details." : filters.scope === "archived" ? "Assets you archive will stay recoverable here." : filters.scope === "all" ? "Upload media to use across your website and business." : "Choose another category to browse your files."}</p>
                 {filters.q || filters.tag || filters.kind !== "all" ? (
                   <Button onClick={() => navigate({ scope: "all", folder: null, kind: null, q: null, tag: null })} size="sm" type="button" variant="secondary">Clear filters</Button>
                 ) : filters.scope === "all" ? (
-                  <Button onClick={() => openUpload()} size="sm" type="button"><Upload size={15} /> Upload images</Button>
+                  <Button onClick={() => openUpload()} size="sm" type="button"><Upload size={15} /> Upload media</Button>
                 ) : null}
               </div>
             )}
@@ -844,7 +750,7 @@ export function MediaLibraryWorkspace({
           ) : null}
         </section>
 
-        {selectedAsset ? <AssetInspector folders={folders} archived={filters.scope === "archived"} asset={selectedAsset} key={selectedAsset?.id || filters.scope} onClose={() => setSelectedId(null)} /> : null}
+        {selectedAsset ? <AssetInspector tags={tags} folders={folders} archived={filters.scope === "archived"} asset={selectedAsset} key={selectedAsset?.id || filters.scope} onClose={() => setSelectedId(null)} /> : null}
       </div>
 
       <UploadAssetsModal folders={folders.map(folder => folder.name)} defaultFolder={uploadFolder} initialFiles={uploadFiles} canUpload={canUpload} onClose={() => { setUploadOpen(false); setUploadFiles([]); }} open={uploadOpen} />

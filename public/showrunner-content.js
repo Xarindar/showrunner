@@ -9,6 +9,7 @@
   let selectedId = "";
   let revealRequest = 0;
   const rendered = new Map();
+  const teamTemplates = new WeakMap();
   const mobileScreen = window.matchMedia?.("(max-width: 720px)");
   let publishedBlocks = [];
   const publishedOrigin = script?.src ? new URL(script.src).origin : location.origin;
@@ -41,6 +42,31 @@
           }
         });
       });
+      if (block.type === "team" && block.presentation?.variant === "team-cards" && block.presentation.selector) {
+        document.querySelectorAll(block.presentation.selector).forEach(host => {
+          const grid = host.querySelector(".team-grid");
+          if (!grid) return;
+          if (!teamTemplates.has(grid) && grid.querySelector("article")) teamTemplates.set(grid, grid.querySelector("article").cloneNode(true));
+          const template = teamTemplates.get(grid);
+          if (!template) return;
+          const cards = (block.payload.items || []).map((item, index) => {
+            const card = template.cloneNode(true);
+            card.removeAttribute("id"); card.querySelectorAll("[id]").forEach(node => node.removeAttribute("id"));
+            const name = card.querySelector("h3"), role = card.querySelector("p"), image = card.querySelector("img");
+            if (name) { name.textContent = item.name || ""; name.dataset.srField = `items.${index}.name`; }
+            if (role) { role.textContent = [item.role, item.bio].filter(Boolean).join("\n"); role.style.whiteSpace = "pre-line"; role.dataset.srField = `items.${index}.role`; }
+            if (image) {
+              const value = item.imageUrl || "";
+              const src = value ? safeUrl(value, value.startsWith("/") ? assetOrigin : block.presentation.assetBaseUrl || location.href) : "";
+              image.removeAttribute("srcset"); card.querySelectorAll("source").forEach(node => node.remove());
+              if (src) image.src = src; else image.removeAttribute("src");
+              image.hidden = !src; image.alt = item.imageAlt || item.name || ""; image.dataset.srField = `items.${index}.imageUrl`;
+            }
+            return card;
+          });
+          grid.replaceChildren(...cards);
+        });
+      }
       // Opt-in dedicated showcase hosts; client CSS owns the card layout and theme.
       if (block.type === "showcase" && block.presentation?.selector) {
         document.querySelectorAll(block.presentation.selector).forEach(host => {

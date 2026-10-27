@@ -55,7 +55,7 @@ function filtersFromParams(params: Record<string, string | undefined>): MediaLib
 
   return {
     folder: (params.folder || "").trim().slice(0, 200),
-    kind: oneOf(params.kind, ["all", "image", "other"] as const, "all"),
+    kind: oneOf(params.kind, ["all", "image", "video", "other"] as const, "all"),
     page: positiveInteger(params.page),
     q: (params.q || "").trim().slice(0, 180),
     scope: requestedScope === "home" ? "all" : requestedScope,
@@ -85,7 +85,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
     select: { name: true }, orderBy: { name: "asc" }
   });
   const matchingBuiltInAssets = globalMediaAssets.filter((asset) => {
-    if (filters.kind === "other") return false;
+    if (filters.kind === "other" || filters.kind === "video") return false;
     if (!filters.q) return true;
     const query = filters.q.toLocaleLowerCase();
     return asset.filename.toLocaleLowerCase().includes(query) || asset.alt.toLocaleLowerCase().includes(query);
@@ -108,7 +108,8 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
   if (filters.folder) clauses.push({ folder: filters.folder });
   if (filters.tag) clauses.push({ tags: { array_contains: [filters.tag] } });
   if (filters.kind === "image") clauses.push({ mimeType: { startsWith: "image/", mode: "insensitive" } });
-  if (filters.kind === "other") clauses.push({ NOT: { mimeType: { startsWith: "image/", mode: "insensitive" } } });
+  if (filters.kind === "video") clauses.push({ mimeType: { startsWith: "video/", mode: "insensitive" } });
+  if (filters.kind === "other") clauses.push({ NOT: { OR: [{ mimeType: { startsWith: "image/", mode: "insensitive" } }, { mimeType: { startsWith: "video/", mode: "insensitive" } }] } });
   if (filters.q) {
     clauses.push({
       OR: [
@@ -261,7 +262,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       recentCount={recentCount}
       resultCount={resultCount}
       savedMessage={savedMessage(params.saved)}
-      tags={summarizeMediaTags(tagRows)}
+      tags={summarizeMediaTags(tagRows, 5000)}
     />
   );
 }

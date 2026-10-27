@@ -34,7 +34,7 @@ export const blockRegistry = {
   }, 30) } },
   about: { label: "About / story section", fields: { ...section, copy: { ...copy("Copy"), kind: "richtext" } as Field, ...framing, imageUrl: url("Image URL"), imageAlt: text("Alternative text") } },
   faq: { label: "FAQ section", fields: { heading: text("Heading"), items: list("Questions", { question: text("Question", 500), answer: { ...copy("Answer"), kind: "richtext" } }) } },
-  team: { label: "Team / staff spotlight", fields: { ...section, items: list("People", { name: text("Name"), role: text("Role"), bio: copy("Biography"), ...framing, imageUrl: url("Photo URL"), imageAlt: text("Alternative text") }) } },
+  team: { label: "Team / staff spotlight", fields: { ...section, items: list("Team member", { name: text("Name"), role: copy("Role"), bio: copy("Biography"), ...framing, imageUrl: url("Photo URL"), imageAlt: text("Alternative text") }, 30) } },
   contact: { label: "Contact / location section", fields: { ...section, locationId: text("Location ID (blank for primary)") } },
   footer: { label: "Footer content controls", fields: { tagline: text("Tagline"), copy: copy("Copy"), links: list("Links", link) } },
   seo: { label: "Page SEO", fields: { title: text("SEO page title", 200), description: text("Meta description", 500) } },

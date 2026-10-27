@@ -12,8 +12,8 @@ export function readStudio(value: unknown): StudioState {
   return { version: 1, blocks: configRecord(studio.blocks) as Record<string, StoredBlock> };
 }
 export function resolveStudioPayload(block: ContentBlockConfig, stored?: StoredBlock) {
-  // The adapter supplies a lossless read of the previous header field arrays.
-  return block.type === "slideshow" && !Array.isArray(stored?.payload.slides)
+  // The adapter supplies a lossless read of the previous header and team field arrays.
+  return ((block.type === "slideshow" && !Array.isArray(stored?.payload.slides)) || (block.type === "team" && !Array.isArray(stored?.payload.items)))
     ? block.defaults || emptyPayload(block.type)
     : stored?.payload || block.defaults || emptyPayload(block.type);
 }

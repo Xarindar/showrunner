@@ -40,6 +40,8 @@ Business hours on service creation and editing opens the availability controls f
 
 ## Media
 
+Saving file details keeps the inspector open and preserves the current search, folder, filters, page and scroll position. Success appears as a toast; validation errors remain beside the form without discarding edits.
+
 File and folder cards offer Rename, Move, and Delete through a three-dot menu. Renaming files preserves their storage keys and links. Folder rename and move carry the complete nested tree, reject conflicting destinations and require access to every affected item. Delete asks for confirmation: files go to the recoverable archive and files still in use are protected; folders must be empty before removal.
 
 Media home shows folders alongside the full authorized file library in one consistent grid; opening a folder filters to its contents. Folders preserve capitals and spaces, open into their direct children, and create new folders within the current path. Search and category filters can find files across folders. Dragging a selection box or using file checkboxes selects multiple files; picking them up shows a floating preview while preserving their grid spaces until a successful drop. Drop on a folder or breadcrumb to move the selection atomically, or use Move to with the keyboard. Cancelled or failed moves restore the files. Grid/list controls sit beside Filters and Sort. Folder creation uses a compact dialog where Enter confirms. Dropping files from the computer opens the upload queue for the hovered folder, or the current folder when dropped elsewhere in the library; the upload dialog shows the destination.
@@ -54,3 +56,11 @@ Bookings contains Appointments (calendar, list and waitlist), Schedule and Staff
 
 ## Time presentation
 Show all user-facing times in 12-hour format with explicit AM/PM. Use `formatTime` / `formatDateTime` for dated values, `formatTimeValue` for wall-clock values, and the shared `TimeInput` / `DateTimeInput` controls for editing. Storage, API payloads, calendar coordinates and timezone calculations retain canonical 24-hour values. Each weekly-hours Edit action starts from that day’s saved scoped schedule; toggling Accept appointments off and back on retains the draft time ranges.
+
+The media library accepts images up to 12 MB and MP4, WebM, and MOV videos up to 25 MB on server, S3, or R2 storage. Video details offer native playback and seeking; playback depends on browser codec support. Media type filters distinguish images, videos, and other files. Image-only website fields remain image-only. The filter summary reserves its row so folder navigation does not shift breadcrumbs.
+
+Media details prioritize filename, folder, and selectable tags with search and a New Tag dialog. Editorial details and accessibility are collapsed, with accessibility last. Technical file information opens from an info icon; privacy and focal-point values are preserved without library controls. Delete asks for confirmation and remains recoverable from Archived. Admin textareas cannot be manually resized.
+
+Deleting an empty media folder asks only for confirmation. Deleting a populated folder offers Media Home or an accessible destination outside its own subtree, then moves files and subfolders before removing the folder in one transaction. Subfolder name collisions stop the change without overwriting content.
+
+Cottage616 and The Hive team sections use editable member lists: clients can add or remove members while the site keeps its existing card design. Legacy team text, photos, framing, and mobile overrides are adapted on read and retained on save. Shared admin textarea controls disable resizing even when embedded editor styles request it.

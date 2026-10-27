@@ -87,7 +87,7 @@
 .showrunner-admin :is(.ui-input, .field input, .field select, .field textarea, .ui-field input:not([type="checkbox"]):not([type="radio"]), .ui-field select, .ui-field textarea) {
   width: 100%;
 }
-.showrunner-admin textarea { min-height: 112px; resize: vertical; }
+.showrunner-admin textarea { min-height: 112px; resize: none !important; }
 .showrunner-admin :is(.admin-main, .login-wrap) :is(input:where(:not([type="checkbox"]):not([type="radio"])), select, textarea):focus-visible {
   outline: 0;
   box-shadow: var(--sd-shadow-input-focus);

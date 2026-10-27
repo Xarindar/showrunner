@@ -7,7 +7,7 @@ import ts from "typescript";
 import { z } from "zod";
 import { normalizeMediaFolder, validMediaFolderPath } from "../lib/media-folders";
 
-test("card actions preserve links and nested paths, enforce scope, reject collisions and delete only empty folders", async () => {
+test("card actions preserve links and nested paths, enforce scope, reject collisions and migrate contents before deleting folders", async () => {
   type Row = Record<string, unknown>;
   let folders: Row[] = [
     { id: "root", siteId: "site", name: "Photos", createdByUserId: "owner" },
@@ -47,7 +47,7 @@ test("card actions preserve links and nested paths, enforce scope, reject collis
     "next/cache": { revalidatePath: () => {} }, "next/navigation": {}, "@/modules/content/hero-presentation": {}, "@/lib/media-usage": {}
   };
   const require = createRequire(import.meta.url);
-  const actions: Record<string, (data: FormData) => Promise<{ error?: string; success?: boolean }>> = {};
+  const actions: Record<string, (data: FormData) => Promise<{ error?: string; success?: boolean; needsDestination?: boolean }>> = {};
   runInNewContext(ts.transpileModule(readFileSync(new URL("../modules/media/actions.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText,
     { exports: actions, require: (id: string) => id in mocks ? mocks[id] : require(id) });
   const data = (values: Record<string, string>) => { const form = new FormData(); Object.entries(values).forEach(([key, value]) => form.set(key, value)); return form; };
@@ -78,6 +78,24 @@ test("card actions preserve links and nested paths, enforce scope, reject collis
   assert.equal(assets[0].folder, "Events/Family Photos");
   assert.equal((await change("Events/Family Photos", "delete")).success, true);
   assert.equal(assets[0].folder, "Events"); assert.equal(folders.length, 1);
+  folders.push({id:"remove",siteId:"site",name:"Remove",createdByUserId:"owner"},{id:"nested",siteId:"site",name:"Remove/Nested",createdByUserId:"owner"});
+  assets.push({...assets[0],id:"direct",folder:"Remove",deletedAt:null},{...assets[0],id:"nested-file",folder:"Remove/Nested",deletedAt:null});
+  assert.equal((await change("Remove","delete")).needsDestination,true);
+  const migrate = (folder: string, migrateTo: string) => actions.changeMediaFolder(data({folder,operation:"delete",value:"",migrateTo}));
+  assert.ok((await migrate("Remove","Remove/Nested")).error);
+  assert.ok((await migrate("Remove","Missing")).error);
+  assert.equal((await migrate("Remove","Events")).success,true);
+  assert.equal(assets.find(row=>row.id==="direct")!.folder,"Events");
+  assert.equal(assets.find(row=>row.id==="nested-file")!.folder,"Events/Nested");
+  assert.ok(folders.some(row=>row.name==="Events/Nested"));assert.ok(!folders.some(row=>row.name==="Remove"));
+  assert.equal(assets.find(row=>row.id==="nested-file")!.url,"/original");
+  folders.push({id:"collision",siteId:"site",name:"Collision",createdByUserId:"owner"},{id:"collision-child",siteId:"site",name:"Collision/Nested",createdByUserId:"owner"});
+  assert.match((await migrate("Collision","Events")).error!,/same name/);
+  assert.ok(folders.some(row=>row.name==="Collision/Nested"));
+  assert.equal((await migrate("Collision","")).success,true);
+  assert.ok(folders.some(row=>row.name==="Nested"));
+  assert.equal((await migrate("Events/Nested","")).success,true);
+  assert.equal(assets.find(row=>row.id==="nested-file")!.folder,"");
   denied = true;
   await assert.rejects(change("Events", "delete"), /Denied/);
   await assert.rejects(actions.renameMediaAsset(data({ id: "a", name: "Changed" })), /Denied/);
