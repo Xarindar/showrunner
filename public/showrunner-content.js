@@ -72,7 +72,7 @@
         document.querySelectorAll(block.presentation.selector).forEach(host => {
           const fragment = document.createDocumentFragment();
           const text = (tag, value, className) => { const node = document.createElement(tag); node.textContent = String(value || ""); if (className) node.className = className; return node; };
-          if (block.payload.heading) fragment.append(text("h2", block.payload.heading));
+          if (block.payload.heading) { const heading = text("h2", block.payload.heading); heading.dataset.srField = "heading"; fragment.append(heading); }
           const list = document.createElement("div"); list.className = "showrunner-showcase";
           (block.payload.items || []).forEach((item, index) => {
             const card = document.createElement("article"); card.className = "showrunner-showcase-card";

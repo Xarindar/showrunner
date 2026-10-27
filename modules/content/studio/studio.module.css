@@ -1,5 +1,6 @@
 .fields { display: grid; gap: var(--sd-space-16); border: 0; padding: 0; min-width: 0; }
 .field { display: grid; gap: var(--sd-space-8); }
+:global(.showrunner-admin) .fields .field textarea { border-block: var(--sd-space-4) solid transparent; padding-block: 0; }
 .check { display: flex; align-items: center; gap: var(--sd-space-8); }
 .mediaPicker { display: block; }
 .mediaPicker small { color: var(--color-muted); }
