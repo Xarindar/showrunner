@@ -4,17 +4,25 @@ import strips from "../clients/cottage616/page-strips.json";
 import { cottageTeamBlock } from "../clients/cottage616/team-blocks";
 import type { ContentBlockConfig } from "../modules/content/studio/manifest";
 import { resolveStudioPayload, validateBlockUpdate, type StoredBlock } from "../modules/content/studio/state";
-import { resolveMobilePayload, mobileOverrides } from "../modules/content/studio/mobile-overrides";
+import { resolveMobilePayload, mobileOverrides, type MobileOverride } from "../modules/content/studio/mobile-overrides";
+type LegacyTeamPayload = Record<string, unknown> & {
+ texts: { id: string; text: string }[];
+ images: { id: string; imagePositionX?: number }[];
+ mobileOverrides?: MobileOverride[];
+};
+type TeamPayload = Record<string, unknown> & {
+ items: { id: string; name: string; imageUrl: string; imagePositionX: number }[];
+};
 for (const [id, count, offset] of [["home-section-7",4,1],["hive-section-4",2,3]] as const) test(`${id} preserves existing members and permits add/remove with mobile overrides`, () => {
  const raw = strips.find(block=>block.id===id)! as ContentBlockConfig;
- const legacy = structuredClone(raw.defaults!) as any;
+ const legacy = structuredClone(raw.defaults!) as LegacyTeamPayload;
  legacy.texts[offset].text="Saved name";
  legacy.images[0].imagePositionX=23;
  legacy.mobileOverrides=[{path:["texts",legacy.texts[offset].id,"text"],value:"Mobile name"},{path:["images",legacy.images[0].id,"url"],value:"/mobile.jpg"}];
  const block=cottageTeamBlock(raw,legacy);
- const payload=block.defaults! as any;
+ const payload=block.defaults! as TeamPayload;
  assert.equal(payload.items.length,count); assert.equal(payload.items[0].name,"Saved name"); assert.equal(payload.items[0].imagePositionX,23);
- const mobile=resolveMobilePayload(payload) as any;
+ const mobile=resolveMobilePayload(payload) as TeamPayload;
  assert.equal(mobile.items[0].name,"Mobile name"); assert.equal(mobile.items[0].imageUrl,"/mobile.jpg");
  const stored: StoredBlock={schemaVersion:1,revision:2,payload:legacy,pageIds:block.pageIds,updatedAt:"",updatedBy:""};
  assert.deepEqual(resolveStudioPayload(block,stored),payload);

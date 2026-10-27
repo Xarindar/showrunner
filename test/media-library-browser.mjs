@@ -1,9 +1,10 @@
-const fs = require('node:fs');
-const assert = require('node:assert/strict');
-const { build } = require('esbuild');
-const { createServer } = require('node:http');
-const path = require('node:path');
-const output = path.join(fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'showrunner-media-')), 'fixture.js');
+import * as fs from 'node:fs';
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { createServer } from 'node:http';
+import path from 'node:path';
+import { tmpdir } from 'node:os';
+const output = path.join(fs.mkdtempSync(path.join(tmpdir(), 'showrunner-media-')), 'fixture.js');
 fs.mkdirSync('.tmp', {recursive:true});
 (async () => {
   await build({ stdin: { contents: `

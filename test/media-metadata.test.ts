@@ -6,8 +6,13 @@ import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { z } from "zod";
 
+type MetadataWrite = {
+  where: { AND: { siteId?: string }[] };
+  data: { filename: string; tags: string[]; isPrivate: boolean; focalPointX: number; focalPointY: number; usageContext: string };
+};
+
 function harness() {
-  const writes: any[] = [];
+  const writes: MetadataWrite[] = [];
   const require = createRequire(import.meta.url);
   const mocks: Record<string, unknown> = {
     "next/cache": { revalidatePath() {} }, "next/navigation": { redirect(url: string) { throw new Error(url); } },
@@ -16,12 +21,13 @@ function harness() {
     "@/lib/site": {getCurrentSiteId: async()=>"site"},
     "@/lib/media": { normalizeMediaFolder: (v: string)=>v, mediaTagsFromInput: (v: string)=>v.split(","), supportsPrivateMediaDriver: ()=>true, ensureMediaAssetVariants: async()=>{} },
     "@/lib/media-usage": {}, "@/modules/content/hero-presentation": {},
-    "@/lib/prisma": {prisma:{mediaAsset:{ findFirst: async()=>({id:"asset",driver:"S3",isPrivate:true,clientFiles:[],portfolioItems:[],purchasedSelections:[]}), updateMany: async (query: any)=>{writes.push(query);return {count:1};} }}}
+    "@/lib/prisma": {prisma:{mediaAsset:{ findFirst: async()=>({id:"asset",driver:"S3",isPrivate:true,clientFiles:[],portfolioItems:[],purchasedSelections:[]}), updateMany: async (query: MetadataWrite)=>{writes.push(query);return {count:1};} }}}
   };
-  const api: any = {};
+  const api: Partial<Pick<typeof import("../modules/media/actions"), "updateMediaAssetAction">> = {};
   const source=ts.transpileModule(readFileSync("modules/media/actions.ts","utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
   runInNewContext(source,{exports:api,require:(name:string)=>name in mocks?mocks[name]:require(name),File,FormData,console});
   const data=new FormData();for(const [key,value] of Object.entries({id:"asset",filename:"Updated.jpg",alt:"Garden",caption:"Caption",credit:"Credit",folder:"Photos",tags:"Garden,Events",usageContext:"existing",focalPointX:"0.2",focalPointY:"0.8",isPrivate:"on"})) data.set(key,value);
+  assert.ok(api.updateMediaAssetAction);
   return {data,writes,save:api.updateMediaAssetAction};
 }
 test("metadata saves filename and selected tags while preserving hidden privacy and framing",async()=>{
