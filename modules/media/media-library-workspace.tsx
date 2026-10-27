@@ -176,7 +176,7 @@ function CardMenu({ name, onAction, onDetails, disabled }: { name: string; onAct
     <div role="group" aria-label={`Actions for ${name}`}>
       {(["rename", "move", ...(onDetails ? ["details" as const] : []), "delete"] as const).map(operation => <Button key={operation} type="button" variant={operation === "delete" ? "danger" : "ghost"} disabled={disabled}
         onClick={() => { if (ref.current) { ref.current.open = false; ref.current.querySelector("summary")?.focus(); } if (operation === "details") onDetails?.(); else onAction(operation); }}>
-        {operation === "rename" ? <Pencil size={16} /> : operation === "move" ? <FolderOpen size={16} /> : operation === "details" ? <Info size={16} /> : <Trash2 size={16} />}
+        {operation === "rename" ? <Pencil size={16} /> : operation === "move" ? <FolderOpen size={16} /> : operation === "details" ? <File size={16} /> : <Trash2 size={16} />}
         {operation === "rename" ? "Rename" : operation === "move" ? "Move" : operation === "details" ? "Details" : "Delete"}
       </Button>)}
     </div>
