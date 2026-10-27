@@ -163,7 +163,8 @@
 :global(.showrunner-admin .admin-main) .overview > :global(.page-header) { flex-shrink: 0; align-items: center; min-height: var(--sd-layout-page-header); margin: 0; padding: var(--sd-space-8) var(--sd-space-16); }
 :global(.showrunner-admin .admin-main) .overview > :global(.page-header) h1 { margin: 0; }
 .overview > p { padding-inline: var(--admin-page-inset); }
-.websitePreview { display: block; flex: 1; min-height: 0; width: 100%; border: 0; background: var(--color-surface); }
+.websitePreview { display: block; flex: 1; min-height: 0; max-width: 100%; align-self: center; border: 0; background: var(--color-surface); }
+.websitePreview:not(.mobileFrame) { width: 100%; }
 @media (max-width: 860px) {
   :global(.showrunner-admin .admin-root):has(.overview) { display: flex; flex-direction: column; height: 100dvh; min-height: 0; }
   :global(.showrunner-admin .admin-root):has(.overview) > :global(.admin-mobile-bar) { flex-shrink: 0; }

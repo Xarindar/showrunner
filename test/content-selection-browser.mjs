@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { readFileSync, mkdtempSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 const require=createRequire(import.meta.url);const {build}=require('esbuild');
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
 const output=resolve(mkdtempSync(resolve(tmpdir(),'section-selection-')),'fixture');
+mkdirSync('.tmp',{recursive:true});
 await build({stdin:{resolveDir:process.cwd(),loader:'tsx',contents:`
 import React from 'react';import {createRoot} from 'react-dom/client';
 import {PuckContentEditor} from './modules/content/studio/puck-editor';
@@ -30,6 +31,20 @@ try{
  const overview=await page.locator('main > div').first().boundingBox();
  const publishedPreview=await page.getByTitle('Your website preview',{exact:true}).boundingBox();
  assert(publishedPreview.y-overview.y<=64,'Content overview keeps its toolbar compact above the preview');
+ await page.screenshot({path:'.tmp/content-overview-desktop.png'});
+ await page.getByRole('button',{name:'Mobile preview',exact:true}).click();
+ await page.waitForFunction(()=>Math.round(document.querySelector('iframe').getBoundingClientRect().width)===390);
+ assert.equal(await page.getByRole('button',{name:'Mobile preview',exact:true}).getAttribute('aria-pressed'),'true');
+ assert.equal(await page.getByRole('navigation',{name:'Page sections'}).count(),0,'Preview sizing does not enter editing');
+ assert(!((await page.getByTitle('Your website preview').getAttribute('src')).includes('showrunner-editor')),'Overview remains the published site');
+ await page.screenshot({path:'.tmp/content-overview-mobile-preview.png'});
+ await page.setViewportSize({width:390,height:844});
+ assert(await page.getByRole('button',{name:'Desktop preview',exact:true}).isVisible());
+ assert(await page.getByRole('button',{name:'Mobile preview',exact:true}).isVisible());
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Overview toolbar fits a phone');
+ await page.setViewportSize({width:1440,height:1000});
+ await page.getByRole('button',{name:'Desktop preview',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('iframe').getBoundingClientRect().width>390);
  await page.getByRole('button',{name:'Edit website',exact:true}).click();
  const preview=page.frameLocator('iframe[title="Home website preview"]');
  await preview.locator('#section-19[data-sr-section]').waitFor();

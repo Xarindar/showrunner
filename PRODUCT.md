@@ -7,6 +7,8 @@ Web application.
 Showrunner is the reusable administration product. Client websites integrate with it; Cottage616 is the beta installation used to validate this content editor.
 
 ## Content editing
+
+The published Content overview includes the same Desktop/Mobile preview toggle as the editor. Switching preview size changes the website iframe width without entering edit mode or changing published content.
 The Content module opens directly onto a published-site preview with an Edit website action. Website owners enter an editor mode in the same tab, with their actual website in the canvas and a left editing sidebar replacing dashboard navigation. Exit editor restores navigation and keeps unpublished edits during the current visit. Clicking a sidebar section snaps the website preview to it, including repeated clicks. Clicking the preview selects and reveals its matching sidebar entry. Clicking text or an image opens its section and focuses the matching field; text is selected for replacement. They can update approved text, images, and featured services. Site designers own the page sections, layout, and order; customers cannot add, remove, duplicate, or move sections.
 
 The inspector groups fields by the visual item, with its image first. Each header slide has an accordion containing its image, title, caption, and button. Add header creates a slide inside the existing fixed section. The photo or empty image placeholder opens the media picker. The editor hides alternative text, internal location IDs, and SEO fields; accessibility descriptions remain in the site data. Native menus and links let owners switch between registered pages without losing unpublished edits.

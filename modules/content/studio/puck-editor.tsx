@@ -220,17 +220,18 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios, mobile, setM
     setPreviewVersion(Date.now().toString(36));
     setReady(false); setFrameError(false); setEditing(true); setPanelOpen(false); setSheetExpanded(false);
   }
+  const previewDevices = <div className={styles.devices} role="group" aria-label="Preview size"><Button variant="ghost" title="Desktop preview" aria-label="Desktop preview" aria-pressed={!mobile} onClick={() => setMobile(false)}><Monitor size={18} /></Button><Button variant="ghost" title="Mobile preview" aria-label="Mobile preview" aria-pressed={mobile} onClick={() => setMobile(true)}><Smartphone size={18} /></Button></div>;
   if (!editing) return <div className={styles.overview}>
-    <header className="page-header"><h1>Content</h1><Button ref={editorEntry} onClick={enterEditor}>Edit website</Button></header>
+    <header className="page-header"><h1>Content</h1><div className="button-row ui-cluster ui-gap-2">{previewDevices}<Button ref={editorEntry} onClick={enterEditor}>Edit website</Button></div></header>
     {dirty && <p className={styles.saveState} role="status">Your unpublished edits are kept in this visit. The preview below shows the published website.</p>}
-    {siteUrl ? <iframe src={siteUrl} title="Your website preview" className={styles.websitePreview} /> : <p>Your website preview has not been connected. Your site administrator can connect it in the content manifest.</p>}
+    {siteUrl ? <iframe src={siteUrl} title="Your website preview" className={`${styles.websitePreview} ${mobile ? styles.mobileFrame : ""}`} /> : <p>Your website preview has not been connected. Your site administrator can connect it in the content manifest.</p>}
   </div>;
   return <div className={`${styles.workspace} showrunner-content-workspace`}>
     <header className={styles.toolbar}>
       <Button ref={editorExit} variant="ghost" aria-label="Exit editor" disabled={pending} onClick={() => { setEditing(false); setReady(false); }}><ArrowLeft size={17} aria-hidden="true" /><span>Exit editor</span></Button>
       <h1 className="ui-sr-only">Website editor</h1>
       <label className={styles.pageLabel}><span className="ui-sr-only">Page</span><select aria-label="Page" value={pageId} disabled={pending} onChange={event => navigate(manifest.pages.find(page => page.id === event.target.value)!.path)}>{manifest.pages.map(item => <option value={item.id} key={item.id}>{item.label}</option>)}</select></label>
-      <div className={styles.devices} role="group" aria-label="Preview size"><Button variant="ghost" title="Desktop preview" aria-label="Desktop preview" aria-pressed={!mobile} onClick={() => setMobile(false)}><Monitor size={18} /></Button><Button variant="ghost" title="Mobile preview" aria-label="Mobile preview" aria-pressed={mobile} onClick={() => setMobile(true)}><Smartphone size={18} /></Button></div>
+      {previewDevices}
       <div className={styles.history}><Button variant="ghost" title="Undo" aria-label="Undo" disabled={!history.hasPast || pending} onClick={history.back}><Undo2 size={17} /></Button><Button variant="ghost" title="Redo" aria-label="Redo" disabled={!history.hasFuture || pending} onClick={history.forward}><Redo2 size={17} /></Button></div>
       <span className={styles.saveState}>{dirty ? "Unpublished changes" : "Up to date"}</span>
       {siteUrl && <a href={siteUrl} target="_blank" rel="noreferrer" title="Open website" aria-label="Open website"><ExternalLink size={17} /></a>}
