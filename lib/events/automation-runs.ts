@@ -1,3 +1,4 @@
+import { recordFromUnknown } from "@/lib/objects";
 import {
   AutomationAction,
   AutomationRunStatus,
@@ -48,9 +49,6 @@ type ExecutionResult = {
   summary: string;
 };
 
-function jsonObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-}
 
 function cleanString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -85,7 +83,7 @@ function assertEnumValue<T extends Record<string, string>>(values: T, value: str
 }
 
 function automationTokens(envelope: AutomationEnvelope, automationName: string) {
-  const metadata = jsonObject(envelope.metadata);
+  const metadata = recordFromUnknown(envelope.metadata);
   const tokens: Record<string, string | number | Date | null | undefined> = {
     actorEmail: envelope.actorEmail || "",
     automationName,
@@ -139,7 +137,7 @@ async function executeSendEmail(
   runId: string,
   category = EmailCategory.TRANSACTIONAL
 ) {
-  const config = jsonObject(automation.actionConfig);
+  const config = recordFromUnknown(automation.actionConfig);
   const recipientEmail = cleanString(config.recipientEmail) || automation.targetEmail || envelope.actorEmail || "";
   if (!recipientEmail) throw new Error("Email automation needs a target email or event actor email.");
 
@@ -166,7 +164,7 @@ async function executeSendEmail(
 }
 
 async function executeNotifyAdmin(automation: AutomationForRun, envelope: AutomationEnvelope, runId: string) {
-  const config = jsonObject(automation.actionConfig);
+  const config = recordFromUnknown(automation.actionConfig);
   const groupKey = cleanString(config.groupKey) || "system";
   const idempotencyKeyBase = `automation:${runId}:admin`;
 
@@ -196,7 +194,7 @@ async function executeNotifyAdmin(automation: AutomationForRun, envelope: Automa
 }
 
 async function resolveClientId(envelope: AutomationEnvelope, siteId: string) {
-  const metadata = jsonObject(envelope.metadata);
+  const metadata = recordFromUnknown(envelope.metadata);
   const metadataClientId = cleanString(metadata.clientId);
   if (metadataClientId) {
     const client = await prisma.client.findFirst({ where: { id: metadataClientId, siteId }, select: { id: true } });
@@ -256,7 +254,7 @@ async function resolveClientByEmail(email: string, siteId: string) {
 }
 
 async function executeAddTag(automation: AutomationForRun, envelope: AutomationEnvelope) {
-  const config = jsonObject(automation.actionConfig);
+  const config = recordFromUnknown(automation.actionConfig);
   const label = cleanString(config.tag) || cleanString(config.label);
   if (!label) throw new Error("Add tag automation needs actionConfig.tag.");
 
@@ -283,7 +281,7 @@ async function executeAddTag(automation: AutomationForRun, envelope: AutomationE
 }
 
 async function executeCreateTask(automation: AutomationForRun, envelope: AutomationEnvelope, runId: string, fallbackTitle?: string) {
-  const config = jsonObject(automation.actionConfig);
+  const config = recordFromUnknown(automation.actionConfig);
   const configuredTitle = cleanString(config.title);
   const title = renderConfigTemplate(configuredTitle || fallbackTitle || `Review ${envelope.name || "automation event"}`, envelope, automation.name);
   const description = renderConfigTemplate(cleanString(config.description), envelope, automation.name);
@@ -315,7 +313,7 @@ async function executeRequestReview(automation: AutomationForRun, envelope: Auto
 }
 
 async function executeUpdateStatus(automation: AutomationForRun, envelope: AutomationEnvelope) {
-  const config = jsonObject(automation.actionConfig);
+  const config = recordFromUnknown(automation.actionConfig);
   const targetType = cleanString(config.targetType) || envelope.relatedType || "";
   const targetId = cleanString(config.targetId) || envelope.relatedId || "";
   const targetStatus = cleanString(config.targetStatus);
@@ -387,8 +385,8 @@ async function executeUpdateStatus(automation: AutomationForRun, envelope: Autom
 }
 
 async function executeCreateInvoice(automation: AutomationForRun, envelope: AutomationEnvelope) {
-  const config = jsonObject(automation.actionConfig);
-  const metadata = jsonObject(envelope.metadata);
+  const config = recordFromUnknown(automation.actionConfig);
+  const metadata = recordFromUnknown(envelope.metadata);
   const clientId = await resolveClientId(envelope, automation.siteId);
   const customerEmail = cleanString(config.customerEmail) || envelope.actorEmail || "";
   const customerName = cleanString(config.customerName) || cleanString(metadata.customerName) || customerEmail;
@@ -425,7 +423,7 @@ async function executeCreateInvoice(automation: AutomationForRun, envelope: Auto
 
 async function executeAutomationRun(run: AutomationRunForExecution): Promise<ExecutionResult> {
   const automation = run.automation;
-  const envelope = jsonObject(run.payload) as AutomationEnvelope;
+  const envelope = recordFromUnknown(run.payload) as AutomationEnvelope;
 
   if (automation.status !== AutomationStatus.ACTIVE) {
     return { status: AutomationRunStatus.SKIPPED, summary: "Automation rule is not active." };

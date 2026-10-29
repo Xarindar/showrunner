@@ -85,6 +85,7 @@
   --sd-layout-button-height: 28px;
   --sd-layout-table-row-height: 48px;
   --sd-layout-touch-target: 44px;
+  --sd-type-input-touch-size: 1rem;
   --sd-font-sans: var(--font-geist-sans, ui-sans-serif), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --sd-font-mono: var(--font-geist-mono, ui-monospace), SFMono-Regular, Consolas, monospace;
   --sd-type-display-size: 1.8125rem;

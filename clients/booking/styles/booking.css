@@ -490,7 +490,7 @@ p {
 }
 
 .booking-form textarea {
-  resize: vertical;
+  resize: none;
 }
 
 .booking-table-wrap {

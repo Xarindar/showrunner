@@ -1,10 +1,13 @@
 "use client";
-import { Notification } from "@/components/ui/notifications";
+import { Notification, useNotify } from "@/components/ui/notifications";
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CreditCard, KeyRound, Loader2, Plus, ReceiptText, RefreshCw, TicketPercent, Unplug, Webhook, Zap } from "lucide-react";
-import { Button, Field, Input, Switch, SwitchReveal } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Field, Input } from "@/components/ui/field";
+import { Switch } from "@/components/ui/switch";
+import { SwitchReveal } from "@/components/ui/switch-reveal";
 import { MethodMark } from "./brand-marks";
 import {
   createCouponAction,
@@ -59,10 +62,13 @@ export function MethodsModal({
   options: MethodOption[];
 }) {
   const [state, formAction, pending] = useActionState(savePaymentMethodsAction, initialPaymentActionState);
+  const notify = useNotify();
 
   useEffect(() => {
-    if (state.status === "success") onClose();
-  }, [state.status, onClose]);
+    if (state.status !== "success") return;
+    notify("Payment methods saved.");
+    onClose();
+  }, [state.status, onClose, notify]);
 
   return (
     <form action={formAction} className="form-grid">
@@ -94,7 +100,7 @@ export function MethodsModal({
           );
         })}
       </div>
-      {state.status === "error" ? <p className="error ui-zero">{state.message}</p> : null}
+      {state.status === "error" ? <Notification tone="danger" eventKey={state}>{state.message}</Notification> : null}
       <div className="pay-step-actions">
         <Button onClick={onClose} type="button" variant="secondary">
           Cancel
@@ -111,12 +117,14 @@ export function MethodsModal({
 export function CouponModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(createCouponAction, initialPaymentActionState);
+  const notify = useNotify();
 
   useEffect(() => {
     if (state.status !== "success") return;
+    notify("Coupon created.");
     router.refresh();
     onClose();
-  }, [onClose, router, state.status]);
+  }, [onClose, router, state.status, notify]);
 
   return (
     <form action={formAction} className="form-grid">
@@ -160,7 +168,7 @@ export function CouponModal({ onClose }: { onClose: () => void }) {
           <input id="maxRedemptions" name="maxRedemptions" min="0" placeholder="No limit" type="number" />
         </div>
       </div>
-      {state.status === "error" ? <p className="error ui-zero">{state.message}</p> : null}
+      {state.status === "error" ? <Notification tone="danger" eventKey={state}>{state.message}</Notification> : null}
       <div className="pay-step-actions">
         <Button onClick={onClose} type="button" variant="secondary">
           Cancel
@@ -184,10 +192,13 @@ export function CheckoutModal({
   providers: { value: string; label: string; connected: boolean }[];
 }) {
   const [state, formAction, pending] = useActionState(setCheckoutProviderAction, initialPaymentActionState);
+  const notify = useNotify();
 
   useEffect(() => {
-    if (state.status === "success") onClose();
-  }, [state.status, onClose]);
+    if (state.status !== "success") return;
+    notify("Checkout account saved.");
+    onClose();
+  }, [state.status, onClose, notify]);
 
   return (
     <form action={formAction} className="form-grid">
@@ -219,7 +230,7 @@ export function CheckoutModal({
           </label>
         ))}
       </div>
-      {state.status === "error" ? <p className="error ui-zero">{state.message}</p> : null}
+      {state.status === "error" ? <Notification tone="danger" eventKey={state}>{state.message}</Notification> : null}
       <div className="pay-step-actions">
         <Button onClick={onClose} type="button" variant="secondary">
           Cancel
@@ -242,12 +253,14 @@ export function CheckoutTotalsModal({
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(updateCheckoutTotalsAction, initialPaymentActionState);
+  const notify = useNotify();
 
   useEffect(() => {
     if (state.status !== "success") return;
+    notify("Checkout totals saved.");
     router.refresh();
     onClose();
-  }, [onClose, router, state.status]);
+  }, [onClose, router, state.status, notify]);
 
   return (
     <form action={formAction} className="form-grid">
@@ -307,7 +320,7 @@ export function CheckoutTotalsModal({
           </div>
         </SwitchReveal>
       </div>
-      {state.status === "error" ? <p className="error ui-zero">{state.message}</p> : null}
+      {state.status === "error" ? <Notification tone="danger" eventKey={state}>{state.message}</Notification> : null}
       <div className="pay-step-actions">
         <Button onClick={onClose} type="button" variant="secondary">
           Cancel
@@ -339,6 +352,7 @@ export function ManageProviderModal({
   webhookMissing?: boolean;
 }) {
   const [recheckState, recheckAction, recheckPending] = useActionState(reverifyProviderAction, initialPaymentActionState);
+  const notify = useNotify();
   const [webhookKeyState, webhookKeyAction, webhookKeyPending] = useActionState(
     saveSquareWebhookKeyAction,
     initialPaymentActionState
@@ -349,18 +363,20 @@ export function ManageProviderModal({
   );
 
   useEffect(() => {
-    if (disconnectState.status === "success") onClose();
-  }, [disconnectState.status, onClose]);
+    if (disconnectState.status !== "success") return;
+    notify(`${name} disconnected.`);
+    onClose();
+  }, [disconnectState.status, onClose, notify, name]);
 
   return (
     <div className="form-grid">
       <p className="pay-step-lead">{detail}</p>
 
       {recheckState.status === "success" ? (
-        <Notification>{`${name} is responding. Connection re-checked.`}</Notification>
+        <Notification eventKey={recheckState}>{`${name} connection checked.`}</Notification>
       ) : null}
-      {recheckState.status === "error" ? <p className="error ui-zero">{recheckState.message}</p> : null}
-      {disconnectState.status === "error" ? <p className="error ui-zero">{disconnectState.message}</p> : null}
+      {recheckState.status === "error" ? <Notification tone="danger" eventKey={recheckState}>{recheckState.message}</Notification> : null}
+      {disconnectState.status === "error" ? <Notification tone="danger" eventKey={disconnectState}>{disconnectState.message}</Notification> : null}
 
       {provider === "STRIPE" && webhookMissing ? (
         <p className="error ui-zero">
@@ -376,7 +392,7 @@ export function ManageProviderModal({
             label="Square webhook signature key">
             <Input autoComplete="off" name="squareWebhookSignatureKey" placeholder="Signature key" type="password" />
           </Field>
-          {webhookKeyState.status === "error" ? <p className="error ui-zero">{webhookKeyState.message}</p> : null}
+          {webhookKeyState.status === "error" ? <Notification tone="danger" eventKey={webhookKeyState}>{webhookKeyState.message}</Notification> : null}
           <Button aria-busy={webhookKeyPending} disabled={webhookKeyPending} size="sm" type="submit" variant="secondary">
             {webhookKeyPending ? <Loader2 className="pay-spin" size={16} /> : <Webhook size={16} />}
             Save webhook key
@@ -384,7 +400,7 @@ export function ManageProviderModal({
         </form>
       ) : null}
       {webhookKeyState.status === "success" && webhookKeyState.message ? (
-        <Notification>{webhookKeyState.message}</Notification>
+        <Notification eventKey={webhookKeyState}>{webhookKeyState.message}</Notification>
       ) : null}
 
       <div className="pay-step-actions">

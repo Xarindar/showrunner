@@ -273,13 +273,15 @@
 .showrunner-admin .ui-select-popover {
   background: var(--color-surface);
   border: 1px solid var(--catalog-border);
-  border-radius: var(--sd-radius-tag);
+  border-radius: var(--sd-radius-input);
   box-shadow: var(--shadow-raised);
   display: grid;
   gap: var(--sd-space-4);
   left: 0;
   max-height: min(280px, calc(100vh - 140px));
-  min-width: 100%;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   overflow: auto;
   padding: var(--sd-space-6);
   position: absolute;
@@ -291,7 +293,7 @@
   appearance: none;
   background: transparent;
   border: 0;
-  border-radius: var(--sd-radius-tag);
+  border-radius: var(--sd-radius-input);
   color: var(--color-text);
   cursor: pointer;
   display: grid;
@@ -327,12 +329,12 @@
   width: 100%;
 }
 .showrunner-admin .ui-dialog::backdrop { background: var(--sd-color-overlay); }
-.showrunner-admin .ui-dialog-header,
 .showrunner-admin .ui-dialog-body { display: grid; gap: var(--space-3); min-width: 0; }
-.showrunner-admin .ui-dialog-header { margin-bottom: var(--sd-space-12); min-height: 0; }
-.showrunner-admin .ui-dialog-header h2 { margin-bottom: 0; }
-.showrunner-admin .ui-dialog-header p { color: var(--color-muted); }
-.showrunner-admin .ui-dialog-close { height: 34px; justify-self: end; min-height: 34px; min-width: 34px; padding: 0; width: 34px; }
+.showrunner-admin .ui-dialog.ui-modal { overflow: hidden; }
+.showrunner-admin .ui-dialog.ui-modal[open] { display: flex; flex-direction: column; }
+.showrunner-admin .ui-dialog.ui-modal > .ui-modal-head { flex-shrink: 0; }
+.showrunner-admin .ui-dialog.ui-modal > .ui-dialog-body { min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.showrunner-admin .ui-dialog-close { aspect-ratio: 1; justify-self: end; min-width: var(--sd-layout-control-height); padding: 0; }
 .showrunner-admin .ui-modal-head {
   align-items: center;
   display: flex;
@@ -407,27 +409,11 @@
   align-items: start;
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: minmax(0, 1fr) 38px;
+  grid-template-columns: minmax(0, 1fr) auto;
   min-width: 0;
 }
 .showrunner-admin .ui-onboarding-header h2 { font-size: var(--type-h1); line-height: var(--leading-tight); }
 .showrunner-admin .ui-onboarding-header p { color: var(--color-muted); margin-top: var(--space-2); }
-.showrunner-admin .ui-onboarding-close {
-  align-items: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  color: var(--color-muted);
-  cursor: pointer;
-  display: flex;
-  height: 38px;
-  justify-content: center;
-  padding: 0;
-  transition: background-color var(--motion-fast) ease,
-    color var(--motion-fast) ease;
-  width: 38px;
-}
-.showrunner-admin .ui-onboarding-close:hover { background: var(--color-hover); color: var(--color-text); }
 .showrunner-admin .ui-onboarding-body { display: grid; min-width: 0; }
 @media (max-width: 720px) {
   .showrunner-admin .ui-onboarding-modal {
@@ -444,15 +430,6 @@
   .showrunner-admin .ui-onboarding-content { padding: var(--space-4); }
   .showrunner-admin .ui-onboarding-header h2 { font-size: var(--type-h2); }
 }
-.showrunner-admin .ui-sheet {
-  height: 100svh;
-  margin: 0;
-  max-height: 100svh;
-  max-width: min(420px, calc(100vw - var(--space-4)));
-  min-height: 100svh;
-}
-.showrunner-admin .ui-sheet-right { margin-left: auto; }
-.showrunner-admin .ui-sheet-left { margin-right: auto; }
 .showrunner-admin .module-modal-actions {
   align-items: center;
   display: flex;
@@ -464,7 +441,7 @@
   .showrunner-admin .module-modal-actions .ui-button { flex: 1 1 100%; }
   .showrunner-admin .module-modal-actions { align-items: stretch; display: grid; }
 }
-.showrunner-admin dialog.ui-dialog > :is(.ui-modal-head,.ui-dialog-header) {
+.showrunner-admin dialog.ui-dialog > .ui-modal-head {
   padding: 0;
   margin: 0 0 var(--sd-space-12);
   min-height: 0;

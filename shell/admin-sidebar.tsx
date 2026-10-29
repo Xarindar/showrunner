@@ -36,7 +36,7 @@ import type { ModuleStatus, ShellModule } from "@/shell/module-types";
 import { useAdminMobileHeaderContext } from "@/shell/admin-mobile-header";
 import { logoutAction } from "@/app/admin/(protected)/actions";
 import { saveAdminModuleNavigationAction } from "@/app/admin/(protected)/navigation-actions";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState, useTransition, type KeyboardEvent, type PointerEvent } from "react";
 
 type AdminSidebarProps = {
@@ -108,7 +108,7 @@ function SidebarModuleLink({
       {label}
     </span>
   ) : (
-    <Link aria-current={isActive ? item.id === "scheduling" ? "location" : "page" : undefined} className={isActive ? "active" : undefined} href={item.href} onClick={closeMenu}>
+    <Link aria-current={isActive ? ["scheduling", "appointments"].includes(item.id) ? "location" : "page" : undefined} className={isActive ? "active" : undefined} href={item.href} onClick={closeMenu}>
       {showIcon ? <Icon size={17} /> : null}
       {label}
       <AdminNavigationPending />
@@ -132,6 +132,13 @@ function SidebarModuleLink({
       ) : null}
       {content}
     </div>
+    {item.id === "appointments" && isActive && enabled && !editing ? <nav className="admin-nav-children" aria-label="Bookings">
+      {[
+        { href: "/admin/modules/appointments", label: "Appointments", active: !["/schedule", "/staff"].some(section => pathname.includes(section)) },
+        { href: "/admin/modules/appointments/schedule", label: "Schedule", active: pathname.includes("/schedule") },
+        { href: "/admin/modules/appointments/staff", label: "Staff", active: pathname.includes("/staff") }
+      ].map(link => <Link key={link.href} href={link.href} onClick={closeMenu} aria-current={link.active ? "page" : undefined}>{link.label}<AdminNavigationPending /></Link>)}
+    </nav> : null}
     {item.id === "scheduling" && isActive && enabled && !editing ? <nav className="admin-nav-children" aria-label="Services">
       {[
         { href: "/admin/modules/services", label: "Session types", active: !["categories", "packages", "rates"].some(section => pathname.startsWith(`/admin/modules/services/${section}`)) },

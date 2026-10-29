@@ -115,5 +115,5 @@
     line-height: 1.5;
   }
   .showrunner-admin .clients-mobile-metrics strong { font-family: var(--font-sans); }
-  .showrunner-admin .clients-mobile-card > .clients-row-actions .clients-action-icon { min-height: 44px; gap: var(--sd-space-8); }
+  .showrunner-admin .clients-mobile-card > .clients-row-actions .clients-action-icon { min-height: var(--sd-layout-touch-target); gap: var(--sd-space-8); }
 }

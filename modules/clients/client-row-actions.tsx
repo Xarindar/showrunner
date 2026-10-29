@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Eye, Mail, Phone } from "lucide-react";
-import { Button, ButtonLink, Modal } from "@/components/ui";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 
 type ClientRowActionsProps = {
   alternateEmails: string[];

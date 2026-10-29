@@ -226,7 +226,7 @@ function actionHarness(references: number, archiveWriteCount = 1, privacy?: { de
     "@/lib/admin-validation": { optionalStoredText: { refine: () => ({ transform: () => ({}) }) }, requiredText: { optional: () => ({}) }, parseForm: async () => ({ id: "asset-a", isPrivate: privacy?.desired }) },
     "@/lib/auth": { requireAdmin: async () => ({ id: "staff-a" }), getAccessibleMediaWhere: async () => ({ id: "asset-a", siteId: "site-a" }) },
     "@/lib/site": { getCurrentSiteId: async () => "site-a", getSiteSettingsForSite: async () => ({ heroImageUrl: "", logoImageUrl: "" }) },
-    "@/lib/media": { mediaAssetIdFromUrl: () => "", normalizeMediaFolder: (value: string) => value, supportsPrivateMediaDriver: () => true },
+    "@/lib/media": { mediaAssetIdFromUrl: () => "", normalizeMediaFolder: (value: string) => value, mediaTagsFromInput: () => [], supportsPrivateMediaDriver: () => true },
     "@/lib/media-usage": { mediaReferenceCount, mediaReferenceCountSelect: {}, unreferencedMediaWhere },
     "@/modules/content/hero-presentation": {},
     "@/lib/prisma": { prisma: { mediaAsset: { findFirst: async () => ({ id: "asset-a", driver: "S3", isPrivate: privacy?.existing, clientFiles: [], portfolioItems: references ? [{ id: "item-a" }] : [], purchasedSelections: privacy?.purchased ? [{ id: "purchase-a" }] : [], _count: { clientFiles: 0, productMedia: 0, services: 0, rectangularServices: 0, galleryServices: 0, serviceCategories: 0, portfolioItems: references, purchasedSelections: 0 } }), updateMany: async (query: unknown) => { writes.push(query); return { count: archiveWriteCount }; } } } }
@@ -241,26 +241,30 @@ function actionHarness(references: number, archiveWriteCount = 1, privacy?: { de
 }
 
 test("archive actions reject referenced media and recheck usage in the write", async () => {
+  const form = new FormData(); form.set("id", "asset-a"); form.set("confirmArchive", "on");
   const linked = actionHarness(1);
-  await assert.rejects(linked.actions.archiveMediaAssetAction(new FormData()), /still%20in%20use/);
+  await assert.rejects(linked.actions.archiveMediaAssetAction(form), /still%20in%20use/);
   assert.equal(linked.writes.length, 0);
   const changed = actionHarness(0, 0);
-  await assert.rejects(changed.actions.archiveMediaAssetAction(new FormData()), /changed%20or%20is%20still%20in%20use/);
+  await assert.rejects(changed.actions.archiveMediaAssetAction(form), /changed%20or%20is%20still%20in%20use/);
   assert.equal(changed.writes.length, 1);
   const clean = actionHarness(0);
-  await assert.rejects(clean.actions.archiveMediaAssetAction(new FormData()), /saved=archive/);
+  await assert.rejects(clean.actions.archiveMediaAssetAction(form), /saved=archive/);
   const query = clean.writes[0] as { where: { AND: unknown[] } };
   assert.equal(query.where.AND[1], unreferencedMediaWhere);
 });
 
 test("media privacy changes cannot publish client originals or relabel previously public files as secure", async () => {
+  const form = new FormData();
+  for (const [key, value] of Object.entries({ id: "asset-a", alt: "Portrait", caption: "", credit: "", focalPointX: "0.5", focalPointY: "0.5", folder: "", tags: "", usageContext: "" })) form.set(key, value);
   for (const scenario of [{ references: 1, desired: false, existing: true }, { references: 0, desired: false, existing: true, purchased: true }]) {
     const linked = actionHarness(scenario.references, 1, scenario);
-    await assert.rejects(linked.actions.updateMediaAssetAction(new FormData()), /Keep%20it%20private/);
+    assert.match((await linked.actions.updateMediaAssetAction(form) as { error: string }).error, /Keep it private/);
     assert.equal(linked.writes.length, 0);
   }
   const formerlyPublic = actionHarness(0, 1, { desired: true, existing: false });
-  await assert.rejects(formerlyPublic.actions.updateMediaAssetAction(new FormData()), /previously%20public%20file/);
+  form.set("isPrivate", "on");
+  assert.match((await formerlyPublic.actions.updateMediaAssetAction(form) as { error: string }).error, /previously public file/);
   assert.equal(formerlyPublic.writes.length, 0);
 });
 

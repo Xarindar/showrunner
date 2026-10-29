@@ -20,9 +20,8 @@
 .filters > * { flex: 1; min-width: 0; }
 .modal :global(.ui-field-hint):empty { display: none; }
 .modal :global(.ui-field) { display: grid; gap: var(--space-1); margin: 0; }
-.modal input:not([type="checkbox"]), .modal select, .modal textarea { width: 100%; min-width: 0; font-size: var(--sd-type-heading-size); }
-.modal input:not([type="checkbox"]), .modal select, .modal button { min-height: 44px; }
-.modal textarea { min-height: 7rem; resize: vertical; }
+.modal input:not([type="checkbox"]), .modal select, .modal textarea { width: 100%; min-width: 0; }
+.modal textarea { min-height: 7rem; resize: none; }
 .results { min-height: 200px; overflow-y: auto; padding: var(--library-inset); display: grid; gap: var(--space-2); }
 .modal .option {
   display: flex;

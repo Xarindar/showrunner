@@ -12,7 +12,7 @@ const recentWindowDays = 30;
 
 function positivePage(value: string | null) {
   const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, 50) : 1;
+  return Number.isSafeInteger(parsed) && parsed > 0 && parsed <= Math.floor(2147483647 / pageSize) ? parsed : 1;
 }
 
 export async function GET(request: NextRequest) {
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
   const [assets, total] = await Promise.all([
     prisma.mediaAsset.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
       select: {

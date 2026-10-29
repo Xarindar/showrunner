@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/format";
 import { CalendarClock } from "lucide-react";
 import { SchedulingCalendarConnectionStatus, SchedulingCalendarOwnerType, type SchedulingCalendarConnection, type StaffMember } from "@prisma/client";
 import { googleCalendarConnectPath, googleCalendarConnectionLabel } from "@/lib/scheduling/google-calendar";
@@ -33,7 +34,7 @@ function connectionStatus(connection?: SchedulingCalendarConnection) {
 function connectionDetail(item?: CalendarFeedsPanelProps["googleConnections"][number]) {
   if (!item) return "Connect Google Calendar to subtract busy time from public availability.";
 
-  const verified = item.connection.lastVerifiedAt ? `Checked ${item.connection.lastVerifiedAt.toLocaleString()}.` : "";
+  const verified = item.connection.lastVerifiedAt ? `Checked ${formatDateTime(item.connection.lastVerifiedAt)}.` : "";
   const error = item.connection.lastError ? ` ${item.connection.lastError}` : "";
   return `${googleCalendarConnectionLabel({ ...item.connection, staff: item.staff })}. ${verified}${error}`;
 }

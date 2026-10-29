@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Button, Field, Input, Select } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Field, Input, Select } from "@/components/ui/field";
 import type { SessionOffering } from "@/lib/scheduling/session-offering";
 import type { ServiceLibraryItem, ServiceLibraryResults } from "@/lib/scheduling/service-library";
 import styles from "./session-packages-editor.module.css";

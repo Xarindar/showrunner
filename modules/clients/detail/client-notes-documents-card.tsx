@@ -2,7 +2,9 @@
 
 import { Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Button, Card, Modal } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Modal } from "@/components/ui/modal";
 
 type ClientWorkspaceTab = "notes" | "documents";
 

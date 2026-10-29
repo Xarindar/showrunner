@@ -49,3 +49,8 @@ test("library uploads preserve privacy and ownership and use the authenticated s
   assert.equal(app.writes[0].siteId, "site-a"); assert.equal(app.writes[0].metadata.uploadedByStaffId, "staff-a"); assert.equal(app.writes[0].metadata.isPrivate, true);
   const failed = harness({ fail: true }); assert.equal((await failed.upload(failed.data)).error, "Storage unavailable");
 });
+
+ test("library video uploads use a filename description without bypassing permissions", async () => {
+  const h = harness(); h.data.set("file", new File(["video"], "tour.mp4", { type: "video/mp4" })); h.data.set("alt", "");
+  assert.ok((await h.upload(h.data)).asset); assert.equal(h.writes[0].metadata.alt,"tour.mp4");
+});

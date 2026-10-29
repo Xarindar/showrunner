@@ -9,10 +9,27 @@ export function timeToMinutes(value: string) {
   return hours * 60 + minutes;
 }
 
+export function formatTime(value: Date, timeZone?: string) {
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone }).format(value);
+}
+
+export function formatTimeValue(value: string) {
+  if (!value) return "";
+  const [hour, minute] = value.split(":").map(Number);
+  return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}`;
+}
+
+export function parseTimeValue(value: string) {
+  const match = /^(0?[1-9]|1[0-2]):([0-5]\d)\s*([ap]m)$/i.exec(value.trim());
+  if (!match) return "";
+  return `${String(Number(match[1]) % 12 + (match[3].toUpperCase() === "PM" ? 12 : 0)).padStart(2, "0")}:${match[2]}`;
+}
+
 export function formatDateTime(value: Date, timeZone?: string) {
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
+    hour12: true,
     timeZone
   }).format(value);
 }

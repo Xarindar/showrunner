@@ -16,6 +16,8 @@ import { unreferencedMediaWhere } from "@/lib/media-usage";
 import { isSafeExternalHttpsUrl } from "@/lib/security/urls";
 import { getCurrentSiteId } from "@/lib/site";
 import { slugify } from "@/lib/slug";
+import { normalizeMediaFolder } from "@/lib/media-folders";
+export { normalizeMediaFolder } from "@/lib/media-folders";
 
 const allowedImageTypes = new Map([
   ["image/jpeg", "jpg"],
@@ -24,6 +26,7 @@ const allowedImageTypes = new Map([
   ["image/gif", "gif"],
   ["image/svg+xml", "svg"]
 ]);
+const allowedVideoTypes = new Map([["video/mp4", "mp4"], ["video/webm", "webm"], ["video/quicktime", "mov"]]);
 const allowedPrivateFileTypes = new Map([...allowedImageTypes, ["application/pdf", "pdf"]]);
 const maxUploadBytes = 12 * 1024 * 1024;
 const signedUrlTtlSeconds = 15 * 60;
@@ -65,6 +68,7 @@ export type MediaUploadValidationOptions = {
   maxBytes?: number;
   maxPixels?: number;
   requireImage?: boolean;
+  allowVideo?: boolean;
 };
 
 type MediaStoredObject = {
@@ -216,17 +220,6 @@ export function mediaTagsFromInput(value?: string | string[]) {
   );
 }
 
-export function normalizeMediaFolder(value?: string) {
-  const folder = (value || "")
-    .split("/")
-    .map((part) => slugify(part))
-    .filter(Boolean)
-    .slice(0, 4)
-    .join("/");
-
-  return folder;
-}
-
 export function normalizeMediaVariantType(value?: string | null) {
   const normalized = String(value || MediaVariantType.FULL).toUpperCase();
   return mediaVariantTypes.includes(normalized as MediaVariantType) ? (normalized as MediaVariantType) : MediaVariantType.FULL;
@@ -243,7 +236,7 @@ function assertAccessibleAlt(metadata: MediaUploadMetadata) {
 }
 
 function mimeTypeExtension(mimeType: string) {
-  return allowedPrivateFileTypes.get(mimeType) || "bin";
+  return allowedPrivateFileTypes.get(mimeType) || allowedVideoTypes.get(mimeType) || "bin";
 }
 
 function isWeakProductionSecret(value: string) {
@@ -272,6 +265,12 @@ async function detectUploadMimeType(file: File) {
   }
   if (ascii.startsWith("GIF87a") || ascii.startsWith("GIF89a")) return "image/gif";
   if (ascii.startsWith("RIFF") && ascii.slice(8, 12) === "WEBP") return "image/webp";
+  if (ascii.slice(4, 8) === "ftyp") {
+    const brand = ascii.slice(8, 12);
+    if (brand === "qt  ") return "video/quicktime";
+    if (["isom", "iso2", "mp41", "mp42", "avc1", "M4V ", "MSNV"].includes(brand)) return "video/mp4";
+  }
+  if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3 && ascii.includes("webm")) return "video/webm";
   if (ascii.startsWith("%PDF-")) return "application/pdf";
   if (/<svg(?:\s|>)/i.test(ascii.replace(/^\uFEFF/, "").replace(/^\s*<\?xml[^>]*>\s*/i, ""))) return "image/svg+xml";
 
@@ -325,15 +324,17 @@ async function assertUploadFile(file: File, metadata: MediaUploadMetadata, valid
       .filter((type) => (requireImage ? allowedImageTypes.has(type) : allowedPrivateFileTypes.has(type)))
   );
 
+  if (validation.allowVideo) for (const type of allowedVideoTypes.keys()) allowedMimeTypes.add(type);
+  const isVideo = validation.allowVideo && allowedVideoTypes.has(file.type);
   if (!allowedMimeTypes.has(file.type.toLowerCase())) {
     throw new Error(
-      requireImage
+      validation.allowVideo ? "Upload an image, MP4, WebM, or MOV video." : requireImage
         ? "Upload a JPG, PNG, WebP, GIF, or SVG image."
         : "Upload a supported file type."
     );
   }
 
-  const maxBytes = Math.min(Math.max(1, validation.maxBytes || maxUploadBytes), 25 * 1024 * 1024);
+  const maxBytes = Math.min(Math.max(1, validation.maxBytes || (isVideo ? 25 * 1024 * 1024 : maxUploadBytes)), 25 * 1024 * 1024);
   if (file.size > maxBytes) {
     throw new Error(`Files must be smaller than ${Math.round(maxBytes / (1024 * 1024))} MB.`);
   }
@@ -343,7 +344,7 @@ async function assertUploadFile(file: File, metadata: MediaUploadMetadata, valid
     throw new Error("The uploaded file contents do not match the selected file type.");
   }
 
-  if (requireImage && validation.maxPixels) {
+  if (!isVideo && requireImage && validation.maxPixels) {
     const maxPixels = Math.min(80_000_000, Math.max(1, validation.maxPixels));
     const dimensions = await sharp(Buffer.from(await file.arrayBuffer()), { animated: false, limitInputPixels: maxPixels }).metadata();
     if (!dimensions.width || !dimensions.height || dimensions.width * dimensions.height > maxPixels) {
@@ -351,7 +352,7 @@ async function assertUploadFile(file: File, metadata: MediaUploadMetadata, valid
     }
   }
 
-  return requireImage ? assertAccessibleAlt(metadata) : metadata.alt?.trim() || file.name;
+  return requireImage && !isVideo ? assertAccessibleAlt(metadata) : metadata.alt?.trim() || file.name;
 }
 
 function mediaSigningSecret() {
@@ -445,7 +446,7 @@ const serverAssetsAdapter: MediaAdapter = {
   upload: async (file, metadata) => {
     const extension = mimeTypeExtension(file.type);
     const sitePrefix = slugify(metadata.siteId || "site") || "site";
-    const folder = normalizeMediaFolder(metadata.folder);
+    const folder = normalizeMediaFolder(metadata.folder).split("/").map(slugify).filter(Boolean).join("/");
     const folderPrefix = folder ? `${folder}/` : "";
     const key = metadata.assetId && file.type.startsWith("image/") ? `photos/${metadata.assetId}/original.${extension}` : `sites/${sitePrefix}/uploads/${folderPrefix}${randomUUID()}.${extension}`;
     const target = serverAssetPath(key);
@@ -494,7 +495,7 @@ function objectStorageAdapter(driver: ObjectStorageDriver): MediaAdapter {
       }
 
       const extension = mimeTypeExtension(file.type);
-      const folder = normalizeMediaFolder(metadata.folder);
+      const folder = normalizeMediaFolder(metadata.folder).split("/").map(slugify).filter(Boolean).join("/");
       const folderPrefix = folder ? `${folder}/` : "";
       const sitePrefix = slugify(metadata.siteId || "site") || "site";
       const key = metadata.assetId && file.type.startsWith("image/") ? `photos/${metadata.assetId}/original.${extension}` : `sites/${sitePrefix}/uploads/${folderPrefix}${randomUUID()}.${extension}`;
@@ -644,6 +645,7 @@ export async function uploadMedia(
   }
 
   const safeAlt = await assertUploadFile(uploadFile, metadata, validation);
+  if (uploadFile.type.startsWith("video/") && driver !== MediaDriver.SERVER_ASSETS && driver !== MediaDriver.S3 && driver !== MediaDriver.R2) throw new Error("Video uploads require server, S3, or R2 storage.");
   const scanResult = await runVirusScanHook(uploadFile);
   const adapter = getMediaAdapter(driver);
   const assetId = randomUUID();
@@ -684,16 +686,16 @@ export async function uploadMedia(
             storageProviderId: stored.storageProviderId || "",
             url: isPrivate ? assetRoute : stored.url || assetRoute
           }).map((row) => ({
-            format: row.format,
-            height: row.height,
+            format: uploadFile.type.startsWith("video/") ? mimeTypeExtension(uploadFile.type) : row.format,
+            height: uploadFile.type.startsWith("video/") ? 0 : row.height,
             metadata: {
               ...(row.metadata as Record<string, unknown>),
               virusScan: scanResult
             },
-            sizeBytes: row.sizeBytes,
+            sizeBytes: uploadFile.type.startsWith("video/") ? uploadFile.size : row.sizeBytes,
             type: row.type,
             url: row.url,
-            width: row.width
+            width: uploadFile.type.startsWith("video/") ? 0 : row.width
           }))
         }
       }
@@ -1245,6 +1247,24 @@ export async function mediaDeliveryResponse({
     headers.set("content-disposition", `attachment; filename="${downloadFilename(asset.filename, contentType, type)}"`);
   }
 
+  if (asset.mimeType.startsWith("video/")) {
+    headers.set("accept-ranges", "bytes");
+    const range = request.headers.get("range");
+    if (range) {
+      // shortcut: buffer ranges for the 25 MB upload limit; use storage-native ranges before raising it.
+      const bytes = await upstream.arrayBuffer();
+      const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+      const start = match?.[1] ? Number(match[1]) : match?.[2] ? Math.max(0, bytes.byteLength - Number(match[2])) : NaN;
+      const end = match?.[1] && match[2] ? Math.min(Number(match[2]), bytes.byteLength - 1) : bytes.byteLength - 1;
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= bytes.byteLength) {
+        headers.set("content-range", `bytes */${bytes.byteLength}`);
+        return new Response(null, { status: 416, headers });
+      }
+      headers.set("content-range", `bytes ${start}-${end}/${bytes.byteLength}`);
+      headers.set("content-length", String(end - start + 1));
+      return new Response(bytes.slice(start, end + 1), { status: 206, headers });
+    }
+  }
   return new Response(upstream.body, {
     headers,
     status: 200

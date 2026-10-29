@@ -3,7 +3,10 @@ import { Notification } from "@/components/ui/notifications";
 
 import { useMemo, useState } from "react";
 import { TicketPlus, Zap } from "lucide-react";
-import { Button, Modal, SettingRow, SettingsGroup, Table } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { SettingRow, SettingsGroup } from "@/components/ui/settings";
+import { Table } from "@/components/ui/table";
 import { ProviderMark } from "./brand-marks";
 import { buildConnectWizards, ConnectWizard, type WebhookUrls } from "./connect-wizard";
 import {
@@ -31,8 +34,7 @@ export type ProviderCard = {
   oauthConnect?: boolean;
   // Rendered as the de-emphasized "paste your own keys" option (PayPal when OAuth is on).
   advanced?: boolean;
-  // Connected but no webhook secret stored: Square OAuth needs a signature key pasted
-  // once; Stripe only hits this when automatic webhook creation failed (fix = reconnect).
+  // Manual Square connections need a signing key; Stripe repairs missing webhooks on reconnect.
   webhookMissing?: boolean;
 };
 
@@ -56,6 +58,7 @@ export type ActiveCoupon = {
 };
 
 export type PaymentsWorkspaceProps = {
+  timezone: string;
   providers: ProviderCard[];
   methods: { connected: boolean; enabledKeys: string[]; options: MethodOption[]; applePayStatus?: string };
   checkout: {
@@ -90,14 +93,14 @@ function couponLimitLabel(coupon: ActiveCoupon) {
   return `${coupon.redemptionCount} / ${coupon.maxRedemptions}`;
 }
 
-function dateLabel(value: string) {
-  return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(value));
+function dateLabel(value: string, timezone: string) {
+  return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: timezone }).format(new Date(value));
 }
 
-function couponAvailabilityLabel(coupon: ActiveCoupon) {
-  if (coupon.startsAt && coupon.endsAt) return `${dateLabel(coupon.startsAt)} to ${dateLabel(coupon.endsAt)}`;
-  if (coupon.startsAt) return `Starts ${dateLabel(coupon.startsAt)}`;
-  if (coupon.endsAt) return `Ends ${dateLabel(coupon.endsAt)}`;
+function couponAvailabilityLabel(coupon: ActiveCoupon, timezone: string) {
+  if (coupon.startsAt && coupon.endsAt) return `${dateLabel(coupon.startsAt, timezone)} to ${dateLabel(coupon.endsAt, timezone)}`;
+  if (coupon.startsAt) return `Starts ${dateLabel(coupon.startsAt, timezone)}`;
+  if (coupon.endsAt) return `Ends ${dateLabel(coupon.endsAt, timezone)}`;
   return "Always available";
 }
 
@@ -116,6 +119,7 @@ export function PaymentsWorkspace({
   methods,
   notice,
   providers,
+  timezone,
   webhooks
 }: PaymentsWorkspaceProps) {
   const [active, setActive] = useState<ActiveModal>(null);
@@ -347,11 +351,11 @@ export function PaymentsWorkspace({
                 <td>{couponValueLabel(coupon)}</td>
                 <td>{couponLimitLabel(coupon)}</td>
                 <td>
-                  <span className="ui-truncate" title={couponAvailabilityLabel(coupon)}>
-                    {couponAvailabilityLabel(coupon)}
+                  <span className="ui-truncate" title={couponAvailabilityLabel(coupon, timezone)}>
+                    {couponAvailabilityLabel(coupon, timezone)}
                   </span>
                 </td>
-                <td>{dateLabel(coupon.createdAt)}</td>
+                <td>{dateLabel(coupon.createdAt, timezone)}</td>
               </tr>
             ))}
             {!coupons.length ? (

@@ -1,3 +1,5 @@
+import { isRecord } from "@/lib/objects";
+
 export type VipLoyaltyUnit = "months" | "years";
 export type VipSpendWindow = "lifetime" | "12-months" | "24-months";
 
@@ -41,9 +43,6 @@ export const defaultClientVipSettings: ClientVipSettings = {
   }
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
 
 function booleanValue(value: unknown, fallback: boolean) {
   return typeof value === "boolean" ? value : fallback;
@@ -54,9 +53,6 @@ function positiveInt(value: unknown, fallback: number) {
   return Number.isFinite(numeric) && numeric > 0 ? Math.round(numeric) : fallback;
 }
 
-function positiveCents(value: unknown, fallback: number) {
-  return positiveInt(value, fallback);
-}
 
 function loyaltyUnit(value: unknown): VipLoyaltyUnit {
   return value === "years" ? "years" : "months";
@@ -89,7 +85,7 @@ export function normalizeClientVipSettings(value: unknown): ClientVipSettings {
     paidRevenueEnabled: booleanValue(value.paidRevenueEnabled, defaultClientVipSettings.paidRevenueEnabled),
     spend: {
       enabled: booleanValue(spend.enabled, defaultClientVipSettings.spend.enabled),
-      thresholdCents: positiveCents(spend.thresholdCents, defaultClientVipSettings.spend.thresholdCents),
+      thresholdCents: positiveInt(spend.thresholdCents, defaultClientVipSettings.spend.thresholdCents),
       window: spendWindow(spend.window)
     }
   };

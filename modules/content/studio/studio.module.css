@@ -1,16 +1,19 @@
 .fields { display: grid; gap: var(--sd-space-16); border: 0; padding: 0; min-width: 0; }
-.field { display: grid; gap: var(--sd-space-6); }
+.field { display: grid; gap: var(--sd-space-8); }
+:global(.showrunner-admin) .fields .field textarea { border-block: var(--sd-space-4) solid transparent; padding-block: 0; }
 .check { display: flex; align-items: center; gap: var(--sd-space-8); }
-.mediaPicker { align-items: center; display: flex; flex-wrap: wrap; gap: var(--sd-space-8); }
+.mediaPicker { display: block; }
 .mediaPicker small { color: var(--color-muted); }
 .mediaPreview {
   aspect-ratio: 16 / 10;
+  position: relative;
+  overflow: hidden;
   background: var(--color-surface-sunken) center / cover;
   border-radius: var(--sd-radius-tag);
   display: grid;
   place-items: center;
 }
-.mediaPicker { display: block; }
+.mediaPreview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .fields .imageTrigger {
   width: 100%;
   display: block;
@@ -30,24 +33,18 @@
   padding: var(--sd-space-8);
   font-size: var(--sd-type-small-size);
   opacity: 0;
-  transition: opacity .15s;
+  transition: opacity var(--motion-standard) var(--motion-ease);
 }
 .imageTrigger:hover .imageHint, .imageTrigger:focus-visible .imageHint, .emptyImageHint { opacity: 1; }
 @media (hover: none) {
   .imageHint { opacity: 1; }
 }
 .contentGroup { min-width: 0; border-bottom: 1px solid var(--color-border); }
-.contentGroup > summary {
-  cursor: pointer;
-  padding: var(--sd-space-16) var(--sd-space-4);
-  font-weight: var(--sd-type-weight-medium);
-  overflow-wrap: anywhere;
-}
-.contentGroup > summary:focus-visible { outline: 2px solid var(--color-brand); }
+.contentGroup > summary { padding-inline: var(--space-1); }
 .groupFields { display: grid; gap: var(--sd-space-12); padding: 0 var(--sd-space-4) var(--sd-space-20); }
 .contentList { display: grid; gap: var(--sd-space-4); min-width: 0; }
 .contentList > h3, .buttonSettings > h3 { font-size: var(--sd-type-body-size); margin: var(--sd-space-6) 0; }
-.buttonSettings { display: grid; gap: var(--sd-space-8); padding-top: var(--sd-space-8); border-top: 1px solid var(--color-border); }
+.buttonSettings { display: grid; gap: var(--sd-space-16); padding-top: var(--sd-space-8); border-top: 1px solid var(--color-border); }
 .fields .addContent {
   display: flex;
   align-items: center;

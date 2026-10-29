@@ -1,24 +1,27 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Button, Field, Input, Modal } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Field, Input } from "@/components/ui/field";
+import { Modal } from "@/components/ui/modal";
 import type { HourlyRate } from "@/lib/scheduling/pricing";
 import { saveHourlyRateAction } from "../rate-actions";
+import { useNotify } from "@/components/ui/notifications";
 
 export function HourlyRateEditor({ rate, onSave, onClose }: { rate?: HourlyRate; onSave: (rate: HourlyRate) => void; onClose: () => void }) {
   const [name, setName] = useState(rate?.name ?? "");
   const [amount, setAmount] = useState(rate ? (rate.amountCents / 100).toFixed(2) : "");
-  const [error, setError] = useState("");
+  const notify = useNotify();
   const [pending, setPending] = useState(false);
   const fields = useRef<HTMLDivElement>(null);
   async function save() {
     if (pending || [...(fields.current?.querySelectorAll("input") ?? [])].some(input => !input.reportValidity())) return;
-    setPending(true); setError("");
+    setPending(true);
     try {
       const result = await saveHourlyRateAction({ id: rate?.id, name, amount });
-      if (result.error) setError(result.error);
-      else if (result.rate) onSave(result.rate);
-    } catch { setError("The rate could not be saved. Please try again."); }
+      if (result.error) notify(result.error, "danger");
+      else if (result.rate) { notify("Hourly rate saved."); onSave(result.rate); }
+    } catch { notify("The rate could not be saved. Please try again.", "danger"); }
     finally { setPending(false); }
   }
   return <Modal open title={rate ? "Edit hourly rate" : "New hourly rate"} onClose={() => { if (!pending) onClose(); }}>
@@ -26,7 +29,6 @@ export function HourlyRateEditor({ rate, onSave, onClose }: { rate?: HourlyRate;
       <Field label="Rate name"><Input autoFocus required maxLength={120} value={name} disabled={pending} placeholder="Standard photography" onChange={event => setName(event.target.value)} /></Field>
       <Field label="Rate per hour (USD)"><Input required type="number" min="0" max="9999999.99" step="0.01" inputMode="decimal" value={amount} disabled={pending} onChange={event => setAmount(event.target.value)} /></Field>
       {rate && <p className="ui-field-hint">Changes apply to new bookings for services using this rate. Existing bookings keep their saved prices.</p>}
-      {error && <p className="error" role="alert">{error}</p>}
       <div className="module-modal-actions"><Button type="button" variant="secondary" disabled={pending} onClick={onClose}>Cancel</Button><Button type="button" onClick={save} disabled={pending}>{pending ? "Saving…" : "Save rate"}</Button></div>
     </div>
   </Modal>;

@@ -3,7 +3,10 @@
 import { useMemo, useState } from "react";
 import { Boxes, Pencil, Plus, Search, X } from "lucide-react";
 import Link from "next/link";
-import { Button, ButtonLink, Pagination, SelectMenu, Tooltip, type SelectMenuOption } from "@/components/ui";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Pagination } from "@/components/ui/pagination";
+import { SelectMenu, type SelectMenuOption } from "@/components/ui/select-menu";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useCatalogTablePagination } from "./use-catalog-table-pagination";
 
 export type ServicePackageTablePackage = {

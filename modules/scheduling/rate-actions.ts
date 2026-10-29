@@ -16,11 +16,14 @@ export async function saveHourlyRateAction(input: unknown): Promise<{ rate?: Hou
   const { id, name, amount } = parsed.data;
   try {
     if (id) {
-      const services = await prisma.service.findMany({ where: { siteId, hourlyRateId: id, pricingType: "HOURLY" }, select: { durationMinutes: true, sessionOffering: true } });
+      const services = await prisma.service.findMany({ where: { siteId }, select: { pricingType: true, hourlyRateId: true, durationMinutes: true, sessionOffering: true } });
       try {
         for (const service of services) {
-          hourlyPriceCents(amount, service.durationMinutes);
-          for (const tier of readSessionOffering(service.sessionOffering)?.tiers ?? []) hourlyPriceCents(amount, tier.durationMinutes);
+          const inheritsRate = service.pricingType === "HOURLY" && service.hourlyRateId === id;
+          if (inheritsRate) hourlyPriceCents(amount, service.durationMinutes);
+          for (const tier of readSessionOffering(service.sessionOffering)?.tiers ?? []) {
+            if (tier.pricingType === "HOURLY" ? tier.hourlyRateId === id : !tier.pricingType && inheritsRate) hourlyPriceCents(amount, tier.durationMinutes);
+          }
         }
       } catch { return { error: "This rate would put an existing package over $9,999,999.99. Use a lower rate or shorten that package first." }; }
     }

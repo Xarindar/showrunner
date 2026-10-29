@@ -5,6 +5,24 @@ import { blockRegistry, emptyFields, payloadSchema } from "../modules/content/st
 import { configuredBlock } from "../modules/content/studio/manifest";
 import { resolveStudioPayload, validateBlockUpdate, type StoredBlock } from "../modules/content/studio/state";
 import { cottageContentManifest } from "../clients/content-manifests";
+import { mobileOverrides, resolveMobilePayload } from "../modules/content/studio/mobile-overrides";
+
+test("header button alignment validates choices and mobile overrides leave desktop intact", () => {
+  const slide = { id: "first", ...emptyFields(blockRegistry.slideshow.fields.slides.fields!), buttonAlignment: "left" };
+  const payload = { slides: [slide] };
+  const block = configuredBlock("header", "slideshow", ["home"]);
+  const request = { id: block.id, revision: 0, pageIds: ["home"], payload };
+  for (const buttonAlignment of ["", "left", "center", "right"]) {
+    assert.doesNotThrow(() => validateBlockUpdate(block, undefined, { ...request, payload: { slides: [{ ...slide, buttonAlignment }] } }));
+  }
+  assert.throws(() => validateBlockUpdate(block, undefined, { ...request, payload: { slides: [{ ...slide, buttonAlignment: "outside" }] } }));
+  const mobile = { slides: [{ ...slide, buttonAlignment: "right" }] };
+  const saved = validateBlockUpdate(block, undefined, { ...request, payload: { ...payload, mobileOverrides: mobileOverrides(payload, mobile) } }).payload;
+  assert.equal((saved.slides as typeof payload.slides)[0].buttonAlignment, "left");
+  assert.equal((resolveMobilePayload(saved).slides as typeof payload.slides)[0].buttonAlignment, "right");
+  const { buttonAlignment: _legacyMissingAlignment, ...legacy } = slide;
+  assert.doesNotThrow(() => payloadSchema("slideshow").parse({ slides: [legacy] }));
+});
 
 test("settings put each item's image first and keep every template binding in a visual group", () => {
   assert.deepEqual(imageFirst(blockRegistry.team.fields.items.fields!).slice(0, 2).map(([key]) => key), ["imageUrl", "name"]);

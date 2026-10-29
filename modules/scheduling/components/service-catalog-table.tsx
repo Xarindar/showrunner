@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { CalendarCheck, MoreHorizontal, Pencil, Search, X } from "lucide-react";
-import { Button, ButtonLink, Pagination, SelectMenu, Tooltip, type SelectMenuOption } from "@/components/ui";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Pagination } from "@/components/ui/pagination";
+import { SelectMenu, type SelectMenuOption } from "@/components/ui/select-menu";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useCatalogTablePagination } from "./use-catalog-table-pagination";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;

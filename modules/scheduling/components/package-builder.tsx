@@ -2,7 +2,8 @@
 
 import { useCallback, useRef, useState, type DragEvent } from "react";
 import { Boxes, Clock3, GripVertical, Layers3, Plus, Tag, Trash2 } from "lucide-react";
-import { Button, Switch } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { cx } from "@/components/ui/utils";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;

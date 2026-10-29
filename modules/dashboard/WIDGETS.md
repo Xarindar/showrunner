@@ -177,13 +177,12 @@ The shell validates real dates, requires both endpoints together, and rejects an
 ## Visual Contract
 
 - Choose a composition that reflects the domain instead of defaulting every widget to a metric followed by rows:
-  - `DashboardTimeline` for schedules and queues ordered by time.
   - `DashboardRing` for readiness, coverage, or completion against a real denominator.
   - `DashboardSegmentBar` for mutually meaningful states such as sent, queued, and failed.
   - `DashboardSparkline` for a time series.
   - `DashboardIdentityList` for people-centered records.
-  - `DashboardCardList` for documents, transactions, and other ledger-like records.
-  - `DashboardKpiRow` or `DashboardStatStack` for a small set of genuinely distinct measures.
+  - `DashboardCardList` for schedules, queues, documents, and transactions.
+  - `DashboardKpiRow` for a small set of distinct measures.
 - The shared frame supplies the title, module identity, navigation, and settings. Descriptions belong in the widget catalog, not inside every dashboard card.
 - Keep one dominant value or task per widget.
 - Let the shared content stage vertically balance the complete widget composition. Do not add widget-level top margins or fixed spacers to push content into place.

@@ -13,7 +13,8 @@ import {
   isReactEmailBuilderDocument,
   normalizeEmailBuilderDocument
 } from "@/lib/email-builder/document";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 
 type SenderIdentityOption = {
   id: string;
@@ -149,7 +150,6 @@ function emptyEditorJson() {
 }
 
 export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const editorRef = useRef<EmailEditorRef>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const allowSubmitRef = useRef(false);
@@ -209,19 +209,6 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
     },
     [textBody, textFallbackDirty, writeHiddenValues]
   );
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-
-    if (isOpen && !dialog.open) {
-      dialog.showModal();
-    }
-
-    if (!isOpen && dialog.open) {
-      dialog.close();
-    }
-  }, [isOpen]);
 
   useEffect(() => {
     writeHiddenValues({
@@ -305,7 +292,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
         </div>
       </div>
 
-      <dialog className="email-playground-dialog" onClose={() => setIsOpen(false)} ref={dialogRef}>
+      <Dialog aria-label={props.templateName} className="email-playground-dialog" open={isOpen} onClose={() => setIsOpen(false)}>
         <div className="email-playground-shell">
           <header className="email-playground-header">
             <div>
@@ -474,7 +461,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
             </div>
           </footer>
         </div>
-      </dialog>
+      </Dialog>
     </form>
   );
 }

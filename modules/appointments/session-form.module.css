@@ -16,16 +16,13 @@
   margin-top: var(--sd-space-6);
   width: 100%;
   min-width: 0;
-  min-height: 44px;
-  font-size: var(--sd-type-heading-size);
 }
 .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sd-space-16); }
-.form details { border-top: 1px solid var(--color-border); padding-top: var(--sd-space-16); }
-.form summary { cursor: pointer; padding-block: var(--sd-space-8); font-weight: var(--sd-type-weight-medium); }
+.form details { border-top: 1px solid var(--color-border); }
 .form details label { margin-top: var(--sd-space-16); }
 .hint { margin: 0; }
 .days { display: flex; flex-wrap: wrap; gap: var(--sd-space-8); }
-.days label { display: flex; align-items: center; gap: var(--sd-space-6); min-height: 44px; padding-inline: var(--sd-space-8); }
+.days label { display: flex; align-items: center; gap: var(--sd-space-6); min-height: var(--sd-layout-touch-target); padding-inline: var(--sd-space-8); }
 .days input { margin: 0; width: 20px; min-height: 20px; }
 .footer {
   position: sticky;

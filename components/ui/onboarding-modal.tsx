@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { Button } from "./button";
+import { Dialog } from "./dialog";
 import { cx } from "./utils";
 
 export type OnboardingModalStep = {
@@ -39,46 +41,18 @@ export function OnboardingModal({
   steps,
   title
 }: OnboardingModalProps) {
-  const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const startedOutside = useRef(false);
-  function isOutside(event: React.MouseEvent<HTMLDialogElement>) {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    return event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom;
-  }
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    const handleCancel = (event: Event) => {
-      event.preventDefault();
-      onClose();
-    };
-    dialog.addEventListener("cancel", handleCancel);
-    return () => dialog.removeEventListener("cancel", handleCancel);
-  }, [onClose]);
 
   const completedThrough =
     completedStepIndex ?? (activeStepIndex === null ? steps.length - 1 : Math.max(-1, activeStepIndex - 1));
   const maxSelectable = maxNavigableStepIndex ?? (activeStepIndex === null ? steps.length - 1 : activeStepIndex);
 
   return (
-    <dialog
+    <Dialog
       aria-labelledby={titleId}
       className={cx("ui-dialog", "ui-onboarding-modal", className)}
-      onPointerDown={event => { startedOutside.current = event.target === ref.current && isOutside(event); }}
-      onClick={(event) => {
-        if (startedOutside.current && event.target === ref.current && isOutside(event)) onClose();
-        startedOutside.current = false;
-      }}
-      ref={ref}>
+      onClose={onClose}
+      open={open}>
       <div className="ui-onboarding-shell">
         <aside className="ui-onboarding-rail" aria-label="Onboarding progress">
           <ol className="ui-onboarding-steps">
@@ -119,13 +93,13 @@ export function OnboardingModal({
               </h2>
               {description ? <p>{description}</p> : null}
             </div>
-            <button aria-label={closeLabel} className="ui-onboarding-close" onClick={onClose} type="button">
+            <Button aria-label={closeLabel} className="ui-dialog-close" onClick={onClose} size="sm" type="button" variant="ghost">
               <X size={18} aria-hidden="true" />
-            </button>
+            </Button>
           </header>
           <div className="ui-onboarding-body">{open ? children : null}</div>
         </section>
       </div>
-    </dialog>
+    </Dialog>
   );
 }

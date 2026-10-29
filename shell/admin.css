@@ -70,7 +70,7 @@
 .showrunner-admin .admin-sidebar .brand {
   color: var(--admin-sidebar-text);
   font-size: var(--sd-type-heading-size);
-  min-height: 44px;
+  min-height: var(--sd-layout-touch-target);
   padding: 0 var(--space-2);
 }
 .showrunner-admin .admin-brand-mark {
@@ -297,7 +297,7 @@
   font-size: var(--type-small);
   font-weight: var(--sd-type-weight-medium);
   gap: var(--sd-space-8);
-  min-height: 44px;
+  min-height: var(--sd-layout-touch-target);
   padding: var(--space-2) calc(var(--space-3) + var(--sd-space-8));
   text-decoration: none;
 }
@@ -562,6 +562,10 @@
   height: calc(100dvh - 8px);
   padding: var(--admin-page-inset);
 }
+.showrunner-admin .admin-main:has(> .stack > .page-header),
+.showrunner-admin .admin-main:has(> .product-studio-page > .product-studio-header) {
+  padding-top: 0;
+}
 .showrunner-admin .admin-main > .stack > .page-header,
 .showrunner-admin .admin-main > .product-studio-page > .product-studio-header {
   margin-inline: calc(-1 * var(--admin-page-inset));
@@ -649,7 +653,7 @@
 .showrunner-admin .admin-sidebar-search input,
 .showrunner-admin .admin-sidebar-search button,
 .showrunner-admin .admin-nav-search-results a {
-    min-height: 44px;
+    min-height: var(--sd-layout-touch-target);
   }
   .showrunner-admin .admin-sidebar-search button { width: 44px; }
   .showrunner-admin .admin-sidebar-search input { font-size: var(--sd-type-heading-size); }
@@ -770,7 +774,7 @@
 @media(max-width:860px) {
   .showrunner-admin .admin-settings-layout { grid-template-columns: minmax(0,1fr); }
   .showrunner-admin .admin-settings-nav { position: static; display: flex; flex-wrap: wrap; }
-  .showrunner-admin .admin-settings-nav a { min-height: 44px; display: flex; align-items: center; }
+  .showrunner-admin .admin-settings-nav a { min-height: var(--sd-layout-touch-target); display: flex; align-items: center; }
 }
 .showrunner-admin .admin-main .ui-field .ui-input { margin: 0; }
 .showrunner-admin .admin-settings-layout form.ui-card { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 0; }
@@ -785,7 +789,7 @@
   box-shadow: none;
 }
 @media(max-width:860px) {
-  .showrunner-admin .admin-main #media-home-search { min-height: 44px; }
+  .showrunner-admin .admin-main #media-home-search { min-height: var(--sd-layout-touch-target); }
 }
 .showrunner-admin .admin-section-nav {
   display: flex;

@@ -222,7 +222,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       </header>
 
       {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
-      {errorMessage ? <Notification tone="danger" queryKey="error">{decodeURIComponent(errorMessage)}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
       <main className="catalog-board" aria-labelledby="products-board-title">
           <div className="catalog-board-header">

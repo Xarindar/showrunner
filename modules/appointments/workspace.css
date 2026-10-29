@@ -652,7 +652,7 @@
   .showrunner-admin .appointments-action-button.icon-only { width: 100%; }
   .showrunner-admin .appointments-inline-metrics { grid-template-columns: 1fr; }
   .showrunner-admin .appointments-hero-filters input,
-.showrunner-admin .appointments-hero-filters select { min-height: 34px; }
+  .showrunner-admin .appointments-hero-filters select { min-height: var(--sd-layout-touch-target); }
   .showrunner-admin .appointment-expanded-list > div { grid-template-columns: 1fr; }
 }
 .showrunner-admin .appointments-rules-modal[open] {
@@ -666,7 +666,7 @@
 @media(max-width:860px) {
   .showrunner-admin .appointments-header-actions { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .showrunner-admin :is(.appointments-action-button,.appointments-icon-link,.appointments-today-link,.admin-section-nav a,.admin-slot-diagnostics > summary) {
-    min-height: 44px;
+    min-height: var(--sd-layout-touch-target);
   }
   .showrunner-admin .appointments-action-button { border-radius: var(--sd-radius-pill); justify-content: center; }
   .showrunner-admin .appointments-action-button span { display: inline; }

@@ -151,38 +151,6 @@ export function DashboardSegmentBar({ items }: { items: DashboardSegment[] }) {
   );
 }
 
-type DashboardTimelineItem = {
-  detail?: ReactNode;
-  href?: string;
-  id: string;
-  time: ReactNode;
-  title: ReactNode;
-};
-
-export function DashboardTimeline({ empty, items }: { empty: string; items: DashboardTimelineItem[] }) {
-  if (!items.length) return <p className="dashboard-card-empty">{empty}</p>;
-
-  return (
-    <ol className="dashboard-widget-timeline">
-      {items.map((item) => {
-        const copy = (
-          <>
-            <span className="dashboard-widget-timeline-time">{item.time}</span>
-            <span className="dashboard-widget-timeline-marker" aria-hidden="true" />
-            <strong className="dashboard-widget-row-title">{item.title}</strong>
-            <small className="dashboard-widget-row-detail">{item.detail || null}</small>
-            <span className="dashboard-widget-row-arrow" aria-hidden="true">
-              {item.href ? <ArrowRight size={14} /> : null}
-            </span>
-          </>
-        );
-
-        return <li key={item.id}>{item.href ? <Link href={item.href}>{copy}</Link> : <span>{copy}</span>}</li>;
-      })}
-    </ol>
-  );
-}
-
 type DashboardIdentityItem = {
   detail?: ReactNode;
   href?: string;
@@ -268,31 +236,6 @@ export function DashboardSparkline({ ariaLabel, labels = [], points }: Dashboard
   );
 }
 
-type DashboardStatItem = {
-  detail?: ReactNode;
-  icon?: ReactNode;
-  label: string;
-  tone?: "neutral" | "positive" | "attention" | "danger";
-  value: ReactNode;
-};
-
-export function DashboardStatStack({ items }: { items: DashboardStatItem[] }) {
-  return (
-    <div className="dashboard-widget-stat-stack">
-      {items.map((item) => (
-        <span key={item.label}>
-          {item.icon ? <i className={`dashboard-widget-stat-icon dashboard-widget-tone-${item.tone || "neutral"}`}>{item.icon}</i> : null}
-          <span>
-            <small>{item.label}</small>
-            {item.detail ? <em>{item.detail}</em> : null}
-          </span>
-          <strong>{item.value}</strong>
-        </span>
-      ))}
-    </div>
-  );
-}
-
 type DashboardKpi = {
   label: string;
   value: ReactNode;
@@ -346,28 +289,5 @@ export function DashboardCardList({ empty, items }: { empty: string; items: Dash
         );
       })}
     </ul>
-  );
-}
-
-type DashboardTrendBar = {
-  label: string;
-  value: number;
-};
-
-export function DashboardTrendBars({ bars }: { bars: DashboardTrendBar[] }) {
-  const max = Math.max(1, ...bars.map((bar) => bar.value));
-
-  return (
-    <div className="dashboard-card-trend" aria-label="Recent activity trend">
-      {bars.map((bar) => (
-        <span className="dashboard-card-trend-bar" key={bar.label}>
-          <span
-            aria-hidden="true"
-            style={{ "--dashboard-card-bar-height": `${Math.max(8, Math.round((bar.value / max) * 100))}%` } as CSSProperties}
-          />
-          <small>{bar.label}</small>
-        </span>
-      ))}
-    </div>
   );
 }

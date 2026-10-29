@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { Button } from "./button";
+import { Dialog } from "./dialog";
 import { cx } from "./utils";
 
 type ModalProps = {
@@ -24,52 +25,23 @@ export function Modal({
   open,
   title
 }: ModalProps) {
-  const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const startedOutside = useRef(false);
-
-  function isOutside(event: React.MouseEvent<HTMLDialogElement>) {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    return event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom;
-  }
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    const handleCancel = (event: Event) => {
-      event.preventDefault();
-      onClose();
-    };
-    dialog.addEventListener("cancel", handleCancel);
-    return () => dialog.removeEventListener("cancel", handleCancel);
-  }, [onClose]);
 
   return (
-    <dialog
+    <Dialog
       aria-labelledby={titleId}
-      className={cx("ui-dialog", className)}
-      onPointerDown={(event) => { startedOutside.current = event.target === ref.current && isOutside(event); }}
-      onClick={(event) => {
-        if (startedOutside.current && event.target === ref.current && isOutside(event)) onClose();
-        startedOutside.current = false;
-      }}
-      ref={ref}>
+      className={cx("ui-dialog", "ui-modal", className)}
+      onClose={onClose}
+      open={open}>
       <div className="ui-modal-head">
         <h2 className="ui-zero" id={titleId}>
           {title}
         </h2>
         <Button aria-label={closeLabel} className="ui-dialog-close" onClick={onClose} size="sm" type="button" variant="ghost">
-          <X size={16} />
+          <X size={16} aria-hidden="true" />
         </Button>
       </div>
       <div className={cx("ui-dialog-body", bodyClassName)}>{open ? children : null}</div>
-    </dialog>
+    </Dialog>
   );
 }

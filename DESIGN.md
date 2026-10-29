@@ -23,3 +23,6 @@ Use the installed font fallback in the exported stack; do not download Shopify's
 Use the shared dialog shell: 16px outer padding, 12px between header and body, and 16px between form groups. Use `module-modal-actions` for action rows with an 8px gap, aligned right, with Cancel before the primary action in DOM order. Keep scrollable contents and status messages separate from the action group.
 
 Input boundaries use inset rings in the shared control recipe and token source for normal, focus, invalid and disabled states. External shadows are decorative only: borders and keyboard focus must remain visible inside clipped or scrolling containers. Preserve container overflow behavior rather than adding per-screen clearance patches.
+
+## Time presentation
+Show all user-facing times in 12-hour format with explicit AM/PM. Use `formatTime` / `formatDateTime` for dated values, `formatTimeValue` for wall-clock values, and the shared `TimeInput` / `DateTimeInput` controls for editing. Storage, API payloads, calendar coordinates and timezone calculations retain canonical 24-hour values. Each weekly-hours Edit action starts from that day’s saved scoped schedule; toggling Accept appointments off and back on retains the draft time ranges.

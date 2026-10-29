@@ -122,7 +122,7 @@ export default async function ServicePackageEditPage({ packageId, searchParams }
   await requireAdmin("scheduling:manage");
   const params = await searchParams;
   const savedMessage = savedPackageMessage(params.saved);
-  const errorMessage = params.error ? decodeURIComponent(params.error) : null;
+  const errorMessage = params.error || null;
 
   if (packageId === "new") {
     return (

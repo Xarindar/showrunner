@@ -21,7 +21,7 @@ const commonWorkflows = [
 },
 {
   label: "Set appointment rules",
-  href: "/admin/modules/appointments?panel=rules",
+  href: "/admin/modules/appointments/schedule",
   detail: "Manage weekly hours, team resources, blockouts, reminders, and calendar connections."
 },
 {

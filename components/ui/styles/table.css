@@ -258,7 +258,7 @@
   .showrunner-admin .ui-table-filter-select .ui-select-trigger {
     grid-template-columns: minmax(0,1fr) auto;
     row-gap: 0;
-    min-height: 44px;
+    min-height: var(--sd-layout-touch-target);
     padding-block: var(--sd-space-6);
   }
   .showrunner-admin .ui-table-filter-select :is(.ui-select-label,.ui-select-value) { grid-column: 1; }

@@ -3,7 +3,8 @@
 import { useId, useState } from "react";
 import { flushSync } from "react-dom";
 import { Copy, Plus, X } from "lucide-react";
-import { Button, Modal } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { sessionOfferingDraft, type SessionOffering, type SessionOfferingDraft } from "@/lib/scheduling/session-offering";
 import type { ServiceLibraryItem } from "@/lib/scheduling/service-library";
 import { ServiceLibraryMenu } from "./service-library-menu";
@@ -11,26 +12,28 @@ import { ServiceLibraryPicker } from "./service-library-picker";
 import styles from "./session-packages-editor.module.css";
 import { hourlyPriceCents, type HourlyRate, type PricingType } from "@/lib/scheduling/pricing";
 import { ServicePricingFields } from "./service-pricing-fields";
+import { useNotify } from "@/components/ui/notifications";
 
 export function SessionPackagesEditor({ initialOffering = null, durationMinutes = 60, priceCents = null, requirePrice = false, initialRates = [], initialPricingType = "FLAT_RATE", initialHourlyRateId = "" }: {
   initialOffering?: SessionOffering | null; durationMinutes?: number; priceCents?: number | null; requirePrice?: boolean;
   initialRates?: HourlyRate[]; initialPricingType?: PricingType; initialHourlyRateId?: string;
 }) {
-  const [draft, setDraft] = useState(() => sessionOfferingDraft(initialOffering, durationMinutes, priceCents));
+  const [draft, setDraft] = useState<SessionOfferingDraft>(() => {
+    const offering = sessionOfferingDraft(initialOffering, durationMinutes, priceCents);
+    return { ...offering, tiers: offering.tiers.map(tier => ({ ...tier, pricingType: tier.pricingType ?? initialPricingType, hourlyRateId: tier.pricingType ? tier.hourlyRateId : initialHourlyRateId })) };
+  });
   const [expandedTiers, setExpandedTiers] = useState(() => new Set<string>());
   const [libraryPicker, setLibraryPicker] = useState<{ editingItem?: SessionOffering["coverageItems"][number] } | null>(null);
   const [inlineService, setInlineService] = useState<SessionOffering["coverageItems"][number] | null>(null);
   const [expandedService, setExpandedService] = useState<string | null>(null);
   const [removal, setRemoval] = useState<{ kind: "service" | "package" | "extra"; id: string; name: string } | null>(null);
   const [newTiers, setNewTiers] = useState(() => new Set<string>());
-  const [message, setMessage] = useState("");
+  const notify = useNotify();
   const [rates, setRates] = useState(initialRates);
-  const [pricingType, setPricingType] = useState(initialPricingType);
-  const [hourlyRateId, setHourlyRateId] = useState(initialHourlyRateId);
-  const hourlyRate = rates.find(rate => rate.id === hourlyRateId);
   const onRateSaved = (rate: HourlyRate) => setRates(current => [...current.filter(item => item.id !== rate.id), rate].sort((a, b) => a.name.localeCompare(b.name)));
   const tierPrice = (tier: SessionOfferingDraft["tiers"][number]) => {
-    if (pricingType !== "HOURLY") return tier.price;
+    if (tier.pricingType !== "HOURLY") return tier.price;
+    const hourlyRate = rates.find(rate => rate.id === tier.hourlyRateId);
     if (!hourlyRate || !tier.durationMinutes) return "";
     try { return (hourlyPriceCents(hourlyRate.amountCents, Number(tier.durationMinutes)) / 100).toFixed(2); }
     catch { return ""; }
@@ -55,12 +58,12 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     while (source && draft.tiers.some(tier => tier.name.toLowerCase() === name.toLowerCase())) name = `${base} copy ${suffix++}`;
     const id = crypto.randomUUID();
     flushSync(() => {
-      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? "", coverageIds: [...(source?.coverageIds ?? [])] }] });
+      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? "", pricingType: source?.pricingType ?? "FLAT_RATE", hourlyRateId: source?.hourlyRateId ?? "", coverageIds: [...(source?.coverageIds ?? [])] }] });
       setExpandedTiers(new Set([id]));
       setNewTiers(current => new Set([...current, id]));
     });
     document.getElementById(`${listId}-${id}`)?.focus();
-    setMessage(source ? `Duplicated ${source.name}. Rename it and adjust what is included.` : "Added a blank package. Enter its name, price, duration, and what's included.");
+    notify(source ? `Package duplicated. Save the session type to keep it.` : "Package added to this draft.");
   }
 
   function chooseLibraryItems(items: ServiceLibraryItem[], candidate = inlineService?.id || libraryPicker?.editingItem?.id || null) {
@@ -73,20 +76,15 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
       };
     });
     closeLibrary();
-    setMessage(editingId ? "Service updated. Save the session type to keep these details." : "Services added. Choose which packages include them, then save the session type.");
+    notify(editingId ? "Service updated in this draft." : "Services added to this draft.");
   }
 
   return <div className={styles.editor}>
-    <input type="hidden" name="pricingType" value={pricingType} />
-    <input type="hidden" name="hourlyRateId" value={pricingType === "HOURLY" ? hourlyRateId : ""} />
+    <input type="hidden" name="pricingType" value={draft.tiers[0].pricingType} />
+    <input type="hidden" name="hourlyRateId" value={draft.tiers[0].pricingType === "HOURLY" ? draft.tiers[0].hourlyRateId ?? "" : ""} />
     <input type="hidden" name="sessionOffering" value={JSON.stringify({ ...draft, tiers: draft.tiers.map(tier => ({ ...tier, price: tierPrice(tier) })) })} />
     <input type="hidden" name="durationMinutes" value={draft.tiers[0].durationMinutes} />
     <input type="hidden" name="price" value={tierPrice(draft.tiers[0])} />
-    <section className="studio-panel" aria-label="Session pricing">
-      <h2>Pricing</h2>
-      <ServicePricingFields pricingType={pricingType} hourlyRateId={hourlyRateId} rates={rates} onChange={(type, rateId) => { setPricingType(type); setHourlyRateId(rateId); }} onRateSaved={onRateSaved} />
-      {pricingType === "HOURLY" && <p className={styles.hint}>Package totals use this rate × duration. Optional extras are added once.</p>}
-    </section>
     <section className="studio-panel" aria-labelledby={`${listId}-included-title`}>
       <div className={styles.heading}><h2 id={`${listId}-included-title`} tabIndex={-1}>What’s included</h2></div>
       <p className={styles.hint}>Add reusable services, then choose which packages include each one below.</p>
@@ -113,13 +111,14 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
         flushSync(() => setExpandedTiers(current => new Set([...current, tier.id])));
       }}>
         <summary className={styles.optionSummary} onClick={event => { event.preventDefault(); setExpandedTiers(current => current.has(tier.id) ? new Set() : new Set([tier.id])); }}>
-          <strong>{tier.name || `Package ${index + 1}`}</strong><small>{tierPrice(tier) ? `$${tierPrice(tier)}` : "Price not set"} · {tier.durationMinutes || "—"} minutes{pricingType === "HOURLY" ? " · Hourly" : ""}</small>
+          <strong>{tier.name || `Package ${index + 1}`}</strong><small>{tierPrice(tier) ? `$${tierPrice(tier)}` : "Price not set"} · {tier.durationMinutes || "—"} minutes{tier.pricingType === "HOURLY" ? " · Hourly" : ""}</small>
           <span className={styles.chips}>{draft.coverageItems.filter(item => tier.coverageIds.includes(item.id)).map(item => <span className="ui-badge" key={item.id}>{item.name}</span>)}</span>
         </summary>
         <div className={styles.tierBody}>
           <label>Package name<input id={`${listId}-${tier.id}`} aria-label={`Package ${index + 1} name`} value={tier.name} required maxLength={120} onChange={event => updateTier(tier.id, { name: event.target.value })} /></label>
+          <ServicePricingFields pricingType={tier.pricingType ?? "FLAT_RATE"} hourlyRateId={tier.hourlyRateId ?? ""} rates={rates} onChange={(pricingType, hourlyRateId) => updateTier(tier.id, { pricingType, hourlyRateId })} onRateSaved={onRateSaved} />
           <div className={styles.tierNumbers}>
-            <label>{pricingType === "HOURLY" ? "Calculated price (USD)" : "Price (USD)"}<input aria-label={`${tier.name} price (USD)`} type="number" inputMode="decimal" min="0" max="9999999.99" step="0.01" required={requirePrice || multi || pricingType === "HOURLY"} readOnly={pricingType === "HOURLY"} placeholder="0.00" value={tierPrice(tier)} onChange={event => updateTier(tier.id, { price: event.target.value })} /></label>
+            <label>{tier.pricingType === "HOURLY" ? "Calculated price (USD)" : "Price (USD)"}<input aria-label={`${tier.name} price (USD)`} type="number" inputMode="decimal" min="0" max="9999999.99" step="0.01" required={requirePrice || multi || tier.pricingType === "HOURLY"} readOnly={tier.pricingType === "HOURLY"} placeholder="0.00" value={tierPrice(tier)} onChange={event => updateTier(tier.id, { price: event.target.value })} /></label>
             <label>Duration (minutes)<input aria-label={`${tier.name} duration (minutes)`} type="number" inputMode="numeric" min="1" max="1440" required value={tier.durationMinutes} onChange={event => updateTier(tier.id, { durationMinutes: event.target.value })} /></label>
           </div>
           <fieldset className={styles.tierCoverage}><legend>Included in this package</legend>{draft.coverageItems.map(item => <label key={item.id}><input type="checkbox" aria-label={`Include ${item.name} in ${tier.name}`} checked={tier.coverageIds.includes(item.id)} onChange={event => updateTier(tier.id, { coverageIds: event.target.checked ? [...tier.coverageIds, item.id] : tier.coverageIds.filter(id => id !== item.id) })} /><span>{item.name}</span></label>)}</fieldset>
@@ -129,7 +128,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
           </div><Button type="button" onClick={event => {
             const fields = event.currentTarget.closest("details")?.querySelectorAll<HTMLInputElement>("input");
             if (fields && [...fields].some(field => !field.reportValidity())) return;
-            if (draft.tiers.some(item => item.id !== tier.id && item.name.trim().toLowerCase() === tier.name.trim().toLowerCase())) { setMessage("Use a different name for each package."); return; }
+            if (draft.tiers.some(item => item.id !== tier.id && item.name.trim().toLowerCase() === tier.name.trim().toLowerCase())) { notify("Use a different name for each package.", "danger"); return; }
             setExpandedTiers(new Set()); setNewTiers(current => new Set([...current].filter(id => id !== tier.id)));
           }}>Done</Button></div>
         </div>
@@ -147,12 +146,11 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
       <Button type="button" variant="secondary" size="sm" disabled={draft.addOns.length >= 50} onClick={() => setDraft({ ...draft, addOns: [...draft.addOns, { id: crypto.randomUUID(), name: "", price: "" }] })}><Plus size={16} />Add optional extra</Button>
     </details>
     </section>
-    <p role="status" className={styles.hint}>{message}</p>
     {removal && <Modal open title={`Remove "${removal.name}"?`} onClose={() => setRemoval(null)}>
       <p>{removal.kind === "service" ? `This removes the service from this session and its package selections. It stays in your library.` : removal.kind === "package" ? "This removes the package and its selections. Your included services stay in this session and the library." : "This removes the optional extra from this session."}</p>
       <div className="module-modal-actions"><Button type="button" variant="secondary" autoFocus onClick={() => setRemoval(null)}>Cancel</Button><Button type="button" variant="danger" onClick={() => {
         setDraft(current => removal.kind === "service" ? { ...current, coverageItems: current.coverageItems.filter(item => item.id !== removal.id), tiers: current.tiers.map(tier => ({ ...tier, coverageIds: tier.coverageIds.filter(id => id !== removal.id) })) } : removal.kind === "package" ? { ...current, tiers: current.tiers.length > 1 ? current.tiers.filter(tier => tier.id !== removal.id) : current.tiers } : { ...current, addOns: current.addOns.filter(item => item.id !== removal.id) });
-        setInlineService(null); setExpandedService(null); setRemoval(null); setMessage(`Removed ${removal.name} from this draft. Save the session type to keep the change.`);
+        setInlineService(null); setExpandedService(null); setRemoval(null); notify(`${removal.name} removed from this draft.`);
       }}>Remove {removal.kind}</Button></div>
     </Modal>}
   </div>;

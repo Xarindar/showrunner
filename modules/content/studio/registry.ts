@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export type Field = { label: string; kind: "text" | "multiline" | "richtext" | "url" | "email" | "list" | "checkbox" | "number"; min?: number; max?: number; default?: number; optional?: boolean; options?: { label: string; value: string }[]; fields?: Record<string, Field> };
+export type Field = { label: string; kind: "time" | "text" | "multiline" | "richtext" | "url" | "email" | "list" | "checkbox" | "number"; min?: number; max?: number; default?: number; optional?: boolean; options?: { label: string; value: string }[]; fields?: Record<string, Field> };
 const text = (label: string, max = 200): Field => ({ label, kind: "text", max });
 const copy = (label: string): Field => ({ label, kind: "multiline", max: 10000 });
 const url = (label: string): Field => ({ label, kind: "url", max: 2048 });
@@ -11,12 +11,12 @@ const image = { ...framing, url: url("Image URL"), alt: text("Alternative text")
 const section = { heading: text("Heading"), copy: copy("Copy") };
 const cta = { ctaLabel: text("Button label"), ctaHref: url("Button destination") };
 const address = { line1: text("Street address"), line2: text("Address line 2"), city: text("City"), region: text("State / region"), postalCode: text("Postal code"), country: text("Country") };
-const hours = list("Business hours", { day: text("Weekday (Monday–Sunday)"), opens: text("Opens (HH:mm)"), closes: text("Closes (HH:mm)") }, 28);
+const hours = list("Business hours", { day: text("Weekday (Monday–Sunday)"), opens: { label: "Opens", kind: "time", max: 5 }, closes: { label: "Closes", kind: "time", max: 5 } }, 28);
 const checkbox = (label: string): Field => ({ label, kind: "checkbox" });
 
 export const blockRegistry = {
   showcase: { label: "Service / product showcase", fields: { heading: text("Heading"), items: list("Cards", { catalogKey: text("Service or product"), ...framing, imageUrl: { ...url("Image"), optional: true }, displayOnly: checkbox("Display only (hide action)"), variant: text("Card style") }, 30) } },
-  slideshow: { label: "Header carousel", fields: { slides: list("Header", { ...framing, imageUrl: url("Image"), imageAlt: text("Alternative text"), title: text("Title"), caption: copy("Caption"), buttonLabel: text("Title"), buttonHref: url("Link to") }, 12) } },
+  slideshow: { label: "Header carousel", fields: { slides: list("Header", { ...framing, imageUrl: url("Image"), imageAlt: text("Alternative text"), title: text("Title"), caption: copy("Caption"), buttonLabel: text("Title"), buttonHref: url("Link to"), buttonAlignment: { label: "Alignment", kind: "text", options: [{ label: "Left", value: "left" }, { label: "Center", value: "center" }, { label: "Right", value: "right" }] } }, 12) } },
   strip: { label: "Page section", fields: { texts: list("Text", { text: copy("Text") }, 100), images: list("Images", image, 30), links: list("Links", link, 30) } },
   hero: { label: "Header / Hero", fields: { ...section, ...cta, images: list("Images", image, 6) } },
   testimonials: { label: "Reviews / Testimonials", fields: { ...section, items: list("Testimonials", { quote: copy("Quote"), author: text("Author"), role: text("Attribution") }) } },
@@ -34,7 +34,7 @@ export const blockRegistry = {
   }, 30) } },
   about: { label: "About / story section", fields: { ...section, copy: { ...copy("Copy"), kind: "richtext" } as Field, ...framing, imageUrl: url("Image URL"), imageAlt: text("Alternative text") } },
   faq: { label: "FAQ section", fields: { heading: text("Heading"), items: list("Questions", { question: text("Question", 500), answer: { ...copy("Answer"), kind: "richtext" } }) } },
-  team: { label: "Team / staff spotlight", fields: { ...section, items: list("People", { name: text("Name"), role: text("Role"), bio: copy("Biography"), ...framing, imageUrl: url("Photo URL"), imageAlt: text("Alternative text") }) } },
+  team: { label: "Team / staff spotlight", fields: { ...section, items: list("Team member", { name: text("Name"), role: copy("Role"), bio: copy("Biography"), ...framing, imageUrl: url("Photo URL"), imageAlt: text("Alternative text") }, 30) } },
   contact: { label: "Contact / location section", fields: { ...section, locationId: text("Location ID (blank for primary)") } },
   footer: { label: "Footer content controls", fields: { tagline: text("Tagline"), copy: copy("Copy"), links: list("Links", link) } },
   seo: { label: "Page SEO", fields: { title: text("SEO page title", 200), description: text("Meta description", 500) } },
@@ -58,6 +58,7 @@ export function isSafeContentUrl(value: string) {
 }
 
 export function fieldSchema(field: Field): z.ZodType {
+  if (field.options) return z.enum(["", ...field.options.map(option => option.value)]).optional();
   if (field.kind === "number") return z.number().min(field.min ?? 0).max(field.max ?? 100).default(field.default ?? 0);
   if (field.kind === "checkbox") return z.boolean();
   if (field.kind === "list") return z.array(z.strictObject({ id: z.string().min(1).max(100), ...schemaFields(field.fields!), ...(("catalogKey" in (field.fields || {}) || "referenceId" in (field.fields || {})) ? { imageSource: z.enum(["service", "custom"]).default("service"), useServiceFraming: z.boolean().default(true) } : {}), ...("catalogKey" in (field.fields || {}) ? { catalogKey: z.string().max(200).regex(/^(service|product):[^:]+$/), variant: z.string().max(100) } : {}), ...("referenceId" in (field.fields || {}) ? { title: z.string().max(200).default(""), description: z.string().max(10000).default("") } : {}) }))
@@ -68,7 +69,11 @@ export function fieldSchema(field: Field): z.ZodType {
   return field.optional ? schema.default("") : schema;
 }
 function schemaFields(fields: Record<string, Field>) { return Object.fromEntries(Object.entries(fields).map(([key, field]) => [key, fieldSchema(field)])); }
-export function payloadSchema(type: BlockType) { return z.strictObject(schemaFields(blockRegistry[type].fields)); }
+export const mobileOverridesSchema = z.array(z.strictObject({
+  path: z.array(z.string().min(1).max(100).refine(key => !["__proto__", "prototype", "constructor", "mobileOverrides"].includes(key))).min(1).max(12),
+  value: z.unknown(),
+})).max(2000);
+export function payloadSchema(type: BlockType) { return z.strictObject({ ...schemaFields(blockRegistry[type].fields), mobileOverrides: mobileOverridesSchema.optional() }); }
 export function emptyFields(fields: Record<string, Field>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(fields).map(([key, field]) => [key, field.kind === "list" ? [] : field.kind === "checkbox" ? false : field.kind === "number" ? field.default ?? 0 : ""]));
 }

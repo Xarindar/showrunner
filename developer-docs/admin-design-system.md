@@ -4,6 +4,18 @@ This is the maintained implementation guide for the Shopify-inspired Showrunner 
 
 ## Start here
 
+Single-choice native selects use `appearance: base-select` where supported. The shared control recipe styles the open picker with input corner tokens, popover elevation, inset rounded options and neutral selected/hover states. Multiple and expanded listbox selects keep their native presentation. Browsers without customizable-select support retain their native picker; keyboard navigation, required/disabled states and form submission stay browser-owned.
+
+Open select menus match their trigger's border-box width. Select values and options stay on one line, clipping long labels with ellipsis instead of making mobile controls taller. Custom select popovers follow the same width rule.
+
+Customizable native selects and their options explicitly center their flex contents vertically, including the picker arrow, at both desktop and touch heights.
+
+Field groups use `align-content: start` so taller neighbours in an equal-column grid do not stretch labels or single-line controls. Search/filter fields reuse the shared input recipe and its 44px mobile minimum; module styles must not reduce that height.
+
+Shared `Modal` dialogs keep the rounded outer shell and header stationary. The inset `.ui-dialog-body` owns vertical scrolling, with `min-height: 0` so long content fits inside the viewport. Keep task-specific content inside that body; do not put scrolling back on the outer `.ui-modal` shell or add another competing scroller.
+
+Workspaces with a shared module or product studio header have no top padding on `.admin-main`. The opaque sticky header starts at the workspace edge so scrolling content cannot show through a gap above it. Side and bottom page insets remain unchanged.
+
 1. Reuse a component from `components/ui/` before writing a control or panel.
 2. Use the semantic tokens in `app/admin/design-tokens.css` for appearance.
 3. Put task-specific layout beside its module, preferably in a CSS Module.
@@ -119,11 +131,13 @@ Fine adjustments can use the existing `--sd-space-1`, `--sd-space-2` and `--sd-s
 
 Use shadow tokens intact rather than reconstructing their layers. Inset input rings are functional boundaries; outer glow is decorative. Photo framing uses `--sd-shadow-crop-mask`, whose large spread shades the area outside the crop. Do not replace it with a card shadow. The foundation zeros the shared duration tokens for reduced motion; local animations still need their own reduced-motion treatment.
 
-Desktop shared fields have a 30px minimum height and buttons a 28px minimum. The shared mobile/coarse-pointer recipe uses `--sd-layout-touch-target` (44px). These are minimums, not permission to clip wrapping content. Custom icon actions also need adequate targets and accessible names; the token alone does not enforce that on every element.
+Desktop shared fields have a 30px minimum height and buttons a 28px minimum. The shared mobile/coarse-pointer recipe uses `--sd-layout-touch-target` (44px) and `--sd-type-input-touch-size` (16px). These are minimums, not permission to clip wrapping content. Custom icon actions also need adequate targets and accessible names; the token alone does not enforce that on every element. Modules must not replace these rules with local control heights or font sizes.
+
+`Stack`, `.ui-stack` and `.stack` share a 16px default gap; use the existing `ui-gap-*` classes for deliberate variations. Native disclosure headings use the foundation's 12px vertical padding, medium weight and 44px minimum target. Modules may arrange disclosure contents or add an enclosing surface, but should not add another vertical inset around ordinary headings. Custom menus and gallery controls can retain their task-specific composition.
 
 ## Building a module with the system
 
-Use direct component imports when a client module only needs a few controls. This avoids pulling unrelated exports through the UI barrel.
+Use direct component imports in client modules. The UI barrel also exports media controls with server-action dependencies; importing a simple button through it unnecessarily traverses that graph.
 
 ```tsx
 import { Button } from "@/components/ui/button";
@@ -153,9 +167,9 @@ Render this inside an admin form connected to the owning module's validated acti
 .actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
 ```
 
-`Button` supports `primary`, `secondary`, `ghost`, and `danger`; use `ButtonLink` for internal navigation and `ButtonAnchor` for ordinary anchors. `sm` currently shares the compact base recipe; `lg` adds padding. `Field` wraps its control in a label and accepts `hint`. Associate additional validation text with the control and use `aria-invalid` for the shared error treatment.
+`Button` supports `primary`, `secondary`, `ghost`, and `danger`; use `ButtonLink` for internal navigation and `ButtonAnchor` for ordinary anchors. `sm` currently shares the compact base recipe; `lg` adds padding. `Field` wraps its control in a label and accepts `hint`. Plain labels directly wrapping text inputs, selects, or textareas inherit the same stacked layout, 8px label gap, and full-width control from the shared recipe. The low-specificity fallback preserves explicit module layouts; checkbox, radio, range, color, file, and action inputs are excluded. Use a 16px gap between ordinary field groups. Associate additional validation text with the control and use `aria-invalid` for the shared error treatment.
 
-`Card` defaults to natural height (`minHeight="none"`). Its header/footer slots render only when supplied. Choose an explicit reserved size only for a real layout contract, such as a dashboard widget; do not add empty slots for hypothetical future content. An empty field hint is hidden. `Modal` owns dialog behavior and the shared shell; module CSS may set a justified content width or layout, but must preserve Escape, focus return, labels and viewport scrolling.
+`Card` defaults to natural height (`minHeight="none"`). Its header/footer slots render only when supplied. Choose an explicit reserved size only for a real layout contract, such as a dashboard widget; do not add empty slots for hypothetical future content. An empty field hint is hidden. `Modal` provides the shared dialog shell; `OnboardingModal` and the full-screen email editor compose the same `Dialog` interaction primitive. Module CSS may set a justified content width or layout. Keep Escape, nested-dialog isolation, guarded closing, focus return, labels and viewport scrolling in the shared implementation.
 
 Shared recipe ownership is concrete: `controls.css` owns buttons and input states; `surfaces.css` owns cards and status surfaces; `overlays.css` owns dialogs; `table.css` owns table primitives. Editor and dashboard CSS compose these recipes. A module selector targeting `.ui-button`, `.ui-input` or `.ui-card` should normally arrange or size the component, not override its color, radius, border or shadow.
 
@@ -184,6 +198,8 @@ From the repository root:
 ```powershell
 node --import tsx --test test/admin-design-scope.test.ts
 node test/admin-design-browser.mjs
+node test/admin-notifications-browser.mjs
+node test/dialog-browser.mjs
 node test/portfolio-proof-browser.mjs
 ```
 
@@ -215,7 +231,7 @@ Maintain this guide with the token source. Keep README, DESIGN.md, PRODUCT.md, m
 
 Keep confirmations to the completed action: “Session created.” or “Changes saved.” Do not narrate things that did not happen or repeat workflow details. Add detail only when the user needs it to act.
 
-The protected admin layout owns one `NotificationProvider`. Use `useNotify()(message, tone)` after client operations and `<Notification queryKey="saved">{message}</Notification>` for redirect feedback (`tone="danger"` and `queryKey="error"` for failures). Import directly from `components/ui/notifications`. The originating query flag is consumed without removing filters or the current selection.
+The protected admin layout owns one `NotificationProvider`, including toast markup; `app/admin/notifications.css` owns its presentation. Use `useNotify()(message, tone)` after client operations and `<Notification queryKey="saved">{message}</Notification>` for redirect feedback (`tone="danger"` and `queryKey="error"` for failures). Import directly from `components/ui/notifications`. For `useActionState` feedback, pass the result object as `eventKey={state}` so a repeated identical failure is announced after another attempt. The originating query flag is consumed without removing filters or the current selection. Next's `searchParams` values are already decoded; do not decode them again.
 
 Action feedback appears in a compact bottom-center toast, never a page-header banner. Confirmations expire after at least five seconds, with more time for long messages; errors remain until dismissed. Hover, keyboard focus and hidden tabs pause automatic dismissal. Keep field validation, upload progress and retry controls beside their task, including inside dialogs. The host follows an open native dialog so feedback remains visible and keyboard-accessible. Notifications are session-local, without a persistent inbox or external delivery.
 
@@ -226,3 +242,6 @@ References: [Shopify Toast API](https://shopify.dev/docs/api/app-home/latest/api
 Keep the existing shell visible during navigation. Sidebar links use Next's actual pending state with a short visual delay, so fast navigation does not flash an indicator. Route fallbacks use the destination's table, editor, gallery, website workspace or calendar shape; the protected parent boundary also covers dedicated static routes and nested records. Keep known page headings visible, hide placeholder controls from assistive technology, and announce loading without implying measured progress.
 
 `app/admin/loading.css` scopes neutral placeholders and reduced-motion behavior to admin. Service-library searches retain existing results while fetching and disable stale selections until the response arrives. Public loading screens and client website branding remain independent.
+
+## Time controls
+User-facing times use 12-hour values with explicit AM/PM, independent of the device locale. Use `TimeInput` from `components/ui/time-input.tsx` in place of native time inputs, and `DateTimeInput` for combined date/time fields. Give combined controls a task-specific `aria-label`; keep their `name` on the shared component so it submits the existing canonical `HH:mm` or `YYYY-MM-DDTHH:mm` payload. Format labels with `formatTime`, `formatDateTime`, or `formatTimeValue` from `lib/format.ts`. Numeric timezone and calendar calculations remain 24-hour.

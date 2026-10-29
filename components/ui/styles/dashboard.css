@@ -122,7 +122,7 @@
   display: grid;
   gap: var(--sd-space-8);
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) auto 18px;
-  min-height: 44px;
+  min-height: var(--sd-layout-touch-target);
   min-width: 0;
   padding: var(--sd-space-8) var(--sd-space-8);
   transition: background var(--motion-standard) var(--motion-ease),
@@ -143,9 +143,7 @@
 .showrunner-admin .dashboard-card-list li > a:hover .dashboard-widget-row-arrow,
 .showrunner-admin .dashboard-card-list li > a:focus-visible .dashboard-widget-row-arrow,
 .showrunner-admin .dashboard-widget-identity-list li > a:hover .dashboard-widget-row-arrow,
-.showrunner-admin .dashboard-widget-identity-list li > a:focus-visible .dashboard-widget-row-arrow,
-.showrunner-admin .dashboard-widget-timeline li > a:hover .dashboard-widget-row-arrow,
-.showrunner-admin .dashboard-widget-timeline li > a:focus-visible .dashboard-widget-row-arrow {
+.showrunner-admin .dashboard-widget-identity-list li > a:focus-visible .dashboard-widget-row-arrow {
   color: var(--color-text);
   transform: translateX(2px);
 }
@@ -201,37 +199,6 @@
 .showrunner-admin .dashboard-card-sm .dashboard-widget-ring { max-width: 88px; }
 .showrunner-admin .dashboard-card-sm .dashboard-widget-ring strong { font-size: var(--sd-type-page-size); }
 .showrunner-admin .dashboard-card-sm .dashboard-widget-ring-copy small { display: none; }
-.showrunner-admin .dashboard-card-trend {
-  align-items: end;
-  border-top: 1px solid var(--sd-color-border);
-  display: grid;
-  gap: var(--space-2);
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  min-height: 138px;
-  padding: var(--sd-space-16) var(--sd-space-2) 0;
-}
-.showrunner-admin .dashboard-card-trend-bar {
-  align-items: center;
-  display: grid;
-  gap: var(--space-2);
-  grid-template-rows: minmax(76px, 1fr) auto;
-  min-width: 0;
-}
-.showrunner-admin .dashboard-card-trend-bar > span {
-  align-self: end;
-  background: var(--sd-color-surface-subtle);
-  border-radius: var(--sd-radius-tag) var(--sd-radius-tag) var(--sd-radius-checkbox) var(--sd-radius-checkbox);
-  display: block;
-  height: var(--dashboard-card-bar-height);
-  min-height: 8px;
-  width: 100%;
-}
-.showrunner-admin .dashboard-card-trend-bar small {
-  color: var(--color-muted);
-  font-size: var(--type-caption);
-  line-height: 1;
-  text-align: center;
-}
 .showrunner-admin .dashboard-card-actions { align-items: center; display: inline-flex; flex: 0 0 auto; gap: var(--sd-space-2); }
 .showrunner-admin .dashboard-card-action-button,
 .showrunner-admin .dashboard-card-corner-handle {

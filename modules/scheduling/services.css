@@ -263,7 +263,7 @@
   font-weight: var(--sd-type-weight-strong);
   gap: var(--space-2);
   justify-content: center;
-  min-height: 44px;
+  min-height: var(--sd-layout-touch-target);
 }
 .showrunner-admin .service-package-items { display: grid; gap: var(--space-2); min-width: 0; }
 .showrunner-admin .service-package-item {
@@ -388,7 +388,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 44px;
+    min-height: var(--sd-layout-touch-target);
     list-style: none;
     cursor: pointer;
     border-radius: var(--sd-radius-pill);

@@ -2,13 +2,16 @@
 
 import { useEffect, useId, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
-import { Button, Field, Input, Modal, Select, Textarea } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import { Modal } from "@/components/ui/modal";
 import { serviceLibraryInputSchema, type ServiceLibraryItem, type ServiceLibraryResults } from "@/lib/scheduling/service-library";
 import type { SessionOffering } from "@/lib/scheduling/session-offering";
 import { saveServiceLibraryItemAction } from "../service-library-actions";
 import styles from "./service-library-picker.module.css";
 import type { HourlyRate, PricingType } from "@/lib/scheduling/pricing";
 import { ServicePricingFields } from "./service-pricing-fields";
+import { useNotify } from "@/components/ui/notifications";
 
 type IncludedItem = SessionOffering["coverageItems"][number];
 
@@ -21,6 +24,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
   onClose: () => void;
 }) {
   const id = useId();
+  const notify = useNotify();
   const [view, setView] = useState<"library" | "edit">(editingItem ? "edit" : "library");
   const [form, setForm] = useState({ id: editingItem?.libraryItemId, name: editingItem?.name || "", description: editingItem?.description || "", category: editingItem?.category || "", tags: editingItem?.tags?.join(", ") || "", pricingType: (editingItem?.pricingType ?? "FLAT_RATE") as PricingType, hourlyRateId: editingItem?.hourlyRateId ?? "", price: editingItem?.priceCents == null ? "" : (editingItem.priceCents / 100).toFixed(2) });
   const [q, setQ] = useState("");
@@ -66,11 +70,6 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
     setLoading(true);
   }
 
-  function showSaveError(message: string) {
-    setError(message);
-    requestAnimationFrame(() => document.getElementById(`${id}-error`)?.focus());
-  }
-
   async function save() {
     const parsed = serviceLibraryInputSchema.safeParse(form);
     if (!parsed.success) {
@@ -82,10 +81,10 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
     setError("");
     try {
       const result = await saveServiceLibraryItemAction(form);
-      if (result.error) { showSaveError(result.error); return; }
+      if (result.error) { notify(result.error, "danger"); return; }
       if (result.item) onChoose([...picked.filter(item => item.id !== result.item.id), result.item]);
     } catch {
-      showSaveError("The service could not be saved. Your details are still here; please try again.");
+      notify("The service could not be saved. Your details are still here; please try again.", "danger");
     } finally { setSaving(false); }
   }
 
@@ -137,7 +136,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
         <Field label="Description" hint="Describe what the client receives. Avoid private or internal notes."><Textarea id={`${id}-description`} value={form.description} maxLength={2000} rows={4} disabled={saving} onChange={event => setForm({ ...form, description: event.target.value })} /></Field>
         <ServicePricingFields pricingType={form.pricingType} hourlyRateId={form.hourlyRateId} rates={rates} onRateSaved={onRateSaved} onChange={(pricingType, hourlyRateId) => setForm({ ...form, pricingType, hourlyRateId })} />
         {form.pricingType === "FLAT_RATE" && <Field label="Flat price (USD)" hint="Optional reference price. Package totals are set separately."><Input id={`${id}-price`} type="number" min="0" max="9999999.99" step="0.01" inputMode="decimal" value={form.price} disabled={saving} onChange={event => setForm({ ...form, price: event.target.value })} /></Field>}
-        {form.pricingType === "HOURLY" && <p className={styles.hint}>This service’s rate is saved for reference. Package totals use the session type’s pricing.</p>}
+        {form.pricingType === "HOURLY" && <p className={styles.hint}>This service’s rate is saved for reference. Package totals use each package’s pricing.</p>}
         <Field label="Category" hint="For example, Weddings or Portraits."><Input id={`${id}-category`} value={form.category} maxLength={120} disabled={saving} onChange={event => setForm({ ...form, category: event.target.value })} /></Field>
         <Field label="Tags" hint="Separate tags with commas."><Input id={`${id}-tags`} value={form.tags} maxLength={1500} disabled={saving} onChange={event => setForm({ ...form, tags: event.target.value })} /></Field>
         {error && <p id={`${id}-error`} tabIndex={-1} role="alert" className={styles.error}>{error}</p>}

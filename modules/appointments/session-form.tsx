@@ -1,7 +1,10 @@
 "use client";
 
+import { TimeInput } from "@/components/ui/time-input";
+import { Notification } from "@/components/ui/notifications";
+
 import { useActionState, useState } from "react";
-import { Button, ButtonLink } from "@/components/ui";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { createSessionAction } from "./create-action";
 import styles from "./session-form.module.css";
 import { selectSessionPackage, type SessionOffering } from "@/lib/scheduling/session-offering";
@@ -10,7 +13,7 @@ import { hourlyPriceCents, type HourlyRate, type PricingType } from "@/lib/sched
 type Service = { id: string; name: string; durationMinutes: number; priceCents: number | null; pricingType: PricingType; hourlyRate: HourlyRate | null; sessionOffering: SessionOffering | null; staffAssignments: { staffId: string }[] };
 type Client = { id: string; name: string; email: string; phone: string | null };
 
-export function SessionForm({ services, clients, staff, timezone }: { services: Service[]; clients: Client[]; staff: { id: string; name: string }[]; timezone: string }) {
+export function SessionForm({ services, clients, staff, timezone, rates }: { services: Service[]; clients: Client[]; staff: { id: string; name: string }[]; timezone: string; rates: HourlyRate[] }) {
   const [state, action, pending] = useActionState(createSessionAction, { error: "" });
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState("CONFIRMED");
@@ -38,7 +41,9 @@ export function SessionForm({ services, clients, staff, timezone }: { services: 
     if (pack && selected) setDetails({ name: selected.name, duration: String(pack.durationMinutes), price: pack.priceCents == null ? "" : (pack.priceCents / 100).toFixed(2) });
   }
   const selectedTier = selected?.sessionOffering?.tiers.find(tier => tier.id === tierId);
-  const hourly = selected?.pricingType === "HOURLY" && selected.hourlyRate;
+  const hourly = selectedTier?.pricingType
+    ? selectedTier.pricingType === "HOURLY" && rates.find(rate => rate.id === selectedTier.hourlyRateId)
+    : selected?.pricingType === "HOURLY" && selected.hourlyRate;
   const extrasCents = selected?.sessionOffering?.addOns.filter(item => addOnIds.includes(item.id)).reduce((total, item) => total + item.priceCents, 0) ?? 0;
   let calculatedPrice = "";
   if (hourly && details.duration) {
@@ -61,7 +66,7 @@ export function SessionForm({ services, clients, staff, timezone }: { services: 
           {selected.sessionOffering.addOns.length > 0 && <fieldset><legend>Optional extras</legend><div className={styles.days}>{selected.sessionOffering.addOns.map(item => <label key={item.id}><input type="checkbox" name="addOnIds" value={item.id} checked={addOnIds.includes(item.id)} onChange={event => choosePackage(tierId, event.target.checked ? [...addOnIds, item.id] : addOnIds.filter(id => id !== item.id))} />{item.name} (+{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(item.priceCents / 100)})</label>)}</div></fieldset>}
         </>}
         <label>Session name<input name="name" required placeholder="Family photos" value={details.name} onChange={event => setDetails({ ...details, name: event.target.value })} /></label>
-        <div className={styles.row}><label>Date<input type="date" name="date" defaultValue={state.date || ""} required /></label><label>Time <small>({timezone})</small><input type="time" name="time" defaultValue={state.time || ""} required /></label></div>
+        <div className={styles.row}><label>Date<input type="date" name="date" defaultValue={state.date || ""} required /></label><label>Time <small>({timezone})</small><TimeInput name="time" defaultValue={state.time || ""} required /></label></div>
         <div className={styles.row}><label>Duration <small>(minutes)</small><input type="number" name="durationMinutes" min="1" max="1440" required value={details.duration} onChange={event => setDetails({ ...details, duration: event.target.value })} /></label><label>Price <small>(USD)</small><input inputMode="decimal" type="number" name="price" min="0" max="9999999.99" step="0.01" placeholder="0.00" required readOnly={Boolean(hourly)} value={hourly ? calculatedPrice : details.price} onChange={event => setDetails({ ...details, price: event.target.value })} /></label></div>
         {hourly && <p className={styles.hint}>{hourly.name}: ${(hourly.amountCents / 100).toFixed(2)} / hour × booked duration{extrasCents ? " + optional extras" : ""}.</p>}
         <p className={styles.hint}>Arrange the location with your client after booking.</p>
@@ -69,7 +74,7 @@ export function SessionForm({ services, clients, staff, timezone }: { services: 
       </fieldset>
       <details><summary>Notes and confirmation</summary><label>Notes<textarea name="notes" rows={3} value={notes} onChange={event => setNotes(event.target.value)} /></label><label>Booking status<select name="status" value={status} onChange={event => setStatus(event.target.value)}><option value="CONFIRMED">Confirmed</option><option value="PENDING">Awaiting confirmation</option></select></label></details>
       <p className={styles.hint}>Saves to your calendar and client record. No email or payment request is sent.</p>
-      {state.error && <p role="alert" className="error">{state.error}</p>}
+      {state.error && <Notification tone="danger" eventKey={state}>{state.error}</Notification>}
       <footer className={styles.footer}><Button type="submit" disabled={pending}>{pending ? "Saving…" : "Create session"}</Button></footer>
     </form>
   </div>;
