@@ -2,7 +2,24 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { sessionOfferingFormSchema, sessionOfferingDraft, sessionOfferingSchema, selectSessionPackage } from "../lib/scheduling/session-offering";
+import { priceSessionOffering, sessionOfferingFormSchema, sessionOfferingDraft, sessionOfferingSchema, selectSessionPackage } from "../lib/scheduling/session-offering";
+
+test("packages keep independent flat and hourly prices, validate rate ownership and retain legacy pricing", () => {
+  const rates = [{ id: "rate", name: "Photography", amountCents: 12550 }];
+  const fallback = { pricingType: "HOURLY" as const, hourlyRateId: "rate" };
+  const mixed = { ...offering, tiers: [
+    { ...offering.tiers[0], pricingType: "FLAT_RATE" as const },
+    { ...offering.tiers[1], pricingType: "HOURLY" as const, hourlyRateId: "rate", durationMinutes: 90 }
+  ] };
+  const saved = priceSessionOffering(sessionOfferingFormSchema.parse(JSON.stringify(sessionOfferingDraft(mixed, 60, null))), rates, fallback);
+  assert.equal(saved.tiers[0].priceCents, 200000);
+  assert.equal(saved.tiers[0].hourlyRateId, null);
+  assert.equal(saved.tiers[1].priceCents, 18825);
+  assert.equal(saved.tiers[1].hourlyRateId, "rate");
+  assert.throws(() => priceSessionOffering(mixed, [], fallback), /from this business/);
+  assert.equal(priceSessionOffering(offering, rates, fallback).tiers[0].priceCents, 75300);
+  assert.equal(priceSessionOffering(mixed, [{ ...rates[0], amountCents: 20000 }], fallback).tiers[1].priceCents, 30000);
+});
 
 const offering = {
   coverageItems: [{ id: "first", name: "First look" }, { id: "reception", name: "Reception" }],

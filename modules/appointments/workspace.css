@@ -652,7 +652,7 @@
   .showrunner-admin .appointments-action-button.icon-only { width: 100%; }
   .showrunner-admin .appointments-inline-metrics { grid-template-columns: 1fr; }
   .showrunner-admin .appointments-hero-filters input,
-.showrunner-admin .appointments-hero-filters select { min-height: 34px; }
+  .showrunner-admin .appointments-hero-filters select { min-height: var(--sd-layout-touch-target); }
   .showrunner-admin .appointment-expanded-list > div { grid-template-columns: 1fr; }
 }
 .showrunner-admin .appointments-rules-modal[open] {

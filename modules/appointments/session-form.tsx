@@ -13,7 +13,7 @@ import { hourlyPriceCents, type HourlyRate, type PricingType } from "@/lib/sched
 type Service = { id: string; name: string; durationMinutes: number; priceCents: number | null; pricingType: PricingType; hourlyRate: HourlyRate | null; sessionOffering: SessionOffering | null; staffAssignments: { staffId: string }[] };
 type Client = { id: string; name: string; email: string; phone: string | null };
 
-export function SessionForm({ services, clients, staff, timezone }: { services: Service[]; clients: Client[]; staff: { id: string; name: string }[]; timezone: string }) {
+export function SessionForm({ services, clients, staff, timezone, rates }: { services: Service[]; clients: Client[]; staff: { id: string; name: string }[]; timezone: string; rates: HourlyRate[] }) {
   const [state, action, pending] = useActionState(createSessionAction, { error: "" });
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState("CONFIRMED");
@@ -41,7 +41,9 @@ export function SessionForm({ services, clients, staff, timezone }: { services: 
     if (pack && selected) setDetails({ name: selected.name, duration: String(pack.durationMinutes), price: pack.priceCents == null ? "" : (pack.priceCents / 100).toFixed(2) });
   }
   const selectedTier = selected?.sessionOffering?.tiers.find(tier => tier.id === tierId);
-  const hourly = selected?.pricingType === "HOURLY" && selected.hourlyRate;
+  const hourly = selectedTier?.pricingType
+    ? selectedTier.pricingType === "HOURLY" && rates.find(rate => rate.id === selectedTier.hourlyRateId)
+    : selected?.pricingType === "HOURLY" && selected.hourlyRate;
   const extrasCents = selected?.sessionOffering?.addOns.filter(item => addOnIds.includes(item.id)).reduce((total, item) => total + item.priceCents, 0) ?? 0;
   let calculatedPrice = "";
   if (hourly && details.duration) {

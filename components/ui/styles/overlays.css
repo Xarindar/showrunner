@@ -273,13 +273,15 @@
 .showrunner-admin .ui-select-popover {
   background: var(--color-surface);
   border: 1px solid var(--catalog-border);
-  border-radius: var(--sd-radius-tag);
+  border-radius: var(--sd-radius-input);
   box-shadow: var(--shadow-raised);
   display: grid;
   gap: var(--sd-space-4);
   left: 0;
   max-height: min(280px, calc(100vh - 140px));
-  min-width: 100%;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   overflow: auto;
   padding: var(--sd-space-6);
   position: absolute;
@@ -291,7 +293,7 @@
   appearance: none;
   background: transparent;
   border: 0;
-  border-radius: var(--sd-radius-tag);
+  border-radius: var(--sd-radius-input);
   color: var(--color-text);
   cursor: pointer;
   display: grid;

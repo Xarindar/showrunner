@@ -7,6 +7,7 @@ import { useActionState, useState, type ReactNode } from "react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { createServiceAction } from "../actions";
 import styles from "@/modules/appointments/session-form.module.css";
+import { ServiceTagsField } from "./service-tags-field";
 import { SessionPackagesEditor } from "./session-packages-editor";
 import editorStyles from "../service-editor.module.css";
 import packageStyles from "./session-packages-editor.module.css";
@@ -14,7 +15,7 @@ import { SessionDraftGuard, revealInvalidSessionField } from "./session-draft-gu
 import { ServiceMediaFields } from "./service-media-fields";
 import type { HourlyRate } from "@/lib/scheduling/pricing";
 
-export function SessionTypeForm({ businessHours, timezone, canUpload, schedulingRules, rates }: { businessHours: string[]; timezone: string; canUpload: boolean; schedulingRules: ReactNode; rates: HourlyRate[] }) {
+export function SessionTypeForm({ businessHours, timezone, canUpload, schedulingRules, rates, tags }: { businessHours: string[]; timezone: string; canUpload: boolean; schedulingRules: ReactNode; rates: HourlyRate[]; tags: string[] }) {
   const [state, action, pending] = useActionState(createServiceAction, { error: "" });
   const [values, setValues] = useState({ name: "", description: "", bufferBeforeMinutes: "0", bufferAfterMinutes: "15", minimumNoticeHours: "12", maxAdvanceDays: "60", slotIntervalMinutes: "30" });
   const [active, setActive] = useState(false);
@@ -27,12 +28,13 @@ export function SessionTypeForm({ businessHours, timezone, canUpload, scheduling
       <section className="studio-panel"><fieldset><legend>Session details</legend>
         <label>Session type name<input {...field("name")} required placeholder="Family session" /></label>
         <label>Description <small>(optional)</small><textarea {...field("description")} rows={3} /></label>
+        <ServiceMediaFields canUpload={canUpload} />
       </fieldset>
       </section>
       <SessionPackagesEditor initialRates={rates} requirePrice />
-      <ServiceMediaFields canUpload={canUpload} />
       </div>
       <aside className="product-studio-sidecar">
+      <section className="studio-panel"><h2>Organization</h2><ServiceTagsField tags={tags} /></section>
       <section className="studio-panel"><fieldset><legend>Booking availability</legend>
         <p className={styles.hint}>{businessHours.length ? `Uses your business hours (${timezone}): ${businessHours.join(" · ")}.` : "Set your business hours below to activate this session type, or save a draft for now."}</p>
         {schedulingRules}

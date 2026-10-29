@@ -1,4 +1,4 @@
-import { formatTimeValue, minutesToTime } from "@/lib/format";
+import { formatTimeValue, minutesToTime, nonEmptyStringArrayFromUnknown } from "@/lib/format";
 import { Notification } from "@/components/ui/notifications";
 import { ServiceMediaFields } from "./components/service-media-fields";
 import { readImageFraming } from "@/modules/content/studio/image-framing";
@@ -13,8 +13,9 @@ import { contentWebsiteUrl, resolveContentManifest } from "@/clients/content-man
 import { notFound } from "next/navigation";
 import { MediaVariantType, type MediaAsset, type Prisma } from "@prisma/client";
 import { ArrowLeft, Boxes, FileText } from "lucide-react";
-import { requireAdmin } from "@/lib/auth";
-import { stringArrayCsv } from "@/lib/format";
+import { ServiceTagsField } from "./components/service-tags-field";
+import { summarizeMediaTags } from "@/lib/media-tags";
+import { requireAdmin, getAccessibleMediaWhere } from "@/lib/auth";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -55,10 +56,6 @@ function uniqueSortedStrings(values: Array<string | null | undefined>) {
   );
 }
 
-function serviceTags(service: ServiceWithBuilderData) {
-  return stringArrayCsv(service.tags);
-}
-
 function serviceDurationLabel(minutes: number) {
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
@@ -96,14 +93,17 @@ function hiddenSchedulingValues(service: ServiceWithBuilderData) {
 }
 
 export default async function ServiceEditPage({ searchParams, serviceId }: ServiceEditPageProps) {
-  await requireAdmin("scheduling:manage");
+  const user = await requireAdmin("scheduling:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [availability, staff, resources, rates] = await Promise.all([
+  const [availability, staff, resources, rates, mediaTags, sessionTags] = await Promise.all([
     prisma.availabilityRule.findMany({ where: { siteId: settings.siteId }, include: { resource: true, staff: true }, orderBy: [{ weekday: "asc" }, { startMinutes: "asc" }] }),
     prisma.staffMember.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
     prisma.resource.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
-    prisma.hourlyRate.findMany({ where: { siteId: settings.siteId }, orderBy: { name: "asc" }, select: { id: true, name: true, amountCents: true } })
+    prisma.hourlyRate.findMany({ where: { siteId: settings.siteId }, orderBy: { name: "asc" }, select: { id: true, name: true, amountCents: true } }),
+    prisma.mediaAsset.findMany({ where: await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: null }), select: { tags: true }, take: 5000 }),
+    prisma.service.findMany({ where: { siteId: settings.siteId }, select: { tags: true } })
   ]);
+  const tagOptions = summarizeMediaTags([...mediaTags, ...sessionTags], 5000).map(tag => tag.name);
   const schedulingRules = <ServiceSchedulingRules><AvailabilityPanel availability={availability} resources={resources} staff={staff} /></ServiceSchedulingRules>;
   const taxonomyServicesPromise = prisma.service.findMany({
     where: { siteId: settings.siteId, isOneOff: false },
@@ -127,7 +127,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     const rules = availability.filter(rule => !rule.staffId && !rule.resourceId);
     const timeLabel = (minutes: number) => formatTimeValue(minutesToTime(minutes));
     const businessHours = rules.map(rule => `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][rule.weekday]} ${timeLabel(rule.startMinutes)}–${timeLabel(rule.endMinutes)}`);
-    return <SessionTypeForm rates={rates} businessHours={businessHours} timezone={settings.timezone} canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)} schedulingRules={schedulingRules} />;
+    return <SessionTypeForm tags={tagOptions} rates={rates} businessHours={businessHours} timezone={settings.timezone} canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)} schedulingRules={schedulingRules} />;
   }
 
   const [service, taxonomyServices, intakeFormFields, serviceCategories] = await Promise.all([
@@ -157,7 +157,6 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   const savedMessage = savedServiceMessage(params.saved);
   const errorMessage = params.error || null;
   const bookingPath = "Client booking rebuild pending";
-  const tagsValue = serviceTags(service);
   const packageCount = service.packageItems.length;
   const canUpload = isMediaUploadDriverConfigured(settings.mediaDriver);
   const toPickerAsset = (asset: MediaAsset): AssetPickerAsset => ({
@@ -205,12 +204,13 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
                   newPlaceholder="Category name"
                   options={categoryOptions}
                 />
-        </section>
-        <SessionPackagesEditor initialRates={rates} initialPricingType={service.pricingType} initialHourlyRateId={service.hourlyRateId ?? ""} initialOffering={offering} durationMinutes={service.durationMinutes} priceCents={service.priceCents} />
         <ServiceMediaFields canUpload={canUpload}
           initialSquare={serviceImageUrl ? { asset: service.mediaAsset ? toPickerAsset(service.mediaAsset) : { id: "", filename: service.name, alt: serviceImageAlt, thumbnailUrl: serviceImageUrl, url: serviceImageUrl }, framing: readImageFraming(service.imageFraming) } : null}
           initialRectangular={service.rectangularMediaAsset ? { asset: toPickerAsset(service.rectangularMediaAsset), framing: readImageFraming(service.rectangularImageFraming) } : null}
           initialGallery={service.galleryAssets.map(toPickerAsset)} />
+        </section>
+        <SessionPackagesEditor initialRates={rates} initialPricingType={service.pricingType} initialHourlyRateId={service.hourlyRateId ?? ""} initialOffering={offering} durationMinutes={service.durationMinutes} priceCents={service.priceCents} />
+
         <section className="studio-panel">
               <details className={styles.moreOptions}><summary>Intake and booking policies</summary>
                 <ServiceBookingRulesTable
@@ -251,8 +251,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
               <section className="studio-panel" aria-labelledby="session-organization-title">
                 <h2 id="session-organization-title" className="section-title">Organization</h2>
                 <div className="ui-field">
-                  <label htmlFor="service-tags">Tags</label>
-                  <input defaultValue={tagsValue} id="service-tags" name="tags" />
+                  <ServiceTagsField tags={tagOptions} initialTags={nonEmptyStringArrayFromUnknown(service.tags)} />
                 </div>
               </section>
         </aside>

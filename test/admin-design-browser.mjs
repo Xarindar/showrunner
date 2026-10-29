@@ -45,6 +45,10 @@ await build({
         <Card bodyClassName="form-grid"><Field label="Name"><Input placeholder="Name" /></Field>
           <Field label="Invalid"><Input aria-invalid="true" defaultValue="Needs correction" /></Field>
           <Field label="Disabled"><Input disabled defaultValue="Unavailable" /></Field>
+          <section aria-label="Unequal field hints" className="ui-equal-grid">
+            <Field label="With hint" hint="Extra guidance below this control"><Input /></Field>
+            <Field label="Aligned select"><select aria-label="Aligned select"><option>A long option that must stay on one line inside a narrow field</option><option>Short option</option></select></Field>
+          </section>
           <div className="ui-cluster ui-gap-2"><Button>Save</Button><Button variant="secondary">Cancel</Button><Button variant="danger">Delete</Button><Button disabled>Disabled action</Button></div>
           <div className="ui-cluster ui-gap-2"><Badge>Neutral</Badge><Badge tone="success">Active</Badge><Badge tone="warning">Warning</Badge><Badge tone="danger">Error</Badge></div>
           <Switch label="Published" defaultChecked />
@@ -98,6 +102,17 @@ try {
   const baseline = await geometry();
   assert.match(baseline[4], /sans-serif/, "Admin font must have a working fallback without Next font injection");
   assert.deepEqual(baseline.slice(0, 3), ["12px", "30px", "13px"]);
+  async function checkFieldAlignment(height) {
+    const pair = page.getByRole("region", { name: "Unequal field hints" });
+    const controls = await pair.locator("input, select").evaluateAll(elements => elements.map(element => {
+      const rect = element.getBoundingClientRect();
+      return { top: rect.top, height: rect.height, align: getComputedStyle(element).alignItems };
+    }));
+    assert(controls.every(control => Math.abs(control.height - height) < 1), "Hints must not stretch neighbouring controls");
+    if (height === 30) assert(Math.abs(controls[0].top - controls[1].top) < 1, "Neighbouring input and select must align");
+    if (await page.evaluate(() => CSS.supports("appearance", "base-select"))) assert.equal(controls[1].align, "center", "Select text and arrow stay vertically centered");
+  }
+  await checkFieldAlignment(30);
   await page.evaluate(() => { document.body.style.cssText = "--color-surface:magenta;--color-brand:red;--space-4:999px;--radius-control:0;--font-sans:serif"; });
   assert.deepEqual(await geometry(), baseline, "Tenant values must not alter admin controls");
   assert.equal(await page.locator(".ui-card-slot[aria-hidden]").count(), 0);
@@ -192,6 +207,7 @@ try {
   assert.equal(await responsive.locator('img').getAttribute('src'),'/photo.svg');
   await page.setViewportSize({ width: 390, height: 844 });
   assert.deepEqual((await geometry()).slice(0, 3), ["12px", "44px", "16px"]);
+  await checkFieldAlignment(44);
   await checkLabelSpacing();
   await buttonSettings.screenshot({path: `${captures}/button-spacing-mobile.png`});
   assert.equal(await page.getByRole("button", { name: "Save", exact: true }).evaluate(element => getComputedStyle(element).minHeight), "44px");

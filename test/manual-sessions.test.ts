@@ -21,6 +21,7 @@ function harness(options: { conflict?: boolean; missingService?: boolean; busy?:
   const writes: RecordData[] = [];
   const service = { id: "type", name: "Family photos", bufferBeforeMinutes: 0, bufferAfterMinutes: 15, staffAssignments: [], resourceAssignments: [{ resourceId: "room" }], sessionOffering: options.offering, ...(options.hourlyRate ? { pricingType: "HOURLY", hourlyRate: options.hourlyRate } : {}) };
   const db = {
+    hourlyRate: { findFirst: async ({ where }: RecordData) => options.hourlyRate?.id === where.id && options.hourlyRate?.siteId === where.siteId ? options.hourlyRate : null },
     service: { findFirst: async (query: RecordData) => { assert.equal(query.where.siteId, "site-a"); return options.missingService ? null : service; }, create: async ({ data }: RecordData) => { writes.push({ kind: "service", ...data }); return { ...service, id: "private" }; } },
     staffMember: { findFirst: async () => ({ id: "staff" }) },
     booking: { findMany: async () => options.conflict ? [{ id: "existing", staffId: null, startsAt: new Date("2099-01-01T09:00:00Z"), endsAt: new Date("2099-01-01T09:50:00Z"), service: { bufferBeforeMinutes: 0, bufferAfterMinutes: 20, resourceAssignments: [] }, resources: [] }] : [], create: async ({ data }: RecordData) => { writes.push({ kind: "booking", ...data }); return { id: "booking", ...data }; } },
@@ -36,6 +37,21 @@ function harness(options: { conflict?: boolean; missingService?: boolean; busy?:
   return { api, writes };
 }
 const input = { siteId: "site-a", timezone: "America/Chicago", name: "Family photos", startsAt: new Date("2099-01-01T10:00:00Z"), durationMinutes: 45, priceCents: 17550, location: "Client's home", customerName: "Test client", customerEmail: "client@example.test", notes: "", status: "CONFIRMED" };
+
+test("bookings use the selected package's pricing even when the session default differs", async () => {
+  const hourlyRate = { id: "rate", siteId: "site-a", name: "Photography", amountCents: 12550 };
+  const offering = { coverageItems: [], tiers: [
+    { id: "flat", name: "Flat", durationMinutes: 60, priceCents: 10000, coverageIds: [], pricingType: "FLAT_RATE" },
+    { id: "hourly", name: "Hourly", durationMinutes: 90, priceCents: 1, coverageIds: [], pricingType: "HOURLY", hourlyRateId: "rate" }
+  ], addOns: [{ id: "album", name: "Album", priceCents: 2500 }] };
+  const flat = await harness({ hourlyRate, offering }).api.createManualSession({ ...input, serviceId: "type", tierId: "flat", priceCents: 10000 });
+  assert.equal(flat.priceCents, 10000);
+  assert.equal(flat.packageSnapshot.pricingType, "FLAT_RATE");
+  const hourly = await harness({ hourlyRate, offering }).api.createManualSession({ ...input, serviceId: "type", tierId: "hourly", durationMinutes: 90, priceCents: 21325, addOnIds: ["album"] });
+  assert.equal(hourly.priceCents, 21325);
+  assert.equal(hourly.packageSnapshot.hourlyRate.id, "rate");
+  await assert.rejects(harness({ offering, hourlyRate: { ...hourlyRate, siteId: "foreign" } }).api.createManualSession({ ...input, serviceId: "type", tierId: "hourly" }), /from this business/);
+});
 
 test("session price validates cents, including zero, without accepting negatives or precision loss", () => {
   assert.equal(sessionPrice.parse("175.50"), 17550);

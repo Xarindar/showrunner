@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { upsertPublicClient } from "@/lib/clients/public-client";
 import { blockoutConflictWhere, getBufferedWindow } from "@/lib/bookings/conflicts";
 import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
-import { selectSessionPackage } from "@/lib/scheduling/session-offering";
+import { readSessionOffering, selectSessionPackage } from "@/lib/scheduling/session-offering";
 import { hourlyPriceCents } from "@/lib/scheduling/pricing";
 
 // Manual sessions use an agreed time, independent of public booking hours.
@@ -55,8 +55,11 @@ export async function createManualSession(input: {
     let service = input.serviceId ? await tx.service.findFirst({ where: { id: input.serviceId, siteId: input.siteId, isActive: true, isOneOff: false }, include: { staffAssignments: true, resourceAssignments: true, hourlyRate: true } }) : null;
     if (input.serviceId && !service) throw new Error("Choose an available session type.");
     let packageSnapshot = selectSessionPackage(service?.sessionOffering, input.tierId, input.addOnIds);
-    const hourly = service?.pricingType === "HOURLY";
-    const hourlyRate = hourly ? service?.hourlyRate : null;
+    const tier = readSessionOffering(service?.sessionOffering)?.tiers.find(tier => tier.id === input.tierId);
+    const hourly = (tier?.pricingType ?? service?.pricingType) === "HOURLY";
+    const hourlyRate = hourly ? tier?.pricingType
+      ? await tx.hourlyRate.findFirst({ where: { id: tier.hourlyRateId || "", siteId: input.siteId } })
+      : service?.hourlyRate : null;
     if (hourly && (!hourlyRate || hourlyRate.siteId !== input.siteId)) throw new Error("Choose an hourly rate from this business.");
     const priceCents = hourlyRate ? hourlyPriceCents(hourlyRate.amountCents, input.durationMinutes) + (packageSnapshot?.extras.reduce((total, extra) => total + extra.priceCents, 0) ?? 0) : input.priceCents;
     if (priceCents > 999999999) throw new Error("The session total must be $9,999,999.99 or less.");
@@ -73,6 +76,7 @@ export async function createManualSession(input: {
     return tx.booking.create({ data: { siteId: input.siteId, serviceId: service.id, clientId, isManual: true,
       sessionName: input.name, sessionLocation: input.location, priceCents,
       ...(packageSnapshot ? { packageSnapshot: { ...packageSnapshot, priceCents, durationMinutes: input.durationMinutes,
+        ...(tier?.pricingType ? { pricingType: tier.pricingType } : {}),
         ...(hourlyRate ? { pricingType: "HOURLY", hourlyRate: { id: hourlyRate.id, name: hourlyRate.name, amountCents: hourlyRate.amountCents } } : {}) } } : {}),
       customerName: input.customerName, customerEmail: input.customerEmail, customerPhone: input.customerPhone,
       staffId: input.staffId || null, startsAt: input.startsAt, endsAt, notes: input.notes, status: input.status,

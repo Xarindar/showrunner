@@ -20,7 +20,7 @@ export function MediaTagPicker({ tags, selected, onChange }: { tags: string[]; s
     const value = name.trim();
     if (!value || value.includes(",") || value.length > 80) { setError("Enter a tag under 80 characters without commas."); return; }
     const tag = options.find(option => option.toLocaleLowerCase() === value.toLocaleLowerCase()) || value;
-    if (!selected.includes(tag) && selected.length >= 20) { setError("Choose up to 20 tags per file."); return; }
+    if (!selected.includes(tag) && selected.length >= 20) { setError("Choose up to 20 tags."); return; }
     setCreated(current => [...current, tag]);
     if (!selected.includes(tag)) onChange([...selected, tag]);
     setCreating(false); setQuery(""); setOpen(true); input.current?.focus();
@@ -38,7 +38,7 @@ export function MediaTagPicker({ tags, selected, onChange }: { tags: string[]; s
           <input type="checkbox" checked={selected.includes(tag)} disabled={!selected.includes(tag) && selected.length >= 20}
             onChange={event => onChange(event.target.checked ? [...selected, tag] : selected.filter(value => value !== tag))} />{tag}
         </label>)}
-        {selected.length >= 20 && <small>Choose up to 20 tags per file.</small>}
+        {selected.length >= 20 && <small>Choose up to 20 tags.</small>}
       </div>}
     </div>
     <Modal open={creating} onClose={() => setCreating(false)} title="New tag" className={styles.folderModal}>

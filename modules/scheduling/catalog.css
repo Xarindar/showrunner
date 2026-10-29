@@ -163,11 +163,14 @@
 .showrunner-admin .catalog-row-actions {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: var(--sd-space-6);
   justify-content: flex-end;
   min-width: 0;
 }
 .showrunner-admin .catalog-row-actions .ui-button {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: var(--type-caption);
   min-height: 30px;
   min-width: 0;

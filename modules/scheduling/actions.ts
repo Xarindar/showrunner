@@ -4,7 +4,7 @@ import { hoursRevision, weeklyHoursSchema } from "@/lib/scheduling/weekly-hours"
 
 import { imageFramingSchema } from "@/modules/content/studio/image-framing";
 import { initialBusinessHoursSchema } from "@/lib/scheduling/session-input";
-import { readSessionOffering, type SessionOffering } from "@/lib/scheduling/session-offering";
+import { priceSessionOffering, readSessionOffering, type SessionOffering } from "@/lib/scheduling/session-offering";
 import { hydrateSessionServiceLibrary } from "@/lib/scheduling/service-library-store";
 import { hourlyPriceCents, type PricingType } from "@/lib/scheduling/pricing";
 
@@ -172,10 +172,15 @@ function refreshScheduling() {
 }
 
 async function servicePricingData(input: { pricingType: PricingType; hourlyRateId: string; durationMinutes: number }, siteId: string, offering: SessionOffering | null) {
+  if (offering) {
+    const rates = await prisma.hourlyRate.findMany({ where: { siteId } });
+    offering.tiers = priceSessionOffering(offering, rates, input).tiers;
+    const first = offering.tiers[0];
+    return { pricingType: first.pricingType!, hourlyRateId: first.hourlyRateId ?? null, priceCents: first.priceCents };
+  }
   if (input.pricingType !== "HOURLY") return { pricingType: input.pricingType, hourlyRateId: null };
   const rate = await prisma.hourlyRate.findFirst({ where: { id: input.hourlyRateId, siteId } });
   if (!rate) throw new Error("Choose an hourly rate from this business.");
-  if (offering) for (const tier of offering.tiers) tier.priceCents = hourlyPriceCents(rate.amountCents, tier.durationMinutes);
   return { pricingType: input.pricingType, hourlyRateId: rate.id, priceCents: hourlyPriceCents(rate.amountCents, input.durationMinutes) };
 }
 
@@ -568,8 +573,8 @@ async function serviceMediaData(formData: FormData, siteId: string, user: Awaite
   }) });
   if (assets.length !== ids.length) throw new Error("One of these photos is unavailable. Choose an active public image from your library.");
   const square = assets.find(asset => asset.id === media.square?.assetId);
-  if (media.rectangular && !media.rectangular.assetId) throw new Error("Choose a rectangular photo.");
-  if (media.square && !square && (!current?.imageUrl || current.mediaAssetId)) throw new Error("Choose a square photo.");
+  if (media.rectangular && !media.rectangular.assetId) throw new Error("Choose a website photo.");
+  if (media.square && !square && (!current?.imageUrl || current.mediaAssetId)) throw new Error("Choose a main photo.");
   return {
     mediaAssetId: square?.id ?? null,
     imageUrl: square ? mediaAssetDisplayUrl(square, MediaVariantType.CARD) : media.square ? current!.imageUrl : "",

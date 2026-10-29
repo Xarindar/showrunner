@@ -18,7 +18,10 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
   initialOffering?: SessionOffering | null; durationMinutes?: number; priceCents?: number | null; requirePrice?: boolean;
   initialRates?: HourlyRate[]; initialPricingType?: PricingType; initialHourlyRateId?: string;
 }) {
-  const [draft, setDraft] = useState(() => sessionOfferingDraft(initialOffering, durationMinutes, priceCents));
+  const [draft, setDraft] = useState<SessionOfferingDraft>(() => {
+    const offering = sessionOfferingDraft(initialOffering, durationMinutes, priceCents);
+    return { ...offering, tiers: offering.tiers.map(tier => ({ ...tier, pricingType: tier.pricingType ?? initialPricingType, hourlyRateId: tier.pricingType ? tier.hourlyRateId : initialHourlyRateId })) };
+  });
   const [expandedTiers, setExpandedTiers] = useState(() => new Set<string>());
   const [libraryPicker, setLibraryPicker] = useState<{ editingItem?: SessionOffering["coverageItems"][number] } | null>(null);
   const [inlineService, setInlineService] = useState<SessionOffering["coverageItems"][number] | null>(null);
@@ -27,12 +30,10 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
   const [newTiers, setNewTiers] = useState(() => new Set<string>());
   const notify = useNotify();
   const [rates, setRates] = useState(initialRates);
-  const [pricingType, setPricingType] = useState(initialPricingType);
-  const [hourlyRateId, setHourlyRateId] = useState(initialHourlyRateId);
-  const hourlyRate = rates.find(rate => rate.id === hourlyRateId);
   const onRateSaved = (rate: HourlyRate) => setRates(current => [...current.filter(item => item.id !== rate.id), rate].sort((a, b) => a.name.localeCompare(b.name)));
   const tierPrice = (tier: SessionOfferingDraft["tiers"][number]) => {
-    if (pricingType !== "HOURLY") return tier.price;
+    if (tier.pricingType !== "HOURLY") return tier.price;
+    const hourlyRate = rates.find(rate => rate.id === tier.hourlyRateId);
     if (!hourlyRate || !tier.durationMinutes) return "";
     try { return (hourlyPriceCents(hourlyRate.amountCents, Number(tier.durationMinutes)) / 100).toFixed(2); }
     catch { return ""; }
@@ -57,7 +58,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     while (source && draft.tiers.some(tier => tier.name.toLowerCase() === name.toLowerCase())) name = `${base} copy ${suffix++}`;
     const id = crypto.randomUUID();
     flushSync(() => {
-      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? "", coverageIds: [...(source?.coverageIds ?? [])] }] });
+      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? "", pricingType: source?.pricingType ?? "FLAT_RATE", hourlyRateId: source?.hourlyRateId ?? "", coverageIds: [...(source?.coverageIds ?? [])] }] });
       setExpandedTiers(new Set([id]));
       setNewTiers(current => new Set([...current, id]));
     });
@@ -79,16 +80,11 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
   }
 
   return <div className={styles.editor}>
-    <input type="hidden" name="pricingType" value={pricingType} />
-    <input type="hidden" name="hourlyRateId" value={pricingType === "HOURLY" ? hourlyRateId : ""} />
+    <input type="hidden" name="pricingType" value={draft.tiers[0].pricingType} />
+    <input type="hidden" name="hourlyRateId" value={draft.tiers[0].pricingType === "HOURLY" ? draft.tiers[0].hourlyRateId ?? "" : ""} />
     <input type="hidden" name="sessionOffering" value={JSON.stringify({ ...draft, tiers: draft.tiers.map(tier => ({ ...tier, price: tierPrice(tier) })) })} />
     <input type="hidden" name="durationMinutes" value={draft.tiers[0].durationMinutes} />
     <input type="hidden" name="price" value={tierPrice(draft.tiers[0])} />
-    <section className="studio-panel" aria-label="Session pricing">
-      <h2>Pricing</h2>
-      <ServicePricingFields pricingType={pricingType} hourlyRateId={hourlyRateId} rates={rates} onChange={(type, rateId) => { setPricingType(type); setHourlyRateId(rateId); }} onRateSaved={onRateSaved} />
-      {pricingType === "HOURLY" && <p className={styles.hint}>Package totals use this rate × duration. Optional extras are added once.</p>}
-    </section>
     <section className="studio-panel" aria-labelledby={`${listId}-included-title`}>
       <div className={styles.heading}><h2 id={`${listId}-included-title`} tabIndex={-1}>What’s included</h2></div>
       <p className={styles.hint}>Add reusable services, then choose which packages include each one below.</p>
@@ -115,13 +111,14 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
         flushSync(() => setExpandedTiers(current => new Set([...current, tier.id])));
       }}>
         <summary className={styles.optionSummary} onClick={event => { event.preventDefault(); setExpandedTiers(current => current.has(tier.id) ? new Set() : new Set([tier.id])); }}>
-          <strong>{tier.name || `Package ${index + 1}`}</strong><small>{tierPrice(tier) ? `$${tierPrice(tier)}` : "Price not set"} · {tier.durationMinutes || "—"} minutes{pricingType === "HOURLY" ? " · Hourly" : ""}</small>
+          <strong>{tier.name || `Package ${index + 1}`}</strong><small>{tierPrice(tier) ? `$${tierPrice(tier)}` : "Price not set"} · {tier.durationMinutes || "—"} minutes{tier.pricingType === "HOURLY" ? " · Hourly" : ""}</small>
           <span className={styles.chips}>{draft.coverageItems.filter(item => tier.coverageIds.includes(item.id)).map(item => <span className="ui-badge" key={item.id}>{item.name}</span>)}</span>
         </summary>
         <div className={styles.tierBody}>
           <label>Package name<input id={`${listId}-${tier.id}`} aria-label={`Package ${index + 1} name`} value={tier.name} required maxLength={120} onChange={event => updateTier(tier.id, { name: event.target.value })} /></label>
+          <ServicePricingFields pricingType={tier.pricingType ?? "FLAT_RATE"} hourlyRateId={tier.hourlyRateId ?? ""} rates={rates} onChange={(pricingType, hourlyRateId) => updateTier(tier.id, { pricingType, hourlyRateId })} onRateSaved={onRateSaved} />
           <div className={styles.tierNumbers}>
-            <label>{pricingType === "HOURLY" ? "Calculated price (USD)" : "Price (USD)"}<input aria-label={`${tier.name} price (USD)`} type="number" inputMode="decimal" min="0" max="9999999.99" step="0.01" required={requirePrice || multi || pricingType === "HOURLY"} readOnly={pricingType === "HOURLY"} placeholder="0.00" value={tierPrice(tier)} onChange={event => updateTier(tier.id, { price: event.target.value })} /></label>
+            <label>{tier.pricingType === "HOURLY" ? "Calculated price (USD)" : "Price (USD)"}<input aria-label={`${tier.name} price (USD)`} type="number" inputMode="decimal" min="0" max="9999999.99" step="0.01" required={requirePrice || multi || tier.pricingType === "HOURLY"} readOnly={tier.pricingType === "HOURLY"} placeholder="0.00" value={tierPrice(tier)} onChange={event => updateTier(tier.id, { price: event.target.value })} /></label>
             <label>Duration (minutes)<input aria-label={`${tier.name} duration (minutes)`} type="number" inputMode="numeric" min="1" max="1440" required value={tier.durationMinutes} onChange={event => updateTier(tier.id, { durationMinutes: event.target.value })} /></label>
           </div>
           <fieldset className={styles.tierCoverage}><legend>Included in this package</legend>{draft.coverageItems.map(item => <label key={item.id}><input type="checkbox" aria-label={`Include ${item.name} in ${tier.name}`} checked={tier.coverageIds.includes(item.id)} onChange={event => updateTier(tier.id, { coverageIds: event.target.checked ? [...tier.coverageIds, item.id] : tier.coverageIds.filter(id => id !== item.id) })} /><span>{item.name}</span></label>)}</fieldset>

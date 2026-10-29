@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { sessionPrice } from "./session-input";
-import { pricingTypeSchema } from "./pricing";
+import { hourlyPriceCents, pricingTypeSchema, type HourlyRate, type PricingType } from "./pricing";
 
 const itemId = z.string().min(1).max(100);
 const itemName = z.string().trim().min(1, "Give each included item, package, and extra a name.").max(120);
@@ -19,6 +19,8 @@ const tier = z.object({
   name: itemName,
   durationMinutes: z.number().int().min(1).max(1440),
   priceCents: z.number().int().min(0).max(999999999).nullable(),
+  pricingType: pricingTypeSchema.optional(),
+  hourlyRateId: itemId.nullable().optional(),
   coverageIds: z.array(itemId).max(100)
 });
 const addOn = z.object({ id: itemId, name: itemName, priceCents: z.number().int().min(0).max(999999999) });
@@ -71,6 +73,17 @@ export const sessionOfferingFormSchema = z.string().max(600000).transform((value
 export function readSessionOffering(value: unknown): SessionOffering | null {
   if (value == null) return null;
   return sessionOfferingSchema.parse(value);
+}
+
+export function priceSessionOffering(offering: SessionOffering, rates: HourlyRate[], fallback: { pricingType: PricingType; hourlyRateId: string }) {
+  return { ...offering, tiers: offering.tiers.map(tier => {
+    const pricingType = tier.pricingType ?? fallback.pricingType;
+    if (pricingType === "FLAT_RATE") return { ...tier, pricingType, hourlyRateId: null };
+    const hourlyRateId = tier.pricingType ? tier.hourlyRateId : fallback.hourlyRateId;
+    const rate = rates.find(rate => rate.id === hourlyRateId);
+    if (!rate) throw new Error("Choose an hourly rate from this business for each hourly package.");
+    return { ...tier, pricingType, hourlyRateId: rate.id, priceCents: hourlyPriceCents(rate.amountCents, tier.durationMinutes) };
+  }) };
 }
 
 export function sessionOfferingDraft(value: SessionOffering | null, durationMinutes: number, priceCents: number | null): SessionOfferingDraft {

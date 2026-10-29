@@ -13,6 +13,58 @@ import { servicePriceCents } from "../lib/scheduling/pricing";
 
 const selection = { square: { assetId: "square", framing: centeredFraming }, rectangular: { assetId: "wide", framing: { ...centeredFraming, imageZoom: 1.5 } }, gallery: ["extra", "square", "extra"] };
 
+test("service media keeps existing crops, assigns the first upload as main, and adds the rest to the gallery", () => {
+  type Node = { type: unknown; props: Record<string, unknown> };
+  const states: unknown[] = [];
+  let cursor = 0;
+  const jsx = (type: unknown, props: Node["props"]) => ({ type, props });
+  const exports: { ServiceMediaFields?: (props: unknown) => Node } = {};
+  const code = ts.transpileModule(readFileSync("modules/scheduling/components/service-media-fields.tsx", "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX }
+  }).outputText;
+  runInNewContext(code, { exports, Map, JSON, require: (id: string) => {
+    if (id === "react") return { useState: (initial: unknown) => {
+      const index = cursor++;
+      if (!(index in states)) states[index] = initial;
+      return [states[index], (next: unknown) => { states[index] = typeof next === "function" ? next(states[index]) : next; }];
+    } };
+    if (id === "react/jsx-runtime") return { jsx, jsxs: jsx };
+    if (id.endsWith("/asset-picker")) return { AssetPicker: "picker" };
+    if (id.endsWith("/image-framing")) return { centeredFraming };
+    if (id.endsWith("/notifications")) return { useNotify: () => () => {} };
+    if (id.endsWith(".css")) return { default: {} };
+    return {};
+  } });
+  const photo = { id: "old", filename: "old.jpg", url: "/old.jpg", thumbnailUrl: "/old.jpg", alt: "Original" };
+  const props = { canUpload: true, initialSquare: { asset: photo, framing: { ...centeredFraming, imageZoom: 2 } }, initialRectangular: { asset: { ...photo, id: "wide" }, framing: selection.rectangular.framing } };
+  const render = () => { cursor = 0; return exports.ServiceMediaFields!(props); };
+  function nodes(value: unknown): Node[] {
+    if (Array.isArray(value)) return value.flatMap(nodes);
+    if (!value || typeof value !== "object" || !("props" in value)) return [];
+    const node = value as Node;
+    return [node, ...nodes(node.props.children)];
+  }
+  const payload = (tree: Node) => JSON.parse(String(nodes(tree).find(node => node.props.name === "serviceMedia")!.props.value));
+  let tree = render();
+  assert.equal(payload(tree).square.framing.imageZoom, 2);
+  const pick = (tree: Node, title: string) => nodes(tree).find(node => node.props.title === title)!.props;
+  (pick(tree, "Choose main photo").onSelectAsset as (asset: unknown) => void)(photo);
+  tree = render();
+  assert.equal(payload(tree).square.framing.imageZoom, 2, "reselecting the same photo keeps its crop");
+  const main = { ...photo, id: "new" };
+  (pick(tree, "Choose main photo").onUploadedAssets as (assets: unknown[]) => void)([main, { ...photo, id: "extra" }]);
+  tree = render();
+  assert.equal(payload(tree).square.assetId, "new");
+  assert.equal(payload(tree).square.framing.imageZoom, 1);
+  assert.deepEqual(payload(tree).gallery, ["extra"]);
+  assert.deepEqual(payload(tree).rectangular, selection.rectangular);
+  states[0] = null;
+  tree = render();
+  (pick(tree, "Add service photos").onUploadedAssets as (assets: unknown[]) => void)([photo, main]);
+  assert.equal(payload(render()).square.assetId, "old");
+  assert.deepEqual(payload(render()).gallery, ["extra", "new"]);
+});
+
 test("media validates framing and limits and deduplicates shared photo references", () => {
   assert.deepEqual(serviceMediaAssetIds(serviceMediaSchema.parse(selection)), ["square", "wide", "extra"]);
   assert.equal(serviceMediaSchema.safeParse({ ...selection, rectangular: { ...selection.rectangular, framing: { ...centeredFraming, imageZoom: 4 } } }).success, false);

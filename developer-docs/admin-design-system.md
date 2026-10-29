@@ -4,6 +4,14 @@ This is the maintained implementation guide for the Shopify-inspired Showrunner 
 
 ## Start here
 
+Single-choice native selects use `appearance: base-select` where supported. The shared control recipe styles the open picker with input corner tokens, popover elevation, inset rounded options and neutral selected/hover states. Multiple and expanded listbox selects keep their native presentation. Browsers without customizable-select support retain their native picker; keyboard navigation, required/disabled states and form submission stay browser-owned.
+
+Open select menus match their trigger's border-box width. Select values and options stay on one line, clipping long labels with ellipsis instead of making mobile controls taller. Custom select popovers follow the same width rule.
+
+Customizable native selects and their options explicitly center their flex contents vertically, including the picker arrow, at both desktop and touch heights.
+
+Field groups use `align-content: start` so taller neighbours in an equal-column grid do not stretch labels or single-line controls. Search/filter fields reuse the shared input recipe and its 44px mobile minimum; module styles must not reduce that height.
+
 Shared `Modal` dialogs keep the rounded outer shell and header stationary. The inset `.ui-dialog-body` owns vertical scrolling, with `min-height: 0` so long content fits inside the viewport. Keep task-specific content inside that body; do not put scrolling back on the outer `.ui-modal` shell or add another competing scroller.
 
 Workspaces with a shared module or product studio header have no top padding on `.admin-main`. The opaque sticky header starts at the workspace edge so scrolling content cannot show through a gap above it. Side and bottom page insets remain unchanged.

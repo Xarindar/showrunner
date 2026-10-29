@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon, Plus } from "lucide-react";
 import { AssetPicker, type AssetPickerAsset } from "@/components/ui/asset-picker";
 import { Button } from "@/components/ui/button";
 import { useNotify } from "@/components/ui/notifications";
-import { ImageFramingControl } from "@/modules/content/studio/image-framing-control";
 import { centeredFraming, type ImageFraming } from "@/modules/content/studio/image-framing";
 import { uploadServiceMediaAssetAction } from "../actions";
 import styles from "./service-media-fields.module.css";
@@ -16,50 +15,57 @@ type Photo = { asset: AssetPickerAsset; framing: ImageFraming };
 export function ServiceMediaFields({ canUpload, initialSquare = null, initialRectangular = null, initialGallery = [] }: {
   canUpload: boolean; initialSquare?: Photo | null; initialRectangular?: Photo | null; initialGallery?: AssetPickerAsset[];
 }) {
-  const [square, setSquare] = useState(initialSquare);
-  const [rectangular, setRectangular] = useState(initialRectangular);
+  const [main, setMain] = useState(initialSquare);
+  const [websitePhoto, setWebsitePhoto] = useState(initialRectangular);
   const [gallery, setGallery] = useState(initialGallery);
   const notify = useNotify();
   const encode = (photo: Photo | null) => photo ? { assetId: photo.asset.id || null, framing: photo.framing } : null;
-  function addImages(assets: AssetPickerAsset[]) {
-    setGallery(current => {
-      const combined = [...new Map([...current, ...assets].map(asset => [asset.id, asset])).values()];
-      return combined.slice(0, 50);
-    });
-    notify("Images added to this draft. Save the session type to keep your choices.");
+  function addImages(assets: AssetPickerAsset[], replaceMain = false) {
+    if (!assets.length) return;
+    const [first, ...rest] = assets;
+    const makeMain = replaceMain || !main;
+    if (makeMain) setMain({ asset: first, framing: main?.asset.id === first.id ? main.framing : centeredFraming });
+    setGallery(current => [...new Map([...current, ...(makeMain ? rest : assets)].map(asset => [asset.id, asset])).values()].slice(0, 50));
+    notify("Photos added to this draft. Save the session type to keep your choices.");
   }
-  return <section className="studio-panel" aria-labelledby="service-media-title">
-    <h2 id="service-media-title" className="section-title">Media</h2>
-    <input type="hidden" name="serviceMedia" value={JSON.stringify({ square: encode(square), rectangular: encode(rectangular), gallery: gallery.map(asset => asset.id) })} />
-    <div className={styles.photos}>
-      {([{ key: "rectangular", label: "Rectangular photo", ratio: 4 / 3, photo: rectangular, setPhoto: setRectangular },
-        { key: "square", label: "Square photo", ratio: 1, photo: square, setPhoto: setSquare }] as const).map(({ key, label, ratio, photo, setPhoto }) => <div className={styles.photo} key={key}>
-        <h3>{label}</h3>
-        <AssetPicker assets={photo ? [photo.asset] : []} canUpload={canUpload} uploadAction={uploadServiceMediaAssetAction}
-          title={`Choose ${label.toLowerCase()}`} triggerClassName={styles.choosePhoto} triggerHint={`Choose or upload ${label.toLowerCase()}`}
-          onSelectAsset={asset => setPhoto({ asset, framing: centeredFraming })}>
-          <span className={styles.preview} style={{ aspectRatio: ratio }}>
-            {photo ? <Image fill sizes="(max-width: 600px) 100vw, 400px" unoptimized src={photo.asset.url || photo.asset.thumbnailUrl} alt={photo.asset.alt} draggable={false} style={{ objectPosition: `${photo.framing.imagePositionX}% ${photo.framing.imagePositionY}%`, transformOrigin: `${photo.framing.imagePositionX}% ${photo.framing.imagePositionY}%`, transform: `scale(${photo.framing.imageZoom})` }} />
-              : <span className={styles.placeholder}><ImageIcon aria-hidden="true" size={24} /><span>Choose or upload</span></span>}
-          </span>
-        </AssetPicker>
-        <p className={styles.help}>{key === "square" ? "1:1 · Used as the booking photo." : "4:3 · For landscape website layouts."}</p>
-        {photo && <div className={styles.actions}>
-          <ImageFramingControl source={photo.asset.url || photo.asset.thumbnailUrl} ratio={ratio} value={photo.framing} onChange={framing => setPhoto({ ...photo, framing })} />
-          <Button type="button" size="sm" variant="ghost" aria-label={`Remove ${label.toLowerCase()}`} onClick={() => setPhoto(null)}>Remove</Button>
-        </div>}
-      </div>)}
+  return <div className={styles.media} role="group" aria-label="Service photos">
+    <input type="hidden" name="serviceMedia" value={JSON.stringify({ square: encode(main), rectangular: encode(websitePhoto), gallery: gallery.map(asset => asset.id) })} />
+    <div className={styles.mainPhoto}>
+      <AssetPicker assets={main ? [main.asset] : []} canUpload={canUpload} uploadAction={uploadServiceMediaAssetAction}
+        title="Choose main photo" triggerClassName={styles.choosePhoto}
+        onUploadedAssets={assets => addImages(assets, true)} onSelectAsset={asset => addImages([asset], true)}>
+        <span className={styles.preview}>
+          {main ? <Image fill sizes="64px" unoptimized src={main.asset.url || main.asset.thumbnailUrl} alt={main.asset.alt} draggable={false} />
+            : <span className={styles.placeholder}><ImageIcon aria-hidden="true" size={22} /></span>}
+        </span>
+      </AssetPicker>
+      <div className={styles.photoDetails}>
+        <span className={styles.photoLabel}>Photo</span>
+        <p className={styles.help}>{main ? main.asset.filename : "Click to upload or choose a photo"}</p>
+        {main && <Button type="button" size="sm" variant="ghost" onClick={() => setMain(null)}>Remove main photo</Button>}
+      </div>
     </div>
-    <div className={styles.additional}>
-      <h3>Additional images</h3>
-      <p className={styles.help}>Attach up to 50 photos for future website use. Removing a photo here keeps the original in your media library.</p>
-      {gallery.length > 0 && <ul className={styles.gallery} aria-label="Additional service images">{gallery.map(asset => <li key={asset.id}>
-        <Image width={160} height={160} unoptimized src={asset.thumbnailUrl} alt={asset.alt} draggable={false} />
-        <Button type="button" variant="ghost" size="sm" aria-label={`Remove ${asset.filename}`} onClick={() => setGallery(current => current.filter(item => item.id !== asset.id))}>Remove</Button>
-      </li>)}</ul>}
-      <AssetPicker assets={gallery} canUpload={canUpload} uploadAction={uploadServiceMediaAssetAction} onUploadedAssets={addImages}
-        title="Add service images" confirmLabel="Add image" onSelectAsset={asset => addImages([asset])}>Add images</AssetPicker>
-      <p className={styles.help}>Photos and framing save with the session type. Original uploads are preserved.</p>
-    </div>
-  </section>;
+    <details className={styles.additional}>
+      <summary>More photos{gallery.length || websitePhoto ? ` (${gallery.length + (websitePhoto ? 1 : 0)})` : ""}</summary>
+      <ul className={styles.gallery} aria-label="Service photos">
+        {websitePhoto && <li>
+          <Image width={160} height={160} unoptimized src={websitePhoto.asset.thumbnailUrl} alt={websitePhoto.asset.alt} draggable={false} />
+          <span className={styles.help}>Existing website photo</span>
+          <Button type="button" variant="ghost" size="sm" onClick={() => addImages([websitePhoto.asset], true)}>Use as main</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setWebsitePhoto(null)}>Remove website photo</Button>
+        </li>}
+        {gallery.map(asset => <li key={asset.id}>
+          <Image width={160} height={160} unoptimized src={asset.thumbnailUrl} alt={asset.alt} draggable={false} />
+          <Button type="button" variant="ghost" size="sm" onClick={() => addImages([asset], true)}>Use as main</Button>
+          <Button type="button" variant="ghost" size="sm" aria-label={`Remove ${asset.filename}`} onClick={() => setGallery(current => current.filter(item => item.id !== asset.id))}>Remove</Button>
+        </li>)}
+        {gallery.length < 50 && <li>
+          <AssetPicker assets={gallery} canUpload={canUpload} uploadAction={uploadServiceMediaAssetAction} onUploadedAssets={addImages}
+            triggerClassName={styles.addPhoto} title="Add service photos" confirmLabel="Add photo" onSelectAsset={asset => addImages([asset])}>
+            <Plus aria-hidden="true" size={20} /><span>Add</span>
+          </AssetPicker>
+        </li>}
+      </ul>
+    </details>
+  </div>;
 }
