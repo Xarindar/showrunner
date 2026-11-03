@@ -46,6 +46,8 @@ The Shopify-inspired system in DESIGN.md applies across admin navigation, resour
 
 Business hours on service creation and editing opens the availability controls from Scheduling rules in a dialog on the current page. Adding or removing hours refreshes the rules without navigating away or discarding the service draft; these hours apply across session types.
 
+Create new service in the included-service picker opens the shared New service modal. Creating and adding or cancelling returns to the current session draft without expanding an inline creation card.
+
 ## Media
 
 Saving file details keeps the inspector open and preserves the current search, folder, filters, page and scroll position. Success appears as a toast; validation errors remain beside the form without discarding edits.

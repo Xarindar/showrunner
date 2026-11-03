@@ -99,9 +99,8 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
             {item.description && <span className={styles.hint}>{item.description}</span>}
           </button>}
         </div>)}
-        {inlineService && !draft.coverageItems.some(item => item.id === inlineService.id) && <div className={styles.optionRow}><h3>New service</h3><ServiceLibraryPicker inline rates={rates} onRateSaved={onRateSaved} selectedItems={draft.coverageItems} editingItem={inlineService} onChoose={chooseLibraryItems} onClose={closeLibrary} /></div>}
       </div>
-      <div><ServiceLibraryMenu selectedItems={draft.coverageItems} onChoose={item => chooseLibraryItems([item], null)} onCreate={() => { setExpandedService(null); setInlineService({ id: crypto.randomUUID(), name: "" }); }} onBrowse={() => { setInlineService(null); setExpandedService(null); setLibraryPicker({}); }} /></div>
+      <div><ServiceLibraryMenu selectedItems={draft.coverageItems} onChoose={item => chooseLibraryItems([item], null)} onCreate={() => { setExpandedService(null); setInlineService(null); setLibraryPicker({ editingItem: { id: crypto.randomUUID(), name: "" } }); }} onBrowse={() => { setInlineService(null); setExpandedService(null); setLibraryPicker({}); }} /></div>
       {libraryPicker && <ServiceLibraryPicker rates={rates} onRateSaved={onRateSaved} selectedItems={draft.coverageItems} editingItem={libraryPicker.editingItem} onChoose={chooseLibraryItems} onClose={closeLibrary} />}
     </section>
     <section className="studio-panel" aria-labelledby={`${listId}-packages-title`}>

@@ -32,6 +32,7 @@ await build({
     import studioStyles from './modules/content/studio/studio.module.css';
     import {ImageFramingControl, HeaderFrameRatios} from './modules/content/studio/image-framing-control';
     import {ServiceBookingRulesTable} from './modules/scheduling/components/service-booking-rules-table';
+    import {SessionPackagesEditor} from './modules/scheduling/components/session-packages-editor';
     import './app/globals.css';
     import './app/admin/design-tokens.css';
     import './app/admin/design-system.css';
@@ -62,6 +63,7 @@ await build({
         </section>
         <section aria-label="Button settings fixture" className={studioStyles.fields} style={{width:240}}><Fields fields={{buttonLabel:{kind:'text',label:'Title'},buttonHref:{kind:'url',label:'Link'}}} prefix="button" value={{buttonLabel:'Book The Hive',buttonHref:'/booking'}} onChange={()=>{}} linkOptions={{pages:[{path:'/booking',label:'Booking'}],services:[]}} /></section>
         <section aria-label="Plain fields fixture" style={{width:240,display:'grid',gap:16}}><label>Plain name<input /></label><label>Plain notes<textarea /></label><label><input type="checkbox" />Keep checked</label></section>
+        <section aria-label="Session services fixture"><form onSubmit={event=>event.preventDefault()}><label>Session draft name<input defaultValue="Unsaved session" /></label><SessionPackagesEditor /></form></section>
         <section aria-label="Schedule fixture" className={scheduleStyles.page}>
           <h1>Schedule</h1>
           <AvailabilityPanel availability={[]} staff={[{id:'staff-1',name:'Staff member',isActive:true}]} resources={[]} timezone="America/Chicago" />
@@ -77,6 +79,8 @@ await build({
   ` },
   bundle: true, outfile: `${output}.js`,
   plugins: [{ name: "schedule-actions-fixture", setup(build) {
+    build.onResolve({filter:/^\.\.\/(service-library-actions|rate-actions)$/},args=>({path:args.path,namespace:'service-actions-fixture'}));
+    build.onLoad({filter:/.*/,namespace:'service-actions-fixture'},args=>({contents:args.path.endsWith('rate-actions')?'export async function saveHourlyRateAction() {}':`export async function saveServiceLibraryItemAction(form) { if(form.name==='Fail once') return {error:'Please retry the service save.'}; return {item:{...form,id:'saved-service',tags:[],priceCents:null,hourlyRateId:null}}; }`,loader:'js'}));
     build.onResolve({ filter: /asset-picker$/ }, args => args.importer.endsWith("editor.tsx") ? {path:"asset-picker",namespace:"image-fixture"} : undefined);
     build.onResolve({ filter: /^\.\/actions$/ }, args => args.importer.endsWith("editor.tsx") ? {path:"actions",namespace:"image-fixture"} : undefined);
     build.onLoad({filter: /.*/, namespace:"image-fixture"}, args => ({contents: args.path === "actions" ? "export async function uploadStudioAsset() {}" : `import React from 'react'; export function AssetPicker({children,triggerClassName,onSelectAsset,onUploadedAssets}) {return <><button className={triggerClassName} onClick={()=>onSelectAsset({url:'/replacement-photo.svg',alt:'Selected photo'})}>{children}</button><button onClick={()=>onUploadedAssets([{url:'/uploaded-photo.svg',alt:'Uploaded photo'}])}>Complete upload</button></>}`,loader:"tsx",resolveDir:process.cwd()}));
@@ -95,7 +99,8 @@ try {
   await page.route("**/*", route => route.fulfill(route.request().url().endsWith("photo.svg")
     ? { contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#789"/></svg>' }
     : { contentType: "text/html", body: `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="root"></div><script>${js}</script></body></html>` }));
-  await page.goto("http://design.example");
+  await page.route('**/api/scheduling/service-library?*',route=>route.fulfill({json:{items:[],categories:[],tags:[],total:0,page:1,pageCount:1}}));
+  await page.goto("https://design.example");
   await page.getByRole("heading", { name: "Shared controls" }).waitFor();
   const input = page.getByPlaceholder("Name", { exact: true });
   const geometry = () => input.evaluate(element => { const style = getComputedStyle(element); return [style.borderRadius, style.minHeight, style.fontSize, style.backgroundColor, style.fontFamily]; });
@@ -232,6 +237,37 @@ try {
   assert.equal(await cropDialog.locator('.ui-dialog-body').evaluate(element => element.scrollWidth > element.clientWidth), false, "Mobile crop dialog must not scroll horizontally");
   await cropDialog.screenshot({ path: `${captures}/crop-mobile.png` });
   await page.keyboard.press("Escape");
+  const sessionServices = page.getByRole('region',{name:'Session services fixture'});
+  for (const width of [1440,390]) {
+    await page.setViewportSize({width,height:844});
+    const draftBefore = await sessionServices.locator('input[name="sessionOffering"]').inputValue();
+    await sessionServices.getByRole('button',{name:'+ Add item',exact:true}).click();
+    await page.getByRole('button',{name:'+ Create new service',exact:true}).click();
+    const newService = page.getByRole('dialog',{name:'New service',exact:true});
+    await newService.waitFor();
+    assert.equal(await newService.evaluate(element=>element.matches(':modal')),true,'Service creation uses the shared modal');
+    await newService.getByRole('button',{name:'Create and add',exact:true}).click();
+    await newService.getByText('Enter a service name.',{exact:true}).waitFor();
+    await newService.getByRole('textbox',{name:'Service name',exact:true}).fill('Fail once');
+    await newService.getByRole('button',{name:'Create and add',exact:true}).click();
+    await page.getByText('Please retry the service save.',{exact:true}).waitFor();
+    assert.equal(await newService.getByRole('textbox',{name:'Service name',exact:true}).inputValue(),'Fail once');
+    await newService.screenshot({path:`${captures}/new-service-${width}.png`});
+    await newService.getByRole('button',{name:'Cancel',exact:true}).click();
+    assert.equal(await newService.count(),0);
+    assert.equal(await sessionServices.locator('input[name="sessionOffering"]').inputValue(),draftBefore,'Cancel preserves the session offering');
+    assert.equal(await sessionServices.getByLabel('Session draft name').inputValue(),'Unsaved session');
+  }
+  await sessionServices.getByRole('button',{name:'+ Add item',exact:true}).click();
+  await page.getByRole('button',{name:'+ Create new service',exact:true}).click();
+  const createService = page.getByRole('dialog',{name:'New service',exact:true});
+  await createService.getByRole('textbox',{name:'Service name',exact:true}).fill('Portrait coverage');
+  await createService.getByRole('button',{name:'Create and add',exact:true}).click();
+  await createService.waitFor({state:'detached'});
+  const savedOffering = JSON.parse(await sessionServices.locator('input[name="sessionOffering"]').inputValue());
+  assert.equal(savedOffering.coverageItems[0].libraryItemId,'saved-service');
+  assert.equal(savedOffering.coverageItems[0].name,'Portrait coverage');
+  assert.equal(await sessionServices.getByLabel('Session draft name').inputValue(),'Unsaved session');
   const live = await browser.newPage({viewport:{width:1200,height:800}});
   await live.setContent('<h1 id="heading"></h1><div><img id="photo"></div>');
   await live.addScriptTag({content:readFileSync('public/showrunner-content.js','utf8')});

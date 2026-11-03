@@ -143,7 +143,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
       </div>
       <footer className={styles.footer}><span className={styles.hint}>Library changes are saved immediately.</span><div className="module-modal-actions">
         <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>Cancel</Button>
-        <Button type="button" disabled={saving} onClick={save}>{saving ? "Saving…" : inline ? "Done" : editingItem ? "Save changes" : "Create and add"}</Button>
+        <Button type="button" disabled={saving} onClick={save}>{saving ? "Saving…" : inline ? "Done" : editingItem?.name ? "Save changes" : "Create and add"}</Button>
       </div></footer>
     </>}
   </>;
