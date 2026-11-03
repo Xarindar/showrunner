@@ -28,7 +28,7 @@ test("admin design rules cannot recolor public routes or escape into the website
     parse(readFileSync(path, "utf8")).walkRules(rule => {
       for (const selector of list.comma(rule.selector)) {
         if (rule.parent?.type === "atrule" && rule.parent.name.endsWith("keyframes")) continue;
-        assert(selector.startsWith(".showrunner-admin") || selector.startsWith("html:has(.showrunner-admin"), `${path}: unscoped selector ${selector}`);
+        assert(selector.startsWith(".showrunner-admin") || selector.startsWith(":where(.showrunner-admin ") || selector.startsWith("html:has(.showrunner-admin"), `${path}: unscoped selector ${selector}`);
         assert(!selector.includes("iframe *"), "Never style the client's website through admin selectors");
       }
     });

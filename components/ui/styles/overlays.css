@@ -329,8 +329,8 @@
   width: 100%;
 }
 .showrunner-admin .ui-dialog::backdrop { background: var(--sd-color-overlay); }
-.showrunner-admin .ui-dialog-body { display: grid; gap: var(--space-3); min-width: 0; }
-.showrunner-admin .ui-dialog.ui-modal { overflow: hidden; }
+:where(.showrunner-admin .ui-dialog-body) { display: grid; gap: var(--space-3); min-width: 0; }
+.showrunner-admin .ui-dialog.ui-modal { overflow: hidden; padding: var(--sd-space-16); }
 .showrunner-admin .ui-dialog.ui-modal[open] { display: flex; flex-direction: column; }
 .showrunner-admin .ui-dialog.ui-modal > .ui-modal-head { flex-shrink: 0; }
 .showrunner-admin .ui-dialog.ui-modal > .ui-dialog-body { min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }

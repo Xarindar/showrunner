@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { sessionOfferingDraft, type SessionOffering, type SessionOfferingDraft } from "@/lib/scheduling/session-offering";
 import type { ServiceLibraryItem } from "@/lib/scheduling/service-library";
-import { ServiceLibraryMenu } from "./service-library-menu";
 import { ServiceLibraryPicker } from "./service-library-picker";
 import styles from "./session-packages-editor.module.css";
 import { hourlyPriceCents, type HourlyRate, type PricingType } from "@/lib/scheduling/pricing";
@@ -100,7 +99,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
           </button>}
         </div>)}
       </div>
-      <div><ServiceLibraryMenu selectedItems={draft.coverageItems} onChoose={item => chooseLibraryItems([item], null)} onCreate={() => { setExpandedService(null); setInlineService(null); setLibraryPicker({ editingItem: { id: crypto.randomUUID(), name: "" } }); }} onBrowse={() => { setInlineService(null); setExpandedService(null); setLibraryPicker({}); }} /></div>
+      <div><Button type="button" variant="ghost" disabled={draft.coverageItems.length >= 100} onClick={() => { setInlineService(null); setExpandedService(null); setLibraryPicker({}); }}>+ Add item</Button></div>
       {libraryPicker && <ServiceLibraryPicker rates={rates} onRateSaved={onRateSaved} selectedItems={draft.coverageItems} editingItem={libraryPicker.editingItem} onChoose={chooseLibraryItems} onClose={closeLibrary} />}
     </section>
     <section className="studio-panel" aria-labelledby={`${listId}-packages-title`}>

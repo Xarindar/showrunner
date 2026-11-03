@@ -238,11 +238,27 @@ try {
   await cropDialog.screenshot({ path: `${captures}/crop-mobile.png` });
   await page.keyboard.press("Escape");
   const sessionServices = page.getByRole('region',{name:'Session services fixture'});
+  async function checkModalInsets(modal) {
+    const layout = await modal.evaluate(element=>{
+      const bounds=element.getBoundingClientRect();
+      const head=element.querySelector('.ui-modal-head').getBoundingClientRect();
+      const footer=element.querySelector('footer').getBoundingClientRect();
+      return {padding:getComputedStyle(element).padding,bodyDisplay:getComputedStyle(element.querySelector('.ui-dialog-body')).display,headLeft:head.left-bounds.left,headTop:head.top-bounds.top,footerLeft:footer.left-bounds.left,footerRight:bounds.right-footer.right,footerBottom:bounds.bottom-footer.bottom};
+    });
+    assert.equal(layout.padding,'16px','Every modal keeps its shared shell inset');
+    assert.equal(layout.bodyDisplay,'flex','Module body layout must override the shared default');
+    for(const edge of ['headLeft','headTop','footerLeft','footerRight','footerBottom']) assert(layout[edge]>=15,`${edge} must stay inside the rounded shell`);
+  }
   for (const width of [1440,390]) {
     await page.setViewportSize({width,height:844});
     const draftBefore = await sessionServices.locator('input[name="sessionOffering"]').inputValue();
     await sessionServices.getByRole('button',{name:'+ Add item',exact:true}).click();
-    await page.getByRole('button',{name:'+ Create new service',exact:true}).click();
+    const serviceLibrary=page.getByRole('dialog',{name:'Service library',exact:true});
+    await serviceLibrary.waitFor();
+    assert.equal(await serviceLibrary.evaluate(element=>element.matches(':modal')),true,'Add item opens the full modal directly');
+    await checkModalInsets(serviceLibrary);
+    await serviceLibrary.screenshot({path:`${captures}/service-library-${width}.png`});
+    await serviceLibrary.getByRole('button',{name:'New service',exact:true}).click();
     const newService = page.getByRole('dialog',{name:'New service',exact:true});
     await newService.waitFor();
     assert.equal(await newService.evaluate(element=>element.matches(':modal')),true,'Service creation uses the shared modal');
@@ -252,6 +268,7 @@ try {
     await newService.getByRole('button',{name:'Create and add',exact:true}).click();
     await page.getByText('Please retry the service save.',{exact:true}).waitFor();
     assert.equal(await newService.getByRole('textbox',{name:'Service name',exact:true}).inputValue(),'Fail once');
+    await checkModalInsets(newService);
     await newService.screenshot({path:`${captures}/new-service-${width}.png`});
     await newService.getByRole('button',{name:'Cancel',exact:true}).click();
     assert.equal(await newService.count(),0);
@@ -259,7 +276,7 @@ try {
     assert.equal(await sessionServices.getByLabel('Session draft name').inputValue(),'Unsaved session');
   }
   await sessionServices.getByRole('button',{name:'+ Add item',exact:true}).click();
-  await page.getByRole('button',{name:'+ Create new service',exact:true}).click();
+  await page.getByRole('dialog',{name:'Service library',exact:true}).getByRole('button',{name:'New service',exact:true}).click();
   const createService = page.getByRole('dialog',{name:'New service',exact:true});
   await createService.getByRole('textbox',{name:'Service name',exact:true}).fill('Portrait coverage');
   await createService.getByRole('button',{name:'Create and add',exact:true}).click();

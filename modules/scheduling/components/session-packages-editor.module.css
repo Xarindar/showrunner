@@ -78,24 +78,3 @@
 .tierCard > summary::-webkit-details-marker { display: none; }
 .tierCard[open] > summary { display: none; }
 .tierBody { padding: var(--space-4); }
-.libraryMenu {
-  position: fixed;
-  inset: auto;
-  margin: 0;
-  padding: var(--space-3);
-  border: 0;
-  border-radius: var(--radius-card);
-  width: min(360px,calc(100% - 24px));
-  max-height: min(480px,calc(100dvh - 24px));
-  overflow: auto;
-  box-shadow: var(--sd-shadow-container);
-  background: var(--color-surface);
-  color: var(--color-text);
-}
-.libraryMenu > :global(.ui-field) { margin-bottom: var(--space-2); }
-.menuResults { display: grid; max-height: 220px; overflow: auto; margin-block: var(--space-3); }
-.menuResults button { justify-content: flex-start; white-space: normal; text-align: left; }
-.libraryMenu > button { display: flex; width: 100%; justify-content: flex-start; }
-@media(max-width:760px) {
-  .libraryMenu button,.libraryMenu input,.libraryMenu select { min-height: var(--sd-layout-touch-target); }
-}

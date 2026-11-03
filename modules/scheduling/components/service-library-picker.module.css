@@ -4,7 +4,6 @@
   width: min(760px, calc(100% - var(--space-5)));
   max-width: min(760px, calc(100% - var(--space-5)));
   max-height: calc(100svh - var(--space-5));
-  padding: 0;
   overflow: hidden;
   border-radius: var(--radius-card);
   background: var(--color-surface);
