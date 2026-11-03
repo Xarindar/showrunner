@@ -106,11 +106,17 @@ try {
     const pair = page.getByRole("region", { name: "Unequal field hints" });
     const controls = await pair.locator("input, select").evaluateAll(elements => elements.map(element => {
       const rect = element.getBoundingClientRect();
-      return { top: rect.top, height: rect.height, align: getComputedStyle(element).alignItems };
+      const style = getComputedStyle(element);
+      return { top: rect.top, height: rect.height, align: style.alignItems, display: style.display, direction: style.flexDirection, justify: style.justifyContent };
     }));
     assert(controls.every(control => Math.abs(control.height - height) < 1), "Hints must not stretch neighbouring controls");
     if (height === 30) assert(Math.abs(controls[0].top - controls[1].top) < 1, "Neighbouring input and select must align");
-    if (await page.evaluate(() => CSS.supports("appearance", "base-select"))) assert.equal(controls[1].align, "center", "Select text and arrow stay vertically centered");
+    if (await page.evaluate(() => CSS.supports("appearance", "base-select"))) {
+      assert.equal(controls[1].align, "center", "Select text and arrow stay vertically centered");
+      assert.equal(controls[1].display, "flex", "Select values and picker arrows share a horizontal layout");
+      assert.equal(controls[1].direction, "row");
+      assert.equal(controls[1].justify, "space-between", "Picker arrows stay at the trailing edge");
+    }
   }
   await checkFieldAlignment(30);
   await page.evaluate(() => { document.body.style.cssText = "--color-surface:magenta;--color-brand:red;--space-4:999px;--radius-control:0;--font-sans:serif"; });

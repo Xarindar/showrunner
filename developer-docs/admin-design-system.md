@@ -8,7 +8,7 @@ Single-choice native selects use `appearance: base-select` where supported. The 
 
 Open select menus match their trigger's border-box width. Select values and options stay on one line, clipping long labels with ellipsis instead of making mobile controls taller. Custom select popovers follow the same width rule.
 
-Customizable native selects and their options explicitly center their flex contents vertically, including the picker arrow, at both desktop and touch heights.
+Customizable native selects explicitly use a horizontal flex layout with the picker arrow at the trailing edge. Vertical alignment alone does not establish a flex layout in every browser. Selects and their options center their contents vertically at both desktop and touch heights.
 
 Field groups use `align-content: start` so taller neighbours in an equal-column grid do not stretch labels or single-line controls. Search/filter fields reuse the shared input recipe and its 44px mobile minimum; module styles must not reduce that height.
 

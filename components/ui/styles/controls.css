@@ -94,7 +94,9 @@
   .showrunner-admin select:not([multiple]):is(:not([size]), [size="1"]),
   .showrunner-admin select::picker(select) { appearance: base-select; }
   .showrunner-admin select:not([multiple]):is(:not([size]), [size="1"]) {
+    display: flex;
     align-items: center;
+    justify-content: space-between;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -128,7 +130,7 @@
   .showrunner-admin select:not([multiple]):is(:not([size]), [size="1"]) option:checked { background: var(--sd-color-fill-secondary); }
   .showrunner-admin select:not([multiple]):is(:not([size]), [size="1"]) option:not(:disabled):is(:hover, :focus-visible) { background: var(--sd-color-fill-hover); }
   .showrunner-admin select:not([multiple]):is(:not([size]), [size="1"]) option:disabled { color: var(--sd-color-text-disabled); }
-  .showrunner-admin select::picker-icon { color: var(--sd-color-text-secondary); }
+  .showrunner-admin select::picker-icon { flex-shrink: 0; color: var(--sd-color-text-secondary); }
   @media (max-width: 860px), (pointer: coarse) {
     .showrunner-admin select:not([multiple]):is(:not([size]), [size="1"]) option { min-block-size: 44px; }
   }
