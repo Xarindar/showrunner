@@ -7,7 +7,7 @@ export const manifest = {
   icon: "ReceiptText",
   order: 110,
   navigation: { category: "finance" },
-  description: "Quotes, invoices, contracts, documents, and payment state.",
+  description: "Quotes, invoices, Booking Terms & Conditions, documents, and payment state.",
   layout: "wide",
   status: "active",
   enabledByDefault: true,
@@ -15,14 +15,14 @@ export const manifest = {
     level: "partial",
     mode: "mixed",
     summary: "Document administration, line items, attachments, totals, status, hosted checkout-link handoff, payment records and refunds are available.",
-    primaryGap: "Public document pages, PDF routes, customer document emails, recurring billing and contract signing/versioning are unavailable."
+    primaryGap: "Public document pages, PDF routes, customer document emails, recurring billing and Booking Terms & Conditions signing/versioning are unavailable."
   },
   capabilities: [
     { label: "Document admin", status: "foundation" },
     { label: "Server-side totals", status: "live" },
     { label: "Public document accept/pay", status: "planned" },
     { label: "PDF document rendering", status: "planned" },
-    { label: "Contract signing", status: "planned" }
+    { label: "Booking T&C signing", status: "planned" }
   ],
   adminRoutes: ["/admin/modules/billing"],
   dependencies: ["clients", "communications"],

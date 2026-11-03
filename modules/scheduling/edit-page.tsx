@@ -22,6 +22,7 @@ import { getSiteSettings } from "@/lib/site";
 import { ButtonLink, Switch, type AssetPickerAsset } from "@/components/ui";
 import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
 import { ServiceBookingRulesTable } from "./components/service-booking-rules-table";
+import { bookingRuleSchema, readBookingRules } from "@/lib/scheduling/booking-rules";
 import { ServicePresetField } from "./components/service-preset-field";
 import { ServiceWorkspaceTabs, type ServiceWorkspaceTab } from "./components/service-workspace-tabs";
 import { AvailabilityPanel } from "./components/availability-panel";
@@ -107,7 +108,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   const schedulingRules = <ServiceSchedulingRules><AvailabilityPanel availability={availability} resources={resources} staff={staff} /></ServiceSchedulingRules>;
   const taxonomyServicesPromise = prisma.service.findMany({
     where: { siteId: settings.siteId, isOneOff: false },
-    select: { category: true, intakePrompt: true, location: true, policyText: true }
+    select: { category: true, intakePrompt: true, location: true, policyText: true, bookingRules: true }
   });
   const serviceCategoriesPromise = prisma.serviceCategory.findMany({
     where: { siteId: settings.siteId },
@@ -117,21 +118,15 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   const intakeFormFieldsPromise = prisma.formField.findMany({
     where: {
       form: { siteId: settings.siteId },
-      isHidden: false
+      isHidden: false,
+      type: { in: ["TEXT", "TEXTAREA", "EMAIL", "PHONE", "RADIO", "SELECT"] }
     },
-    select: { label: true },
+    select: { id: true, label: true, type: true, fieldRole: true, isRequired: true, options: true, placeholder: true, helpText: true, form: { select: { name: true } } },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }]
   });
 
-  if (serviceId === "new") {
-    const rules = availability.filter(rule => !rule.staffId && !rule.resourceId);
-    const timeLabel = (minutes: number) => formatTimeValue(minutesToTime(minutes));
-    const businessHours = rules.map(rule => `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][rule.weekday]} ${timeLabel(rule.startMinutes)}–${timeLabel(rule.endMinutes)}`);
-    return <SessionTypeForm tags={tagOptions} rates={rates} businessHours={businessHours} timezone={settings.timezone} canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)} schedulingRules={schedulingRules} />;
-  }
-
   const [service, taxonomyServices, intakeFormFields, serviceCategories] = await Promise.all([
-    prisma.service.findFirst({
+    serviceId === "new" ? null : prisma.service.findFirst({
       where: { id: serviceId, siteId: settings.siteId },
       include: {
         mediaAsset: true,
@@ -148,12 +143,22 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     serviceCategoriesPromise
   ]);
 
+  const categoryOptions = uniqueSortedStrings([...serviceCategories.map((category) => category.name), ...taxonomyServices.map((item: ServiceTaxonomyOption) => item.category)]);
+  const intakeOptions = uniqueSortedStrings([...taxonomyServices.filter(service => service.bookingRules == null).map((item: ServiceTaxonomyOption) => item.intakePrompt), ...intakeFormFields.map((field) => field.label)]);
+  const policyOptions = uniqueSortedStrings(taxonomyServices.filter(service => service.bookingRules == null).map((item: ServiceTaxonomyOption) => item.policyText));
+  const availableRules = [...taxonomyServices.flatMap(service => service.bookingRules == null ? [] : readBookingRules(service.bookingRules)), ...intakeFormFields.flatMap(field => {
+    const contactField = field.fieldRole === "SUBMITTER_NAME" ? "customerName" : field.fieldRole === "SUBMITTER_EMAIL" || field.type === "EMAIL" ? "customerEmail" : field.type === "PHONE" ? "customerPhone" : undefined;
+    const parsed = bookingRuleSchema.safeParse({ id: field.id, kind: "intake", category: contactField ? "Contact" : field.form.name.slice(0, 80), label: field.label, type: field.type === "RADIO" || field.type === "SELECT" ? field.type : "TEXT", required: field.isRequired, options: Array.isArray(field.options) ? field.options : [], placeholder: field.placeholder, helpText: field.helpText, contactField });
+    return parsed.success ? [parsed.data] : [];
+  })];
+  if (serviceId === "new") {
+    const rules = availability.filter(rule => !rule.staffId && !rule.resourceId);
+    const timeLabel = (minutes: number) => formatTimeValue(minutesToTime(minutes));
+    const businessHours = rules.map(rule => `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][rule.weekday]} ${timeLabel(rule.startMinutes)}–${timeLabel(rule.endMinutes)}`);
+    return <SessionTypeForm availableRules={availableRules} intakeOptions={intakeOptions} policyOptions={policyOptions} tags={tagOptions} rates={rates} businessHours={businessHours} timezone={settings.timezone} canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)} schedulingRules={schedulingRules} />;
+  }
   if (!service) notFound();
   const offering = await hydrateSessionServiceLibrary(readSessionOffering(service.sessionOffering), settings.siteId);
-
-  const categoryOptions = uniqueSortedStrings([...serviceCategories.map((category) => category.name), ...taxonomyServices.map((item: ServiceTaxonomyOption) => item.category)]);
-  const intakeOptions = uniqueSortedStrings([...taxonomyServices.map((item: ServiceTaxonomyOption) => item.intakePrompt), ...intakeFormFields.map((field) => field.label)]);
-  const policyOptions = uniqueSortedStrings(taxonomyServices.map((item: ServiceTaxonomyOption) => item.policyText));
   const savedMessage = savedServiceMessage(params.saved);
   const errorMessage = params.error || null;
   const bookingPath = "Client booking rebuild pending";
@@ -212,8 +217,10 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
         <SessionPackagesEditor initialRates={rates} initialPricingType={service.pricingType} initialHourlyRateId={service.hourlyRateId ?? ""} initialOffering={offering} durationMinutes={service.durationMinutes} priceCents={service.priceCents} />
 
         <section className="studio-panel">
-              <details className={styles.moreOptions}><summary>Intake and booking policies</summary>
+              <details className={styles.moreOptions}><summary>Intake and Booking Terms &amp; Conditions</summary>
                 <ServiceBookingRulesTable
+                  defaultRules={service.bookingRules}
+                  availableRules={availableRules}
                   defaultIntakePrompt={service.intakePrompt}
                   defaultPolicyText={service.policyText}
                   defaultRequirePolicy={service.requirePolicy}

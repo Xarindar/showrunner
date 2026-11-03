@@ -41,5 +41,11 @@ export function resolveIncludedServices(offering: SessionOffering, library: Serv
       : library.find(row => row.name.toLowerCase() === item.name.trim().toLowerCase());
     if (!saved && item.libraryItemId) throw new Error("A selected library service is no longer available. Remove it and choose another.");
     return saved ? { ...saved, id: item.id, libraryItemId: saved.id } : item;
+  }), addOns: offering.addOns.map(item => {
+    if (!item.libraryItemId) return item;
+    const saved = library.find(row => row.id === item.libraryItemId);
+    if (!saved) throw new Error("An optional service is no longer available. Remove it and choose another.");
+    // Linked optional services are covered by the package tier.
+    return { ...item, name: saved.name, priceCents: 0 };
   }) });
 }

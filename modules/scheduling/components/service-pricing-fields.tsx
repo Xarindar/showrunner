@@ -17,7 +17,7 @@ export function ServicePricingFields({ pricingType, hourlyRateId, rates, onChang
     <Field label="Pricing type"><Select aria-label="Pricing type" value={pricingType} onChange={event => onChange(event.target.value as PricingType, hourlyRateId)}><option value="FLAT_RATE">Flat rate</option><option value="HOURLY">Hourly</option></Select></Field>
     {pricingType === "HOURLY" && <div className="hourly-rate-field">
       <Field label="Hourly rate" hint={selectedRate ? `${selectedRate.name} · $${(selectedRate.amountCents / 100).toFixed(2)} / hour` : undefined}><Select aria-label="Hourly rate" required value={hourlyRateId} onChange={event => onChange(pricingType, event.target.value)}><option value="">Choose a rate</option>{rates.map(rate => <option key={rate.id} value={rate.id}>{rate.name} — {(rate.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} / hour</option>)}</Select></Field>
-      <Button type="button" variant="ghost" onClick={() => setAdding(true)}>Add rate</Button>
+      <Button type="button" onClick={() => setAdding(true)}>Add rate</Button>
     </div>}
     {adding && <HourlyRateEditor onClose={() => setAdding(false)} onSave={rate => { onRateSaved(rate); onChange(pricingType, rate.id); setAdding(false); }} />}
   </>;

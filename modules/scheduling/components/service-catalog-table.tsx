@@ -98,6 +98,7 @@ export function ServiceCatalogTable({
     nextPage,
     pageCount,
     previousPage,
+    resizePage,
     startIndex
   } = useCatalogTablePagination(filteredServices.length);
   const pagedServices = filteredServices.slice(startIndex, endIndex);
@@ -121,7 +122,7 @@ export function ServiceCatalogTable({
   };
 
   return (
-    <div className="service-catalog-folder-panel" aria-labelledby="services-board-title">
+    <div data-viewport-table className="service-catalog-folder-panel" aria-labelledby="services-board-title">
       <div className="catalog-board-header">
         <div>
           <h2 id="services-board-title">Session types</h2>
@@ -190,7 +191,7 @@ export function ServiceCatalogTable({
 
       <ul aria-label="Session types" className="service-mobile-list">
         {pagedServices.map((service) => (
-          <li key={service.id}>
+          <li data-viewport-row key={service.id}>
             <div className="service-mobile-summary">
               <Link className="service-mobile-name" href={`/admin/modules/services/${service.id}`}>{service.name}</Link>
               <div className="service-mobile-meta">
@@ -324,6 +325,7 @@ export function ServiceCatalogTable({
         </table>
       </div>
       <Pagination
+        onPageSizeChange={resizePage}
         className="catalog-table-pagination"
         label="Service catalog pages"
         onNext={nextPage}

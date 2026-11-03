@@ -1,4 +1,5 @@
 import "server-only";
+import { BookingRuleAnswerError, intakeAnswersSchema, readBookingRules } from "@/lib/scheduling/booking-rules";
 import { servicePriceCents } from "@/lib/scheduling/pricing";
 import { readImageFraming } from "@/modules/content/studio/image-framing";
 
@@ -31,6 +32,7 @@ const bookingSchema = z.object({
   customerPhone: z.string().trim().optional(),
   notes: z.string().trim().optional(),
   intakeResponse: z.string().trim().optional(),
+  intakeAnswers: intakeAnswersSchema.optional(),
   policyAccepted: z.boolean().optional(),
   [hiddenHoneypotField]: z.string().trim().optional()
 });
@@ -70,12 +72,13 @@ const expectedBookingErrorStatuses = new Map<string, number>([
   ["Choose an available resource-backed slot for this service.", 400],
   ["Choose a valid appointment time.", 400],
   ["That service is not configured for online booking.", 400],
-  ["Please accept the appointment policy before booking.", 400],
+  ["Please agree to the Booking Terms & Conditions before booking.", 400],
   ["That time is no longer available. Please choose another time.", 409],
   ["That time was just booked or blocked. Please choose another time.", 409]
 ]);
 
 function mapPublicBookingError(error: unknown): never {
+  if (error instanceof BookingRuleAnswerError) throw new EmbedRequestError(error.message, 400);
   if (error instanceof EmbedRequestError) throw error;
   if (error instanceof Error) {
     const status = expectedBookingErrorStatuses.get(error.message);
@@ -145,6 +148,7 @@ export function serializePublicService(service: PublicService, categoryRecord?: 
     maxAdvanceDays: service.maxAdvanceDays,
     slotIntervalMinutes: service.slotIntervalMinutes,
     intakePrompt: cleanOptionalString(service.intakePrompt),
+    bookingRules: service.bookingRules == null ? null : readBookingRules(service.bookingRules),
     policyText: cleanOptionalString(service.policyText),
     requirePolicy: service.requirePolicy,
     requestOnly: service.requestOnly,
@@ -283,6 +287,7 @@ export async function createPublicSchedulingBooking(input: {
       customerPhone: parsed.data.customerPhone,
       notes: parsed.data.notes,
       intakeResponse: parsed.data.intakeResponse,
+      intakeAnswers: parsed.data.intakeAnswers,
       policyAccepted: parsed.data.policyAccepted === true
     });
   } catch (error) {

@@ -44,7 +44,7 @@ export function SessionForm({ services, clients, staff, timezone, rates }: { ser
   const hourly = selectedTier?.pricingType
     ? selectedTier.pricingType === "HOURLY" && rates.find(rate => rate.id === selectedTier.hourlyRateId)
     : selected?.pricingType === "HOURLY" && selected.hourlyRate;
-  const extrasCents = selected?.sessionOffering?.addOns.filter(item => addOnIds.includes(item.id)).reduce((total, item) => total + item.priceCents, 0) ?? 0;
+  const extrasCents = selected?.sessionOffering?.addOns.filter(item => addOnIds.includes(item.id)).reduce((total, item) => total + (item.libraryItemId ? 0 : item.priceCents), 0) ?? 0;
   let calculatedPrice = "";
   if (hourly && details.duration) {
     try { calculatedPrice = ((hourlyPriceCents(hourly.amountCents, Number(details.duration)) + extrasCents) / 100).toFixed(2); }
@@ -63,7 +63,7 @@ export function SessionForm({ services, clients, staff, timezone, rates }: { ser
         {selected?.sessionOffering && <>
           <label>Package<select name="tierId" required value={tierId} onChange={event => choosePackage(event.target.value, [])}>{selected.sessionOffering.tiers.map(tier => <option key={tier.id} value={tier.id}>{tier.name}</option>)}</select></label>
           {selectedTier && <p className={styles.hint}>{selected.sessionOffering.coverageItems.filter(item => selectedTier.coverageIds.includes(item.id)).map(item => item.name).join(" · ")}</p>}
-          {selected.sessionOffering.addOns.length > 0 && <fieldset><legend>Optional extras</legend><div className={styles.days}>{selected.sessionOffering.addOns.map(item => <label key={item.id}><input type="checkbox" name="addOnIds" value={item.id} checked={addOnIds.includes(item.id)} onChange={event => choosePackage(tierId, event.target.checked ? [...addOnIds, item.id] : addOnIds.filter(id => id !== item.id))} />{item.name} (+{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(item.priceCents / 100)})</label>)}</div></fieldset>}
+          {selected.sessionOffering.addOns.length > 0 && <fieldset><legend>Optional extras</legend><div className={styles.days}>{selected.sessionOffering.addOns.map(item => <label key={item.id}><input type="checkbox" name="addOnIds" value={item.id} checked={addOnIds.includes(item.id)} onChange={event => choosePackage(tierId, event.target.checked ? [...addOnIds, item.id] : addOnIds.filter(id => id !== item.id))} />{item.name}{!item.libraryItemId && <> (+{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(item.priceCents / 100)})</>}</label>)}</div></fieldset>}
         </>}
         <label>Session name<input name="name" required placeholder="Family photos" value={details.name} onChange={event => setDetails({ ...details, name: event.target.value })} /></label>
         <div className={styles.row}><label>Date<input type="date" name="date" defaultValue={state.date || ""} required /></label><label>Time <small>({timezone})</small><TimeInput name="time" defaultValue={state.time || ""} required /></label></div>

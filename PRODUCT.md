@@ -8,6 +8,8 @@ Showrunner is the reusable administration product. Client websites integrate wit
 
 ## Session packages
 
+User-facing agreement labels use **Booking Terms & Conditions**, shortened to **Booking T&C** in compact rows and controls. Existing stored agreement text, billing document types/numbers and booking acceptance behavior stay intact.
+
 Session packages each choose Flat rate or Hourly pricing and their own named hourly rate. Hourly totals use package duration; manual bookings recalculate with the booked duration and snapshot the rate. Existing packages retain their prior session pricing until edited. Session organization tags reuse the media tag picker, including search, selection and new tags, with suggestions from accessible media and session types in the same site.
 
 ## Content editing
@@ -47,6 +49,12 @@ The Shopify-inspired system in DESIGN.md applies across admin navigation, resour
 Business hours on service creation and editing opens the availability controls from Scheduling rules in a dialog on the current page. Adding or removing hours refreshes the rules without navigating away or discarding the service draft; these hours apply across session types.
 
 Add item opens the full Service library modal, including search, filters, selection and New service. Creating and adding or cancelling returns to the current session draft without expanding an inline creation card.
+
+Included services use compact rows with the name and pricing on one line. Full descriptions remain in the service editor, and package assignment badges appear only when assigned. Add rate uses the shared primary button in every pricing editor.
+
+Optional extras select reusable services from the same library. The package tier sets the price; selecting a service does not add its individual price or hourly rate. Services do not need individual prices to be selected. Names and ownership are verified against the site's catalog when saving the session. Existing unlinked extras retain their previously saved charges.
+
+Intake questions and booking policies use a width-fitting list with wrapped copy, visible status and edit/remove controls. The rule library groups fields into categories with Add all actions; Contact reuses existing booking name/email/phone inputs. Owners configure text boxes, radio buttons or dropdowns with required answers, choices, placeholders and help text. Named, site-scoped rule sets can be saved and applied as independent copies to other services. Booking clients render those fields and the server validates and stores labelled answers. Legacy questions and policies remain readable. Empty and populated states fit narrow editor panels and phones without horizontal scrolling.
 
 ## Media
 

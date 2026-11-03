@@ -1288,3 +1288,9 @@ p {
     transition-duration: 1ms !important;
   }
 }
+.booking-rule-fields, .booking-rule-fields fieldset { display: grid; gap: 12px; min-width: 0; }
+.booking-rule-fields[hidden] { display: none; }
+.booking-rule-fields fieldset { border: 0; padding: 0; margin: 0; }
+.booking-rule-fields legend { margin-bottom: 8px; font-weight: 600; }
+.booking-rule-fields .booking-rule-choice { display: flex; align-items: center; gap: 8px; }
+.booking-rule-fields .booking-rule-choice input { width: auto; flex: 0 0 auto; }

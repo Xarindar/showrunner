@@ -1,315 +1,118 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ClipboardCheck, FileQuestion, Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { Switch } from "@/components/ui/switch";
+import { useNotify } from "@/components/ui/notifications";
+import { bookingRuleSchema, bookingRulesSchema, defaultBookingRules, readBookingRules, type BookingRule, type BookingRuleSet } from "@/lib/scheduling/booking-rules";
+import { listBookingRuleSets, saveBookingRuleSet } from "../booking-rule-actions";
 
-type BookingRuleKind = "intake" | "policy";
+type Props = { defaultRules?: unknown; defaultIntakePrompt?: string | null; defaultPolicyText?: string | null; defaultRequirePolicy?: boolean; defaultRequestOnly?: boolean; defaultWaitlistEnabled?: boolean; idPrefix: string; intakeOptions?: string[]; policyOptions?: string[]; availableRules?: BookingRule[] };
+const typeLabels = { TEXT: "Text box", RADIO: "Radio buttons", SELECT: "Dropdown" };
 
-type BookingRuleOption = {
-  kind: BookingRuleKind;
-  value: string;
-};
-
-type ServiceBookingRulesTableProps = {
-  defaultIntakePrompt?: string | null;
-  defaultPolicyText?: string | null;
-  defaultRequirePolicy?: boolean;
-  defaultRequestOnly?: boolean;
-  defaultWaitlistEnabled?: boolean;
-  idPrefix: string;
-  intakeOptions: string[];
-  policyOptions: string[];
-};
-
-const ruleLabels: Record<BookingRuleKind, { description: string; label: string }> = {
-  intake: {
-    description: "Customer prompt",
-    label: "Intake question"
-  },
-  policy: {
-    description: "Booking copy",
-    label: "Booking policy"
-  }
-};
-
-function normalizeValue(value: string | null | undefined) {
-  return (value || "").trim();
-}
-
-function normalizedOptions(options: string[]) {
-  return Array.from(new Set(options.map((option) => option.trim()).filter(Boolean))).sort((left, right) => left.localeCompare(right));
-}
-
-function matchesSearch(option: BookingRuleOption, searchQuery: string) {
-  if (!searchQuery) return true;
-  const haystack = `${ruleLabels[option.kind].label} ${option.value}`.toLowerCase();
-  return haystack.includes(searchQuery.toLowerCase());
-}
-
-function statusLabel(kind: BookingRuleKind, requirePolicy: boolean) {
-  if (kind === "policy") return requirePolicy ? "Acceptance required" : "Shown at booking";
-  return "Shown at booking";
-}
-
-function RuleIcon({ kind }: { kind: BookingRuleKind }) {
-  return kind === "policy" ? <ClipboardCheck size={17} /> : <FileQuestion size={17} />;
-}
-
-export function ServiceBookingRulesTable({
-  defaultIntakePrompt = "",
-  defaultPolicyText = "",
-  defaultRequirePolicy = false,
-  defaultRequestOnly = false,
-  defaultWaitlistEnabled = false,
-  idPrefix,
-  intakeOptions,
-  policyOptions
-}: ServiceBookingRulesTableProps) {
-  const [intakePrompt, setIntakePrompt] = useState(() => normalizeValue(defaultIntakePrompt));
-  const [policyText, setPolicyText] = useState(() => normalizeValue(defaultPolicyText));
-  const [requirePolicy, setRequirePolicy] = useState(() => Boolean(defaultRequirePolicy && normalizeValue(defaultPolicyText)));
+export function ServiceBookingRulesTable({ defaultRules, defaultIntakePrompt, defaultPolicyText, defaultRequirePolicy = false, defaultRequestOnly = false, defaultWaitlistEnabled = false, idPrefix, intakeOptions = [], policyOptions = [], availableRules = [] }: Props) {
+  const [rules, setRules] = useState(() => readBookingRules(defaultRules, { intakePrompt: defaultIntakePrompt, policyText: defaultPolicyText }));
+  const [requirePolicy, setRequirePolicy] = useState(defaultRequirePolicy);
   const [requestOnly, setRequestOnly] = useState(defaultRequestOnly);
   const [waitlistEnabled, setWaitlistEnabled] = useState(defaultWaitlistEnabled);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [draftKind, setDraftKind] = useState<BookingRuleKind>("intake");
-  const [draftValue, setDraftValue] = useState("");
+  const [mode, setMode] = useState<"library" | "edit" | "save-set" | null>(null);
+  const [draft, setDraft] = useState<BookingRule | null>(null);
+  const [choices, setChoices] = useState("");
+  const [search, setSearch] = useState("");
+  const [setName, setSetName] = useState("");
+  const [sets, setSets] = useState<BookingRuleSet[]>([]);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const [setsError, setSetsError] = useState("");
+  const modalBody = useRef<HTMLDivElement>(null);
+  const notify = useNotify();
+  const policyText = rules.filter(rule => rule.kind === "policy").map(rule => rule.label).join("\n\n");
+  const intakePrompt = rules.filter(rule => rule.kind === "intake" && !rule.contactField).map(rule => rule.label).join("\n");
+  const legacyOptions = [...intakeOptions.map(label => ({ kind: "intake" as const, label })), ...policyOptions.map(label => ({ kind: "policy" as const, label }))].map((rule, index): BookingRule => ({ ...rule, id: `suggestion-${index}`, category: rule.kind === "policy" ? "Booking Terms & Conditions" : "General", type: "TEXT", required: false, options: [], placeholder: "", helpText: "" }));
+  const library = [...defaultBookingRules, ...availableRules, ...legacyOptions].filter((rule, index, all) => all.findIndex(other => (rule.contactField && other.contactField === rule.contactField) || (other.kind === rule.kind && other.label.toLowerCase() === rule.label.toLowerCase())) === index);
+  const categories = [...new Set(library.map(rule => rule.category))];
+  const alreadyAdded = (rule: BookingRule) => rules.some(saved => (rule.contactField && saved.contactField === rule.contactField) || (saved.kind === rule.kind && saved.label.toLowerCase() === rule.label.toLowerCase()));
 
-  const savedOptions = useMemo<BookingRuleOption[]>(
-    () => [
-      ...normalizedOptions(intakeOptions).map((value) => ({ kind: "intake" as const, value })),
-      ...normalizedOptions(policyOptions).map((value) => ({ kind: "policy" as const, value }))
-    ],
-    [intakeOptions, policyOptions]
-  );
-  const selectedRows = useMemo<BookingRuleOption[]>(
-    () =>
-      [
-        intakePrompt ? { kind: "intake" as const, value: intakePrompt } : null,
-        policyText ? { kind: "policy" as const, value: policyText } : null
-      ].filter((row): row is BookingRuleOption => Boolean(row)),
-    [intakePrompt, policyText]
-  );
-  const filteredOptions = useMemo(
-    () =>
-      savedOptions.filter((option) => {
-        if (option.kind === "intake" && option.value === intakePrompt) return false;
-        if (option.kind === "policy" && option.value === policyText) return false;
-        return matchesSearch(option, searchQuery.trim());
-      }),
-    [intakePrompt, policyText, savedOptions, searchQuery]
-  );
-
-  const closeModal = () => {
-    setModalOpen(false);
-    setSearchQuery("");
-    setDraftValue("");
-  };
-
-  const openModal = () => {
-    setDraftKind(!intakePrompt ? "intake" : !policyText ? "policy" : "intake");
-    setModalOpen(true);
-  };
-
-  const applyOption = (kind: BookingRuleKind, value: string) => {
-    const nextValue = value.trim();
-    if (!nextValue) return;
-
-    if (kind === "intake") {
-      setIntakePrompt(nextValue);
-    } else {
-      setPolicyText(nextValue);
-    }
-
-    closeModal();
-  };
-
-  const removeRule = (kind: BookingRuleKind) => {
-    if (kind === "intake") {
-      setIntakePrompt("");
-      return;
-    }
-
-    setPolicyText("");
-    setRequirePolicy(false);
-  };
-
-  const saveDraft = () => applyOption(draftKind, draftValue);
-  const searchId = `${idPrefix}-booking-rule-search`;
-  const draftId = `${idPrefix}-booking-rule-draft`;
-
-  return (
-    <div className="service-booking-rules">
-      <input name="intakePrompt" type="hidden" value={intakePrompt} />
-      <input name="policyText" type="hidden" value={policyText} />
-
-      <div className="booking-rules-toolbar">
-        <Button onClick={openModal} size="sm" type="button">
-          <Plus size={15} />
-          Add rule
-        </Button>
-      </div>
-
-      <div className="catalog-table-scroll booking-rules-table-scroll">
-        <table className="catalog-product-table booking-rules-table">
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Option</th>
-              <th>Status</th>
-              <th aria-label="Actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {selectedRows.map((row) => (
-              <tr key={row.kind}>
-                <td>
-                  <div className="booking-rule-type-cell">
-                    <span className="booking-rule-icon">
-                      <RuleIcon kind={row.kind} />
-                    </span>
-                    <span>
-                      <strong>{ruleLabels[row.kind].label}</strong>
-                      <small>{ruleLabels[row.kind].description}</small>
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <span className="booking-rule-copy" title={row.value}>
-                    {row.value}
-                  </span>
-                </td>
-                <td>
-                  <span className="catalog-status">{statusLabel(row.kind, requirePolicy)}</span>
-                </td>
-                <td>
-                  <Button
-                    aria-label={`Remove ${ruleLabels[row.kind].label.toLowerCase()}`}
-                    className="booking-rule-icon-button"
-                    onClick={() => removeRule(row.kind)}
-                    size="sm"
-                    type="button"
-                    variant="ghost">
-                    <Trash2 size={15} />
-                  </Button>
-                </td>
-              </tr>
-            ))}
-
-            {!selectedRows.length ? (
-              <tr className="booking-rules-empty-row">
-                <td colSpan={4}>
-                  <div className="booking-rules-empty">No intake question or booking policy added</div>
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="studio-toggle-strip booking-rules-toggle-strip">
-        <Switch
-          checked={requirePolicy}
-          disabled={!policyText}
-          label="Require policy acceptance"
-          name="requirePolicy"
-          onChange={(event) => setRequirePolicy(event.currentTarget.checked)}
-          variant="inline"
-        />
-        <Switch
-          checked={requestOnly}
-          label="Request-only approval"
-          name="requestOnly"
-          onChange={(event) => setRequestOnly(event.currentTarget.checked)}
-          variant="inline"
-        />
-        <Switch
-          checked={waitlistEnabled}
-          label="Offer waitlist"
-          name="waitlistEnabled"
-          onChange={(event) => setWaitlistEnabled(event.currentTarget.checked)}
-          variant="inline"
-        />
-      </div>
-
-      <Modal
-        bodyClassName="booking-rule-modal-body"
-        className="booking-rule-modal"
-        closeLabel="Close booking rule dialog"
-        onClose={closeModal}
-        open={modalOpen}
-        title="Add booking rule">
-        <div className="ui-table-filter-search booking-rule-search" role="search">
-          <label className="ui-sr-only" htmlFor={searchId}>
-            Search saved options
-          </label>
-          <span className="ui-table-filter-input">
-            <Search aria-hidden="true" size={15} />
-            <input
-              autoComplete="off"
-              autoFocus
-              id={searchId}
-              onChange={(event) => setSearchQuery(event.currentTarget.value)}
-              placeholder="Search intake questions and booking policies"
-              value={searchQuery}
-            />
-          </span>
-        </div>
-
-        <div className="booking-rule-option-list">
-          {filteredOptions.map((option) => (
-            <button
-              className="booking-rule-option"
-              key={`${option.kind}-${option.value}`}
-              onClick={() => applyOption(option.kind, option.value)}
-              type="button">
-              <span className="catalog-status">{ruleLabels[option.kind].label}</span>
-              <strong>{option.value}</strong>
-            </button>
-          ))}
-          {!filteredOptions.length ? <div className="booking-rule-no-results">No matching saved options</div> : null}
-        </div>
-
-        <div className="booking-rule-create-panel">
-          <h3>Create new option</h3>
-          <div className="booking-rule-kind-toggle" role="group" aria-label="New booking rule type">
-            <button
-              aria-pressed={draftKind === "intake"}
-              className={draftKind === "intake" ? "is-active" : undefined}
-              onClick={() => setDraftKind("intake")}
-              type="button">
-              Intake question
-            </button>
-            <button
-              aria-pressed={draftKind === "policy"}
-              className={draftKind === "policy" ? "is-active" : undefined}
-              onClick={() => setDraftKind("policy")}
-              type="button">
-              Booking policy
-            </button>
-          </div>
-          <div className="ui-field">
-            <label htmlFor={draftId}>{ruleLabels[draftKind].label}</label>
-            <textarea
-              id={draftId}
-              onChange={(event) => setDraftValue(event.currentTarget.value)}
-              placeholder={draftKind === "intake" ? "Anything we should know before your appointment?" : "Please arrive 10 minutes early."}
-              value={draftValue}
-            />
-          </div>
-          <div className="module-modal-actions">
-            <Button onClick={closeModal} type="button" variant="ghost">
-              Cancel
-            </Button>
-            <Button disabled={!draftValue.trim()} onClick={saveDraft} type="button">
-              Add option
-            </Button>
-          </div>
-        </div>
-      </Modal>
+  useEffect(() => {
+    modalBody.current?.parentElement?.scrollTo(0, 0);
+    if (mode !== "library") return;
+    let active = true;
+    listBookingRuleSets().then(result => { if (active) { setSets(result); setSetsError(""); } }).catch(() => { if (active) setSetsError("Saved sets could not be loaded. Close and reopen to retry."); });
+    return () => { active = false; };
+  }, [mode]);
+  function open(mode: "library" | "save-set") { setError(""); setSearch(""); setMode(mode); }
+  function edit(rule?: BookingRule) {
+    const value: BookingRule = rule ?? { id: crypto.randomUUID(), kind: "intake", category: "General", label: "", type: "TEXT", required: false, placeholder: "", helpText: "", options: [] };
+    setDraft(value); setChoices(value.options.join("\n")); setError(""); setMode("edit");
+  }
+  function add(incoming: BookingRule[]) {
+    const parsed = bookingRulesSchema.safeParse([...rules, ...incoming.filter(rule => !alreadyAdded(rule)).map(rule => ({ ...rule, id: rule.contactField ? rule.id : crypto.randomUUID() }))]);
+    if (!parsed.success) { setError(parsed.error.issues[0].message); return; }
+    setRules(parsed.data); setMode(null); notify("Rules added to this draft. Save the session type to keep them.");
+  }
+  function saveRule() {
+    const parsed = bookingRuleSchema.safeParse({ ...draft, options: draft?.type === "TEXT" ? [] : choices.split(/\r?\n/).map(value => value.trim()).filter(Boolean) });
+    if (!parsed.success) { setError(parsed.error.issues[0].message); return; }
+    const next = bookingRulesSchema.safeParse(rules.some(rule => rule.id === parsed.data.id) ? rules.map(rule => rule.id === parsed.data.id ? parsed.data : rule) : [...rules, parsed.data]);
+    if (!next.success) { setError(next.error.issues[0].message); return; }
+    setRules(next.data); setMode(null);
+  }
+  async function saveSet() {
+    setPending(true); setError("");
+    try {
+      const result = await saveBookingRuleSet({ name: setName, rules });
+      if (result.error) { setError(result.error); return; }
+      if (result.set) { setSets(current => [...current, result.set!]); setSetName(""); setMode(null); notify("Rule set saved. Apply it from Add rule on another service."); }
+    } catch { setError("The rule set could not be saved. Your rules are still here; please try again."); }
+    finally { setPending(false); }
+  }
+  return <div className="service-booking-rules" id={`${idPrefix}-booking-rules`}>
+    <input name="bookingRules" type="hidden" value={JSON.stringify(rules)} />
+    <input name="intakePrompt" type="hidden" value={intakePrompt} /><input name="policyText" type="hidden" value={policyText} />
+    <div className="booking-rules-toolbar"><Button type="button" onClick={() => open("library")}><Plus size={15} />Add rule</Button><Button type="button" variant="secondary" disabled={!rules.length} onClick={() => open("save-set")}>Save as set</Button></div>
+    <div className="booking-rules-list" role={rules.length ? "list" : "region"} aria-label="Selected booking rules">
+      {rules.map(rule => <div className="booking-rule-row" key={rule.id} role="listitem">
+        <div className="booking-rule-type-cell"><span><strong>{rule.kind === "policy" ? "Booking Terms & Conditions" : rule.label}</strong><small>{rule.kind === "policy" ? (rule.category === "Booking Terms & Conditions" ? "Booking T&C" : rule.category) : `${rule.category} · ${typeLabels[rule.type]}`}{rule.required ? " · Required" : ""}</small></span></div>
+        <span className="booking-rule-copy">{rule.kind === "policy" ? rule.label : rule.helpText || (rule.type === "TEXT" ? rule.placeholder : rule.options.join(" · "))}</span>
+        <span className="catalog-status">{rule.kind === "policy" && requirePolicy ? "Acceptance required" : "Shown at booking"}</span>
+        <div className="booking-rule-actions"><Button type="button" variant="ghost" className="booking-rule-icon-button" aria-label={`Edit ${rule.label}`} onClick={() => edit(rule)}><Pencil size={15} /></Button><Button type="button" variant="ghost" className="booking-rule-icon-button" aria-label={`Remove ${rule.kind === "policy" ? "Booking T&C" : "intake question"}: ${rule.label}`} onClick={() => { const next = rules.filter(saved => saved.id !== rule.id); setRules(next); if (!next.some(saved => saved.kind === "policy")) setRequirePolicy(false); }}><Trash2 size={15} /></Button></div>
+      </div>)}
+      {!rules.length && <div className="booking-rules-empty">No intake question or Booking Terms & Conditions added</div>}
     </div>
-  );
+    <div className="studio-toggle-strip booking-rules-toggle-strip"><Switch checked={Boolean(requirePolicy && policyText)} disabled={!policyText} label="Require Booking T&C" name="requirePolicy" onChange={event => setRequirePolicy(event.currentTarget.checked)} variant="inline" /><Switch checked={requestOnly} label="Require Booking Approval" name="requestOnly" onChange={event => setRequestOnly(event.currentTarget.checked)} variant="inline" /><Switch checked={waitlistEnabled} label="Offer waitlist" name="waitlistEnabled" onChange={event => setWaitlistEnabled(event.currentTarget.checked)} variant="inline" /></div>
+    <Modal open={mode !== null} title={mode === "library" ? "Add booking rule" : mode === "save-set" ? "Save rule set" : "Configure booking rule"} className="booking-rule-modal" bodyClassName="booking-rule-modal-body" onClose={() => { if (!pending) setMode(null); }}>
+      <div ref={modalBody} className="booking-rule-modal-body" onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) { event.preventDefault(); if (mode === "save-set" && !pending) void saveSet(); } }}>
+      {mode === "library" && <>
+        <Field label="Search rules"><Input type="search" value={search} onChange={event => setSearch(event.target.value)} /></Field>
+        {sets.length > 0 && <section className="booking-rule-category"><h3>Saved rule sets</h3>{sets.filter(set => set.name.toLowerCase().includes(search.toLowerCase())).map(set => <div className="booking-rule-set" key={set.id}><span><strong>{set.name}</strong><small>{set.rules.length} rules</small></span><Button type="button" variant="secondary" onClick={() => add(set.rules)}>Apply {set.name}</Button></div>)}</section>}
+        {setsError && <p role="alert">{setsError}</p>}
+        {categories.map(category => {
+          const categoryRules = library.filter(rule => rule.category === category);
+          const entries = categoryRules.filter(rule => `${category} ${rule.label}`.toLowerCase().includes(search.toLowerCase()));
+          if (!entries.length) return null;
+          return <section className="booking-rule-category" key={category}><header><h3>{category}</h3><Button type="button" variant="secondary" disabled={categoryRules.every(alreadyAdded)} onClick={() => add(categoryRules)}>Add all {category === "Booking Terms & Conditions" ? "Booking T&C" : category}</Button></header><div className="booking-rule-option-list">{entries.map(rule => <Button type="button" variant="ghost" className="booking-rule-option" key={rule.id} disabled={alreadyAdded(rule)} onClick={() => add([rule])}><strong>{rule.label}</strong><span>{rule.kind === "policy" ? "Booking Terms & Conditions" : typeLabels[rule.type]}{alreadyAdded(rule) ? " · Added" : ""}</span></Button>)}</div></section>;
+        })}
+        <div className="module-modal-actions"><Button type="button" variant="ghost" onClick={() => setMode(null)}>Cancel</Button><Button type="button" onClick={() => edit()}>Create rule</Button></div>
+      </>}
+      {mode === "edit" && draft && <>
+        <Field label="Rule kind"><Select value={draft.kind} onChange={event => setDraft({ ...draft, kind: event.target.value as BookingRule["kind"], type: "TEXT", contactField: undefined })}><option value="intake">Intake question</option><option value="policy">Booking Terms &amp; Conditions</option></Select></Field>
+        <Field label="Category"><Input value={draft.category} maxLength={80} onChange={event => setDraft({ ...draft, category: event.target.value })} /></Field>
+        <Field label={draft.kind === "policy" ? "Booking Terms & Conditions" : "Question"}>{draft.kind === "policy" ? <Textarea value={draft.label} maxLength={2000} onChange={event => setDraft({ ...draft, label: event.target.value })} /> : <Input value={draft.label} maxLength={2000} onChange={event => setDraft({ ...draft, label: event.target.value })} />}</Field>
+        {draft.kind === "intake" && <>
+          <Field label="Answer type"><Select disabled={Boolean(draft.contactField)} value={draft.type} onChange={event => setDraft({ ...draft, type: event.target.value as BookingRule["type"] })}>{Object.entries(typeLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</Select></Field>
+          {draft.contactField && <p className="ui-field-hint">Uses the existing booking contact field, without asking the client twice.</p>}
+          {draft.type !== "TEXT" ? <Field label="Choices" hint="One choice per line; at least two different choices."><Textarea value={choices} onChange={event => setChoices(event.target.value)} /></Field> : <Field label="Placeholder"><Input value={draft.placeholder} maxLength={200} onChange={event => setDraft({ ...draft, placeholder: event.target.value })} /></Field>}
+          <Field label="Help text"><Input value={draft.helpText} maxLength={500} onChange={event => setDraft({ ...draft, helpText: event.target.value })} /></Field>
+          <Switch label="Required answer" disabled={draft.contactField === "customerName" || draft.contactField === "customerEmail"} checked={draft.contactField === "customerName" || draft.contactField === "customerEmail" || draft.required} onChange={event => setDraft({ ...draft, required: event.target.checked })} />
+        </>}
+        <div className="module-modal-actions"><Button type="button" variant="ghost" onClick={() => setMode(null)}>Cancel</Button><Button type="button" onClick={saveRule}>Apply rule</Button></div>
+      </>}
+      {mode === "save-set" && <><p>Save these {rules.length} rules for reuse on other services. Applying a set adds copies to that service’s draft.</p><Field label="Set name"><Input value={setName} maxLength={100} disabled={pending} onChange={event => setSetName(event.target.value)} /></Field><div className="module-modal-actions"><Button type="button" variant="ghost" disabled={pending} onClick={() => setMode(null)}>Cancel</Button><Button type="button" disabled={pending} onClick={saveSet}>{pending ? "Saving…" : "Save set"}</Button></div></>}
+      {error && <p role="alert">{error}</p>}
+      </div>
+    </Modal>
+  </div>;
 }

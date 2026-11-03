@@ -15,9 +15,10 @@ import { useNotify } from "@/components/ui/notifications";
 
 type IncludedItem = SessionOffering["coverageItems"][number];
 
-export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onClose, inline = false, rates, onRateSaved }: {
+export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onClose, inline = false, rates, onRateSaved, optional = false }: {
   rates: HourlyRate[]; onRateSaved: (rate: HourlyRate) => void;
   inline?: boolean;
+  optional?: boolean;
   selectedItems: IncludedItem[];
   editingItem?: IncludedItem;
   onChoose: (items: ServiceLibraryItem[]) => void;
@@ -37,7 +38,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
-  const remaining = 100 - selectedItems.length;
+  const remaining = (optional ? 50 : 100) - selectedItems.length;
 
   useEffect(() => {
     document.getElementById(`${id}-${view === "library" ? "search" : "name"}`)?.focus();

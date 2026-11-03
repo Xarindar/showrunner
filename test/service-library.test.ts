@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
+import ts from "typescript";
 import { PGlite } from "@electric-sql/pglite";
 import { resolveIncludedServices, serviceLibraryInputSchema } from "../lib/scheduling/service-library";
 import { sessionOfferingDraft, sessionOfferingFormSchema, sessionOfferingSchema, selectSessionPackage } from "../lib/scheduling/session-offering";
@@ -29,6 +31,42 @@ test("library resolution preserves package references and uses authoritative ser
   assert.deepEqual(snapshot?.includedItems, [{ name: item.name, description: item.description, pricingType: "FLAT_RATE", priceCents: null, hourlyRateId: null }]);
   linked.coverageItems[0].description = "Changed after booking";
   assert.equal(snapshot?.includedItems?.[0].description, item.description);
+});
+
+test("optional services use catalog names without adding to tier prices and preserve existing extras", () => {
+  const selected = { ...offering, addOns: [{ id: "optional", libraryItemId: item.id, name: "Forged name", priceCents: 1 }, { id: "legacy", name: "Existing extra", priceCents: 2500 }] };
+  const resolved = resolveIncludedServices(selected, [{ ...item, priceCents: 10000 }]);
+  assert.deepEqual(resolved.addOns, [{ id: "optional", libraryItemId: item.id, name: item.name, priceCents: 0 }, selected.addOns[1]]);
+  const roundTrip = sessionOfferingFormSchema.parse(JSON.stringify(sessionOfferingDraft(resolved, 60, null)));
+  assert.deepEqual(roundTrip.addOns, resolved.addOns);
+  assert.equal(selectSessionPackage(roundTrip, "standard", ["optional"])?.priceCents, 10000);
+  assert.equal(selectSessionPackage(selected, "standard", ["optional"])?.priceCents, 10000, "Stored service reference prices cannot change the package total");
+  assert.equal(selectSessionPackage(roundTrip, "standard", ["legacy"])?.priceCents, 12500);
+  assert.equal(resolveIncludedServices(selected, [{ ...item, priceCents: 0 }]).addOns[0].priceCents, 0);
+  assert.throws(() => resolveIncludedServices(selected, []), /optional service.*no longer available/);
+  for (const saved of [{ ...item, priceCents: null }, { ...item, pricingType: "HOURLY" as const }]) assert.equal(resolveIncludedServices(selected, [saved]).addOns[0].priceCents, 0);
+  assert.throws(() => resolveIncludedServices({ ...selected, addOns: [selected.addOns[0], { ...selected.addOns[0], id: "duplicate", name: "Another name" }] }, [{ ...item, priceCents: 10000 }]), /different names|only once/);
+});
+
+test("optional-only offerings hydrate library references within the current site", async () => {
+  const exports: Record<string, (offering: unknown, siteId: string) => Promise<unknown>> = {};
+  let queries = 0;
+  runInNewContext(ts.transpileModule(readFileSync("lib/scheduling/service-library-store.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports, require: (id: string) => {
+    if (id === "server-only") return {};
+    if (id === "./service-library") return { resolveIncludedServices };
+    if (id === "@/lib/prisma") return { prisma: { serviceLibraryItem: { findMany: async ({ where }: { where: { siteId: string; OR: Array<{ id?: { in: string[] } }> } }) => {
+      queries++;
+      assert.equal(where.siteId, "site-a");
+      assert.deepEqual(Array.from(where.OR[0].id!.in), [item.id]);
+      return [{ ...item, priceCents: 5000 }];
+    } } } };
+    throw new Error(`Unexpected import ${id}`);
+  } });
+  const selected = { ...offering, coverageItems: [], tiers: offering.tiers.map(tier => ({ ...tier, coverageIds: [] })), addOns: [{ id: "extra", libraryItemId: item.id, name: "Forged", priceCents: 1 }] };
+  const resolved = await exports.hydrateSessionServiceLibrary(selected, "site-a") as typeof selected;
+  assert.equal(queries, 1);
+  assert.equal(resolved.addOns[0].priceCents, 0);
+  assert.equal(resolved.addOns[0].name, item.name);
 });
 
 test("library migration imports legacy names by site without changing session JSON or selections", async () => {

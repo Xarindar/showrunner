@@ -14,8 +14,10 @@ import packageStyles from "./session-packages-editor.module.css";
 import { SessionDraftGuard, revealInvalidSessionField } from "./session-draft-guard";
 import { ServiceMediaFields } from "./service-media-fields";
 import type { HourlyRate } from "@/lib/scheduling/pricing";
+import { ServiceBookingRulesTable } from "./service-booking-rules-table";
+import type { BookingRule } from "@/lib/scheduling/booking-rules";
 
-export function SessionTypeForm({ businessHours, timezone, canUpload, schedulingRules, rates, tags }: { businessHours: string[]; timezone: string; canUpload: boolean; schedulingRules: ReactNode; rates: HourlyRate[]; tags: string[] }) {
+export function SessionTypeForm({ businessHours, timezone, canUpload, schedulingRules, rates, tags, availableRules, intakeOptions, policyOptions }: { businessHours: string[]; timezone: string; canUpload: boolean; schedulingRules: ReactNode; rates: HourlyRate[]; tags: string[]; availableRules?: BookingRule[]; intakeOptions?: string[]; policyOptions?: string[] }) {
   const [state, action, pending] = useActionState(createServiceAction, { error: "" });
   const [values, setValues] = useState({ name: "", description: "", bufferBeforeMinutes: "0", bufferAfterMinutes: "15", minimumNoticeHours: "12", maxAdvanceDays: "60", slotIntervalMinutes: "30" });
   const [active, setActive] = useState(false);
@@ -32,6 +34,7 @@ export function SessionTypeForm({ businessHours, timezone, canUpload, scheduling
       </fieldset>
       </section>
       <SessionPackagesEditor initialRates={rates} requirePrice />
+      <section className="studio-panel"><details><summary>Intake and Booking Terms &amp; Conditions</summary><ServiceBookingRulesTable idPrefix="new-session" availableRules={availableRules} intakeOptions={intakeOptions} policyOptions={policyOptions} /></details></section>
       </div>
       <aside className="product-studio-sidecar">
       <section className="studio-panel"><h2>Organization</h2><ServiceTagsField tags={tags} /></section>

@@ -74,6 +74,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
     nextPage,
     pageCount,
     previousPage,
+    resizePage,
     startIndex
   } = useCatalogTablePagination(filteredPackages.length);
   const pagedPackages = filteredPackages.slice(startIndex, endIndex);
@@ -89,7 +90,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
   };
 
   return (
-    <div className="service-catalog-folder-panel" aria-labelledby="packages-board-title">
+    <div data-viewport-table className="service-catalog-folder-panel" aria-labelledby="packages-board-title">
       <div className="catalog-board-header">
         <div>
           <h2 id="packages-board-title">Service bundles</h2>
@@ -252,6 +253,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
         </table>
       </div>
       <Pagination
+        onPageSizeChange={resizePage}
         className="catalog-table-pagination"
         label="Service bundle catalog pages"
         onNext={nextPage}

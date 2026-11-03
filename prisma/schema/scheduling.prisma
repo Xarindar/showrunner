@@ -120,6 +120,7 @@ model Service {
   maxAdvanceDays      Int       @default(60)
   slotIntervalMinutes Int       @default(30)
   intakePrompt        String?
+  bookingRules        Json?
   policyText          String?
   requirePolicy       Boolean   @default(false)
   requestOnly         Boolean   @default(false)

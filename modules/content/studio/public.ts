@@ -16,6 +16,8 @@ import { contentLinkOptions } from "./field-layout";
 import { catalogMediaUrl } from "@/lib/catalog-media-url";
 import { showcaseCatalog } from "./showcase-catalog";
 import { resolveShowcase, type ShowcaseRow } from "./showcase";
+import { listPublicSchedulingCatalog } from "@/lib/embed/public-scheduling";
+import { resolveServiceCategories, type CategoryRow } from "./service-categories";
 
 import { desktopPayload, resolveMobilePayload } from "./mobile-overrides";
 
@@ -25,6 +27,8 @@ export async function getPublicStudio(siteId: string, pageId: string) {
   if (!manifest.pages.some(page => page.id === pageId)) throw new EmbedRequestError("Unknown content page", 404);
   const catalog = manifest.blocks.some(block => block.type === "showcase") ? await showcaseCatalog(siteId, settings.enabledModuleIds) : [];
   const state = readStudio(settings.publicContentConfig);
+  const categoryChoices = manifest.blocks.some(block => block.source === "categories") && settings.enabledModuleIds.includes("scheduling")
+    ? (await listPublicSchedulingCatalog(siteId)).categories.map(category => ({ id: category.id, label: category.name, description: category.description || "", imageUrl: category.imageUrl || "" })) : [];
   const business = resolveBusinessInfo(settings, manifest.blocks.find(block => block.type === "business")?.defaults);
   const blocks = await Promise.all(manifest.blocks.filter(block => block.type !== "business" && blockDependenciesAvailable(block, settings.enabledModuleIds)).map(async block => {
     const stored = state.blocks[block.id];
@@ -34,6 +38,7 @@ export async function getPublicStudio(siteId: string, pageId: string) {
     const original = resolveStudioPayload(block, stored);
     async function renderPayload(payload: Record<string, unknown>, mobile = false) {
       payload = desktopPayload(payload);
+      if (block.source === "categories") payload = { ...payload, items: resolveServiceCategories(payload.items as CategoryRow[], categoryChoices) };
       const visibleBusiness = mobile ? resolveMobilePayload(business) : business;
       if (block.type === "showcase") payload = { ...payload, items: resolveShowcase(payload.items as ShowcaseRow[], catalog, manifest).map(item => ({ ...item, imageUrl: publicMediaUrl(catalogMediaUrl(item.imageUrl, manifest.previewUrl)) })) };
       if (block.type === "about") payload = { ...payload, copyHtml: renderContentRichText(String(payload.copy || "")) };

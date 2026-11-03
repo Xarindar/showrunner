@@ -1,4 +1,5 @@
 import { sessionPrice } from "@/lib/scheduling/session-input";
+import { bookingRulesFormSchema } from "@/lib/scheduling/booking-rules";
 import { sessionOfferingFormSchema } from "@/lib/scheduling/session-offering";
 import { pricingTypeSchema } from "@/lib/scheduling/pricing";
 import "server-only";
@@ -118,6 +119,7 @@ export const serviceFormSchema = z
     maxAdvanceDays: z.coerce.number().int().min(1).max(3650),
     slotIntervalMinutes: z.coerce.number().int().min(1).max(24 * 60),
     intakePrompt: optionalStoredText,
+    bookingRules: bookingRulesFormSchema.optional(),
     policyText: optionalStoredText,
     requirePolicy: z.literal("on").optional(),
     requestOnly: z.literal("on").optional(),
@@ -126,12 +128,13 @@ export const serviceFormSchema = z
   })
   .transform((value) => ({
     ...value,
+    ...(value.bookingRules ? { intakePrompt: value.bookingRules.filter(rule => rule.kind === "intake" && !rule.contactField).map(rule => rule.label).join("\n"), policyText: value.bookingRules.filter(rule => rule.kind === "policy").map(rule => rule.label).join("\n\n") } : {}),
     ...(value.sessionOffering ? {
       durationMinutes: value.sessionOffering.tiers[0].durationMinutes,
       price: value.sessionOffering.tiers[0].priceCents ?? "" as const
     } : {}),
     tags: csvList(value.tags),
-    requirePolicy: Boolean(value.requirePolicy && value.policyText.trim()),
+    requirePolicy: Boolean(value.requirePolicy && (value.bookingRules ? value.bookingRules.some(rule => rule.kind === "policy") : value.policyText.trim())),
     requestOnly: value.requestOnly === "on",
     waitlistEnabled: value.waitlistEnabled === "on",
     isActive: value.isActive === "on"

@@ -183,6 +183,8 @@ test("actual inspector renderer offers catalog selection, display-only and appro
 test("showcase publication requires content-manage authorization before reading tenant data", async () => {
   let reads = 0;
   const loaded = loadMocked("modules/content/studio/actions.ts", {
+    "./service-categories": {},
+    "@/lib/embed/public-scheduling": {},
     "next/cache": {}, "@/lib/auth": { requireAdmin: async (permission: string) => { assert.equal(permission, "content:manage"); throw new Error("Forbidden"); } },
     "@/lib/audit": {}, "@/lib/media": {}, "@/lib/prisma": { prisma: {} },
     "@/lib/site": { resolveCurrentSite: async () => { reads++; return { id: "site-a" }; } },
@@ -197,6 +199,8 @@ test("public studio refreshes catalog bindings on each request without page repu
   let catalog = [service, product];
   const block = configuredBlock("menu", "showcase", ["home"], { defaults: { heading: "Menu", items: rows } });
   const loaded = loadMocked("modules/content/studio/public.ts", {
+    "./service-categories": {},
+    "@/lib/embed/public-scheduling": {},
     "server-only": {}, "@/lib/env": { publicAppBaseUrl: () => "https://admin.example" }, "@/lib/media": {},
     "@/lib/site": { getSiteSettingsForSite: async () => ({ siteId: "site-a", publicContentConfig: {}, enabledModuleIds: ["content", "scheduling", "products"] }) },
     "@/lib/prisma": { prisma: {} }, "@/clients/content-editor-manifests": { getEditorManifest: async () => ({ ...manifest, blocks: [block] }) },

@@ -635,7 +635,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         <Switch defaultChecked={client.photoUsageRelease} label="Photo release" name="photoUsageRelease" variant="inline" />
       </EqualGrid>
       <EqualGrid min="220px">
-        <Switch label="Record policy acceptance" name="policyAccepted" variant="inline" />
+        <Switch label="Record Booking T&C acceptance" name="policyAccepted" variant="inline" />
         <Switch defaultChecked={Boolean(client.dataExportRequestedAt)} label="Data export requested" name="dataExportRequested" variant="inline" />
         <Switch defaultChecked={Boolean(client.dataDeletionRequestedAt)} label="Deletion requested" name="dataDeletionRequested" variant="inline" />
       </EqualGrid>
@@ -720,7 +720,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         </div>
         <div className="ui-field">
           <label htmlFor="client-document-category">Category</label>
-          <input id="client-document-category" name="category" placeholder="contract, release, gallery" />
+          <input id="client-document-category" name="category" placeholder="Booking T&C, release, gallery" />
         </div>
       </EqualGrid>
       <UploadField

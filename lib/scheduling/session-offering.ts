@@ -23,7 +23,7 @@ const tier = z.object({
   hourlyRateId: itemId.nullable().optional(),
   coverageIds: z.array(itemId).max(100)
 });
-const addOn = z.object({ id: itemId, name: itemName, priceCents: z.number().int().min(0).max(999999999) });
+const addOn = z.object({ id: itemId, name: itemName, libraryItemId: itemId.optional(), priceCents: z.number().int().min(0).max(999999999) });
 
 export const sessionOfferingSchema = z.object({
   coverageItems: z.array(coverageItem).max(100),
@@ -36,8 +36,10 @@ export const sessionOfferingSchema = z.object({
     }
   }
   const ids = new Set(value.coverageItems.map(item => item.id));
-  const linkedIds = value.coverageItems.flatMap(item => item.libraryItemId ? [item.libraryItemId] : []);
-  if (new Set(linkedIds).size !== linkedIds.length) ctx.addIssue({ code: "custom", message: "Add each library service only once." });
+  for (const items of [value.coverageItems, value.addOns]) {
+    const linkedIds = items.flatMap(item => item.libraryItemId ? [item.libraryItemId] : []);
+    if (new Set(linkedIds).size !== linkedIds.length) ctx.addIssue({ code: "custom", message: "Add each library service only once." });
+  }
   for (const tier of value.tiers) {
     if (new Set(tier.coverageIds).size !== tier.coverageIds.length || tier.coverageIds.some(id => !ids.has(id))) {
       ctx.addIssue({ code: "custom", message: "Choose included items from this session type." });
@@ -116,7 +118,7 @@ export function selectSessionPackage(value: unknown, tierId?: string, addOnIds: 
   }
   const tier = offering.tiers.find(item => item.id === tierId);
   if (!tier) throw new Error("Choose a package from this session type.");
-  const extras = offering.addOns.filter(item => addOnIds.includes(item.id));
+  const extras = offering.addOns.filter(item => addOnIds.includes(item.id)).map(item => item.libraryItemId ? { ...item, priceCents: 0 } : item);
   const included = offering.coverageItems.filter(item => tier.coverageIds.includes(item.id));
   if (extras.length !== addOnIds.length) throw new Error("Choose available extras from this session type.");
   return {

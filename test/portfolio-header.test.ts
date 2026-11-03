@@ -5,12 +5,14 @@ import ts from "typescript";
 import { test } from "node:test";
 
 test("header selects matching orientation and scopes candidates to public published tenant photos", async () => {
-  type Query = { where: { asset: { siteId: string; isPrivate: boolean; deletedAt: null; portfolioItems: { some: { gallery: { siteId: string; status: string; visibility: string; clientId: null } } } } } };
+  type Query = { where: { asset: { siteId: string; isPrivate: boolean; deletedAt: null; portfolioItems: { some: { gallery: { siteId: string; status: string; visibility: string; clientId: null; slug?: string } } } } } };
   const captured = {} as { query: Query };
   let candidates = [{assetId:"landscape",width:1920,height:1280},{assetId:"portrait",width:1280,height:1920},{assetId:"square",width:1000,height:1000}];
   const exports = {} as { getPortfolioHeader: typeof import("../lib/embed/portfolio-header").getPortfolioHeader };
   const output = ts.transpileModule(readFileSync("lib/embed/portfolio-header.ts", "utf8"), {compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
-  runInNewContext(output, {exports, encodeURIComponent, Math, require:(name:string)=> name === "server-only" ? {} : {prisma:{mediaAssetVariant:{findMany:async(q:Query)=>{captured.query=q;return candidates;}}}}});
+  let random = 0;
+  const math = Object.create(Math); math.random = () => random;
+  runInNewContext(output, {exports, encodeURIComponent, Math: math, require:(name:string)=> name === "server-only" ? {} : {prisma:{mediaAssetVariant:{findMany:async(q:Query)=>{captured.query=q;return candidates;}}}}});
   const desktop = await exports.getPortfolioHeader("site-a", "desktop");
   assert(desktop);
   assert.match(desktop.imageUrl, /landscape\?variant=HERO$/);
@@ -24,6 +26,17 @@ test("header selects matching orientation and scopes candidates to public publis
   assert.equal(captured.query.where.asset.portfolioItems.some.gallery.status,"PUBLISHED");
   assert.equal(captured.query.where.asset.portfolioItems.some.gallery.visibility,"PUBLIC");
   assert.equal(captured.query.where.asset.portfolioItems.some.gallery.clientId,null);
+  assert.equal(captured.query.where.asset.portfolioItems.some.gallery.slug,undefined);
+  await exports.getPortfolioHeader("site-a", "desktop", "weddings");
+  assert.equal(captured.query.where.asset.portfolioItems.some.gallery.slug,"weddings");
+  assert.equal(captured.query.where.asset.portfolioItems.some.gallery.siteId,"site-a");
+  candidates.push({assetId:"second-landscape",width:2048,height:1365});
+  random = 0.999;
+  assert.match((await exports.getPortfolioHeader("site-a", "desktop", "weddings"))!.imageUrl, /second-landscape/);
+  random = 0;
+  assert.match((await exports.getPortfolioHeader("site-a", "desktop", "weddings"))!.imageUrl, /\/landscape\?/);
+  candidates = [{assetId:"portrait-only",width:1000,height:1500}];
+  assert.equal(await exports.getPortfolioHeader("site-a","desktop","weddings"),null);
   candidates=[];
   assert.equal(await exports.getPortfolioHeader("site-a","desktop"),null);
 });

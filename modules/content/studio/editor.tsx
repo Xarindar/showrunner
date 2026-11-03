@@ -37,7 +37,7 @@ export function Fields({ headerId, canUpload = false, fixedRows = false, assetBa
       return <div key={key} className={styles.contentList}>
         {key !== "slides" && <h3>{field.label}</h3>}
         {rows.map((row, index) => <details key={String(row.id)} className={styles.contentGroup} open onFocusCapture={() => { if (key === "slides") window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: row.id } })); }} onClick={() => { if (key === "slides") window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: row.id } })); }}>
-          <summary>{key === "slides" ? `Header ${index + 1}` : String(row.name || row.title || row.author || row.question || `${field.label === "Images" ? "Image" : "Item"} ${index + 1}`)}</summary>
+          <summary>{key === "slides" ? `Header ${index + 1}` : String(row.name || row.title || row.author || row.question || choices.find(choice => choice.id === row.categoryId)?.label || `${field.label === "Images" ? "Image" : "Item"} ${index + 1}`)}</summary>
           <div className={styles.groupFields}><Fields headerId={headerId} canUpload={canUpload} assetBaseUrl={assetBaseUrl} linkOptions={linkOptions} fields={field.fields!} value={row} prefix={`${id}-${row.id}`} choices={choices} onChange={next => update(rows.map((current, i) => i === index ? next : current))} />
           {!fixedRows && <Button variant="secondary" className={styles.removeItem} type="button" disabled={rows.length <= minimum} onClick={() => update(rows.filter((_, i) => i !== index))}>Remove {key === "slides" ? "header" : field.label === "Team member" ? "team member" : "item"}</Button>}</div>
         </details>)}
@@ -45,6 +45,7 @@ export function Fields({ headerId, canUpload = false, fixedRows = false, assetBa
       </div>;
     }
     if (field.options) return <label key={key} htmlFor={id}>{field.label}<select id={id} value={String(value[key] || (key === "buttonAlignment" ? "right" : ""))} onChange={event => update(event.target.value)}>{key !== "buttonAlignment" && <option value="">Site default</option>}{field.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+    if (key === "categoryId") return <label key={key} htmlFor={id}>Category<select id={id} value={String(value[key] || "")} onChange={event => update(event.target.value)}><option value="">Choose a category</option>{choices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}{value[key] && !choices.some(choice => choice.id === value[key]) ? <option value={String(value[key])}>Unavailable category · Choose replacement</option> : null}</select></label>;
     if (key === "catalogKey" || key === "referenceId") return <div className={styles.field} key={key}><span>{key === "catalogKey" ? "Service or product" : "Service"}</span><ServicePicker title={key === "catalogKey" ? "Pick service or product" : "Pick service"} value={String(value[key] || "")} options={choices.map(choice => ({ ...choice, imageUrl: choice.imageUrl || choice.catalog?.imageUrl, imageFraming: choice.imageFraming || choice.catalog?.imageFraming }))} onChange={update} /></div>;
     const media = key === "imageUrl" || (key === "url" && "alt" in fields);
     const servicePhoto = media && ("referenceId" in fields || "catalogKey" in fields);

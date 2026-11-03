@@ -160,6 +160,7 @@ test("public services retain the booking photo and expose named crops without pu
   const mocks: Record<string, unknown> = {
     "server-only": {},
     "@/lib/scheduling/pricing": { servicePriceCents },
+    "@/lib/scheduling/booking-rules": bookingRules,
     "@/modules/content/studio/image-framing": { readImageFraming },
     "@/lib/env": { publicAppBaseUrl: () => "https://example.test" },
     "@/lib/media": { mediaAssetDisplayUrl: (asset: { url: string }) => asset.url }
@@ -179,3 +180,4 @@ test("public services retain the booking photo and expose named crops without pu
   service.rectangularMediaAsset.isPrivate = true;
   assert.equal(exports.serializePublicService!(service).media.rectangular, null);
 });
+import * as bookingRules from "../lib/scheduling/booking-rules";

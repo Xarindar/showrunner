@@ -1,4 +1,5 @@
 "use client";
+import { resolveServiceCategories, type CategoryRow } from "./service-categories";
 
 import { resolveFeatured } from "./featured";
 
@@ -191,6 +192,7 @@ function Workspace({ manifest, entries, linkChoices, onFrameRatios, mobile, setM
     const blocks = pageEntries.map(entry => {
       let payload = content.find(item => item.props.id === entry.block.id)?.props.payload || entry.payload;
       if (mobile) payload = resolveMobilePayload(payload);
+      if (entry.block.source === "categories") payload = { ...payload, items: resolveServiceCategories(payload.items as CategoryRow[], entry.choices) };
       payload = { ...payload, ...(payload.imageUrl ? { imageUrl: mediaUrl(payload.imageUrl) } : {}), ...(Array.isArray(payload.slides) ? { slides: payload.slides.map((slide: Record<string, string>) => ({ ...slide, imageUrl: mediaUrl(slide.imageUrl) })) } : {}), ...(Array.isArray(payload.images) ? { images: payload.images.map((image: Record<string, string>) => ({ ...image, url: mediaUrl(image.url) })) } : {}) };
       if (entry.block.type === "showcase") payload = { ...payload, items: resolveShowcase(payload.items as ShowcaseRow[], entry.choices.flatMap(choice => choice.catalog ? [choice.catalog] : []), manifest).map(item => ({ ...item, imageUrl: mediaUrl(item.imageUrl) })) };
       if (entry.block.source === "services") payload = { ...payload, items: (payload.items as Record<string, string>[]).map(row => {

@@ -546,7 +546,8 @@
     els.confirmSummary.innerHTML = summaryMarkup(service, slot);
     els.submitBooking.textContent = service.requestOnly ? "Send request" : "Confirm booking";
 
-    if (service.intakePrompt) {
+    window.ShowrunnerBookingRules.render(els.form, service.bookingRules, service.id);
+    if (service.intakePrompt && !Array.isArray(service.bookingRules)) {
       els.intakeField.hidden = false;
       els.intakeLabel.textContent = service.intakePrompt;
     } else {
@@ -664,6 +665,7 @@
       customerPhone: String(formData.get("customerPhone") || "").trim(),
       notes: String(formData.get("notes") || "").trim(),
       intakeResponse: String(formData.get("intakeResponse") || "").trim(),
+      intakeAnswers: window.ShowrunnerBookingRules.answers(els.form),
       policyAccepted: formData.get("policyAccepted") === "on",
       companyWebsite: String(formData.get("companyWebsite") || "")
     };
@@ -848,6 +850,7 @@
         maxAdvanceDays: service.maxAdvanceDays,
         slotIntervalMinutes: service.slotIntervalMinutes,
         intakePrompt: service.intakePrompt || "",
+        bookingRules: Array.isArray(service.bookingRules) ? service.bookingRules : null,
         policyText: service.policyText || "",
         requirePolicy: Boolean(service.requirePolicy),
         requestOnly: Boolean(service.requestOnly),

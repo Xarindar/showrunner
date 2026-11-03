@@ -22,7 +22,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     return { ...offering, tiers: offering.tiers.map(tier => ({ ...tier, pricingType: tier.pricingType ?? initialPricingType, hourlyRateId: tier.pricingType ? tier.hourlyRateId : initialHourlyRateId })) };
   });
   const [expandedTiers, setExpandedTiers] = useState(() => new Set<string>());
-  const [libraryPicker, setLibraryPicker] = useState<{ editingItem?: SessionOffering["coverageItems"][number] } | null>(null);
+  const [libraryPicker, setLibraryPicker] = useState<{ editingItem?: SessionOffering["coverageItems"][number]; optional?: boolean } | null>(null);
   const [inlineService, setInlineService] = useState<SessionOffering["coverageItems"][number] | null>(null);
   const [expandedService, setExpandedService] = useState<string | null>(null);
   const [removal, setRemoval] = useState<{ kind: "service" | "package" | "extra"; id: string; name: string } | null>(null);
@@ -46,7 +46,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     setInlineService(null);
     setExpandedService(null);
     requestAnimationFrame(() => {
-      document.getElementById(`${listId}-included-title`)?.focus();
+      document.getElementById(`${listId}-${libraryPicker?.optional ? "optional-title" : "included-title"}`)?.focus();
     });
   }
 
@@ -66,6 +66,12 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
   }
 
   function chooseLibraryItems(items: ServiceLibraryItem[], candidate = inlineService?.id || libraryPicker?.editingItem?.id || null) {
+    if (libraryPicker?.optional) {
+      setDraft(current => ({ ...current, addOns: [...current.addOns, ...items.filter(item => !current.addOns.some(row => row.libraryItemId === item.id || row.name.toLowerCase() === item.name.toLowerCase())).map(item => ({ id: crypto.randomUUID(), libraryItemId: item.id, name: item.name, price: "0.00" }))].slice(0, 50) }));
+      closeLibrary();
+      notify("Optional services added to this draft.");
+      return;
+    }
     const editingId = draft.coverageItems.some(item => item.id === candidate) ? candidate : undefined;
     setDraft(current => {
       const included = items.map(({ id, ...item }) => ({ ...item, id: editingId || crypto.randomUUID(), libraryItemId: id }));
@@ -92,15 +98,14 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
           {expandedService === item.id ? <>
             <ServiceLibraryPicker inline rates={rates} onRateSaved={onRateSaved} selectedItems={draft.coverageItems} editingItem={item} onChoose={chooseLibraryItems} onClose={closeLibrary} />
             <Button type="button" variant="danger" size="sm" onClick={() => setRemoval({ kind: "service", id: item.id, name: item.name })}>Remove from session</Button>
-          </> : <button type="button" className={styles.optionSummary} onClick={() => { setExpandedService(item.id); setInlineService(item); }}>
-            <strong>{item.name}</strong><span className={styles.chips}>{draft.tiers.filter(tier => tier.coverageIds.includes(item.id)).map(tier => <span className="ui-badge" key={tier.id}>{tier.name}</span>)}</span>
+          </> : <button type="button" className={`${styles.optionSummary} ${styles.serviceSummary}`} onClick={() => { setExpandedService(item.id); setInlineService(item); }}>
+            <strong title={item.name}>{item.name}</strong>
             {item.pricingType && <small>{item.pricingType === "HOURLY" ? `${rates.find(rate => rate.id === item.hourlyRateId)?.name || "Hourly rate"} · Hourly` : item.priceCents == null ? "Flat rate" : `$${(item.priceCents / 100).toFixed(2)} · Flat rate`}</small>}
-            {item.description && <span className={styles.hint}>{item.description}</span>}
+            <span className={styles.chips}>{draft.tiers.filter(tier => tier.coverageIds.includes(item.id)).map(tier => <span className="ui-badge" key={tier.id}>{tier.name}</span>)}</span>
           </button>}
         </div>)}
       </div>
       <div><Button type="button" variant="ghost" disabled={draft.coverageItems.length >= 100} onClick={() => { setInlineService(null); setExpandedService(null); setLibraryPicker({}); }}>+ Add item</Button></div>
-      {libraryPicker && <ServiceLibraryPicker rates={rates} onRateSaved={onRateSaved} selectedItems={draft.coverageItems} editingItem={libraryPicker.editingItem} onChoose={chooseLibraryItems} onClose={closeLibrary} />}
     </section>
     <section className="studio-panel" aria-labelledby={`${listId}-packages-title`}>
     <div className={styles.heading}><h2 id={`${listId}-packages-title`}>Packages</h2></div>
@@ -134,16 +139,17 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     </div>
     <Button type="button" variant="ghost" disabled={draft.tiers.length >= 10} onClick={() => addTier()}><Plus size={16} />Add package</Button>
     <details className={styles.extras} open={draft.addOns.length > 0 || undefined}>
-      <summary>Optional extras{draft.addOns.length ? ` (${draft.addOns.length})` : ""}</summary>
-      <p className={styles.hint}>Extras add to the package price. Adjust the duration when booking if an extra needs more time.</p>
+      <summary id={`${listId}-optional-title`}>Optional extras{draft.addOns.length ? ` (${draft.addOns.length})` : ""}</summary>
+      <p className={styles.hint}>Choose optional services from your library. The package tier sets the price.</p>
       {draft.addOns.map((item, index) => <div className={styles.extraRow} key={item.id}>
-        <label>Extra name<input aria-label={`Extra ${index + 1} name`} value={item.name} required maxLength={120} onChange={event => setDraft({ ...draft, addOns: draft.addOns.map(row => row.id === item.id ? { ...row, name: event.target.value } : row) })} /></label>
-        <label>Price (USD)<input aria-label={`Extra ${index + 1} price (USD)`} type="number" min="0" max="9999999.99" step="0.01" required value={item.price} onChange={event => setDraft({ ...draft, addOns: draft.addOns.map(row => row.id === item.id ? { ...row, price: event.target.value } : row) })} /></label>
+        <strong>{item.name || `Extra ${index + 1}`}</strong>
+        <span>{item.libraryItemId ? "No extra charge" : Number(item.price).toLocaleString("en-US", { style: "currency", currency: "USD" })}</span>
         <Button type="button" variant="ghost" aria-label={`Remove extra ${item.name || index + 1}`} onClick={() => setRemoval({ kind: "extra", id: item.id, name: item.name || `Extra ${index + 1}` })}><X size={16} /></Button>
       </div>)}
-      <Button type="button" variant="secondary" size="sm" disabled={draft.addOns.length >= 50} onClick={() => setDraft({ ...draft, addOns: [...draft.addOns, { id: crypto.randomUUID(), name: "", price: "" }] })}><Plus size={16} />Add optional extra</Button>
+      <Button type="button" variant="secondary" size="sm" disabled={draft.addOns.length >= 50} onClick={() => { setInlineService(null); setExpandedService(null); setLibraryPicker({ optional: true }); }}><Plus size={16} />Add optional service</Button>
     </details>
     </section>
+    {libraryPicker && <ServiceLibraryPicker optional={libraryPicker.optional} rates={rates} onRateSaved={onRateSaved} selectedItems={libraryPicker.optional ? draft.addOns : draft.coverageItems} editingItem={libraryPicker.editingItem} onChoose={chooseLibraryItems} onClose={closeLibrary} />}
     {removal && <Modal open title={`Remove "${removal.name}"?`} onClose={() => setRemoval(null)}>
       <p>{removal.kind === "service" ? `This removes the service from this session and its package selections. It stays in your library.` : removal.kind === "package" ? "This removes the package and its selections. Your included services stay in this session and the library." : "This removes the optional extra from this session."}</p>
       <div className="module-modal-actions"><Button type="button" variant="secondary" autoFocus onClick={() => setRemoval(null)}>Cancel</Button><Button type="button" variant="danger" onClick={() => {

@@ -42,6 +42,7 @@ export function formatMoney(cents: number, currency = "USD") {
 }
 
 export function enumLabel(value: string) {
+  if (value === "CONTRACT") return "Booking Terms & Conditions";
   return value.toLowerCase().split("_").join(" ");
 }
 

@@ -21,6 +21,7 @@ await build({
     import {Badge} from './components/ui/badge';
     import {Modal} from './components/ui/modal';
     import {Switch} from './components/ui/switch';
+    import {Tooltip} from './components/ui/tooltip';
     import {NotificationProvider} from './components/ui/notifications';
     import {AvailabilityPanel} from './modules/scheduling/components/availability-panel';
     import {BlockoutsPanel} from './modules/scheduling/components/blockouts-panel';
@@ -54,7 +55,7 @@ await build({
           <div className="ui-cluster ui-gap-2"><Badge>Neutral</Badge><Badge tone="success">Active</Badge><Badge tone="warning">Warning</Badge><Badge tone="danger">Error</Badge></div>
           <Switch label="Published" defaultChecked />
           <ImageFramingControl source="/slow-photo.svg" ratio={1} value={{}} onChange={value=>window.appliedCrop=value} />
-          <ServiceBookingRulesTable idPrefix="fixture" intakeOptions={["What should we prepare?"]} policyOptions={[]} />
+          <section aria-label="Booking rules fixture" style={{maxWidth:560,width:'100%'}}><ServiceBookingRulesTable idPrefix="fixture" intakeOptions={["What should we prepare?"]} policyOptions={['Please review these booking conditions. '+ 'Policy details for clients. '.repeat(20)]} /></section>
         </Card></div>
         <HeaderFrameRatios.Provider value={{portrait: 9/16}}><section aria-label="Image inspector" className={studioStyles.fields} style={{width:240}}><Fields fields={{url:{kind:'text',label:'Image'},alt:{kind:'text',label:'Alt'}}} prefix="portrait" value={photo} onChange={setPhoto} /></section></HeaderFrameRatios.Provider>
         <section aria-label="Responsive inspector" className={studioStyles.fields} style={{width:240}}>
@@ -63,7 +64,10 @@ await build({
         </section>
         <section aria-label="Button settings fixture" className={studioStyles.fields} style={{width:240}}><Fields fields={{buttonLabel:{kind:'text',label:'Title'},buttonHref:{kind:'url',label:'Link'}}} prefix="button" value={{buttonLabel:'Book The Hive',buttonHref:'/booking'}} onChange={()=>{}} linkOptions={{pages:[{path:'/booking',label:'Booking'}],services:[]}} /></section>
         <section aria-label="Plain fields fixture" style={{width:240,display:'grid',gap:16}}><label>Plain name<input /></label><label>Plain notes<textarea /></label><label><input type="checkbox" />Keep checked</label></section>
+        <section aria-label="Tooltip fixture" style={{padding:40}}><Tooltip content="Edit session type" focusable={false}><Button variant="secondary">Tooltip target</Button></Tooltip></section>
+        <section aria-label="Booking rules copy fixture" style={{maxWidth:560}}><ServiceBookingRulesTable idPrefix="copy" /></section>
         <section aria-label="Session services fixture"><form onSubmit={event=>event.preventDefault()}><label>Session draft name<input defaultValue="Unsaved session" /></label><SessionPackagesEditor /></form></section>
+        <section aria-label="Compact included services" style={{maxWidth:600}}><SessionPackagesEditor initialOffering={{coverageItems:Array.from({length:24},(_,index)=>({id:'compact-'+index,name:index===0?'Douglas':index===1?'A very long included service name that should stay within its row':'Service '+(index+1),description:'Full service details remain available when editing.',pricingType:'FLAT_RATE',priceCents:20000})),tiers:[{id:'compact-standard',name:'Standard',durationMinutes:60,priceCents:null,coverageIds:[]}],addOns:[]}} /></section>
         <section aria-label="Schedule fixture" className={scheduleStyles.page}>
           <h1>Schedule</h1>
           <AvailabilityPanel availability={[]} staff={[{id:'staff-1',name:'Staff member',isActive:true}]} resources={[]} timezone="America/Chicago" />
@@ -79,6 +83,8 @@ await build({
   ` },
   bundle: true, outfile: `${output}.js`,
   plugins: [{ name: "schedule-actions-fixture", setup(build) {
+    build.onResolve({filter:/^\.\.\/booking-rule-actions$/},()=>({path:'booking-rule-actions',namespace:'rule-actions-fixture'}));
+    build.onLoad({filter:/.*/,namespace:'rule-actions-fixture'},()=>({contents:`const sets=[]; export async function listBookingRuleSets(){return structuredClone(sets)} export async function saveBookingRuleSet(input){if(input.name==='Fail')return {error:'Set save failed. Try again.'}; const set={...structuredClone(input),id:'saved-set'};sets.push(set);return {set}}`,loader:'js'}));
     build.onResolve({filter:/^\.\.\/(service-library-actions|rate-actions)$/},args=>({path:args.path,namespace:'service-actions-fixture'}));
     build.onLoad({filter:/.*/,namespace:'service-actions-fixture'},args=>({contents:args.path.endsWith('rate-actions')?'export async function saveHourlyRateAction() {}':`export async function saveServiceLibraryItemAction(form) { if(form.name==='Fail once') return {error:'Please retry the service save.'}; return {item:{...form,id:'saved-service',tags:[],priceCents:null,hourlyRateId:null}}; }`,loader:'js'}));
     build.onResolve({ filter: /asset-picker$/ }, args => args.importer.endsWith("editor.tsx") ? {path:"asset-picker",namespace:"image-fixture"} : undefined);
@@ -99,10 +105,35 @@ try {
   await page.route("**/*", route => route.fulfill(route.request().url().endsWith("photo.svg")
     ? { contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#789"/></svg>' }
     : { contentType: "text/html", body: `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="root"></div><script>${js}</script></body></html>` }));
-  await page.route('**/api/scheduling/service-library?*',route=>route.fulfill({json:{items:[],categories:[],tags:[],total:0,page:1,pageCount:1}}));
+  await page.route('**/api/scheduling/service-library?*',route=>route.fulfill({json:{items:[{id:'flat-extra',name:'Album service',description:'Printed album',category:'',tags:[],pricingType:'FLAT_RATE',priceCents:5000,hourlyRateId:null},{id:'free-extra',name:'Free service',description:'No charge',category:'',tags:[],pricingType:'FLAT_RATE',priceCents:0,hourlyRateId:null},{id:'unpriced-extra',name:'Unpriced service',description:'',category:'',tags:[],pricingType:'FLAT_RATE',priceCents:null,hourlyRateId:null},{id:'hourly-extra',name:'Hourly service',description:'',category:'',tags:[],pricingType:'HOURLY',priceCents:null,hourlyRateId:'rate'}],categories:[],tags:[],total:4,page:1,pageCount:1}}));
   await page.goto("https://design.example");
   await page.getByRole("heading", { name: "Shared controls" }).waitFor();
+  async function checkTooltipContrast(view) {
+    await page.getByRole('button',{name:'Tooltip target',exact:true}).focus();
+    const tooltip=page.getByRole('tooltip',{name:'Edit session type',exact:true});
+    await tooltip.waitFor();
+    await page.waitForFunction(()=>[...document.querySelectorAll('[role="tooltip"]')].some(element=>element.textContent.trim()==='Edit session type'&&getComputedStyle(element).opacity==='1'));
+    const colors=await tooltip.evaluate(element=>{const style=getComputedStyle(element);return {text:style.color,background:style.backgroundColor,arrow:getComputedStyle(element,'::after').backgroundColor};});
+    const luminance=color=>color.match(/\d+/g).slice(0,3).map(value=>{const channel=Number(value)/255;return channel<=0.04045?channel/12.92:((channel+0.055)/1.055)**2.4;}).reduce((total,value,index)=>total+value*[0.2126,0.7152,0.0722][index],0);
+    const values=[luminance(colors.text),luminance(colors.background)];
+    assert((Math.max(...values)+0.05)/(Math.min(...values)+0.05)>=4.5,'Shared tooltips must have readable text contrast');
+    assert.equal(colors.arrow,colors.background,'Tooltip arrows match the readable surface');
+    await tooltip.screenshot({path:`${captures}/tooltip-${view}.png`});
+  }
+  await checkTooltipContrast('desktop');
   const input = page.getByPlaceholder("Name", { exact: true });
+  const bookingRules=page.getByRole('region',{name:'Booking rules fixture'});
+  async function checkBookingRulesOverflow() {
+    assert.equal(await bookingRules.evaluate(element=>element.scrollWidth>element.clientWidth),false,'Booking rules fit the panel width');
+    assert.equal(await bookingRules.locator('.booking-rules-list').evaluate(element=>element.scrollWidth>element.clientWidth),false,'Rules never need horizontal scrolling');
+    for(const remove of await bookingRules.getByRole('button',{name:/^Remove /}).all()) {
+      const bounds=await remove.boundingBox();
+      const panel=await bookingRules.boundingBox();
+      assert(bounds.x>=panel.x&&bounds.x+bounds.width<=panel.x+panel.width+1,'Remove controls stay within the panel');
+    }
+  }
+  await checkBookingRulesOverflow();
+  await bookingRules.screenshot({path:`${captures}/booking-rules-empty-desktop.png`});
   const geometry = () => input.evaluate(element => { const style = getComputedStyle(element); return [style.borderRadius, style.minHeight, style.fontSize, style.backgroundColor, style.fontFamily]; });
   const baseline = await geometry();
   assert.match(baseline[4], /sans-serif/, "Admin font must have a working fallback without Next font injection");
@@ -217,8 +248,10 @@ try {
   assert.equal(await responsive.getByLabel('Heading',{exact:true}).inputValue(),'Desktop heading');
   assert.equal(await responsive.locator('img').getAttribute('src'),'/photo.svg');
   await page.setViewportSize({ width: 390, height: 844 });
+  await checkTooltipContrast('mobile');
   assert.deepEqual((await geometry()).slice(0, 3), ["12px", "44px", "16px"]);
   await checkFieldAlignment(44);
+  await checkBookingRulesOverflow();
   await checkLabelSpacing();
   await buttonSettings.screenshot({path: `${captures}/button-spacing-mobile.png`});
   assert.equal(await page.getByRole("button", { name: "Save", exact: true }).evaluate(element => getComputedStyle(element).minHeight), "44px");
@@ -227,10 +260,24 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.getByRole("region", { name: "Schedule fixture" }).screenshot({ path: `${captures}/schedule-mobile.png` });
   await page.screenshot({ path: `${captures}/controls-mobile.png` });
-  await page.getByRole("button", { name: "Add rule", exact: true }).click();
+  await bookingRules.getByRole("button", { name: "Add rule", exact: true }).click();
   await page.getByRole("button", { name: /What should we prepare/ }).click();
-  assert.equal(await page.locator('input[name="intakePrompt"]').inputValue(), "What should we prepare?");
+  assert.equal(await bookingRules.locator('input[name="intakePrompt"]').inputValue(), "What should we prepare?");
   assert.equal(await page.locator(".booking-rule-type-cell").evaluate(element => getComputedStyle(element).display), "grid");
+  await bookingRules.getByRole('button',{name:'Add rule',exact:true}).click();
+  await page.getByRole('button',{name:/Please review these booking conditions/}).click();
+  assert.equal(await bookingRules.getByRole('listitem').count(),2);
+  assert.equal(await bookingRules.getByText('Booking Terms & Conditions',{exact:true}).count(),1);
+  await checkBookingRulesOverflow();
+  await bookingRules.screenshot({path:`${captures}/booking-rules-mobile.png`});
+  await page.setViewportSize({width:1440,height:1000});
+  await checkBookingRulesOverflow();
+  await bookingRules.screenshot({path:`${captures}/booking-rules-desktop.png`});
+  await bookingRules.getByRole('switch',{name:'Require Booking T&C',exact:true}).check();
+  await bookingRules.getByRole('button',{name:/^Remove Booking T&C:/}).click();
+  assert.equal(await bookingRules.locator('input[name="policyText"]').inputValue(),'');
+  assert.equal(await bookingRules.getByRole('switch',{name:'Require Booking T&C',exact:true}).isDisabled(),true);
+  await page.setViewportSize({width:390,height:844});
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.getByRole("button", { name: "Adjust framing", exact: true }).first().click();
   await frame.waitFor();
@@ -238,6 +285,49 @@ try {
   await cropDialog.screenshot({ path: `${captures}/crop-mobile.png` });
   await page.keyboard.press("Escape");
   const sessionServices = page.getByRole('region',{name:'Session services fixture'});
+  await bookingRules.getByRole('button',{name:'Add rule',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Search rules',exact:true}).fill('Email');
+  await page.getByRole('button',{name:'Add all Contact',exact:true}).click();
+  assert.equal(await bookingRules.getByRole('listitem').count(),4);
+  await bookingRules.getByRole('button',{name:'Add rule',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'Add all Contact',exact:true}).isDisabled(),true);
+  await page.getByRole('button',{name:'Create rule',exact:true}).click();
+  const ruleEditor=page.getByRole('dialog',{name:'Configure booking rule',exact:true});
+  await ruleEditor.getByRole('textbox',{name:'Category',exact:true}).fill('Session preferences');
+  await ruleEditor.getByRole('textbox',{name:'Question',exact:true}).fill('Preferred style');
+  await ruleEditor.getByRole('combobox',{name:'Answer type',exact:true}).selectOption('RADIO');
+  await ruleEditor.getByRole('textbox',{name:/^Choices/}).fill('Candid');
+  await ruleEditor.getByRole('button',{name:'Apply rule',exact:true}).click();
+  await ruleEditor.getByText('Add at least two different choices.',{exact:true}).waitFor();
+  await ruleEditor.getByRole('textbox',{name:/^Choices/}).fill('Candid\nPosed');
+  await ruleEditor.screenshot({path:`${captures}/booking-rule-configure-mobile.png`});
+  await ruleEditor.getByRole('switch',{name:'Required answer',exact:true}).check();
+  await ruleEditor.getByRole('button',{name:'Apply rule',exact:true}).click();
+  assert.equal(JSON.parse(await bookingRules.locator('input[name="bookingRules"]').inputValue()).at(-1).type,'RADIO');
+  await bookingRules.getByRole('button',{name:'Edit Preferred style',exact:true}).click();
+  await ruleEditor.getByRole('combobox',{name:'Answer type',exact:true}).selectOption('SELECT');
+  await ruleEditor.getByRole('button',{name:'Apply rule',exact:true}).click();
+  await bookingRules.getByRole('button',{name:'Save as set',exact:true}).click();
+  const saveRules=page.getByRole('dialog',{name:'Save rule set',exact:true});
+  await saveRules.getByRole('textbox',{name:'Set name',exact:true}).fill('Fail');
+  await saveRules.getByRole('button',{name:'Save set',exact:true}).click();
+  await saveRules.getByText('Set save failed. Try again.',{exact:true}).waitFor();
+  await saveRules.getByRole('textbox',{name:'Set name',exact:true}).fill('Contact and session');
+  await saveRules.getByRole('button',{name:'Save set',exact:true}).click();
+  await saveRules.waitFor({state:'hidden'});
+  const sourceRules=await bookingRules.locator('input[name="bookingRules"]').inputValue();
+  const copyRules=page.getByRole('region',{name:'Booking rules copy fixture',exact:true});
+  await copyRules.getByRole('button',{name:'Add rule',exact:true}).click();
+  await page.getByRole('button',{name:'Apply Contact and session',exact:true}).click();
+  const copied=JSON.parse(await copyRules.locator('input[name="bookingRules"]').inputValue());
+  assert.equal(copied.length,5);
+  assert.equal(copied.at(-1).type,'SELECT');
+  await copyRules.getByRole('button',{name:'Edit Preferred style',exact:true}).click();
+  await ruleEditor.getByRole('textbox',{name:'Question',exact:true}).fill('Copy-only question');
+  await ruleEditor.getByRole('button',{name:'Apply rule',exact:true}).click();
+  assert.equal(await bookingRules.locator('input[name="bookingRules"]').inputValue(),sourceRules,'Applying a set creates independent service drafts');
+  await checkBookingRulesOverflow();
+  await bookingRules.screenshot({path:`${captures}/configured-rules-mobile.png`});
   async function checkModalInsets(modal) {
     const layout = await modal.evaluate(element=>{
       const bounds=element.getBoundingClientRect();
@@ -252,6 +342,17 @@ try {
   for (const width of [1440,390]) {
     await page.setViewportSize({width,height:844});
     const draftBefore = await sessionServices.locator('input[name="sessionOffering"]').inputValue();
+    const compactServices=page.getByRole('region',{name:'Compact included services'});
+    const rows=compactServices.locator('button').filter({has:page.locator('strong')});
+    assert.equal(await rows.count(),24);
+    const rowGeometry=await rows.evaluateAll(elements=>elements.map(element=>{const rect=element.getBoundingClientRect();return {height:rect.height,scroll:element.scrollWidth,width:element.clientWidth};}));
+    assert(rowGeometry.every(row=>row.height<=(width===390?48:40)),'Dozens of services stay in compact rows');
+    assert(rowGeometry.every(row=>row.scroll<=row.width),'Long names stay within their row');
+    await compactServices.screenshot({path:`${captures}/compact-services-${width}.png`});
+    await rows.first().click();
+    assert.equal(await compactServices.getByRole('textbox',{name:'Service name',exact:true}).inputValue(),'Douglas');
+    assert.equal(await compactServices.getByRole('textbox',{name:/^Description/}).inputValue(),'Full service details remain available when editing.');
+    await compactServices.getByRole('button',{name:'Cancel',exact:true}).click();
     await sessionServices.getByRole('button',{name:'+ Add item',exact:true}).click();
     const serviceLibrary=page.getByRole('dialog',{name:'Service library',exact:true});
     await serviceLibrary.waitFor();
@@ -268,12 +369,33 @@ try {
     await newService.getByRole('button',{name:'Create and add',exact:true}).click();
     await page.getByText('Please retry the service save.',{exact:true}).waitFor();
     assert.equal(await newService.getByRole('textbox',{name:'Service name',exact:true}).inputValue(),'Fail once');
+    await newService.getByRole('combobox',{name:'Pricing type',exact:true}).selectOption('HOURLY');
+    assert.equal(await newService.getByRole('button',{name:'Add rate',exact:true}).evaluate(element=>getComputedStyle(element).backgroundColor),await page.getByRole('button',{name:'Save',exact:true}).evaluate(element=>getComputedStyle(element).backgroundColor),'Add rate uses the shared primary button');
     await checkModalInsets(newService);
     await newService.screenshot({path:`${captures}/new-service-${width}.png`});
     await newService.getByRole('button',{name:'Cancel',exact:true}).click();
     assert.equal(await newService.count(),0);
     assert.equal(await sessionServices.locator('input[name="sessionOffering"]').inputValue(),draftBefore,'Cancel preserves the session offering');
     assert.equal(await sessionServices.getByLabel('Session draft name').inputValue(),'Unsaved session');
+    const extras=sessionServices.locator('details').filter({has:page.locator('summary').filter({hasText:/^Optional extras/})});
+    if(!await extras.evaluate(element=>element.open)) await extras.locator('summary').click();
+    const extrasBefore=await sessionServices.locator('input[name="sessionOffering"]').inputValue();
+    await extras.getByRole('button',{name:'Add optional service',exact:true}).click();
+    const optionalLibrary=page.getByRole('dialog',{name:'Service library',exact:true});
+    await optionalLibrary.getByRole('checkbox',{name:'Select Album service',exact:true}).waitFor();
+    assert.equal(await optionalLibrary.getByRole('checkbox',{name:'Select Hourly service',exact:true}).isDisabled(),false);
+    assert.equal(await optionalLibrary.getByRole('checkbox',{name:'Select Unpriced service',exact:true}).isDisabled(),false);
+    await optionalLibrary.getByRole('button',{name:'Cancel',exact:true}).click();
+    assert.equal(await sessionServices.locator('input[name="sessionOffering"]').inputValue(),extrasBefore);
+    await extras.getByRole('button',{name:'Add optional service',exact:true}).click();
+    const extraName=width===1440?'Album service':'Hourly service';
+    await optionalLibrary.getByRole('checkbox',{name:`Select ${extraName}`,exact:true}).check();
+    await optionalLibrary.getByRole('button',{name:'Add 1 service',exact:true}).click();
+    await optionalLibrary.waitFor({state:'detached'});
+    const optionalOffering=JSON.parse(await sessionServices.locator('input[name="sessionOffering"]').inputValue());
+    assert(optionalOffering.addOns.some(item=>item.libraryItemId===(width===1440?'flat-extra':'hourly-extra')&&item.price==='0.00'));
+    assert.equal(await extras.getByRole('textbox').count(),0,'Optional services are selected rather than typed');
+    await extras.screenshot({path:`${captures}/optional-services-${width}.png`});
   }
   await sessionServices.getByRole('button',{name:'+ Add item',exact:true}).click();
   await page.getByRole('dialog',{name:'Service library',exact:true}).getByRole('button',{name:'New service',exact:true}).click();

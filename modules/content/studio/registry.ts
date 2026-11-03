@@ -15,6 +15,7 @@ const hours = list("Business hours", { day: text("Weekday (Monday–Sunday)"), o
 const checkbox = (label: string): Field => ({ label, kind: "checkbox" });
 
 export const blockRegistry = {
+  serviceCategories: { label: "Service categories", fields: { heading: text("Heading"), items: list("Category", { categoryId: text("Category") }, 100) } },
   showcase: { label: "Service / product showcase", fields: { heading: text("Heading"), items: list("Cards", { catalogKey: text("Service or product"), ...framing, imageUrl: { ...url("Image"), optional: true }, displayOnly: checkbox("Display only (hide action)"), variant: text("Card style") }, 30) } },
   slideshow: { label: "Header carousel", fields: { slides: list("Header", { ...framing, imageUrl: url("Image"), imageAlt: text("Alternative text"), title: text("Title"), caption: copy("Caption"), buttonLabel: text("Title"), buttonHref: url("Link to"), buttonAlignment: { label: "Alignment", kind: "text", options: [{ label: "Left", value: "left" }, { label: "Center", value: "center" }, { label: "Right", value: "right" }] } }, 12) } },
   strip: { label: "Page section", fields: { texts: list("Text", { text: copy("Text") }, 100), images: list("Images", image, 30), links: list("Links", link, 30) } },

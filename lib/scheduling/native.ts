@@ -1,4 +1,5 @@
 import { formatTime } from "@/lib/format";
+import { readBookingRules, validateBookingRuleAnswers } from "@/lib/scheduling/booking-rules";
 import "server-only";
 import { servicePriceCents } from "@/lib/scheduling/pricing";
 
@@ -425,8 +426,9 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     }
 
     if (service.requirePolicy && service.policyText?.trim() && !input.policyAccepted) {
-      throw new Error("Please accept the appointment policy before booking.");
+      throw new Error("Please agree to the Booking Terms & Conditions before booking.");
     }
+    const intakeResponse = service.bookingRules == null ? input.intakeResponse : validateBookingRuleAnswers(readBookingRules(service.bookingRules), input.intakeAnswers, input);
 
     const offeredSlots = await nativeSchedulingAdapter.getAvailableSlots(input.serviceId, input.startsAt, {
       siteId,
@@ -516,7 +518,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
               customerEmail: input.customerEmail.toLowerCase(),
               customerPhone: input.customerPhone,
               notes: input.notes,
-              intakeResponse: input.intakeResponse,
+              intakeResponse,
               policyAccepted: Boolean(input.policyAccepted),
               status: input.status || (service.requestOnly ? BookingStatus.PENDING : BookingStatus.CONFIRMED),
               resources: requiredResourceIds.length

@@ -14,6 +14,8 @@ import { blockDependenciesAvailable } from "./manifest";
 
 import { resolveMobilePayload } from "./mobile-overrides";
 import { showcaseCatalog } from "./showcase-catalog";
+import { listPublicSchedulingCatalog } from "@/lib/embed/public-scheduling";
+import { validateServiceCategories, type CategoryRow } from "./service-categories";
 
 export async function saveStudioBlock(raw: unknown): Promise<{ error?: string; revision?: number }> {
   const user = await requireAdmin("content:manage");
@@ -38,6 +40,10 @@ export async function saveStudioBlock(raw: unknown): Promise<{ error?: string; r
       const { payload, pageIds } = validateBlockUpdate(block, baseline, input);
       for (const candidate of [payload, ...(Array.isArray(payload.mobileOverrides) && payload.mobileOverrides.length ? [resolveMobilePayload(payload)] : [])]) {
         if (block.type === "business") validateBusinessInfo(candidate);
+        if (block.source === "categories") {
+          const { categories } = await listPublicSchedulingCatalog(site.id);
+          validateServiceCategories(candidate.items as CategoryRow[], categories.map(category => ({ id: category.id, label: category.name })));
+        }
         if (block.type === "contact") {
           const locations = resolveBusinessInfo(current).locations as { id: string }[];
           if (candidate.locationId && !locations.some(location => location.id === candidate.locationId)) throw new Error("Unknown location");

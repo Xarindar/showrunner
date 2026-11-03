@@ -1,3 +1,4 @@
+import { tablePageSize } from "@/lib/admin-table-pagination";
 import { Notification } from "@/components/ui/notifications";
 import Link from "next/link";
 import { TestimonialStatus } from "@prisma/client";
@@ -12,11 +13,10 @@ import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
 
-const pageSize = 25;
 const statusFilters = ["all", ...Object.values(TestimonialStatus).map((status) => status.toLowerCase())] as const;
 
 type TestimonialsPageProps = {
-  searchParams: Promise<{saved?: string;error?: string;page?: string;status?: string;}>;
+  searchParams: Promise<{saved?: string;error?: string;page?: string; pageSize?: string;status?: string;}>;
 };
 
 function normalizeStatusFilter(value?: string) {
@@ -32,6 +32,7 @@ function statusClass(status: TestimonialStatus) {
 export default async function TestimonialsPage({ searchParams }: TestimonialsPageProps) {
   const user = await requireAdmin("testimonials:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
+  const pageSize = tablePageSize(params.pageSize);
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
   const statusExtra = statusFilter === "all" ? {} : { status: statusFilter.toUpperCase() as TestimonialStatus };
@@ -161,7 +162,7 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
         </Card>
       </EqualGrid>
 
-      <Card as="section">
+      <Card data-viewport-table as="section">
           <div className="page-header compact-header">
             <div>
               <h2 className="section-title">Moderation queue</h2>
@@ -296,6 +297,7 @@ export default async function TestimonialsPage({ searchParams }: TestimonialsPag
             </tbody>
           </Table>
           <Pagination
+            pageSize={pageSize}
             label="Testimonial pages"
             nextHref={`/admin/modules/testimonials?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
             page={page}

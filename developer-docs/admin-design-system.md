@@ -18,6 +18,8 @@ The shared modal shell enforces its 16px inset even when a module supplies a dia
 
 Workspaces with a shared module or product studio header have no top padding on `.admin-main`. The opaque sticky header starts at the workspace edge so scrolling content cannot show through a gap above it. Side and bottom page insets remain unchanged.
 
+End-of-page resource lists use viewport-sized pagination. Mark the list boundary with `data-viewport-table`; shared `Pagination` measures visible rows and reserves space for filters, headings, pagination and any list footer. Client lists supply `onPageSizeChange`; server lists parse `pageSize` with `tablePageSize` and pass it to `Pagination`. Mobile card rows use `data-viewport-row`. Capacity updates on window and layout changes, keeps the current first record in view, and is bounded to 1–100 rows. Sparse and empty lists never add filler records. Embedded tables and independently scrolling dialogs keep their existing pagination.
+
 1. Reuse a component from `components/ui/` before writing a control or panel.
 2. Use the semantic tokens in `app/admin/design-tokens.css` for appearance.
 3. Put task-specific layout beside its module, preferably in a CSS Module.

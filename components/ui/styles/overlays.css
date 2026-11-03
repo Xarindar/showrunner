@@ -192,12 +192,12 @@
 }
 .showrunner-admin .ui-tooltip { align-items: center; display: inline-flex; position: relative; }
 .showrunner-admin .ui-tooltip-content {
-  background: var(--sd-color-surface-subtle);
-  border: 1px solid var(--sd-color-surface-overlay);
+  background: var(--sd-color-text);
+  border: 1px solid var(--sd-color-text);
   border-radius: var(--radius-control);
   bottom: calc(100% + 8px);
   box-shadow: var(--shadow-panel);
-  color: var(--sd-color-on-primary);
+  color: var(--sd-color-surface);
   font-size: var(--type-caption);
   font-weight: var(--sd-type-weight-medium);
   left: 50%;
@@ -217,7 +217,7 @@
   z-index: 20;
 }
 .showrunner-admin .ui-tooltip-content::after {
-  background: var(--sd-color-surface-subtle);
+  background: var(--sd-color-text);
   bottom: -4px;
   content: "";
   height: 8px;
