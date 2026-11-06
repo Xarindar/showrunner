@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Pencil, Plus, Search, Settings, Smartphone, Trash2 } from "lucide-react";
-import { Button, DashboardCardFrame, EmptyState, Modal } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { DashboardCardFrame } from "@/components/ui/dashboard-card";
+import { EmptyState } from "@/components/ui/states";
+import { Modal } from "@/components/ui/modal";
 import { moduleIcons } from "@/shell/module-icons";
 import {
   dashboardCardGridRowHeight,

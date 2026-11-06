@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Gift, PackagePlus, Plus } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { cx } from "@/components/ui/utils";
 

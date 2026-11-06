@@ -12,7 +12,10 @@ import { configRecord, readStudio, resolveStudioPayload, saveRequestSchema, vali
 import { businessInfoExtensions, resolveBusinessInfo, validateBusinessInfo } from "./business-info";
 import { blockDependenciesAvailable } from "./manifest";
 
+import { resolveMobilePayload } from "./mobile-overrides";
 import { showcaseCatalog } from "./showcase-catalog";
+import { listPublicSchedulingCatalog } from "@/lib/embed/public-scheduling";
+import { validateServiceCategories, type CategoryRow } from "./service-categories";
 
 export async function saveStudioBlock(raw: unknown): Promise<{ error?: string; revision?: number }> {
   const user = await requireAdmin("content:manage");
@@ -35,20 +38,26 @@ export async function saveStudioBlock(raw: unknown): Promise<{ error?: string; r
         ? { schemaVersion: 1 as const, revision: stored?.revision || 0, payload: resolveBusinessInfo(current, block.defaults), pageIds: [], updatedAt: stored?.updatedAt || "", updatedBy: stored?.updatedBy || "" }
         : stored ? { ...stored, payload: resolveStudioPayload(block, stored) } : (block.defaults ? { schemaVersion: 1 as const, revision: 0, payload: block.defaults, pageIds: block.pageIds, updatedAt: "", updatedBy: "" } : undefined);
       const { payload, pageIds } = validateBlockUpdate(block, baseline, input);
-      if (block.type === "business") validateBusinessInfo(payload);
-      if (block.type === "contact") {
-        const locations = resolveBusinessInfo(current).locations as { id: string }[];
-        if (payload.locationId && !locations.some(location => location.id === payload.locationId)) throw new Error("Unknown location");
-      }
-      if (block.type === "showcase") {
-        const catalog = await showcaseCatalog(site.id, settings.enabledModuleIds, tx);
-        if ((payload.items as { catalogKey: string }[]).some(row => !catalog.some(item => item.key === row.catalogKey))) throw new Error("A selected catalog item is unavailable for this site");
-      }
-      if (block.source === "services") {
-        const ids = (payload.items as { referenceId: string }[]).map(item => item.referenceId);
-        if (new Set(ids).size !== ids.length) throw new Error("Select each item only once");
-        const count = await tx.service.count({ where: { siteId: site.id, isActive: true, id: { in: ids }, ...(block.sourceCategory ? { category: { equals: block.sourceCategory, mode: "insensitive" } } : {}) } });
-        if (count !== ids.length) throw new Error("A selected service is unavailable for this site");
+      for (const candidate of [payload, ...(Array.isArray(payload.mobileOverrides) && payload.mobileOverrides.length ? [resolveMobilePayload(payload)] : [])]) {
+        if (block.type === "business") validateBusinessInfo(candidate);
+        if (block.source === "categories") {
+          const { categories } = await listPublicSchedulingCatalog(site.id);
+          validateServiceCategories(candidate.items as CategoryRow[], categories.map(category => ({ id: category.id, label: category.name })));
+        }
+        if (block.type === "contact") {
+          const locations = resolveBusinessInfo(current).locations as { id: string }[];
+          if (candidate.locationId && !locations.some(location => location.id === candidate.locationId)) throw new Error("Unknown location");
+        }
+        if (block.type === "showcase") {
+          const catalog = await showcaseCatalog(site.id, settings.enabledModuleIds, tx);
+          if ((candidate.items as { catalogKey: string }[]).some(row => !catalog.some(item => item.key === row.catalogKey))) throw new Error("A selected catalog item is unavailable for this site");
+        }
+        if (block.source === "services") {
+          const ids = (candidate.items as { referenceId: string }[]).map(item => item.referenceId);
+          if (new Set(ids).size !== ids.length) throw new Error("Select each item only once");
+          const count = await tx.service.count({ where: { siteId: site.id, isActive: true, id: { in: ids }, ...(block.sourceCategory ? { category: { equals: block.sourceCategory, mode: "insensitive" } } : {}) } });
+          if (count !== ids.length) throw new Error("A selected service is unavailable for this site");
+        }
       }
       const nextRevision = (stored?.revision || 0) + 1;
       studio.blocks[block.id] = { schemaVersion: 1, revision: nextRevision, payload: block.type === "business" ? businessInfoExtensions(payload) : payload, pageIds, updatedAt: new Date().toISOString(), updatedBy: user.id };

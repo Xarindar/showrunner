@@ -1,5 +1,5 @@
 import { BookingReminderStatus, BookingStatus, EmailCategory, Prisma } from "@prisma/client";
-import { formatDateTime } from "@/lib/format";
+import { formatTime, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { queueEmail } from "@/lib/email/queue";
 import { getSiteSettingsForSite } from "@/lib/site";
@@ -32,10 +32,7 @@ export type BookingReminderSweepResult = {
 };
 
 function endTime(value: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en", {
-    timeStyle: "short",
-    timeZone
-  }).format(value);
+  return formatTime(value, timeZone);
 }
 
 function appointmentTime(booking: ReminderBooking, timeZone: string) {

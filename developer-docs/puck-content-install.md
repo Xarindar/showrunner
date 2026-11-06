@@ -33,3 +33,24 @@ Featured/showcase rows store `imageSource` (`service` or `custom`) and `useServi
 Configure optional `booking.profileLabels` alongside `profilesByCategory` to give the service picker business names without changing booking routing. Service tags power its tag filter. The Cottage event panel may select services from either business.
 
 Service Media preserves `imageUrl`, `mediaAssetId` and `imageFraming` as the square booking photo. The additive `20261021120000_service_media` migration adds a rectangular asset and framing plus gallery asset references. `/api/public/v1/services` retains its existing image fields and adds `media.square` and `media.rectangular`, each with a URL, aspect ratio and framing. Gallery assets are stored for later use and are not automatically published. Apply migrations before starting the upgraded server.
+
+## Mobile overrides
+
+Studio payloads may include `mobileOverrides`, a sparse list of `{ path, value }` changes. List paths use stable row IDs rather than indices. Photo changes retain source and crop together. Desktop updates retain overrides; removing an override restores inheritance. Structural list edits override that list, subject to the same fixed-row, ordering, and size constraints. Save validation checks both resolved variants, including catalog/service ownership and revision conflicts. No database migration is required.
+
+The public API returns the desktop `payload` and an optional fully resolved `mobilePayload` per block. Business metadata similarly includes optional `mobileBusiness`; integrations that render it outside the bridge must select it at the same breakpoint. The shared bridge selects mobile content at `(max-width: 720px)` and reapplies content when that breakpoint changes. Custom renderers continue consuming `showrunner:render`; they receive the selected payload. Update the client bridge and its script cache version with the editor rollout. The editor's mobile preview explicitly resolves mobile overrides before sending drafts; physical phones open in mobile editing mode. Original payloads without overrides keep their existing behavior.
+
+## Service category lists
+
+Use a `serviceCategories` block with `source: "categories"` for an approved
+category section. Its payload contains `heading` and `items` rows with stable
+`id` and catalog `categoryId` (the public category slug). The Content inspector
+adds/removes selections using the site's active booking catalog. Names, photos
+and descriptions stay in the catalog; public content and drafts resolve those
+same fields through `resolveServiceCategories`. Missing catalog entries are
+omitted publicly, duplicate/foreign references cannot be published, and an empty
+selection is intentional. The public website renders the resolved list and uses
+`booking.path?category=SLUG`; its booking adapter must support that parameter.
+Jazzr's adapter binds to its registered admin domain because standalone
+installations share the default site ID. It initializes unpublished defaults
+from the current catalog without writing to client content.

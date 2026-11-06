@@ -92,8 +92,11 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
   const paypalEnv = metadataString(paypalCredential, "environment") === "live" ? "Live" : "Sandbox";
 
   const squareOAuth = metadataString(squareCredential, "onboarding") === "oauth";
+  const squareSyncAt = metadataString(squareCredential, "squareSyncedAt");
+  // eslint-disable-next-line react-hooks/purity -- This async server page reports health at request time.
+  const squareSyncStale = squareConnected && squareOAuth && Date.now() - new Date(squareSyncAt || squareCredential!.connectedAt || squareCredential!.createdAt).getTime() > 5 * 60_000;
   const squareLocations = pendingSquareLocations(squareCredential);
-  const squareWebhookMissing = squareConnected && !squareCredential?.webhookSecretHint;
+  const squareWebhookMissing = squareConnected && !squareOAuth && !squareCredential?.webhookSecretHint;
   // Paste-flow Stripe always has a webhook secret; this only trips when one-click connect
   // could not create the webhook endpoint automatically (the admin retries via Reconnect).
   const stripeWebhookMissing = stripeConnected && !stripeCredential?.webhookSecretHint;
@@ -120,7 +123,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
       provider: "SQUARE",
       name: "Square",
       connected: squareConnected,
-      needsAttention: needsAttention(squareCredential),
+      needsAttention: needsAttention(squareCredential) || squareSyncStale,
       oauthConnect: oauthEnabled,
       webhookMissing: squareWebhookMissing,
       headline: squareReconnectRequired
@@ -133,7 +136,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
       manageDetail: squareReconnectRequired
         ? `Square's refresh authorization was lost. Reconnect now; the current access token expires on ${squareCredential?.expiresAt?.toISOString().slice(0, 10) || "its existing expiry date"}.`
         : squareConnected
-        ? `${squareCredential?.displayName || "Square"} · ${squareEnv}${squareOAuth ? " · connected with one-click" : ""}.${lastChecked(squareCredential)}`
+        ? `${squareCredential?.displayName || "Square"} · ${squareEnv}.${squareOAuth ? squareSyncStale ? " Automatic payment updates are delayed. Contact support; you do not need to paste a webhook key." : " Payment and refund updates are checked automatically, usually within a minute." : lastChecked(squareCredential)}`
         : "Square is not connected yet."
     },
     {
@@ -196,10 +199,11 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
         </section>
       ) : null}
       <PaymentsWorkspace
+      timezone={settings.timezone}
       checkout={{
         active: activeCheckoutProvider,
         anyConnected,
-        disconnected: selectedDisconnected,
+        disconnected: selectedDisconnected && !anyConnected,
         providers: checkoutProviders
       }}
       checkoutTotals={{

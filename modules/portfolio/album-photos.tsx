@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Eye, EyeOff, Grid2X2, Grid3X3, Image as ImageIco
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useNotify } from "@/components/ui/notifications";
 import { updatePortfolioGalleryStatusAction, uploadPortfolioPhotoAction } from "./actions";
 import { albumPhotoError, albumPhotoTypes } from "./album-upload";
 import styles from "./albums.module.css";
@@ -15,6 +16,7 @@ type AlbumPhotosProps = { galleryId: string; title: string; status: string; visi
 
 export function AlbumPhotos({ galleryId, title, status, visibility, photos, children }: AlbumPhotosProps) {
   const router = useRouter();
+  const notify = useNotify();
   const picker = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
   const [dragging, setDragging] = useState(false);
@@ -39,7 +41,7 @@ export function AlbumPhotos({ galleryId, title, status, visibility, photos, chil
     data.set("status", published ? "DRAFT" : "PUBLISHED");
     startPublication(async () => {
       try { await updatePortfolioGalleryStatusAction(data); }
-      catch { setErrors(["Could not change publication status. Please try again."]); }
+      catch { notify("Could not change publication status. Please try again.", "danger"); }
     });
   }
 
@@ -73,7 +75,8 @@ export function AlbumPhotos({ galleryId, title, status, visibility, photos, chil
       else saved++;
     }
     setErrors(problems); setFailed(failures); setBusy(false);
-    setMessage(`${saved} photo${saved === 1 ? "" : "s"} added${failures.length ? `; ${failures.length} not uploaded` : ""}.`);
+    setMessage("");
+    if (saved) notify(`${saved} photo${saved === 1 ? "" : "s"} added.`);
     router.refresh();
   }
 
@@ -126,7 +129,7 @@ export function AlbumPhotos({ galleryId, title, status, visibility, photos, chil
         const files = Array.from(event.target.files || []); event.target.value = ""; void upload(files);
       }} />
     </header>
-    <p role="status" className={styles.feedback}>{message}</p>
+    {busy && <p role="status" className={styles.feedback}>{message}</p>}
     {errors.length > 0 && <div role="alert" className={styles.errors}><ul>{errors.map((error, index) => <li key={index}>{error}</li>)}</ul>{failed.length > 0 && <Button type="button" variant="secondary" disabled={busy} onClick={() => void upload(failed)}>Retry failed photos</Button>}</div>}
     {photos.length ? <div className={`${styles.photoGrid} ${largeThumbnails ? styles.photoGridLarge : ""}`}>{photos.map((item, index) => <button className={styles.photo} key={item.id} type="button" onClick={() => setActive(index)} aria-label={`View ${item.alt || item.title || `photo ${index + 1}`}`}>
       {unavailable.includes(item.thumbnail) ? <span className={styles.unavailablePhoto}><ImageIcon size={24} aria-hidden="true" /><span>Photo unavailable</span></span> : <img draggable={false} src={item.thumbnail} srcSet={`${item.thumbnail} 320w, ${item.largeThumbnail} 720w`} sizes={largeThumbnails ? "(max-width: 600px) 50vw, 320px" : "(max-width: 600px) 33vw, 200px"} alt={item.alt} loading={index < 24 ? "eager" : "lazy"} decoding="async" onError={() => setUnavailable(urls => urls.includes(item.thumbnail) ? urls : [...urls, item.thumbnail])} />}

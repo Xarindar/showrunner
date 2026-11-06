@@ -1,9 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
-import { CalendarCheck, MoreHorizontal, Pencil, Search, X } from "lucide-react";
-import { Button, ButtonLink, Pagination, SelectMenu, Tooltip, type SelectMenuOption } from "@/components/ui";
+import { Eye, EyeOff, MoreHorizontal, Pencil, Search, X } from "lucide-react";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { Pagination } from "@/components/ui/pagination";
+import { SelectMenu, type SelectMenuOption } from "@/components/ui/select-menu";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useCatalogTablePagination } from "./use-catalog-table-pagination";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
@@ -14,7 +19,6 @@ export type ServiceCatalogTableService = {
   description: string;
   durationMinutes: number;
   id: string;
-  imageUrl: string;
   isActive: boolean;
   location: string;
   name: string;
@@ -74,6 +78,7 @@ export function ServiceCatalogTable({
   tagOptions,
   toggleServiceAction
 }: ServiceCatalogTableProps) {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [categoryFilter, setCategoryFilter] = useState(initialCategory);
   const [tagFilter, setTagFilter] = useState(initialTag);
@@ -95,6 +100,7 @@ export function ServiceCatalogTable({
     nextPage,
     pageCount,
     previousPage,
+    resizePage,
     startIndex
   } = useCatalogTablePagination(filteredServices.length);
   const pagedServices = filteredServices.slice(startIndex, endIndex);
@@ -103,11 +109,11 @@ export function ServiceCatalogTable({
   const hasServices = Boolean(services.length);
   const statusModalService = statusActionService || null;
   const nextToggleState = statusModalService?.isActive ? "draft" : "active";
-  const toggleModalTitle = statusModalService ? `Mark ${statusModalService.name} ${nextToggleState}?` : "Update session type status";
+  const toggleModalTitle = statusModalService ? `Mark ${statusModalService.name} ${nextToggleState}?` : "Update session status";
   const toggleModalCopy =
     statusModalService?.isActive
-      ? "This session type will be hidden from new bookings. Its details and existing appointments will stay in place."
-      : "This session type will be available when booking a client. Online package selection is not available yet.";
+      ? "This session will be hidden from new bookings. Its details and existing appointments will stay in place."
+      : "This session will be available when booking a client. Online package selection is not available yet.";
   const servicesHref = "/admin/modules/services";
 
   const resetFilters = () => {
@@ -118,13 +124,13 @@ export function ServiceCatalogTable({
   };
 
   return (
-    <div className="service-catalog-folder-panel" aria-labelledby="services-board-title">
+    <div data-viewport-table className="service-catalog-folder-panel" aria-labelledby="services-board-title">
       <div className="catalog-board-header">
         <div>
-          <h2 id="services-board-title">Session types</h2>
+          <h2 id="services-board-title">Sessions</h2>
           <p>
             {filteredServices.length ? `${rangeStart}-${rangeEnd}` : "0"} of {filteredServices.length || services.length}
-            {normalizedSearch ? ` matching "${normalizedSearch}"` : " session types"}
+            {normalizedSearch ? ` matching "${normalizedSearch}"` : " sessions"}
           </p>
         </div>
         <div className="catalog-board-actions">
@@ -136,7 +142,7 @@ export function ServiceCatalogTable({
       <div className="ui-table-filter-bar catalog-board-filters">
         <div className="ui-table-filter-search" role="search">
           <label className="ui-sr-only" htmlFor="services-search">
-            Search session type, category, tag
+            Search session, category, tag
           </label>
           <span className="ui-table-filter-input">
             <Search aria-hidden="true" size={15} />
@@ -146,7 +152,7 @@ export function ServiceCatalogTable({
                 setSearchQuery(event.currentTarget.value);
                 firstPage();
               }}
-              placeholder="Search session type, category, tag"
+              placeholder="Search session, category, tag"
               value={searchQuery}
             />
           </span>
@@ -185,16 +191,16 @@ export function ServiceCatalogTable({
         </div>
       </div>
 
-      <ul aria-label="Session types" className="service-mobile-list">
+      <ul data-viewport-table-frame aria-label="Sessions" className="service-mobile-list">
         {pagedServices.map((service) => (
-          <li key={service.id}>
+          <li data-viewport-row key={service.id}>
             <div className="service-mobile-summary">
               <Link className="service-mobile-name" href={`/admin/modules/services/${service.id}`}>{service.name}</Link>
               <div className="service-mobile-meta">
                 <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
                 <span>{serviceDurationLabel(service.durationMinutes)}</span>
                 <span>{service.pricing}</span>
-                <span>{service.packageCount} {service.packageCount === 1 ? "package" : "packages"}</span>
+                <span aria-label={`Packages: ${service.packageCount}`}>{service.packageCount}</span>
               </div>
             </div>
             <ButtonLink aria-label={`Edit ${service.name}`} className="service-mobile-edit" href={`/admin/modules/services/${service.id}`} size="sm" variant="secondary">
@@ -209,19 +215,20 @@ export function ServiceCatalogTable({
           </li>
         ))}
         {!filteredServices.length ? <li className="service-mobile-empty">
-          <strong>{hasServices ? "No session types found" : "No session types yet"}</strong>
-          {hasServices ? <p>Adjust the current filters.</p> : emptyCreateAction || <p>Create a session type to get started.</p>}
+          <strong>{hasServices ? "No sessions found" : "No sessions yet"}</strong>
+          {hasServices ? <p>Adjust the current filters.</p> : emptyCreateAction || <p>Create a session to get started.</p>}
         </li> : null}
       </ul>
-      <div aria-label="Session types table" className="catalog-table-scroll catalog-viewport-table service-desktop-table" role="region" tabIndex={0}>
+      <div aria-label="Sessions table" className="catalog-table-scroll catalog-viewport-table service-desktop-table" role="region" tabIndex={0}>
         <table className="catalog-product-table">
           <thead>
             <tr>
-              <th>Session type</th>
+              <th>Session</th>
               <th>Status</th>
               <th>Category</th>
               <th>Tags</th>
               <th>Duration</th>
+              <th>Price</th>
               <th>Packages</th>
               <th>Actions</th>
             </tr>
@@ -230,23 +237,11 @@ export function ServiceCatalogTable({
             {pagedServices.map((service) => {
               const category = service.category || "Uncategorized";
               const tagsLabel = service.tags.join(", ") || "No tags";
-              const packageLabel = `${service.packageCount} ${service.packageCount === 1 ? "package" : "packages"}`;
               return (
                 <tr key={service.id}>
-                  <td data-label="Session type">
-                    <div className="catalog-product-cell">
-                      <div className="catalog-row-thumb">
-                        {service.imageUrl ? <img alt="" src={service.imageUrl} /> : (
-                          <span>
-                            <CalendarCheck size={17} />
-                          </span>
-                        )}
-                      </div>
-                      <div className="catalog-row-copy">
-                        <Link href={`/admin/modules/services/${service.id}`} title={service.name}>{service.name}</Link>
-                        <small>{service.pricing}</small>
-                        {service.description || service.location ? <small title={service.description || service.location}>{service.description || service.location}</small> : null}
-                      </div>
+                  <td data-label="Session">
+                    <div className="catalog-row-copy">
+                      <Link className="catalog-cell-text" href={`/admin/modules/services/${service.id}`} title={service.name}>{service.name}</Link>
                     </div>
                   </td>
                   <td data-label="Status">
@@ -261,18 +256,19 @@ export function ServiceCatalogTable({
                   <td data-label="Duration">
                     <strong className="catalog-price-cell">{serviceDurationLabel(service.durationMinutes)}</strong>
                   </td>
-                  <td data-label="Packages">
-                    <span className="catalog-cell-text" title={packageLabel}>{packageLabel}</span>
+                  <td data-label="Price">
+                    <span className="catalog-cell-text" title={service.pricing === "-" ? "Price not set" : service.pricing}>{service.pricing}</span>
                   </td>
+                  <td data-label="Packages">{service.packageCount}</td>
                   <td data-label="Actions">
                     <div className="catalog-row-actions">
-                      <Tooltip content="Edit session type" focusable={false}>
+                      <Tooltip content="Edit session" focusable={false}>
                         <ButtonLink
                           aria-label={`Edit ${service.name}`}
                           className="catalog-icon-button"
                           href={`/admin/modules/services/${service.id}`}
                           size="sm"
-                          title="Edit session type"
+                          title="Edit session"
                           variant="secondary">
                           <Pencil aria-hidden="true" size={15} />
                         </ButtonLink>
@@ -281,12 +277,12 @@ export function ServiceCatalogTable({
                         <ButtonLink
                           aria-haspopup="dialog"
                           aria-label={service.isActive ? `Mark ${service.name} draft` : `Mark ${service.name} active`}
-                          className="catalog-status-action"
+                          className="catalog-icon-button"
                           href={`${servicesHref}?statusService=${encodeURIComponent(service.id)}`}
                           size="sm"
                           title={service.isActive ? "Mark draft" : "Mark active"}
                           variant="secondary">
-                          {service.isActive ? "Mark draft" : "Mark active"}
+                          {service.isActive ? <EyeOff aria-hidden="true" size={15} /> : <Eye aria-hidden="true" size={15} />}
                         </ButtonLink>
                       </Tooltip>
                     </div>
@@ -298,18 +294,18 @@ export function ServiceCatalogTable({
               <tr
                 className="catalog-table-empty-state-row"
                 >
-                <td colSpan={7}>
+                <td colSpan={8}>
                   <div className="catalog-empty-state">
                     {hasServices ? (
                       <>
-                        <h3>No session types found</h3>
+                        <h3>No sessions found</h3>
                         <p>Adjust the current filters.</p>
                       </>
                     ) : (
                       <>
-                        <h3>No session types yet</h3>
+                        <h3>No sessions yet</h3>
                         <div className="catalog-empty-state-action">
-                          {emptyCreateAction || "Create a session type or adjust the current filters."}
+                          {emptyCreateAction || "Create a session or adjust the current filters."}
                         </div>
                       </>
                     )}
@@ -321,6 +317,7 @@ export function ServiceCatalogTable({
         </table>
       </div>
       <Pagination
+        onPageSizeChange={resizePage}
         className="catalog-table-pagination"
         label="Service catalog pages"
         onNext={nextPage}
@@ -329,23 +326,7 @@ export function ServiceCatalogTable({
         pageCount={pageCount}
       />
       {statusModalService ? (
-        <>
-          <div aria-hidden="true" className="catalog-confirm-backdrop" />
-          <dialog aria-labelledby="service-status-dialog-title" aria-modal="true" className="ui-dialog catalog-confirm-modal" open>
-            <div className="ui-modal-head">
-              <h2 className="ui-zero" id="service-status-dialog-title">
-                {toggleModalTitle}
-              </h2>
-              <ButtonLink
-                aria-label="Close dialog"
-                className="ui-dialog-close"
-                href={servicesHref}
-                size="sm"
-                title="Close dialog"
-                variant="ghost">
-                <X aria-hidden="true" size={16} />
-              </ButtonLink>
-            </div>
+        <Modal open title={toggleModalTitle} className="catalog-confirm-modal" onClose={() => router.push(servicesHref)}>
             <form action={toggleServiceAction} className="catalog-confirm-form">
               <p className="catalog-confirm-copy">{toggleModalCopy}</p>
               <input name="id" type="hidden" value={statusModalService.id} />
@@ -359,8 +340,7 @@ export function ServiceCatalogTable({
                 </Button>
               </div>
             </form>
-          </dialog>
-        </>
+        </Modal>
       ) : null}
     </div>
   );

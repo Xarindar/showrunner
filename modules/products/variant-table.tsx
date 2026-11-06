@@ -2,7 +2,8 @@
 
 import { useCallback, useState } from "react";
 import { Save } from "lucide-react";
-import { Button, Switch } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { cx } from "@/components/ui/utils";
 
 export type VariantRow = {

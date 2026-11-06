@@ -263,7 +263,7 @@
   font-weight: var(--sd-type-weight-strong);
   gap: var(--space-2);
   justify-content: center;
-  min-height: 44px;
+  min-height: var(--sd-layout-touch-target);
 }
 .showrunner-admin .service-package-items { display: grid; gap: var(--space-2); min-width: 0; }
 .showrunner-admin .service-package-item {
@@ -388,7 +388,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 44px;
+    min-height: var(--sd-layout-touch-target);
     list-style: none;
     cursor: pointer;
     border-radius: var(--sd-radius-pill);
@@ -407,3 +407,14 @@
   .showrunner-admin .service-mobile-list > .service-mobile-empty { display: block; }
 }
 .showrunner-admin .service-catalog-folder-panel .catalog-product-table th:last-child { width: 176px; }
+.showrunner-admin :is(.service-desktop-table, .hourly-rates-table) .catalog-product-table th:last-child {
+  text-align: center;
+  width: 104px;
+}
+.showrunner-admin :is(.service-desktop-table, .hourly-rates-table) .catalog-row-actions { justify-content: center; }
+.showrunner-admin .hourly-rates-table .catalog-product-table { min-width: 0; }
+.showrunner-admin .hourly-rates-table .catalog-product-table th:first-child { width: auto; }
+.showrunner-admin .hourly-rates-table .catalog-product-table th:nth-child(2) { width: 34%; }
+.showrunner-admin .hourly-rates-table .catalog-product-table th:last-child { width: 80px; }
+
+.showrunner-admin .service-mobile-list, .showrunner-admin .service-mobile-list > li { background: var(--data-table-row-bg); }

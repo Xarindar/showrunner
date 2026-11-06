@@ -20,5 +20,4 @@ export * from "./table";
 export * from "./table-filter-bar";
 export * from "./tabs";
 export * from "./tooltip";
-export * from "./toast";
 export * from "./upload-field";

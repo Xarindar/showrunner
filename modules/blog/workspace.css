@@ -289,17 +289,8 @@
   text-transform: uppercase;
 }
 .showrunner-admin .blog-more-type select {
-  background: var(--sd-color-surface-subtle);
-  border: 1px solid var(--sd-color-border);
-  border-radius: var(--sd-radius-tag);
-  color: var(--color-text);
-  font-size: var(--sd-type-small-size);
-  min-height: 34px;
-  outline: 0;
-  padding: 0 var(--sd-space-8);
   width: 100%;
 }
-.showrunner-admin .blog-more-type select:focus { border-color: var(--color-brand); box-shadow: var(--sd-shadow-focus); }
 .showrunner-admin .blog-more-grid { display: grid; gap: var(--sd-space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .showrunner-admin .blog-more-grid button,
 .showrunner-admin .blog-more-utilities button,
@@ -367,19 +358,6 @@
 }
 .showrunner-admin .blog-emoji-popover button:hover { background: var(--color-hover); }
 .showrunner-admin .blog-spin { animation: blog-spin 800ms linear infinite; }
-.showrunner-admin .blog-inline-error {
-  align-items: center;
-  background: var(--sd-color-critical-bg);
-  border: 1px solid var(--sd-color-critical-text);
-  border-radius: var(--radius-control);
-  color: var(--color-danger);
-  display: flex;
-  font-size: var(--type-caption);
-  gap: var(--sd-space-6);
-  margin: 0 auto var(--space-3);
-  max-width: 790px;
-  padding: var(--space-2) var(--space-3);
-}
 .showrunner-admin .blog-prose {
   color: var(--blog-ink);
   font-family: var(--font-sans);
@@ -559,24 +537,9 @@
 .showrunner-admin .blog-setting-field { display: grid; gap: var(--sd-space-6); }
 .showrunner-admin .blog-setting-field > input,
 .showrunner-admin .blog-category-field > select {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--sd-radius-tag);
-  color: var(--color-text);
-  min-height: 36px;
   width: 100%;
 }
-.showrunner-admin .blog-setting-field > input,
-.showrunner-admin .blog-category-field > select {
-  outline: 0;
-  padding: 0 var(--sd-space-8);
-}
-.showrunner-admin .blog-setting-field > input:focus,
-.showrunner-admin .blog-category-field > select:focus {
-  border-color: var(--color-brand);
-  box-shadow: var(--sd-shadow-focus);
-}
-.showrunner-admin .blog-category-field > select { cursor: pointer; font-size: var(--sd-type-small-size); }
+.showrunner-admin .blog-category-field > select { cursor: pointer; }
 .showrunner-admin .blog-publish-note {
   background: var(--color-surface);
   border: 1px solid var(--color-border);

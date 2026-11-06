@@ -13,7 +13,8 @@ import {
   isReactEmailBuilderDocument,
   normalizeEmailBuilderDocument
 } from "@/lib/email-builder/document";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 
 type SenderIdentityOption = {
   id: string;
@@ -149,7 +150,6 @@ function emptyEditorJson() {
 }
 
 export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const editorRef = useRef<EmailEditorRef>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const allowSubmitRef = useRef(false);
@@ -209,19 +209,6 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
     },
     [textBody, textFallbackDirty, writeHiddenValues]
   );
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-
-    if (isOpen && !dialog.open) {
-      dialog.showModal();
-    }
-
-    if (!isOpen && dialog.open) {
-      dialog.close();
-    }
-  }, [isOpen]);
 
   useEffect(() => {
     writeHiddenValues({
@@ -305,12 +292,12 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
         </div>
       </div>
 
-      <dialog className="email-playground-dialog" onClose={() => setIsOpen(false)} ref={dialogRef}>
+      <Dialog aria-label={props.templateName} className="ui-dialog email-playground-dialog" open={isOpen} onClose={() => setIsOpen(false)}>
         <div className="email-playground-shell">
-          <header className="email-playground-header">
+          <header className="email-playground-header ui-dialog-header">
             <div>
               <span className="eyebrow">{props.templateKey || props.purposeLabel}</span>
-              <h2>{props.templateName}</h2>
+              <h2 className="ui-dialog-title">{props.templateName}</h2>
             </div>
             <div className="email-playground-header-actions">
               <Button type="button" variant="secondary" onClick={() => void goToStep("review")}>
@@ -321,7 +308,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
                 <Save size={16} />
                 {isSaving ? "Saving" : "Save"}
               </Button>
-              <Button type="button" variant="ghost" aria-label="Close playground" onClick={() => setIsOpen(false)}>
+              <Button type="button" variant="ghost" className="ui-dialog-close" aria-label="Close playground" onClick={() => setIsOpen(false)}>
                 <X size={18} />
               </Button>
             </div>
@@ -474,7 +461,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
             </div>
           </footer>
         </div>
-      </dialog>
+      </Dialog>
     </form>
   );
 }

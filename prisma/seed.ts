@@ -280,7 +280,7 @@ async function seedEmailCore(businessName: string, contactEmail: string, siteId 
       id: "email-template-billing-document-customer",
       key: "billing.document.customer",
       name: "Billing document notice",
-      description: "Sent to customers with a public invoice, quote, or contract link.",
+      description: "Sent to customers with a public invoice, quote, or Booking Terms & Conditions link.",
       purpose: MessageTemplatePurpose.INVOICE_NOTICE,
       subject: "{{businessName}} {{documentType}} {{documentNumber}}",
       previewText: "{{documentTotal}} due for {{documentNumber}}.",

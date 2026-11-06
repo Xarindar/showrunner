@@ -48,7 +48,11 @@ import {
   type MouseEvent,
   type ReactNode
 } from "react";
-import { AssetPicker, Button, Card, Modal, type AssetPickerAsset } from "@/components/ui";
+import { AssetPicker, type AssetPickerAsset } from "@/components/ui/asset-picker";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Modal } from "@/components/ui/modal";
+import { useNotify } from "@/components/ui/notifications";
 import type { BlogPostDraft } from "./data";
 
 type BlogAction = (formData: FormData) => void | Promise<void>;
@@ -233,7 +237,7 @@ function BlogComposer({
   const [focusMode, setFocusMode] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [uploadingInline, setUploadingInline] = useState(false);
-  const [inlineError, setInlineError] = useState("");
+  const notify = useNotify();
   const [fontSize, setFontSize] = useState(18);
 
   useEffect(() => {
@@ -353,7 +357,6 @@ function BlogComposer({
     event.currentTarget.value = "";
     if (!file) return;
     setUploadingInline(true);
-    setInlineError("");
     try {
       const body = new FormData();
       body.set("file", file);
@@ -363,7 +366,7 @@ function BlogComposer({
       if (!response.ok || !payload.url) throw new Error(payload.error || "Image upload failed.");
       insertImage({ alt: payload.alt || file.name, thumbnailUrl: payload.url, url: payload.url } as AssetPickerAsset);
     } catch (error) {
-      setInlineError(error instanceof Error ? error.message : "Image upload failed.");
+      notify(error instanceof Error ? error.message : "Image upload failed. Please try again.", "danger");
     } finally {
       setUploadingInline(false);
     }
@@ -484,7 +487,6 @@ function BlogComposer({
                   onRememberSelection={rememberSelection}
                   uploadingInline={uploadingInline}
                 />
-                {inlineError ? <div className="blog-inline-error"><X aria-hidden="true" size={14} />{inlineError}</div> : null}
                 <div
                   aria-label="Story body"
                   aria-multiline="true"

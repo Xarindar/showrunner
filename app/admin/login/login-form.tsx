@@ -3,7 +3,8 @@
 import { useActionState } from "react";
 import { LogIn } from "lucide-react";
 import { loginAction, type LoginState } from "./actions";
-import { Button, Card } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 const initialState: LoginState = {};
 

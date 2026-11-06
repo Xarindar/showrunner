@@ -1,0 +1,20 @@
+.week, .editor { display: grid; gap: var(--space-4); min-width: 0; }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.heading h2 { margin: 0; }
+.rows { padding-block: var(--space-2); }
+.row { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(0, 2fr) auto; align-items: center; gap: var(--space-3); padding-block: var(--space-2); }
+.row + .row { border-top: 1px solid var(--color-border); }
+.row span { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.range { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: var(--space-2); }
+.range label { display: grid; gap: var(--space-2); min-width: 0; }
+.range input { width: 100%; min-width: 0; }
+.days { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.days label, .toggle { display: flex; gap: var(--space-2); align-items: center; }
+@media (max-width: 560px) {
+  .row { grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--space-1); }
+  .row strong { grid-column: 1; grid-row: 1; }
+  .row span { grid-column: 1; grid-row: 2; }
+  .row button { grid-column: 2; grid-row: 1 / 3; }
+  .range { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .range button { grid-column: 1 / -1; justify-self: end; }
+}

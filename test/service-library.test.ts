@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
+import ts from "typescript";
 import { PGlite } from "@electric-sql/pglite";
 import { resolveIncludedServices, serviceLibraryInputSchema } from "../lib/scheduling/service-library";
-import { sessionOfferingDraft, sessionOfferingFormSchema, sessionOfferingSchema, selectSessionPackage } from "../lib/scheduling/session-offering";
+import { priceSessionOffering, sessionOfferingDraft, sessionOfferingFormSchema, sessionOfferingSchema, selectSessionPackage, suggestedSessionAddOns } from "../lib/scheduling/session-offering";
 
 const offering = { coverageItems: [{ id: "legacy-ceremony", name: "Ceremony" }], tiers: [{ id: "standard", name: "Standard", durationMinutes: 60, priceCents: 10000, coverageIds: ["legacy-ceremony"] }], addOns: [] };
 const item = { id: "library-ceremony", name: "Ceremony", description: "Your ceremony photographed from arrival to your first kiss.", category: "Weddings", tags: ["ceremony"], pricingType: "FLAT_RATE" as const, priceCents: null, hourlyRateId: null };
@@ -29,6 +31,60 @@ test("library resolution preserves package references and uses authoritative ser
   assert.deepEqual(snapshot?.includedItems, [{ name: item.name, description: item.description, pricingType: "FLAT_RATE", priceCents: null, hourlyRateId: null }]);
   linked.coverageItems[0].description = "Changed after booking";
   assert.equal(snapshot?.includedItems?.[0].description, item.description);
+});
+
+test("add-on availability is optional, explicit, and clears disabled prices", () => {
+  const base = { name: "First look", description: "", category: "", tags: "" };
+  assert.equal(serviceLibraryInputSchema.parse({ ...base, availableAsAddOn: false, price: "bad", pricingType: "HOURLY" }).priceCents, null);
+  assert.equal(serviceLibraryInputSchema.safeParse({ ...base, availableAsAddOn: true, price: "" }).success, false);
+  assert.equal(serviceLibraryInputSchema.parse({ ...base, availableAsAddOn: true, price: "0" }).priceCents, 0);
+  assert.equal(serviceLibraryInputSchema.parse({ ...base, availableAsAddOn: true, price: "125.50" }).priceCents, 12550);
+});
+
+test("suggested add-ons use authoritative prices and never charge included services", () => {
+  const selected = { ...offering, coverageItems: [], tiers: offering.tiers.map(tier => ({ ...tier, coverageIds: [] })), addOns: [{ id: "optional", libraryItemId: item.id, name: "Forged name", priceCents: 1 }, { id: "legacy", name: "Existing extra", priceCents: 2500 }] };
+  const resolved = resolveIncludedServices(selected, [{ ...item, priceCents: 5000 }]);
+  const roundTrip = sessionOfferingFormSchema.parse(JSON.stringify(sessionOfferingDraft(resolved, 60, null)));
+  assert.deepEqual(roundTrip.addOns, resolved.addOns);
+  assert.equal(selectSessionPackage(roundTrip, "standard")?.priceCents, 10000);
+  const snapshot = selectSessionPackage(roundTrip, "standard", ["optional"]);
+  assert.equal(snapshot?.priceCents, 15000);
+  assert.equal(snapshot?.extras[0].name, item.name);
+  assert.equal(selectSessionPackage(roundTrip, "standard", ["legacy"])?.priceCents, 12500);
+  assert.equal(resolveIncludedServices(selected, [{ ...item, priceCents: 0 }]).addOns[0].priceCents, 0);
+  assert.throws(() => resolveIncludedServices(selected, [item]), /no longer available as an add-on/);
+  assert.throws(() => resolveIncludedServices(selected, []), /no longer available/);
+  const included = resolveIncludedServices({ ...offering, addOns: selected.addOns }, [{ ...item, priceCents: 5000 }]);
+  assert.deepEqual(suggestedSessionAddOns(included, "standard").map(extra => extra.id), ["legacy"]);
+  assert.throws(() => selectSessionPackage(included, "standard", ["optional"]), /available extras/);
+  assert.equal(selectSessionPackage(included, "standard")?.priceCents, 10000);
+  resolved.addOns[0].priceCents = 9000;
+  assert.equal(snapshot?.priceCents, 15000, "Previously booked snapshots keep the agreed price");
+  const hourly = priceSessionOffering(resolveIncludedServices(selected, [{ ...item, pricingType: "HOURLY", hourlyRateId: "rate" }]), [{ id: "rate", name: "Coverage", amountCents: 10000 }], { pricingType: "FLAT_RATE", hourlyRateId: "" });
+  assert.equal(selectSessionPackage(hourly, "standard", ["optional"], 90)?.priceCents, 25000);
+  assert.throws(() => priceSessionOffering(hourly, [], { pricingType: "FLAT_RATE", hourlyRateId: "" }), /from this business/);
+  assert.throws(() => selectSessionPackage({ ...resolved, tiers: [{ ...resolved.tiers[0], priceCents: 999999999 }] }, "standard", ["optional"]), /less/);
+});
+
+test("optional-only offerings hydrate library references within the current site", async () => {
+  const exports: Record<string, (offering: unknown, siteId: string) => Promise<unknown>> = {};
+  let queries = 0;
+  runInNewContext(ts.transpileModule(readFileSync("lib/scheduling/service-library-store.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports, require: (id: string) => {
+    if (id === "server-only") return {};
+    if (id === "./service-library") return { resolveIncludedServices };
+    if (id === "@/lib/prisma") return { prisma: { serviceLibraryItem: { findMany: async ({ where }: { where: { siteId: string; OR: Array<{ id?: { in: string[] } }> } }) => {
+      queries++;
+      assert.equal(where.siteId, "site-a");
+      assert.deepEqual(Array.from(where.OR[0].id!.in), [item.id]);
+      return [{ ...item, priceCents: 5000 }];
+    } } } };
+    throw new Error(`Unexpected import ${id}`);
+  } });
+  const selected = { ...offering, coverageItems: [], tiers: offering.tiers.map(tier => ({ ...tier, coverageIds: [] })), addOns: [{ id: "extra", libraryItemId: item.id, name: "Forged", priceCents: 1 }] };
+  const resolved = await exports.hydrateSessionServiceLibrary(selected, "site-a") as typeof selected;
+  assert.equal(queries, 1);
+  assert.equal(resolved.addOns[0].priceCents, 5000);
+  assert.equal(resolved.addOns[0].name, item.name);
 });
 
 test("library migration imports legacy names by site without changing session JSON or selections", async () => {

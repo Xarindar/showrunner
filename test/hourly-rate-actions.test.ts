@@ -14,7 +14,7 @@ test("rates and included services validate permissions and business scope before
   const writes: Array<{ where?: { siteId: string }; data: { siteId?: string; amountCents?: number } }> = [];
   const require = createRequire(import.meta.url);
   const db = {
-    service: { findMany: async ({ where }: { where: { siteId: string } }) => { assert.equal(where.siteId, "site-a"); return [{ durationMinutes: 90, sessionOffering: null }]; } },
+    service: { findMany: async ({ where }: { where: { siteId: string } }) => { assert.equal(where.siteId, "site-a"); return [{ pricingType: "FLAT_RATE", hourlyRateId: null, durationMinutes: 60, sessionOffering: { coverageItems: [], addOns: [], tiers: [{ id: "hourly", name: "Hourly package", durationMinutes: 90, priceCents: 100, coverageIds: [], pricingType: "HOURLY", hourlyRateId: "rate" }] } }]; } },
     hourlyRate: {
       findFirst: async ({ where }: { where: { id: string; siteId: string } }) => { assert.equal(where.siteId, "site-a"); return rateAvailable ? { id: where.id } : null; },
       update: async (query: typeof writes[number]) => { writes.push(query); return { id: "rate", name: "Standard", ...query.data }; },

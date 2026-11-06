@@ -9,8 +9,10 @@ import styles from "./image-framing.module.css";
 
 export const HeaderFrameRatios = createContext<Record<string, number>>({});
 
-export function ImageFramingControl({ source, blockId, ratio, value, onChange }: { source: string; blockId?: string; ratio?: number; value: Record<string, unknown>; onChange: (framing: ImageFraming) => void }) {
-  const [open, setOpen] = useState(false);
+export function ImageFramingControl({ source, blockId, ratio, value, onChange, open: controlledOpen, onOpenChange }: { open?: boolean; onOpenChange?: (open: boolean) => void; source: string; blockId?: string; ratio?: number; value: Record<string, unknown>; onChange: (framing: ImageFraming) => void }) {
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
+  const setOpen = onOpenChange ?? setLocalOpen;
   const ratios = useContext(HeaderFrameRatios);
   const original = source && typeof window !== "undefined" ? new URL(source, window.location.href) : null;
   if (original && original.origin === window.location.origin && /^\/api\/media\/assets\/[^/]+$/.test(original.pathname)) original.searchParams.set("variant", "DOWNLOAD");

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { AdminNavigationPending } from "@/shell/admin-navigation-pending";
 import Image from "next/image";
 import {
-  ArrowLeft,
   Check,
   ChevronDown,
   ExternalLink,
@@ -33,10 +32,11 @@ import {
 import { groupAdminModuleNavigationLayout, moveAdminModuleNavigationItem } from "@/shell/admin-navigation-layout";
 import { searchAdminNavigation } from "@/shell/admin-navigation-search";
 import type { ModuleStatus, ShellModule } from "@/shell/module-types";
+import { AdminMobileMenu } from "@/shell/admin-mobile-menu";
 import { useAdminMobileHeaderContext } from "@/shell/admin-mobile-header";
 import { logoutAction } from "@/app/admin/(protected)/actions";
 import { saveAdminModuleNavigationAction } from "@/app/admin/(protected)/navigation-actions";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState, useTransition, type KeyboardEvent, type PointerEvent } from "react";
 
 type AdminSidebarProps = {
@@ -108,7 +108,7 @@ function SidebarModuleLink({
       {label}
     </span>
   ) : (
-    <Link aria-current={isActive ? item.id === "scheduling" ? "location" : "page" : undefined} className={isActive ? "active" : undefined} href={item.href} onClick={closeMenu}>
+    <Link aria-current={isActive ? ["scheduling", "appointments"].includes(item.id) ? "location" : "page" : undefined} className={isActive ? "active" : undefined} href={item.href} onClick={closeMenu}>
       {showIcon ? <Icon size={17} /> : null}
       {label}
       <AdminNavigationPending />
@@ -132,12 +132,19 @@ function SidebarModuleLink({
       ) : null}
       {content}
     </div>
+    {item.id === "appointments" && isActive && enabled && !editing ? <nav className="admin-nav-children" aria-label="Bookings">
+      {[
+        { href: "/admin/modules/appointments", label: "Appointments", active: !["/schedule", "/staff"].some(section => pathname.includes(section)) },
+        { href: "/admin/modules/appointments/schedule", label: "Schedule", active: pathname.includes("/schedule") },
+        { href: "/admin/modules/appointments/staff", label: "Staff", active: pathname.includes("/staff") }
+      ].map(link => <Link key={link.href} href={link.href} onClick={closeMenu} aria-current={link.active ? "page" : undefined}>{link.label}<AdminNavigationPending /></Link>)}
+    </nav> : null}
     {item.id === "scheduling" && isActive && enabled && !editing ? <nav className="admin-nav-children" aria-label="Services">
       {[
-        { href: "/admin/modules/services", label: "Session types", active: !["categories", "packages", "rates"].some(section => pathname.startsWith(`/admin/modules/services/${section}`)) },
+        { href: "/admin/modules/services", label: "Sessions", active: !["categories", "packages", "rates"].some(section => pathname.startsWith(`/admin/modules/services/${section}`)) },
+        { href: "/admin/modules/services/packages", label: "Session Bundles", active: pathname.startsWith("/admin/modules/services/packages") },
         { href: "/admin/modules/services/rates", label: "Hourly rates", active: pathname.startsWith("/admin/modules/services/rates") },
-        { href: "/admin/modules/services/categories", label: "Categories", active: pathname.startsWith("/admin/modules/services/categories") },
-        { href: "/admin/modules/services/packages", label: "Service bundles", active: pathname.startsWith("/admin/modules/services/packages") }
+        { href: "/admin/modules/services/categories", label: "Categories", active: pathname.startsWith("/admin/modules/services/categories") }
       ].map(link => <Link key={link.href} href={link.href} onClick={closeMenu} aria-current={link.active ? "page" : undefined}>{link.label}<AdminNavigationPending /></Link>)}
     </nav> : null}
     </>
@@ -442,32 +449,18 @@ export function AdminSidebar({ publicSiteUrl, businessName, enabledModules, logo
 
   return (
     <>
-      <header className="admin-mobile-bar">
-        <Link href="/admin" className="brand" onClick={closeMenu}>
-          <SidebarBrand businessName={businessName} logoUrl={logoUrl} />
-        </Link>
-        {resolvedMobileHeader ? (
-          <>
-            {mobileHeaderContext ? (
-              <Link className="admin-mobile-context-back" href={mobileHeaderContext.backHref} onClick={closeMenu}>
-                <ArrowLeft size={17} />
-                <span>Back</span>
-              </Link>
-            ) : <span aria-hidden="true" />}
-            <strong className="admin-mobile-context-title">{resolvedMobileHeader.title}</strong>
-          </>
-        ) : null}
+      <AdminMobileMenu routeKey={pathname} fallbackTitle={resolvedMobileHeader?.title ?? "Showrunner"}>
         <button
           aria-controls="admin-sidebar"
           aria-expanded={menuOpen}
           aria-label="Open admin menu"
-          className="admin-menu-toggle"
+          className="admin-menu-toggle admin-page-menu"
           onClick={() => setMenuOpen(true)}
           type="button"
         >
           <Menu size={22} />
         </button>
-      </header>
+      </AdminMobileMenu>
 
       <button
         aria-label="Close admin menu"

@@ -1,5 +1,5 @@
 import { CartStatus, EmailCategory, EmailSubscriberStatus } from "@prisma/client";
-import { publicAppBaseUrl } from "@/lib/env";
+import { positiveIntegerEnv, publicAppBaseUrl } from "@/lib/env";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettingsForSite } from "@/lib/site";
@@ -35,11 +35,6 @@ export type AbandonedCartSweepResult = {
   skipped: number;
   failed: number;
 };
-
-function positiveIntegerEnv(name: string, fallback: number) {
-  const value = Number.parseInt(process.env[name] || "", 10);
-  return Number.isFinite(value) && value > 0 ? value : fallback;
-}
 
 function cleanError(error: unknown) {
   return error instanceof Error ? error.message.slice(0, 1000) : String(error).slice(0, 1000);

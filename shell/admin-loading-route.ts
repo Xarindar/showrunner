@@ -2,10 +2,11 @@ export function adminLoadingRoute(pathname: string) {
   const segments = pathname.split("/").filter(Boolean);
   const [section, detail, child] = segments.slice(segments[1] === "modules" ? 2 : 1);
   if (section === "services" || section === "scheduling") {
+    if (detail === "rates") return { kind: "workspace", title: "Hourly rates" } as const;
     if (detail === "categories") return { kind: "workspace", title: "Service categories" } as const;
-    if (detail === "packages" && !child) return { kind: "packages", title: "Service bundles" } as const;
-    if (detail) return { kind: "editor", title: detail === "packages" ? "Service bundle" : "Session type" } as const;
-    return { kind: "services", title: "Session types" } as const;
+    if (detail === "packages" && !child) return { kind: "packages", title: "Session Bundles" } as const;
+    if (detail) return { kind: "editor", title: detail === "packages" ? "Session Bundle" : "Session" } as const;
+    return { kind: "services", title: "Sessions" } as const;
   }
   if (section === "products" || section === "clients") {
     if (detail) return { kind: "editor", title: section === "clients" ? "Client" : "Product" } as const;

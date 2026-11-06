@@ -40,4 +40,8 @@ test("image picker combines folder, tag and search within the authorized library
   assert.equal(calls.folders.where.createdByUserId, "owner-a");
   assert.equal(calls.folders.where.siteId, "site-a");
   assert.equal(response.folders.join(","), "Empty folder,Events");
+  await exports.GET({ nextUrl: new URL("https://example.test/api/media/assets?page=51") });
+  assert.equal(calls.assets.skip, 1200, "Scrolling can reach beyond the old 50-page limit");
+  await exports.GET({ nextUrl: new URL("https://example.test/api/media/assets?page=1e100") });
+  assert.equal(calls.assets.skip, 0, "Invalid offsets cannot reach the database");
 });

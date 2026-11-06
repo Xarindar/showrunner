@@ -72,9 +72,5 @@
   overflow: hidden;
 }
 @media (max-width: 600px) {
-  :global(.showrunner-admin) :global(.admin-main) .body .search input[type="search"] {
-    min-height: 44px;
-    font-size: var(--sd-type-heading-size);
-  }
   .photo { width: 64px; height: 64px; }
 }

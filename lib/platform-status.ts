@@ -47,14 +47,14 @@ export const platformFoundationItems: PlatformFoundationItem[] = [
     key: "site-tenant",
     title: "Site and tenant boundary",
     status: "schema-ready",
-    detail: "Tenant, Site, and SiteDomain exist with a default site; site-owned records carry siteId and composite uniques. Domain resolution and multi-site UI remain future work.",
+    detail: "Tenant, Site, and SiteDomain scope records and resolve registered hostnames. Site-owned records carry siteId and composite uniques.",
     models: ["Tenant", "Site", "SiteDomain"]
   },
   {
     key: "module-installation",
     title: "Module installation records",
-    status: "schema-needed",
-    detail: "Persist installed, enabled, configured, public visibility, beta, dependency, and per-site settings state instead of storing only enabled IDs.",
+    status: "schema-ready",
+    detail: "ModuleInstallation owns per-site enablement. Settings and module choices save atomically; ModuleSetting stores per-module configuration.",
     models: ["ModuleInstallation", "ModuleSetting"]
   },
   {
@@ -75,8 +75,8 @@ export const platformFoundationItems: PlatformFoundationItem[] = [
     key: "security-controls",
     title: "Session and request hardening",
     status: "policy-needed",
-    detail: "Add persistent login attempts, session revocation, MFA-ready fields, CSRF strategy, signed embed keys, allowed origins, and data export/delete policies.",
-    models: ["AdminSession", "LoginAttempt", "SiteApiKey", "AllowedOrigin", "DataRequest"]
+    detail: "Signed sessions, database-backed login throttling, site API keys and allowed-origin checks are implemented. MFA, session revocation and data export/delete policies remain future work.",
+    models: ["AdminUser", "PublicRateLimit", "SiteApiKey"]
   }
 ];
 
@@ -127,30 +127,34 @@ function isEnabled(settings: SiteSettingsWithModules, moduleId: string) {
   return settings.enabledModuleIds.includes(moduleId as ModuleId);
 }
 
-// Pull an enabled module's own health check (modules/<id>/health.ts) by convention. Modules without
-// a health file resolve to no warnings. The id comes from the registry, so the dynamic path is bounded.
-async function loadModuleHealth(moduleId: string): Promise<ModuleHealthCheck | null> {
-  try {
-    const mod = (await import(`../modules/${moduleId}/health`)) as { getHealth?: ModuleHealthCheck };
-    return typeof mod.getHealth === "function" ? mod.getHealth : null;
-  } catch {
-    return null;
-  }
-}
+const moduleHealthChecks: Partial<Record<ModuleId, () => Promise<{ getHealth: ModuleHealthCheck }>>> = {
+  analytics: () => import("@/modules/analytics/health"),
+  automation: () => import("@/modules/automation/health"),
+  billing: () => import("@/modules/billing/health"),
+  communications: () => import("@/modules/communications/health"),
+  deployments: () => import("@/modules/deployments/health"),
+  forms: () => import("@/modules/forms/health"),
+  media: () => import("@/modules/media/health"),
+  portfolio: () => import("@/modules/portfolio/health"),
+  products: () => import("@/modules/products/health"),
+  scheduling: () => import("@/modules/scheduling/health"),
+  testimonials: () => import("@/modules/testimonials/health")
+};
 
 async function collectModuleWarnings(ctx: ModuleHealthContext): Promise<PlatformWarning[]> {
   const enabledModules = moduleRegistry.filter((module) => isEnabled(ctx.settings, module.id));
 
   const results = await Promise.all(
     enabledModules.map(async (module) => {
-      const getHealth = await loadModuleHealth(module.id);
-      if (!getHealth) return [] as PlatformWarning[];
+      const loadHealth = moduleHealthChecks[module.id];
+      if (!loadHealth) return [];
 
       try {
+        const { getHealth } = await loadHealth();
         return await getHealth(ctx);
       } catch (error) {
         console.error("[platform-status:module-health-failed]", module.id, error);
-        return [] as PlatformWarning[];
+        return [warning(`${module.label} health check unavailable`, "Refresh to try again. If this continues, contact your administrator.", "warning", module.id, module.href)];
       }
     })
   );
@@ -162,11 +166,11 @@ async function collectModuleWarnings(ctx: ModuleHealthContext): Promise<Platform
 function collectPlatformWarnings(): PlatformWarning[] {
   const warnings: PlatformWarning[] = [];
 
-  if (envLooksDefault(process.env.AUTH_SECRET)) {
+  if (envLooksDefault(process.env.AUTH_SECRET) || (process.env.AUTH_SECRET?.length ?? 0) < 32) {
     warnings.push(
       warning(
         "AUTH_SECRET should be hardened",
-        "Set a production-length AUTH_SECRET before deployment; auth currently falls back to development behavior when unset.",
+        "Set a unique AUTH_SECRET of at least 32 characters. Production sign-in requires it.",
         process.env.NODE_ENV === "production" ? "critical" : "info",
         "settings",
         "/admin/modules/settings"
@@ -181,11 +185,8 @@ export async function getPlatformStatus(settingsInput?: SiteSettingsWithModules)
   const settings = settingsInput || (await getSiteSettings());
   const ctx: ModuleHealthContext = { settings, now: new Date() };
 
-  const [moduleWarnings, platformWarnings] = await Promise.all([
-    collectModuleWarnings(ctx),
-    Promise.resolve(collectPlatformWarnings())
-  ]);
-  const warnings = [...moduleWarnings, ...platformWarnings];
+  const moduleWarnings = await collectModuleWarnings(ctx);
+  const warnings = [...moduleWarnings, ...collectPlatformWarnings()];
 
   const warningsByModule = new Map<ModuleId, PlatformWarning[]>();
   for (const item of warnings) {

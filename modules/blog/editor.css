@@ -28,7 +28,7 @@
   border-radius: var(--sd-radius-element);
   box-shadow: var(--sd-shadow-container);
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: var(--sd-space-2);
   margin: 0 auto var(--space-4);
   max-width: 900px;
@@ -132,12 +132,16 @@
 }
 @media (max-width: 720px) {
   .showrunner-admin .blog-editor-toolbar {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     justify-content: start;
     margin-inline: 0;
     overflow: visible;
     padding: var(--sd-space-4);
   }
+  .showrunner-admin .blog-more-wrap,
+  .showrunner-admin .blog-emoji-wrap { position: static; }
+  .showrunner-admin .blog-more-menu,
+  .showrunner-admin .blog-emoji-popover { max-width: 100%; }
 }
 @media (max-width: 720px) {
   .showrunner-admin .blog-tool-icon,

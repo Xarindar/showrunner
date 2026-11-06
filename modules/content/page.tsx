@@ -13,6 +13,7 @@ import { serviceGroupLabel } from "./studio/field-layout";
 import { nonEmptyStringArrayFromUnknown } from "@/lib/format";
 import { catalogMediaUrl } from "@/lib/catalog-media-url";
 import { showcaseCatalog } from "./studio/showcase-catalog";
+import { listPublicSchedulingCatalog } from "@/lib/embed/public-scheduling";
 
 export const dynamic = "force-dynamic";
 export default async function ContentPage() {
@@ -20,6 +21,8 @@ export default async function ContentPage() {
   const settings = await getSiteSettings();
   const manifest = await getEditorManifest(settings);
   const studio = readStudio(settings.publicContentConfig);
+  const categoryChoices = manifest.blocks.some(block => block.source === "categories") && settings.enabledModuleIds.includes("scheduling")
+    ? (await listPublicSchedulingCatalog(settings.siteId)).categories.map(category => ({ id: category.id, label: category.name, description: category.description || "", imageUrl: category.imageUrl || "" })) : [];
   const services = settings.enabledModuleIds.includes("scheduling") ? await prisma.service.findMany({
     where: { siteId: settings.siteId, isActive: true }, include: { mediaAsset: true }, orderBy: { name: "asc" }
   }) : [];
@@ -33,6 +36,6 @@ export default async function ContentPage() {
     payload: block.type === "business" ? resolveBusinessInfo(settings, block.defaults) : resolveStudioPayload(block, studio.blocks[block.id]),
     revision: studio.blocks[block.id]?.revision || 0,
     pageIds: studio.blocks[block.id]?.pageIds || block.pageIds,
-    choices: block.type === "showcase" ? catalog.map(item => ({ id: item.key, label: `${item.kind === "service" ? "Service" : "Product"}: ${item.name}`, group: serviceGroupLabel(manifest, item.category), tags: item.tags, catalog: { ...item, framingUrl: catalogMediaUrl(item.framingUrl || item.imageUrl, manifest.previewUrl), imageUrl: catalogMediaUrl(item.imageUrl, manifest.previewUrl) } })) : serviceChoices.filter(service => !block.sourceCategory || service.category.toLowerCase() === block.sourceCategory.toLowerCase())
+    choices: block.source === "categories" ? categoryChoices : block.type === "showcase" ? catalog.map(item => ({ id: item.key, label: `${item.kind === "service" ? "Service" : "Product"}: ${item.name}`, group: serviceGroupLabel(manifest, item.category), tags: item.tags, catalog: { ...item, framingUrl: catalogMediaUrl(item.framingUrl || item.imageUrl, manifest.previewUrl), imageUrl: catalogMediaUrl(item.imageUrl, manifest.previewUrl) } })) : serviceChoices.filter(service => !block.sourceCategory || service.category.toLowerCase() === block.sourceCategory.toLowerCase())
   }))} />;
 }

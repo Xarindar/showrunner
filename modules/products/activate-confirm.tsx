@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, type ButtonProps } from "@/components/ui";
+import { Button, type ButtonProps } from "@/components/ui/button";
 
 type ActivateConfirmButtonProps = ButtonProps & {
   confirmMessage?: string;

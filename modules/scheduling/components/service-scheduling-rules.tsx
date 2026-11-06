@@ -3,7 +3,8 @@
 import { useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Clock3 } from "lucide-react";
-import { Button, Modal } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import styles from "./service-scheduling-rules.module.css";
 
 export function ServiceSchedulingRules({ children }: { children: ReactNode }) {

@@ -192,12 +192,12 @@
 }
 .showrunner-admin .ui-tooltip { align-items: center; display: inline-flex; position: relative; }
 .showrunner-admin .ui-tooltip-content {
-  background: var(--sd-color-surface-subtle);
-  border: 1px solid var(--sd-color-surface-overlay);
+  background: var(--sd-color-text);
+  border: 1px solid var(--sd-color-text);
   border-radius: var(--radius-control);
   bottom: calc(100% + 8px);
   box-shadow: var(--shadow-panel);
-  color: var(--sd-color-on-primary);
+  color: var(--sd-color-surface);
   font-size: var(--type-caption);
   font-weight: var(--sd-type-weight-medium);
   left: 50%;
@@ -217,7 +217,7 @@
   z-index: 20;
 }
 .showrunner-admin .ui-tooltip-content::after {
-  background: var(--sd-color-surface-subtle);
+  background: var(--sd-color-text);
   bottom: -4px;
   content: "";
   height: 8px;
@@ -273,13 +273,15 @@
 .showrunner-admin .ui-select-popover {
   background: var(--color-surface);
   border: 1px solid var(--catalog-border);
-  border-radius: var(--sd-radius-tag);
+  border-radius: var(--sd-radius-input);
   box-shadow: var(--shadow-raised);
   display: grid;
   gap: var(--sd-space-4);
   left: 0;
   max-height: min(280px, calc(100vh - 140px));
-  min-width: 100%;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   overflow: auto;
   padding: var(--sd-space-6);
   position: absolute;
@@ -291,7 +293,7 @@
   appearance: none;
   background: transparent;
   border: 0;
-  border-radius: var(--sd-radius-tag);
+  border-radius: var(--sd-radius-input);
   color: var(--color-text);
   cursor: pointer;
   display: grid;
@@ -327,12 +329,15 @@
   width: 100%;
 }
 .showrunner-admin .ui-dialog::backdrop { background: var(--sd-color-overlay); }
-.showrunner-admin .ui-dialog-header,
-.showrunner-admin .ui-dialog-body { display: grid; gap: var(--space-3); min-width: 0; }
-.showrunner-admin .ui-dialog-header { margin-bottom: var(--sd-space-12); min-height: 0; }
-.showrunner-admin .ui-dialog-header h2 { margin-bottom: 0; }
-.showrunner-admin .ui-dialog-header p { color: var(--color-muted); }
-.showrunner-admin .ui-dialog-close { height: 34px; justify-self: end; min-height: 34px; min-width: 34px; padding: 0; width: 34px; }
+:where(.showrunner-admin .ui-dialog-body) { display: grid; gap: var(--space-3); min-width: 0; }
+.showrunner-admin .ui-dialog.ui-modal { overflow: hidden; padding: var(--sd-space-16); }
+.showrunner-admin .ui-dialog.ui-modal[open] { display: flex; flex-direction: column; }
+.showrunner-admin .ui-dialog.ui-modal > .ui-modal-head { flex-shrink: 0; }
+.showrunner-admin .ui-dialog.ui-modal > .ui-dialog-body { min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: auto; }
+.showrunner-admin .ui-dialog-close { aspect-ratio: 1; justify-self: end; width: var(--sd-layout-control-height); height: var(--sd-layout-control-height); min-width: var(--sd-layout-control-height); min-height: var(--sd-layout-control-height); padding: 0; }
+@media (max-width: 860px), (pointer: coarse) {
+  .showrunner-admin .ui-dialog-close { width: var(--sd-layout-touch-target); height: var(--sd-layout-touch-target); min-width: var(--sd-layout-touch-target); min-height: var(--sd-layout-touch-target); }
+}
 .showrunner-admin .ui-modal-head {
   align-items: center;
   display: flex;
@@ -400,34 +405,17 @@
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   overflow: auto;
-  padding: clamp(var(--sd-space-20), 3vw, var(--sd-space-32));
-  scrollbar-gutter: stable;
+  padding: var(--sd-space-16);
+  scrollbar-gutter: auto;
 }
 .showrunner-admin .ui-onboarding-header {
   align-items: start;
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: minmax(0, 1fr) 38px;
+  grid-template-columns: minmax(0, 1fr) auto;
   min-width: 0;
 }
-.showrunner-admin .ui-onboarding-header h2 { font-size: var(--type-h1); line-height: var(--leading-tight); }
 .showrunner-admin .ui-onboarding-header p { color: var(--color-muted); margin-top: var(--space-2); }
-.showrunner-admin .ui-onboarding-close {
-  align-items: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  color: var(--color-muted);
-  cursor: pointer;
-  display: flex;
-  height: 38px;
-  justify-content: center;
-  padding: 0;
-  transition: background-color var(--motion-fast) ease,
-    color var(--motion-fast) ease;
-  width: 38px;
-}
-.showrunner-admin .ui-onboarding-close:hover { background: var(--color-hover); color: var(--color-text); }
 .showrunner-admin .ui-onboarding-body { display: grid; min-width: 0; }
 @media (max-width: 720px) {
   .showrunner-admin .ui-onboarding-modal {
@@ -442,17 +430,7 @@
   .showrunner-admin .ui-onboarding-step-item:last-child { border-right: 0; }
   .showrunner-admin .ui-onboarding-step-control { min-height: 64px; min-width: 0; padding: 0 var(--space-3); }
   .showrunner-admin .ui-onboarding-content { padding: var(--space-4); }
-  .showrunner-admin .ui-onboarding-header h2 { font-size: var(--type-h2); }
 }
-.showrunner-admin .ui-sheet {
-  height: 100svh;
-  margin: 0;
-  max-height: 100svh;
-  max-width: min(420px, calc(100vw - var(--space-4)));
-  min-height: 100svh;
-}
-.showrunner-admin .ui-sheet-right { margin-left: auto; }
-.showrunner-admin .ui-sheet-left { margin-right: auto; }
 .showrunner-admin .module-modal-actions {
   align-items: center;
   display: flex;
@@ -464,9 +442,9 @@
   .showrunner-admin .module-modal-actions .ui-button { flex: 1 1 100%; }
   .showrunner-admin .module-modal-actions { align-items: stretch; display: grid; }
 }
-.showrunner-admin dialog.ui-dialog > :is(.ui-modal-head,.ui-dialog-header) {
-  padding: 0;
-  margin: 0 0 var(--sd-space-12);
+.showrunner-admin dialog.ui-dialog > .ui-modal-head {
+  padding: var(--sd-space-8) var(--sd-space-16);
+  margin: calc(-1 * var(--sd-space-16)) calc(-1 * var(--sd-space-16)) var(--sd-space-12);
   min-height: 0;
   gap: var(--sd-space-8);
   border: 0;
@@ -487,3 +465,70 @@
 }
 .showrunner-admin .ui-dialog .module-modal-actions { display: flex; align-items: center; }
 .showrunner-admin .ui-dialog .module-modal-actions .ui-button { flex: 0 1 auto; }
+
+.showrunner-admin .ui-dialog .ui-dialog-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--sd-type-section-size);
+  font-weight: var(--sd-type-section-weight);
+  line-height: var(--sd-type-section-line);
+  letter-spacing: var(--sd-type-section-tracking);
+  overflow-wrap: anywhere;
+}
+.showrunner-admin .ui-modal-head > .ui-dialog-close { flex-shrink: 0; }
+
+.showrunner-admin .ui-dialog .ui-dialog-header {
+  background: var(--sd-color-primary);
+  color: var(--sd-color-on-primary);
+}
+.showrunner-admin .ui-dialog-header .ui-dialog-title { color: var(--sd-color-on-primary); }
+.showrunner-admin .ui-dialog-header .ui-button-ghost {
+  background: transparent;
+  color: var(--sd-color-on-primary);
+}
+.showrunner-admin .ui-dialog-header .ui-button-ghost:not(:disabled):hover { background: var(--sd-color-inverse-fill-hover); }
+.showrunner-admin .ui-dialog-header .ui-button:not(.ui-button-ghost):not(.ui-button-secondary):not(.ui-button-danger):not(:disabled) {
+  background: var(--sd-color-on-primary);
+  color: var(--sd-color-primary);
+  box-shadow: none;
+}
+.showrunner-admin .ui-dialog-header .ui-button:not(.ui-button-ghost):not(.ui-button-danger):not(:disabled):hover { background: var(--sd-color-fill-secondary-hover); }
+.showrunner-admin .ui-onboarding-header.ui-dialog-header {
+  margin: calc(-1 * var(--sd-space-16)) calc(-1 * var(--sd-space-16)) 0;
+  padding: var(--sd-space-8) var(--sd-space-16);
+}
+.showrunner-admin .ui-onboarding-header.ui-dialog-header p { color: var(--sd-color-on-primary); }
+
+.showrunner-admin .ui-dialog .ui-dialog-header .ui-dialog-close {
+  position: relative;
+  flex: 0 0 auto;
+  background: transparent;
+  color: var(--sd-color-primary);
+  border-radius: var(--sd-radius-pill);
+  box-shadow: none;
+}
+.showrunner-admin .ui-dialog .ui-dialog-header .ui-dialog-close::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--dialog-close-disc-size);
+  height: var(--dialog-close-disc-size);
+  border-radius: var(--sd-radius-pill);
+  background: var(--sd-color-on-primary);
+  pointer-events: none;
+}
+.showrunner-admin .ui-dialog .ui-dialog-header .ui-dialog-close:hover { background: transparent; color: var(--sd-color-primary); }
+.showrunner-admin .ui-dialog .ui-dialog-header .ui-dialog-close:hover::before { background: var(--sd-color-fill-secondary-hover); }
+.showrunner-admin .ui-dialog-header .ui-dialog-close > :is(svg, span) {
+  position: absolute;
+  right: calc((var(--dialog-close-disc-size) - var(--sd-space-16)) / 2);
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--sd-space-16);
+  height: var(--sd-space-16);
+  color: inherit;
+  stroke: currentColor;
+}

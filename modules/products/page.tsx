@@ -1,3 +1,4 @@
+import { tablePageSize } from "@/lib/admin-table-pagination";
 import { Notification } from "@/components/ui/notifications";
 import NextImage from "next/image";
 import { MediaDriver, MediaVariantType, Prisma, ProductStatus, ProductType } from "@prisma/client";
@@ -19,11 +20,10 @@ import { PackageProductFields } from "./package-product-fields";
 
 export const dynamic = "force-dynamic";
 
-const pageSize = 50;
 const statusFilters = ["all", ...Object.values(ProductStatus).map((status) => status.toLowerCase())] as const;
 
 type ProductsPageProps = {
-  searchParams: Promise<{ saved?: string; error?: string; page?: string; status?: string; q?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; page?: string; pageSize?: string; status?: string; q?: string }>;
 };
 
 function normalizeStatusFilter(value?: string) {
@@ -79,6 +79,7 @@ function productMediaUrl(product: {
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
   await requireAdmin("products:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
+  const pageSize = tablePageSize(params.pageSize);
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
   const searchQuery = (params.q || "").trim().slice(0, 120);
@@ -222,9 +223,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       </header>
 
       {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
-      {errorMessage ? <Notification tone="danger" queryKey="error">{decodeURIComponent(errorMessage)}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
-      <main className="catalog-board" aria-labelledby="products-board-title">
+      <main data-viewport-table className="catalog-board" aria-labelledby="products-board-title">
           <div className="catalog-board-header">
             <div>
               <p className="catalog-rail-label">Inventory</p>
@@ -362,6 +363,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           </div>
 
           <Pagination
+            pageSize={pageSize}
             label="Product pages"
             nextHref={productsHref({ page: Math.min(pageCount, page + 1), q: searchQuery, status: statusFilter })}
             page={page}

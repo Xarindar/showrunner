@@ -775,7 +775,7 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
       </header>
 
       {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
-      {errorMessage ? <Notification tone="danger" queryKey="error">{decodeURIComponent(errorMessage)}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
       <ProductEditorTabs initialTab={params.tab} tabs={tabs} />
     </div>

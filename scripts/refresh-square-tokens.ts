@@ -50,13 +50,14 @@ async function main() {
     }
   }
 
-  const stale = credentials
+  const currentCredentials = await prisma.paymentGatewayCredential.findMany({ where: { id: { in: credentials.map((credential) => credential.id) } } });
+  const stale = currentCredentials
     .filter((credential) => {
       const refreshedAt = squareTokenRefreshedAt(credential);
       return isOAuthSquareCredential(credential) && (!refreshedAt || refreshedAt <= staleCutoff);
     })
     .map((credential) => credential.siteId);
-  const reconnectRequired = credentials
+  const reconnectRequired = currentCredentials
     .filter((credential) => isOAuthSquareCredential(credential) && squareRefreshRequiresReconnect(credential))
     .map((credential) => credential.siteId);
 

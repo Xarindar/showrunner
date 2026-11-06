@@ -20,8 +20,8 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return <input className={cx("ui-input", className)} {...props} />;
 }
 
-export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={cx("ui-input", className)} {...props} />;
+export function Select({ className, compact = false, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { compact?: boolean }) {
+  return <select className={cx("ui-input", compact && "ui-select-compact", className)} {...props} />;
 }
 
 export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {

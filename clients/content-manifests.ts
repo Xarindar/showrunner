@@ -1,5 +1,6 @@
 import { configuredBlock, validateManifest, type ContentManifest } from "@/modules/content/studio/manifest";
 import { cottageEventStripDefaults, cottageVendorDirectoryDefaults, cottageVenueGalleryDefaults } from "./cottage616/content-defaults";
+import { cottageTeamBlock } from "./cottage616/team-blocks";
 import pageStrips from "./cottage616/page-strips.json";
 import type { ContentBlockConfig } from "@/modules/content/studio/manifest";
 
@@ -14,7 +15,7 @@ export const cottageContentManifest = validateManifest({
   booking: { path: "/booking.html", profileLabels: { cottage616: "Cottage 616", "the-hive": "The Hive" }, profilesByCategory: { events: "cottage616", "the-hive": "the-hive" } },
   pages: [{ id: "home", path: "/index.html", label: "Cottage 616" }, { id: "hive", path: "/the-hive.html", label: "The Hive" }, { id: "booking", path: "/booking.html", label: "Booking" }, { id: "vendors", path: "/vendors.html", label: "Vendors" }],
   blocks: [
-    ...pageStrips as ContentBlockConfig[],
+    ...(pageStrips as ContentBlockConfig[]).map(block => cottageTeamBlock(block)),
     configuredBlock("home-events", "featured", ["home"], { defaults: cottageEventStripDefaults, label: "Events panel", fixedRows: true, limits: { items: 3 }, minimums: { items: 3 }, presentation: { assetBaseUrl: "https://cottage616-production.up.railway.app/", variant: "event-strip" }, source: "services" }),
     configuredBlock("home-venue-gallery", "gallery", ["home"], { defaults: cottageVenueGalleryDefaults, label: "Small venue image carousel", limits: { images: 30 }, presentation: { assetBaseUrl: "https://cottage616-production.up.railway.app/", variant: "image-strip" } }),
     configuredBlock("vendors-directory", "directory", ["vendors"], { defaults: cottageVendorDirectoryDefaults, label: "Vendors", limits: { items: 30 }, presentation: { assetBaseUrl: "https://cottage616-production.up.railway.app/", variant: "vendor-directory" } }),

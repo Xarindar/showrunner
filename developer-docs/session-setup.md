@@ -2,11 +2,11 @@
 
 The calendar's **New session** action opens a client-first form at
 `/admin/appointments/new`. Choose an existing client or enter name, email and
-phone; choose a reusable session type or a one-off session; enter the agreed
+phone; choose a reusable session or a one-off session; enter the agreed
 date, time, duration and price. This action saves the booking and client
 together. It does not send email, request payment or mark money as paid.
 
-**New session type** at `/admin/modules/services/new` saves name, duration,
+**New session** at `/admin/modules/services/new` saves name, duration,
 and price together. Location is arranged with the client after booking and can
 be added, changed or cleared on the individual session. New bookings start with
 location "To be arranged" rather than inheriting the reusable type's location.
@@ -43,20 +43,21 @@ existing-client reuse, hidden one-offs, and a rejected conflict preserving every
 form value. Use a separate local database; do not create test client bookings in
 a live installation.
 
-## Session types and package tiers
+## Sessions and package tiers
 
-Create a session type and its package tiers together at `/admin/modules/services/new`.
-One package is shown initially; **Add package** creates a blank package, while
-**Duplicate** copies price, duration and coverage selections. The shared coverage matrix lets owners define a row once,
+Create a session and its package tiers together at `/admin/modules/services/new`.
+New sessions start with no packages. **Add package** creates a blank package. Add at least one before saving.
+**Add Services** assigns services and optional counts for locations, outfit changes, and final photos to a package.
+**Duplicate** copies price, duration, deliverables and coverage selections. The shared coverage matrix lets owners define a row once,
 then select which tiers include it. The **What’s included** table comes before
 Packages. Its **Add item** button opens the reusable service library, with search,
 category/tag filters, multiple selection, and a New service form. Library services
-are parts of a session, not independently scheduled session types.
-Optional extras have independent prices. Existing service bundles remain available
-under **Service bundles** and are not converted or deleted.
+are parts of a session, not independently scheduled sessions.
+Suggested Add-Ons are shown in an always-visible table. Library services expose an optional Available as an add-on switch; enabled services have a separate flat price or named hourly rate. Included services do not increase package totals. Separately selected add-ons use their authoritative catalog price, and services already included in the selected package are excluded from suggestions. Existing booking snapshots remain unchanged. Existing session bundles remain available
+under **Session Bundles** and are not converted or deleted.
 
 `Service.sessionOffering` stores the validated coverage rows, tiers and extras as
-one JSON document, saved atomically with the session type. The first tier supplies
+one JSON document, saved atomically with the session. The first tier supplies
 the service's default duration and price for existing consumers. Existing forms
 that do not submit an offering preserve the stored configuration. The current
 public booking rebuild remains separate; this change does not add a public tier
@@ -67,12 +68,12 @@ duration. Owners may adjust those agreed values before saving. Extras are one-ti
 price additions; adjust the booking duration explicitly for any extra coverage.
 The selected package name, coverage, extras and agreed values are copied to
 `Booking.packageSnapshot`. Later catalog edits do not change booked inclusions.
-Legacy session types and bookings with null configuration continue to work.
+Legacy sessions and bookings with null configuration continue to work.
 
 `ServiceLibraryItem` holds site-scoped reusable names, descriptions, categories and
 tags. Names are unique within a site ignoring case. Library creates/edits save
 immediately; adding a service or changing its package selections remains a session
-draft until Save session type. The existing shared Modal, Field and Button controls
+draft until Save session. The existing shared Modal, Field and Button controls
 provide dialog behavior. `service-library-picker.module.css` uses the shared color,
 type, space and radius tokens; the picker is reused by new and existing sessions.
 
@@ -91,8 +92,8 @@ and public links intact. Local verification uses the isolated session-check data
 
 ## Builder refinement — October 15, 2026
 
-The Services catalog calls reusable offerings **Session types**, choices within
-one offering **Packages**, and combinations of separate services **Service bundles**.
+The Services catalog calls reusable offerings **Sessions**, choices within
+one session **Packages**, and groups of separately scheduled sessions **Session Bundles**.
 The desktop comparison matrix and mobile package cards remain. New packages receive
 keyboard focus; invalid fields reveal their enclosing disclosures before native
 validation focuses them. Create/edit forms warn before following links away from

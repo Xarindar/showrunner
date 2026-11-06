@@ -1,6 +1,6 @@
 import { SkeletonBlock, SkeletonLine } from "@/components/ui/states";
 
-const headings = { clients: "Clients", products: "Products", services: "Session types", packages: "Service bundles" };
+const headings = { clients: "Clients", products: "Products", services: "Sessions", packages: "Session Bundles" };
 
 export function AdminTableSkeleton({ kind }: { kind: keyof typeof headings }) {
   return (

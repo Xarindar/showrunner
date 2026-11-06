@@ -1,10 +1,12 @@
 "use client";
-import { Notification } from "@/components/ui/notifications";
+import { useNotify } from "@/components/ui/notifications";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { Check, Copy, ExternalLink, ImagePlus, Images, Plus, Search, Upload } from "lucide-react";
-import { Button, Card, Modal } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Modal } from "@/components/ui/modal";
 import {
   addClientGalleryMediaAction, browseClientGalleryMediaAction, createClientGalleryAction, createClientGalleryLinkAction,
   getClientGalleryWorkspace, uploadClientGalleryPhotoAction
@@ -31,8 +33,7 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
   const [extraPrice, setExtraPrice] = useState("");
   const [currency, setCurrency] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const notify = useNotify();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState("");
   const [query, setQuery] = useState("");
@@ -84,7 +85,7 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
   function resetBrowse() { setSearchDraft(""); setQuery(""); setPage(1); setSelected([]); }
   function openCreate() {
     setRequestId(crypto.randomUUID()); setPackageKey(""); setAllowance(""); setExtraPrice(""); setCurrency("");
-    setError(""); setNotice(""); setCreating(true);
+    setCreating(true);
   }
 
   function choosePackage(key: string) {
@@ -99,36 +100,36 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
     event.preventDefault();
     if (busy || !selectedPackage) return;
     const form = new FormData(event.currentTarget);
-    setBusy(true); setError(""); setNotice("");
+    setBusy(true);
     try {
       const result = await createClientGalleryAction({
         clientId, requestId, title: String(form.get("title") || ""), packageProductId: selectedPackage.productId,
         purchasedOrderId: selectedPackage.orderId, selectionAllowance: allowance, extraPhotoPrice: extraPrice, selectionCurrency: currency
       });
-      if (!result.ok) { setError(result.error); return; }
+      if (!result.ok) { notify(result.error, "danger"); return; }
       await reload(); setGalleryId(result.data.galleryId); resetBrowse(); setCreating(false);
-      setNotice("Private shoot gallery created. Add photos, then copy the client’s link when you’re ready.");
-    } catch { setError("The gallery could not be created. Check your connection and try again."); }
+      notify("Private shoot gallery created.");
+    } catch { notify("The gallery could not be created. Check your connection and try again.", "danger"); }
     finally { setBusy(false); }
   }
 
   async function addSelected() {
     if (busy || !selected.length) return;
-    setBusy(true); setError(""); setNotice("");
+    setBusy(true);
     try {
       const result = await addClientGalleryMediaAction({ clientId, galleryId, assetIds: selected });
-      if (!result.ok) { setError(result.error); return; }
+      if (!result.ok) { notify(result.error, "danger"); return; }
       await reload(); setPickerOpen(false); resetBrowse();
-      setNotice(`${result.data.added} photo${result.data.added === 1 ? "" : "s"} added to this shoot.`);
-    } catch { setError("Photos could not be added. Your selection is saved here; try again."); }
+      notify(`${result.data.added} photo${result.data.added === 1 ? "" : "s"} added to this shoot.`);
+    } catch { notify("Photos could not be added. Your selection is saved here; try again.", "danger"); }
     finally { setBusy(false); }
   }
 
   async function uploadBatch() {
     if (uploading || busy || !uploads.some((row) => row.status === "ready")) return;
     const batchError = clientGalleryBatchError(uploads.map(row => row.file));
-    if (batchError) { setError(batchError); return; }
-    stopUpload.current = false; setUploading(true); setError(""); setNotice("");
+    if (batchError) { notify(batchError, "danger"); return; }
+    stopUpload.current = false; setUploading(true);
     const rows = [...uploads];
     let completed = 0;
     try {
@@ -148,8 +149,8 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
         setUploads([...rows]);
       }
       await reload();
-      setNotice(`${completed} photo${completed === 1 ? "" : "s"} uploaded to private Media and added to this shoot.${stopUpload.current ? " Remaining files were not uploaded." : ""}`);
-    } catch { setError("The photo list could not refresh. Check the file statuses below before retrying."); }
+      if (completed) notify(`${completed} photo${completed === 1 ? "" : "s"} added to this shoot.`);
+    } catch { notify("The photo list could not refresh. Check the file statuses below before retrying.", "danger"); }
     finally { setUploading(false); }
   }
 
@@ -157,18 +158,18 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
     if (!gallery?.accessPath) return;
     try {
       await navigator.clipboard.writeText(new URL(gallery.accessPath, window.location.origin).toString());
-      setNotice("Private link copied. Anyone holding this link can view this client’s shoot; share it only with the client."); setError("");
-    } catch { setError("Copy was unavailable. Open the private gallery and copy its address from your browser."); }
+      notify("Private link copied.");
+    } catch { notify("Copy was unavailable. Open the private gallery and copy its address from your browser.", "danger"); }
   }
 
   async function createLink() {
     if (busy) return;
-    setBusy(true); setError("");
+    setBusy(true);
     try {
       const result = await createClientGalleryLinkAction({ clientId, galleryId });
-      if (!result.ok) { setError(result.error); return; }
-      await reload(); setNotice("Client access link created. Copy it when you’re ready to share.");
-    } catch { setError("The private link could not be created. Please try again."); }
+      if (!result.ok) { notify(result.error, "danger"); return; }
+      await reload(); notify("Client access link created.");
+    } catch { notify("The private link could not be created. Please try again.", "danger"); }
     finally { setBusy(false); }
   }
 
@@ -203,8 +204,6 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
         <div><h2 className="section-title">Shoot galleries</h2><p className="ui-zero muted-text">Private photos, package selections, and delivery for this client.</p></div>
         <Button disabled={busy || uploading || creating} onClick={openCreate} size="sm" type="button" variant="secondary"><Plus aria-hidden="true" size={16} /> New shoot</Button>
       </header>
-      {notice ? <Notification>{notice}</Notification> : null}
-      {error && !pickerOpen ? <Notification tone="danger">{error}</Notification> : null}
 
       {creating ? <form className={styles.createForm} onSubmit={createGallery}>
         <h3>New private shoot</h3>
@@ -224,7 +223,7 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
       {!creating && !workspace.galleries.length ? <div className={styles.empty}><Images aria-hidden="true" size={28} /><p>No shoot galleries yet. Create one from a purchased package, then add the client’s photos.</p></div> : null}
       {gallery && !creating ? <>
         <div className={styles.galleryToolbar}>
-          <label className={styles.field}><span>Shoot</span><select disabled={busy || uploading} onChange={(event) => { setGalleryId(event.target.value); resetBrowse(); setUploads([]); setError(""); setNotice(""); if (uploadInput.current) uploadInput.current.value = ""; }} value={galleryId}>{workspace.galleries.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.photoCount} photos</option>)}</select></label>
+          <label className={styles.field}><span>Shoot</span><select disabled={busy || uploading} onChange={(event) => { setGalleryId(event.target.value); resetBrowse(); setUploads([]); if (uploadInput.current) uploadInput.current.value = ""; }} value={galleryId}>{workspace.galleries.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.photoCount} photos</option>)}</select></label>
           <span className="ui-badge">Private</span>
         </div>
         <div className={styles.terms}>
@@ -232,32 +231,29 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
           <div className={styles.actions}>{gallery.accessPath ? <><Button disabled={busy || uploading} onClick={copyLink} size="sm" type="button" variant="secondary"><Copy aria-hidden="true" size={15} /> Copy client link</Button><a className={styles.openLink} href={gallery.accessPath} rel="noreferrer" target="_blank">Open private gallery <ExternalLink aria-hidden="true" size={14} /></a></> : <Button disabled={busy || uploading} onClick={createLink} size="sm" type="button" variant="secondary">Create client link</Button>}</div>
         </div>
         <p className={styles.help}>Keep the client link private. Photos stay in shared Media as private originals. Your public Portfolio remains separately curated.</p>
-        <div className={styles.photosHeader}><h3>{gallery.photoCount} shoot photo{gallery.photoCount === 1 ? "" : "s"}</h3>{workspace.canManageMedia ? <Button disabled={busy || uploading} onClick={() => { resetBrowse(); setError(""); setPickerOpen(true); }} size="sm" type="button" variant="secondary"><ImagePlus aria-hidden="true" size={16} /> Choose from Media</Button> : null}</div>
+        <div className={styles.photosHeader}><h3>{gallery.photoCount} shoot photo{gallery.photoCount === 1 ? "" : "s"}</h3>{workspace.canManageMedia ? <Button disabled={busy || uploading} onClick={() => { resetBrowse(); setPickerOpen(true); }} size="sm" type="button" variant="secondary"><ImagePlus aria-hidden="true" size={16} /> Choose from Media</Button> : null}</div>
         {!pickerOpen && workspace.canManageMedia ? photoGrid : null}
         {workspace.canManageMedia ? <section className={styles.uploadSection} aria-label="Upload shoot photos">
           <h3>Upload originals</h3>
           <p className={styles.help}>JPG, PNG, WebP, or GIF originals: up to 25 MiB and 80 megapixels each. Choose at most 100 photos totaling 250 MiB per batch. Files upload one at a time; RAW files are not supported.</p>
-          {!workspace.canUpload ? <p className="error">Private uploads need configured server, S3, or R2 storage. Update Media storage settings to upload originals.</p> : <>
+          {!workspace.canUpload ? <p className="error">Private photo uploads are unavailable. Contact support to enable them.</p> : <>
             <label className={styles.field}><span>Photo files</span><input accept={clientGalleryImageTypes.join(",")} disabled={uploading || busy} multiple onChange={(event) => {
               const files = Array.from(event.target.files || []);
               const batchError = clientGalleryBatchError(files);
-              if (batchError) { setUploads([]); setError(batchError); event.target.value = ""; return; }
-              setError("");
+              if (batchError) { setUploads([]); notify(batchError, "danger"); event.target.value = ""; return; }
               setUploads(files.map((file) => ({ file, status: file.size > clientGalleryUploadMaxBytes || !(clientGalleryImageTypes as readonly string[]).includes(file.type) ? "failed" : "ready", error: file.size > clientGalleryUploadMaxBytes ? "Exceeds 25 MiB per photo." : !(clientGalleryImageTypes as readonly string[]).includes(file.type) ? "Use JPG, PNG, WebP, or GIF." : undefined })));
-              setNotice("");
             }} ref={uploadInput} type="file" /></label>
             {uploads.length ? <ul aria-live="polite" className={styles.uploadList}>{uploads.map((row, index) => <li key={`${row.file.name}-${index}`}><span className={styles.uploadFilename}>{row.file.name}</span><span>{row.status === "done" ? <><Check aria-hidden="true" size={14} /> Added</> : row.status === "uploading" ? "Uploading…" : row.status === "failed" ? "Needs attention" : "Ready"}</span>{row.error ? <small className={styles.uploadError}>{row.error}</small> : null}</li>)}</ul> : null}
-            <div className={styles.actions}><Button disabled={uploading || busy || !uploads.some((row) => row.status === "ready")} onClick={uploadBatch} size="sm" type="button"><Upload aria-hidden="true" size={16} />{uploading ? "Uploading…" : "Upload photos"}</Button>{uploading ? <Button onClick={() => { stopUpload.current = true; setNotice("Stopping after the current photo finishes."); }} size="sm" type="button" variant="ghost">Stop after this photo</Button> : uploads.length ? <Button onClick={() => { setUploads([]); if (uploadInput.current) uploadInput.current.value = ""; }} size="sm" type="button" variant="ghost">Clear file list</Button> : null}</div>
+            <div className={styles.actions}><Button disabled={uploading || busy || !uploads.some((row) => row.status === "ready")} onClick={uploadBatch} size="sm" type="button"><Upload aria-hidden="true" size={16} />{uploading ? "Uploading…" : "Upload photos"}</Button>{uploading ? <Button onClick={() => { stopUpload.current = true; notify("Stopping after the current photo finishes.", "neutral"); }} size="sm" type="button" variant="ghost">Stop after this photo</Button> : uploads.length ? <Button onClick={() => { setUploads([]); if (uploadInput.current) uploadInput.current.value = ""; }} size="sm" type="button" variant="ghost">Clear file list</Button> : null}</div>
           </>}
         </section> : <p className={styles.help}>Media permission is required to browse or add shoot photos.</p>}
       </> : null}
 
-      <Modal bodyClassName={styles.pickerBody} className={styles.picker} onClose={() => { if (!busy) { setPickerOpen(false); resetBrowse(); setError(""); } }} open={pickerOpen} title="Choose private photos from Media">
+      <Modal bodyClassName={styles.pickerBody} className={styles.picker} onClose={() => { if (!busy) { setPickerOpen(false); resetBrowse(); } }} open={pickerOpen} title="Choose private photos from Media">
         <p className={styles.help}>Search across your private Media library by filename, description, folder, or exact tag. Selections stay checked as you browse pages.</p>
         <form className={styles.search} onSubmit={(event) => { event.preventDefault(); setPage(1); setQuery(searchDraft.trim()); }}><label className={styles.field}><span>Search private photos</span><input maxLength={180} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search photos or folders" type="search" value={searchDraft} /></label><Button disabled={busy} size="sm" type="submit" variant="secondary"><Search aria-hidden="true" size={16} /> Search</Button></form>
-        {error ? <p className="error" role="alert">{error}</p> : null}
         {photoGrid}
-        <footer className={styles.pickerFooter}><span>{selected.length} selected{selected.length === 100 ? " · Add this batch to select more" : ""}</span><div className={`module-modal-actions ${styles.actions}`}><Button disabled={busy} onClick={() => { setPickerOpen(false); resetBrowse(); setError(""); }} size="sm" type="button" variant="ghost">Cancel</Button><Button disabled={busy || !selected.length} onClick={addSelected} size="sm" type="button">{busy ? "Adding…" : `Add ${selected.length || "selected"} photo${selected.length === 1 ? "" : "s"}`}</Button></div></footer>
+        <footer className={styles.pickerFooter}><span>{selected.length} selected{selected.length === 100 ? " · Add this batch to select more" : ""}</span><div className={`module-modal-actions ${styles.actions}`}><Button disabled={busy} onClick={() => { setPickerOpen(false); resetBrowse(); }} size="sm" type="button" variant="ghost">Cancel</Button><Button disabled={busy || !selected.length} onClick={addSelected} size="sm" type="button">{busy ? "Adding…" : `Add ${selected.length || "selected"} photo${selected.length === 1 ? "" : "s"}`}</Button></div></footer>
       </Modal>
     </Card>
   );

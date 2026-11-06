@@ -28,7 +28,7 @@ test("admin design rules cannot recolor public routes or escape into the website
     parse(readFileSync(path, "utf8")).walkRules(rule => {
       for (const selector of list.comma(rule.selector)) {
         if (rule.parent?.type === "atrule" && rule.parent.name.endsWith("keyframes")) continue;
-        assert(selector.startsWith(".showrunner-admin") || selector.startsWith("html:has(.showrunner-admin"), `${path}: unscoped selector ${selector}`);
+        assert(selector.startsWith(".showrunner-admin") || selector.startsWith(":where(.showrunner-admin ") || selector.startsWith("html:has(.showrunner-admin"), `${path}: unscoped selector ${selector}`);
         assert(!selector.includes("iframe *"), "Never style the client's website through admin selectors");
       }
     });
@@ -87,4 +87,16 @@ test("admin token aliases resolve without tenant values or circular references",
   }
   for (const name of tokens.keys()) resolveToken(name, []);
   for (let step = 1; step <= 12; step++) assert(tokens.has(`--space-${step}`), "Admin spacing must be independent of public presets");
+});
+
+test("source stays valid UTF-8 and admin confirmations use the shared native dialog", () => {
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  for (const directory of ["app", "components", "modules", "shell"]) {
+    for (const name of readdirSync(directory, { recursive: true, encoding: "utf8" })) {
+      if (!/\.(tsx?|css)$/.test(name)) continue;
+      const path = resolve(directory, name);
+      const source = decoder.decode(readFileSync(path));
+      if (path !== resolve("components/ui/dialog.tsx")) assert(!/<dialog[\s>]/.test(source), `${path}: use the shared native Dialog or Modal`);
+    }
+  }
 });

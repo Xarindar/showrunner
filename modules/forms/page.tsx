@@ -1,3 +1,4 @@
+import { tablePageSize } from "@/lib/admin-table-pagination";
 import { Notification } from "@/components/ui/notifications";
 import Link from "next/link";
 import NextImage from "next/image";
@@ -30,7 +31,6 @@ import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
 
-const pageSize = 20;
 const statusFilters = ["all", ...Object.values(FormStatus).map((status) => status.toLowerCase())] as const;
 const supportedDestinations = Object.values(FormDestination);
 const conditionActionLabels = {
@@ -46,7 +46,7 @@ const conditionOperatorLabels = {
 } as const;
 
 type FormsPageProps = {
-  searchParams: Promise<{saved?: string;error?: string;page?: string;status?: string;form?: string;}>;
+  searchParams: Promise<{saved?: string;error?: string;page?: string; pageSize?: string;status?: string;form?: string;}>;
 };
 
 type BuilderField = {
@@ -320,6 +320,7 @@ function uploadControls(input: {field?: BuilderField;idPrefix: string;}) {
 export default async function FormsPage({ searchParams }: FormsPageProps) {
   const user = await requireAdmin("forms:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
+  const pageSize = tablePageSize(params.pageSize);
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
   const formWhere = statusFilter === "all" ? { siteId: settings.siteId } : { siteId: settings.siteId, status: statusFilter.toUpperCase() as FormStatus };
@@ -574,7 +575,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
       </EqualGrid>
 
       <EqualGrid as="section">
-        <Card>
+        <Card data-viewport-table>
           <div className="page-header compact-header">
             <div>
               <h2 className="section-title">Form library</h2>
@@ -666,6 +667,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
             </tbody>
           </Table>
           <Pagination
+            pageSize={pageSize}
             label="Form pages"
             nextHref={`/admin/modules/forms?status=${statusFilter}&page=${Math.min(pageCount, page + 1)}`}
             page={page}

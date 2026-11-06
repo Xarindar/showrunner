@@ -2,7 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 import { Filter, Plus, Upload } from "lucide-react";
-import { Button, Modal } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 
 type ActiveModal = "add" | "filters" | "data" | null;
 

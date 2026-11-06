@@ -22,10 +22,6 @@ export type HeroElementLayout = {
   isVisible: boolean;
 };
 
-export type HeroCanvasLayerElementLayout = HeroElementLayout & {
-  type: HeroCanvasLayerElementType;
-};
-
 export type HeroSlideEditor = {
   id?: string;
   clientId: string;
@@ -174,28 +170,6 @@ export function defaultHeroElementLayout(type: HeroElementType): HeroElementLayo
   };
 }
 
-export function heroElementLabel(type: HeroElementType) {
-  if (type === "IMAGE") return "Image";
-  if (type === "HEADLINE") return "Title";
-  if (type === "CAPTION") return "Caption";
-  return "CTA";
-}
-
-export function clampHeroElementLayout(input: HeroElementLayout): HeroElementLayout {
-  const columnSpan = clampInteger(input.columnSpan, 1, HERO_GRID_COLUMNS);
-  const rowSpan = clampInteger(input.rowSpan, 1, HERO_GRID_ROWS);
-
-  return {
-    ...input,
-    gridColumn: clampInteger(input.gridColumn, 1, HERO_GRID_COLUMNS - columnSpan + 1),
-    gridRow: clampInteger(input.gridRow, 1, HERO_GRID_ROWS - rowSpan + 1),
-    columnSpan,
-    rowSpan,
-    zIndex: clampInteger(input.zIndex, 1, 20),
-    isVisible: input.isVisible !== false
-  };
-}
-
 // Keeps the element's anchor cell and shrinks its footprint at the grid edges
 // instead of pushing the anchor back, so assets can sit flush against the
 // right and bottom of the image even when their default footprint is wide.
@@ -251,35 +225,6 @@ export function normalizeHeroPresentation(
     autoplayIntervalMs: clampInteger(presentation?.autoplayIntervalMs ?? HERO_AUTOPLAY_INTERVAL_MS, 2500, 20000),
     slides: slides.length ? slides : [fallback]
   };
-}
-
-export function parseHeroPresentationPayload(raw: FormDataEntryValue | null, fallback: HeroPresentationEditor): HeroPresentationEditor {
-  if (typeof raw !== "string" || !raw.trim()) return fallback;
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!isRecord(parsed)) return fallback;
-
-    const slidesValue = Array.isArray(parsed.slides) ? parsed.slides : [];
-    const slides = slidesValue
-      .slice(0, 8)
-      .map((slide, index) => normalizeHeroSlide(isRecord(slide) ? slide : {}, index, fallback.slides[0]))
-      .filter((slide) => slide.headline || slide.caption || slide.imageUrl || slide.ctaLabel);
-
-    const normalizedSlides = slides.length ? slides : [fallback.slides[0]];
-
-    return {
-      mode: parsed.mode === "SLIDESHOW" && normalizedSlides.length > 1 ? "SLIDESHOW" : "STATIC",
-      autoplayIntervalMs: clampInteger(numberFromUnknown(parsed.autoplayIntervalMs, fallback.autoplayIntervalMs), 2500, 20000),
-      slides: normalizedSlides
-    };
-  } catch {
-    return fallback;
-  }
-}
-
-export function serializeHeroPresentation(presentation: HeroPresentationEditor) {
-  return JSON.stringify(presentation);
 }
 
 export function toHeroCanvasPayload(presentation: HeroPresentationEditor): HeroCanvasPayload {
@@ -356,55 +301,6 @@ export function toHeroCanvasLayout(layout: HeroElementLayout): HeroCanvasLayout 
 
 export function heroElementsArray(elements: Record<HeroElementType, HeroElementLayout>) {
   return heroElementTypes.map((type) => elements[type]);
-}
-
-export function heroCanvasLayerElementsArray(elements: Record<HeroElementType, HeroElementLayout>): HeroCanvasLayerElementLayout[] {
-  return heroCanvasLayerElementTypes.map((type) => ({ ...elements[type], type }));
-}
-
-export function withUpdatedHeroElement(
-  slide: HeroSlideEditor,
-  type: HeroElementType,
-  input: Partial<HeroElementLayout>
-): HeroSlideEditor {
-  const current = slide.elements[type] || defaultHeroElementLayout(type);
-
-  return {
-    ...slide,
-    elements: {
-      ...slide.elements,
-      [type]: fitHeroElementLayoutToContent({
-        ...current,
-        ...input,
-        type
-      })
-    }
-  };
-}
-
-export function createHeroSlideCopy(slide: HeroSlideEditor, index: number): HeroSlideEditor {
-  return {
-    ...slide,
-    id: undefined,
-    clientId: `hero-slide-${Date.now()}-${index}`,
-    sortOrder: index,
-    headline: slide.headline || "New hero screen",
-    elements: cloneHeroElements(slide.elements)
-  };
-}
-
-export function createBlankHeroSlide(index: number, settings: HeroFallbackContent): HeroSlideEditor {
-  const fallback = defaultHeroSlideFromSettings(settings);
-
-  return {
-    ...fallback,
-    id: undefined,
-    clientId: `hero-slide-${Date.now()}-${index}`,
-    sortOrder: index,
-    headline: "New hero screen",
-    caption: fallback.caption,
-    elements: defaultHeroElements()
-  };
 }
 
 function normalizeHeroSlide(input: unknown, index: number, fallback: HeroSlideEditor): HeroSlideEditor {

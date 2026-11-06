@@ -1,8 +1,10 @@
 "use server";
 
+import { hoursRevision, weeklyHoursSchema } from "@/lib/scheduling/weekly-hours";
+
 import { imageFramingSchema } from "@/modules/content/studio/image-framing";
 import { initialBusinessHoursSchema } from "@/lib/scheduling/session-input";
-import { readSessionOffering, type SessionOffering } from "@/lib/scheduling/session-offering";
+import { priceSessionOffering, readSessionOffering, type SessionOffering } from "@/lib/scheduling/session-offering";
 import { hydrateSessionServiceLibrary } from "@/lib/scheduling/service-library-store";
 import { hourlyPriceCents, type PricingType } from "@/lib/scheduling/pricing";
 
@@ -64,7 +66,7 @@ const reminderSettingsFormSchema = z.object({
 const servicePackageFormSchema = z
   .object({
     id: z.string().trim().optional(),
-    name: z.string().trim().min(1, "Add a package name."),
+    name: z.string().trim().min(1, "Add a bundle name."),
     slug: z.string().trim().optional(),
     description: z.string().trim().max(2000).default(""),
     tags: z.string().trim().default(""),
@@ -151,23 +153,34 @@ function serviceCategoriesPath(params?: Record<string, string>) {
 }
 
 function appointmentRulesPath(tab: "availability" | "team" | "calendar", params?: Record<string, string>) {
-  const query = new URLSearchParams({ panel: "rules", tab, ...params }).toString();
-  return `${APPOINTMENTS_ADMIN_PATH}?${query}`;
+  const query = new URLSearchParams({ tab, ...params }).toString();
+  return `${APPOINTMENTS_ADMIN_PATH}/schedule?${query}`;
+}
+
+function staffAdminPath(params: Record<string, string>) {
+  return `${APPOINTMENTS_ADMIN_PATH}/staff?${new URLSearchParams(params)}`;
 }
 
 function refreshScheduling() {
   revalidatePath("/admin");
   revalidatePath(SERVICES_ADMIN_PATH);
   revalidatePath(APPOINTMENTS_ADMIN_PATH);
+  revalidatePath(`${APPOINTMENTS_ADMIN_PATH}/schedule`);
+  revalidatePath(`${APPOINTMENTS_ADMIN_PATH}/staff`);
   revalidatePath(LEGACY_SCHEDULING_ADMIN_PATH);
   revalidatePath("/book");
 }
 
 async function servicePricingData(input: { pricingType: PricingType; hourlyRateId: string; durationMinutes: number }, siteId: string, offering: SessionOffering | null) {
+  if (offering) {
+    const rates = await prisma.hourlyRate.findMany({ where: { siteId } });
+    Object.assign(offering, priceSessionOffering(offering, rates, input));
+    const first = offering.tiers[0];
+    return { pricingType: first.pricingType!, hourlyRateId: first.hourlyRateId ?? null, priceCents: first.priceCents };
+  }
   if (input.pricingType !== "HOURLY") return { pricingType: input.pricingType, hourlyRateId: null };
   const rate = await prisma.hourlyRate.findFirst({ where: { id: input.hourlyRateId, siteId } });
   if (!rate) throw new Error("Choose an hourly rate from this business.");
-  if (offering) for (const tier of offering.tiers) tier.priceCents = hourlyPriceCents(rate.amountCents, tier.durationMinutes);
   return { pricingType: input.pricingType, hourlyRateId: rate.id, priceCents: hourlyPriceCents(rate.amountCents, input.durationMinutes) };
 }
 
@@ -398,6 +411,7 @@ export async function createServiceAction(_previous: { error: string }, formData
           maxAdvanceDays: input.maxAdvanceDays,
           slotIntervalMinutes: input.slotIntervalMinutes,
           intakePrompt: input.intakePrompt,
+          bookingRules: input.bookingRules,
           policyText: input.policyText,
           requirePolicy: input.requirePolicy,
           requestOnly: input.requestOnly,
@@ -408,7 +422,7 @@ export async function createServiceAction(_previous: { error: string }, formData
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
   } catch (error) {
-    return { error: error instanceof Error && !("code" in error) ? error.message : "The session type could not be saved. Your details are still here; please try again." };
+    return { error: error instanceof Error && !("code" in error) ? error.message : "The session could not be saved. Your details are still here; please try again." };
   }
 
   refreshScheduling();
@@ -437,7 +451,7 @@ export async function updateServiceAction(formData: FormData) {
   const input = await parseForm(serviceUpdateFormSchema, formData);
   const settings = await getSiteSettings();
   const current = await prisma.service.findFirst({ where: { id: input.id, siteId: settings.siteId } });
-  if (!current) redirect(servicesAdminPath({ error: "Session type not found." }));
+  if (!current) redirect(servicesAdminPath({ error: "Session not found." }));
   const offering = await hydrateSessionServiceLibrary(input.sessionOffering ?? readSessionOffering(current.sessionOffering), settings.siteId);
   // Older service forms edit the default package; keep the other tiers and coverage intact.
   if (offering && !input.sessionOffering) {
@@ -468,6 +482,7 @@ export async function updateServiceAction(formData: FormData) {
       maxAdvanceDays: input.maxAdvanceDays,
       slotIntervalMinutes: input.slotIntervalMinutes,
       intakePrompt: input.intakePrompt,
+      bookingRules: input.bookingRules,
       policyText: input.policyText,
       requirePolicy: input.requirePolicy,
       requestOnly: input.requestOnly,
@@ -494,12 +509,12 @@ export async function updateSessionTypeAction(_previous: { error: string }, form
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const settings = await getSiteSettings();
   if (!await prisma.service.findFirst({ where: { id: parsed.data.id, siteId: settings.siteId, isOneOff: false }, select: { id: true } })) {
-    return { error: "This session type is no longer available." };
+    return { error: "This session is no longer available." };
   }
   try { await updateServiceAction(formData); }
   catch (error) {
     unstable_rethrow(error);
-    return { error: error instanceof Error && !("code" in error) ? error.message : "The session type could not be saved or changed in another window. Your changes are still here; reload before trying again." };
+    return { error: error instanceof Error && !("code" in error) ? error.message : "The session could not be saved or changed in another window. Your changes are still here; reload before trying again." };
   }
   return { error: "" };
 }
@@ -560,8 +575,8 @@ async function serviceMediaData(formData: FormData, siteId: string, user: Awaite
   }) });
   if (assets.length !== ids.length) throw new Error("One of these photos is unavailable. Choose an active public image from your library.");
   const square = assets.find(asset => asset.id === media.square?.assetId);
-  if (media.rectangular && !media.rectangular.assetId) throw new Error("Choose a rectangular photo.");
-  if (media.square && !square && (!current?.imageUrl || current.mediaAssetId)) throw new Error("Choose a square photo.");
+  if (media.rectangular && !media.rectangular.assetId) throw new Error("Choose a website photo.");
+  if (media.square && !square && (!current?.imageUrl || current.mediaAssetId)) throw new Error("Choose a main photo.");
   return {
     mediaAssetId: square?.id ?? null,
     imageUrl: square ? mediaAssetDisplayUrl(square, MediaVariantType.CARD) : media.square ? current!.imageUrl : "",
@@ -808,7 +823,7 @@ export async function updateServicePackageAction(formData: FormData) {
   await requireAdmin("scheduling:manage");
   const input = await parseForm(servicePackageFormSchema, formData, SERVICES_ADMIN_PATH);
   if (!input.id) {
-    redirect(servicesAdminPath({ error: "Choose a package to update.", tab: "packages" }));
+    redirect(servicesAdminPath({ error: "Choose a bundle to update.", tab: "packages" }));
   }
 
   const settings = await getSiteSettings();
@@ -817,7 +832,7 @@ export async function updateServicePackageAction(formData: FormData) {
     select: { id: true, slug: true }
   });
   if (!currentPackage) {
-    redirect(servicesAdminPath({ error: "Package not found.", tab: "packages" }));
+    redirect(servicesAdminPath({ error: "Bundle not found.", tab: "packages" }));
   }
 
   const slug = await generateUniqueServicePackageSlug({
@@ -859,10 +874,10 @@ export async function addServicePackageItemAction(formData: FormData) {
   ]);
 
   if (!servicePackage || !service) {
-    redirect(servicePackageEditPath(input.packageId, { error: "Choose a valid service and package." }));
+    redirect(servicePackageEditPath(input.packageId, { error: "Choose a valid session and bundle." }));
   }
   if (existing) {
-    redirect(servicePackageEditPath(input.packageId, { error: "That service is already in this package." }));
+    redirect(servicePackageEditPath(input.packageId, { error: "That session is already in this bundle." }));
   }
 
   await prisma.servicePackageItem.create({
@@ -894,7 +909,7 @@ export async function removeServicePackageItemAction(formData: FormData) {
   });
 
   if (deleted.count !== 1) {
-    redirect(servicePackageEditPath(input.packageId, { error: "Package item not found." }));
+    redirect(servicePackageEditPath(input.packageId, { error: "Bundle item not found." }));
   }
 
   refreshScheduling();
@@ -913,7 +928,7 @@ export async function createStaffMemberAction(formData: FormData) {
     isActive: formData.get("isActive") || undefined
   });
   if (!parsed.success) {
-    redirect(appointmentRulesPath("team", { error: parsed.error.issues[0]?.message || "Check the staff form." }));
+    redirect(staffAdminPath({ error: parsed.error.issues[0]?.message || "Check the staff form." }));
   }
   const settings = await getSiteSettings();
 
@@ -930,7 +945,7 @@ export async function createStaffMemberAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(appointmentRulesPath("team", { saved: "staff" }));
+  redirect(staffAdminPath({ saved: "staff" }));
 }
 
 export async function updateStaffMemberAction(formData: FormData) {
@@ -945,7 +960,7 @@ export async function updateStaffMemberAction(formData: FormData) {
     isActive: formData.get("isActive") || undefined
   });
   if (!parsed.success || !parsed.data.id) {
-    redirect(appointmentRulesPath("team", { error: parsed.error?.issues[0]?.message || "Choose a staff member to update." }));
+    redirect(staffAdminPath({ error: parsed.error?.issues[0]?.message || "Choose a staff member to update." }));
   }
   const settings = await getSiteSettings();
 
@@ -962,7 +977,7 @@ export async function updateStaffMemberAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(appointmentRulesPath("team", { saved: "staff" }));
+  redirect(staffAdminPath({ saved: "staff" }));
 }
 
 const staffAdminLinkFormSchema = z.object({
@@ -977,7 +992,7 @@ export async function linkStaffMemberAdminUserAction(formData: FormData) {
     adminUserId: formData.get("adminUserId") || ""
   });
   if (!parsed.success) {
-    redirect(appointmentRulesPath("team", { error: parsed.error.issues[0]?.message || "Choose a staff member to link." }));
+    redirect(staffAdminPath({ error: parsed.error.issues[0]?.message || "Choose a staff member to link." }));
   }
   const settings = await getSiteSettings();
   const adminUserId = parsed.data.adminUserId || null;
@@ -987,7 +1002,7 @@ export async function linkStaffMemberAdminUserAction(formData: FormData) {
     select: { id: true }
   });
   if (!staffMember) {
-    redirect(appointmentRulesPath("team", { error: "Staff member not found." }));
+    redirect(staffAdminPath({ error: "Staff member not found." }));
   }
 
   if (adminUserId) {
@@ -996,7 +1011,7 @@ export async function linkStaffMemberAdminUserAction(formData: FormData) {
       select: { id: true }
     });
     if (!adminUser) {
-      redirect(appointmentRulesPath("team", { error: "Admin user not found." }));
+      redirect(staffAdminPath({ error: "Admin user not found." }));
     }
   }
 
@@ -1015,7 +1030,7 @@ export async function linkStaffMemberAdminUserAction(formData: FormData) {
   });
 
   refreshScheduling();
-  redirect(appointmentRulesPath("team", { saved: "staff-link" }));
+  redirect(staffAdminPath({ saved: "staff-link" }));
 }
 
 export async function createResourceAction(formData: FormData) {
@@ -1108,6 +1123,42 @@ export async function updateReminderSettingsAction(formData: FormData) {
 
   refreshScheduling();
   redirect(appointmentRulesPath("calendar", { saved: "reminders" }));
+}
+
+export async function saveWeeklyHoursAction(_state: { error: string; success: string }, formData: FormData) {
+  await requireAdmin("scheduling:manage");
+  let payload: unknown;
+  try { payload = JSON.parse(String(formData.get("hours"))); }
+  catch { return { error: "Check your hours and try again.", success: "" }; }
+  const parsed = weeklyHoursSchema.safeParse(payload);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "Check your hours.", success: "" };
+  const { staffId, resourceId, days, ranges, revision } = parsed.data;
+  const { siteId } = await getSiteSettings();
+  if (staffId && !await prisma.staffMember.findFirst({ where: { id: staffId, siteId, isActive: true }, select: { id: true } })) {
+    return { error: "Choose an active staff member.", success: "" };
+  }
+  if (resourceId && !await prisma.resource.findFirst({ where: { id: resourceId, siteId, isActive: true }, select: { id: true } })) {
+    return { error: "Choose an active resource.", success: "" };
+  }
+  const where = { siteId, staffId: staffId || null, resourceId: resourceId || null };
+  try {
+    await prisma.$transaction(async tx => {
+      const current = await tx.availabilityRule.findMany({ where });
+      if (hoursRevision(current) !== revision) throw new Error("HOURS_CHANGED");
+      await tx.availabilityRule.deleteMany({ where: { ...where, weekday: { in: days } } });
+      if (ranges.length) await tx.availabilityRule.createMany({ data: [...new Set(days)].flatMap(weekday =>
+        ranges.map(range => ({ ...where, weekday, startMinutes: range.start, endMinutes: range.end }))
+      ) });
+    }, { isolationLevel: "Serializable" });
+  } catch (error) {
+    if (error instanceof Error && (error.message === "HOURS_CHANGED" || ("code" in error && error.code === "P2034"))) {
+      return { error: "These hours changed in another session. Close this editor and refresh before trying again.", success: "" };
+    }
+    return { error: "Hours could not be saved. Your existing hours are unchanged; please try again.", success: "" };
+  }
+  refreshScheduling();
+  revalidatePath("/admin/modules/services/[serviceId]", "page");
+  return { error: "", success: "Hours saved." };
 }
 
 export async function createAvailabilityAction(_state: { error: string; success: string }, formData: FormData) {

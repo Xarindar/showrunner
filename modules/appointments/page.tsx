@@ -1,15 +1,14 @@
+import { DateTimeInput } from "@/components/ui/time-input";
 import { getClientStatusSettings } from "@/lib/clients/configuration";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { BookingStatus, BookingWaitlistStatus, Prisma } from "@prisma/client";
-import { CalendarClock, CalendarDays, ChevronDown, Clock, ListChecks, Plus, Users } from "lucide-react";
-import { getAccessibleBookingWaitlistWhere, getAccessibleBookingWhere, hasAdminPermission, requireAdmin } from "@/lib/auth";
+import { CalendarDays, ChevronDown, Clock, ListChecks, Plus } from "lucide-react";
+import { getAccessibleBookingWaitlistWhere, getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import { bookingConflictWarnings } from "@/lib/bookings/conflicts";
 import { clientStatusLabel } from "@/lib/clients/status";
-import { enumLabel, formatDateTime } from "@/lib/format";
+import { formatTime, enumLabel, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { absoluteCalendarUrl, icsCalendarAdapter, requestBaseUrl } from "@/lib/scheduling/calendar";
-import { getGoogleCalendarConnections } from "@/lib/scheduling/google-calendar";
-import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import { getSiteSettings } from "@/lib/site";
 import { addDaysToDateKey, getTodayDateKey, parseZonedDateKey } from "@/lib/timezone";
 import { promoteWaitlistEntryAction, updateWaitlistEntryStatusAction } from "./actions";
@@ -18,14 +17,6 @@ import { AppointmentCalendarShell } from "./components/appointment-calendar-shel
 import { AppointmentsTable } from "./components/appointments-table";
 import { Button, ButtonLink, Pagination } from "@/components/ui";
 import { addDashboardCardAction } from "@/modules/dashboard/actions";
-import { AvailabilityPanel } from "@/modules/scheduling/components/availability-panel";
-import { BlockoutsPanel } from "@/modules/scheduling/components/blockouts-panel";
-import { CalendarFeedsPanel } from "@/modules/scheduling/components/calendar-feeds-panel";
-import { RemindersPanel } from "@/modules/scheduling/components/reminders-panel";
-import { ResourcesPanel } from "@/modules/scheduling/components/resources-panel";
-import { ServiceWorkspaceTabs, type ServiceWorkspaceTab } from "@/modules/scheduling/components/service-workspace-tabs";
-import { SlotDiagnosticsPanel } from "@/modules/scheduling/components/slot-diagnostics-panel";
-import { StaffPanel } from "@/modules/scheduling/components/staff-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -183,7 +174,7 @@ function localBookingParts(date: Date, timeZone: string) {
     dateKey: `${values.year}-${values.month}-${values.day}`,
     hour: Number(values.hour),
     minute: Number(values.minute),
-    timeLabel: new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit", timeZone }).format(date)
+    timeLabel: formatTime(date, timeZone)
   };
 }
 
@@ -234,11 +225,13 @@ function calendarHref(input: {
 export default async function AppointmentsPage({ searchParams }: AppointmentsPageProps = {}) {
   const now = new Date();
   const params = searchParams ? await searchParams : {};
+  if (params.panel === "rules") {
+    const query = new URLSearchParams(Object.entries(params).filter(([key, value]) => key !== "panel" && value !== undefined) as [string, string][]);
+    redirect(`/admin/modules/appointments/schedule?${query}`);
+  }
   const user = await requireAdmin("appointments:manage");
   const settings = await getSiteSettings();
   const { options: configuredStatusOptions } = await getClientStatusSettings(settings.siteId);
-  const canLinkStaffAccounts = hasAdminPermission(user, "users:manage");
-  const baseUrl = await requestBaseUrl();
   const page = Math.max(1, Number(params.page || 1) || 1);
   const statusFilter = normalizeStatusFilter(params.status);
   const view = normalizeCalendarView(params.view);
@@ -285,13 +278,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
     waitlistCount,
     calendarBookings,
     staff,
-    resources,
-    services,
-    availability,
-    blockouts,
-    schedulingSettings,
-    googleCalendarConnections,
-    adminUsers
+    resources
   ] = await Promise.all([
   prisma.booking.findMany({
     where: bookingWhere,
@@ -342,30 +329,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
     take: 500
   }),
   prisma.staffMember.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
-  prisma.resource.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
-  prisma.service.findMany({
-    where: { siteId: settings.siteId },
-    include: {
-      resourceAssignments: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
-      staffAssignments: { include: { staff: true }, orderBy: { staff: { name: "asc" } } }
-    },
-    orderBy: [{ isActive: "desc" }, { category: "asc" }, { name: "asc" }]
-  }),
-  prisma.availabilityRule.findMany({
-    where: { siteId: settings.siteId },
-    include: { resource: true, staff: true },
-    orderBy: [{ staffId: "asc" }, { resourceId: "asc" }, { weekday: "asc" }, { startMinutes: "asc" }]
-  }),
-  prisma.blockedTime.findMany({ where: { siteId: settings.siteId }, include: { resource: true }, orderBy: { startsAt: "asc" }, take: 20 }),
-  prisma.schedulingSettings.findUnique({ where: { siteId: settings.siteId } }),
-  getGoogleCalendarConnections(settings.siteId),
-  canLinkStaffAccounts
-    ? prisma.adminUser.findMany({
-        where: { tenantId: user.tenantId },
-        select: { id: true, email: true, role: true },
-        orderBy: { email: "asc" }
-      })
-    : Promise.resolve([])]
+  prisma.resource.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] })]
   );
   const pageCount = Math.max(1, Math.ceil(bookingCount / pageSize));
   const warningsByBookingId = new Map<string, string[]>();
@@ -454,99 +418,12 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
     statusFilter,
     view
   });
-  const selectedDiagnosticServiceId = services.some((service) => service.id === params.diagnosticServiceId)
-    ? String(params.diagnosticServiceId)
-    : services[0]?.id || "";
-  const selectedDiagnosticDate = /^\d{4}-\d{2}-\d{2}$/.test(params.diagnosticDate || "")
-    ? String(params.diagnosticDate)
-    : selectedDateKey;
-  const selectedDiagnosticStaffId = staff.some((member) => member.id === params.diagnosticStaffId) ? String(params.diagnosticStaffId) : "";
-  const selectedDiagnosticResourceId = resources.some((resource) => resource.id === params.diagnosticResourceId) ? String(params.diagnosticResourceId) : "";
-  const diagnosticDay = parseZonedDateKey(selectedDiagnosticDate, settings.timezone);
-  const diagnostics =
-    selectedDiagnosticServiceId && diagnosticDay
-      ? await nativeSchedulingAdapter.getSlotDiagnostics(selectedDiagnosticServiceId, diagnosticDay, {
-          resourceId: selectedDiagnosticResourceId || undefined,
-          staffId: selectedDiagnosticStaffId || undefined
-        })
-      : null;
-  const staffIdsWithAvailability = new Set(availability.flatMap((rule) => (rule.staffId ? [rule.staffId] : [])));
-  const assignedStaffIds = new Set(services.flatMap((service) => service.staffAssignments.map((assignment) => assignment.staffId)));
-  const resourceIdsWithAvailability = new Set(availability.flatMap((rule) => (rule.resourceId ? [rule.resourceId] : [])));
-  const assignedResourceIds = new Set(services.flatMap((service) => service.resourceAssignments.map((assignment) => assignment.resourceId)));
-  const rulesTabs: ServiceWorkspaceTab[] = [
-    {
-      content: (
-        <div className="product-editor-stack">
-          <AvailabilityPanel availability={availability} resources={resources} staff={staff} />
-          <SlotDiagnosticsPanel
-            defaultOpen={Boolean(params.diagnosticServiceId)}
-            diagnostics={diagnostics}
-            resources={resources}
-            selectedDate={selectedDiagnosticDate}
-            selectedResourceId={selectedDiagnosticResourceId}
-            selectedServiceId={selectedDiagnosticServiceId}
-            selectedStaffId={selectedDiagnosticStaffId}
-            services={services}
-            staff={staff}
-          />
-          <BlockoutsPanel blockouts={blockouts} resources={resources} timezone={settings.timezone} />
-        </div>
-      ),
-      icon: <CalendarDays size={15} />,
-      id: "availability",
-      label: "Availability"
-    },
-    {
-      content: (
-        <div className="product-editor-stack">
-          <StaffPanel
-            adminUsers={adminUsers}
-            assignedStaffIds={assignedStaffIds}
-            canLinkStaffAccounts={canLinkStaffAccounts}
-            staff={staff}
-            staffIdsWithAvailability={staffIdsWithAvailability}
-          />
-          <ResourcesPanel resources={resources} assignedResourceIds={assignedResourceIds} resourceIdsWithAvailability={resourceIdsWithAvailability} />
-        </div>
-      ),
-      icon: <Users size={15} />,
-      id: "team",
-      label: "Team & resources"
-    },
-    {
-      content: (
-        <div className="product-editor-stack">
-          <RemindersPanel
-            enabled={schedulingSettings?.bookingReminderEnabled ?? true}
-            leadMinutes={schedulingSettings?.bookingReminderLeadMinutes ?? 1440}
-          />
-          <CalendarFeedsPanel
-            googleConnections={googleCalendarConnections.map((connection) => ({
-              connection,
-              staff: staff.find((member) => member.id === connection.ownerId) || null
-            }))}
-            siteFeedUrl={absoluteCalendarUrl(baseUrl, icsCalendarAdapter.feedPath({ siteId: settings.siteId }))}
-            staff={staff}
-            staffFeedUrls={staff.map((member) => ({
-              staff: member,
-              url: absoluteCalendarUrl(baseUrl, icsCalendarAdapter.feedPath({ siteId: settings.siteId, staffId: member.id }))
-            }))}
-          />
-        </div>
-      ),
-      icon: <CalendarClock size={15} />,
-      id: "calendar",
-      label: "Calendar & reminders"
-    }
-  ];
   const savedMessage = params.saved?.startsWith("dashboard-card")
     ? "Dashboard card updated."
     : params.saved
       ? "Appointment settings updated."
       : undefined;
-  const errorMessage = params.error ? decodeURIComponent(params.error) : undefined;
-  const initialPanel = params.panel === "rules" ? "rules" : null;
+  const errorMessage = params.error;
 
 
   return (
@@ -665,7 +542,6 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
             </form>
           </div>
         }
-        initialPanel={initialPanel}
         nextHref={calendarHref({
           dateKey: calendarRange.nextDateKey,
           resourceId: selectedResourceId,
@@ -681,7 +557,6 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
           view
         })}
         rangeLabel={selectedRangeLabel}
-        rulesPanel={<ServiceWorkspaceTabs initialTab={params.tab} tabs={rulesTabs} />}
         savedMessage={savedMessage}
         todayHref={calendarHref({ dateKey: todayKey, resourceId: selectedResourceId, staffId: selectedStaffId, statusFilter, view })}
         toolsPanel={
@@ -736,10 +611,10 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
                       <form action={promoteWaitlistEntryAction} className="appointments-promote-form">
                         <input type="hidden" name="id" value={entry.id} />
                         <label htmlFor={`waitlist-${entry.id}-startsAt`}>Start time</label>
-                        <input
+                        <DateTimeInput aria-label="Waitlist start"
                           id={`waitlist-${entry.id}-startsAt`}
                           name="startsAt"
-                          type="datetime-local"
+
                           defaultValue={formatDateTimeLocalInput(entry.startsAt, settings.timezone)}
                           required
                         />

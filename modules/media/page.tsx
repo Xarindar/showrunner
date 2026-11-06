@@ -34,14 +34,6 @@ function positiveInteger(value: string | undefined, fallback = 1) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function safeDecodedMessage(value: string | undefined) {
-  if (!value) return "";
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
 
 function savedMessage(value: string | undefined) {
   const messages: Record<string, string> = {
@@ -63,7 +55,7 @@ function filtersFromParams(params: Record<string, string | undefined>): MediaLib
 
   return {
     folder: (params.folder || "").trim().slice(0, 200),
-    kind: oneOf(params.kind, ["all", "image", "other"] as const, "all"),
+    kind: oneOf(params.kind, ["all", "image", "video", "other"] as const, "all"),
     page: positiveInteger(params.page),
     q: (params.q || "").trim().slice(0, 180),
     scope: requestedScope === "home" ? "all" : requestedScope,
@@ -93,7 +85,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
     select: { name: true }, orderBy: { name: "asc" }
   });
   const matchingBuiltInAssets = globalMediaAssets.filter((asset) => {
-    if (filters.kind === "other") return false;
+    if (filters.kind === "other" || filters.kind === "video") return false;
     if (!filters.q) return true;
     const query = filters.q.toLocaleLowerCase();
     return asset.filename.toLocaleLowerCase().includes(query) || asset.alt.toLocaleLowerCase().includes(query);
@@ -114,9 +106,11 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
   }
   if (filters.scope === "built-in") clauses.push({ id: "__built_in_asset__" });
   if (filters.folder) clauses.push({ folder: filters.folder });
+  else if (filters.scope === "all" && !filters.q && !filters.tag && filters.kind === "all") clauses.push({ folder: "" });
   if (filters.tag) clauses.push({ tags: { array_contains: [filters.tag] } });
   if (filters.kind === "image") clauses.push({ mimeType: { startsWith: "image/", mode: "insensitive" } });
-  if (filters.kind === "other") clauses.push({ NOT: { mimeType: { startsWith: "image/", mode: "insensitive" } } });
+  if (filters.kind === "video") clauses.push({ mimeType: { startsWith: "video/", mode: "insensitive" } });
+  if (filters.kind === "other") clauses.push({ NOT: { OR: [{ mimeType: { startsWith: "image/", mode: "insensitive" } }, { mimeType: { startsWith: "video/", mode: "insensitive" } }] } });
   if (filters.q) {
     clauses.push({
       OR: [
@@ -147,8 +141,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       by: ["folder"],
       where: activeAccess,
       _count: { _all: true },
-      orderBy: { folder: "asc" },
-      take: 24
+      orderBy: { folder: "asc" }
     }),
     prisma.mediaAsset.findMany({
       where: activeAccess,
@@ -261,7 +254,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       assets={assets}
       builtInCount={globalMediaAssets.length}
       canUpload={isMediaUploadDriverConfigured(settings.mediaDriver)}
-      errorMessage={params.error === "missing-file" ? "Choose a file before uploading." : safeDecodedMessage(params.error)}
+      errorMessage={params.error === "missing-file" ? "Choose a file before uploading." : params.error || ""}
       filters={normalizedFilters}
       folders={Array.from(folderCounts, ([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name))}
       needsAltCount={needsAltCount}
@@ -270,7 +263,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
       recentCount={recentCount}
       resultCount={resultCount}
       savedMessage={savedMessage(params.saved)}
-      tags={summarizeMediaTags(tagRows)}
+      tags={summarizeMediaTags(tagRows, 5000)}
     />
   );
 }

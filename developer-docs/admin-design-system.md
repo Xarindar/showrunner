@@ -4,6 +4,28 @@ This is the maintained implementation guide for the Shopify-inspired Showrunner 
 
 ## Start here
 
+Single-choice native selects use `appearance: base-select` where supported. The shared control recipe styles the open picker with input corner tokens, popover elevation, inset rounded options and neutral selected/hover states. Multiple and expanded listbox selects keep their native presentation. Browsers without customizable-select support retain their native picker; keyboard navigation, required/disabled states and form submission stay browser-owned.
+
+Open select menus match their trigger's border-box width. Select values and options stay on one line, clipping long labels with ellipsis instead of making mobile controls taller. Custom select popovers follow the same width rule.
+
+Customizable native selects explicitly use a horizontal flex layout with the picker arrow at the trailing edge. Vertical alignment alone does not establish a flex layout in every browser. Selects and their options center their contents vertically at both desktop and touch heights.
+
+`Select compact` uses the shared `ui-select-compact` recipe for short numeric values: tokenized minimum width, trigger/option padding and picker padding, a thin picker scrollbar and selected background without a checkmark that would consume value space. It preserves the usual desktop/touch control heights and native keyboard/validation behavior. Package duration uses H/M display units with full Hours/Minutes accessible labels.
+
+Field groups use `align-content: start` so taller neighbours in an equal-column grid do not stretch labels or single-line controls. Search/filter fields reuse the shared input recipe and its 44px mobile minimum; module styles must not reduce that height.
+
+All admin dialog titles use `ui-dialog-title`: the existing section type tokens (22px, weight 500, 28px line height), including custom onboarding and email editor shells. Do not apply panel-label type or module-specific font sizes to modal headings. Long titles wrap beside a non-shrinking close button. Headers form a black band with white titles, 8px vertical padding and 16px horizontal padding. Close controls are 28px white circles with a black X, with 30px desktop and 44px touch hit targets, aligned to the same 16px right inset as footer actions. Public proofing and booking retain tenant styling.
+
+Shared `Dialog` measures the actual `.admin-main` bounds when opened and observes workspace resizing, including sidebar collapse and mobile layouts. Its native top-layer bounds and maximum dimensions stay inside that workspace. Login/public dialogs without an admin workspace keep their original behavior. Module CSS must not guess sidebar offsets. Full-workspace viewers use a zero `--dialog-workspace-inset`; ordinary dialogs reserve the shared 16px inset.
+
+Shared `Modal` dialogs keep the rounded outer shell and header stationary. The inset `.ui-dialog-body` owns vertical scrolling, with `min-height: 0` so long content fits inside the viewport. Keep task-specific content inside that body; do not put scrolling back on the outer `.ui-modal` shell or add another competing scroller.
+
+The shared modal shell enforces its 16px inset even when a module supplies a dialog class. Body layout defaults use low specificity so module flex layouts can keep their action footer visible. Do not remove the shell inset or add padding workarounds to individual titles and footers. Keep content and footer edges on this same inset: do not reserve empty scrollbar gutters or add a second inset to inner form or picker content. Scrollbars consume space only when content actually overflows. Module CSS owns width, height and task layout, not header typography, shell corners or duplicate header/body insets. The full-screen email editor, dark photo viewer and gallery settings drawer intentionally keep their workspace geometry, with the same title scale and aligned inner edges. Appointment detail and blog formatting popovers remain nonmodal. Session status confirmation uses the same native `Modal` for focus trapping, Escape and backdrop dismissal.
+
+Workspaces with a shared module or product studio header have no top padding on `.admin-main`. The opaque sticky header starts at the workspace edge so scrolling content cannot show through a gap above it. Side and bottom page insets remain unchanged.
+
+End-of-page resource lists use viewport-sized pagination. Mark the list boundary with `data-viewport-table`; shared `Pagination` measures visible rows and reserves space for filters, headings, pagination and any list footer. Client lists supply `onPageSizeChange`; server lists parse `pageSize` with `tablePageSize` and pass it to `Pagination`. Mobile card rows use `data-viewport-row`. Capacity updates on window and layout changes, keeps the current first record in view, and is bounded to 1–100 rows. The table frame fills spare space below the rows while reserving room for pagination, footers and the workspace inset. Mark mobile card frames with `data-viewport-table-frame`. Sparse and empty lists never add filler records. Embedded tables and independently scrolling dialogs keep their existing pagination.
+
 1. Reuse a component from `components/ui/` before writing a control or panel.
 2. Use the semantic tokens in `app/admin/design-tokens.css` for appearance.
 3. Put task-specific layout beside its module, preferably in a CSS Module.
@@ -119,11 +141,13 @@ Fine adjustments can use the existing `--sd-space-1`, `--sd-space-2` and `--sd-s
 
 Use shadow tokens intact rather than reconstructing their layers. Inset input rings are functional boundaries; outer glow is decorative. Photo framing uses `--sd-shadow-crop-mask`, whose large spread shades the area outside the crop. Do not replace it with a card shadow. The foundation zeros the shared duration tokens for reduced motion; local animations still need their own reduced-motion treatment.
 
-Desktop shared fields have a 30px minimum height and buttons a 28px minimum. The shared mobile/coarse-pointer recipe uses `--sd-layout-touch-target` (44px). These are minimums, not permission to clip wrapping content. Custom icon actions also need adequate targets and accessible names; the token alone does not enforce that on every element.
+Desktop shared fields have a 30px minimum height and buttons a 28px minimum. The shared mobile/coarse-pointer recipe uses `--sd-layout-touch-target` (44px) and `--sd-type-input-touch-size` (16px). These are minimums, not permission to clip wrapping content. Custom icon actions also need adequate targets and accessible names; the token alone does not enforce that on every element. Modules must not replace these rules with local control heights or font sizes.
+
+`Stack`, `.ui-stack` and `.stack` share a 16px default gap; use the existing `ui-gap-*` classes for deliberate variations. Native disclosure headings use the foundation's 12px vertical padding, medium weight and 44px minimum target. Modules may arrange disclosure contents or add an enclosing surface, but should not add another vertical inset around ordinary headings. Custom menus and gallery controls can retain their task-specific composition.
 
 ## Building a module with the system
 
-Use direct component imports when a client module only needs a few controls. This avoids pulling unrelated exports through the UI barrel.
+Use direct component imports in client modules. The UI barrel also exports media controls with server-action dependencies; importing a simple button through it unnecessarily traverses that graph.
 
 ```tsx
 import { Button } from "@/components/ui/button";
@@ -153,9 +177,9 @@ Render this inside an admin form connected to the owning module's validated acti
 .actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
 ```
 
-`Button` supports `primary`, `secondary`, `ghost`, and `danger`; use `ButtonLink` for internal navigation and `ButtonAnchor` for ordinary anchors. `sm` currently shares the compact base recipe; `lg` adds padding. `Field` wraps its control in a label and accepts `hint`. Associate additional validation text with the control and use `aria-invalid` for the shared error treatment.
+`Button` supports `primary`, `secondary`, `ghost`, and `danger`; use `ButtonLink` for internal navigation and `ButtonAnchor` for ordinary anchors. `sm` currently shares the compact base recipe; `lg` adds padding. `Field` wraps its control in a label and accepts `hint`. Plain labels directly wrapping text inputs, selects, or textareas inherit the same stacked layout, 8px label gap, and full-width control from the shared recipe. The low-specificity fallback preserves explicit module layouts; checkbox, radio, range, color, file, and action inputs are excluded. Use a 16px gap between ordinary field groups. Associate additional validation text with the control and use `aria-invalid` for the shared error treatment.
 
-`Card` defaults to natural height (`minHeight="none"`). Its header/footer slots render only when supplied. Choose an explicit reserved size only for a real layout contract, such as a dashboard widget; do not add empty slots for hypothetical future content. An empty field hint is hidden. `Modal` owns dialog behavior and the shared shell; module CSS may set a justified content width or layout, but must preserve Escape, focus return, labels and viewport scrolling.
+`Card` defaults to natural height (`minHeight="none"`). Its header/footer slots render only when supplied. Choose an explicit reserved size only for a real layout contract, such as a dashboard widget; do not add empty slots for hypothetical future content. An empty field hint is hidden. `Modal` provides the shared dialog shell; `OnboardingModal` and the full-screen email editor compose the same `Dialog` interaction primitive. Module CSS may set a justified content width or layout. Keep Escape, nested-dialog isolation, guarded closing, focus return, labels and viewport scrolling in the shared implementation.
 
 Shared recipe ownership is concrete: `controls.css` owns buttons and input states; `surfaces.css` owns cards and status surfaces; `overlays.css` owns dialogs; `table.css` owns table primitives. Editor and dashboard CSS compose these recipes. A module selector targeting `.ui-button`, `.ui-input` or `.ui-card` should normally arrange or size the component, not override its color, radius, border or shadow.
 
@@ -184,6 +208,8 @@ From the repository root:
 ```powershell
 node --import tsx --test test/admin-design-scope.test.ts
 node test/admin-design-browser.mjs
+node test/admin-notifications-browser.mjs
+node test/dialog-browser.mjs
 node test/portfolio-proof-browser.mjs
 ```
 
@@ -215,7 +241,7 @@ Maintain this guide with the token source. Keep README, DESIGN.md, PRODUCT.md, m
 
 Keep confirmations to the completed action: “Session created.” or “Changes saved.” Do not narrate things that did not happen or repeat workflow details. Add detail only when the user needs it to act.
 
-The protected admin layout owns one `NotificationProvider`. Use `useNotify()(message, tone)` after client operations and `<Notification queryKey="saved">{message}</Notification>` for redirect feedback (`tone="danger"` and `queryKey="error"` for failures). Import directly from `components/ui/notifications`. The originating query flag is consumed without removing filters or the current selection.
+The protected admin layout owns one `NotificationProvider`, including toast markup; `app/admin/notifications.css` owns its presentation. Use `useNotify()(message, tone)` after client operations and `<Notification queryKey="saved">{message}</Notification>` for redirect feedback (`tone="danger"` and `queryKey="error"` for failures). Import directly from `components/ui/notifications`. For `useActionState` feedback, pass the result object as `eventKey={state}` so a repeated identical failure is announced after another attempt. The originating query flag is consumed without removing filters or the current selection. Next's `searchParams` values are already decoded; do not decode them again.
 
 Action feedback appears in a compact bottom-center toast, never a page-header banner. Confirmations expire after at least five seconds, with more time for long messages; errors remain until dismissed. Hover, keyboard focus and hidden tabs pause automatic dismissal. Keep field validation, upload progress and retry controls beside their task, including inside dialogs. The host follows an open native dialog so feedback remains visible and keyboard-accessible. Notifications are session-local, without a persistent inbox or external delivery.
 
@@ -226,3 +252,32 @@ References: [Shopify Toast API](https://shopify.dev/docs/api/app-home/latest/api
 Keep the existing shell visible during navigation. Sidebar links use Next's actual pending state with a short visual delay, so fast navigation does not flash an indicator. Route fallbacks use the destination's table, editor, gallery, website workspace or calendar shape; the protected parent boundary also covers dedicated static routes and nested records. Keep known page headings visible, hide placeholder controls from assistive technology, and announce loading without implying measured progress.
 
 `app/admin/loading.css` scopes neutral placeholders and reduced-motion behavior to admin. Service-library searches retain existing results while fetching and disable stale selections until the response arrives. Public loading screens and client website branding remain independent.
+
+## Time controls
+User-facing times use 12-hour values with explicit AM/PM, independent of the device locale. Use `TimeInput` from `components/ui/time-input.tsx` in place of native time inputs, and `DateTimeInput` for combined date/time fields. Give combined controls a task-specific `aria-label`; keep their `name` on the shared component so it submits the existing canonical `HH:mm` or `YYYY-MM-DDTHH:mm` payload. Format labels with `formatTime`, `formatDateTime`, or `formatTimeValue` from `lib/format.ts`. Numeric timezone and calendar calculations remain 24-hour.
+
+Table sections can use `ui-section-card`, `ui-section-header` and `ui-section-body`: separate cards with compact black headers, 15px section titles, white secondary add actions and a 16px body inset. Card titles deliberately use the compact heading scale; dialog titles retain the larger section scale.
+
+The session builder uses these headers for details, status/booking availability, organization, packages, suggested add-ons, scheduling options and booking terms. Collapsible sections keep native summaries and keyboard behavior. Section cards allow popovers to overflow; round the header itself instead of clipping the whole card. Noninteractive `admin-editor-section` anchor targets retain programmatic focus without a section-sized outline; controls inside them keep their own focus indicators.
+
+Use `ui-table-card` for Packages and Suggested Add-Ons: the title/action bar and table share one outer surface. Place the table directly below the header, without a padded `ui-section-body` or a second bordered/rounded frame. The table frame owns the card’s lower corners.
+
+## Shared table appearance
+
+`app/admin/design-tokens.css` owns the `--data-table-*` palette, density and frame values; `components/ui/styles/table.css` applies them to `Table`, catalog tables, legacy `.table`, structured Clients/Payments shells and table cards. Module styles may define column widths, alignment, wrapping of content and explicit density, but must not introduce another table palette, frame shadow or header skin.
+
+Use a compact black title/action bar (15px title, white add button), light gray column labels (12px, 32px height), white rows (48px default), subtle separators, a 20px outer radius and no elevated shadow. Headers stay on one line; reserve `--data-table-actions-width` (80px) for a single icon action column including its padding. Long labels truncate rather than increasing header height. Compact tables use the shared 32px row / 4px vertical-padding tokens. Embedded table cards and structured shells reserve a body floor equal to the column-header height plus the 80px empty-state height in both empty and populated states; viewport lists and fixed-size modal tables retain their own fill behavior without filler records. Selection, hover, dirty-row and disabled states remain visible. Icon-only secondary row actions use the shared quiet action treatment.
+
+`ui-table-card` combines the title bar and table in one frame; do not add a padded body or nested border. Structured shells keep their filters and pagination on white toolbars. Embedded table cards grow naturally above their shared minimum height, while `data-viewport-table` and dialog grid layouts own their reserved space. Loading placeholders use the same header, row and border tokens. Public tenant styles and domain calendar layouts do not inherit the admin table recipe.
+
+Mobile section-header secondary actions use `--section-header-action-visual-height` (28px) inside the standard 44px touch target; the white pill is drawn separately so visual size does not expand with the hit area. Header padding stays compact. Native section summaries use a centered flex row and a shared disclosure chevron. The mobile sidebar trigger is portaled into the existing module page header, leaving Save actions unobscured without a duplicate app bar. `AdminMobileMenu` discovers headers containing an h1, `.product-studio-header`, or an explicit `data-admin-page-header`; it follows streamed headers and route replacements, cleans up its host marker, and remains hidden on desktop. A compact fallback exists only when there is no page header.
+
+Asset-picker dialogs reserve their full library height before requests finish. The body and library view flex into that height; only results scroll, keeping the footer fixed. Upload remains on the right of search, including mobile.
+
+Empty table placeholder rows do not receive row hover styling. Intake rules render their empty message outside the tbody, matching the embedded package-table pattern. Their settings use three equal columns below a shared divider; the switch labels are Require T&C Acceptance, Require Approval and Offer Waitlist. Reusable rule-set saving remains an action in the rule-library modal, not a requirement on the main table.
+
+The calendar marks its heading with `data-admin-page-header` and retains its mobile grid: title and menu share the first row, with calendar navigation and actions below.
+
+Booking-option label/switch pairs hug their contents with an 8px internal gap and are centered together on desktop. Mobile stacks each pair in one of three equal columns. At mobile widths, the visible policy label shortens to Require T&C; its accessible name remains Require T&C Acceptance. Desktop retains the full label.
+
+`MediaTagPicker` composes the shared `Field` recipe so Tags uses the normal 13px label scale and 8px control gap wherever it is embedded. Media inspector metadata retains its deliberately smaller scale. Session details places Tags after Active; an editor without a sidecar spans the available form columns.

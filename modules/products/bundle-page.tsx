@@ -85,7 +85,7 @@ export default async function ProductBundlePage({ productId, searchParams }: Pro
       </header>
 
       {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
-      {errorMessage ? <Notification tone="danger" queryKey="error">{decodeURIComponent(errorMessage)}</Notification> : null}
+      {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
       <main className="bundle-builder-grid">
         <section className="studio-workbench">

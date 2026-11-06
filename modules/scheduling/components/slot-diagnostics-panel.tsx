@@ -5,7 +5,7 @@ import { Button, Card, EqualGrid, Table } from "@/components/ui";
 
 type SlotDiagnosticsPanelProps = {
   defaultOpen?: boolean;
-  services: Service[];
+  services: Pick<Service, "id" | "name" | "isActive">[];
   resources: Resource[];
   selectedServiceId: string;
   selectedDate: string;
@@ -37,12 +37,11 @@ export function SlotDiagnosticsPanel({
   return (
     <Card as="section" bodyClassName="ui-stack">
       <details open={defaultOpen} className="admin-slot-diagnostics">
-        <summary>Slot diagnostics</summary>
+        <summary>Check availability</summary>
         <div className="ui-stack">
           <p className="ui-zero">Trace generated openings and the rules blocking unavailable times.</p>
 
-      <form action="/admin/modules/appointments" className="subpanel form-grid">
-        <input name="panel" type="hidden" value="rules" />
+      <form action="/admin/modules/appointments/schedule" className="subpanel form-grid">
         <input name="tab" type="hidden" value="availability" />
         <EqualGrid min="220px">
           <div className="ui-field">

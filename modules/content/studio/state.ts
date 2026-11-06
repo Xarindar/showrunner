@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { desktopPayload, resolveMobilePayload } from "./mobile-overrides";
 import { emptyPayload, payloadSchema } from "./registry";
 import type { ContentBlockConfig } from "./manifest";
 
@@ -11,8 +12,8 @@ export function readStudio(value: unknown): StudioState {
   return { version: 1, blocks: configRecord(studio.blocks) as Record<string, StoredBlock> };
 }
 export function resolveStudioPayload(block: ContentBlockConfig, stored?: StoredBlock) {
-  // The adapter supplies a lossless read of the previous header field arrays.
-  return block.type === "slideshow" && !Array.isArray(stored?.payload.slides)
+  // The adapter supplies a lossless read of the previous header and team field arrays.
+  return ((block.type === "slideshow" && !Array.isArray(stored?.payload.slides)) || (block.type === "team" && !Array.isArray(stored?.payload.items)))
     ? block.defaults || emptyPayload(block.type)
     : stored?.payload || block.defaults || emptyPayload(block.type);
 }
@@ -22,7 +23,7 @@ export const saveRequestSchema = z.strictObject({
 export function validateBlockUpdate(block: ContentBlockConfig, current: StoredBlock | undefined, input: z.infer<typeof saveRequestSchema>) {
   if (input.id !== block.id) throw new Error("Unknown content instance");
   if ((current?.revision || 0) !== input.revision) throw new Error("This content changed in another session. Reload before saving; keep a copy of your edits.");
-  for (const key of Object.keys(input.payload)) if (!block.editableFields.includes(key)) throw new Error(`Field ${key} is locked`);
+  for (const key of Object.keys(input.payload)) if (!block.editableFields.includes(key) && key !== "mobileOverrides") throw new Error(`Field ${key} is locked`);
   const payload = payloadSchema(block.type).parse({ ...emptyPayload(block.type), ...current?.payload, ...input.payload }) as Record<string, unknown>;
   if (block.type === "showcase") {
     const rows = payload.items as { catalogKey: string; variant: string }[];
@@ -31,6 +32,7 @@ export function validateBlockUpdate(block: ContentBlockConfig, current: StoredBl
   }
   // Existing rows retain their deployment order; clients may edit, remove, or append rows.
   for (const [key, value] of Object.entries(payload)) {
+    if (key === "mobileOverrides") continue;
     const before = current?.payload[key];
     if (!Array.isArray(value) || !Array.isArray(before)) continue;
     const oldIds = before.map(row => row.id);
@@ -43,5 +45,10 @@ export function validateBlockUpdate(block: ContentBlockConfig, current: StoredBl
   if (new Set(input.pageIds).size !== input.pageIds.length || input.pageIds.some(id => !block.pageIds.includes(id))) throw new Error("Page is not allowed for this block");
   const existingPages = current?.pageIds || block.pageIds;
   if (!block.allowPageTargeting && JSON.stringify(input.pageIds) !== JSON.stringify(existingPages)) throw new Error("Page targeting is locked");
+  if (Array.isArray(payload.mobileOverrides) && payload.mobileOverrides.length) {
+    for (const override of payload.mobileOverrides as { path: string[] }[]) if (!block.editableFields.includes(override.path[0])) throw new Error(`Field ${override.path[0]} is locked`);
+    const mobile = resolveMobilePayload(payload);
+    validateBlockUpdate(block, { schemaVersion: 1, revision: input.revision, payload: desktopPayload(payload), pageIds: input.pageIds, updatedAt: "", updatedBy: "" }, { ...input, payload: Object.fromEntries(block.editableFields.map(key => [key, mobile[key]])) });
+  }
   return { payload, pageIds: input.pageIds };
 }

@@ -1,3 +1,4 @@
+import { tablePageSize } from "@/lib/admin-table-pagination";
 import { Notification } from "@/components/ui/notifications";
 import { clientServiceId } from "@/lib/clients/service-selection";
 import { getClientStatusSettings } from "@/lib/clients/configuration";
@@ -32,7 +33,6 @@ import { ClientsActionModals } from "./clients-action-modals";
 
 export const dynamic = "force-dynamic";
 
-const pageSize = 25;
 const clientMetricOptions = [
   { heading: "Appts", id: "appointments", label: "Appointments" },
   { heading: "Orders", id: "orders", label: "Orders" }
@@ -62,6 +62,7 @@ type ClientsPageProps = {
     error?: string;
     imported?: string;
     page?: string;
+    pageSize?: string;
     q?: string;
     metrics?: string | string[];
     saved?: string;
@@ -176,6 +177,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
   const { options: configuredStatusOptions, defaultStatus: defaultClientStatus } = await getClientStatusSettings(settings.siteId);
   const clientStatusOptions = [...configuredStatusOptions];
   const services = await prisma.service.findMany({ where: { siteId: settings.siteId }, select: { id: true, name: true, isActive: true }, orderBy: { name: "asc" } });
+  const pageSize = tablePageSize(params.pageSize);
   const page = Math.max(1, Number(params.page || 1) || 1);
   const query = String(params.q || "").trim();
   const selectedStatus = normalizeClientStatus(params.status);
@@ -486,7 +488,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
       {message ? <Notification tone="success" queryKey="saved">{message}</Notification> : null}
       {params.error ? <Notification tone="danger" queryKey="error">{params.error}</Notification> : null}
 
-      <section aria-labelledby="clients-table-title" className="ui-data-table-shell clients-data-table">
+      <section data-viewport-table aria-labelledby="clients-table-title" className="ui-data-table-shell clients-data-table">
         <div className="ui-data-table-header">
           <div className="ui-data-table-titlebar">
             <div>
@@ -635,7 +637,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
           </tbody>
         </Table>
 
-        <div aria-label="Clients" className="clients-mobile-list">
+        <div data-viewport-table-frame aria-label="Clients" className="clients-mobile-list">
           {clients.map((client) => {
             const visibleTags = client.tags.slice(0, 3);
             const hiddenTagCount = Math.max(0, client.tags.length - visibleTags.length);
@@ -648,7 +650,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
             const lastAppointment = client.bookings[0] ? formatDateTime(client.bookings[0].startsAt, settings.timezone) : "None yet";
 
             return (
-              <article className="clients-mobile-card" key={client.id}>
+              <article data-viewport-row className="clients-mobile-card" key={client.id}>
                 <div className="clients-mobile-card-head">
                   <Link className="clients-mobile-title" href={detailHref}>
                     <span className="clients-name-line">
@@ -728,6 +730,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
 
         <div className="ui-data-table-footer">
           <Pagination
+            pageSize={pageSize}
             className="clients-pagination"
             label="Client pages"
             nextHref={clientsHref({

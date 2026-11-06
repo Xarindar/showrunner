@@ -1,6 +1,12 @@
+"use client";
+
+import { useCallback, useRef, type RefObject } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { tablePageHref } from "@/lib/admin-table-pagination";
 import { Button, ButtonLink } from "./button";
 import { cx } from "./utils";
+import { useViewportTablePageSize } from "./use-viewport-table-page-size";
 
 type PaginationProps = {
   className?: string;
@@ -10,8 +16,23 @@ type PaginationProps = {
   onPrevious?: () => void;
   page: number;
   pageCount: number;
+  pageSize?: number;
+  onPageSizeChange?: (size: number) => void;
   previousHref?: string;
 };
+
+function PageSizeNavigation({ paginationRef, page, pageSize }: { paginationRef: RefObject<HTMLElement | null>; page: number; pageSize: number }) {
+  const router = useRouter();
+  const updateSize = useCallback((size: number) => {
+    if (size === pageSize) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("pageSize", String(size));
+    url.searchParams.set("page", String(Math.floor((page - 1) * pageSize / size) + 1));
+    router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false });
+  }, [router, page, pageSize]);
+  useViewportTablePageSize(paginationRef, updateSize);
+  return null;
+}
 
 export function Pagination({
   className,
@@ -21,20 +42,25 @@ export function Pagination({
   onPrevious,
   page,
   pageCount,
+  pageSize,
+  onPageSizeChange,
   previousHref
 }: PaginationProps) {
+  const paginationRef = useRef<HTMLElement>(null);
+  useViewportTablePageSize(paginationRef, onPageSizeChange);
   const safePageCount = Math.max(1, pageCount);
   const currentPage = Math.min(Math.max(1, page), safePageCount);
   const previousDisabled = currentPage <= 1;
   const nextDisabled = currentPage >= safePageCount;
 
   return (
-    <nav aria-label={label} className={cx("ui-pagination", className)}>
+    <nav ref={paginationRef} aria-label={label} className={cx("ui-pagination", className)}>
+      {pageSize && !onPageSizeChange ? <PageSizeNavigation paginationRef={paginationRef} page={page} pageSize={pageSize} /> : null}
       {previousHref ? (
         <ButtonLink
           aria-disabled={previousDisabled}
           className="ui-pagination-action"
-          href={previousHref}
+          href={tablePageHref(previousHref, pageSize)!}
           size="sm"
           variant="secondary">
           <ChevronLeft size={15} />
@@ -60,7 +86,7 @@ export function Pagination({
         <ButtonLink
           aria-disabled={nextDisabled}
           className="ui-pagination-action"
-          href={nextHref}
+          href={tablePageHref(nextHref, pageSize)!}
           size="sm"
           variant="secondary">
           <span>Next</span>

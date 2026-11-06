@@ -1,4 +1,8 @@
 import "server-only";
+import { prisma } from "@/lib/prisma";
+import { listPublicSchedulingCatalog } from "@/lib/embed/public-scheduling";
+import { jazzrContentManifest } from "./jazzr/content-manifest";
+import { cottageTeamBlock } from "./cottage616/team-blocks";
 import { resolveContentManifest } from "@/clients/content-manifests";
 import { getPublicContentProfilePayload } from "@/clients/cottage616/content-profiles";
 import { readStudio } from "@/modules/content/studio/state";
@@ -8,6 +12,11 @@ import { configuredBlock, type ContentBlockConfig } from "@/modules/content/stud
 // Deployment adapters supply existing content; the shared editor only consumes manifests.
 export async function getEditorManifest(settings: SiteSettingsWithModules) {
   const manifest = resolveContentManifest(settings.siteId, settings.publicContentConfig);
+  // Installation IDs such as "site" are shared; only a registered Jazzr domain enables this adapter.
+  if (manifest.id === "default" && await prisma.siteDomain.findFirst({ where: { siteId: settings.siteId, hostname: "admin.jazzrphotography.com" }, select: { id: true } })) {
+    const { categories } = settings.enabledModuleIds.includes("scheduling") ? await listPublicSchedulingCatalog(settings.siteId) : { categories: [] };
+    return { ...jazzrContentManifest, blocks: jazzrContentManifest.blocks.map(block => ({ ...block, defaults: { ...block.defaults, items: categories.map(category => ({ id: category.id, categoryId: category.id })) } })) };
+  }
   if (manifest.id !== "cottage616") return manifest;
   const profiles = await Promise.all(["cottage616", "the-hive"].map(key => getPublicContentProfilePayload(settings.siteId, key)));
   const dynamic: ContentBlockConfig[] = profiles.flatMap((profile, pageIndex) => {
@@ -44,7 +53,7 @@ export async function getEditorManifest(settings: SiteSettingsWithModules) {
     ];
   });
   const selectors: Record<string, string> = { "home-events": "#events", "home-venue-gallery": ".venue-strip", "vendors-directory": ".vendors-directory", "business-info": ".site-footer address" };
-  return { ...manifest, previewUrl: process.env.CONTENT_PREVIEW_URL || manifest.previewUrl, blocks: [...dynamic, ...manifest.blocks.map(block => ({ ...block,
+  return { ...manifest, previewUrl: process.env.CONTENT_PREVIEW_URL || manifest.previewUrl, blocks: [...dynamic, ...manifest.blocks.map(block => ({ ...cottageTeamBlock(block, readStudio(settings.publicContentConfig).blocks[block.id]?.payload || block.defaults),
     ...(block.type === "business" ? { defaults: { phone: "(870) 219-6982", line1: "3773 County Road 616", city: "Bay", region: "AR", postalCode: "72411" } } : {}),
     ...(selectors[block.id] ? { presentation: { ...block.presentation, selector: selectors[block.id] } } : {})
   }))] };

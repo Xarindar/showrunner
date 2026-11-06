@@ -1,3 +1,4 @@
+import { DateTimeInput } from "@/components/ui/time-input";
 import { Notification } from "@/components/ui/notifications";
 import { AnalyticsEventType, BookingStatus, OrderStatus, PortfolioGalleryStatus, Prisma } from "@prisma/client";
 import { Plus } from "lucide-react";
@@ -135,7 +136,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       <EqualGrid min="220px">
         <Field label="Value" htmlFor="event-value"><Input id="event-value" name="value" inputMode="decimal" placeholder="125.00" /></Field>
         <Field label="Currency" htmlFor="event-currency"><Input id="event-currency" name="currency" defaultValue="USD" maxLength={3} /></Field>
-        <Field label="Occurred at" htmlFor="event-occurred"><Input id="event-occurred" name="occurredAt" type="datetime-local" /></Field>
+        <Field label="Occurred at" htmlFor="event-occurred"><DateTimeInput aria-label="Occurred at" id="event-occurred" name="occurredAt"  /></Field>
       </EqualGrid>
       <EqualGrid>
         <Field label="Related type" htmlFor="event-related-type"><Input id="event-related-type" name="relatedType" placeholder="booking" /></Field>

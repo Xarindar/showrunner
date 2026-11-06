@@ -3,7 +3,7 @@ import { isSafeContentUrl, blockRegistry, emptyPayload, payloadSchema, type Bloc
 export type ContentBlockConfig = {
   id: string; type: BlockType; label: string; editableFields: string[];
   pageIds: string[]; allowPageTargeting?: boolean; limits?: Record<string, number>; minimums?: Record<string, number>;
-  presentation?: { assetBaseUrl?: string; variant?: string; selector?: string; bindings?: { path: string; selector: string; attribute?: "src" | "alt" | "href" | "background" }[] }; source?: "services";
+  presentation?: { assetBaseUrl?: string; variant?: string; selector?: string; bindings?: { path: string; selector: string; attribute?: "src" | "alt" | "href" | "background" }[] }; source?: "services" | "categories";
   cardVariants?: { value: string; label: string }[];
   fixedRows?: boolean;
   editorGroups?: { label: string; fields: { path: string; label: string }[] }[];
@@ -33,6 +33,7 @@ export function validateManifest(manifest: ContentManifest): ContentManifest {
     if (block.type === "business" && block.id !== "business-info") throw new Error("Canonical Business Info ID must be business-info");
     if (block.type === "showcase" && block.source) throw new Error("Showcase cards use catalog bindings, not a section source");
     if (block.type === "featured" && !block.source) throw new Error("Featured items require a source");
+    if ((block.type === "serviceCategories") !== (block.source === "categories")) throw new Error("Service categories require a category source and block");
     if (block.sourceCategory && block.source !== "services") throw new Error("Source categories require a service source");
     if (block.type === "mailingList" && !block.formId) throw new Error("Mailing-list popup requires a configured form");
     if (block.defaults) payloadSchema(block.type).parse({ ...emptyPayload(block.type), ...block.defaults });

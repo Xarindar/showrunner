@@ -47,6 +47,10 @@ test("showcase renderer uses safe semantic cards and selection scrolls once", as
   assert.ok(!article.children.some(node => node.tag === "a"));
   await listeners.message(update);
   assert.equal(host.scrolls, 1, "typing drafts must not reset canvas scroll");
+  await listeners.message({ ...update, data: { ...update.data, revealRequest: 1 } });
+  assert.equal(host.scrolls, 2, "Clicking the selected sidebar section must reveal it again");
+  await listeners.message({ ...update, data: { ...update.data, revealRequest: 1 } });
+  assert.equal(host.scrolls, 2, "Further draft updates must not repeat the reveal");
   card.available = true;
   card.ctaHref = "javascript:alert(1)";
   await listeners.message(update);
@@ -156,6 +160,16 @@ test("preview clicks keep menus interactive, route navigation to the editor, and
   await listeners.message({ source: parent, origin: "https://editor.example", data: { channel: "showrunner-editor-v1", type: "update", blocks: [{ id: "hero", payload: {}, presentation: { bindings: [{ selector: ".headline", path: "links.0.href", attribute: "href" }, { selector: ".headline", path: "texts.0.text" }] } }] } });
   click({ "[data-sr-section]": section, ".headline": true });
   assert.equal(messages.at(-1)?.field, "texts.0.text", "text bindings win over link destinations");
+  const birthday = new Element({ "[data-sr-section]": section });
+  birthday.dataset.srField = "items.0.imageUrl";
+  const eventsHeading = new Element({ "[data-sr-section]": section });
+  eventsHeading.dataset.srField = "heading";
+  for (const target of [birthday, eventsHeading, birthday, eventsHeading]) {
+    clicks.pointerover({ target });
+    assert.ok(target.attributes.has("data-sr-hover"));
+    clicks.click({ target, preventDefault() {}, stopImmediatePropagation() {} });
+    assert.equal(messages.at(-1)?.field, target.dataset.srField, "every click selects its field within the same section");
+  }
   const submit = { prevented: false, preventDefault() { this.prevented = true; }, stopImmediatePropagation() {} };
   clicks.submit(submit);
   assert.equal(submit.prevented, true);

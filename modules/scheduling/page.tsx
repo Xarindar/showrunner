@@ -13,10 +13,8 @@ import { ServiceCategoryManager, type ServiceCategoryManagerCategory } from "./c
 import { ServiceCatalogTable, type ServiceCatalogTableService } from "./components/service-catalog-table";
 import { ServicePackageTable, type ServicePackageTablePackage } from "./components/service-package-table";
 
-import { catalogMediaUrl } from "@/lib/catalog-media-url";
 import { readSessionOffering } from "@/lib/scheduling/session-offering";
-import { servicePriceCents } from "@/lib/scheduling/pricing";
-import { contentWebsiteUrl, resolveContentManifest } from "@/clients/content-manifests";
+import { servicePriceCents, sessionCatalogPriceLabel } from "@/lib/scheduling/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +35,7 @@ type SchedulingPageProps = {
 };
 
 type ServiceCatalogItem = Prisma.ServiceGetPayload<{
-  include: { _count: { select: { packageItems: true } }; mediaAsset: true; hourlyRate: true };
+  include: { hourlyRate: true };
 }>;
 
 type ServicePackageWithItems = Prisma.ServicePackageGetPayload<{
@@ -78,24 +76,22 @@ function savedServiceMessage(saved?: string) {
   return null;
 }
 
-function serviceImageUrl(service: ServiceCatalogItem) {
-  if (service.mediaAsset) return mediaAssetDisplayUrl(service.mediaAsset, MediaVariantType.CARD);
-  return service.imageUrl || "";
-}
-
-function toServiceCatalogTableService(service: ServiceCatalogItem, websiteUrl?: string): ServiceCatalogTableService {
+function toServiceCatalogTableService(service: ServiceCatalogItem): ServiceCatalogTableService {
+  const offering = readSessionOffering(service.sessionOffering);
+  const prices = offering?.tiers.map(tier => tier.priceCents) ?? [
+    service.hourlyRate ? servicePriceCents(service) : service.priceCents
+  ];
   return {
     bookingPath: "Online booking unavailable",
     category: serviceCategory(service) || "Uncategorized",
     description: service.description || "",
     durationMinutes: service.durationMinutes,
     id: service.id,
-    imageUrl: catalogMediaUrl(serviceImageUrl(service), websiteUrl),
     isActive: service.isActive,
     location: service.location || "",
     name: service.name,
-    pricing: service.pricingType === "HOURLY" && service.hourlyRate ? `$${(service.hourlyRate.amountCents / 100).toFixed(2)} / hour` : servicePriceCents(service) == null ? "Price not set" : `$${(servicePriceCents(service)! / 100).toFixed(2)}`,
-    packageCount: readSessionOffering(service.sessionOffering)?.tiers.length ?? 1,
+    pricing: sessionCatalogPriceLabel(prices),
+    packageCount: offering?.tiers.length ?? 1,
     tags: serviceTags(service)
   };
 }
@@ -142,7 +138,7 @@ export default async function SchedulingPage({ searchParams, section }: Scheduli
   const [services, servicePackages, serviceCategories, mediaAssets] = await Promise.all([
     prisma.service.findMany({
       where: { siteId: settings.siteId, isOneOff: false },
-      include: { _count: { select: { packageItems: true } }, mediaAsset: true, hourlyRate: true },
+      include: { hourlyRate: true },
       orderBy: [{ isActive: "desc" }, { category: "asc" }, { updatedAt: "desc" }]
     }),
     prisma.servicePackage.findMany({
@@ -176,7 +172,7 @@ export default async function SchedulingPage({ searchParams, section }: Scheduli
   const tagFilter = tags.includes(params.tag || "") ? String(params.tag) : "all";
 
   const savedMessage = savedServiceMessage(params.saved);
-  const errorMessage = params.error ? decodeURIComponent(params.error) : null;
+  const errorMessage = params.error || null;
   const categoryOptions: SelectMenuOption[] = [
     { label: "All categories", value: "all" },
     ...categories.map((category) => ({ label: category, value: category }))
@@ -193,8 +189,7 @@ export default async function SchedulingPage({ searchParams, section }: Scheduli
     { label: "All tags", value: "all" },
     ...packageTags.map((tag) => ({ label: tag, value: tag }))
   ];
-  const websiteUrl = contentWebsiteUrl(resolveContentManifest(settings.siteId, settings.publicContentConfig));
-  const serviceRows = services.map(service => toServiceCatalogTableService(service, websiteUrl));
+  const serviceRows = services.map(toServiceCatalogTableService);
   const statusActionService = serviceRows.find((service) => service.id === params.statusService) || null;
   const categoryServiceCounts = new Map<string, number>();
   services.forEach((service) => {
@@ -224,12 +219,12 @@ export default async function SchedulingPage({ searchParams, section }: Scheduli
       createAction={
         <ButtonLink href="/admin/modules/services/new" size="sm">
           <Plus size={15} />
-          New session type
+          New session
         </ButtonLink>
       }
       emptyCreateAction={
         <Link className="catalog-empty-state-link" href="/admin/modules/services/new">
-          Click here to make your first service
+          Create your first session
         </Link>
       }
       initialCategory={categoryFilter}
@@ -259,7 +254,7 @@ export default async function SchedulingPage({ searchParams, section }: Scheduli
   );
 
   const selectedSection = section || "services";
-  const sectionLabel = selectedSection === "categories" ? "Service categories" : selectedSection === "packages" ? "Service bundles" : "Services";
+  const sectionLabel = selectedSection === "categories" ? "Service categories" : selectedSection === "packages" ? "Session Bundles" : "Services";
 
   return (
     <div className="stack products-workspace service-workspace">

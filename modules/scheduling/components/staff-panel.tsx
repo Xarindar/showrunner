@@ -1,21 +1,28 @@
-import type { AdminRole, StaffMember } from "@prisma/client";
+import type { AdminRole, AvailabilityRule, Resource, StaffMember } from "@prisma/client";
+import { AvailabilityPanel } from "./availability-panel";
 import { Link2, Plus, Save } from "lucide-react";
 import { createStaffMemberAction, linkStaffMemberAdminUserAction, updateStaffMemberAction } from "../actions";
-import { Button, Card, EqualGrid, Switch, Table } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { EqualGrid } from "@/components/ui/layout";
+import { Switch } from "@/components/ui/switch";
 
 type StaffPanelProps = {
   staff: StaffMember[];
+  availability: Array<AvailabilityRule & { resource: Resource | null; staff: StaffMember | null }>;
+  timezone: string;
   assignedStaffIds: Set<string>;
   staffIdsWithAvailability: Set<string>;
   adminUsers: {id: string;email: string;role: AdminRole;}[];
   canLinkStaffAccounts: boolean;
 };
 
-export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, adminUsers, canLinkStaffAccounts }: StaffPanelProps) {
+export function StaffPanel({ availability, timezone, staff, assignedStaffIds, staffIdsWithAvailability, adminUsers, canLinkStaffAccounts }: StaffPanelProps) {
   return (
-    <EqualGrid as="section">
+    <section className="form-grid">
+      <details>
+        <summary>Add staff</summary>
       <Card action={createStaffMemberAction} as="form" minHeight="none" bodyClassName="form-grid">
-        <h2 className="section-title">Add staff</h2>
         <EqualGrid>
           <div className="ui-field">
             <label htmlFor="staff-name">Name</label>
@@ -46,17 +53,14 @@ export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, 
           Add staff
         </Button>
       </Card>
+      </details>
 
-      <Card>
+      <section className="form-grid">
         <h2 className="section-title">Staff roster</h2>
-        <Table>
-          <tbody>
             {staff.map((member) => {
               const needsAvailability = member.isActive && assignedStaffIds.has(member.id) && !staffIdsWithAvailability.has(member.id);
               return (
-                <tr key={member.id}>
-                <td>
-                  <details>
+                  <details key={member.id}>
                     <summary>
                       <strong>{member.name}</strong>{" "}
                       <span className={member.isActive ? "ui-badge ui-badge-success" : "ui-badge ui-badge-danger"}>
@@ -67,7 +71,7 @@ export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, 
                     {needsAvailability ?
                       <p className="ui-zero">
                         {member.name} is assigned to a service but has no personal weekly availability rules, so they
-                        won&apos;t appear as a bookable option. Add their hours in Availability rules below to make
+                        won&apos;t appear as a bookable option. Add their weekly hours below to make
                         them bookable.
                       </p> :
                       null}
@@ -125,19 +129,15 @@ export function StaffPanel({ staff, assignedStaffIds, staffIdsWithAvailability, 
                         </Button>
                       </form> :
                       null}
+                    <AvailabilityPanel availability={availability.filter(rule => rule.staffId === member.id)} resources={[]} staff={[member]} fixedStaffId={member.id} timezone={timezone} />
                   </details>
-                </td>
-              </tr>);
+              );
 
             })}
             {!staff.length ?
-            <tr>
-                <td>No staff members yet. Services can still use business-wide availability.</td>
-              </tr> :
+            <p>No staff members yet. Services can still use business-wide availability.</p> :
             null}
-          </tbody>
-        </Table>
-      </Card>
-    </EqualGrid>);
+      </section>
+    </section>);
 
 }

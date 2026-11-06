@@ -1,12 +1,12 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 
-export async function getPortfolioHeader(siteId: string, orientation: "desktop" | "mobile") {
+export async function getPortfolioHeader(siteId: string, orientation: "desktop" | "mobile", gallerySlug?: string) {
   const photos = await prisma.mediaAssetVariant.findMany({
     where: {
       type: "HERO", sizeBytes: { gt: 0 }, width: { gt: 0 }, height: { gt: 0 },
       asset: { siteId, deletedAt: null, isPrivate: false, mimeType: { startsWith: "image/" },
-        portfolioItems: { some: { type: "IMAGE", gallery: { siteId, status: "PUBLISHED", visibility: "PUBLIC", clientId: null } } }
+        portfolioItems: { some: { type: "IMAGE", gallery: { siteId, status: "PUBLISHED", visibility: "PUBLIC", clientId: null, ...(gallerySlug ? { slug: gallerySlug } : {}) } } }
       }
     },
     select: { assetId: true, width: true, height: true }

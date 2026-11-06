@@ -297,7 +297,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
           <ReceiptText size={22} />
           <h3>{documentCount} documents</h3>
           <p className="lead lead-compact">
-            Quotes, invoices, and contracts in the billing workspace.
+            Quotes, invoices, and Booking Terms &amp; Conditions in the billing workspace.
           </p>
         </Card>
         <Card>
@@ -351,7 +351,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                     <Link href={`/admin/modules/billing?document=${document.id}`}>{document.documentNumber}</Link>
                     <br />
                     <span className="muted-text">
-                      {enumLabel(document.type)} - {document._count.lineItems} lines - {document._count.attachments} files
+                      {document.type === BillingDocumentType.CONTRACT ? "Booking T&C" : enumLabel(document.type)} - {document._count.lineItems} lines - {document._count.attachments} files
                     </span>
                   </td>
                   <td>
