@@ -349,8 +349,6 @@ try {
   const focusRing = await addServicesButton.evaluate(element=>{const style=getComputedStyle(element);return {width:parseFloat(style.outlineWidth),offset:parseFloat(style.outlineOffset),style:style.outlineStyle};});
   assert(focusRing.width>=2&&focusRing.style==='solid'&&focusRing.width+focusRing.offset<=0,'Keyboard focus rings stay inside the button edge and cannot be clipped by a scroller');
   await newPackage.screenshot({path:captures+'/package-button-focus.png'});
-  const packageModalBounds = await newPackage.boundingBox();
-  const packageModalNode = await newPackage.elementHandle();
   await newPackage.getByRole('button', {name:'Add Services', exact:true}).click();
   const packageServices = page.getByRole('dialog', {name:'Add Services', exact:true});
   await packageServices.getByText('Loading services…', {exact:true}).waitFor();
