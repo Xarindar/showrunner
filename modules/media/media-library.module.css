@@ -628,15 +628,7 @@
 .newFolder label { display: grid; gap: var(--sd-space-4); }
 .newFolder p { margin: 0; color: var(--color-danger); }
 .page :global(dialog.ui-dialog).folderModal { width: min(440px, calc(100vw - 32px)); }
-@media (min-width: 861px) {
-  :global(.ui-dialog).folderModal {
-    left: var(--layout-admin-sidebar);
-    right: 4px;
-    max-width: calc(100vw - var(--layout-admin-sidebar) - 36px);
-    margin-inline: auto;
-  }
-  :global(.admin-root:has(.admin-sidebar.is-collapsed)) .folderModal { left: 52px; max-width: calc(100vw - 88px); }
-}
+
 .detailsModal .inspectorScroll { display: grid; grid-template-columns: minmax(0, 1fr) 360px; align-items: start; height: max-content; gap: var(--space-6); overflow: visible; padding: 0; }
 .detailsModal .heroPreview { position: sticky; top: 0; aspect-ratio: auto; height: min(750px, calc(100svh - 140px)); background: var(--color-surface-sunken); }
 .inspectorOptions { min-width: 0; padding-inline-end: var(--space-2); }

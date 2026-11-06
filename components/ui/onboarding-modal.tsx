@@ -86,9 +86,9 @@ export function OnboardingModal({
         </aside>
 
         <section className="ui-onboarding-content">
-          <header className="ui-onboarding-header">
+          <header className="ui-onboarding-header ui-dialog-header">
             <div>
-              <h2 className="ui-zero" id={titleId}>
+              <h2 className="ui-zero ui-dialog-title" id={titleId}>
                 {title}
               </h2>
               {description ? <p>{description}</p> : null}

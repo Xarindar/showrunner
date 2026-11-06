@@ -407,3 +407,14 @@
   .showrunner-admin .service-mobile-list > .service-mobile-empty { display: block; }
 }
 .showrunner-admin .service-catalog-folder-panel .catalog-product-table th:last-child { width: 176px; }
+.showrunner-admin :is(.service-desktop-table, .hourly-rates-table) .catalog-product-table th:last-child {
+  text-align: center;
+  width: 104px;
+}
+.showrunner-admin :is(.service-desktop-table, .hourly-rates-table) .catalog-row-actions { justify-content: center; }
+.showrunner-admin .hourly-rates-table .catalog-product-table { min-width: 0; }
+.showrunner-admin .hourly-rates-table .catalog-product-table th:first-child { width: auto; }
+.showrunner-admin .hourly-rates-table .catalog-product-table th:nth-child(2) { width: 34%; }
+.showrunner-admin .hourly-rates-table .catalog-product-table th:last-child { width: 80px; }
+
+.showrunner-admin .service-mobile-list, .showrunner-admin .service-mobile-list > li { background: var(--data-table-row-bg); }

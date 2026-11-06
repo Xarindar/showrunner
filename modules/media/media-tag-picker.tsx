@@ -2,6 +2,7 @@
 
 import { useId, useRef, useState } from "react";
 import { Plus } from "lucide-react";
+import { Field } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import styles from "./media-library.module.css";
@@ -28,9 +29,9 @@ export function MediaTagPicker({ tags, selected, onChange }: { tags: string[]; s
   return <>
     <div className={styles.tagPicker} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}
       onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); setOpen(false); input.current?.focus(); } }}>
-      <label className={styles.field} htmlFor={id}><span>Tags</span>
+      <Field label="Tags" htmlFor={id}>
       <input ref={input} id={id} autoComplete="off" value={query} placeholder="Find or add tags" aria-controls={`${id}-options`}
-        onFocus={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setOpen(true); }} onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }} /></label>
+        onFocus={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setOpen(true); }} onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }} /></Field>
       {selected.length > 0 && <p className={styles.selectedTags}>{selected.join(", ")}</p>}
       {open && <div id={`${id}-options`} className={styles.tagOptions} role="group" aria-label="Available tags">
         <Button type="button" variant="ghost" onClick={() => { setName(query); setError(""); setCreating(true); setOpen(false); }}><Plus size={16} aria-hidden="true" />New Tag</Button>

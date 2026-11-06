@@ -292,12 +292,12 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
         </div>
       </div>
 
-      <Dialog aria-label={props.templateName} className="email-playground-dialog" open={isOpen} onClose={() => setIsOpen(false)}>
+      <Dialog aria-label={props.templateName} className="ui-dialog email-playground-dialog" open={isOpen} onClose={() => setIsOpen(false)}>
         <div className="email-playground-shell">
-          <header className="email-playground-header">
+          <header className="email-playground-header ui-dialog-header">
             <div>
               <span className="eyebrow">{props.templateKey || props.purposeLabel}</span>
-              <h2>{props.templateName}</h2>
+              <h2 className="ui-dialog-title">{props.templateName}</h2>
             </div>
             <div className="email-playground-header-actions">
               <Button type="button" variant="secondary" onClick={() => void goToStep("review")}>
@@ -308,7 +308,7 @@ export function EmailTemplateBuilder(props: EmailTemplateBuilderProps) {
                 <Save size={16} />
                 {isSaving ? "Saving" : "Save"}
               </Button>
-              <Button type="button" variant="ghost" aria-label="Close playground" onClick={() => setIsOpen(false)}>
+              <Button type="button" variant="ghost" className="ui-dialog-close" aria-label="Close playground" onClick={() => setIsOpen(false)}>
                 <X size={18} />
               </Button>
             </div>

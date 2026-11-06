@@ -54,7 +54,7 @@
   cursor: not-allowed;
   opacity: 1;
 }
-.showrunner-admin :is(.ui-button, .button):focus-visible { outline: 2px solid var(--sd-color-focus); outline-offset: 3px; }
+.showrunner-admin :is(.ui-button, .button):focus-visible { outline: 2px solid var(--sd-color-focus); outline-offset: -2px; }
 .showrunner-admin .ui-button-lg { padding: var(--sd-space-8) var(--sd-space-16); }
 /* Plain wrapped fields share label spacing; explicit module layouts can override this default. */
 .showrunner-admin :where(label:has(> :is(select, textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"])))) {
@@ -158,3 +158,19 @@
 
 /* Native range margins otherwise overflow full-width tracks in scrolling dialogs. */
 .showrunner-admin input[type="range"] { margin: 0; }
+
+.showrunner-admin :is(.admin-main, .login-wrap) select.ui-select-compact {
+  min-inline-size: var(--select-compact-min-width);
+  padding-inline: var(--select-compact-padding-x);
+}
+@supports (appearance: base-select) {
+  .showrunner-admin select.ui-select-compact::picker(select) {
+    padding: var(--select-compact-picker-padding);
+    scrollbar-width: thin;
+  }
+  .showrunner-admin select.ui-select-compact:not([multiple]):is(:not([size]), [size="1"]) option {
+    justify-content: center;
+    padding-inline: var(--select-compact-option-padding-x);
+  }
+  .showrunner-admin select.ui-select-compact option::checkmark { display: none; }
+}

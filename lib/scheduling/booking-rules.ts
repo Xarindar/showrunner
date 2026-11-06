@@ -38,12 +38,6 @@ export function readBookingRules(value: unknown, legacy: { intakePrompt?: string
   ].map(rule => ({ ...rule, type: "TEXT", required: false, placeholder: "", helpText: "", options: [] }));
 }
 
-export const defaultBookingRules: BookingRule[] = [
-  { id: "contact-name", label: "Name", contactField: "customerName", required: true },
-  { id: "contact-email", label: "Email", contactField: "customerEmail", required: true },
-  { id: "contact-phone", label: "Phone", contactField: "customerPhone", required: false }
-].map(rule => ({ ...rule, category: "Contact", kind: "intake", type: "TEXT", options: [], placeholder: "", helpText: "" })) as BookingRule[];
-
 export const intakeAnswersSchema = z.record(z.string().min(1).max(100), z.string().trim().max(4000)).refine(value => Object.keys(value).length <= 40, "Too many answers.");
 export class BookingRuleAnswerError extends Error {}
 

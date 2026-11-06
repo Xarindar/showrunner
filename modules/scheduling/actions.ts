@@ -66,7 +66,7 @@ const reminderSettingsFormSchema = z.object({
 const servicePackageFormSchema = z
   .object({
     id: z.string().trim().optional(),
-    name: z.string().trim().min(1, "Add a package name."),
+    name: z.string().trim().min(1, "Add a bundle name."),
     slug: z.string().trim().optional(),
     description: z.string().trim().max(2000).default(""),
     tags: z.string().trim().default(""),
@@ -174,7 +174,7 @@ function refreshScheduling() {
 async function servicePricingData(input: { pricingType: PricingType; hourlyRateId: string; durationMinutes: number }, siteId: string, offering: SessionOffering | null) {
   if (offering) {
     const rates = await prisma.hourlyRate.findMany({ where: { siteId } });
-    offering.tiers = priceSessionOffering(offering, rates, input).tiers;
+    Object.assign(offering, priceSessionOffering(offering, rates, input));
     const first = offering.tiers[0];
     return { pricingType: first.pricingType!, hourlyRateId: first.hourlyRateId ?? null, priceCents: first.priceCents };
   }
@@ -422,7 +422,7 @@ export async function createServiceAction(_previous: { error: string }, formData
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
   } catch (error) {
-    return { error: error instanceof Error && !("code" in error) ? error.message : "The session type could not be saved. Your details are still here; please try again." };
+    return { error: error instanceof Error && !("code" in error) ? error.message : "The session could not be saved. Your details are still here; please try again." };
   }
 
   refreshScheduling();
@@ -451,7 +451,7 @@ export async function updateServiceAction(formData: FormData) {
   const input = await parseForm(serviceUpdateFormSchema, formData);
   const settings = await getSiteSettings();
   const current = await prisma.service.findFirst({ where: { id: input.id, siteId: settings.siteId } });
-  if (!current) redirect(servicesAdminPath({ error: "Session type not found." }));
+  if (!current) redirect(servicesAdminPath({ error: "Session not found." }));
   const offering = await hydrateSessionServiceLibrary(input.sessionOffering ?? readSessionOffering(current.sessionOffering), settings.siteId);
   // Older service forms edit the default package; keep the other tiers and coverage intact.
   if (offering && !input.sessionOffering) {
@@ -509,12 +509,12 @@ export async function updateSessionTypeAction(_previous: { error: string }, form
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const settings = await getSiteSettings();
   if (!await prisma.service.findFirst({ where: { id: parsed.data.id, siteId: settings.siteId, isOneOff: false }, select: { id: true } })) {
-    return { error: "This session type is no longer available." };
+    return { error: "This session is no longer available." };
   }
   try { await updateServiceAction(formData); }
   catch (error) {
     unstable_rethrow(error);
-    return { error: error instanceof Error && !("code" in error) ? error.message : "The session type could not be saved or changed in another window. Your changes are still here; reload before trying again." };
+    return { error: error instanceof Error && !("code" in error) ? error.message : "The session could not be saved or changed in another window. Your changes are still here; reload before trying again." };
   }
   return { error: "" };
 }
@@ -823,7 +823,7 @@ export async function updateServicePackageAction(formData: FormData) {
   await requireAdmin("scheduling:manage");
   const input = await parseForm(servicePackageFormSchema, formData, SERVICES_ADMIN_PATH);
   if (!input.id) {
-    redirect(servicesAdminPath({ error: "Choose a package to update.", tab: "packages" }));
+    redirect(servicesAdminPath({ error: "Choose a bundle to update.", tab: "packages" }));
   }
 
   const settings = await getSiteSettings();
@@ -832,7 +832,7 @@ export async function updateServicePackageAction(formData: FormData) {
     select: { id: true, slug: true }
   });
   if (!currentPackage) {
-    redirect(servicesAdminPath({ error: "Package not found.", tab: "packages" }));
+    redirect(servicesAdminPath({ error: "Bundle not found.", tab: "packages" }));
   }
 
   const slug = await generateUniqueServicePackageSlug({
@@ -874,10 +874,10 @@ export async function addServicePackageItemAction(formData: FormData) {
   ]);
 
   if (!servicePackage || !service) {
-    redirect(servicePackageEditPath(input.packageId, { error: "Choose a valid service and package." }));
+    redirect(servicePackageEditPath(input.packageId, { error: "Choose a valid session and bundle." }));
   }
   if (existing) {
-    redirect(servicePackageEditPath(input.packageId, { error: "That service is already in this package." }));
+    redirect(servicePackageEditPath(input.packageId, { error: "That session is already in this bundle." }));
   }
 
   await prisma.servicePackageItem.create({
@@ -909,7 +909,7 @@ export async function removeServicePackageItemAction(formData: FormData) {
   });
 
   if (deleted.count !== 1) {
-    redirect(servicePackageEditPath(input.packageId, { error: "Package item not found." }));
+    redirect(servicePackageEditPath(input.packageId, { error: "Bundle item not found." }));
   }
 
   refreshScheduling();

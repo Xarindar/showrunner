@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatMoney } from "../format";
 import { sessionPrice } from "./session-input";
 
 export const pricingTypeSchema = z.enum(["FLAT_RATE", "HOURLY"]);
@@ -16,6 +17,12 @@ export function hourlyPriceCents(amountCents: number, durationMinutes: number) {
     throw new Error("The hourly rate and duration must produce a price of $9,999,999.99 or less.");
   }
   return total;
+}
+
+export function sessionCatalogPriceLabel(prices: readonly (number | null)[]) {
+  const priced = prices.filter(price => price !== null);
+  if (!priced.length) return "-";
+  return `${formatMoney(Math.min(...priced))}${priced.length > 1 ? "+" : ""}`;
 }
 
 export function servicePriceCents(service: { pricingType?: string; priceCents: number | null; durationMinutes: number; hourlyRate?: HourlyRate | null }) {

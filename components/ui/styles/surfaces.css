@@ -22,7 +22,7 @@
   min-height: 0;
   min-width: 0;
   overflow: auto;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
 }
 .showrunner-admin :where(.ui-card-body) { gap: var(--space-2); }
 .showrunner-admin .ui-card:not(:has(.ui-card-body)) { gap: var(--space-2); grid-template-rows: none; }
@@ -210,4 +210,66 @@
 .showrunner-admin :is(.ui-badge-danger,.catalog-status.is-archived) {
   background: var(--sd-color-critical-bg);
   color: var(--sd-color-critical-text);
+}
+
+.showrunner-admin .studio-panel.ui-section-card { padding: 0; gap: 0; overflow: visible; }
+.showrunner-admin .ui-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sd-space-8);
+  padding: var(--sd-space-8) var(--sd-space-16);
+  background: var(--sd-color-primary);
+  color: var(--sd-color-on-primary);
+}
+.showrunner-admin .ui-section-card .ui-section-header h2 {
+  min-width: 0;
+  margin: 0;
+  color: inherit;
+  font-size: var(--sd-type-heading-size);
+  font-weight: var(--sd-type-heading-weight);
+  line-height: var(--sd-type-heading-line);
+  letter-spacing: var(--sd-type-heading-tracking);
+  overflow-wrap: anywhere;
+}
+.showrunner-admin .ui-section-header .ui-button-secondary:not(:disabled) { background: var(--section-header-action-bg); color: var(--sd-color-primary); }
+.showrunner-admin .ui-section-header .ui-button-secondary:not(:disabled):hover { background: var(--sd-color-fill-secondary-hover); }
+.showrunner-admin .ui-section-body { display: grid; gap: var(--sd-space-16); min-width: 0; padding: var(--sd-space-16); }
+
+.showrunner-admin .ui-section-card > details { border: 0; padding: 0; }
+.showrunner-admin .ui-section-card > details > summary.ui-section-header { display: flex; justify-content: flex-start; flex-wrap: nowrap; min-height: var(--sd-layout-touch-target); padding: var(--sd-space-8) var(--sd-space-16); font-size: var(--sd-type-heading-size); line-height: var(--sd-type-heading-line); list-style: none; }
+.showrunner-admin .ui-section-card > details > summary:focus-visible { outline-offset: -2px; }
+
+.showrunner-admin .ui-section-card > .ui-section-header,
+.showrunner-admin .ui-section-card > details > .ui-section-header { border-radius: var(--sd-radius-container) var(--sd-radius-container) 0 0; }
+.showrunner-admin .ui-section-card > details:not([open]) > .ui-section-header { border-radius: var(--sd-radius-container); }
+
+.showrunner-admin .ui-table-card > .catalog-table-scroll {
+  border: 0;
+  border-radius: 0 0 var(--sd-radius-container) var(--sd-radius-container);
+}
+
+.showrunner-admin .ui-section-card > details > summary.ui-section-header::-webkit-details-marker { display: none; }
+.showrunner-admin .ui-section-card > details > summary.ui-section-header::before { content: ""; flex: none; width: var(--sd-space-6); height: var(--sd-space-6); border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); margin-right: var(--sd-space-4); }
+.showrunner-admin .ui-section-card > details[open] > summary.ui-section-header::before { transform: rotate(45deg); }
+@media (max-width: 860px), (pointer: coarse) {
+  .showrunner-admin :is(.ui-section-header, .ui-data-table-titlebar) { --section-header-action-bg: transparent; padding-block: 0; min-height: var(--sd-layout-touch-target); }
+  .showrunner-admin :is(.ui-section-header, .ui-data-table-titlebar) .ui-button-secondary:not(:disabled) {
+    position: relative;
+    isolation: isolate;
+    background: transparent;
+    box-shadow: none;
+    padding-inline: var(--sd-space-12);
+    white-space: nowrap;
+  }
+  .showrunner-admin :is(.ui-section-header, .ui-data-table-titlebar) .ui-button-secondary:not(:disabled)::before {
+    content: "";
+    position: absolute;
+    inset: calc((var(--sd-layout-touch-target) - var(--section-header-action-visual-height)) / 2) 0;
+    border-radius: inherit;
+    background: var(--sd-color-on-primary);
+    z-index: -1;
+  }
+  .showrunner-admin :is(.ui-section-header, .ui-data-table-titlebar) .ui-button-secondary:not(:disabled):hover::before { background: var(--sd-color-fill-secondary-hover); }
 }

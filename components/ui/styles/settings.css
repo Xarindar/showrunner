@@ -23,7 +23,8 @@
   display: inline-grid;
   gap: var(--space-2);
   grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 30px;
+  min-height: var(--sd-layout-control-height);
+  height: max-content;
 }
 .showrunner-admin .ui-switch-copy { display: grid; gap: var(--sd-space-2); min-width: 0; }
 .showrunner-admin .ui-switch-copy strong { color: var(--color-text); font-weight: var(--sd-type-weight-medium); }

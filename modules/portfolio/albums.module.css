@@ -183,7 +183,8 @@
 }
 .galleryEmpty h2, .galleryEmpty p { margin: 0; }
 .galleryEmpty p, .galleryEmpty small { color: var(--sd-color-media-muted); }
-.settingsPanel.settingsPanel {
+.settingsPanel.settingsPanel:global(.ui-dialog) {
+  --dialog-workspace-inset: 0px;
   inset: 0;
   margin: 0 0 0 auto;
   width: min(680px, 100%);
@@ -192,24 +193,17 @@
   max-height: 100dvh;
   border: 0;
   border-radius: 0;
-  padding: 0;
+  padding: var(--sd-space-16);
   overflow: hidden;
 }
 .settingsPanel[open] { display: flex; flex-direction: column; }
-.settingsPanel :global(.ui-modal-head) {
-  flex-shrink: 0;
-  margin: 0;
-  padding: var(--space-4) var(--space-6);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
 .settingsBody.settingsBody { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 0; }
 .settingsScroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: var(--space-4) var(--space-6);
+  padding: 0;
   scroll-padding-block: var(--space-3);
 }
 .settingsFooter.settingsFooter {
@@ -218,11 +212,11 @@
   border-top: 1px solid var(--color-border);
   border-radius: 0;
   box-shadow: none;
-  padding: var(--space-3) var(--space-6);
-  padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
+  padding: var(--sd-space-16) 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
 }
-.settingsPanel :global(.ui-modal-head) h2 { font-size: var(--type-h3); }
-.viewer.viewer {
+.viewer.viewer:global(.ui-dialog) {
+  --dialog-workspace-inset: 0px;
   inset: 0;
   margin: 0;
   width: 100vw;
@@ -241,25 +235,16 @@
   -webkit-user-select: none;
 }
 .viewer::backdrop { background: var(--sd-color-media-viewer); }
-.viewer :global(.ui-modal-head) { position: absolute; z-index: 2; top: 16px; right: 20px; left: 24px; margin: 0; }
+:global(.showrunner-admin dialog.ui-dialog).viewer > :global(.ui-modal-head) { position: absolute; z-index: 2; top: 0; right: 0; left: 0; margin: 0; }
 .viewer :global(.ui-modal-head) h2 {
-  font-size: var(--sd-type-body-size);
-  font-weight: var(--sd-type-weight-regular);
-  color: var(--sd-color-media-muted);
-}
-.viewer :global(.ui-dialog-close) {
-  min-width: 44px;
-  min-height: var(--sd-layout-touch-target);
   color: var(--sd-color-media-text);
-  background: var(--sd-color-media-surface);
-  border-radius: var(--sd-radius-checkbox);
 }
-.viewerBody {
+:global(.showrunner-admin dialog.ui-dialog).viewer > .viewerBody {
   height: 100%;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--sd-space-16);
-  padding: var(--sd-space-80) var(--sd-space-64) var(--sd-space-24);
+  padding: var(--sd-space-64) 0 0;
 }
 .fullPhoto { width: 100%; height: 100%; min-height: 0; object-fit: contain; display: block; }
 .viewerArrow {
@@ -307,8 +292,6 @@
   .galleryActions { gap: var(--space-1); }
   .photoGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); padding: var(--space-2); }
   .photoGridLarge { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .settingsPanel :global(.ui-modal-head), .settingsScroll, .settingsFooter.settingsFooter { padding-inline: var(--space-4); }
-  .viewerBody { padding: var(--sd-space-80) var(--sd-space-8) var(--sd-space-24); }
   .viewerArrow { top: auto; bottom: 66px; }
   .viewerCaption { padding: 0 var(--sd-space-8); }
 }

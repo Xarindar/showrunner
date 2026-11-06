@@ -25,12 +25,15 @@ try {
 const page=await browser.newPage({viewport:{width:1440,height:1000}});const requests=[];const errors=[];
 page.on('pageerror',error=>{errors.push(error.message);console.error(error.message);});
 let failNext=false;
+let holdLibrary=true,releaseLibrary;
+let libraryGate=new Promise(resolve=>{releaseLibrary=resolve});
 let releaseStale, markStaleStarted;
 const staleGate=new Promise(resolve=>{releaseStale=resolve});
 const staleStarted=new Promise(resolve=>{markStaleStarted=resolve});
 await page.route('**/*',async route=>{
 const url=new URL(route.request().url());
 if(url.pathname==='/api/media/assets') {
+ if(holdLibrary){await libraryGate;}
  const folder=url.searchParams.get('folder')||'',query=url.searchParams.get('q')||'',number=Number(url.searchParams.get('page'));requests.push({folder,query,number});
  if(query==='old'){markStaleStarted();await staleGate;}
  if(failNext&&number===2){failNext=false;await route.fulfill({status:503,body:'Unavailable'});return;}
@@ -43,7 +46,13 @@ await route.fulfill({contentType:'text/html',body:'<html><head><meta name="viewp
 });
 await page.goto('http://picker.example');await page.getByRole('button',{name:'Choose an image',exact:true}).click();
 const dialog=page.getByRole('dialog',{name:'Choose an image'}),grid=dialog.getByLabel('Available assets');
+await dialog.getByText('Loading images…',{exact:true}).waitFor();
+const reservedFooter=await dialog.locator('footer').boundingBox();
+const reservedDialog=await dialog.boundingBox();
+holdLibrary=false;releaseLibrary();
 await dialog.getByRole('button',{name:'Open folder Trips',exact:true}).waitFor();
+assert.deepEqual(await dialog.locator('footer').boundingBox(),reservedFooter,'Footer stays in place when initial data arrives');
+assert.deepEqual(await dialog.boundingBox(),reservedDialog,'Picker reserves its full size before data arrives');
 await dialog.getByRole('combobox',{name:'Tag',exact:true}).selectOption('venue');
 await page.waitForFunction(()=>document.querySelectorAll('[aria-label^="Open folder "]').length===0);
 await dialog.getByRole('button',{name:'Select Image 0.jpg',exact:true}).waitFor();
@@ -60,9 +69,10 @@ await dialog.getByRole('button',{name:'Open folder Trips',exact:true}).waitFor()
 assert((await dialog.boundingBox()).width>=1000);assert((await dialog.boundingBox()).height>=800);
 assert.equal(await dialog.getByRole('button',{name:'Load more assets'}).count(),0);
 await dialog.screenshot({path:captures+'/desktop.png'});
+const pageTwoBefore=requests.filter(request=>!request.folder&&!request.query&&request.number===2).length;
 await grid.evaluate(element=>element.scrollTop=element.scrollHeight);
 await page.waitForFunction(()=>document.querySelectorAll('[aria-label^="Select Image"]').length===48);
-assert.equal(requests.filter(request=>!request.folder&&!request.query&&request.number===2).length,1);
+assert.equal(requests.filter(request=>!request.folder&&!request.query&&request.number===2).length-pageTwoBefore,1);
 await grid.evaluate(element=>element.scrollTop=element.scrollHeight);
 await page.waitForFunction(()=>document.querySelectorAll('[aria-label^="Select Image"]').length===72);
 await dialog.getByRole('button',{name:'Open folder Trips',exact:true}).click();
@@ -92,6 +102,9 @@ await page.setViewportSize({width:390,height:844});await page.getByRole('button'
 await dialog.getByRole('button',{name:'Open folder Trips',exact:true}).waitFor();
 assert.equal(await dialog.evaluate(element=>element.scrollWidth>element.clientWidth),false);
 assert.equal(await grid.evaluate(element=>element.scrollWidth>element.clientWidth),false);
+const search=await dialog.getByRole('searchbox',{name:'Search assets'}).boundingBox(),upload=await dialog.getByRole('button',{name:'Upload images',exact:true}).boundingBox();
+assert(Math.abs(search.y+search.height/2-upload.y-upload.height/2)<2,'Upload stays beside search on mobile');
+assert(upload.x>search.x+search.width,'Upload is to the right of search');
 await dialog.screenshot({path:captures+'/mobile.png'});
 await dialog.getByRole('button',{name:'Open folder Trips',exact:true}).focus();await page.keyboard.press('Enter');
 await dialog.getByRole('button',{name:'Open folder Family',exact:true}).waitFor();

@@ -20,9 +20,11 @@ Use the scoped `--sd-*` reference tokens through Showrunner semantic aliases. Pr
 Use the installed font fallback in the exported stack; do not download Shopify's proprietary font or assets. Keep Content's real iframe, domain-specific calendars, media imagery and charts distinct from administrative chrome.
 
 ## Admin dialogs
-Use the shared dialog shell: 16px outer padding, 12px between header and body, and 16px between form groups. Use `module-modal-actions` for action rows with an 8px gap, aligned right, with Cancel before the primary action in DOM order. Keep scrollable contents and status messages separate from the action group.
+Align dialogs to the actual admin workspace, excluding the navigation sidebar and responding to collapse and mobile layouts. Use the shared dialog shell: compact black headers with white 22px titles at weight 500 and 28px line height, white circular close buttons with black X icons, 16px outer padding, 12px between header and body, and 16px between form groups. Use `module-modal-actions` for action rows with an 8px gap, aligned right, with Cancel before the primary action in DOM order. Keep scrollable contents and status messages separate from the action group.
 
 Input boundaries use inset rings in the shared control recipe and token source for normal, focus, invalid and disabled states. External shadows are decorative only: borders and keyboard focus must remain visible inside clipped or scrolling containers. Preserve container overflow behavior rather than adding per-screen clearance patches.
 
 ## Time presentation
 Show all user-facing times in 12-hour format with explicit AM/PM. Use `formatTime` / `formatDateTime` for dated values, `formatTimeValue` for wall-clock values, and the shared `TimeInput` / `DateTimeInput` controls for editing. Storage, API payloads, calendar coordinates and timezone calculations retain canonical 24-hour values. Each weekly-hours Edit action starts from that day’s saved scoped schedule; toggling Accept appointments off and back on retains the draft time ranges.
+
+Admin tables share semantic `--data-table-*` tokens: compact black title/action bars with white add buttons, light gray single-line column labels, white rows, subtle separators and quiet borders without elevated shadows. Embedded table cards reserve the same minimum body height in empty and populated states, then grow with their contents; module indexes and fixed-height modal tables retain their reserved space. Public tables and calendar geometry remain independent.

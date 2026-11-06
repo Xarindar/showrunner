@@ -7,7 +7,7 @@ import { useActionState, useState } from "react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { createSessionAction } from "./create-action";
 import styles from "./session-form.module.css";
-import { selectSessionPackage, type SessionOffering } from "@/lib/scheduling/session-offering";
+import { selectSessionPackage, sessionAddOnPriceCents, suggestedSessionAddOns, type SessionOffering } from "@/lib/scheduling/session-offering";
 import { hourlyPriceCents, type HourlyRate, type PricingType } from "@/lib/scheduling/pricing";
 
 type Service = { id: string; name: string; durationMinutes: number; priceCents: number | null; pricingType: PricingType; hourlyRate: HourlyRate | null; sessionOffering: SessionOffering | null; staffAssignments: { staffId: string }[] };
@@ -41,10 +41,12 @@ export function SessionForm({ services, clients, staff, timezone, rates }: { ser
     if (pack && selected) setDetails({ name: selected.name, duration: String(pack.durationMinutes), price: pack.priceCents == null ? "" : (pack.priceCents / 100).toFixed(2) });
   }
   const selectedTier = selected?.sessionOffering?.tiers.find(tier => tier.id === tierId);
+  const suggestedAddOns = selected?.sessionOffering ? suggestedSessionAddOns(selected.sessionOffering, tierId) : [];
   const hourly = selectedTier?.pricingType
     ? selectedTier.pricingType === "HOURLY" && rates.find(rate => rate.id === selectedTier.hourlyRateId)
     : selected?.pricingType === "HOURLY" && selected.hourlyRate;
-  const extrasCents = selected?.sessionOffering?.addOns.filter(item => addOnIds.includes(item.id)).reduce((total, item) => total + (item.libraryItemId ? 0 : item.priceCents), 0) ?? 0;
+  let extrasCents = 0;
+  try { extrasCents = selected?.sessionOffering?.addOns.filter(item => addOnIds.includes(item.id)).reduce((total, item) => total + sessionAddOnPriceCents(item, Number(details.duration) || selectedTier?.durationMinutes || 60), 0) ?? 0; } catch { /* Duration validation is handled by the form. */ }
   let calculatedPrice = "";
   if (hourly && details.duration) {
     try { calculatedPrice = ((hourlyPriceCents(hourly.amountCents, Number(details.duration)) + extrasCents) / 100).toFixed(2); }
@@ -63,7 +65,7 @@ export function SessionForm({ services, clients, staff, timezone, rates }: { ser
         {selected?.sessionOffering && <>
           <label>Package<select name="tierId" required value={tierId} onChange={event => choosePackage(event.target.value, [])}>{selected.sessionOffering.tiers.map(tier => <option key={tier.id} value={tier.id}>{tier.name}</option>)}</select></label>
           {selectedTier && <p className={styles.hint}>{selected.sessionOffering.coverageItems.filter(item => selectedTier.coverageIds.includes(item.id)).map(item => item.name).join(" · ")}</p>}
-          {selected.sessionOffering.addOns.length > 0 && <fieldset><legend>Optional extras</legend><div className={styles.days}>{selected.sessionOffering.addOns.map(item => <label key={item.id}><input type="checkbox" name="addOnIds" value={item.id} checked={addOnIds.includes(item.id)} onChange={event => choosePackage(tierId, event.target.checked ? [...addOnIds, item.id] : addOnIds.filter(id => id !== item.id))} />{item.name}{!item.libraryItemId && <> (+{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(item.priceCents / 100)})</>}</label>)}</div></fieldset>}
+          {suggestedAddOns.length > 0 && <fieldset><legend>Suggested Add-Ons</legend><div className={styles.days}>{suggestedAddOns.map(item => <label key={item.id}><input type="checkbox" name="addOnIds" value={item.id} checked={addOnIds.includes(item.id)} onChange={event => choosePackage(tierId, event.target.checked ? [...addOnIds, item.id] : addOnIds.filter(id => id !== item.id))} />{item.name}{<> (+{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(item.priceCents / 100)}{item.pricingType === "HOURLY" ? " / hour" : ""})</>}</label>)}</div></fieldset>}
         </>}
         <label>Session name<input name="name" required placeholder="Family photos" value={details.name} onChange={event => setDetails({ ...details, name: event.target.value })} /></label>
         <div className={styles.row}><label>Date<input type="date" name="date" defaultValue={state.date || ""} required /></label><label>Time <small>({timezone})</small><TimeInput name="time" defaultValue={state.time || ""} required /></label></div>

@@ -52,7 +52,7 @@ export function AppointmentCalendarShell({
   return (
     <section className="appointments-calendar-shell" aria-label="Appointment scheduler">
       <input id="appointment-calendar-view-input" form="appointments-filter-form" name="view" type="hidden" defaultValue={view} />
-      <header className="appointments-subtle-header">
+      <header className="appointments-subtle-header" data-admin-page-header>
         <div className="appointments-subtle-title">
           <span>Appointments</span>
           <strong>{rangeLabel}</strong>

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { upsertPublicClient } from "@/lib/clients/public-client";
 import { blockoutConflictWhere, getBufferedWindow } from "@/lib/bookings/conflicts";
 import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
-import { readSessionOffering, selectSessionPackage } from "@/lib/scheduling/session-offering";
+import { priceSessionOffering, readSessionOffering, selectSessionPackage } from "@/lib/scheduling/session-offering";
 import { hourlyPriceCents } from "@/lib/scheduling/pricing";
 
 // Manual sessions use an agreed time, independent of public booking hours.
@@ -54,7 +54,9 @@ export async function createManualSession(input: {
   return prisma.$transaction(async tx => {
     let service = input.serviceId ? await tx.service.findFirst({ where: { id: input.serviceId, siteId: input.siteId, isActive: true, isOneOff: false }, include: { staffAssignments: true, resourceAssignments: true, hourlyRate: true } }) : null;
     if (input.serviceId && !service) throw new Error("Choose an available session type.");
-    let packageSnapshot = selectSessionPackage(service?.sessionOffering, input.tierId, input.addOnIds);
+    let offering = readSessionOffering(service?.sessionOffering);
+    if (offering?.addOns.some(item => item.pricingType === "HOURLY")) offering = priceSessionOffering(offering, await tx.hourlyRate.findMany({ where: { siteId: input.siteId } }), { pricingType: service?.pricingType ?? "FLAT_RATE", hourlyRateId: service?.hourlyRateId ?? "" });
+    let packageSnapshot = selectSessionPackage(offering, input.tierId, input.addOnIds, input.durationMinutes);
     const tier = readSessionOffering(service?.sessionOffering)?.tiers.find(tier => tier.id === input.tierId);
     const hourly = (tier?.pricingType ?? service?.pricingType) === "HOURLY";
     const hourlyRate = hourly ? tier?.pricingType

@@ -320,32 +320,6 @@
   border-color: var(--sd-color-success-text);
   color: var(--sd-color-success-text);
 }
-.showrunner-admin .table {
-  border-collapse: collapse;
-  font-size: var(--sd-type-heading-size);
-  min-width: 720px;
-  table-layout: fixed;
-  width: 100%;
-}
-.showrunner-admin .table th,
-.showrunner-admin .table td {
-  border-bottom: 1px solid var(--line);
-  height: var(--row-height);
-  overflow: hidden;
-  padding: var(--sd-space-12) var(--sd-space-8);
-  text-align: left;
-  text-overflow: ellipsis;
-  vertical-align: middle;
-}
-.showrunner-admin .table th {
-  color: var(--muted);
-  font-size: var(--sd-type-small-size);
-  font-weight: var(--sd-type-weight-strong);
-  height: 42px;
-  text-transform: uppercase;
-}
-.showrunner-admin .table tr:last-child td { border-bottom: 0; }
-.showrunner-admin .table td[colspan] { color: var(--muted); height: 164px; text-align: center; }
 .showrunner-admin .table strong { font-weight: var(--sd-type-weight-medium); }
 .showrunner-admin .table span { min-width: 0; }
 @keyframes skeletonSweep {
@@ -391,3 +365,5 @@
 @media(max-width:860px) {
   .showrunner-admin { --admin-page-inset: var(--sd-space-16); }
 }
+
+.showrunner-admin .admin-editor-section:focus { outline: none; }

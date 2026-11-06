@@ -64,6 +64,8 @@
   padding: var(--space-2) 0 var(--space-2) var(--space-3);
 }
 .showrunner-admin .email-playground-dialog {
+  --dialog-workspace-inset: 0px;
+  border-radius: 0;
   background: var(--color-surface);
   border: 0;
   color: var(--color-text);
@@ -78,7 +80,7 @@
 .showrunner-admin .email-playground-shell {
   display: grid;
   grid-template-rows: 72px 48px minmax(0, 1fr) 64px;
-  height: 100dvh;
+  height: 100%;
   min-width: 0;
 }
 .showrunner-admin .email-playground-header,
@@ -86,11 +88,11 @@
   background: var(--sd-color-surface-subtle);
   border-color: var(--color-border);
   min-width: 0;
-  padding: 0 clamp(var(--sd-space-16), 2.2vw, var(--sd-space-24));
+  padding: 0 var(--sd-space-16);
 }
+.showrunner-admin .email-playground-header .eyebrow { color: var(--sd-color-on-primary); }
 .showrunner-admin .email-playground-header { border-bottom: 1px solid var(--color-border); }
 .showrunner-admin .email-playground-footer { border-top: 1px solid var(--color-border); }
-.showrunner-admin .email-playground-header h2 { font-size: clamp(1.05rem, 1.6vw, 1.35rem); margin: 0; }
 .showrunner-admin .email-playground-header > div:first-child { min-width: 0; }
 .showrunner-admin .email-playground-header-actions { flex-wrap: wrap; justify-content: flex-end; }
 .showrunner-admin .email-playground-steps {
@@ -250,3 +252,14 @@
   }
   .showrunner-admin .email-review-grid { grid-template-columns: 1fr; }
 }
+
+.showrunner-admin .email-playground-header.ui-dialog-header {
+  position: relative;
+  display: block;
+  min-height: var(--sd-space-64);
+  padding: var(--sd-space-8) var(--sd-space-16);
+}
+.showrunner-admin .email-playground-header > div:first-child { padding-right: var(--sd-space-64); }
+.showrunner-admin .ui-dialog .email-playground-header .ui-dialog-close { position: absolute; right: var(--sd-space-16); top: var(--sd-space-8); }
+.showrunner-admin .email-playground-header-actions { padding-right: var(--sd-space-64); }
+.showrunner-admin .email-playground-shell { grid-template-rows: auto 48px minmax(0, 1fr) 64px; }

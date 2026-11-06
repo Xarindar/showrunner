@@ -33,8 +33,8 @@ export function Modal({
       className={cx("ui-dialog", "ui-modal", className)}
       onClose={onClose}
       open={open}>
-      <div className="ui-modal-head">
-        <h2 className="ui-zero" id={titleId}>
+      <div className="ui-modal-head ui-dialog-header">
+        <h2 className="ui-zero ui-dialog-title" id={titleId}>
           {title}
         </h2>
         <Button aria-label={closeLabel} className="ui-dialog-close" onClick={onClose} size="sm" type="button" variant="ghost">

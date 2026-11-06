@@ -102,7 +102,7 @@ export function PackageBuilder({
       <section className="service-library-panel" aria-labelledby="service-library-title">
         <div className="studio-section-head">
           <div>
-            <h2 id="service-library-title">Service tiles</h2>
+            <h2 id="service-library-title">Sessions</h2>
           </div>
           <span className="catalog-pill">
             <Layers3 size={14} />
@@ -176,8 +176,8 @@ export function PackageBuilder({
         ) : (
           <div className="catalog-empty-state">
             <Layers3 size={28} />
-            <h3>No services match</h3>
-            <p>Clear filters or add a session type before building a bundle.</p>
+            <h3>No sessions match</h3>
+            <p>Clear filters or add a session before building a bundle.</p>
           </div>
         )}
       </section>
@@ -189,7 +189,7 @@ export function PackageBuilder({
           </div>
           <span className="catalog-pill">
             <Boxes size={14} />
-            {packages.length} package{packages.length === 1 ? "" : "s"}
+            {packages.length} bundle{packages.length === 1 ? "" : "s"}
           </span>
         </div>
 
@@ -220,7 +220,7 @@ export function PackageBuilder({
 
                   <dl className="service-package-stats">
                     <div>
-                      <dt>Services</dt>
+                      <dt>Sessions</dt>
                       <dd>{servicePackage.items.length}</dd>
                     </div>
                     <div>
@@ -231,7 +231,7 @@ export function PackageBuilder({
 
                   <div className="service-package-drop-hint">
                     <Plus size={15} />
-                    Drop services here
+                    Drop sessions here
                   </div>
 
                   {servicePackage.items.length ? (
@@ -253,7 +253,7 @@ export function PackageBuilder({
                       ))}
                     </div>
                   ) : (
-                    <p className="muted-text">Use Add beside a service to include it in this bundle. You can also drag it here.</p>
+                    <p className="muted-text">Use Add beside a session to include it in this bundle. You can also drag it here.</p>
                   )}
 
                   <details className="product-editor-advanced">

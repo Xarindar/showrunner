@@ -17,23 +17,32 @@ export function useViewportTablePageSize(
     const measure = () => {
       const rows = Array.from(root.querySelectorAll<HTMLElement>("tbody > tr, [data-viewport-row]"))
         .filter(row => row.getBoundingClientRect().height > 0 && !row.querySelector("[colspan]") && !row.closest("dialog, [role=dialog]"));
-      if (!rows.length) return;
       const main = root.closest<HTMLElement>(".admin-main");
       const mainStyle = main && getComputedStyle(main);
       const mainScrolls = mainStyle && /auto|scroll/.test(mainStyle.overflowY);
       const viewportBottom = window.visualViewport?.height ?? window.innerHeight;
       const bottom = mainScrolls ? Math.min(viewportBottom, main!.getBoundingClientRect().bottom) : viewportBottom;
-      const firstTop = rows[0].getBoundingClientRect().top + window.scrollY + (mainScrolls ? main!.scrollTop : 0);
-      const lastBottom = rows.at(-1)!.getBoundingClientRect().bottom;
-      const footer = root.getBoundingClientRect().bottom - lastBottom;
+      const scroll = window.scrollY + (mainScrolls ? main!.scrollTop : 0);
       const padding = mainStyle ? parseFloat(mainStyle.paddingBottom) || 0 : 0;
+      const rootBottom = root.getBoundingClientRect().bottom;
+      const fillProperty = "--viewport-table-fill";
+      const currentFill = parseFloat(root.style.getPropertyValue(fillProperty)) || 0;
+      const availableBottom = bottom - padding;
+      const fill = Math.max(0, Math.round(availableBottom - rootBottom - scroll + currentFill));
+      if (fill !== currentFill) root.style.setProperty(fillProperty, `${fill}px`);
+      if (!rows.length) return;
+
+      const firstTop = rows[0].getBoundingClientRect().top + scroll;
+      const lastBottom = rows.at(-1)!.getBoundingClientRect().bottom;
+      // Measure the footer without the flexible space so it never reduces row capacity.
+      const footer = root.getBoundingClientRect().bottom - lastBottom - fill;
       const gap = parseFloat(getComputedStyle(rows[0].parentElement!).rowGap) || 0;
       const measuredHeight = Math.max(...rows.map(row => row.getBoundingClientRect().height + (parseFloat(getComputedStyle(row).marginBottom) || 0))) + gap;
       const width = root.getBoundingClientRect().width;
       // Keep the tallest measured row at this width to avoid page-size loops on mixed-height records.
       rowMetrics.current = { width, height: width === rowMetrics.current.width ? Math.max(rowMetrics.current.height, measuredHeight) : measuredHeight };
       const rowHeight = rowMetrics.current.height;
-      const size = Math.max(1, Math.min(100, Math.floor((bottom - firstTop - footer - padding) / rowHeight)));
+      const size = Math.max(1, Math.min(100, Math.floor((availableBottom - firstTop - footer) / rowHeight)));
       onSizeChange(size);
     };
     const schedule = () => { if (active) { clearTimeout(timer); timer = setTimeout(measure, 150); } };

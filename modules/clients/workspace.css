@@ -1,6 +1,4 @@
 .showrunner-admin .clients-module { gap: var(--space-3); }
-.showrunner-admin .clients-data-table { --data-table-shell-bg: var(--sd-color-surface-subtle); box-shadow: var(--shadow-panel); }
-.showrunner-admin .clients-data-table > .ui-data-table-header { padding-bottom: var(--space-3); }
 .showrunner-admin .clients-recent-appointments { display: grid; gap: var(--space-2); min-width: 0; }
 .showrunner-admin .clients-records-toolbar {
   align-items: center;
@@ -44,11 +42,6 @@
   line-height: 1.2;
   margin: 0;
   min-width: 0;
-}
-.showrunner-admin .clients-records-table-wrap {
-  border: 1px solid var(--sd-color-border);
-  border-radius: var(--radius-control);
-  overflow: auto;
 }
 .showrunner-admin .clients-records-table { min-width: var(--data-table-min-width); }
 .showrunner-admin .clients-records-table th,
@@ -130,8 +123,7 @@
 .showrunner-admin .clients-search-form select { flex: 0 0 210px; }
 .showrunner-admin .clients-list-body { gap: 0; overflow: auto; }
 .showrunner-admin .clients-table { min-width: 1240px; }
-.showrunner-admin .clients-table th,
-.showrunner-admin .clients-table td { height: auto; padding: var(--sd-space-8); vertical-align: top; }
+.showrunner-admin .clients-table td { height: auto; vertical-align: top; }
 .showrunner-admin .clients-table th { vertical-align: middle; }
 .showrunner-admin .clients-col-client,
 .showrunner-admin .clients-col-email { width: 220px; }

@@ -2,8 +2,9 @@
 
 import { useId, useState } from "react";
 import { flushSync } from "react-dom";
-import { Copy, Plus, X } from "lucide-react";
+import { Copy, Pencil, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Field, Input, Select } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { sessionOfferingDraft, type SessionOffering, type SessionOfferingDraft } from "@/lib/scheduling/session-offering";
 import type { ServiceLibraryItem } from "@/lib/scheduling/service-library";
@@ -13,19 +14,33 @@ import { hourlyPriceCents, type HourlyRate, type PricingType } from "@/lib/sched
 import { ServicePricingFields } from "./service-pricing-fields";
 import { useNotify } from "@/components/ui/notifications";
 
-export function SessionPackagesEditor({ initialOffering = null, durationMinutes = 60, priceCents = null, requirePrice = false, initialRates = [], initialPricingType = "FLAT_RATE", initialHourlyRateId = "" }: {
-  initialOffering?: SessionOffering | null; durationMinutes?: number; priceCents?: number | null; requirePrice?: boolean;
+const maxDurationHours = 24;
+const durationHours = Array.from({ length: maxDurationHours + 1 }, (_, index) => index);
+const durationMinutesOfHour = Array.from({ length: 60 }, (_, index) => index);
+
+const deliverableFields = [
+  ["locations", "Locations"],
+  ["outfitChanges", "Outfit changes"],
+  ["finalPhotos", "Final photos"]
+] as const;
+
+function packageDurationLabel(value: string) {
+  const total = Number(value), hours = Math.floor(total / 60), minutes = total % 60;
+  return hours ? `${hours} hr${minutes ? ` ${minutes} min` : ""}` : `${minutes} min`;
+}
+
+export function SessionPackagesEditor({ initialOffering = null, durationMinutes = 60, priceCents = null, isNew = false, initialRates = [], initialPricingType = "FLAT_RATE", initialHourlyRateId = "" }: {
+  initialOffering?: SessionOffering | null; durationMinutes?: number; priceCents?: number | null; isNew?: boolean;
   initialRates?: HourlyRate[]; initialPricingType?: PricingType; initialHourlyRateId?: string;
 }) {
   const [draft, setDraft] = useState<SessionOfferingDraft>(() => {
+    if (isNew && !initialOffering) return { coverageItems: [], tiers: [], addOns: [] };
     const offering = sessionOfferingDraft(initialOffering, durationMinutes, priceCents);
     return { ...offering, tiers: offering.tiers.map(tier => ({ ...tier, pricingType: tier.pricingType ?? initialPricingType, hourlyRateId: tier.pricingType ? tier.hourlyRateId : initialHourlyRateId })) };
   });
   const [expandedTiers, setExpandedTiers] = useState(() => new Set<string>());
-  const [libraryPicker, setLibraryPicker] = useState<{ editingItem?: SessionOffering["coverageItems"][number]; optional?: boolean } | null>(null);
-  const [inlineService, setInlineService] = useState<SessionOffering["coverageItems"][number] | null>(null);
-  const [expandedService, setExpandedService] = useState<string | null>(null);
-  const [removal, setRemoval] = useState<{ kind: "service" | "package" | "extra"; id: string; name: string } | null>(null);
+  const [libraryPicker, setLibraryPicker] = useState<{ editingItem?: SessionOffering["coverageItems"][number]; optional?: boolean; tierId?: string } | null>(null);
+  const [removal, setRemoval] = useState<{ kind: "package" | "extra"; id: string; name: string } | null>(null);
   const [newTiers, setNewTiers] = useState(() => new Set<string>());
   const notify = useNotify();
   const [rates, setRates] = useState(initialRates);
@@ -38,15 +53,27 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     catch { return ""; }
   };
   const listId = useId();
+  const firstTier = draft.tiers[0];
   const multi = draft.tiers.length > 1;
+  const canDiscardTier = isNew || multi;
+  const libraryTier = draft.tiers.find(tier => tier.id === libraryPicker?.tierId);
   const updateTier = (id: string, changes: Partial<SessionOfferingDraft["tiers"][number]>) => setDraft(current => ({ ...current, tiers: current.tiers.map(tier => tier.id === id ? { ...tier, ...changes } : tier) }));
+
+  function discardTier(id: string) {
+    setDraft(current => !isNew && current.tiers.length <= 1 ? current : {
+      ...current,
+      tiers: current.tiers.filter(tier => tier.id !== id)
+    });
+    setNewTiers(current => new Set([...current].filter(tierId => tierId !== id)));
+  }
 
   function closeLibrary() {
     setLibraryPicker(null);
-    setInlineService(null);
-    setExpandedService(null);
     requestAnimationFrame(() => {
-      document.getElementById(`${listId}-${libraryPicker?.optional ? "optional-title" : "included-title"}`)?.focus();
+      const target = libraryPicker?.tierId
+        ? libraryPicker.editingItem ? `${listId}-edit-${libraryPicker.tierId}-${libraryPicker.editingItem.id}` : `${listId}-services-${libraryPicker.tierId}`
+        : `${listId}-${libraryPicker?.optional ? "optional-title" : "packages-title"}`;
+      document.getElementById(target)?.focus();
     });
   }
 
@@ -57,19 +84,17 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     while (source && draft.tiers.some(tier => tier.name.toLowerCase() === name.toLowerCase())) name = `${base} copy ${suffix++}`;
     const id = crypto.randomUUID();
     flushSync(() => {
-      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? "", pricingType: source?.pricingType ?? "FLAT_RATE", hourlyRateId: source?.hourlyRateId ?? "", coverageIds: [...(source?.coverageIds ?? [])] }] });
-      setExpandedTiers(new Set([id]));
+      setExpandedTiers(new Set());
+      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? String(durationMinutes), pricingType: source?.pricingType ?? "FLAT_RATE", hourlyRateId: source?.hourlyRateId ?? "", deliverables: source?.deliverables, coverageIds: [...(source?.coverageIds ?? [])] }] });
       setNewTiers(current => new Set([...current, id]));
     });
-    document.getElementById(`${listId}-${id}`)?.focus();
-    notify(source ? `Package duplicated. Save the session type to keep it.` : "Package added to this draft.");
   }
 
-  function chooseLibraryItems(items: ServiceLibraryItem[], candidate = inlineService?.id || libraryPicker?.editingItem?.id || null) {
+  function chooseLibraryItems(items: ServiceLibraryItem[], candidate = libraryPicker?.editingItem?.id || null) {
     if (libraryPicker?.optional) {
-      setDraft(current => ({ ...current, addOns: [...current.addOns, ...items.filter(item => !current.addOns.some(row => row.libraryItemId === item.id || row.name.toLowerCase() === item.name.toLowerCase())).map(item => ({ id: crypto.randomUUID(), libraryItemId: item.id, name: item.name, price: "0.00" }))].slice(0, 50) }));
+      setDraft(current => ({ ...current, addOns: [...current.addOns, ...items.filter(item => !current.addOns.some(row => row.libraryItemId === item.id || row.name.toLowerCase() === item.name.toLowerCase())).map(item => ({ id: crypto.randomUUID(), libraryItemId: item.id, name: item.name, price: ((item.priceCents ?? 0) / 100).toFixed(2), pricingType: item.pricingType, hourlyRateId: item.hourlyRateId }))].slice(0, 50) }));
       closeLibrary();
-      notify("Optional services added to this draft.");
+      notify("Suggested add-ons added to this draft.");
       return;
     }
     const editingId = draft.coverageItems.some(item => item.id === candidate) ? candidate : undefined;
@@ -84,77 +109,155 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     notify(editingId ? "Service updated in this draft." : "Services added to this draft.");
   }
 
+  const packagePicker = libraryTier && <ServiceLibraryPicker embedded rates={rates} onRateSaved={onRateSaved} selectedItems={draft.coverageItems}
+      editingItem={libraryPicker?.editingItem} packageServices={libraryPicker?.editingItem ? undefined : libraryTier} onClose={closeLibrary}
+      onChoose={(items, details) => {
+        if (libraryPicker?.editingItem) { chooseLibraryItems(items, libraryPicker.editingItem.id); return; }
+        if (!details) return;
+        const additions = items.map(({ id, ...item }) => ({ ...item, id: crypto.randomUUID(), libraryItemId: id }));
+        setDraft(current => ({
+          ...current,
+          coverageItems: [...current.coverageItems, ...additions],
+          tiers: current.tiers.map(tier => tier.id === libraryTier.id ? {
+            ...tier,
+            coverageIds: [...details.coverageIds, ...additions.map(item => item.id)]
+          } : tier)
+        }));
+        closeLibrary();
+      }} />;
+
   return <div className={styles.editor}>
-    <input type="hidden" name="pricingType" value={draft.tiers[0].pricingType} />
-    <input type="hidden" name="hourlyRateId" value={draft.tiers[0].pricingType === "HOURLY" ? draft.tiers[0].hourlyRateId ?? "" : ""} />
+    <input type="hidden" name="pricingType" value={firstTier?.pricingType ?? "FLAT_RATE"} />
+    <input type="hidden" name="hourlyRateId" value={firstTier?.pricingType === "HOURLY" ? firstTier.hourlyRateId ?? "" : ""} />
     <input type="hidden" name="sessionOffering" value={JSON.stringify({ ...draft, tiers: draft.tiers.map(tier => ({ ...tier, price: tierPrice(tier) })) })} />
-    <input type="hidden" name="durationMinutes" value={draft.tiers[0].durationMinutes} />
-    <input type="hidden" name="price" value={tierPrice(draft.tiers[0])} />
-    <section className="studio-panel" aria-labelledby={`${listId}-included-title`}>
-      <div className={styles.heading}><h2 id={`${listId}-included-title`} tabIndex={-1}>What’s included</h2></div>
-      <p className={styles.hint}>Add reusable services, then choose which packages include each one below.</p>
-      <div className={styles.optionList}>
-        {draft.coverageItems.map(item => <div className={styles.optionRow} key={item.id}>
-          {expandedService === item.id ? <>
-            <ServiceLibraryPicker inline rates={rates} onRateSaved={onRateSaved} selectedItems={draft.coverageItems} editingItem={item} onChoose={chooseLibraryItems} onClose={closeLibrary} />
-            <Button type="button" variant="danger" size="sm" onClick={() => setRemoval({ kind: "service", id: item.id, name: item.name })}>Remove from session</Button>
-          </> : <button type="button" className={`${styles.optionSummary} ${styles.serviceSummary}`} onClick={() => { setExpandedService(item.id); setInlineService(item); }}>
-            <strong title={item.name}>{item.name}</strong>
-            {item.pricingType && <small>{item.pricingType === "HOURLY" ? `${rates.find(rate => rate.id === item.hourlyRateId)?.name || "Hourly rate"} · Hourly` : item.priceCents == null ? "Flat rate" : `$${(item.priceCents / 100).toFixed(2)} · Flat rate`}</small>}
-            <span className={styles.chips}>{draft.tiers.filter(tier => tier.coverageIds.includes(item.id)).map(tier => <span className="ui-badge" key={tier.id}>{tier.name}</span>)}</span>
-          </button>}
-        </div>)}
-      </div>
-      <div><Button type="button" variant="ghost" disabled={draft.coverageItems.length >= 100} onClick={() => { setInlineService(null); setExpandedService(null); setLibraryPicker({}); }}>+ Add item</Button></div>
-    </section>
-    <section className="studio-panel" aria-labelledby={`${listId}-packages-title`}>
-    <div className={styles.heading}><h2 id={`${listId}-packages-title`}>Packages</h2></div>
-    <div className={styles.optionList}>
-      {draft.tiers.map((tier, index) => <details key={tier.id} className={styles.tierCard} open={expandedTiers.has(tier.id)} onInvalidCapture={() => {
-        flushSync(() => setExpandedTiers(current => new Set([...current, tier.id])));
-      }}>
-        <summary className={styles.optionSummary} onClick={event => { event.preventDefault(); setExpandedTiers(current => current.has(tier.id) ? new Set() : new Set([tier.id])); }}>
-          <strong>{tier.name || `Package ${index + 1}`}</strong><small>{tierPrice(tier) ? `$${tierPrice(tier)}` : "Price not set"} · {tier.durationMinutes || "—"} minutes{tier.pricingType === "HOURLY" ? " · Hourly" : ""}</small>
-          <span className={styles.chips}>{draft.coverageItems.filter(item => tier.coverageIds.includes(item.id)).map(item => <span className="ui-badge" key={item.id}>{item.name}</span>)}</span>
-        </summary>
-        <div className={styles.tierBody}>
-          <label>Package name<input id={`${listId}-${tier.id}`} aria-label={`Package ${index + 1} name`} value={tier.name} required maxLength={120} onChange={event => updateTier(tier.id, { name: event.target.value })} /></label>
-          <ServicePricingFields pricingType={tier.pricingType ?? "FLAT_RATE"} hourlyRateId={tier.hourlyRateId ?? ""} rates={rates} onChange={(pricingType, hourlyRateId) => updateTier(tier.id, { pricingType, hourlyRateId })} onRateSaved={onRateSaved} />
+    <input type="hidden" name="durationMinutes" value={firstTier?.durationMinutes ?? durationMinutes} />
+    <input type="hidden" name="price" value={firstTier ? tierPrice(firstTier) : ""} />
+    <section className="studio-panel ui-section-card ui-table-card" aria-labelledby={`${listId}-packages-title`}>
+    <div className="ui-section-header"><h2 id={`${listId}-packages-title`}>Packages</h2><Button type="button" variant="secondary" size="sm" disabled={draft.tiers.length >= 10} onClick={() => addTier()}><Plus aria-hidden="true" size={16} />Add package</Button></div>
+    <div className={`catalog-table-scroll ${styles.servicesTable} ${styles.packagesTable}`} role="region" aria-label="Packages table" tabIndex={0}>
+      <table className="catalog-product-table"><thead><tr><th scope="col">Package</th><th scope="col">Price</th><th scope="col">Duration</th><th scope="col">Actions</th></tr></thead><tbody>
+        {draft.tiers.filter(tier => !newTiers.has(tier.id)).map(tier => <tr key={tier.id}>
+          <td><button type="button" className={styles.packageName} aria-haspopup="dialog" onClick={() => setExpandedTiers(new Set([tier.id]))}>{tier.name}</button></td>
+          <td>{tierPrice(tier) ? Number(tierPrice(tier)).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "—"}</td>
+          <td>{packageDurationLabel(tier.durationMinutes)}</td>
+          <td><Button type="button" variant="ghost" size="sm" aria-label={`Edit ${tier.name}`} onClick={() => setExpandedTiers(new Set([tier.id]))}><Pencil aria-hidden="true" size={15} /></Button></td>
+        </tr>)}
+      </tbody></table>
+      {!draft.tiers.some(tier => !newTiers.has(tier.id)) && <p className={styles.servicesEmpty}>No packages added</p>}
+    </div>
+      {draft.tiers.map((tier, index) => {
+        const services = draft.coverageItems.filter(item => tier.coverageIds.includes(item.id));
+        const totalMinutes = Number(tier.durationMinutes);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        const durationLabelId = `${listId}-duration-${tier.id}`;
+        const content = (
+          <div className={styles.tierBody}>
+          <div className={styles.tierFields}>
+          <label>Package name<input id={`${listId}-${tier.id}`} aria-label={`Package ${index + 1} name`} value={tier.name} autoFocus required maxLength={120} onChange={event => updateTier(tier.id, { name: event.target.value })} /></label>
           <div className={styles.tierNumbers}>
-            <label>{tier.pricingType === "HOURLY" ? "Calculated price (USD)" : "Price (USD)"}<input aria-label={`${tier.name} price (USD)`} type="number" inputMode="decimal" min="0" max="9999999.99" step="0.01" required={requirePrice || multi || tier.pricingType === "HOURLY"} readOnly={tier.pricingType === "HOURLY"} placeholder="0.00" value={tierPrice(tier)} onChange={event => updateTier(tier.id, { price: event.target.value })} /></label>
-            <label>Duration (minutes)<input aria-label={`${tier.name} duration (minutes)`} type="number" inputMode="numeric" min="1" max="1440" required value={tier.durationMinutes} onChange={event => updateTier(tier.id, { durationMinutes: event.target.value })} /></label>
+            <ServicePricingFields pricingType={tier.pricingType ?? "FLAT_RATE"} hourlyRateId={tier.hourlyRateId ?? ""} rates={rates}
+              onChange={(pricingType, hourlyRateId) => updateTier(tier.id, { pricingType, hourlyRateId })} onRateSaved={onRateSaved}
+              priceField={<Field label="Price (USD)">
+                <Input aria-label={`${tier.name} price (USD)`} type="number" inputMode="decimal" min="0" max="9999999.99" step="0.01"
+                  required={isNew || multi}
+                  placeholder="0.00" value={tier.price} onChange={event => updateTier(tier.id, { price: event.target.value })} />
+              </Field>}
+            />
           </div>
-          <fieldset className={styles.tierCoverage}><legend>Included in this package</legend>{draft.coverageItems.map(item => <label key={item.id}><input type="checkbox" aria-label={`Include ${item.name} in ${tier.name}`} checked={tier.coverageIds.includes(item.id)} onChange={event => updateTier(tier.id, { coverageIds: event.target.checked ? [...tier.coverageIds, item.id] : tier.coverageIds.filter(id => id !== item.id) })} /><span>{item.name}</span></label>)}</fieldset>
-          <div className={styles.actions}><div className="ui-inline-actions">
-            {newTiers.has(tier.id) ? <Button type="button" variant="ghost" onClick={() => { setDraft(current => ({ ...current, tiers: current.tiers.filter(item => item.id !== tier.id) })); setNewTiers(current => new Set([...current].filter(id => id !== tier.id))); }}>Cancel</Button> : <Button type="button" variant="danger" disabled={!multi} onClick={() => setRemoval({ kind: "package", id: tier.id, name: tier.name })}>Remove</Button>}
-            <Button type="button" variant="secondary" disabled={draft.tiers.length >= 10} onClick={() => addTier(tier)}><Copy size={15} />Duplicate</Button>
-          </div><Button type="button" onClick={event => {
-            const fields = event.currentTarget.closest("details")?.querySelectorAll<HTMLInputElement>("input");
+          <div className={styles.deliverables}>
+            <div className={styles.duration} role="group" aria-labelledby={durationLabelId}>
+              <span className="ui-field-label" id={durationLabelId}>Duration</span>
+              <div className={styles.durationControls}>
+                <Select compact aria-label="Hours" value={hours} onChange={event => {
+                  const nextHours = Number(event.target.value);
+                  const nextMinutes = nextHours === maxDurationHours ? 0 : minutes;
+                  updateTier(tier.id, { durationMinutes: String(nextHours * 60 + nextMinutes) });
+                }}>
+                  {durationHours.map(hour => <option key={hour} value={hour}>{hour} H</option>)}
+                </Select>
+                <Select compact aria-label="Minutes" required disabled={hours === maxDurationHours}
+                  value={totalMinutes === 0 ? "" : minutes}
+                  onChange={event => updateTier(tier.id, { durationMinutes: String(hours * 60 + Number(event.target.value)) })}>
+                  <option value={hours === 0 ? "" : 0}>{hours === 0 ? "— M" : "0 M"}</option>
+                  {durationMinutesOfHour.slice(1).map(minute => <option key={minute} value={minute}>{minute} M</option>)}
+                </Select>
+              </div>
+            </div>
+            {deliverableFields.map(([key, label]) => (
+              <Field key={key} label={label}>
+                <Input type="number" inputMode="numeric" min="0" max={Number.MAX_SAFE_INTEGER} step="1"
+                  value={tier.deliverables?.[key] ?? ""}
+                  onChange={event => {
+                    const counts = { ...tier.deliverables };
+                    if (event.currentTarget.value === "") delete counts[key];
+                    else counts[key] = event.currentTarget.valueAsNumber;
+                    updateTier(tier.id, { deliverables: Object.keys(counts).length ? counts : undefined });
+                  }} />
+              </Field>
+            ))}
+          </div>
+          <section className={styles.tierServices} aria-labelledby={`${listId}-service-title-${tier.id}`}>
+            <div className={styles.heading}>
+              <h3 id={`${listId}-service-title-${tier.id}`}>Services</h3>
+              <Button id={`${listId}-services-${tier.id}`} type="button" size="sm" variant="secondary" onClick={() => setLibraryPicker({ tierId: tier.id })}>
+                <Plus aria-hidden="true" size={15} />Add Services
+              </Button>
+            </div>
+            <div className={`catalog-table-scroll ${styles.servicesTable}`} tabIndex={0} role="region" aria-label="Package services table">
+              <table className="catalog-product-table">
+                <thead><tr><th scope="col">Service</th><th scope="col" className={styles.serviceActions}>Actions</th></tr></thead>
+                <tbody>
+                  {services.map(item => <tr key={item.id}><td>{item.name}</td><td className={styles.serviceActions}><Button id={`${listId}-edit-${tier.id}-${item.id}`} type="button" variant="secondary" size="sm" aria-label={`Edit ${item.name}`} onClick={() => setLibraryPicker({ tierId: tier.id, editingItem: item })}><Pencil aria-hidden="true" size={15} /></Button></td></tr>)}
+                </tbody>
+              </table>
+              {!services.length && <p className={styles.servicesEmpty}>No services added</p>}
+            </div>
+          </section>
+          </div>
+          <div className={`ui-inline-actions ${styles.actions}`}>
+            {newTiers.has(tier.id)
+              ? <Button type="button" variant="ghost" disabled={!canDiscardTier} onClick={() => discardTier(tier.id)}>Cancel</Button>
+              : <Button type="button" variant="danger" disabled={!canDiscardTier} onClick={() => setRemoval({ kind: "package", id: tier.id, name: tier.name })}>Remove</Button>}
+            {!newTiers.has(tier.id) && <Button type="button" variant="secondary" disabled={draft.tiers.length >= 10} onClick={() => addTier(tier)}><Copy size={15} />Duplicate</Button>}
+            <Button type="button" onClick={event => {
+            const fields = event.currentTarget.closest(`.${styles.tierBody}`)?.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select");
             if (fields && [...fields].some(field => !field.reportValidity())) return;
             if (draft.tiers.some(item => item.id !== tier.id && item.name.trim().toLowerCase() === tier.name.trim().toLowerCase())) { notify("Use a different name for each package.", "danger"); return; }
             setExpandedTiers(new Set()); setNewTiers(current => new Set([...current].filter(id => id !== tier.id)));
           }}>Done</Button></div>
         </div>
-      </details>)}
-    </div>
-    <Button type="button" variant="ghost" disabled={draft.tiers.length >= 10} onClick={() => addTier()}><Plus size={16} />Add package</Button>
-    <details className={styles.extras} open={draft.addOns.length > 0 || undefined}>
-      <summary id={`${listId}-optional-title`}>Optional extras{draft.addOns.length ? ` (${draft.addOns.length})` : ""}</summary>
-      <p className={styles.hint}>Choose optional services from your library. The package tier sets the price.</p>
-      {draft.addOns.map((item, index) => <div className={styles.extraRow} key={item.id}>
-        <strong>{item.name || `Extra ${index + 1}`}</strong>
-        <span>{item.libraryItemId ? "No extra charge" : Number(item.price).toLocaleString("en-US", { style: "currency", currency: "USD" })}</span>
-        <Button type="button" variant="ghost" aria-label={`Remove extra ${item.name || index + 1}`} onClick={() => setRemoval({ kind: "extra", id: item.id, name: item.name || `Extra ${index + 1}` })}><X size={16} /></Button>
-      </div>)}
-      <Button type="button" variant="secondary" size="sm" disabled={draft.addOns.length >= 50} onClick={() => { setInlineService(null); setExpandedService(null); setLibraryPicker({ optional: true }); }}><Plus size={16} />Add optional service</Button>
-    </details>
+        );
+        const isNewTier = newTiers.has(tier.id);
+        return (isNewTier || expandedTiers.has(tier.id)) ? <Modal key={tier.id} open title={libraryPicker?.tierId === tier.id ? libraryPicker.editingItem ? "Edit service" : "Add Services" : isNewTier ? "New package" : `Edit ${tier.name || "package"}`} className={styles.packageModal} bodyClassName={styles.packageModalBody}
+          onClose={() => libraryPicker?.tierId === tier.id ? closeLibrary() : isNewTier ? discardTier(tier.id) : setExpandedTiers(new Set())}>
+          {libraryPicker?.tierId === tier.id ? packagePicker : content}
+        </Modal> : null;
+      })}
     </section>
-    {libraryPicker && <ServiceLibraryPicker optional={libraryPicker.optional} rates={rates} onRateSaved={onRateSaved} selectedItems={libraryPicker.optional ? draft.addOns : draft.coverageItems} editingItem={libraryPicker.editingItem} onChoose={chooseLibraryItems} onClose={closeLibrary} />}
+    <section className="studio-panel ui-section-card ui-table-card" aria-labelledby={`${listId}-optional-title`}>
+      <div className="ui-section-header">
+        <h2 id={`${listId}-optional-title`} tabIndex={-1}>Suggested Add-Ons</h2>
+        <Button type="button" variant="secondary" size="sm" disabled={draft.addOns.length >= 50} onClick={() => { setLibraryPicker({ optional: true }); }}><Plus size={16} />Add add-on</Button>
+      </div>
+      <div className={`catalog-table-scroll ${styles.servicesTable} ${styles.suggestionsTable}`} tabIndex={0} role="region" aria-label="Suggested add-ons table">
+        <table className="catalog-product-table"><thead><tr><th scope="col">Service</th><th scope="col">Add-on price</th><th scope="col">Actions</th></tr></thead><tbody>
+          {draft.addOns.map((item, index) => <tr key={item.id}>
+            <td>{item.name || `Add-on ${index + 1}`}</td>
+            <td>{item.pricingType === "HOURLY" ? `${((rates.find(rate => rate.id === item.hourlyRateId)?.amountCents ?? 0) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} / hour` : Number(item.price).toLocaleString("en-US", { style: "currency", currency: "USD" })}</td>
+            <td><Button type="button" variant="ghost" size="sm" aria-label={`Remove add-on ${item.name || index + 1}`} onClick={() => setRemoval({ kind: "extra", id: item.id, name: item.name || `Add-on ${index + 1}` })}><X aria-hidden="true" size={16} /></Button></td>
+          </tr>)}
+        </tbody></table>
+        {!draft.addOns.length && <p className={styles.servicesEmpty}>No suggested add-ons</p>}
+      </div>
+    </section>
+    {libraryPicker && !libraryPicker.tierId && <ServiceLibraryPicker optional={libraryPicker.optional} rates={rates} onRateSaved={onRateSaved} selectedItems={libraryPicker.optional ? draft.addOns : draft.coverageItems} editingItem={libraryPicker.editingItem} onChoose={items => chooseLibraryItems(items)} onClose={closeLibrary} />}
     {removal && <Modal open title={`Remove "${removal.name}"?`} onClose={() => setRemoval(null)}>
-      <p>{removal.kind === "service" ? `This removes the service from this session and its package selections. It stays in your library.` : removal.kind === "package" ? "This removes the package and its selections. Your included services stay in this session and the library." : "This removes the optional extra from this session."}</p>
+      <p>{removal.kind === "package" ? "This removes the package and its selections. Your included services stay in this session and the library." : "This removes the optional extra from this session."}</p>
       <div className="module-modal-actions"><Button type="button" variant="secondary" autoFocus onClick={() => setRemoval(null)}>Cancel</Button><Button type="button" variant="danger" onClick={() => {
-        setDraft(current => removal.kind === "service" ? { ...current, coverageItems: current.coverageItems.filter(item => item.id !== removal.id), tiers: current.tiers.map(tier => ({ ...tier, coverageIds: tier.coverageIds.filter(id => id !== removal.id) })) } : removal.kind === "package" ? { ...current, tiers: current.tiers.length > 1 ? current.tiers.filter(tier => tier.id !== removal.id) : current.tiers } : { ...current, addOns: current.addOns.filter(item => item.id !== removal.id) });
-        setInlineService(null); setExpandedService(null); setRemoval(null); notify(`${removal.name} removed from this draft.`);
+        if (removal.kind === "package") discardTier(removal.id);
+        else setDraft(current => ({ ...current, addOns: current.addOns.filter(item => item.id !== removal.id) }));
+        setRemoval(null); notify(`${removal.name} removed from this draft.`);
       }}>Remove {removal.kind}</Button></div>
     </Modal>}
   </div>;

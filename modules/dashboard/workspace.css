@@ -403,16 +403,10 @@
   padding: 0;
 }
 .showrunner-admin .dashboard-quickcard-dialog[open] { display: grid; }
-.showrunner-admin .dashboard-quickcard-dialog .ui-modal-head {
-  border-bottom: 1px solid var(--sd-color-border);
-  margin: 0;
-  padding: var(--sd-space-16) var(--sd-space-20);
-}
 .showrunner-admin .dashboard-quickcard-dialog-body {
   max-height: none;
   overflow: auto;
-  padding: var(--sd-space-20) var(--sd-space-20) var(--sd-space-24);
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
 }
 .showrunner-admin .dashboard-catalog { display: grid; gap: var(--sd-space-20); }
 .showrunner-admin .dashboard-catalog-intro { align-items: center; display: flex; gap: var(--space-3); justify-content: space-between; }
@@ -653,8 +647,6 @@
   .showrunner-admin .dashboard-layout-card { grid-column: 1; }
 }
 @media (max-width: 560px) {
-  .showrunner-admin .dashboard-quickcard-dialog .ui-modal-head { padding: var(--sd-space-12) var(--sd-space-16); }
-  .showrunner-admin .dashboard-quickcard-dialog-body { padding: var(--sd-space-16); }
   .showrunner-admin .dashboard-catalog-intro { align-items: flex-start; flex-direction: column; }
   .showrunner-admin .dashboard-catalog-gallery { grid-template-columns: 1fr; }
   .showrunner-admin .dashboard-catalog-preview-lg { grid-column: 1; }

@@ -14,9 +14,4 @@
 .dialog :global(.ui-card-body) { padding: 0; overflow: visible; align-content: start; gap: var(--sd-space-16); }
 .dialog :global(.ui-card-body) > :global(.ui-equal-grid):has(> :nth-child(2)) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .dialog :global(.ui-card-body) > :global(.ui-button) { justify-self: start; }
-.dialog :global(.ui-table) { min-width: 0; table-layout: auto; }
-.dialog :global(.ui-table) :is(th, td) { padding: var(--sd-space-8); }
-@media (min-width: 861px) {
-  :global(.ui-dialog).dialog { left: var(--layout-admin-sidebar); right: 4px; max-width: calc(100vw - var(--layout-admin-sidebar) - 36px); }
-  :global(.admin-root:has(.admin-sidebar.is-collapsed)) .dialog { left: 52px; max-width: calc(100vw - 88px); }
-}
+.dialog :global(.ui-table) { min-width: 0; table-layout: auto; --data-table-cell-x: var(--sd-space-8); --data-table-cell-y: var(--sd-space-8); }

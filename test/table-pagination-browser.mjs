@@ -36,7 +36,7 @@ await build({
         <section data-viewport-table style={{display:'grid',gap:12}}>
           <div><h2>Session types</h2><p aria-label="Record range">{data.length?start+1:0}–{end} of {data.length}</p></div>
           <input aria-label="Search" value={query} onChange={e=>{setQuery(e.target.value);client.firstPage()}} />
-          <ul className="service-mobile-list">{rows.map(name=><li data-viewport-row key={name} style={{minHeight:88}}>{name}</li>)}</ul>
+          <ul data-viewport-table-frame className="service-mobile-list">{rows.map(name=><li data-viewport-row key={name} style={{minHeight:88}}>{name}</li>)}</ul>
           <div className="catalog-table-scroll service-desktop-table"><table className="catalog-product-table"><thead><tr><th>Session type</th><th>Status</th><th>Duration</th></tr></thead><tbody>
             {rows.map(name=><tr key={name}><td><strong>{name}</strong><br/>Description of this service</td><td>Active</td><td>1 hour</td></tr>)}
             {!rows.length&&<tr><td colSpan={3}>No matching sessions.</td></tr>}
@@ -85,8 +85,16 @@ try {
   assert(await count()<initial);await fits();
   await page.getByRole('textbox',{name:'Search'}).fill('not found');await settled();
   await page.getByText('No matching sessions.').waitFor();
+  const fills = async () => assert(await page.getByRole('navigation').evaluate(nav => {
+    const main = nav.closest('.admin-main');
+    const bottom = Math.min(innerHeight, main.getBoundingClientRect().bottom);
+    const inset = parseFloat(getComputedStyle(main).paddingBottom);
+    return Math.abs(bottom - nav.getBoundingClientRect().bottom - inset) <= 1;
+  }), 'The table fills the available space above the workspace inset');
+  await fills();
   await page.getByRole('textbox',{name:'Search'}).fill('Session 001');await settled();
   assert.equal(await count(),1);
+  await fills();
   await page.getByRole('textbox',{name:'Search'}).fill('');await settled();
   await page.setViewportSize({width:390,height:844});await settled();
   const mobileCount=await page.locator('[data-viewport-row]').count();
@@ -99,6 +107,9 @@ try {
   }),'Mobile capacity uses the available height');
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.screenshot({path:`${captures}/viewport-table-mobile.png`});
+  await page.getByRole('textbox',{name:'Search'}).fill('Session 001');await settled();
+  assert.equal(await page.locator('[data-viewport-row]').count(),1);
+  await fills();
   await page.setViewportSize({width:1200,height:800});
   await page.goto('http://table.test/admin/modules/services?mode=server&status=active&page=2');await settled();
   const serverSize=Number(new URL(page.url()).searchParams.get('pageSize'));

@@ -1,16 +1,13 @@
 :global(.ui-dialog).modal {
   --library-gap: var(--space-3);
-  --library-inset: var(--space-4);
+  --library-inset: 0px;
   width: min(760px, calc(100% - var(--space-5)));
   max-width: min(760px, calc(100% - var(--space-5)));
+  height: 42rem;
   max-height: calc(100svh - var(--space-5));
   overflow: hidden;
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  color: var(--color-text);
 }
-.modal :global(.ui-modal-head) { margin: 0; padding: var(--library-inset); border-bottom: 1px solid var(--color-border); }
-.body { display: flex; flex-direction: column; min-height: 0; max-height: calc(100svh - 112px); overflow: hidden; }
+.body { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 .toolbar, .filters, .footer, .pagination { display: flex; align-items: end; gap: var(--library-gap); }
 .toolbar { padding: var(--library-inset); padding-bottom: 0; }
 .toolbar > :global(.ui-field) { flex: 1; min-width: 0; }
@@ -21,7 +18,28 @@
 .modal :global(.ui-field) { display: grid; gap: var(--space-1); margin: 0; }
 .modal input:not([type="checkbox"]), .modal select, .modal textarea { width: 100%; min-width: 0; }
 .modal textarea { min-height: 7rem; resize: none; }
-.results { min-height: 200px; overflow-y: auto; padding: var(--library-inset); display: grid; gap: var(--space-2); }
+.results, .modal .editBody {
+  flex: 1;
+  min-height: min(8rem, 24svh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: auto;
+  align-content: start;
+}
+.results { padding: var(--library-inset); display: grid; gap: var(--space-2); }
+.sessionServices {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.sessionServices legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-weight: var(--sd-type-weight-medium);
+}
 .modal .option {
   display: flex;
   gap: var(--library-gap);
@@ -53,7 +71,7 @@
 .empty h3 { margin: 0 0 var(--space-2); font-size: var(--sd-type-heading-size); }
 .empty p { margin: 0; color: var(--color-muted); }
 .empty button { margin-top: var(--space-2); }
-.editBody { display: grid; gap: var(--library-gap); padding: var(--library-inset); overflow-y: auto; }
+.editBody { display: grid; gap: var(--library-gap); padding: var(--library-inset); }
 .back { justify-self: start; }
 .error { color: var(--color-danger); padding-inline: var(--library-inset); }
 .error p { margin-block: var(--space-2); }
@@ -64,6 +82,15 @@
   .footer { flex-wrap: wrap; }
   .footer > div { margin-left: auto; }
 }
-.inlineEditor { display: grid; gap: var(--space-3); min-width: 0; }
-.inlineEditor .editBody { padding: 0; overflow: visible; }
-.inlineEditor .footer { padding: var(--space-3) 0 0; }
+
+.embedded {
+  --library-gap: var(--space-3);
+  --library-inset: 0px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.addOnPricing { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sd-space-12); }

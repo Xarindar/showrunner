@@ -73,10 +73,7 @@
   border-top: 1px solid var(--color-border);
 }
 .footer > div { margin-left: auto; }
-@media (min-width: 861px) {
-  :global(.ui-dialog).dialog { left: var(--layout-admin-sidebar); right: 4px; max-width: calc(100vw - var(--layout-admin-sidebar) - 36px); }
-  :global(.admin-root:has(.admin-sidebar.is-collapsed)) .dialog { left: 52px; max-width: calc(100vw - 88px); }
-}
+
 @media (max-width: 600px) {
   .metadata { grid-template-columns: minmax(0,1fr); }
   .toolbar { align-items: start; }

@@ -93,7 +93,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
     <div data-viewport-table className="service-catalog-folder-panel" aria-labelledby="packages-board-title">
       <div className="catalog-board-header">
         <div>
-          <h2 id="packages-board-title">Service bundles</h2>
+          <h2 id="packages-board-title">Session Bundles</h2>
           <p>
             {filteredPackages.length ? `${rangeStart}-${rangeEnd}` : "0"} of {filteredPackages.length || packages.length}
             {normalizedSearch ? ` matching "${normalizedSearch}"` : " bundles"}
@@ -102,16 +102,16 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
         <div className="catalog-board-actions">
           <ButtonLink href="/admin/modules/services/packages/new" size="sm">
             <Plus size={15} />
-            New service bundle
+            New session bundle
           </ButtonLink>
         </div>
       </div>
 
-      <p className="muted-text">Bundles combine separate services. For package choices within one session type, open Session types and edit its packages.</p>
+      <p className="muted-text">Bundles group separately scheduled sessions. Use packages to offer tiers within a single session.</p>
       <div className="ui-table-filter-bar catalog-board-filters">
         <div className="ui-table-filter-search" role="search">
           <label className="ui-sr-only" htmlFor="packages-search">
-            Search bundle, service, category, tag
+            Search bundle, session, category, tag
           </label>
           <span className="ui-table-filter-input">
             <Search aria-hidden="true" size={15} />
@@ -121,7 +121,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
                 setSearchQuery(event.currentTarget.value);
                 firstPage();
               }}
-              placeholder="Search bundle, service, category, tag"
+              placeholder="Search bundle, session, category, tag"
               value={searchQuery}
             />
           </span>
@@ -165,7 +165,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
             <tr>
               <th>Bundle</th>
               <th>Status</th>
-              <th>Services</th>
+              <th>Sessions</th>
               <th>Duration</th>
               <th>Tags</th>
               <th>Actions</th>
@@ -174,7 +174,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
           <tbody>
             {pagedPackages.map((servicePackage) => {
               const tagsLabel = servicePackage.tags.join(", ") || "No tags";
-              const servicesLabel = servicePackage.serviceNames.join(", ") || "No services";
+              const servicesLabel = servicePackage.serviceNames.join(", ") || "No sessions";
               return (
                 <tr key={servicePackage.id}>
                   <td data-label="Bundle">
@@ -195,7 +195,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
                       {servicePackage.isActive ? "active" : "draft"}
                     </span>
                   </td>
-                  <td data-label="Services">
+                  <td data-label="Sessions">
                     <span className="catalog-cell-text" title={servicesLabel}>
                       {servicePackage.itemCount} svc
                     </span>
@@ -237,10 +237,10 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
                       </>
                     ) : (
                       <>
-                        <h3>No service bundles yet</h3>
+                        <h3>No session bundles yet</h3>
                         <p>
                           <Link className="catalog-empty-state-link" href="/admin/modules/services/packages/new">
-                            Create your first service bundle
+                            Create your first session bundle
                           </Link>
                         </p>
                       </>
@@ -255,7 +255,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
       <Pagination
         onPageSizeChange={resizePage}
         className="catalog-table-pagination"
-        label="Service bundle catalog pages"
+        label="Session bundle catalog pages"
         onNext={nextPage}
         onPrevious={previousPage}
         page={currentPage}

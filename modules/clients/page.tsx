@@ -637,7 +637,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
           </tbody>
         </Table>
 
-        <div aria-label="Clients" className="clients-mobile-list">
+        <div data-viewport-table-frame aria-label="Clients" className="clients-mobile-list">
           {clients.map((client) => {
             const visibleTags = client.tags.slice(0, 3);
             const hiddenTagCount = Math.max(0, client.tags.length - visibleTags.length);

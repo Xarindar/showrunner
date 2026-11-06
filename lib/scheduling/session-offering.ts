@@ -14,6 +14,13 @@ const coverageItem = z.object({
   category: z.string().trim().max(120).optional(),
   tags: z.array(z.string().trim().min(1).max(60)).max(20).optional()
 });
+const packageCount = z.number().int().nonnegative().optional();
+const deliverables = z.object({
+  locations: packageCount,
+  outfitChanges: packageCount,
+  finalPhotos: packageCount
+}).optional();
+
 const tier = z.object({
   id: itemId,
   name: itemName,
@@ -21,9 +28,11 @@ const tier = z.object({
   priceCents: z.number().int().min(0).max(999999999).nullable(),
   pricingType: pricingTypeSchema.optional(),
   hourlyRateId: itemId.nullable().optional(),
+  deliverables,
   coverageIds: z.array(itemId).max(100)
 });
-const addOn = z.object({ id: itemId, name: itemName, libraryItemId: itemId.optional(), priceCents: z.number().int().min(0).max(999999999) });
+const hourlyRateSnapshot = z.object({ id: itemId, name: itemName, amountCents: z.number().int().min(0).max(999999999) });
+const addOn = z.object({ id: itemId, name: itemName, libraryItemId: itemId.optional(), priceCents: z.number().int().min(0).max(999999999), pricingType: pricingTypeSchema.optional(), hourlyRateId: itemId.nullable().optional(), hourlyRate: hourlyRateSnapshot.optional() });
 
 export const sessionOfferingSchema = z.object({
   coverageItems: z.array(coverageItem).max(100),
@@ -62,7 +71,7 @@ const draftSchema = z.object({
   tiers: z.array(tier.omit({ priceCents: true }).extend({
     durationMinutes: z.coerce.number().int().min(1).max(1440),
     price: z.union([z.literal("").transform(() => null), sessionPrice])
-  }).transform(({ price, ...value }) => ({ ...value, priceCents: price }))).min(1).max(10),
+  }).transform(({ price, ...value }) => ({ ...value, priceCents: price }))).min(1, "Add a package before saving the session.").max(10),
   addOns: z.array(addOn.omit({ priceCents: true }).extend({ price: sessionPrice })
     .transform(({ price, ...value }) => ({ ...value, priceCents: price }))).max(50)
 }).pipe(sessionOfferingSchema);
@@ -85,7 +94,24 @@ export function priceSessionOffering(offering: SessionOffering, rates: HourlyRat
     const rate = rates.find(rate => rate.id === hourlyRateId);
     if (!rate) throw new Error("Choose an hourly rate from this business for each hourly package.");
     return { ...tier, pricingType, hourlyRateId: rate.id, priceCents: hourlyPriceCents(rate.amountCents, tier.durationMinutes) };
+  }), addOns: offering.addOns.map(item => {
+    if (item.pricingType !== "HOURLY") return item;
+    const rate = rates.find(rate => rate.id === item.hourlyRateId);
+    if (!rate) throw new Error("Choose an hourly rate from this business for each hourly add-on.");
+    return { ...item, priceCents: rate.amountCents, hourlyRate: rate };
   }) };
+}
+
+export function sessionAddOnPriceCents(item: SessionOffering["addOns"][number], durationMinutes: number) {
+  if (item.pricingType !== "HOURLY") return item.priceCents;
+  if (!item.hourlyRate) throw new Error("Choose an hourly rate for this add-on.");
+  return hourlyPriceCents(item.hourlyRate.amountCents, durationMinutes);
+}
+
+export function suggestedSessionAddOns(offering: SessionOffering, tierId?: string) {
+  const tier = offering.tiers.find(item => item.id === tierId);
+  const included = offering.coverageItems.filter(item => tier?.coverageIds.includes(item.id));
+  return offering.addOns.filter(extra => !included.some(item => extra.libraryItemId && item.libraryItemId === extra.libraryItemId || item.name.toLowerCase() === extra.name.toLowerCase()));
 }
 
 export function sessionOfferingDraft(value: SessionOffering | null, durationMinutes: number, priceCents: number | null): SessionOfferingDraft {
@@ -105,12 +131,19 @@ export const sessionPackageSnapshotSchema = z.object({
   priceCents: z.number().int().nonnegative().nullable(),
   pricingType: pricingTypeSchema.optional(),
   hourlyRate: z.object({ id: itemId, name: itemName, amountCents: z.number().int().nonnegative() }).optional(),
+  deliverables,
   coverage: z.array(z.string()),
   includedItems: z.array(coverageItem.omit({ id: true, libraryItemId: true, category: true, tags: true }).extend({ description: z.string().max(2000) })).max(100).optional(),
   extras: z.array(z.object({ name: itemName, priceCents: z.number().int().nonnegative() }))
 });
 
-export function selectSessionPackage(value: unknown, tierId?: string, addOnIds: string[] = []) {
+function sessionPriceTotal(base: number, extras: Array<{ priceCents: number }>) {
+  const total = base + extras.reduce((sum, item) => sum + item.priceCents, 0);
+  if (total > 999999999) throw new Error("The session total must be $9,999,999.99 or less.");
+  return total;
+}
+
+export function selectSessionPackage(value: unknown, tierId?: string, addOnIds: string[] = [], durationMinutes?: number) {
   const offering = readSessionOffering(value);
   if (!offering) {
     if (tierId || addOnIds.length) throw new Error("Choose a package from this session type.");
@@ -118,14 +151,15 @@ export function selectSessionPackage(value: unknown, tierId?: string, addOnIds: 
   }
   const tier = offering.tiers.find(item => item.id === tierId);
   if (!tier) throw new Error("Choose a package from this session type.");
-  const extras = offering.addOns.filter(item => addOnIds.includes(item.id)).map(item => item.libraryItemId ? { ...item, priceCents: 0 } : item);
+  const extras = suggestedSessionAddOns(offering, tierId).filter(item => addOnIds.includes(item.id)).map(item => ({ ...item, priceCents: sessionAddOnPriceCents(item, durationMinutes ?? tier.durationMinutes) }));
   const included = offering.coverageItems.filter(item => tier.coverageIds.includes(item.id));
   if (extras.length !== addOnIds.length) throw new Error("Choose available extras from this session type.");
   return {
     tierId: tier.id,
     name: tier.name,
     durationMinutes: tier.durationMinutes,
-    priceCents: tier.priceCents == null ? null : tier.priceCents + extras.reduce((total, item) => total + item.priceCents, 0),
+    priceCents: tier.priceCents == null ? null : sessionPriceTotal(tier.priceCents, extras),
+    ...(tier.deliverables ? { deliverables: tier.deliverables } : {}),
     coverage: included.map(item => item.name),
     ...(included.some(item => item.description !== undefined || item.pricingType !== undefined) ? { includedItems: included.map(item => ({ name: item.name, description: item.description || "", ...(item.pricingType ? { pricingType: item.pricingType, priceCents: item.priceCents, hourlyRateId: item.hourlyRateId } : {}) })) } : {}),
     extras: extras.map(item => ({ name: item.name, priceCents: item.priceCents }))

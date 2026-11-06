@@ -57,18 +57,11 @@ function uniqueSortedStrings(values: Array<string | null | undefined>) {
   );
 }
 
-function serviceDurationLabel(minutes: number) {
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`;
-}
-
 function savedServiceMessage(saved?: string) {
-  if (saved === "created") return "Session type saved.";
-  if (saved === "media") return "Session type image updated.";
-  if (saved === "service") return "Session type saved.";
-  if (saved) return "Session type updated.";
+  if (saved === "created") return "Session saved.";
+  if (saved === "media") return "Session image updated.";
+  if (saved === "service") return "Session saved.";
+  if (saved) return "Session updated.";
   return null;
 }
 
@@ -144,7 +137,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   ]);
 
   const categoryOptions = uniqueSortedStrings([...serviceCategories.map((category) => category.name), ...taxonomyServices.map((item: ServiceTaxonomyOption) => item.category)]);
-  const intakeOptions = uniqueSortedStrings([...taxonomyServices.filter(service => service.bookingRules == null).map((item: ServiceTaxonomyOption) => item.intakePrompt), ...intakeFormFields.map((field) => field.label)]);
+  const intakeOptions = uniqueSortedStrings([...taxonomyServices.filter(service => service.bookingRules == null).map((item: ServiceTaxonomyOption) => item.intakePrompt)]);
   const policyOptions = uniqueSortedStrings(taxonomyServices.filter(service => service.bookingRules == null).map((item: ServiceTaxonomyOption) => item.policyText));
   const availableRules = [...taxonomyServices.flatMap(service => service.bookingRules == null ? [] : readBookingRules(service.bookingRules)), ...intakeFormFields.flatMap(field => {
     const contactField = field.fieldRole === "SUBMITTER_NAME" ? "customerName" : field.fieldRole === "SUBMITTER_EMAIL" || field.type === "EMAIL" ? "customerEmail" : field.type === "PHONE" ? "customerPhone" : undefined;
@@ -161,7 +154,6 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   const offering = await hydrateSessionServiceLibrary(readSessionOffering(service.sessionOffering), settings.siteId);
   const savedMessage = savedServiceMessage(params.saved);
   const errorMessage = params.error || null;
-  const bookingPath = "Client booking rebuild pending";
   const packageCount = service.packageItems.length;
   const canUpload = isMediaUploadDriverConfigured(settings.mediaDriver);
   const toPickerAsset = (asset: MediaAsset): AssetPickerAsset => ({
@@ -182,14 +174,15 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
         <input name="updatedAt" type="hidden" value={service.updatedAt.toISOString()} />
         <input name="location" type="hidden" value={service.location || ""} />
         {hiddenSchedulingValues(service)}
-        <main className="product-studio-main">
-        <section className="studio-panel" aria-labelledby="session-details-title">
-          <div className="studio-section-head">
+        <main className={`product-studio-main ${styles.detailsMain}`}>
+        <section className="studio-panel ui-section-card" aria-labelledby="session-details-title">
+          <div className="ui-section-header">
             <h2 id="session-details-title">Session details</h2>
           </div>
+          <div className="ui-section-body">
             <div className="catalog-form-grid">
               <div className="ui-field">
-                <label htmlFor="service-name">Session type name</label>
+                <label htmlFor="service-name">Session name</label>
                 <input defaultValue={service.name} id="service-name" name="name" required />
               </div>
             </div>
@@ -213,55 +206,27 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
           initialSquare={serviceImageUrl ? { asset: service.mediaAsset ? toPickerAsset(service.mediaAsset) : { id: "", filename: service.name, alt: serviceImageAlt, thumbnailUrl: serviceImageUrl, url: serviceImageUrl }, framing: readImageFraming(service.imageFraming) } : null}
           initialRectangular={service.rectangularMediaAsset ? { asset: toPickerAsset(service.rectangularMediaAsset), framing: readImageFraming(service.rectangularImageFraming) } : null}
           initialGallery={service.galleryAssets.map(toPickerAsset)} />
+            <Switch defaultChecked={service.isActive} label="Active" name="isActive" variant="inline" />
+            <ServiceTagsField tags={tagOptions} initialTags={nonEmptyStringArrayFromUnknown(service.tags)} />
+          </div>
         </section>
         <SessionPackagesEditor initialRates={rates} initialPricingType={service.pricingType} initialHourlyRateId={service.hourlyRateId ?? ""} initialOffering={offering} durationMinutes={service.durationMinutes} priceCents={service.priceCents} />
 
-        <section className="studio-panel">
-              <details className={styles.moreOptions}><summary>Intake and Booking Terms &amp; Conditions</summary>
-                <ServiceBookingRulesTable
-                  defaultRules={service.bookingRules}
-                  availableRules={availableRules}
-                  defaultIntakePrompt={service.intakePrompt}
-                  defaultPolicyText={service.policyText}
-                  defaultRequirePolicy={service.requirePolicy}
-                  defaultRequestOnly={service.requestOnly}
-                  defaultWaitlistEnabled={service.waitlistEnabled}
-                  idPrefix="service"
-                  intakeOptions={intakeOptions}
-                  policyOptions={policyOptions}
-                />
-              </details>
-        </section>
-
+        <ServiceBookingRulesTable
+          defaultRules={service.bookingRules}
+          availableRules={availableRules}
+          defaultIntakePrompt={service.intakePrompt}
+          defaultPolicyText={service.policyText}
+          defaultRequirePolicy={service.requirePolicy}
+          defaultRequestOnly={service.requestOnly}
+          defaultWaitlistEnabled={service.waitlistEnabled}
+          idPrefix="service"
+          intakeOptions={intakeOptions}
+          policyOptions={policyOptions}
+        />
 
         </main>
 
-        <aside className="product-studio-sidecar">
-
-
-          <section className="studio-panel">
-          <h2 className="section-title">Status</h2>
-          <Switch defaultChecked={service.isActive} label="Active" name="isActive" variant="inline" />
-          <dl className="service-editor-summary">
-            <div>
-              <dt>Duration</dt>
-              <dd>{serviceDurationLabel(service.durationMinutes)}</dd>
-            </div>
-            <div>
-              <dt>Packages</dt>
-              <dd>{readSessionOffering(service.sessionOffering)?.tiers.length ?? 1}</dd>
-            </div>
-            {bookingPath !== "Client booking rebuild pending" && <div><dt>Booking link</dt><dd>{bookingPath}</dd></div>}
-          </dl>
-          {schedulingRules}
-          </section>
-              <section className="studio-panel" aria-labelledby="session-organization-title">
-                <h2 id="session-organization-title" className="section-title">Organization</h2>
-                <div className="ui-field">
-                  <ServiceTagsField tags={tagOptions} initialTags={nonEmptyStringArrayFromUnknown(service.tags)} />
-                </div>
-              </section>
-        </aside>
         <footer className={styles.saveFooter}>
           <SessionDetailsSaveButton />
         </footer>
@@ -271,15 +236,15 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   );
 
   const packagesContent = (
-    <section className="studio-panel">
-      <div className="studio-section-head">
+    <section className="studio-panel ui-section-card">
+      <div className="ui-section-header">
         <div>
-          <h2>Service bundles</h2>
+          <h2>Session Bundles</h2>
         </div>
         <Boxes size={20} />
       </div>
 
-      {service.packageItems.length ? (
+      <div className="ui-section-body">{service.packageItems.length ? (
         <div className="catalog-table-scroll">
           <table className="catalog-product-table">
             <thead>
@@ -315,19 +280,20 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
       ) : (
         <div className="catalog-empty-state">
           <Boxes size={28} />
-          <h3>No service bundles</h3>
-          <p>Open a bundle to combine this session type with other services.</p>
+          <h3>No session bundles</h3>
+          <p>Open a bundle to combine this session with other sessions.</p>
           <ButtonLink href="/admin/modules/services?tab=packages" variant="secondary">
-            Open service bundles
+            Open session bundles
           </ButtonLink>
         </div>
       )}
+      </div>
     </section>
   );
 
   const tabs: ServiceWorkspaceTab[] = [
     { content: detailsContent, icon: <FileText size={15} />, id: "details", label: "Session & packages" },
-    ...(packageCount ? [{ content: packagesContent, icon: <Boxes size={15} />, id: "packages", label: "Service bundles" }] : [])
+    ...(packageCount ? [{ content: packagesContent, icon: <Boxes size={15} />, id: "packages", label: "Session Bundles" }] : [])
   ];
 
   return (

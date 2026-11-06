@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   const tags = await prisma.$queryRaw<Array<{ tag: string }>>`SELECT DISTINCT unnest("tags") AS tag FROM "ServiceLibraryItem" WHERE "siteId" = ${siteId} ORDER BY tag`;
   const where: Prisma.ServiceLibraryItemWhereInput = {
     siteId,
+    ...(params.get("addOnsOnly") === "true" ? { AND: [{ OR: [{ pricingType: "FLAT_RATE" as const, priceCents: { not: null } }, { pricingType: "HOURLY" as const, hourlyRateId: { not: null } }] }] } : {}),
     ...(category ? { category } : {}),
     ...(tag ? { tags: { has: tag } } : {}),
     ...(q ? { OR: [

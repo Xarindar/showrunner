@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { priceSessionOffering, sessionOfferingFormSchema, sessionOfferingDraft, sessionOfferingSchema, selectSessionPackage } from "../lib/scheduling/session-offering";
+import { priceSessionOffering, sessionOfferingFormSchema, sessionOfferingDraft, sessionOfferingSchema, selectSessionPackage, sessionPackageSnapshotSchema } from "../lib/scheduling/session-offering";
 
 test("packages keep independent flat and hourly prices, validate rate ownership and retain legacy pricing", () => {
   const rates = [{ id: "rate", name: "Photography", amountCents: 12550 }];
@@ -41,6 +41,20 @@ test("session tiers round-trip once-defined coverage with independent prices and
   assert.deepEqual(signature?.coverage, ["First look", "Reception"]);
   saved.coverageItems[0].name = "Changed later";
   assert.deepEqual(signature?.coverage, ["First look", "Reception"], "a booking's inclusions are a snapshot, not references");
+});
+
+test("optional package deliverables round-trip and are captured in the booking snapshot", () => {
+  const draft = sessionOfferingDraft(offering, 60, null);
+  draft.tiers[0].deliverables = { locations: 2, outfitChanges: 0, finalPhotos: 35 };
+  const saved = sessionOfferingFormSchema.parse(JSON.stringify(draft));
+  const snapshot = sessionPackageSnapshotSchema.parse(selectSessionPackage(saved, "essential"));
+  assert.deepEqual(snapshot.deliverables, draft.tiers[0].deliverables);
+  assert.equal(saved.tiers[1].deliverables, undefined);
+
+  for (const locations of [-1, 1.5]) {
+    draft.tiers[0].deliverables.locations = locations;
+    assert.equal(sessionOfferingFormSchema.safeParse(JSON.stringify(draft)).success, false);
+  }
 });
 
 test("legacy session types keep their price and duration without requiring migration to tiers", () => {

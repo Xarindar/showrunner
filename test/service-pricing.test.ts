@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { hourlyPriceCents, hourlyRateInputSchema, servicePriceCents } from "../lib/scheduling/pricing";
+import { hourlyPriceCents, hourlyRateInputSchema, servicePriceCents, sessionCatalogPriceLabel } from "../lib/scheduling/pricing";
 import { serviceLibraryInputSchema, resolveIncludedServices } from "../lib/scheduling/service-library";
 
 test("named rates validate money and hourly totals round only at the final cent", () => {
@@ -16,6 +16,13 @@ test("named rates validate money and hourly totals round only at the final cent"
   assert.equal(servicePriceCents({ pricingType: "FLAT_RATE", priceCents: 5000, durationMinutes: 90 }), 5000);
   assert.equal(servicePriceCents({ pricingType: "HOURLY", priceCents: 1, durationMinutes: 90, hourlyRate: { id: "rate", name: "Standard", amountCents: 12550 } }), 18825);
   assert.throws(() => servicePriceCents({ pricingType: "HOURLY", priceCents: null, durationMinutes: 60 }), /Choose an hourly rate/);
+});
+
+test("session catalog prices show the lowest configured amount and preserve free sessions", () => {
+  assert.equal(sessionCatalogPriceLabel([null]), "-");
+  assert.equal(sessionCatalogPriceLabel([0]), "$0.00");
+  assert.equal(sessionCatalogPriceLabel([15000]), "$150.00");
+  assert.equal(sessionCatalogPriceLabel([25000, 12550, 18000]), "$125.50+");
 });
 
 test("included services retain their pricing and require a named rate for hourly pricing", () => {

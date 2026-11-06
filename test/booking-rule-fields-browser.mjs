@@ -14,7 +14,8 @@ try {
   assert.equal(await page.locator('img').count(),0,'Labels are text, not executable markup');
   await page.getByLabel('Name',{exact:true}).fill('Test Client');
   await page.getByLabel('Email',{exact:true}).fill('test@example.com');
-  await page.getByLabel('Contact number',{exact:true}).fill('5551234567');
+  assert.equal(await page.getByLabel('Phone',{exact:true}).getAttribute('required'),'');
+  await page.getByLabel('Phone',{exact:true}).fill('5551234567');
   assert.equal(await page.locator('form').evaluate(form=>form.checkValidity()),false);
   await page.getByLabel('<img src=x onerror=alert(1)>',{exact:true}).fill('Client answer');
   await page.getByRole('radio',{name:'Candid',exact:true}).check();
@@ -24,7 +25,10 @@ try {
   await page.evaluate(rules=>window.ShowrunnerBookingRules.render(document.querySelector('form'),rules,'one'),rules);
   assert.equal(await page.getByLabel('Location',{exact:true}).inputValue(),'Studio','Returning to review retains draft answers');
   await page.evaluate(()=>window.ShowrunnerBookingRules.render(document.querySelector('form'),null,'two'));
-  assert.equal(await page.locator('input[name="customerPhone"]').getAttribute('required'),null);
+  assert.equal(await page.locator('input[name="customerPhone"]').getAttribute('required'),'','Phone stays required after changing to a service without contact rules');
+  assert.equal(await page.getByLabel('Phone',{exact:true}).count(),1,'Contact labels are global, not renamed by service rules');
+  await page.getByLabel('Phone',{exact:true}).fill('');
+  assert.equal(await page.locator('form').evaluate(form=>form.checkValidity()),false,'Bookings cannot proceed without a phone even when there are no service rules');
   assert.equal(await page.locator('[data-booking-rule-fields] input').count(),0,'Changing services clears unrelated answers');
   assert.equal(readFileSync('clients/booking/scripts/booking-rules.js','utf8'),readFileSync('../jazz/src/booking/booking-rules.js','utf8'),'Jazzr uses the shared renderer unchanged');
   console.log('Passed: typed answers, required fields, native choices, contact reuse, safe text, draft retention and shared Jazzr integration.');

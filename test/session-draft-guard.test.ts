@@ -30,12 +30,12 @@ test("session drafts warn on changed fields and package JSON, but allow unchange
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX }
   }).outputText;
   runInNewContext(code, {
-    exports, Element, HTMLAnchorElement: Anchor, HTMLFormElement: Form, HTMLDetailsElement: Details, URL,
+    exports, process: { env: { NODE_ENV: "test" } }, Element, HTMLAnchorElement: Anchor, HTMLFormElement: Form, HTMLDetailsElement: Details, URL,
     FormData: class { [Symbol.iterator]() { return form.entries[Symbol.iterator](); } },
     location: new URL("https://example.test/admin/modules/services/portrait"),
     window: { ...events, confirm: () => { prompts++; return discard; } },
     document: { ...events, getElementById: () => form },
-    require: (id: string) => id === "react" ? { useState: () => [false, () => {}], useRef: () => ({ current: null }), useEffect: (effect: () => (() => void) | undefined) => { const result = effect(); if (result) cleanup = result; } } : id === "react/jsx-runtime" ? {} : { useFormStatus: () => ({ pending: false }) }
+    require: (id: string) => id === "react" ? { useState: () => [false, () => {}], useRef: () => ({ current: null }), useEffect: (effect: () => (() => void) | undefined) => { const result = effect(); if (result) cleanup = result; } } : id === "react/jsx-runtime" ? { jsx: () => null, jsxs: () => null } : { useFormStatus: () => ({ pending: false }) }
   });
   exports.SessionDraftGuard!({ formId: "service-core-form" });
   function event(href = "https://example.test/admin/modules/services") {

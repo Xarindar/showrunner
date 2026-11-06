@@ -1,6 +1,5 @@
 (function () {
   const prefix = "bookingRule:";
-  const defaults = new WeakMap();
   function answers(form) {
     return Object.fromEntries([...new FormData(form)].filter(([key]) => key.startsWith(prefix)).map(([key, value]) => [key.slice(prefix.length), String(value)]));
   }
@@ -17,13 +16,7 @@
     for (const name of ["customerName", "customerEmail", "customerPhone"]) {
       const input = form.elements.namedItem(name);
       if (!input) continue;
-      if (!defaults.has(input)) defaults.set(input, { required: input.required, placeholder: input.placeholder, label: input.closest("label")?.querySelector("span")?.textContent });
-      const original = defaults.get(input);
-      const rule = rules?.find(rule => rule.contactField === name);
-      input.required = original.required || Boolean(rule?.required);
-      input.placeholder = rule?.placeholder || original.placeholder;
-      const label = input.closest("label")?.querySelector("span");
-      if (label) label.textContent = rule?.label || original.label;
+      input.required = true;
     }
     let root = form.querySelector("[data-booking-rule-fields]");
     if (!root) {

@@ -9,8 +9,11 @@ const available = [
 ];
 
 test("navigation search finds nested service pages and normalizes words", () => {
-  assert.deepEqual(searchAdminNavigation(available, "  SERVICES   BUNDLES "), [{ label: "Service bundles", href: "/admin/modules/services/packages" }]);
-  assert.deepEqual(searchAdminNavigation(available, "session"), [{ label: "Session types", href: "/admin/modules/services" }]);
+  assert.deepEqual(searchAdminNavigation(available, "  SERVICES   BUNDLES "), [{ label: "Session Bundles", href: "/admin/modules/services/packages" }]);
+  assert.deepEqual(searchAdminNavigation(available, "session"), [
+    { label: "Sessions", href: "/admin/modules/services" },
+    { label: "Session Bundles", href: "/admin/modules/services/packages" }
+  ]);
   assert.deepEqual(searchAdminNavigation(available, "home"), [{ label: "Home", href: "/admin" }]);
   assert.equal(new Set(searchAdminNavigation(available, "services").map(page => page.href)).size, 3);
 });

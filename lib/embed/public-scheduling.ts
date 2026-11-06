@@ -29,7 +29,7 @@ const bookingSchema = z.object({
   startsAt: z.string().min(1).refine((value) => !Number.isNaN(new Date(value).getTime()), "Choose a valid appointment time."),
   customerName: z.string().trim().min(2, "Add your name."),
   customerEmail: z.email("Add a valid email.").transform((value) => value.trim().toLowerCase()),
-  customerPhone: z.string().trim().optional(),
+  customerPhone: z.string({ error: "Add your phone number." }).trim().min(1, "Add your phone number."),
   notes: z.string().trim().optional(),
   intakeResponse: z.string().trim().optional(),
   intakeAnswers: intakeAnswersSchema.optional(),

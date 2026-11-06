@@ -671,3 +671,9 @@
   .showrunner-admin .appointments-action-button { border-radius: var(--sd-radius-pill); justify-content: center; }
   .showrunner-admin .appointments-action-button span { display: inline; }
 }
+
+@media (max-width: 860px) {
+  .showrunner-admin .admin-main .appointments-subtle-header[data-admin-menu-host] { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .showrunner-admin .appointments-subtle-header[data-admin-menu-host] > .admin-page-menu { grid-column: 2; grid-row: 1; }
+  .showrunner-admin .appointments-subtle-header[data-admin-menu-host] > :is(.appointments-header-nav, .appointments-header-actions) { grid-column: 1 / -1; }
+}
