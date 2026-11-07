@@ -178,8 +178,10 @@
   --data-table-header-divider: var(--sd-color-border);
   --data-table-row-bg: var(--sd-color-surface);
   --data-table-row-color: var(--sd-color-text);
-  --data-table-row-divider: var(--sd-color-border-subtle);
+  --data-table-row-divider: var(--sd-color-border);
   --data-table-row-changed-bg: var(--sd-color-warning-bg);
+  --data-table-reserved-rows: 2;
+  --data-table-row-control-height: var(--sd-layout-control-height);
   --data-table-empty-height: var(--sd-space-80);
   --data-table-empty-color: var(--sd-color-text-secondary);
   --data-table-action-bg: transparent;

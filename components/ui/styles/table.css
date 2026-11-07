@@ -44,8 +44,7 @@
 .showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody tr { background: var(--data-table-row-bg); }
 .showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody tr:not(:has(> td[colspan])):hover { background: var(--data-table-row-hover); }
 .showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody tr[data-state="selected"] { background: var(--data-table-row-selected); }
-.showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody tr:last-child > :is(th, td) { border-bottom: 0; }
-.showrunner-admin [data-viewport-table] :is(.ui-table, .catalog-product-table) tbody tr:last-child > td { border-bottom: 1px solid var(--data-table-row-divider); }
+.showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody tr:last-child > td[colspan] { border-bottom: 0; }
 .showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody td[colspan] {
   color: var(--data-table-empty-color);
   height: var(--data-table-empty-height);
@@ -286,5 +285,14 @@
 
 .showrunner-admin .ui-table-card > :is(.catalog-table-scroll, .ui-table-wrap),
 .showrunner-admin .ui-data-table-shell > .ui-table-wrap {
-  min-block-size: calc(var(--data-table-header-height) + var(--data-table-empty-height));
+  --data-table-reserved-body-height: max(
+    var(--data-table-empty-height),
+    var(--data-table-reserved-rows) * max(var(--data-table-row-height), var(--data-table-row-control-height) + var(--data-table-cell-y) * 2 + 1px)
+  );
+  min-block-size: calc(var(--data-table-header-height) + var(--data-table-reserved-body-height));
+}
+.showrunner-admin :is(.ui-table-card, .ui-data-table-shell) tbody td[colspan] { height: var(--data-table-reserved-body-height, var(--data-table-empty-height)); }
+
+@media (max-width: 860px), (pointer: coarse) {
+  .showrunner-admin :is(.ui-table-card, .ui-data-table-shell) { --data-table-row-control-height: var(--sd-layout-touch-target); }
 }

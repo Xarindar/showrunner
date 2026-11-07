@@ -92,3 +92,5 @@ The session Active switch lives in Session details for both new and existing ses
 Tags appears directly below Active in Session details; there is no separate Organization card. The shared tag picker uses the standard form-label typography and 8px label-to-input gap. Embedded table cards retain the same minimum body height when their first row is added.
 
 Client-facing bookings always require name, email and phone in the shared contact step and public booking API, regardless of session rules or saved sets. Contact labels and requirements do not vary by session. Legacy records and manual admin bookings retain their existing optional-phone contract.
+
+Session configuration shows its details, package tiers and intake/booking settings. Bundles containing that session are managed in Session Bundles, not repeated as a reverse-association section or navigation item in the session editor. Removing that editor section does not delete bundles or their session memberships.
