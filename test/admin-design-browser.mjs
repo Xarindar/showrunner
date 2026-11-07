@@ -377,6 +377,12 @@ try {
   await packageServices.screenshot({path:`${captures}/package-services-mobile.png`});
   await page.setViewportSize(servicesViewport);
   await packageServices.getByRole('checkbox', {name:'Select Album service', exact:true}).check();
+  const chosenService=packageServices.getByRole('checkbox',{name:'Select Album service',exact:true});
+  await chosenService.press('Space');
+  await chosenService.press('Space');
+  assert(await chosenService.isChecked());
+  assert(await chosenService.locator('..').evaluate(card=>{const style=getComputedStyle(card);return style.outlineStyle==='solid'&&parseFloat(style.outlineWidth)>=2&&parseFloat(style.outlineWidth)+parseFloat(style.outlineOffset)<=0;}),'Service card keyboard focus stays inside the result boundaries');
+
   await packageServices.getByRole('button', {name:'Apply to package'}).click();
   assert.equal(await page.getByRole('dialog').count(), 1, 'Applying services returns to the package in the same dialog');
   assert(await servicesTable.getByRole('cell', {name:'Album service', exact:true}).isVisible());
@@ -893,6 +899,8 @@ try {
     const bookingTops=await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).getByRole('spinbutton').evaluateAll(elements=>elements.map(element=>Math.round(element.getBoundingClientRect().top)));
     assert.equal(new Set(bookingTops).size,width===1440?1:2,'Booking fields use one desktop row and two mobile rows');
     assert(await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).locator('[aria-hidden="true"]').evaluateAll(elements=>elements.every(unit=>unit.getBoundingClientRect().right<=unit.previousElementSibling.getBoundingClientRect().right-28)),'Unit hints leave room for native number steppers');
+    assert(await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).locator('[aria-hidden="true"]').evaluateAll(elements=>elements.every(unit=>unit.getBoundingClientRect().left-unit.previousElementSibling.getBoundingClientRect().left<60)),'Units sit beside their number instead of at the end of the input');
+
 
 
     assert(await savedPackage.evaluate(modal=>Math.abs(modal.querySelector('select[aria-label="Hours"]').getBoundingClientRect().top-[...modal.querySelectorAll('label')].find(label=>label.textContent==='Locations').querySelector('input').getBoundingClientRect().top)<1),'Duration and locations align at '+width+'px');

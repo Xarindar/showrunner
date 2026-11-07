@@ -215,7 +215,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
             ] as const).map(([key, label, unit, accessibleUnit, min, max]) => <Field key={key} label={label}>
               <span className={styles.unitField}>
                 <Input aria-label={`${label} (${accessibleUnit})`} type="number" min={min} max={max} required value={scheduling[key]} onChange={event => setScheduling(current => ({ ...current, [key]: event.target.value }))} />
-                <span className={styles.unit} aria-hidden="true">{unit}</span>
+                <span className={styles.unit} style={{ insetInlineStart: `calc(var(--sd-space-12) + ${Math.max(1, scheduling[key].length)}ch + var(--sd-space-4))` }} aria-hidden="true">{unit}</span>
               </span>
             </Field>)}
           </div>

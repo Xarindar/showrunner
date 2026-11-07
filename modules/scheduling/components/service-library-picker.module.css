@@ -51,7 +51,7 @@
   cursor: pointer;
 }
 .option:hover, .option:has(input:checked) { background: var(--color-surface-sunken); }
-.option:focus-within { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+.option:has(input:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .option[data-added="true"] { cursor: default; }
 .option input[type="checkbox"] { flex-shrink: 0; width: 20px; height: 20px; margin: 0; accent-color: var(--color-brand); }
 .serviceCopy { display: grid; gap: var(--space-1); min-width: 0; flex: 1; overflow-wrap: anywhere; }
