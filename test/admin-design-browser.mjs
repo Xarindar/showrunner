@@ -33,7 +33,6 @@ await build({
     import {Tooltip} from './components/ui/tooltip';
     import {NotificationProvider} from './components/ui/notifications';
     import {AvailabilityPanel} from './modules/scheduling/components/availability-panel';
-    import {ServiceSchedulingRules} from './modules/scheduling/components/service-scheduling-rules';
     import {BlockoutsPanel} from './modules/scheduling/components/blockouts-panel';
     import scheduleStyles from './modules/appointments/schedule.module.css';
     import serviceStyles from './modules/scheduling/service-editor.module.css';
@@ -47,6 +46,7 @@ await build({
     import {ServiceWorkspaceTabs} from './modules/scheduling/components/service-workspace-tabs';
     import {ServiceMediaFields} from './modules/scheduling/components/service-media-fields';
     import {SessionTypeForm} from './modules/scheduling/components/session-type-form';
+    import {SessionForm} from './modules/appointments/session-form';
     import './app/globals.css';
     import './app/admin/design-tokens.css';
     import './app/admin/design-system.css';
@@ -150,8 +150,9 @@ await build({
         <TableStyleFixtures />
         <ModalAuditFixtures />
         <Modal title="Shared dialog" open={open} onClose={()=>setOpen(false)}><Field label="Dialog field"><Input /></Field><div className="module-modal-actions"><Button variant="secondary" onClick={()=>setOpen(false)}>Cancel dialog</Button><Button>Confirm</Button></div></Modal>
-        <section aria-label="New session builder fixture"><SessionTypeForm businessHours={["Monday"]} timezone="America/Chicago" canUpload={false} schedulingRules={<ServiceSchedulingRules><AvailabilityPanel availability={[]} resources={[]} staff={[]} timezone="America/Chicago" /></ServiceSchedulingRules>} rates={[]} tags={[]} /></section>
-        <section aria-label="Edit session builder fixture"><SessionTypeForm businessHours={["Monday"]} timezone="America/Chicago" canUpload={false} schedulingRules={<ServiceSchedulingRules><AvailabilityPanel availability={[]} resources={[]} staff={[]} timezone="America/Chicago" /></ServiceSchedulingRules>} rates={[]} tags={[]} initialService={{id:'saved-session',updatedAt:new Date('2026-11-07T00:00:00Z'),name:'Saved session',description:'Saved description',category:'Photography',tags:['Portraits'],isActive:true,location:'Studio',durationMinutes:90,priceCents:10000,pricingType:'FLAT_RATE',hourlyRateId:null,bufferBeforeMinutes:10,bufferAfterMinutes:20,minimumNoticeHours:48,maxAdvanceDays:90,slotIntervalMinutes:15,bookingRules:null,intakePrompt:null,policyText:null,requirePolicy:false,requestOnly:false,waitlistEnabled:false}} /></section>
+        <section aria-label="Per-unit booking fixture"><SessionForm services={[{id:'per-unit-service',name:'Portrait session',durationMinutes:60,priceCents:10000,pricingType:'FLAT_RATE',hourlyRate:null,staffAssignments:[],sessionOffering:{coverageItems:[],tiers:[{id:'standard',name:'Standard',durationMinutes:60,priceCents:10000,coverageIds:[]}],addOns:[{id:'photos',name:'Extra photos',pricingType:'PER_UNIT',priceCents:300}]}}]} clients={[]} staff={[]} rates={[]} timezone="America/Chicago" /></section>
+        <section aria-label="New session builder fixture"><SessionTypeForm canUpload={false} rates={[]} tags={[]} /></section>
+        <section aria-label="Edit session builder fixture"><SessionTypeForm canUpload={false} rates={[]} tags={[]} initialService={{id:'saved-session',updatedAt:new Date('2026-11-07T00:00:00Z'),name:'Saved session',description:'Saved description',category:'Photography',tags:['Portraits'],isActive:true,location:'Studio',durationMinutes:90,priceCents:10000,pricingType:'FLAT_RATE',hourlyRateId:null,bufferBeforeMinutes:10,bufferAfterMinutes:20,minimumNoticeHours:48,maxAdvanceDays:90,slotIntervalMinutes:15,bookingRules:null,intakePrompt:null,policyText:null,requirePolicy:false,requestOnly:false,waitlistEnabled:false}} /></section>
       </main></NotificationProvider></div>;
     }
     createRoot(document.getElementById('root')).render(location.pathname==='/workspace-fixture'?<WorkspaceFixture />:<Fixture />);
@@ -169,6 +170,8 @@ await build({
     build.onResolve({ filter: /asset-picker$/ }, args => (args.importer.endsWith("editor.tsx") || args.importer.endsWith("service-media-fields.tsx")) ? {path:"asset-picker",namespace:"image-fixture"} : undefined);
     build.onResolve({ filter: /^\.\/actions$/ }, args => args.importer.endsWith("editor.tsx") ? {path:"actions",namespace:"image-fixture"} : undefined);
     build.onLoad({filter: /.*/, namespace:"image-fixture"}, args => ({contents: args.path === "actions" ? "export async function uploadStudioAsset() {}" : `import React from 'react'; export function AssetPicker({children,triggerClassName,onSelectAsset,onUploadedAssets}) {return <><button className={triggerClassName} onClick={()=>onSelectAsset({id:'chosen-photo',filename:'Selected photo',url:'/replacement-photo.svg',thumbnailUrl:'/replacement-photo.svg',alt:'Selected photo'})}>{children}</button><button onClick={()=>onUploadedAssets([1,2,3,4,5].map(id=>({id:'photo-'+id,filename:'Photo '+id,url:'/uploaded-photo.svg',thumbnailUrl:'/uploaded-photo.svg',alt:'Uploaded photo'})))}>Complete upload</button></>}`,loader:"tsx",resolveDir:process.cwd()}));
+    build.onResolve({filter:/^\.\/create-action$/},()=>({path:'manual-session-action',namespace:'manual-session-fixture'}));
+    build.onLoad({filter:/.*/,namespace:'manual-session-fixture'},()=>({contents:'export async function createSessionAction(){return {error:""}}',loader:'js'}));
     build.onResolve({ filter: /^\.\.\/actions$/ }, args => args.importer.includes("scheduling") ? { path: "schedule-actions", namespace: "fixture" } : undefined);
     build.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({ contents: "export async function saveWeeklyHoursAction() { return { error: '', success: 'Hours saved.' }; } export async function createBlockoutAction() {} export async function deleteBlockoutAction() {} export async function createServiceAction() {} export async function updateSessionTypeAction() {} export async function uploadServiceMediaAssetAction() {}", loader: "js" }));
   } }],
@@ -378,6 +381,12 @@ try {
   await packageServices.screenshot({path:`${captures}/package-services-mobile.png`});
   await page.setViewportSize(servicesViewport);
   await packageServices.getByRole('checkbox', {name:'Select Album service', exact:true}).check();
+  const chosenService=packageServices.getByRole('checkbox',{name:'Select Album service',exact:true});
+  await chosenService.press('Space');
+  await chosenService.press('Space');
+  assert(await chosenService.isChecked());
+  assert(await chosenService.locator('..').evaluate(card=>{const style=getComputedStyle(card);return style.outlineStyle==='solid'&&parseFloat(style.outlineWidth)>=2&&parseFloat(style.outlineWidth)+parseFloat(style.outlineOffset)<=0;}),'Service card keyboard focus stays inside the result boundaries');
+
   await packageServices.getByRole('button', {name:'Apply to package'}).click();
   assert.equal(await page.getByRole('dialog').count(), 1, 'Applying services returns to the package in the same dialog');
   assert(await servicesTable.getByRole('cell', {name:'Album service', exact:true}).isVisible());
@@ -759,14 +768,16 @@ try {
   await createService.getByRole('textbox',{name:'Service name',exact:true}).fill('Portrait coverage');
   assert.equal(await createService.getByRole('spinbutton',{name:'Add-on price (USD)'}).count(),0);
   await createService.getByRole('switch',{name:/Available as an add-on/}).check();
-  await createService.getByRole('spinbutton',{name:'Add-on price (USD)'}).fill('75');
+  await createService.getByRole('combobox',{name:'Pricing type',exact:true}).selectOption('PER_UNIT');
+  await createService.getByRole('spinbutton',{name:'Price per unit (USD)'}).fill('3');
   await createService.getByRole('button',{name:'Create and add',exact:true}).click();
   await createService.getByRole('button',{name:'Apply to package',exact:true}).click();
   await creationPackage.getByRole('button',{name:'Done',exact:true}).click();
   const savedOffering = JSON.parse(await sessionServices.locator('input[name="sessionOffering"]').inputValue());
   assert.equal(savedOffering.coverageItems[0].libraryItemId,'saved-service');
   assert.equal(savedOffering.coverageItems[0].name,'Portrait coverage');
-  assert.equal(savedOffering.coverageItems[0].priceCents,7500);
+  assert.equal(savedOffering.coverageItems[0].pricingType,'PER_UNIT');
+  assert.equal(savedOffering.coverageItems[0].priceCents,300);
   assert.equal(await sessionServices.getByLabel('Session draft name').inputValue(),'Unsaved session');
   const live = await browser.newPage({viewport:{width:1200,height:800}});
   await live.setContent('<h1 id="heading"></h1><div><img id="photo"></div>');
@@ -862,38 +873,51 @@ try {
     await photos.screenshot({path:captures+'/session-photos-'+width+'.png'});
     await newSession.screenshot({path:captures+'/session-mobile-refinement-'+width+'.png'});
   }
+
+  const unitBooking=page.getByRole('region',{name:'Per-unit booking fixture',exact:true});
+  await unitBooking.locator('select[name="serviceId"]').selectOption('per-unit-service');
+  await unitBooking.getByRole('checkbox',{name:/Extra photos/}).check();
+  await unitBooking.locator('input[name="durationMinutes"]').fill('90');
+  await unitBooking.getByRole('spinbutton',{name:'Extra photos quantity',exact:true}).fill('10');
+  assert.equal(await unitBooking.locator('input[name="durationMinutes"]').inputValue(),'90','Changing add-on quantity preserves the agreed duration');
+  assert.equal(await unitBooking.locator('input[name="price"]').inputValue(),'130.00');
+  assert.deepEqual(JSON.parse(await unitBooking.locator('input[name="addOnQuantities"]').inputValue()),{photos:10});
   const builder=page.getByRole('region',{name:'New session builder fixture',exact:true});
   assert.equal(await builder.locator('.product-studio-sidecar').count(),0,'Booking settings have no create-only sidebar');
+  assert.equal(await builder.getByRole('textbox',{name:'Session name',exact:true}).getAttribute('autocomplete'),'off','Session names suppress browser saved-entry suggestions');
   await builder.getByRole('button',{name:'Add package',exact:true}).click();
   const bookingPackage=page.getByRole('dialog',{name:'New package',exact:true});
-  const availability=bookingPackage.getByRole('region',{name:'Booking availability',exact:true});
-  assert(await availability.isVisible(),'Booking availability lives inside the package editor');
-  await availability.getByRole('button',{name:'Business hours',exact:true}).click();
-  const businessHoursDialog=page.getByRole('dialog',{name:'Scheduling rules',exact:true});
-  assert(await businessHoursDialog.getByRole('region',{name:'Weekly hours',exact:true}).isVisible(),'Shared business hours can be opened from a package');
-  await businessHoursDialog.getByRole('button',{name:'Close dialog',exact:true}).click();
-  assert(await bookingPackage.isVisible(),'Closing business hours returns to the package draft');
-
-  await availability.getByText('Booking options',{exact:true}).click();
-  await availability.getByRole('spinbutton',{name:'Minimum notice (hours)',exact:true}).fill('24');
+  const settingsRow=bookingPackage.getByRole('group',{name:'Booking settings',exact:true});
+  assert(await settingsRow.isVisible(),'Booking settings are visible without expanding a dropdown');
+  assert.equal(await bookingPackage.getByRole('heading',{name:'Booking availability',exact:true}).count(),0);
+  assert.equal(await bookingPackage.getByRole('button',{name:'Business hours',exact:true}).count(),0);
+  assert.equal(await settingsRow.getByRole('spinbutton').count(),4,'Only the four compact booking fields are displayed');
+  assert.deepEqual(await settingsRow.locator('[aria-hidden="true"]').allTextContents(),['min','min','hr','days'],'Units are shown inside the inputs');
+  await settingsRow.getByRole('spinbutton',{name:'Minimum Notice (hours)',exact:true}).fill('24');
   await bookingPackage.getByRole('button',{name:'Cancel',exact:true}).click();
   assert.equal(await builder.locator('input[name="minimumNoticeHours"]').inputValue(),'24','Booking settings submit even after the package modal closes');
 
 
   const editBuilder=page.getByRole('region',{name:'Edit session builder fixture',exact:true});
   assert.equal(await editBuilder.locator('.product-studio-sidecar').count(),0);
+  assert.equal(await editBuilder.getByRole('textbox',{name:'Session name',exact:true}).getAttribute('autocomplete'),'off');
   const fieldNames=scope=>scope.locator('input[name], textarea[name], select[name]').evaluateAll(elements=>elements.map(element=>element.name).filter(name=>!['id','updatedAt','location'].includes(name)).sort());
   assert.deepEqual(await fieldNames(editBuilder),await fieldNames(builder),'New and edit use identical session fields');
   await editBuilder.getByRole('button',{name:'Edit Standard',exact:true}).click();
   const savedPackage=page.getByRole('dialog',{name:'Edit Standard',exact:true});
-  assert(await savedPackage.getByRole('region',{name:'Booking availability',exact:true}).isVisible(),'Existing packages expose booking availability too');
-  await savedPackage.getByText('Booking options',{exact:true}).click();
-  assert.equal(await savedPackage.getByRole('spinbutton',{name:'Minimum notice (hours)',exact:true}).inputValue(),'48','Edit loads saved scheduling values');
-  await savedPackage.getByRole('spinbutton',{name:'Minimum notice (hours)',exact:true}).fill('72');
-  await savedPackage.getByText('Booking options',{exact:true}).click();
+  assert(await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).isVisible(),'Existing packages expose the same booking fields');
+  assert.equal(await savedPackage.getByRole('spinbutton',{name:'Minimum Notice (hours)',exact:true}).inputValue(),'48','Edit loads saved scheduling values');
+  await savedPackage.getByRole('spinbutton',{name:'Minimum Notice (hours)',exact:true}).fill('72');
   for (const width of [1440,390]) {
     await page.setViewportSize({width,height:844});
     assert.equal(await savedPackage.evaluate(element=>element.scrollWidth>element.clientWidth),false,'Package booking settings fit '+width+'px');
+    const bookingTops=await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).getByRole('spinbutton').evaluateAll(elements=>elements.map(element=>Math.round(element.getBoundingClientRect().top)));
+    assert.equal(new Set(bookingTops).size,width===1440?1:2,'Booking fields use one desktop row and two mobile rows');
+    assert(await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).locator('[aria-hidden="true"]').evaluateAll(elements=>elements.every(unit=>unit.getBoundingClientRect().right<=unit.previousElementSibling.getBoundingClientRect().right-28)),'Unit hints leave room for native number steppers');
+    assert(await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).locator('[aria-hidden="true"]').evaluateAll(elements=>elements.every(unit=>unit.getBoundingClientRect().left-unit.previousElementSibling.getBoundingClientRect().left<60)),'Units sit beside their number instead of at the end of the input');
+
+
+
     assert(await savedPackage.evaluate(modal=>Math.abs(modal.querySelector('select[aria-label="Hours"]').getBoundingClientRect().top-[...modal.querySelectorAll('label')].find(label=>label.textContent==='Locations').querySelector('input').getBoundingClientRect().top)<1),'Duration and locations align at '+width+'px');
     await savedPackage.screenshot({path:captures+'/package-booking-'+width+'.png'});
   }

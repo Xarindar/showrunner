@@ -6,7 +6,7 @@ import { upsertPublicClient } from "@/lib/clients/public-client";
 import { blockoutConflictWhere, getBufferedWindow } from "@/lib/bookings/conflicts";
 import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
 import { priceSessionOffering, readSessionOffering, selectSessionPackage } from "@/lib/scheduling/session-offering";
-import { hourlyPriceCents } from "@/lib/scheduling/pricing";
+import { hourlyPriceCents, pricingTypeSchema } from "@/lib/scheduling/pricing";
 
 // Manual sessions use an agreed time, independent of public booking hours.
 // They still reserve staff/resources and respect calendar conflicts and buffers.
@@ -41,7 +41,7 @@ export async function createManualSession(input: {
   durationMinutes: number; priceCents: number; location: string; staffId?: string;
   customerName: string; customerEmail: string; customerPhone?: string; notes: string;
   status: "PENDING" | "CONFIRMED";
-  tierId?: string; addOnIds?: string[];
+  tierId?: string; addOnIds?: string[]; addOnQuantities?: Record<string, number>;
 }) {
   if (!Number.isFinite(input.startsAt.getTime()) || input.startsAt <= new Date()) throw new Error("Choose a future date and time.");
   const endsAt = new Date(input.startsAt.getTime() + input.durationMinutes * 60000);
@@ -55,8 +55,8 @@ export async function createManualSession(input: {
     let service = input.serviceId ? await tx.service.findFirst({ where: { id: input.serviceId, siteId: input.siteId, isActive: true, isOneOff: false }, include: { staffAssignments: true, resourceAssignments: true, hourlyRate: true } }) : null;
     if (input.serviceId && !service) throw new Error("Choose an available session type.");
     let offering = readSessionOffering(service?.sessionOffering);
-    if (offering?.addOns.some(item => item.pricingType === "HOURLY")) offering = priceSessionOffering(offering, await tx.hourlyRate.findMany({ where: { siteId: input.siteId } }), { pricingType: service?.pricingType ?? "FLAT_RATE", hourlyRateId: service?.hourlyRateId ?? "" });
-    let packageSnapshot = selectSessionPackage(offering, input.tierId, input.addOnIds, input.durationMinutes);
+    if (offering?.addOns.some(item => item.pricingType === "HOURLY")) offering = priceSessionOffering(offering, await tx.hourlyRate.findMany({ where: { siteId: input.siteId } }), { pricingType: pricingTypeSchema.parse(service?.pricingType ?? "FLAT_RATE"), hourlyRateId: service?.hourlyRateId ?? "" });
+    let packageSnapshot = selectSessionPackage(offering, input.tierId, input.addOnIds, input.durationMinutes, input.addOnQuantities);
     const tier = readSessionOffering(service?.sessionOffering)?.tiers.find(tier => tier.id === input.tierId);
     const hourly = (tier?.pricingType ?? service?.pricingType) === "HOURLY";
     const hourlyRate = hourly ? tier?.pricingType

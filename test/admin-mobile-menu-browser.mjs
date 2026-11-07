@@ -29,25 +29,27 @@ try{
  await menu.waitFor();assert.equal(await page.locator('.admin-mobile-bar').count(),1,'Fallback exists only while a page header is missing');
  for(const screen of ['editor','index','product','custom','calendar']){
   await page.evaluate(screen=>window.setScreen(screen),screen);
-  await page.locator('[data-admin-menu-host] .admin-page-menu').waitFor();
+  await page.locator('.admin-page-menu-anchor .admin-page-menu').waitFor();
   assert.equal(await page.locator('.admin-mobile-bar').count(),0,'No duplicate mobile top bar');
-  assert.equal(await page.locator('[data-admin-menu-host]').count(),1,'Exactly one page header owns the menu');
+  assert.equal(await page.locator('.admin-page-menu-anchor').count(),1,'Exactly one shell anchor owns the menu');
   for(const width of [517,390]){
    await page.setViewportSize({width,height:764});
-   const header=await page.locator('[data-admin-menu-host]').boundingBox(),title=await page.locator(screen==='calendar'?'.appointments-subtle-title':'[data-admin-menu-host]').boundingBox(),button=await menu.boundingBox(),save=await page.getByRole('button',{name:'Save session',exact:true}).boundingBox();
+   await page.waitForFunction(screen=>{const header=document.querySelector(screen==='calendar'?'.appointments-subtle-title':'.admin-main header')?.getBoundingClientRect(),button=document.querySelector('.admin-page-menu-anchor button')?.getBoundingClientRect();return header&&button&&Math.abs(button.y+button.height/2-header.y-header.height/2)<2;},screen);
+
+   const header=await page.locator('.admin-main header').boundingBox(),title=await page.locator(screen==='calendar'?'.appointments-subtle-title':'.admin-main header').boundingBox(),button=await menu.boundingBox(),save=await page.getByRole('button',{name:'Save session',exact:true}).boundingBox();
    assert(button.x>=header.x&&button.x+button.width<=header.x+header.width+1,'Menu fits inside the existing page header');
-   assert(Math.abs(button.y+button.height/2-title.y-title.height/2)<2,'Menu is centered with the page heading');
+   assert(Math.abs(button.y+button.height/2-title.y-title.height/2)<2,'Menu is centered with the '+screen+' heading at '+width+'px');
    assert(button.y+button.height<save.y,'Menu never overlaps Save');
    assert.equal(button.width,44);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    await menu.focus();await page.keyboard.press('Enter');
    await page.screenshot({path:captures+'/'+screen+'-'+width+'.png'});
   }
  }
- assert.equal(await page.evaluate(()=>window.menuClicks),10,'The portaled menu remains keyboard operable');
+ assert.equal(await page.evaluate(()=>window.menuClicks),10,'The anchored menu remains keyboard operable');
  await page.evaluate(()=>{window.setScreen('loading');window.setRoute('b')});
  await page.locator('.admin-mobile-bar').waitFor();assert.equal(await page.locator('[data-admin-menu-host]').count(),0,'Removed headers release the menu');
  await page.evaluate(()=>window.setScreen('editor'));
- await page.locator('[data-admin-menu-host] .admin-page-menu').waitFor();
+ await page.locator('.admin-page-menu-anchor .admin-page-menu').waitFor();
  await page.setViewportSize({width:1440,height:900});assert.equal(await menu.isVisible(),false,'Desktop navigation remains unchanged');
  assert.deepEqual(errors,[]);
  console.log('Passed: menu in existing editor/index/product/portfolio/calendar headers at 517/390px, no duplicate bar or Save overlap, late headers, route replacement, keyboard activation, and desktop hiding.');

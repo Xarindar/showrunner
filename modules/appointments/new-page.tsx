@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { SessionForm } from "./session-form";
 import { priceSessionOffering, readSessionOffering } from "@/lib/scheduling/session-offering";
-import { servicePriceCents } from "@/lib/scheduling/pricing";
+import { servicePriceCents, pricingTypeSchema } from "@/lib/scheduling/pricing";
 
 export default async function NewSessionPage() {
   const user = await requireAdmin("appointments:manage");
@@ -17,6 +17,7 @@ export default async function NewSessionPage() {
   ]);
   return <SessionForm rates={rates} services={services.map(service => {
     const offering = readSessionOffering(service.sessionOffering);
-    return { ...service, priceCents: servicePriceCents(service), sessionOffering: offering ? priceSessionOffering(offering, rates, { pricingType: service.pricingType, hourlyRateId: service.hourlyRate?.id ?? "" }) : null };
+    const pricingType = pricingTypeSchema.parse(service.pricingType);
+    return { ...service, pricingType, priceCents: servicePriceCents(service), sessionOffering: offering ? priceSessionOffering(offering, rates, { pricingType, hourlyRateId: service.hourlyRate?.id ?? "" }) : null };
   })} clients={clients} staff={staff} timezone={settings.timezone} />;
 }

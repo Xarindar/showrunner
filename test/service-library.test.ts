@@ -5,7 +5,7 @@ import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { PGlite } from "@electric-sql/pglite";
 import { resolveIncludedServices, serviceLibraryInputSchema } from "../lib/scheduling/service-library";
-import { priceSessionOffering, sessionOfferingDraft, sessionOfferingFormSchema, sessionOfferingSchema, selectSessionPackage, suggestedSessionAddOns } from "../lib/scheduling/session-offering";
+import { priceSessionOffering, sessionOfferingDraft, sessionOfferingFormSchema, sessionOfferingSchema, sessionPackageSnapshotSchema, selectSessionPackage, suggestedSessionAddOns } from "../lib/scheduling/session-offering";
 
 const offering = { coverageItems: [{ id: "legacy-ceremony", name: "Ceremony" }], tiers: [{ id: "standard", name: "Standard", durationMinutes: 60, priceCents: 10000, coverageIds: ["legacy-ceremony"] }], addOns: [] };
 const item = { id: "library-ceremony", name: "Ceremony", description: "Your ceremony photographed from arrival to your first kiss.", category: "Weddings", tags: ["ceremony"], pricingType: "FLAT_RATE" as const, priceCents: null, hourlyRateId: null };
@@ -98,5 +98,36 @@ test("library migration imports legacy names by site without changing session JS
     assert.deepEqual(rows.rows[0], { siteId: "one", name: "Ceremony", nameKey: "ceremony", description: "", category: "", tags: [] });
     assert.deepEqual((await db.query('SELECT "sessionOffering" FROM "Service" WHERE id=\'a\'')).rows[0], { sessionOffering: offering });
     await assert.rejects(db.exec('INSERT INTO "ServiceLibraryItem" (id,"siteId",name,"nameKey","updatedAt") VALUES (\'duplicate\',\'one\',\'ceremony\',\'ceremony\',CURRENT_TIMESTAMP)'), /unique/i);
+  } finally { await db.close(); }
+});
+
+test("per-unit add-ons retain unit costs, multiply quantities and snapshot the agreed amount", () => {
+  const saved = serviceLibraryInputSchema.parse({ name: "Extra photos", description: "", category: "", tags: "", availableAsAddOn: true, pricingType: "PER_UNIT", price: "3.00" });
+  assert.equal(saved.priceCents, 300);
+  assert.equal(saved.pricingType, "PER_UNIT");
+  assert.equal(saved.hourlyRateId, null);
+  assert.equal(serviceLibraryInputSchema.safeParse({ ...saved, tags: "", availableAsAddOn: true, price: "" }).success, false);
+  const perUnit = { ...offering, coverageItems: [], tiers: offering.tiers.map(tier => ({ ...tier, coverageIds: [] })), addOns: [{ id: "photos", name: "Extra photos", pricingType: "PER_UNIT" as const, priceCents: 300 }] };
+  const roundTrip = sessionOfferingFormSchema.parse(JSON.stringify(sessionOfferingDraft(perUnit, 60, null)));
+  const snapshot = selectSessionPackage(roundTrip, "standard", ["photos"], undefined, { photos: 10 });
+  assert.equal(snapshot?.priceCents, 13000);
+  assert.deepEqual(sessionPackageSnapshotSchema.parse(snapshot).extras, snapshot?.extras);
+  assert.deepEqual(snapshot?.extras, [{ name: "Extra photos", priceCents: 3000, pricingType: "PER_UNIT", quantity: 10, unitPriceCents: 300 }]);
+  assert.equal(selectSessionPackage(roundTrip, "standard", ["photos"])?.priceCents, 10300);
+  for (const quantity of [0, -1, 1.5, 10001]) assert.throws(() => selectSessionPackage(roundTrip, "standard", ["photos"], undefined, { photos: quantity }));
+  assert.throws(() => selectSessionPackage(roundTrip, "standard", [], undefined, { photos: 10 }), /selected add-ons/);
+  assert.throws(() => selectSessionPackage({ ...perUnit, addOns: [{ ...perUnit.addOns[0], pricingType: "FLAT_RATE" }] }, "standard", ["photos"], undefined, { photos: 10 }), /quantity/);
+  assert.throws(() => selectSessionPackage({ ...perUnit, addOns: [{ ...perUnit.addOns[0], priceCents: 999999999 }] }, "standard", ["photos"], undefined, { photos: 2 }), /less/);
+  perUnit.addOns[0].priceCents = 500;
+  assert.equal(snapshot?.extras[0].unitPriceCents, 300);
+});
+
+test("per-unit library migration preserves existing flat and hourly pricing", async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(`CREATE TYPE "ServicePricingType" AS ENUM ('FLAT_RATE', 'HOURLY'); CREATE TABLE "ServiceLibraryItem" (id TEXT PRIMARY KEY, "pricingType" "ServicePricingType" NOT NULL DEFAULT 'FLAT_RATE'); INSERT INTO "ServiceLibraryItem" VALUES ('flat','FLAT_RATE'),('hourly','HOURLY');`);
+    await db.exec(readFileSync("prisma/migrations/20261107010000_per_unit_add_ons/migration.sql", "utf8"));
+    await db.exec(`INSERT INTO "ServiceLibraryItem" VALUES ('per-unit','PER_UNIT'); INSERT INTO "ServiceLibraryItem" (id) VALUES ('default');`);
+    assert.deepEqual((await db.query('SELECT id, "pricingType" FROM "ServiceLibraryItem" ORDER BY id')).rows, [{ id: "default", pricingType: "FLAT_RATE" }, { id: "flat", pricingType: "FLAT_RATE" }, { id: "hourly", pricingType: "HOURLY" }, { id: "per-unit", pricingType: "PER_UNIT" }]);
   } finally { await db.close(); }
 });

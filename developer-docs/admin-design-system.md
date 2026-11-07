@@ -285,3 +285,5 @@ Booking-option label/switch pairs hug their contents with an 8px internal gap an
 Every populated table row keeps a 1px bottom divider, including the final row above reserved space. `--data-table-row-divider` uses the standard border tone rather than the subtle border tone, so record boundaries stay visible without hover. Empty placeholder cells do not receive a record-ending divider. This rule applies to all shared admin table families.
 
 Table cards reserve at least two standard rows through `--data-table-reserved-rows`, with the 80px empty-state height as a floor. The calculation includes cell padding, dividers and the responsive row-control height, so the second row also fits beside mobile touch-sized actions. Cards grow naturally beyond that minimum; this reservation does not add dummy records.
+
+Mobile navigation stays owned by the admin shell and is positioned beside the current page header. Never insert menu controls or mutate attributes inside page headers from the shell: streamed client boundaries may not have hydrated yet. Reserve header space in CSS and observe layout for alignment; keep one menu button through route changes.

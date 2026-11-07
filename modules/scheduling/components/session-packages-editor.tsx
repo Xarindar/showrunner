@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useId, useState } from "react";
 import { flushSync } from "react-dom";
 import { Copy, Pencil, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,10 +29,10 @@ function packageDurationLabel(value: string) {
   return hours ? `${hours} hr${minutes ? ` ${minutes} min` : ""}` : `${minutes} min`;
 }
 
-export function SessionPackagesEditor({ initialOffering = null, durationMinutes = 60, priceCents = null, isNew = false, initialRates = [], initialPricingType = "FLAT_RATE", initialHourlyRateId = "", initialScheduling, bookingAvailability }: {
+export function SessionPackagesEditor({ initialOffering = null, durationMinutes = 60, priceCents = null, isNew = false, initialRates = [], initialPricingType = "FLAT_RATE", initialHourlyRateId = "", initialScheduling }: {
   initialOffering?: SessionOffering | null; durationMinutes?: number; priceCents?: number | null; isNew?: boolean;
   initialRates?: HourlyRate[]; initialPricingType?: PricingType; initialHourlyRateId?: string;
-  initialScheduling?: { bufferBeforeMinutes: number; bufferAfterMinutes: number; minimumNoticeHours: number; maxAdvanceDays: number; slotIntervalMinutes: number }; bookingAvailability?: ReactNode;
+  initialScheduling?: { bufferBeforeMinutes: number; bufferAfterMinutes: number; minimumNoticeHours: number; maxAdvanceDays: number; slotIntervalMinutes: number };
 }) {
   const [draft, setDraft] = useState<SessionOfferingDraft>(() => {
     if (isNew && !initialOffering) return { coverageItems: [], tiers: [], addOns: [] };
@@ -206,19 +206,19 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
               </Field>
             ))}
           </div>
-          {bookingAvailability && <section className={styles.booking} aria-label="Booking availability">
-            <div className={styles.heading}><h3>Booking availability</h3></div>
-            {bookingAvailability}
-            <details><summary>Booking options</summary><div className={styles.bookingOptions}>
-              {([
-                ["bufferBeforeMinutes", "Preparation (minutes)", 0, 1440],
-                ["bufferAfterMinutes", "Break after (minutes)", 0, 1440],
-                ["slotIntervalMinutes", "Start interval (minutes)", 1, 1440],
-                ["minimumNoticeHours", "Minimum notice (hours)", 0, 8760],
-                ["maxAdvanceDays", "Book ahead (days)", 1, 3650]
-              ] as const).map(([key, label, min, max]) => <Field key={key} label={label}><Input type="number" min={min} max={max} required value={scheduling[key]} onChange={event => setScheduling(current => ({ ...current, [key]: event.target.value }))} /></Field>)}
-            </div></details>
-          </section>}
+          <div className={styles.bookingOptions} role="group" aria-label="Booking settings">
+            {([
+              ["bufferBeforeMinutes", "Time Before", "min", "minutes", 0, 1440],
+              ["bufferAfterMinutes", "Time After", "min", "minutes", 0, 1440],
+              ["minimumNoticeHours", "Minimum Notice", "hr", "hours", 0, 8760],
+              ["maxAdvanceDays", "Book Ahead", "days", "days", 1, 3650]
+            ] as const).map(([key, label, unit, accessibleUnit, min, max]) => <Field key={key} label={label}>
+              <span className={styles.unitField}>
+                <Input aria-label={`${label} (${accessibleUnit})`} type="number" min={min} max={max} required value={scheduling[key]} onChange={event => setScheduling(current => ({ ...current, [key]: event.target.value }))} />
+                <span className={styles.unit} style={{ insetInlineStart: `calc(var(--sd-space-12) + ${Math.max(1, scheduling[key].length)}ch + var(--sd-space-4))` }} aria-hidden="true">{unit}</span>
+              </span>
+            </Field>)}
+          </div>
           <section className={styles.tierServices} aria-labelledby={`${listId}-service-title-${tier.id}`}>
             <div className={styles.heading}>
               <h3 id={`${listId}-service-title-${tier.id}`}>Services</h3>
@@ -266,7 +266,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
         <table className="catalog-product-table"><thead><tr><th scope="col">Service</th><th scope="col">Add-on price</th><th scope="col">Actions</th></tr></thead><tbody>
           {draft.addOns.map((item, index) => <tr key={item.id}>
             <td>{item.name || `Add-on ${index + 1}`}</td>
-            <td>{item.pricingType === "HOURLY" ? `${((rates.find(rate => rate.id === item.hourlyRateId)?.amountCents ?? 0) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} / hour` : Number(item.price).toLocaleString("en-US", { style: "currency", currency: "USD" })}</td>
+            <td>{item.pricingType === "HOURLY" ? `${((rates.find(rate => rate.id === item.hourlyRateId)?.amountCents ?? 0) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} / hour` : Number(item.price).toLocaleString("en-US", { style: "currency", currency: "USD" })}{item.pricingType === "PER_UNIT" ? " / unit" : ""}</td>
             <td><Button type="button" variant="ghost" size="sm" aria-label={`Remove add-on ${item.name || index + 1}`} onClick={() => setRemoval({ kind: "extra", id: item.id, name: item.name || `Add-on ${index + 1}` })}><X aria-hidden="true" size={16} /></Button></td>
           </tr>)}
         </tbody></table>
