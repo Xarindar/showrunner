@@ -1,5 +1,8 @@
 "use server";
 
+import { resolveBookingRequirements } from "@/lib/scheduling/booking-documents";
+import { listBookingDocuments } from "@/lib/scheduling/booking-document-store";
+
 import { hoursRevision, weeklyHoursSchema } from "@/lib/scheduling/weekly-hours";
 
 import { imageFramingSchema } from "@/modules/content/studio/image-framing";
@@ -373,6 +376,7 @@ export async function createServiceAction(_previous: { error: string }, formData
   const settings = await getSiteSettings();
   let service;
   try {
+    if (input.bookingDocumentSelection) resolveBookingRequirements(input, await listBookingDocuments(settings.siteId));
     const media = await serviceMediaData(formData, settings.siteId, user);
     const offering = await hydrateSessionServiceLibrary(input.sessionOffering ?? null, settings.siteId);
     const pricing = await servicePricingData(input, settings.siteId, offering);
@@ -412,6 +416,7 @@ export async function createServiceAction(_previous: { error: string }, formData
           slotIntervalMinutes: input.slotIntervalMinutes,
           intakePrompt: input.intakePrompt,
           bookingRules: input.bookingRules,
+          ...(input.bookingDocumentSelection ? { bookingDocumentSelection: input.bookingDocumentSelection } : {}),
           policyText: input.policyText,
           requirePolicy: input.requirePolicy,
           requestOnly: input.requestOnly,
@@ -450,6 +455,7 @@ export async function updateServiceAction(formData: FormData) {
   const user = await requireAdmin("scheduling:manage");
   const input = await parseForm(serviceUpdateFormSchema, formData);
   const settings = await getSiteSettings();
+  if (input.bookingDocumentSelection) resolveBookingRequirements(input, await listBookingDocuments(settings.siteId));
   const current = await prisma.service.findFirst({ where: { id: input.id, siteId: settings.siteId } });
   if (!current) redirect(servicesAdminPath({ error: "Session not found." }));
   const offering = await hydrateSessionServiceLibrary(input.sessionOffering ?? readSessionOffering(current.sessionOffering), settings.siteId);
@@ -483,6 +489,7 @@ export async function updateServiceAction(formData: FormData) {
       slotIntervalMinutes: input.slotIntervalMinutes,
       intakePrompt: input.intakePrompt,
       bookingRules: input.bookingRules,
+          ...(input.bookingDocumentSelection ? { bookingDocumentSelection: input.bookingDocumentSelection } : {}),
       policyText: input.policyText,
       requirePolicy: input.requirePolicy,
       requestOnly: input.requestOnly,

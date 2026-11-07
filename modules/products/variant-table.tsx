@@ -1,5 +1,6 @@
 "use client";
 
+import { ResponsiveTableFrame } from "@/components/ui/responsive-table";
 import { useCallback, useState } from "react";
 import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ export function VariantTable({ productId, updateAction, variants }: VariantTable
   }
 
   return (
-    <div
+    <ResponsiveTableFrame
       className="product-variant-table-scroll"
       onChange={(event) => {
         const row = (event.target as HTMLElement).closest<HTMLElement>("[data-variant-id]");
@@ -125,6 +126,6 @@ export function VariantTable({ productId, updateAction, variants }: VariantTable
           <input name="sortOrder" type="hidden" value={variant.sortOrder} />
         </form>
       ))}
-    </div>
+    </ResponsiveTableFrame>
   );
 }

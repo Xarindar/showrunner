@@ -1,3 +1,4 @@
+import { listBookingDocuments } from "@/lib/scheduling/booking-document-store";
 import { Notification } from "@/components/ui/notifications";
 import { readImageFraming } from "@/modules/content/studio/image-framing";
 import { SessionTypeForm } from "./components/session-type-form";
@@ -55,10 +56,11 @@ function serviceMediaUrl(service: ServiceWithBuilderData) {
 export default async function ServiceEditPage({ searchParams, serviceId }: ServiceEditPageProps) {
   const user = await requireAdmin("scheduling:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [rates, mediaTags, sessionTags] = await Promise.all([
+  const [rates, mediaTags, sessionTags, bookingDocuments] = await Promise.all([
     prisma.hourlyRate.findMany({ where: { siteId: settings.siteId }, orderBy: { name: "asc" }, select: { id: true, name: true, amountCents: true } }),
     prisma.mediaAsset.findMany({ where: await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: null }), select: { tags: true }, take: 5000 }),
-    prisma.service.findMany({ where: { siteId: settings.siteId }, select: { tags: true } })
+    prisma.service.findMany({ where: { siteId: settings.siteId }, select: { tags: true } }),
+    listBookingDocuments(settings.siteId)
   ]);
   const tagOptions = summarizeMediaTags([...mediaTags, ...sessionTags], 5000).map(tag => tag.name);
   const taxonomyServicesPromise = prisma.service.findMany({
@@ -102,7 +104,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     const parsed = bookingRuleSchema.safeParse({ id: field.id, kind: "intake", category: contactField ? "Contact" : field.form.name.slice(0, 80), label: field.label, type: field.type === "RADIO" || field.type === "SELECT" ? field.type : "TEXT", required: field.isRequired, options: Array.isArray(field.options) ? field.options : [], placeholder: field.placeholder, helpText: field.helpText, contactField });
     return parsed.success ? [parsed.data] : [];
   })];
-  const formProps = { availableRules, intakeOptions, policyOptions, tags: tagOptions, rates, canUpload: isMediaUploadDriverConfigured(settings.mediaDriver), categoryOptions };
+  const formProps = { bookingDocuments, availableRules, intakeOptions, policyOptions, tags: tagOptions, rates, canUpload: isMediaUploadDriverConfigured(settings.mediaDriver), categoryOptions };
   if (serviceId === "new") return <SessionTypeForm {...formProps} />;
   if (!service) notFound();
   const offering = await hydrateSessionServiceLibrary(readSessionOffering(service.sessionOffering), settings.siteId);

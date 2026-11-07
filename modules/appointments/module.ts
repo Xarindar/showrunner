@@ -26,7 +26,7 @@ export const manifest = {
     { label: "Status email hooks", status: "live" },
     { label: "Calendar/reschedule UI", status: "live" }
   ],
-  adminRoutes: ["/admin/modules/appointments", "/admin/appointments/[id]"],
+  adminRoutes: ["/admin/modules/appointments", "/admin/appointments/[id]", "/admin/modules/appointments/forms-terms"],
   dependencies: ["scheduling", "clients", "communications"],
   dataModels: ["Booking", "Client", "Service", "StaffMember", "Resource", "AvailabilityRule", "BlockedTime", "EmailOutbox"],
   permissions: ["appointments:manage"],

@@ -19,7 +19,7 @@ export async function saveBookingRuleSet(input: unknown): Promise<{ set?: Bookin
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const { siteId } = await getSiteSettings();
   try {
-    const set = await prisma.bookingRuleSet.create({ data: { siteId, name: parsed.data.name, nameKey: parsed.data.name.toLowerCase(), rules: parsed.data.rules } });
+    const set = await prisma.bookingRuleSet.create({ data: { siteId, kind: parsed.data.rules.every(rule=>rule.kind === "policy") ? "TERMS" : "INTAKE", name: parsed.data.name, nameKey: parsed.data.name.toLowerCase(), rules: parsed.data.rules } });
     return { set: { id: set.id, name: set.name, rules: parsed.data.rules } };
   } catch (error) {
     return { error: error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" ? "A rule set with that name already exists." : "The rule set could not be saved. Your rules are still here; please try again." };

@@ -1,5 +1,6 @@
 "use client";
 
+import { ResponsiveTableFrame } from "@/components/ui/responsive-table";
 import { useRef, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -55,7 +56,7 @@ export function HourlyRates({ initialRates }: { initialRates: HourlyRate[] }) {
           </div>
           <Button size="sm" onClick={() => setEditing("new")}><Plus aria-hidden="true" size={15} />Add rate</Button>
         </div>
-        <div aria-label="Hourly rates table" className="catalog-table-scroll catalog-viewport-table hourly-rates-table" role="region" tabIndex={0}>
+        <ResponsiveTableFrame aria-label="Hourly rates table" className="catalog-table-scroll catalog-viewport-table hourly-rates-table" role="region" tabIndex={0}>
           <table className="catalog-product-table">
             <thead><tr><th>Rate name</th><th>Price per hour</th><th>Actions</th></tr></thead>
             <tbody>
@@ -77,7 +78,7 @@ export function HourlyRates({ initialRates }: { initialRates: HourlyRate[] }) {
               </td></tr>}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableFrame>
         <Pagination label="Hourly rate pages" page={pagination.currentPage} pageCount={pagination.pageCount}
           onPageSizeChange={pagination.resizePage} onNext={pagination.nextPage} onPrevious={pagination.previousPage} />
       </div>

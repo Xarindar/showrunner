@@ -87,6 +87,8 @@ export function SelectMenu({ className, id, label, name, onValueChange, options,
   return (
     <div className={cx("ui-select-menu", className)} data-open={open ? "true" : undefined} ref={rootRef}>
       <input name={name} type="hidden" value={selectedOption.value} />
+      <label className="ui-select-label" htmlFor={id} id={labelId}>{label}</label>
+      <div className="ui-select-control">
       <button
         role="combobox"
         aria-label={label}
@@ -99,9 +101,6 @@ export function SelectMenu({ className, id, label, name, onValueChange, options,
         onClick={() => setOpen((current) => !current)}
         onKeyDown={handleTriggerKeyDown}
         type="button">
-        <span className="ui-select-label" id={labelId}>
-          {label}
-        </span>
         <span className="ui-select-value">{selectedOption.label}</span>
         <ChevronDown aria-hidden="true" size={15} />
       </button>
@@ -131,6 +130,7 @@ export function SelectMenu({ className, id, label, name, onValueChange, options,
           })}
         </div>
       ) : null}
+      </div>
     </div>
   );
 }

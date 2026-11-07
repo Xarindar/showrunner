@@ -136,7 +136,8 @@ function SidebarModuleLink({
       {[
         { href: "/admin/modules/appointments", label: "Appointments", active: !["/schedule", "/staff"].some(section => pathname.includes(section)) },
         { href: "/admin/modules/appointments/schedule", label: "Schedule", active: pathname.includes("/schedule") },
-        { href: "/admin/modules/appointments/staff", label: "Staff", active: pathname.includes("/staff") }
+        { href: "/admin/modules/appointments/staff", label: "Staff", active: pathname.includes("/staff") },
+        { href: "/admin/modules/appointments/forms-terms", label: "Forms & Terms", active: pathname.includes("/forms-terms") }
       ].map(link => <Link key={link.href} href={link.href} onClick={closeMenu} aria-current={link.active ? "page" : undefined}>{link.label}<AdminNavigationPending /></Link>)}
     </nav> : null}
     {item.id === "scheduling" && isActive && enabled && !editing ? <nav className="admin-nav-children" aria-label="Services">

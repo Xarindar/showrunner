@@ -46,8 +46,6 @@
 .showrunner-admin .clients-records-table { min-width: var(--data-table-min-width); }
 .showrunner-admin .clients-records-table th,
 .showrunner-admin .clients-records-table td { white-space: normal; }
-.showrunner-admin .clients-records-table th:last-child,
-.showrunner-admin .clients-records-table td:last-child { width: 160px; }
 .showrunner-admin .clients-records-text {
   display: -webkit-box;
   line-clamp: 2;
@@ -122,16 +120,8 @@
 .showrunner-admin .clients-search-form input { flex: 1 1 260px; width: 100%; }
 .showrunner-admin .clients-search-form select { flex: 0 0 210px; }
 .showrunner-admin .clients-list-body { gap: 0; overflow: auto; }
-.showrunner-admin .clients-table { min-width: 1240px; }
 .showrunner-admin .clients-table td { height: auto; vertical-align: top; }
 .showrunner-admin .clients-table th { vertical-align: middle; }
-.showrunner-admin .clients-col-client,
-.showrunner-admin .clients-col-email { width: 220px; }
-.showrunner-admin .clients-col-phone { width: 140px; }
-.showrunner-admin .clients-col-metric { width: 78px; }
-.showrunner-admin .clients-col-date { width: 165px; }
-.showrunner-admin .clients-col-status { width: 170px; }
-.showrunner-admin .clients-col-actions { width: 104px; }
 .showrunner-admin .clients-primary-cell,
 .showrunner-admin .clients-status-cell { display: grid; gap: var(--sd-space-4); min-width: 0; }
 .showrunner-admin .clients-name-line { align-items: center; display: inline-flex; gap: var(--sd-space-6); min-width: 0; }
@@ -215,7 +205,6 @@
   .showrunner-admin .clients-records-pagination { justify-self: stretch; }
   .showrunner-admin .clients-records-pagination.ui-pagination-round { justify-content: center; }
   .showrunner-admin .clients-data-table { min-height: 0; }
-  .showrunner-admin .clients-table-wrap { display: none; }
   .showrunner-admin .clients-data-table .ui-data-table-stats {
     flex-wrap: nowrap;
     margin-inline: calc(var(--space-3) * -1);
@@ -237,8 +226,7 @@
 .showrunner-admin .clients-modal-actions { align-items: stretch; display: grid; }
   .showrunner-admin .clients-search-form select { width: 100%; }
 }
-.showrunner-admin .clients-table { min-width: 900px; table-layout: auto; }
-.showrunner-admin .clients-table :is(col,th,td) { width: auto; }
+.showrunner-admin .clients-table { min-width: 0; }
 .showrunner-admin .clients-name-line strong { font-weight: var(--sd-type-weight-medium); }
 .showrunner-admin .clients-action-label { display: none; }
 @media(max-width:860px) {

@@ -10,7 +10,8 @@ export function searchAdminNavigation(modules: Pick<ShellModule, "id" | "label" 
     );
     if (item.id === "appointments") pages.push(
       { label: "Schedule", href: "/admin/modules/appointments/schedule" },
-      { label: "Staff", href: "/admin/modules/appointments/staff" }
+      { label: "Staff", href: "/admin/modules/appointments/staff" },
+      { label: "Forms & Terms", href: "/admin/modules/appointments/forms-terms" }
     );
     return pages.filter(page => words.every(word => `${item.label} ${page.label}`.toLowerCase().includes(word)));
   });

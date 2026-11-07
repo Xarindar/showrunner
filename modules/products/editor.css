@@ -298,7 +298,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   min-width: 0;
 }
-.showrunner-admin .product-variant-table { min-width: 880px; }
+.showrunner-admin .product-variant-table { min-width: 0; }
 .showrunner-admin .product-variant-table th,
 .showrunner-admin .product-variant-table td { white-space: nowrap; }
 .showrunner-admin .product-variant-table input:not([type="checkbox"]) { min-width: 0; width: 100%; }

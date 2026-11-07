@@ -233,7 +233,8 @@
   transform: translate(-50%, 0);
   visibility: visible;
 }
-.showrunner-admin .ui-select-menu { display: inline-flex; min-width: 0; position: relative; }
+.showrunner-admin .ui-select-menu { display: inline-grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: var(--space-2); min-width: 0; position: relative; }
+.showrunner-admin .ui-select-control { min-width: 0; position: relative; }
 .showrunner-admin .ui-select-trigger {
   align-items: center;
   appearance: none;
@@ -244,20 +245,22 @@
   cursor: pointer;
   display: grid;
   gap: var(--sd-space-8);
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  min-height: 34px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  font: inherit;
+  min-height: var(--sd-layout-control-height);
   min-width: 100%;
   padding: 0 var(--sd-space-8);
   text-align: left;
 }
 .showrunner-admin .ui-select-label {
-  color: var(--color-muted);
-  font-size: var(--type-caption);
-  font-weight: var(--sd-type-weight-strong);
-  text-transform: uppercase;
+  color: var(--color-text);
+  font-size: var(--sd-type-body-size);
+  font-weight: var(--sd-type-weight-regular);
+  line-height: var(--sd-type-body-line);
+  white-space: nowrap;
 }
 .showrunner-admin .ui-select-value {
-  font-weight: var(--sd-type-weight-strong);
+  font-weight: var(--sd-type-weight-regular);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -531,4 +534,8 @@
   height: var(--sd-space-16);
   color: inherit;
   stroke: currentColor;
+}
+
+@media (max-width: 860px), (pointer: coarse) {
+  .showrunner-admin .ui-select-trigger { min-height: var(--sd-layout-touch-target); font-size: var(--sd-type-input-touch-size); }
 }

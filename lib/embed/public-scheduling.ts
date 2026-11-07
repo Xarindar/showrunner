@@ -1,4 +1,6 @@
 import "server-only";
+import { listBookingDocuments } from "@/lib/scheduling/booking-document-store";
+import { resolveBookingRequirements } from "@/lib/scheduling/booking-documents";
 import { BookingRuleAnswerError, intakeAnswersSchema, readBookingRules } from "@/lib/scheduling/booking-rules";
 import { servicePriceCents } from "@/lib/scheduling/pricing";
 import { readImageFraming } from "@/modules/content/studio/image-framing";
@@ -34,6 +36,7 @@ const bookingSchema = z.object({
   intakeResponse: z.string().trim().optional(),
   intakeAnswers: intakeAnswersSchema.optional(),
   policyAccepted: z.boolean().optional(),
+  bookingRequirementsRevision: z.string().max(500).optional(),
   [hiddenHoneypotField]: z.string().trim().optional()
 });
 
@@ -198,12 +201,18 @@ async function listPublicSchedulingCategoryRows(siteId: string) {
 }
 
 export async function listPublicSchedulingCatalog(siteId: string) {
-  const [services, serviceCategories] = await Promise.all([
+  const [services, serviceCategories, documents] = await Promise.all([
     nativeSchedulingAdapter.listActiveServices({ siteId }),
-    listPublicSchedulingCategoryRows(siteId)
+    listPublicSchedulingCategoryRows(siteId),
+    listBookingDocuments(siteId)
   ]);
   const categoriesByName = new Map(serviceCategories.map((category) => [categoryKey(category.name), category]));
-  const serializedServices = services.map((service) => serializePublicService(service, categoriesByName.get(categoryKey(service.category))));
+  const serializedServices = services.map(service=>{
+    const requirements=resolveBookingRequirements(service,documents);
+    return {...serializePublicService(service,categoriesByName.get(categoryKey(service.category))),bookingRules:requirements.bookingRules,policyText:requirements.policyText || null,requirePolicy:requirements.requirePolicy,bookingRequirementsRevision:requirements.revision,
+      bookingFormTitle:requirements.documents.find(document=>document.kind==="INTAKE")?.name || "Session details",
+      bookingTermsTitle:requirements.documents.find(document=>document.kind==="TERMS")?.name || "Booking terms"};
+  });
   const usedCategoryIds = new Set(serializedServices.map((service) => service.categoryId));
   const categoriesById = new Map(
     serviceCategories
@@ -288,6 +297,7 @@ export async function createPublicSchedulingBooking(input: {
       notes: parsed.data.notes,
       intakeResponse: parsed.data.intakeResponse,
       intakeAnswers: parsed.data.intakeAnswers,
+      bookingRequirementsRevision: parsed.data.bookingRequirementsRevision,
       policyAccepted: parsed.data.policyAccepted === true
     });
   } catch (error) {

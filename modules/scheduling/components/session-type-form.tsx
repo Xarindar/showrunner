@@ -10,6 +10,7 @@ import { Notification } from "@/components/ui/notifications";
 import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
 import { nonEmptyStringArrayFromUnknown } from "@/lib/format";
 import { pricingTypeSchema, type HourlyRate } from "@/lib/scheduling/pricing";
+import type { BookingDocument } from "@/lib/scheduling/booking-documents";
 import type { BookingRule } from "@/lib/scheduling/booking-rules";
 import type { SessionOffering } from "@/lib/scheduling/session-offering";
 import { createServiceAction, updateSessionTypeAction } from "../actions";
@@ -21,10 +22,10 @@ import { ServicePresetField } from "./service-preset-field";
 import { ServiceBookingRulesTable } from "./service-booking-rules-table";
 import styles from "../service-editor.module.css";
 
-type InitialSession = Pick<Service, "id" | "updatedAt" | "name" | "description" | "category" | "tags" | "isActive" | "location" | "durationMinutes" | "priceCents" | "pricingType" | "hourlyRateId" | "bufferBeforeMinutes" | "bufferAfterMinutes" | "minimumNoticeHours" | "maxAdvanceDays" | "slotIntervalMinutes" | "bookingRules" | "intakePrompt" | "policyText" | "requirePolicy" | "requestOnly" | "waitlistEnabled">;
+type InitialSession = Pick<Service, "bookingDocumentSelection" | "id" | "updatedAt" | "name" | "description" | "category" | "tags" | "isActive" | "location" | "durationMinutes" | "priceCents" | "pricingType" | "hourlyRateId" | "bufferBeforeMinutes" | "bufferAfterMinutes" | "minimumNoticeHours" | "maxAdvanceDays" | "slotIntervalMinutes" | "bookingRules" | "intakePrompt" | "policyText" | "requirePolicy" | "requestOnly" | "waitlistEnabled">;
 
-export function SessionTypeForm({ canUpload, rates, tags, categoryOptions = [], availableRules, intakeOptions, policyOptions, initialService, initialOffering, initialMedia }: {
-  canUpload: boolean; rates: HourlyRate[]; tags: string[]; categoryOptions?: string[];
+export function SessionTypeForm({ canUpload, rates, tags, bookingDocuments = [], categoryOptions = [], availableRules, intakeOptions, policyOptions, initialService, initialOffering, initialMedia }: {
+  bookingDocuments?: BookingDocument[]; canUpload: boolean; rates: HourlyRate[]; tags: string[]; categoryOptions?: string[];
   availableRules?: BookingRule[]; intakeOptions?: string[]; policyOptions?: string[];
   initialService?: InitialSession; initialOffering?: SessionOffering | null; initialMedia?: Omit<ComponentProps<typeof ServiceMediaFields>, "canUpload">;
 }) {
@@ -58,7 +59,7 @@ export function SessionTypeForm({ canUpload, rates, tags, categoryOptions = [], 
           </div>
         </section>
         <SessionPackagesEditor initialRates={rates} isNew={!initialService} initialOffering={initialOffering} durationMinutes={initialService?.durationMinutes} priceCents={initialService?.priceCents} initialPricingType={pricingTypeSchema.parse(initialService?.pricingType ?? "FLAT_RATE")} initialHourlyRateId={initialService?.hourlyRateId ?? ""} initialScheduling={initialService} />
-        <ServiceBookingRulesTable idPrefix={initialService ? "service" : "new-session"} availableRules={availableRules} intakeOptions={intakeOptions} policyOptions={policyOptions}
+        <ServiceBookingRulesTable documents={bookingDocuments} initialSelection={initialService?.bookingDocumentSelection} idPrefix={initialService ? "service" : "new-session"} availableRules={availableRules} intakeOptions={intakeOptions} policyOptions={policyOptions}
           defaultRules={initialService?.bookingRules} defaultIntakePrompt={initialService?.intakePrompt} defaultPolicyText={initialService?.policyText} defaultRequirePolicy={initialService?.requirePolicy} defaultRequestOnly={initialService?.requestOnly} defaultWaitlistEnabled={initialService?.waitlistEnabled} />
       </main>
       {state.error && <Notification tone="danger" eventKey={state}>{state.error}</Notification>}

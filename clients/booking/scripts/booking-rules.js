@@ -9,10 +9,11 @@
     if (className) node.className = className;
     return node;
   }
-  function render(form, rules, serviceId) {
+  function render(form, rules, serviceId, context = {}) {
     if (!form) return;
-    const previous = form.dataset.ruleService === serviceId ? answers(form) : {};
-    form.dataset.ruleService = serviceId;
+    const identity = serviceId + ":" + (context.revision || "");
+    const previous = form.dataset.ruleService === identity ? answers(form) : {};
+    form.dataset.ruleService = identity;
     for (const name of ["customerName", "customerEmail", "customerPhone"]) {
       const input = form.elements.namedItem(name);
       if (!input) continue;
@@ -26,14 +27,15 @@
       if (anchor) anchor.after(root); else form.append(root);
     }
     root.replaceChildren();
-    root.hidden = !Array.isArray(rules);
     const fields = (rules || []).filter(rule => rule.kind === "intake" && !rule.contactField);
+    root.hidden = fields.length === 0;
+    if (fields.length) root.append(element("h3", context.title || "Session details", "booking-rule-title"));
     for (const category of new Set(fields.map(rule => rule.category))) {
       const group = element("fieldset");
-      group.append(element("legend", category));
+      if (category !== context.title) group.append(element("legend", category));
       for (const rule of fields.filter(rule => rule.category === category)) {
         const field = element(rule.type === "RADIO" ? "fieldset" : "label");
-        field.append(element(rule.type === "RADIO" ? "legend" : "span", rule.label));
+        field.append(element(rule.type === "RADIO" ? "legend" : "span", rule.label + (rule.required ? "" : " (optional)")));
         if (rule.type === "RADIO") {
           for (const option of rule.options) {
             const label = element("label", "", "booking-rule-choice");

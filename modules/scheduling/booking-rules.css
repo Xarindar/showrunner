@@ -11,8 +11,7 @@
 .showrunner-admin .booking-rule-option-list { border: 1px solid var(--sd-color-border-subtle); border-radius: var(--sd-radius-input); min-width: 0; }
 .showrunner-admin .service-booking-rules { gap: 0; }
 .showrunner-admin .service-booking-rules .ui-section-header h2 { flex: 1; }
-.showrunner-admin .service-booking-rules .booking-rules-table th:last-child { width: calc(var(--sd-layout-button-height) * 2 + var(--data-table-cell-x) * 2 + var(--sd-space-4)); text-align: center; }
-.showrunner-admin .service-booking-rules .booking-rules-table th:first-child { width: auto; }
+.showrunner-admin .service-booking-rules .booking-rules-table th:last-child {  text-align: center; }
 .showrunner-admin .booking-rule-type-cell { display: grid; min-width: 0; }
 .showrunner-admin .booking-rule-type-cell strong,
 .showrunner-admin .booking-rule-type-cell small,
@@ -57,7 +56,6 @@
 }
 
 @media (max-width: 860px), (pointer: coarse) {
-  .showrunner-admin .service-booking-rules .booking-rules-table th:last-child { width: calc(var(--sd-layout-touch-target) * 2 + var(--data-table-cell-x) * 2 + var(--sd-space-4)); }
   .showrunner-admin .booking-rule-icon-button { min-width: var(--sd-layout-touch-target); width: var(--sd-layout-touch-target); }
 }
 
@@ -71,3 +69,7 @@
   .showrunner-admin .booking-rules-toggle-strip .ui-switch { grid-row: auto; grid-template-columns: auto auto; grid-template-rows: auto; column-gap: var(--sd-space-8); flex: none; justify-items: stretch; align-items: center; align-content: center; min-height: var(--sd-layout-button-height); height: auto; }
   .showrunner-admin .booking-rules-toggle-strip .ui-switch-copy { text-align: left; }
 }
+
+.showrunner-admin .booking-document-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.showrunner-admin .booking-document-choices > .ui-button { grid-column: 1 / -1; justify-self: start; }
+@media (max-width: 600px) { .showrunner-admin .booking-document-choices { grid-template-columns: minmax(0, 1fr); } }

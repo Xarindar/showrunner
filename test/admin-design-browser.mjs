@@ -19,6 +19,7 @@ await build({
     import {Input, Field} from './components/ui/field';
     import {Card} from './components/ui/card';
     import {Table} from './components/ui/table';
+    import {ResponsiveTableFrame} from './components/ui/responsive-table';
     import {Pencil} from 'lucide-react';
     import {Badge} from './components/ui/badge';
     import {Modal} from './components/ui/modal';
@@ -47,6 +48,7 @@ await build({
     import {ServiceMediaFields} from './modules/scheduling/components/service-media-fields';
     import {SessionTypeForm} from './modules/scheduling/components/session-type-form';
     import {SessionForm} from './modules/appointments/session-form';
+    import {FormsTerms} from './modules/appointments/forms-terms';
     import './app/globals.css';
     import './app/admin/design-tokens.css';
     import './app/admin/design-system.css';
@@ -80,6 +82,10 @@ await build({
           </Modal>)}
       </section>;
     }
+    function CatalogWorkspaceFixture() {
+      const services=[['design','Design Session',120],['studio','Studio Session',90],['proof','Proof Review',60]].map(([id,name,durationMinutes])=>({id,name,durationMinutes,category:'Uncategorized',description:'',location:'',bookingPath:'',isActive:true,tags:[],pricing:'-',packageCount:1}));
+      return <div className="showrunner-admin"><div className="admin-root"><aside className="admin-sidebar">Navigation</aside><main className="admin-main"><div className="stack products-workspace"><header className="page-header"><h1>Services</h1></header><section className="admin-index-panel"><ServiceCatalogTable services={services} categoryOptions={[{label:'All categories',value:'all'},{label:'Portraits',value:'Portraits'}]} tagOptions={[{label:'All tags',value:'all'},{label:'Featured',value:'Featured'}]} initialCategory="all" initialSearch="" initialTag="all" createAction={<Button>New session</Button>} toggleServiceAction={()=>{}} /></section></div></main></div></div>;
+    }
     function WorkspaceFixture() {
       const [open,setOpen]=useState(false);
       return <div className="showrunner-admin"><div className="admin-root"><aside className="admin-sidebar">Navigation</aside><main className="admin-main" style={{minHeight:'calc(100dvh - 8px)'}}><Button onClick={()=>setOpen(true)}>Open workspace dialog</Button><ServiceWorkspaceTabs tabs={[{id:"details",label:"Session details",content:<div><p>Session panel</p><Button>Panel control</Button></div>}]} /><Modal title="Workspace modal" open={open} onClose={()=>setOpen(false)} className="module-action-modal"><Field label="Workspace field"><Input /></Field><div className="module-modal-actions"><Button onClick={()=>setOpen(false)}>Done</Button></div></Modal></main></div></div>;
@@ -97,7 +103,7 @@ await build({
     function TableStyleFixtures() {
       return <section aria-label="Table appearance fixtures" style={{display:'grid',gap:24}}>{tableFamilies.map(family=>{
         const cells=<><thead><tr><th scope="col">Name</th><th scope="col">Value</th><th scope="col">Actions</th></tr></thead><tbody>{family.key==='empty'?<tr><td colSpan={3}>No records added</td></tr>:<><tr><td>Design session</td><td>$120.00</td><td><Button variant="secondary" aria-label="Edit fixture"><Pencil size={15}/></Button></td></tr><tr data-state="selected"><td>Selected session</td><td>$200.00</td><td>Selected</td></tr></>}</tbody></>;
-        const table=family.raw?<div className={family.frame}><table className={family.table}>{cells}</table></div>:<Table className={family.frame} tableClassName={family.table}>{cells}</Table>;
+        const table=family.raw?<ResponsiveTableFrame className={family.frame}><table className={family.table}>{cells}</table></ResponsiveTableFrame>:<Table className={family.frame} tableClassName={family.table}>{cells}</Table>;
         return <section key={family.key} aria-label={'Table family '+family.key} style={{minWidth:0,maxWidth:900}}>{family.shell?<section className={'ui-data-table-shell '+family.shell}><div className="ui-data-table-header"><div className="ui-data-table-titlebar"><div><h2>Records</h2><p>2 records</p></div><Button>Add record</Button></div><div className="ui-data-table-toolbar"><Input aria-label="Filter fixture" placeholder="Search"/></div></div>{table}<footer className="ui-data-table-footer">2 records</footer></section>:table}</section>;
       })}</section>;
     }
@@ -147,6 +153,8 @@ await build({
         </section>
         <section aria-label="Session photo fixture"><ServiceMediaFields canUpload={false} /></section>
         <section className="studio-panel ui-section-card"><details><summary className="ui-section-header">Centered section heading</summary><p>Section body</p></details></section>
+        <section aria-label="Forms and terms fixture"><FormsTerms initialDocuments={[]} /></section>
+        <section aria-label="Document selection fixture"><ServiceBookingRulesTable idPrefix="documents" documents={[{id:"intake-default",name:"Portrait preparation",kind:"INTAKE",version:1,isDefault:true,rules:[{id:"style",kind:"intake",category:"Portraits",label:"Preferred style",type:"TEXT",required:true,placeholder:"",helpText:"",options:[]}]},{id:"terms-default",name:"Studio terms",kind:"TERMS",version:1,isDefault:true,rules:[{id:"terms",kind:"policy",category:"Terms",label:"Please accept studio terms.",type:"TEXT",required:true,placeholder:"",helpText:"",options:[]}]}]} /></section>
         <TableStyleFixtures />
         <ModalAuditFixtures />
         <Modal title="Shared dialog" open={open} onClose={()=>setOpen(false)}><Field label="Dialog field"><Input /></Field><div className="module-modal-actions"><Button variant="secondary" onClick={()=>setOpen(false)}>Cancel dialog</Button><Button>Confirm</Button></div></Modal>
@@ -155,12 +163,14 @@ await build({
         <section aria-label="Edit session builder fixture"><SessionTypeForm canUpload={false} rates={[]} tags={[]} initialService={{id:'saved-session',updatedAt:new Date('2026-11-07T00:00:00Z'),name:'Saved session',description:'Saved description',category:'Photography',tags:['Portraits'],isActive:true,location:'Studio',durationMinutes:90,priceCents:10000,pricingType:'FLAT_RATE',hourlyRateId:null,bufferBeforeMinutes:10,bufferAfterMinutes:20,minimumNoticeHours:48,maxAdvanceDays:90,slotIntervalMinutes:15,bookingRules:null,intakePrompt:null,policyText:null,requirePolicy:false,requestOnly:false,waitlistEnabled:false}} /></section>
       </main></NotificationProvider></div>;
     }
-    createRoot(document.getElementById('root')).render(location.pathname==='/workspace-fixture'?<WorkspaceFixture />:<Fixture />);
+    createRoot(document.getElementById('root')).render(location.pathname==='/catalog-workspace-fixture'?<CatalogWorkspaceFixture />:location.pathname==='/forms-workspace-fixture'?<div className="showrunner-admin"><div className="admin-root"><aside className="admin-sidebar">Navigation</aside><main className="admin-main"><NotificationProvider><FormsTerms initialDocuments={[]} /></NotificationProvider></main></div></div>:location.pathname==='/workspace-fixture'?<WorkspaceFixture />:<Fixture />);
   ` },
   bundle: true, outfile: `${output}.js`,
   plugins: [{ name: "schedule-actions-fixture", setup(build) {
     build.onResolve({filter:/^\.\/service-media-fields$/},()=>({path:'media-fields',namespace:'builder-media-fixture'}));
     build.onLoad({filter:/.*/,namespace:'builder-media-fixture'},()=>({contents:"export function ServiceMediaFields(){return null}",loader:'js'}));
+    build.onResolve({filter:/^\.\/forms-terms-actions$/},()=>({path:'forms-terms-actions',namespace:'documents-fixture'}));
+    build.onLoad({filter:/.*/,namespace:'documents-fixture'},()=>({contents:'export async function saveBookingDocument(input){return {document:{...input,id:input.id||crypto.randomUUID(),version:(input.version||0)+1}}}',loader:'js'}));
     build.onResolve({filter:/^next\/navigation$/},()=>({path:'navigation',namespace:'modal-router-fixture'}));
     build.onLoad({filter:/.*/,namespace:'modal-router-fixture'},()=>({contents:"export function useRouter(){return {push(path){window.location.assign(path)}}}",loader:'js'}));
     build.onResolve({filter:/^\.\.\/booking-rule-actions$/},()=>({path:'booking-rule-actions',namespace:'rule-actions-fixture'}));
@@ -194,6 +204,67 @@ try {
   });
   await page.goto("https://design.example");
   await page.getByRole("heading", { name: "Shared controls" }).waitFor();
+  const forms=page.getByRole('region',{name:'Forms and terms fixture'});
+  // Library editing and session inheritance use the same table/modal tokens at both sizes.
+  for (const width of [1440,390]) {
+    await page.setViewportSize({width,height:900});
+    await forms.getByRole('button',{name:'New form',exact:true}).click();
+    let dialog=page.getByRole('dialog');
+    const start=await dialog.boundingBox();
+    const questionPanel=dialog.locator('section.ui-table-card');
+    const questionBounds=await questionPanel.boundingBox();
+    const defaultToggleBounds=await dialog.getByRole('switch',{name:'Default for all bookings'}).locator('..').boundingBox();
+    assert(defaultToggleBounds.y>=questionBounds.y+questionBounds.height,'Default toggle follows the questions table');
+    assert(defaultToggleBounds.y-questionBounds.y-questionBounds.height<32,'Questions table uses available modal space');
+    await dialog.screenshot({path:captures+'/intake-empty-'+width+'.png'});
+    await dialog.getByLabel('Form name',{exact:true}).fill('Portrait preparation '+width);
+    await dialog.getByRole('switch',{name:'Default for all bookings'}).check();
+    await dialog.getByRole('button',{name:'Add question',exact:true}).click();
+    assert.equal(await page.getByRole('dialog').count(),1,'Question editing reuses its parent modal');
+    await dialog.getByLabel('Question',{exact:true}).fill('Preferred style');
+    await dialog.getByRole('combobox',{name:'Answer type'}).selectOption('RADIO');
+    await dialog.getByRole('textbox',{name:'Choice 1',exact:true}).fill('Candid');
+    await dialog.getByRole('button',{name:'Add choice',exact:true}).click();
+    await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Choice 2');
+    await dialog.getByRole('textbox',{name:'Choice 2',exact:true}).fill('Posed');
+    await dialog.getByRole('button',{name:'Add choice',exact:true}).click();
+    await dialog.getByRole('textbox',{name:'Choice 3',exact:true}).fill('Remove this');
+    await dialog.getByRole('button',{name:'Remove choice 3',exact:true}).click();
+    await dialog.getByRole('combobox',{name:'Answer type'}).selectOption('SELECT');
+    assert.equal(await dialog.getByRole('textbox',{name:'Choice 2',exact:true}).inputValue(),'Posed','Dropdown and single choice share the same choices');
+    await dialog.getByRole('combobox',{name:'Answer type'}).selectOption('RADIO');
+    await dialog.screenshot({path:captures+'/question-choices-'+width+'.png'});
+    await dialog.getByRole('switch',{name:'Required answer',exact:true}).check();
+    await dialog.getByRole('button',{name:'Apply question',exact:true}).click();
+    assert(Math.abs((await dialog.boundingBox()).height-start.height)<2,'Modal size remains reserved');
+    assert(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Form editor fits the modal');
+    await dialog.screenshot({path:`${captures}/intake-form-${width}.png`});
+    await dialog.getByRole('button',{name:'Save',exact:true}).click();
+    await page.getByRole('dialog').waitFor({state:'hidden'});
+    await forms.getByRole('button',{name:'New terms',exact:true}).click();
+    dialog=page.getByRole('dialog');
+    await dialog.getByLabel('Terms name',{exact:true}).fill('Studio terms '+width);
+    await dialog.getByLabel('Booking terms',{exact:true}).fill('Please review and accept our studio terms.');
+    const termsBounds=await dialog.getByLabel('Booking terms',{exact:true}).boundingBox();
+    const defaultBounds=await dialog.getByRole('switch',{name:'Default for all bookings'}).locator('..').boundingBox();
+    assert(defaultBounds.y>=termsBounds.y+termsBounds.height,'Default toggle is below the terms editor');
+    assert(defaultBounds.y-termsBounds.y-termsBounds.height<32,'Terms editor uses the reserved space instead of leaving a blank block');
+    await dialog.getByRole('switch',{name:'Default for all bookings'}).check();
+    await dialog.screenshot({path:`${captures}/forms-terms-${width}.png`});
+    await dialog.getByRole('button',{name:'Save',exact:true}).click();
+    await page.getByRole('dialog').waitFor({state:'hidden'});
+    const rows=forms.locator('tbody tr');
+    assert.equal(await rows.filter({hasText:'Default'}).count(),2,'Only one document per kind is the global default');
+  }
+  await page.setViewportSize({width:1440,height:1000});
+  const selections=page.getByRole('region',{name:'Document selection fixture'});
+  assert(await selections.getByText('Preferred style',{exact:true}).isVisible());
+  assert(await selections.getByRole('switch',{name:'Require T&C Acceptance',exact:true}).isChecked());
+  await selections.getByLabel('Intake form',{exact:true}).selectOption('none');
+  assert.equal(await selections.getByText('Preferred style',{exact:true}).count(),0);
+  await selections.getByLabel('Intake form',{exact:true}).selectOption('intake-default');
+  assert(await selections.getByText('Preferred style',{exact:true}).isVisible());
+  assert.deepEqual(await selections.locator('[name=bookingDocumentSelection]').evaluate(el=>JSON.parse(el.value)),{intake:'intake-default',terms:'default'});
   async function clearNotifications() {
     const dismiss = page.getByRole('button',{name:'Dismiss notification',exact:true});
     while (await dismiss.count()) await dismiss.last().click();
@@ -247,6 +318,10 @@ try {
   assert.deepEqual((await readOffering()).tiers, []);
   await packageList.getByRole('button', {name:'Add package', exact:true}).click();
   const newPackage = page.getByRole('dialog', {name:'New package', exact:true});
+  assert.deepEqual(await newPackage.getByRole('heading',{level:3}).allTextContents(),['Name & pricing','Session coverage','Booking settings','Services'],'Package fields have a clear sectional hierarchy');
+  assert(await newPackage.getByRole('region',{name:'Name & pricing',exact:true}).getByRole('textbox',{name:'Package 1 name',exact:true}).isVisible());
+  assert(await newPackage.getByRole('region',{name:'Session coverage',exact:true}).getByRole('group',{name:'Duration',exact:true}).isVisible());
+
   await newPackage.getByRole('combobox', {name:'Pricing type'}).selectOption('HOURLY');
   await newPackage.getByRole('combobox', {name:'Hourly rate'}).selectOption('package-rate');
   assert.equal((await readOffering()).tiers[0].price, '120.00');
@@ -301,7 +376,7 @@ try {
     assert(await newPackage.isVisible(),'Closing a duration dropdown keeps the package modal open');
   }
   await page.setViewportSize(durationViewport);
-  const controlTops = await newPackage.locator('select[aria-label="Hours"], input[type="number"]').evaluateAll(elements => elements.slice(-4).map(element => Math.round(element.getBoundingClientRect().top)));
+  const controlTops = await newPackage.getByRole('region',{name:'Session coverage',exact:true}).locator('select[aria-label="Hours"], input[type="number"]').evaluateAll(elements => elements.map(element => Math.round(element.getBoundingClientRect().top)));
   assert(new Set(controlTops).size === 1, 'Duration and deliverable counts share one desktop row');
   const servicesTable = newPackage.getByRole('region', {name:'Package services table'});
   async function assertModalInsets(modal, content) {
@@ -347,12 +422,25 @@ try {
   });
   assert(durationAlignment<1,'Duration selects align with deliverable inputs');
   const emptyPackageLayout = await packageLayout();
-  assert(emptyPackageLayout[1] > 160, 'Services table grows into the available desktop modal space');
+  assert(emptyPackageLayout[1] >= 96, 'Services table fills the remaining modal space while keeping room for its contents');
   const tableToActionsGap = await servicesTable.evaluate(table => {
     const actions = table.closest('dialog').querySelector('.ui-inline-actions');
     return actions.getBoundingClientRect().top - table.getBoundingClientRect().bottom;
   });
   assert(tableToActionsGap > 0 && tableToActionsGap < 40, 'Services table ends just above the modal actions');
+  const sectionViewport=page.viewportSize();
+  await page.setViewportSize({width:478,height:532});
+  for (const title of ['Name & pricing','Session coverage','Booking settings','Services']) {
+    const heading=newPackage.getByRole('heading',{name:title,exact:true});
+    await heading.scrollIntoViewIfNeeded();
+    assert(await heading.isVisible(),'Section '+title+' remains reachable in a short viewport');
+  }
+  assert.equal(await newPackage.evaluate(element=>element.scrollWidth>element.clientWidth),false,'Sectional editor fits a short mobile viewport');
+  const shortActions=await newPackage.getByRole('button',{name:'Done',exact:true}).boundingBox();
+  assert(shortActions.y>=0&&shortActions.y+shortActions.height<=532,'Done stays visible while sections scroll');
+  await newPackage.screenshot({path:captures+'/package-sections-short.png'});
+  await page.setViewportSize(sectionViewport);
+
   let releaseLibrary;
   libraryResponse = new Promise(resolve => { releaseLibrary = resolve; });
   const addServicesButton = newPackage.getByRole('button', {name:'Add Services', exact:true});
@@ -596,7 +684,7 @@ try {
   await bookingRules.getByRole("button", { name: "Add rule", exact: true }).click();
   await page.getByRole("button", { name: /What should we prepare/ }).click();
   assert.equal(await bookingRules.locator('input[name="intakePrompt"]').inputValue(), "What should we prepare?");
-  assert.equal(await page.locator(".booking-rule-type-cell").evaluate(element => getComputedStyle(element).display), "grid");
+  assert.equal(await bookingRules.locator(".booking-rule-type-cell").evaluate(element => getComputedStyle(element).display), "grid");
   await bookingRules.getByRole('button',{name:'Add rule',exact:true}).click();
   await page.getByRole('button',{name:/Please review these booking conditions/}).click();
   assert.equal(await bookingRules.locator('tbody tr').count(),2);
@@ -631,10 +719,11 @@ try {
   await ruleEditor.getByRole('textbox',{name:'Category',exact:true}).fill('Session preferences');
   await ruleEditor.getByRole('textbox',{name:'Question',exact:true}).fill('Preferred style');
   await ruleEditor.getByRole('combobox',{name:'Answer type',exact:true}).selectOption('RADIO');
-  await ruleEditor.getByRole('textbox',{name:/^Choices/}).fill('Candid');
+  await ruleEditor.getByRole('textbox',{name:'Choice 1',exact:true}).fill('Candid');
   await ruleEditor.getByRole('button',{name:'Apply rule',exact:true}).click();
-  await ruleEditor.getByText('Add at least two different choices.',{exact:true}).waitFor();
-  await ruleEditor.getByRole('textbox',{name:/^Choices/}).fill('Candid\nPosed');
+  await ruleEditor.getByRole('alert').filter({hasText:'Add at least two different choices.'}).waitFor();
+  await ruleEditor.getByRole('button',{name:'Add choice',exact:true}).click();
+  await ruleEditor.getByRole('textbox',{name:'Choice 2',exact:true}).fill('Posed');
   await ruleEditor.screenshot({path:`${captures}/booking-rule-configure-mobile.png`});
   await ruleEditor.getByRole('switch',{name:'Required answer',exact:true}).check();
   await ruleEditor.getByRole('button',{name:'Apply rule',exact:true}).click();
@@ -797,10 +886,6 @@ try {
     for (const key of ['base','catalog','variants','records','clients','payments','legacy','empty']) {
       await page.mouse.move(0,0);
       const family=page.getByRole('region',{name:'Table family '+key,exact:true});
-      if (key==='clients'&&width===390) {
-        assert.equal(await family.locator('.clients-table-wrap').isVisible(),false,'Clients retain their mobile card layout');
-        continue;
-      }
       const header=family.getByRole('columnheader').first();
       assert.deepEqual(await header.evaluate(element=>{const s=getComputedStyle(element);return [s.backgroundColor,s.color,s.fontSize,Math.round(element.getBoundingClientRect().height),s.textTransform];}),['rgb(247, 247, 247)','rgb(74, 74, 74)','12px',32,'none'],key+' shares the table header tokens at '+width+'px');
       const frame=family.locator('.ui-table-wrap,.catalog-table-scroll,.product-variant-table-scroll').first();
@@ -828,6 +913,10 @@ try {
     for (const name of ['Packages table','Suggested add-ons table']) {
       const table=newSession.getByRole('region',{name,exact:true});
       const header=table.getByRole('columnheader',{name:'Actions',exact:true});
+      if(await table.getAttribute('data-table-layout')==='cards') {
+        assert(await table.locator('[data-table-label]').count()>0,'Mobile rows use shared column labels');
+        continue;
+      }
       if (name==='Packages table') assert(await table.getByRole('columnheader',{name:'Duration',exact:true}).evaluate(element=>element.scrollWidth<=element.clientWidth),'Duration header fits at '+width+'px');
       assert(await header.evaluate(element=>element.scrollWidth<=element.clientWidth),'Actions header fits without clipping at '+width+'px');
       assert.equal(await header.evaluate(element=>getComputedStyle(element).whiteSpace),'nowrap');
@@ -939,6 +1028,7 @@ try {
   assert(builderCards.length===4&&builderCards.every(card=>card.card&&card.header),'Every builder card uses the shared black header');
   await builder.getByPlaceholder('Find or add tags').focus();
   const newTag=builder.getByRole('button',{name:'New Tag',exact:true});
+  await newTag.scrollIntoViewIfNeeded();
   assert(await newTag.evaluate(element=>{const b=element.getBoundingClientRect();return element.contains(document.elementFromPoint(b.x+b.width/2,b.y+b.height/2));}),'Card headers do not clip the organization tag popup');
   await newTag.click();
   await page.getByRole('dialog',{name:'New tag',exact:true}).getByRole('button',{name:'Cancel',exact:true}).click();
@@ -1013,6 +1103,66 @@ try {
     await page.screenshot({path:captures+'/workspace-modal-'+state+'.png'});
   }
   await page.keyboard.press('Escape');
+  for (const width of [1440,390]) {
+    await page.setViewportSize({width,height:844});
+    await page.goto('https://design.example/forms-workspace-fixture');
+    await page.getByRole('heading',{name:'Forms & Terms',exact:true}).waitFor();
+    const first=page.getByRole('region',{name:'Intake forms',exact:true});
+    const second=page.getByRole('region',{name:'Booking terms',exact:true});
+    const a=await first.boundingBox(),b=await second.boundingBox();
+    assert(Math.abs(a.height-b.height)<2,'Forms and terms split available height equally');
+    assert(b.y>=a.y+a.height,'Tables stay vertically stacked');
+    assert.equal(await page.getByText('Create reusable intake forms and booking terms.',{exact:false}).count(),0,'Intro caption is removed');
+    const bottom=await page.locator('.admin-main').evaluate(el=>{const r=el.getBoundingClientRect();return r.bottom-parseFloat(getComputedStyle(el).paddingBottom);});
+    assert(Math.abs(b.y+b.height-bottom)<2,'Tables fill the workspace down to its token bottom inset');
+    assert(await page.locator('.admin-main').evaluate(el=>el.scrollHeight<=el.clientHeight+1),'Empty tables do not overflow the workspace');
+    await page.screenshot({path:captures+'/forms-workspace-'+width+'.png'});
+  }
+  for (const width of [1440,950,860,768,677,640,600,517,390]) {
+    await page.setViewportSize({width,height:844});
+    await page.goto('https://design.example/catalog-workspace-fixture');
+    const panel=page.locator('.service-catalog-folder-panel');
+    const responsiveFrame=panel.locator('[data-responsive-table-frame]');
+    await panel.waitFor();
+    await page.waitForFunction(()=>{const frame=document.querySelector('.service-desktop-table');return frame.dataset.tableLayout==='table'||frame.dataset.tableLayout==='cards'});
+    const cards=await responsiveFrame.getAttribute('data-table-layout')==='cards';
+    const category=panel.getByRole('combobox',{name:'Category',exact:true});
+    const label=panel.locator('label[for="services-category-filter"]');
+    const cb=await category.boundingBox(),lb=await label.boundingBox();
+    assert(lb.x+lb.width<=cb.x,'Filter label sits left of its trigger');
+    assert(Math.abs(lb.y+lb.height/2-cb.y-cb.height/2)<2,'Label and dropdown are vertically centered');
+    assert.equal(await category.locator('.ui-select-label').count(),0,'Trigger contains only its selected value and arrow');
+    assert.equal(Math.round(cb.height),width<=860?44:30,'Dropdown uses standard modal field height');
+    await category.click();
+    const menuBounds=await panel.getByRole('listbox',{name:'Category',exact:true}).boundingBox();
+    assert(Math.abs(menuBounds.x-cb.x)<1&&Math.abs(menuBounds.width-cb.width)<1,'Menu aligns to its control without including the label');
+    await category.press('ArrowDown');
+    assert.equal(await panel.locator('input[name=category]').inputValue(),'Portraits','Keyboard selection still works');
+    await category.press('Home');
+    await category.press('Escape');
+
+    if(width===677) assert.equal(cards,false,'Tablet width retains the complete table');
+    if(width===390) assert.equal(cards,true,'Narrow widths switch to cards');
+    assert(await page.locator('.admin-main').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Catalog never overflows the workspace');
+    if(!cards) {
+      const frame=panel.getByRole('region',{name:'Sessions table',exact:true});
+      assert(await frame.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Table fits before falling back to cards');
+      const cells=frame.locator('thead th,td[data-label="Duration"] strong');
+      assert(await cells.evaluateAll(elements=>elements.every(el=>el.scrollWidth<=el.clientWidth+1)),'Headers and duration remain readable without truncation');
+      assert(await frame.getByRole('link',{name:'Edit Design Session',exact:true}).isVisible(),'Actions remain available in the table');
+    } else {
+      assert(await responsiveFrame.getByRole('table').isVisible(),'The same table renders the mobile layout');
+      assert.equal(await responsiveFrame.getByRole('link',{name:'Edit Design Session',exact:true}).count(),1,'Actions are never duplicated in a separate mobile tree');
+    }
+    if(width===677||width===390) await page.screenshot({path:captures+'/sessions-fit-'+width+'.png'});
+  }
+  await page.setViewportSize({width:1440,height:844});
+  await page.goto('https://design.example/catalog-workspace-fixture');
+  await page.locator('.service-desktop-table[data-table-layout="table"]').waitFor();
+  await page.locator('.admin-main').evaluate(el=>{el.style.width='380px';});
+  await page.locator('.service-desktop-table[data-table-layout="cards"]').waitFor();
+  await page.locator('.admin-main').evaluate(el=>{el.style.width='100%';});
+  await page.locator('.service-desktop-table[data-table-layout="table"]').waitFor();
   assert.deepEqual(errors, []);
   console.log("Passed: hero and two thumbnail rows, compact photo/header controls, centered summaries, booking rules table, eight table families, single-line package columns at four widths, shared controls, package/rate editing, compact duration pickers, and 15 modal families on desktop/mobile (title, black header, compact close circle, alignment, overflow, Escape and focus).");
 } finally { await browser.close(); }

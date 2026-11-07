@@ -4,6 +4,9 @@ model BookingRuleSet {
   site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   name      String
   nameKey   String
+  kind      String   @default("INTAKE")
+  version   Int      @default(1)
+  isDefault Boolean  @default(false)
   rules     Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -1,3 +1,4 @@
+import { bookingDocumentSelectionFormSchema } from "@/lib/scheduling/booking-documents";
 import { sessionPrice } from "@/lib/scheduling/session-input";
 import { bookingRulesFormSchema } from "@/lib/scheduling/booking-rules";
 import { sessionOfferingFormSchema } from "@/lib/scheduling/session-offering";
@@ -120,6 +121,7 @@ export const serviceFormSchema = z
     slotIntervalMinutes: z.coerce.number().int().min(1).max(24 * 60),
     intakePrompt: optionalStoredText,
     bookingRules: bookingRulesFormSchema.optional(),
+    bookingDocumentSelection: bookingDocumentSelectionFormSchema.optional(),
     policyText: optionalStoredText,
     requirePolicy: z.literal("on").optional(),
     requestOnly: z.literal("on").optional(),

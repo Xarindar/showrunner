@@ -149,7 +149,7 @@
   --select-compact-option-padding-x: var(--sd-space-4);
   --select-compact-picker-padding: var(--sd-space-2);
   --data-table-radius: var(--sd-radius-container);
-  --data-table-min-width: var(--sd-layout-table-min);
+  --data-table-min-width: 0px;
   --data-table-scroll-height: var(--sd-layout-table-scroll);
   --data-table-shell-bg: var(--color-surface);
   --data-table-shell-border: var(--sd-color-border);
@@ -157,7 +157,7 @@
   --data-table-strip-bg: var(--sd-color-surface-subtle);
   --data-table-row-hover: var(--sd-color-surface-subtle);
   --data-table-row-selected: var(--sd-color-fill-active);
-  --data-table-base-min-width: 45rem;
+  --data-table-base-min-width: 0px;
   --data-table-actions-width: var(--sd-space-80);
   --data-table-title-bg: var(--sd-color-primary);
   --data-table-title-color: var(--sd-color-on-primary);
@@ -192,6 +192,9 @@
   --data-table-header-height: var(--sd-space-32);
   --data-table-row-height: var(--sd-layout-table-row-height);
   --data-table-cell-x: var(--sd-space-12);
+  --data-table-compact-cell-x: var(--sd-space-8);
+  --data-table-mobile-columns: 2;
+  --data-table-mobile-gap: var(--sd-space-12);
   --data-table-cell-y: var(--sd-space-8);
   --admin-canvas: var(--sd-color-canvas);
   --admin-surface: var(--sd-color-surface);
