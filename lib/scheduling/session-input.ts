@@ -9,10 +9,17 @@ export const initialBusinessHoursSchema = z.object({
   end: clockTime
 }).refine(value => value.end > value.start, "Business hours must end after they start.");
 
+export const addOnQuantitiesSchema = z.record(z.string().min(1).max(100), z.number().int().min(1).max(10000)).refine(value => Object.keys(value).length <= 50, "Choose up to 50 add-ons.");
+const addOnQuantitiesInput = z.preprocess(value => {
+  if (typeof value !== "string") return value;
+  try { return JSON.parse(value); } catch { return null; }
+}, addOnQuantitiesSchema).default({});
+
 export const manualSessionSchema = z.object({
   serviceId: z.string().optional(),
   tierId: z.string().max(100).optional(),
   addOnIds: z.array(z.string().min(1).max(100)).max(50).default([]),
+  addOnQuantities: addOnQuantitiesInput,
   name: z.string().trim().min(1, "Add a session name."),
   customerName: z.string().trim().min(1, "Add the client's name."),
   customerEmail: z.email("Enter a valid client email.").transform(value => value.toLowerCase()),

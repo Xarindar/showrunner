@@ -21,6 +21,7 @@ export function SessionForm({ services, clients, staff, timezone, rates }: { ser
   const [clientId, setClientId] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [tierId, setTierId] = useState("");
+  const [addOnQuantities, setAddOnQuantities] = useState<Record<string, string>>({});
   const [addOnIds, setAddOnIds] = useState<string[]>([]);
   const [customer, setCustomer] = useState({ name: "", email: "", phone: "" });
   const [details, setDetails] = useState({ name: "", duration: "60", price: "" });
@@ -32,13 +33,20 @@ export function SessionForm({ services, clients, staff, timezone, rates }: { ser
     const service = services.find(item => item.id === id);
     setTierId(service?.sessionOffering?.tiers[0].id || "");
     setAddOnIds([]);
+    setAddOnQuantities({});
     setDetails(service ? { name: service.name, duration: String(service.durationMinutes), price: service.priceCents == null ? "" : (service.priceCents / 100).toFixed(2) } : { name: "", duration: "60", price: "" });
   }
-  function choosePackage(id: string, extras: string[]) {
-    const pack = selectSessionPackage(selected?.sessionOffering, id, extras);
+  function quantitiesFor(extras: string[], values = addOnQuantities) {
+    return Object.fromEntries(extras.filter(id => selected?.sessionOffering?.addOns.some(item => item.id === id && item.pricingType === "PER_UNIT")).map(id => [id, Number(values[id] ?? 1)]));
+  }
+  function choosePackage(id: string, extras: string[], quantities = addOnQuantities, preserveDetails = false) {
     setTierId(id);
     setAddOnIds(extras);
-    if (pack && selected) setDetails({ name: selected.name, duration: String(pack.durationMinutes), price: pack.priceCents == null ? "" : (pack.priceCents / 100).toFixed(2) });
+    const counts = quantitiesFor(extras, quantities);
+    if (Object.values(counts).some(value => !Number.isInteger(value) || value < 1 || value > 10000)) return;
+    const duration = Number(details.duration);
+    const pack = selectSessionPackage(selected?.sessionOffering, id, extras, preserveDetails && Number.isInteger(duration) && duration >= 1 && duration <= 1440 ? duration : undefined, counts);
+    if (pack && selected) setDetails(current => ({ ...(preserveDetails ? current : { name: selected.name, duration: String(pack.durationMinutes) }), price: pack.priceCents == null ? "" : (pack.priceCents / 100).toFixed(2) }));
   }
   const selectedTier = selected?.sessionOffering?.tiers.find(tier => tier.id === tierId);
   const suggestedAddOns = selected?.sessionOffering ? suggestedSessionAddOns(selected.sessionOffering, tierId) : [];
@@ -46,7 +54,7 @@ export function SessionForm({ services, clients, staff, timezone, rates }: { ser
     ? selectedTier.pricingType === "HOURLY" && rates.find(rate => rate.id === selectedTier.hourlyRateId)
     : selected?.pricingType === "HOURLY" && selected.hourlyRate;
   let extrasCents = 0;
-  try { extrasCents = selected?.sessionOffering?.addOns.filter(item => addOnIds.includes(item.id)).reduce((total, item) => total + sessionAddOnPriceCents(item, Number(details.duration) || selectedTier?.durationMinutes || 60), 0) ?? 0; } catch { /* Duration validation is handled by the form. */ }
+  try { extrasCents = selected?.sessionOffering?.addOns.filter(item => addOnIds.includes(item.id)).reduce((total, item) => total + sessionAddOnPriceCents(item, Number(details.duration) || selectedTier?.durationMinutes || 60, item.pricingType === "PER_UNIT" ? Number(addOnQuantities[item.id] ?? 1) : 1), 0) ?? 0; } catch { /* Duration validation is handled by the form. */ }
   let calculatedPrice = "";
   if (hourly && details.duration) {
     try { calculatedPrice = ((hourlyPriceCents(hourly.amountCents, Number(details.duration)) + extrasCents) / 100).toFixed(2); }
@@ -55,6 +63,7 @@ export function SessionForm({ services, clients, staff, timezone, rates }: { ser
   return <div className={styles.page}>
     <header className={`page-header ${styles.header}`}><h1>New session</h1><ButtonLink href="/admin/modules/appointments" variant="ghost">Cancel</ButtonLink></header>
     <form action={action} className={styles.form} onReset={event => event.preventDefault()}>
+      <input type="hidden" name="addOnQuantities" value={JSON.stringify(quantitiesFor(addOnIds))} />
       <fieldset><legend>Client</legend>
         {clients.length > 0 && <label>Existing client<select value={clientId} onChange={event => { setClientId(event.target.value); const client = clients.find(item => item.id === event.target.value); setCustomer(client ? { name: client.name, email: client.email, phone: client.phone || "" } : { name: "", email: "", phone: "" }); }}><option value="">New client</option>{clients.map(client => <option key={client.id} value={client.id}>{client.name} · {client.email}</option>)}</select></label>}
         <label>Name<input autoComplete="name" name="customerName" required value={customer.name} onChange={event => setCustomer({ ...customer, name: event.target.value })} /></label>
@@ -65,7 +74,15 @@ export function SessionForm({ services, clients, staff, timezone, rates }: { ser
         {selected?.sessionOffering && <>
           <label>Package<select name="tierId" required value={tierId} onChange={event => choosePackage(event.target.value, [])}>{selected.sessionOffering.tiers.map(tier => <option key={tier.id} value={tier.id}>{tier.name}</option>)}</select></label>
           {selectedTier && <p className={styles.hint}>{selected.sessionOffering.coverageItems.filter(item => selectedTier.coverageIds.includes(item.id)).map(item => item.name).join(" · ")}</p>}
-          {suggestedAddOns.length > 0 && <fieldset><legend>Suggested Add-Ons</legend><div className={styles.days}>{suggestedAddOns.map(item => <label key={item.id}><input type="checkbox" name="addOnIds" value={item.id} checked={addOnIds.includes(item.id)} onChange={event => choosePackage(tierId, event.target.checked ? [...addOnIds, item.id] : addOnIds.filter(id => id !== item.id))} />{item.name}{<> (+{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(item.priceCents / 100)}{item.pricingType === "HOURLY" ? " / hour" : ""})</>}</label>)}</div></fieldset>}
+          {suggestedAddOns.length > 0 && <fieldset><legend>Suggested Add-Ons</legend><div className={styles.addOns}>{suggestedAddOns.map(item => <div key={item.id} className={styles.addOn}>
+            <label><input type="checkbox" name="addOnIds" value={item.id} checked={addOnIds.includes(item.id)} onChange={event => choosePackage(tierId, event.target.checked ? [...addOnIds, item.id] : addOnIds.filter(id => id !== item.id))} />{item.name} (+{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(item.priceCents / 100)}{item.pricingType === "HOURLY" ? " / hour" : item.pricingType === "PER_UNIT" ? " / unit" : ""})</label>
+            {item.pricingType === "PER_UNIT" && addOnIds.includes(item.id) && <label>Quantity<input aria-label={`${item.name} quantity`} type="number" min="1" max="10000" step="1" required value={addOnQuantities[item.id] ?? "1"} onChange={event => {
+              const next = { ...addOnQuantities, [item.id]: event.target.value };
+              setAddOnQuantities(next);
+              if (event.target.validity.valid && event.target.value) choosePackage(tierId, addOnIds, next, true);
+            }} /></label>}
+          </div>)}</div></fieldset>}
+
         </>}
         <label>Session name<input name="name" required placeholder="Family photos" value={details.name} onChange={event => setDetails({ ...details, name: event.target.value })} /></label>
         <div className={styles.row}><label>Date<input type="date" name="date" defaultValue={state.date || ""} required /></label><label>Time <small>({timezone})</small><TimeInput name="time" defaultValue={state.time || ""} required /></label></div>

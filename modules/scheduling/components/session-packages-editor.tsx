@@ -266,7 +266,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
         <table className="catalog-product-table"><thead><tr><th scope="col">Service</th><th scope="col">Add-on price</th><th scope="col">Actions</th></tr></thead><tbody>
           {draft.addOns.map((item, index) => <tr key={item.id}>
             <td>{item.name || `Add-on ${index + 1}`}</td>
-            <td>{item.pricingType === "HOURLY" ? `${((rates.find(rate => rate.id === item.hourlyRateId)?.amountCents ?? 0) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} / hour` : Number(item.price).toLocaleString("en-US", { style: "currency", currency: "USD" })}</td>
+            <td>{item.pricingType === "HOURLY" ? `${((rates.find(rate => rate.id === item.hourlyRateId)?.amountCents ?? 0) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} / hour` : Number(item.price).toLocaleString("en-US", { style: "currency", currency: "USD" })}{item.pricingType === "PER_UNIT" ? " / unit" : ""}</td>
             <td><Button type="button" variant="ghost" size="sm" aria-label={`Remove add-on ${item.name || index + 1}`} onClick={() => setRemoval({ kind: "extra", id: item.id, name: item.name || `Add-on ${index + 1}` })}><X aria-hidden="true" size={16} /></Button></td>
           </tr>)}
         </tbody></table>

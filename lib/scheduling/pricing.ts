@@ -3,6 +3,8 @@ import { formatMoney } from "../format";
 import { sessionPrice } from "./session-input";
 
 export const pricingTypeSchema = z.enum(["FLAT_RATE", "HOURLY"]);
+export const addOnPricingTypeSchema = z.enum(["FLAT_RATE", "HOURLY", "PER_UNIT"]);
+export type AddOnPricingType = z.infer<typeof addOnPricingTypeSchema>;
 export type PricingType = z.infer<typeof pricingTypeSchema>;
 export type HourlyRate = { id: string; name: string; amountCents: number };
 export const hourlyRateInputSchema = z.object({

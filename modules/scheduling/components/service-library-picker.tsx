@@ -10,7 +10,7 @@ import { isServiceAddOn, serviceLibraryInputSchema, type ServiceLibraryItem, typ
 import type { SessionOffering } from "@/lib/scheduling/session-offering";
 import { saveServiceLibraryItemAction } from "../service-library-actions";
 import styles from "./service-library-picker.module.css";
-import type { HourlyRate, PricingType } from "@/lib/scheduling/pricing";
+import type { HourlyRate, AddOnPricingType } from "@/lib/scheduling/pricing";
 import { ServicePricingFields } from "./service-pricing-fields";
 import { useNotify } from "@/components/ui/notifications";
 
@@ -30,7 +30,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
   const id = useId();
   const notify = useNotify();
   const [view, setView] = useState<"library" | "edit">(editingItem ? "edit" : "library");
-  const [form, setForm] = useState({ id: editingItem?.libraryItemId, name: editingItem?.name || "", description: editingItem?.description || "", category: editingItem?.category || "", tags: editingItem?.tags?.join(", ") || "", pricingType: (editingItem?.pricingType ?? "FLAT_RATE") as PricingType, hourlyRateId: editingItem?.hourlyRateId ?? "", price: editingItem?.priceCents == null ? "" : (editingItem.priceCents / 100).toFixed(2) });
+  const [form, setForm] = useState({ id: editingItem?.libraryItemId, name: editingItem?.name || "", description: editingItem?.description || "", category: editingItem?.category || "", tags: editingItem?.tags?.join(", ") || "", pricingType: (editingItem?.pricingType ?? "FLAT_RATE") as AddOnPricingType, hourlyRateId: editingItem?.hourlyRateId ?? "", price: editingItem?.priceCents == null ? "" : (editingItem.priceCents / 100).toFixed(2) });
   const [availableAsAddOn, setAvailableAsAddOn] = useState(isServiceAddOn(editingItem ?? {}));
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
@@ -143,7 +143,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
               <span className={styles.serviceCopy}><strong>{item.name}</strong><span className={styles.description}>{item.description || "No description yet"}</span>
                 {(item.category || item.tags.length > 0) && <span className={styles.metadata}>{[item.category, ...item.tags.map(value => `#${value}`)].filter(Boolean).join(" · ")}</span>}
               </span>
-              {added ? <span className={styles.hint}>Added</span> : unavailable ? <span className={styles.hint}>Included only</span> : optional && <span className={styles.hint}>{item.pricingType === "HOURLY" ? `${rates.find(rate => rate.id === item.hourlyRateId)?.name || "Hourly rate"} / hour` : (item.priceCents! / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}</span>}
+              {added ? <span className={styles.hint}>Added</span> : unavailable ? <span className={styles.hint}>Included only</span> : optional && <span className={styles.hint}>{item.pricingType === "HOURLY" ? `${rates.find(rate => rate.id === item.hourlyRateId)?.name || "Hourly rate"} / hour` : (item.priceCents! / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}{item.pricingType === "PER_UNIT" ? " / unit" : ""}</span>}
             </label>;
           })}
           {results.pageCount > 1 && <div className={styles.pagination}>
@@ -165,8 +165,8 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
         <Field label="Description" hint="Describe what the client receives. Avoid private or internal notes."><Textarea id={`${id}-description`} value={form.description} maxLength={2000} rows={4} disabled={saving} onChange={event => setForm({ ...form, description: event.target.value })} /></Field>
         <Switch label="Available as an add-on" description="Charge only when added separately. Including this service in a package doesn't change its price." variant="inline" checked={availableAsAddOn} disabled={saving} onChange={event => setAvailableAsAddOn(event.target.checked)} />
         {availableAsAddOn && <div className={styles.addOnPricing}>
-          <ServicePricingFields pricingType={form.pricingType} hourlyRateId={form.hourlyRateId} rates={rates} onRateSaved={onRateSaved} onChange={(pricingType, hourlyRateId) => setForm({ ...form, pricingType, hourlyRateId })}
-            priceField={<Field label="Add-on price (USD)"><Input id={`${id}-price`} required type="number" min="0" max="9999999.99" step="0.01" inputMode="decimal" value={form.price} disabled={saving} onChange={event => setForm({ ...form, price: event.target.value })} /></Field>} />
+          <ServicePricingFields allowPerUnit pricingType={form.pricingType} hourlyRateId={form.hourlyRateId} rates={rates} onRateSaved={onRateSaved} onChange={(pricingType, hourlyRateId) => setForm({ ...form, pricingType, hourlyRateId })}
+            priceField={<Field label={form.pricingType === "PER_UNIT" ? "Price per unit (USD)" : "Add-on price (USD)"}><Input id={`${id}-price`} required type="number" min="0" max="9999999.99" step="0.01" inputMode="decimal" value={form.price} disabled={saving} onChange={event => setForm({ ...form, price: event.target.value })} /></Field>} />
         </div>}
         <Field label="Category" hint="For example, Weddings or Portraits."><Input id={`${id}-category`} value={form.category} maxLength={120} disabled={saving} onChange={event => setForm({ ...form, category: event.target.value })} /></Field>
         <Field label="Tags" hint="Separate tags with commas."><Input id={`${id}-tags`} value={form.tags} maxLength={1500} disabled={saving} onChange={event => setForm({ ...form, tags: event.target.value })} /></Field>

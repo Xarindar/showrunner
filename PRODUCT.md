@@ -94,3 +94,5 @@ Tags appears directly below Active in Session details; there is no separate Orga
 Client-facing bookings always require name, email and phone in the shared contact step and public booking API, regardless of session rules or saved sets. Contact labels and requirements do not vary by session. Legacy records and manual admin bookings retain their existing optional-phone contract.
 
 Session configuration shows its details, package tiers and intake/booking settings. Bundles containing that session are managed in Session Bundles, not repeated as a reverse-association section or navigation item in the session editor. Removing that editor section does not delete bundles or their session memberships.
+
+Add-on pricing supports Flat rate, Hourly and Per unit. Per-unit add-ons store a unit cost (for example, Extra photos at $3 per unit); manual bookings accept a positive whole-number quantity and snapshot quantity, unit cost and line total. Included services still do not change package prices, and already-booked snapshots retain their agreed amounts. Public checkout presentation of Suggested Add-Ons remains separate work.

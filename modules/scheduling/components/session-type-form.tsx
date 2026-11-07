@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Notification } from "@/components/ui/notifications";
 import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
 import { nonEmptyStringArrayFromUnknown } from "@/lib/format";
-import type { HourlyRate } from "@/lib/scheduling/pricing";
+import { pricingTypeSchema, type HourlyRate } from "@/lib/scheduling/pricing";
 import type { BookingRule } from "@/lib/scheduling/booking-rules";
 import type { SessionOffering } from "@/lib/scheduling/session-offering";
 import { createServiceAction, updateSessionTypeAction } from "../actions";
@@ -57,7 +57,7 @@ export function SessionTypeForm({ canUpload, rates, tags, categoryOptions = [], 
             <ServiceTagsField tags={tags} initialTags={nonEmptyStringArrayFromUnknown(initialService?.tags)} />
           </div>
         </section>
-        <SessionPackagesEditor initialRates={rates} isNew={!initialService} initialOffering={initialOffering} durationMinutes={initialService?.durationMinutes} priceCents={initialService?.priceCents} initialPricingType={initialService?.pricingType} initialHourlyRateId={initialService?.hourlyRateId ?? ""} initialScheduling={initialService} />
+        <SessionPackagesEditor initialRates={rates} isNew={!initialService} initialOffering={initialOffering} durationMinutes={initialService?.durationMinutes} priceCents={initialService?.priceCents} initialPricingType={pricingTypeSchema.parse(initialService?.pricingType ?? "FLAT_RATE")} initialHourlyRateId={initialService?.hourlyRateId ?? ""} initialScheduling={initialService} />
         <ServiceBookingRulesTable idPrefix={initialService ? "service" : "new-session"} availableRules={availableRules} intakeOptions={intakeOptions} policyOptions={policyOptions}
           defaultRules={initialService?.bookingRules} defaultIntakePrompt={initialService?.intakePrompt} defaultPolicyText={initialService?.policyText} defaultRequirePolicy={initialService?.requirePolicy} defaultRequestOnly={initialService?.requestOnly} defaultWaitlistEnabled={initialService?.waitlistEnabled} />
       </main>

@@ -141,3 +141,12 @@ test("additive session migration preserves existing links and unknown historical
     assert.equal((await db.query<RecordData>('SELECT * FROM "Booking"')).rows[0].isManual, false);
   } finally { await db.close(); }
 });
+
+test("manual sessions snapshot per-unit add-on quantities and unit prices", async () => {
+  const offering = { coverageItems: [], tiers: [{ id: "standard", name: "Standard", durationMinutes: 60, priceCents: 10000, coverageIds: [] }], addOns: [{ id: "photos", name: "Extra photos", pricingType: "PER_UNIT", priceCents: 300 }] };
+  const booking = await harness({ offering }).api.createManualSession({ ...input, serviceId: "type", tierId: "standard", priceCents: 13000, addOnIds: ["photos"], addOnQuantities: { photos: 10 } });
+  assert.equal(booking.packageSnapshot.priceCents, 13000);
+  assert.equal(booking.packageSnapshot.extras[0].quantity, 10);
+  assert.equal(booking.packageSnapshot.extras[0].unitPriceCents, 300);
+  await assert.rejects(harness({ offering }).api.createManualSession({ ...input, serviceId: "type", tierId: "standard", addOnIds: ["photos"], addOnQuantities: { photos: 0 } }));
+});

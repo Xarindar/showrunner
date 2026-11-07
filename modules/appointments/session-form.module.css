@@ -37,3 +37,8 @@
   .row { grid-template-columns: minmax(0, 1fr); }
   .footer button { width: 100%; min-height: 48px; }
 }
+
+.addOns { display: grid; gap: var(--sd-space-12); }
+.addOn { display: grid; grid-template-columns: minmax(0, 1fr) minmax(80px, 120px); align-items: center; gap: var(--sd-space-12); }
+.addOn > label:first-child { display: flex; align-items: center; gap: var(--sd-space-8); }
+.addOn input[type="checkbox"] { width: 20px; min-height: 20px; margin: 0; flex-shrink: 0; }

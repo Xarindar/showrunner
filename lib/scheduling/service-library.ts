@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { sessionOfferingSchema, type SessionOffering } from "./session-offering";
-import { pricingTypeSchema } from "./pricing";
+import { addOnPricingTypeSchema } from "./pricing";
 import { sessionPrice } from "./session-input";
 
 export const serviceLibraryItemSchema = z.object({
@@ -9,7 +9,7 @@ export const serviceLibraryItemSchema = z.object({
   description: z.string().trim().max(2000),
   category: z.string().trim().max(120),
   tags: z.array(z.string().trim().min(1).max(60)).max(20),
-  pricingType: pricingTypeSchema.default("FLAT_RATE"),
+  pricingType: addOnPricingTypeSchema.default("FLAT_RATE"),
   priceCents: z.number().int().min(0).max(999999999).nullable().default(null),
   hourlyRateId: z.string().min(1).max(100).nullable().default(null)
 });
@@ -29,10 +29,10 @@ export const serviceLibraryInputSchema = z.preprocess(input => {
 }).superRefine((value, ctx) => {
   if (value.availableAsAddOn === false) return;
   if (value.pricingType === "HOURLY" && !value.hourlyRateId) ctx.addIssue({ code: "custom", message: "Choose an hourly rate.", path: ["hourlyRateId"] });
-  if (value.availableAsAddOn === true && value.pricingType === "FLAT_RATE" && value.price === null) ctx.addIssue({ code: "custom", message: "Enter an add-on price, or turn off Available as an add-on.", path: ["price"] });
+  if (value.availableAsAddOn === true && value.pricingType !== "HOURLY" && value.price === null) ctx.addIssue({ code: "custom", message: "Enter an add-on price, or turn off Available as an add-on.", path: ["price"] });
 }).transform(({ price, hourlyRateId, availableAsAddOn, ...value }) => availableAsAddOn === false
   ? { ...value, pricingType: "FLAT_RATE" as const, priceCents: null, hourlyRateId: null }
-  : { ...value, priceCents: value.pricingType === "FLAT_RATE" ? price : null, hourlyRateId: value.pricingType === "HOURLY" ? hourlyRateId : null }));
+  : { ...value, priceCents: value.pricingType !== "HOURLY" ? price : null, hourlyRateId: value.pricingType === "HOURLY" ? hourlyRateId : null }));
 
 export function isServiceAddOn(item: { pricingType?: string; priceCents?: number | null; hourlyRateId?: string | null }) {
   return item.pricingType === "HOURLY" ? Boolean(item.hourlyRateId) : item.priceCents != null;

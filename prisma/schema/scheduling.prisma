@@ -3,6 +3,7 @@
 enum ServicePricingType {
   FLAT_RATE
   HOURLY
+  PER_UNIT
 }
 
 model HourlyRate {
