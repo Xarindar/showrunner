@@ -32,7 +32,7 @@ export function ServicePicker({ value, options, onChange, title = "Pick service"
         <label><span className="ui-sr-only">Tag</span><select aria-label="Tag" value={tag} onChange={event => setTag(event.target.value)}><option value="">All tags</option>{tags.map(item => <option key={item.name} value={item.name}>{item.name} ({item.count})</option>)}</select></label>
       </div>
       <span className={styles.count} role="status">{matches.length} {matches.length === 1 ? "service" : "services"}</span>
-      <div className={styles.results}>
+      <div className={`ui-dialog-scroll ${styles.results}`}>
         {matches.map(option => { const framing = readImageFraming(option.imageFraming); return <button key={option.id} type="button" className={styles.result} aria-pressed={value === option.id} onClick={() => { onChange(option.id); setOpen(false); }}>
           <span className={styles.photo}>{option.imageUrl ? <NextImage src={option.imageUrl} alt="" width={88} height={88} style={{ objectPosition: `${framing.imagePositionX}% ${framing.imagePositionY}%`, transformOrigin: `${framing.imagePositionX}% ${framing.imagePositionY}%`, transform: `scale(${framing.imageZoom})` }} unoptimized /> : <ImageIcon aria-hidden="true" size={24} />}</span>
           <span className={styles.copy}><strong>{option.label}</strong>{(option.group || option.category) && <span>{option.group || option.category}</span>}{option.description && <span>{option.description}</span>}</span>

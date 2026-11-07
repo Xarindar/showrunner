@@ -63,7 +63,7 @@ export function FormsTerms({initialDocuments}:{initialDocuments:BookingDocument[
     </div>
     <Modal open={Boolean(draft)} title={question?question.rule.kind==="policy"?"Edit booking terms":"Configure question":draft?.kind==="TERMS"?draft.id?"Edit booking terms":"New booking terms":draft?.id?"Edit intake form":"New intake form"} onClose={()=>{if(!pending){setDraft(null);setQuestion(null);}}} className={styles.modal} bodyClassName={styles.body}>
       {draft&&<>
-        <div className={styles.content}>
+        <div className={`ui-dialog-scroll ${styles.content}`}>
         {question?<>
           <Field label={question.rule.kind==="policy"?"Booking terms":"Question"}><Textarea value={question.rule.label} maxLength={question.rule.kind==="policy"?20000:2000} onChange={event=>setQuestion({...question,rule:{...question.rule,label:event.target.value}})}/></Field>
           {question.rule.kind==="intake"&&<>

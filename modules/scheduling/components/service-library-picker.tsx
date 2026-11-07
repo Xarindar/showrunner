@@ -116,7 +116,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
         <Field label="Category"><Select value={category} onChange={event => changeFilter(setCategory, event.target.value)}><option value="">All categories</option>{results.categories.map(value => <option key={value}>{value}</option>)}</Select></Field>
         <Field label="Tag"><Select value={tag} onChange={event => changeFilter(setTag, event.target.value)}><option value="">All tags</option>{results.tags.map(value => <option key={value}>{value}</option>)}</Select></Field>
       </div>
-      <div className={styles.results} aria-busy={loading} aria-label="Library services">
+      <div className={`ui-dialog-scroll ${styles.results}`} aria-busy={loading} aria-label="Library services">
         {packageServices && selectedItems.length > 0 && <fieldset className={styles.sessionServices}>
             <legend>Services in this session</legend>
             {selectedItems.map(item => (
@@ -158,7 +158,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
         <Button type="button" disabled={!packageServices && !picked.length} onClick={applySelection}>{packageServices ? "Apply to package" : `Add ${picked.length || "selected"} ${picked.length === 1 ? "service" : "services"}`}</Button>
       </div></footer>
     </> : <>
-      <div className={styles.editBody} onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) { event.preventDefault(); if (!saving) void save(); } }}>
+      <div className={`ui-dialog-scroll ${styles.editBody}`} onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) { event.preventDefault(); if (!saving) void save(); } }}>
         {!editingItem && <Button type="button" variant="ghost" className={styles.back} disabled={saving} onClick={() => { setError(""); setView("library"); }}><ArrowLeft size={16} />Service library</Button>}
         <p className={styles.hint}>Save a reusable service. Its description can be used in client-facing session and package details.</p>
         <Field label="Service name"><Input id={`${id}-name`} value={form.name} required maxLength={120} disabled={saving} onChange={event => setForm({ ...form, name: event.target.value })} /></Field>

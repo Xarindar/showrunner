@@ -163,7 +163,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
         const durationLabelId = `${listId}-duration-${tier.id}`;
         const content = (
           <div className={styles.tierBody}>
-          <div className={styles.tierFields}>
+          <div className={`ui-dialog-scroll ${styles.tierFields}`}>
           <section className={styles.packageSection} aria-labelledby={`${listId}-basics-${tier.id}`}>
           <h3 className="ui-zero" id={`${listId}-basics-${tier.id}`}>Name &amp; pricing</h3>
           <Field label="Package name"><Input id={`${listId}-${tier.id}`} aria-label={`Package ${index + 1} name`} value={tier.name} autoFocus required maxLength={120} onChange={event => updateTier(tier.id, { name: event.target.value })} /></Field>

@@ -80,7 +80,7 @@ export function AssetUploadPanel({ canUpload, allowVideo = false, defaultFolder 
     onDragOver={event => { if (canUpload && !busy && event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } }}
     onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
     onDrop={event => { event.preventDefault(); setDragging(false); if (canUpload && !busy) addFiles(event.dataTransfer.files); }}>
-    <div className={styles.scroll}>
+    <div className={`ui-dialog-scroll ${styles.scroll}`}>
       {!showMetadata && defaultFolder && <input form="" type="hidden" name="folder" value={defaultFolder} />}
       <input ref={fileInput} form="" type="file" className="ui-sr-only" aria-label={allowVideo ? "Choose images or videos to upload" : "Choose images to upload"} accept={allowVideo ? "image/*,video/mp4,video/webm,video/quicktime" : "image/*"} disabled={!canUpload || busy} multiple onChange={event => { addFiles(event.currentTarget.files); event.currentTarget.value = ""; }} />
       <div className={styles.toolbar}>
