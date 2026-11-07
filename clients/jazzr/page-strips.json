@@ -1,0 +1,1987 @@
+[
+  {
+    "id": "home-reviews",
+    "type": "strip",
+    "label": "Client reviews",
+    "pageIds": [
+      "home"
+    ],
+    "editableFields": [
+      "texts"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "You're so talented! I love these!"
+        },
+        {
+          "id": "text-2",
+          "text": "RHIANNA MARTINEZ"
+        },
+        {
+          "id": "text-3",
+          "text": "I love working with you, I'm always amazed by the results. You actually get me smiling too!"
+        },
+        {
+          "id": "text-4",
+          "text": "ROWEN SCARLETT"
+        },
+        {
+          "id": "text-5",
+          "text": "I enjoy working with you, keep me in mind for any future session ideas you may have"
+        },
+        {
+          "id": "text-6",
+          "text": "JESSICA THORN"
+        }
+      ],
+      "images": [],
+      "links": []
+    },
+    "presentation": {
+      "selector": "#reviews",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "#reviews > div:nth-child(1) > figure:nth-child(1) > blockquote:nth-child(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#reviews > div:nth-child(1) > figure:nth-child(1) > figcaption:nth-child(2)"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "#reviews > div:nth-child(1) > figure:nth-child(2) > blockquote:nth-child(1)"
+        },
+        {
+          "path": "texts.3.text",
+          "selector": "#reviews > div:nth-child(1) > figure:nth-child(2) > figcaption:nth-child(2)"
+        },
+        {
+          "path": "texts.4.text",
+          "selector": "#reviews > div:nth-child(1) > figure:nth-child(3) > blockquote:nth-child(1)"
+        },
+        {
+          "path": "texts.5.text",
+          "selector": "#reviews > div:nth-child(1) > figure:nth-child(3) > figcaption:nth-child(2)"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Client reviews",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Review"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Text"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Review"
+          },
+          {
+            "path": "texts.3.text",
+            "label": "Text"
+          },
+          {
+            "path": "texts.4.text",
+            "label": "Review"
+          },
+          {
+            "path": "texts.5.text",
+            "label": "Text"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "home-service-areas",
+    "type": "strip",
+    "label": "Service areas",
+    "pageIds": [
+      "home"
+    ],
+    "editableFields": [
+      "texts"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Jazzr Photography proudly serves"
+        },
+        {
+          "id": "text-2",
+          "text": "NW ARKANSAS"
+        },
+        {
+          "id": "text-3",
+          "text": "SE MISSOURI"
+        }
+      ],
+      "images": [],
+      "links": []
+    },
+    "presentation": {
+      "selector": "#service-areas",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": "#service-areas > div:nth-child(1) > p:nth-child(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": "#service-areas > div:nth-child(1) > div:nth-child(2) > article:nth-child(1) > p:nth-child(2)"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": "#service-areas > div:nth-child(1) > div:nth-child(2) > article:nth-child(2) > p:nth-child(2)"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Service areas",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Text"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Text"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Text"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "home-navigation",
+    "type": "strip",
+    "label": "Navigation",
+    "pageIds": [
+      "home"
+    ],
+    "editableFields": [
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [],
+      "images": [],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Jazzr Photography",
+          "href": "/"
+        },
+        {
+          "id": "link-2",
+          "label": "Portfolio",
+          "href": "/portfolio"
+        },
+        {
+          "id": "link-3",
+          "label": "Packages",
+          "href": "/sessions"
+        },
+        {
+          "id": "link-4",
+          "label": "About",
+          "href": "/about"
+        },
+        {
+          "id": "link-5",
+          "label": "Book a Session",
+          "href": "/booking.html"
+        },
+        {
+          "id": "link-6",
+          "label": "Portfolio",
+          "href": "/portfolio"
+        },
+        {
+          "id": "link-7",
+          "label": "Packages",
+          "href": "/sessions"
+        },
+        {
+          "id": "link-8",
+          "label": "About",
+          "href": "/about"
+        },
+        {
+          "id": "link-9",
+          "label": "Book a Session",
+          "href": "/booking.html"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".site-header",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "links.0.label",
+          "selector": ".site-header > a:nth-child(2)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".site-header > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.1.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)"
+        },
+        {
+          "path": "links.1.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.2.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)"
+        },
+        {
+          "path": "links.2.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.3.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)"
+        },
+        {
+          "path": "links.3.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.4.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)"
+        },
+        {
+          "path": "links.4.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.5.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)"
+        },
+        {
+          "path": "links.5.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.6.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)"
+        },
+        {
+          "path": "links.6.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.7.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)"
+        },
+        {
+          "path": "links.7.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.8.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)"
+        },
+        {
+          "path": "links.8.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Navigation",
+        "fields": [
+          {
+            "path": "links.0",
+            "label": "Jazzr Photography"
+          },
+          {
+            "path": "links.1",
+            "label": "Portfolio"
+          },
+          {
+            "path": "links.2",
+            "label": "Packages"
+          },
+          {
+            "path": "links.3",
+            "label": "About"
+          },
+          {
+            "path": "links.4",
+            "label": "Book a Session"
+          },
+          {
+            "path": "links.5",
+            "label": "Portfolio"
+          },
+          {
+            "path": "links.6",
+            "label": "Packages"
+          },
+          {
+            "path": "links.7",
+            "label": "About"
+          },
+          {
+            "path": "links.8",
+            "label": "Book a Session"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "site-footer",
+    "type": "strip",
+    "label": "Footer",
+    "pageIds": [
+      "home",
+      "portfolio",
+      "about",
+      "contact",
+      "booking"
+    ],
+    "editableFields": [
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [],
+      "images": [],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Jazzr Photography",
+          "href": "/"
+        },
+        {
+          "id": "link-2",
+          "label": "jazzrphotography@gmail.com",
+          "href": "mailto:jazzrphotography@gmail.com"
+        },
+        {
+          "id": "link-3",
+          "label": "(573) 718-2148",
+          "href": "tel:+15737182148"
+        },
+        {
+          "id": "link-4",
+          "label": "@jazzrphotography",
+          "href": "https://www.instagram.com/jazzrphotography/"
+        },
+        {
+          "id": "link-5",
+          "label": "Messenger",
+          "href": "https://m.me/JazzrPhotography"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".site-footer",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "links.0.label",
+          "selector": ".site-footer > a:nth-child(1)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".site-footer > a:nth-child(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.1.label",
+          "selector": ".site-footer > address:nth-child(2) > a:nth-child(1)"
+        },
+        {
+          "path": "links.1.href",
+          "selector": ".site-footer > address:nth-child(2) > a:nth-child(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.2.label",
+          "selector": ".site-footer > address:nth-child(2) > a:nth-child(2)"
+        },
+        {
+          "path": "links.2.href",
+          "selector": ".site-footer > address:nth-child(2) > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.3.label",
+          "selector": ".site-footer > address:nth-child(2) > a:nth-child(3)"
+        },
+        {
+          "path": "links.3.href",
+          "selector": ".site-footer > address:nth-child(2) > a:nth-child(3)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.4.label",
+          "selector": ".site-footer > address:nth-child(2) > a:nth-child(4)"
+        },
+        {
+          "path": "links.4.href",
+          "selector": ".site-footer > address:nth-child(2) > a:nth-child(4)",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Footer",
+        "fields": [
+          {
+            "path": "links.0",
+            "label": "Jazzr Photography"
+          },
+          {
+            "path": "links.1",
+            "label": "jazzrphotography@gmail.com"
+          },
+          {
+            "path": "links.2",
+            "label": "(573) 718-2148"
+          },
+          {
+            "path": "links.3",
+            "label": "@jazzrphotography"
+          },
+          {
+            "path": "links.4",
+            "label": "Messenger"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "portfolio-intro",
+    "type": "strip",
+    "label": "Portfolio introduction",
+    "pageIds": [
+      "portfolio"
+    ],
+    "editableFields": [
+      "texts",
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Behind\nthe lens."
+        },
+        {
+          "id": "text-2",
+          "text": "A collection of stories,\nseen through my lens."
+        }
+      ],
+      "images": [],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Let’s create yours",
+          "href": "/booking.html"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".portfolio-directory__intro",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": ".portfolio-directory__intro > h1:nth-child(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": ".portfolio-directory__intro > p:nth-child(2)"
+        },
+        {
+          "path": "links.0.label",
+          "selector": ".portfolio-directory__intro > a:nth-child(3)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".portfolio-directory__intro > a:nth-child(3)",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Portfolio introduction",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Heading"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Text"
+          },
+          {
+            "path": "links.0",
+            "label": "Let’s create yours"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "portfolio-navigation",
+    "type": "strip",
+    "label": "Navigation",
+    "pageIds": [
+      "portfolio"
+    ],
+    "editableFields": [
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [],
+      "images": [],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Jazzr Photography",
+          "href": "/"
+        },
+        {
+          "id": "link-2",
+          "label": "Home",
+          "href": "/"
+        },
+        {
+          "id": "link-3",
+          "label": "Packages",
+          "href": "/sessions"
+        },
+        {
+          "id": "link-4",
+          "label": "About",
+          "href": "/about"
+        },
+        {
+          "id": "link-5",
+          "label": "Book a Session",
+          "href": "/booking.html"
+        },
+        {
+          "id": "link-6",
+          "label": "Home",
+          "href": "/"
+        },
+        {
+          "id": "link-7",
+          "label": "Packages",
+          "href": "/sessions"
+        },
+        {
+          "id": "link-8",
+          "label": "About",
+          "href": "/about"
+        },
+        {
+          "id": "link-9",
+          "label": "Book a Session",
+          "href": "/booking.html"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".site-header",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "links.0.label",
+          "selector": ".site-header > a:nth-child(2)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".site-header > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.1.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)"
+        },
+        {
+          "path": "links.1.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.2.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)"
+        },
+        {
+          "path": "links.2.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.3.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)"
+        },
+        {
+          "path": "links.3.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.4.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)"
+        },
+        {
+          "path": "links.4.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.5.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)"
+        },
+        {
+          "path": "links.5.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.6.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)"
+        },
+        {
+          "path": "links.6.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.7.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)"
+        },
+        {
+          "path": "links.7.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.8.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)"
+        },
+        {
+          "path": "links.8.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Navigation",
+        "fields": [
+          {
+            "path": "links.0",
+            "label": "Jazzr Photography"
+          },
+          {
+            "path": "links.1",
+            "label": "Home"
+          },
+          {
+            "path": "links.2",
+            "label": "Packages"
+          },
+          {
+            "path": "links.3",
+            "label": "About"
+          },
+          {
+            "path": "links.4",
+            "label": "Book a Session"
+          },
+          {
+            "path": "links.5",
+            "label": "Home"
+          },
+          {
+            "path": "links.6",
+            "label": "Packages"
+          },
+          {
+            "path": "links.7",
+            "label": "About"
+          },
+          {
+            "path": "links.8",
+            "label": "Book a Session"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "about-intro",
+    "type": "strip",
+    "label": "About Jasmine",
+    "pageIds": [
+      "about"
+    ],
+    "editableFields": [
+      "texts",
+      "images"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "ABOUT"
+        },
+        {
+          "id": "text-2",
+          "text": "Jasmine Reindl"
+        },
+        {
+          "id": "text-3",
+          "text": "Hi, I'm Jasmine Reindl, a documentary candid lifestyle photographer based in Lowell Arkansas. For the past ten years I've been capturing families and couples in their most real, unguarded moments, and honestly, I can't imagine doing anything else."
+        },
+        {
+          "id": "text-4",
+          "text": "My style is relaxed and natural, yet quietly sophisticated. Every photo feels less like a photoshoot and more like a window into the special moments you actually lived."
+        }
+      ],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "https://jazzrphotography.com/images/about/jazz.jpg",
+          "alt": "Jasmine Reindl",
+          "caption": ""
+        }
+      ],
+      "links": []
+    },
+    "presentation": {
+      "selector": ".about-section__grid",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "images.0.url",
+          "selector": ".about-section__grid > figure:nth-child(1) > img:nth-child(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": ".about-section__grid > figure:nth-child(1) > img:nth-child(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "texts.0.text",
+          "selector": ".about-section__grid > div:nth-child(2) > p:nth-child(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": ".about-section__grid > div:nth-child(2) > h1:nth-child(2)"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": ".about-section__grid > div:nth-child(2) > p:nth-child(3)"
+        },
+        {
+          "path": "texts.3.text",
+          "selector": ".about-section__grid > div:nth-child(2) > p:nth-child(4)"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "About Jasmine",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Photo"
+          },
+          {
+            "path": "texts.0.text",
+            "label": "Text"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Heading"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Text"
+          },
+          {
+            "path": "texts.3.text",
+            "label": "Text"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "about-recognition-heading",
+    "type": "strip",
+    "label": "Recognition heading",
+    "pageIds": [
+      "about"
+    ],
+    "editableFields": [
+      "texts"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "RECOGNITION"
+        },
+        {
+          "id": "text-2",
+          "text": "Featured placements and honors"
+        }
+      ],
+      "images": [],
+      "links": []
+    },
+    "presentation": {
+      "selector": ".recognition-section__heading",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": ".recognition-section__heading > p:nth-child(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": ".recognition-section__heading > h2:nth-child(2)"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Recognition heading",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Text"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Heading"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "about-recognition-1",
+    "type": "strip",
+    "label": "Recognition 1",
+    "pageIds": [
+      "about"
+    ],
+    "editableFields": [
+      "texts",
+      "images",
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "America's Favorite Photos"
+        },
+        {
+          "id": "text-2",
+          "text": "Jasmine's entry, Monochrome diva, finished 8th in its group in the Semifinal Round of the May 2026 Competition."
+        }
+      ],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "https://jazzrphotography.com/images/about/monochrome-diva.jpg",
+          "alt": "Monochrome diva",
+          "caption": ""
+        }
+      ],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "View the entry",
+          "href": "https://americasfavoritephotos.com/v/grwjdz"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".recognition-entry:nth-child(1)",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "images.0.url",
+          "selector": ".recognition-entry:nth-child(1) > figure:nth-child(1) > img:nth-child(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": ".recognition-entry:nth-child(1) > figure:nth-child(1) > img:nth-child(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "texts.0.text",
+          "selector": ".recognition-entry:nth-child(1) > div:nth-child(2) > h3:nth-child(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": ".recognition-entry:nth-child(1) > div:nth-child(2) > p:nth-child(2)"
+        },
+        {
+          "path": "links.0.label",
+          "selector": ".recognition-entry:nth-child(1) > div:nth-child(2) > a:nth-child(3)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".recognition-entry:nth-child(1) > div:nth-child(2) > a:nth-child(3)",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Recognition 1",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Photo"
+          },
+          {
+            "path": "texts.0.text",
+            "label": "Heading"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Text"
+          },
+          {
+            "path": "links.0",
+            "label": "View the entry"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "about-recognition-2",
+    "type": "strip",
+    "label": "Recognition 2",
+    "pageIds": [
+      "about"
+    ],
+    "editableFields": [
+      "texts",
+      "images",
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Shutter Up Magazine"
+        },
+        {
+          "id": "text-2",
+          "text": "Jasmine's photo of Rowen Scarlett was published in Shutter Up Magazine."
+        }
+      ],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "https://jazzrphotography.com/images/about/recognition/rowen-scarlett-shutter-up.jpg",
+          "alt": "Published photo of Rowen Scarlett",
+          "caption": ""
+        }
+      ],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Visit publication",
+          "href": "https://shutterupmagazine.mypixieset.com/"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".recognition-entry:nth-child(2)",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "images.0.url",
+          "selector": ".recognition-entry:nth-child(2) > figure:nth-child(1) > img:nth-child(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": ".recognition-entry:nth-child(2) > figure:nth-child(1) > img:nth-child(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "texts.0.text",
+          "selector": ".recognition-entry:nth-child(2) > div:nth-child(2) > h3:nth-child(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": ".recognition-entry:nth-child(2) > div:nth-child(2) > p:nth-child(2)"
+        },
+        {
+          "path": "links.0.label",
+          "selector": ".recognition-entry:nth-child(2) > div:nth-child(2) > a:nth-child(3)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".recognition-entry:nth-child(2) > div:nth-child(2) > a:nth-child(3)",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Recognition 2",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Photo"
+          },
+          {
+            "path": "texts.0.text",
+            "label": "Heading"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Text"
+          },
+          {
+            "path": "links.0",
+            "label": "Visit publication"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "about-recognition-3",
+    "type": "strip",
+    "label": "Recognition 3",
+    "pageIds": [
+      "about"
+    ],
+    "editableFields": [
+      "texts",
+      "images",
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Photography & More Magazine"
+        },
+        {
+          "id": "text-2",
+          "text": "Jasmine's photo of Karen Lynn was published in the UK-based Photography & More Magazine."
+        }
+      ],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "https://jazzrphotography.com/images/about/recognition/karen-lynn-photography-more.jpg",
+          "alt": "Published photo of Karen Lynn",
+          "caption": ""
+        }
+      ],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Visit publication",
+          "href": "https://www.photography-and-more.com/"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".recognition-entry:nth-child(3)",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "images.0.url",
+          "selector": ".recognition-entry:nth-child(3) > figure:nth-child(1) > img:nth-child(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": ".recognition-entry:nth-child(3) > figure:nth-child(1) > img:nth-child(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "texts.0.text",
+          "selector": ".recognition-entry:nth-child(3) > div:nth-child(2) > h3:nth-child(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": ".recognition-entry:nth-child(3) > div:nth-child(2) > p:nth-child(2)"
+        },
+        {
+          "path": "links.0.label",
+          "selector": ".recognition-entry:nth-child(3) > div:nth-child(2) > a:nth-child(3)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".recognition-entry:nth-child(3) > div:nth-child(2) > a:nth-child(3)",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Recognition 3",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Photo"
+          },
+          {
+            "path": "texts.0.text",
+            "label": "Heading"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Text"
+          },
+          {
+            "path": "links.0",
+            "label": "Visit publication"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "about-recognition-4",
+    "type": "strip",
+    "label": "Recognition 4",
+    "pageIds": [
+      "about"
+    ],
+    "editableFields": [
+      "texts",
+      "images",
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Bold & Beautiful Magazine"
+        },
+        {
+          "id": "text-2",
+          "text": "Jasmine's photo of Rhianna Martinez was published in Bold & Beautiful Magazine."
+        }
+      ],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "https://jazzrphotography.com/images/about/recognition/rhianna-martinez-bold-beautiful.jpg",
+          "alt": "Published photo of Rhianna Martinez",
+          "caption": ""
+        }
+      ],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Visit publication",
+          "href": "https://boldbeautifulmagazine.mypixieset.com/"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".recognition-entry:nth-child(4)",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "images.0.url",
+          "selector": ".recognition-entry:nth-child(4) > figure:nth-child(1) > img:nth-child(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": ".recognition-entry:nth-child(4) > figure:nth-child(1) > img:nth-child(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "texts.0.text",
+          "selector": ".recognition-entry:nth-child(4) > div:nth-child(2) > h3:nth-child(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": ".recognition-entry:nth-child(4) > div:nth-child(2) > p:nth-child(2)"
+        },
+        {
+          "path": "links.0.label",
+          "selector": ".recognition-entry:nth-child(4) > div:nth-child(2) > a:nth-child(3)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".recognition-entry:nth-child(4) > div:nth-child(2) > a:nth-child(3)",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Recognition 4",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Photo"
+          },
+          {
+            "path": "texts.0.text",
+            "label": "Heading"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Text"
+          },
+          {
+            "path": "links.0",
+            "label": "Visit publication"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "about-recognition-5",
+    "type": "strip",
+    "label": "Recognition 5",
+    "pageIds": [
+      "about"
+    ],
+    "editableFields": [
+      "texts",
+      "images",
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "Through the Lens Fashion Magazine"
+        },
+        {
+          "id": "text-2",
+          "text": "Jasmine's photo of Jessica Thorn was published in Through the Lens Fashion Magazine."
+        }
+      ],
+      "images": [
+        {
+          "id": "image-1",
+          "url": "https://jazzrphotography.com/images/about/recognition/jessica-thorn-through-the-lens.jpg",
+          "alt": "Published tear sheet for Jessica Thorn",
+          "caption": ""
+        }
+      ],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Visit publication",
+          "href": "https://www.magcloud.com/browse/magazine/1618877"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".recognition-entry:nth-child(5)",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "images.0.url",
+          "selector": ".recognition-entry:nth-child(5) > figure:nth-child(1) > img:nth-child(1)",
+          "attribute": "src"
+        },
+        {
+          "path": "images.0.alt",
+          "selector": ".recognition-entry:nth-child(5) > figure:nth-child(1) > img:nth-child(1)",
+          "attribute": "alt"
+        },
+        {
+          "path": "texts.0.text",
+          "selector": ".recognition-entry:nth-child(5) > div:nth-child(2) > h3:nth-child(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": ".recognition-entry:nth-child(5) > div:nth-child(2) > p:nth-child(2)"
+        },
+        {
+          "path": "links.0.label",
+          "selector": ".recognition-entry:nth-child(5) > div:nth-child(2) > a:nth-child(3)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".recognition-entry:nth-child(5) > div:nth-child(2) > a:nth-child(3)",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Recognition 5",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Photo"
+          },
+          {
+            "path": "texts.0.text",
+            "label": "Heading"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Text"
+          },
+          {
+            "path": "links.0",
+            "label": "Visit publication"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "about-navigation",
+    "type": "strip",
+    "label": "Navigation",
+    "pageIds": [
+      "about"
+    ],
+    "editableFields": [
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [],
+      "images": [],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Jazzr Photography",
+          "href": "/"
+        },
+        {
+          "id": "link-2",
+          "label": "Home",
+          "href": "/"
+        },
+        {
+          "id": "link-3",
+          "label": "Portfolio",
+          "href": "/portfolio"
+        },
+        {
+          "id": "link-4",
+          "label": "Packages",
+          "href": "/sessions"
+        },
+        {
+          "id": "link-5",
+          "label": "Book a Session",
+          "href": "/booking.html"
+        },
+        {
+          "id": "link-6",
+          "label": "Home",
+          "href": "/"
+        },
+        {
+          "id": "link-7",
+          "label": "Portfolio",
+          "href": "/portfolio"
+        },
+        {
+          "id": "link-8",
+          "label": "Packages",
+          "href": "/sessions"
+        },
+        {
+          "id": "link-9",
+          "label": "Book a Session",
+          "href": "/booking.html"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".site-header",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "links.0.label",
+          "selector": ".site-header > a:nth-child(2)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".site-header > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.1.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)"
+        },
+        {
+          "path": "links.1.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.2.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)"
+        },
+        {
+          "path": "links.2.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.3.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)"
+        },
+        {
+          "path": "links.3.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.4.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)"
+        },
+        {
+          "path": "links.4.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.5.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)"
+        },
+        {
+          "path": "links.5.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.6.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)"
+        },
+        {
+          "path": "links.6.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.7.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)"
+        },
+        {
+          "path": "links.7.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.8.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)"
+        },
+        {
+          "path": "links.8.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Navigation",
+        "fields": [
+          {
+            "path": "links.0",
+            "label": "Jazzr Photography"
+          },
+          {
+            "path": "links.1",
+            "label": "Home"
+          },
+          {
+            "path": "links.2",
+            "label": "Portfolio"
+          },
+          {
+            "path": "links.3",
+            "label": "Packages"
+          },
+          {
+            "path": "links.4",
+            "label": "Book a Session"
+          },
+          {
+            "path": "links.5",
+            "label": "Home"
+          },
+          {
+            "path": "links.6",
+            "label": "Portfolio"
+          },
+          {
+            "path": "links.7",
+            "label": "Packages"
+          },
+          {
+            "path": "links.8",
+            "label": "Book a Session"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "contact-intro",
+    "type": "strip",
+    "label": "Contact introduction",
+    "pageIds": [
+      "contact"
+    ],
+    "editableFields": [
+      "texts"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "CONTACT INFORMATION"
+        },
+        {
+          "id": "text-2",
+          "text": "Where should we send your details?"
+        },
+        {
+          "id": "text-3",
+          "text": "Share the best way to reach you before choosing your session date and time."
+        }
+      ],
+      "images": [],
+      "links": []
+    },
+    "presentation": {
+      "selector": ".contact-section__intro",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": ".contact-section__intro > p:nth-child(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": ".contact-section__intro > h1:nth-child(2)"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": ".contact-section__intro > p:nth-child(3)"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Contact introduction",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Text"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Heading"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Text"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "contact-form",
+    "type": "strip",
+    "label": "Contact form",
+    "pageIds": [
+      "contact"
+    ],
+    "editableFields": [
+      "texts",
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "text-1",
+          "text": "FULL NAME"
+        },
+        {
+          "id": "text-2",
+          "text": "EMAIL"
+        },
+        {
+          "id": "text-3",
+          "text": "PHONE"
+        },
+        {
+          "id": "text-4",
+          "text": "NOTES"
+        }
+      ],
+      "images": [],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Continue to scheduling",
+          "href": "/booking.html"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".contact-form",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": ".contact-form > label:nth-child(1) > span:nth-child(1)"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": ".contact-form > label:nth-child(2) > span:nth-child(1)"
+        },
+        {
+          "path": "texts.2.text",
+          "selector": ".contact-form > label:nth-child(3) > span:nth-child(1)"
+        },
+        {
+          "path": "texts.3.text",
+          "selector": ".contact-form > label:nth-child(4) > span:nth-child(1)"
+        },
+        {
+          "path": "links.0.label",
+          "selector": ".contact-form > a:nth-child(5)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".contact-form > a:nth-child(5)",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Contact form",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Text"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Text"
+          },
+          {
+            "path": "texts.2.text",
+            "label": "Text"
+          },
+          {
+            "path": "texts.3.text",
+            "label": "Text"
+          },
+          {
+            "path": "links.0",
+            "label": "Continue to scheduling"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "contact-navigation",
+    "type": "strip",
+    "label": "Navigation",
+    "pageIds": [
+      "contact"
+    ],
+    "editableFields": [
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [],
+      "images": [],
+      "links": [
+        {
+          "id": "link-1",
+          "label": "Jazzr Photography",
+          "href": "/"
+        },
+        {
+          "id": "link-2",
+          "label": "Home",
+          "href": "/"
+        },
+        {
+          "id": "link-3",
+          "label": "Portfolio",
+          "href": "/portfolio"
+        },
+        {
+          "id": "link-4",
+          "label": "Packages",
+          "href": "/sessions"
+        },
+        {
+          "id": "link-5",
+          "label": "About",
+          "href": "/about"
+        },
+        {
+          "id": "link-6",
+          "label": "Book a Session",
+          "href": "/booking.html"
+        },
+        {
+          "id": "link-7",
+          "label": "Home",
+          "href": "/"
+        },
+        {
+          "id": "link-8",
+          "label": "Portfolio",
+          "href": "/portfolio"
+        },
+        {
+          "id": "link-9",
+          "label": "Packages",
+          "href": "/sessions"
+        },
+        {
+          "id": "link-10",
+          "label": "About",
+          "href": "/about"
+        },
+        {
+          "id": "link-11",
+          "label": "Book a Session",
+          "href": "/booking.html"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".site-header",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "links.0.label",
+          "selector": ".site-header > a:nth-child(2)"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".site-header > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.1.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)"
+        },
+        {
+          "path": "links.1.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.2.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)"
+        },
+        {
+          "path": "links.2.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.3.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)"
+        },
+        {
+          "path": "links.3.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.4.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)"
+        },
+        {
+          "path": "links.4.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.5.label",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(5)"
+        },
+        {
+          "path": "links.5.href",
+          "selector": ".site-header > nav:nth-child(3) > a:nth-child(5)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.6.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)"
+        },
+        {
+          "path": "links.6.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.7.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)"
+        },
+        {
+          "path": "links.7.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.8.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)"
+        },
+        {
+          "path": "links.8.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.9.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)"
+        },
+        {
+          "path": "links.9.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)",
+          "attribute": "href"
+        },
+        {
+          "path": "links.10.label",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(5)"
+        },
+        {
+          "path": "links.10.href",
+          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(5)",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Navigation",
+        "fields": [
+          {
+            "path": "links.0",
+            "label": "Jazzr Photography"
+          },
+          {
+            "path": "links.1",
+            "label": "Home"
+          },
+          {
+            "path": "links.2",
+            "label": "Portfolio"
+          },
+          {
+            "path": "links.3",
+            "label": "Packages"
+          },
+          {
+            "path": "links.4",
+            "label": "About"
+          },
+          {
+            "path": "links.5",
+            "label": "Book a Session"
+          },
+          {
+            "path": "links.6",
+            "label": "Home"
+          },
+          {
+            "path": "links.7",
+            "label": "Portfolio"
+          },
+          {
+            "path": "links.8",
+            "label": "Packages"
+          },
+          {
+            "path": "links.9",
+            "label": "About"
+          },
+          {
+            "path": "links.10",
+            "label": "Book a Session"
+          }
+        ]
+      }
+    ]
+  }
+]
