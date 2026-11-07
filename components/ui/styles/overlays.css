@@ -332,6 +332,20 @@
   width: 100%;
 }
 .showrunner-admin .ui-dialog::backdrop { background: var(--sd-color-overlay); }
+/* Explicit tracks keep overlay scrollbars off controls, including nested modal scrollers. */
+.showrunner-admin .ui-dialog,
+.showrunner-admin .ui-dialog * { scrollbar-color: auto; scrollbar-width: auto; }
+.showrunner-admin .ui-dialog::-webkit-scrollbar,
+.showrunner-admin .ui-dialog ::-webkit-scrollbar { width: var(--sd-space-12); height: var(--sd-space-12); }
+.showrunner-admin .ui-dialog::-webkit-scrollbar-thumb,
+.showrunner-admin .ui-dialog ::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: var(--sd-radius-dialog);
+}
+.showrunner-admin .ui-dialog::-webkit-scrollbar-track,
+.showrunner-admin .ui-dialog ::-webkit-scrollbar-track { background: transparent; }
 :where(.showrunner-admin .ui-dialog-body) { display: grid; gap: var(--space-3); min-width: 0; }
 .showrunner-admin .ui-dialog.ui-modal { overflow: hidden; padding: var(--sd-space-16); }
 .showrunner-admin .ui-dialog.ui-modal[open] { display: flex; flex-direction: column; }

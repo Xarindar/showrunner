@@ -85,7 +85,13 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
     {requiresDocumentPolicy&&requirePolicy&&<input name="requirePolicy" type="hidden" value="on"/>}
     <input name="bookingRules" type="hidden" value={JSON.stringify(rules)} />
     <input name="intakePrompt" type="hidden" value={intakePrompt} /><input name="policyText" type="hidden" value={policyText} />
-    <div className="ui-section-header"><h2 id={`${idPrefix}-rules-title`}>Intake and Booking Terms &amp; Conditions</h2><Button type="button" variant="secondary" onClick={() => open("library")}><Plus size={15} />Add rule</Button></div>
+    <div className="ui-section-header">
+      <h2 id={`${idPrefix}-rules-title`}>Intake and Booking Terms &amp; Conditions</h2>
+      <div className="booking-rule-actions">
+        <Button type="button" variant="secondary" onClick={() => open("library")}><Plus size={15} />Add rule</Button>
+        <ButtonLink href="/admin/modules/appointments/forms-terms" variant="secondary">Manage forms &amp; terms</ButtonLink>
+      </div>
+    </div>
     <div className="ui-section-body booking-document-choices">
       {([["intake","INTAKE","Intake form"],["terms","TERMS","Booking terms"]] as const).map(([key,kind,label])=>{
         const global=documents.find(document=>document.kind===kind&&document.isDefault);
@@ -96,7 +102,6 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
           </Select>
         </Field>;
       })}
-      <ButtonLink href="/admin/modules/appointments/forms-terms" size="sm" variant="ghost">Manage forms &amp; terms</ButtonLink>
     </div>
     <ResponsiveTableFrame className="catalog-table-scroll booking-rules-table" role="region" aria-label="Selected booking rules" tabIndex={0}>
       <table className="catalog-product-table"><thead><tr><th scope="col">Rule</th><th scope="col">Actions</th></tr></thead><tbody>
