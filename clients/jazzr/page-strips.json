@@ -103,73 +103,6 @@
     ]
   },
   {
-    "id": "home-service-areas",
-    "type": "strip",
-    "label": "Service areas",
-    "pageIds": [
-      "home"
-    ],
-    "editableFields": [
-      "texts"
-    ],
-    "fixedRows": true,
-    "defaults": {
-      "texts": [
-        {
-          "id": "text-1",
-          "text": "Jazzr Photography proudly serves"
-        },
-        {
-          "id": "text-2",
-          "text": "NW ARKANSAS"
-        },
-        {
-          "id": "text-3",
-          "text": "SE MISSOURI"
-        }
-      ],
-      "images": [],
-      "links": []
-    },
-    "presentation": {
-      "selector": "#service-areas",
-      "assetBaseUrl": "https://jazzrphotography.com/",
-      "bindings": [
-        {
-          "path": "texts.0.text",
-          "selector": "#service-areas > div:nth-child(1) > p:nth-child(1)"
-        },
-        {
-          "path": "texts.1.text",
-          "selector": "#service-areas > div:nth-child(1) > div:nth-child(2) > article:nth-child(1) > p:nth-child(2)"
-        },
-        {
-          "path": "texts.2.text",
-          "selector": "#service-areas > div:nth-child(1) > div:nth-child(2) > article:nth-child(2) > p:nth-child(2)"
-        }
-      ]
-    },
-    "editorGroups": [
-      {
-        "label": "Service areas",
-        "fields": [
-          {
-            "path": "texts.0.text",
-            "label": "Text"
-          },
-          {
-            "path": "texts.1.text",
-            "label": "Text"
-          },
-          {
-            "path": "texts.2.text",
-            "label": "Text"
-          }
-        ]
-      }
-    ]
-  },
-  {
     "id": "home-navigation",
     "type": "strip",
     "label": "Navigation",
@@ -363,6 +296,81 @@
     ]
   },
   {
+    "id": "home-inquiry",
+    "type": "strip",
+    "label": "Session booking",
+    "pageIds": [
+      "home"
+    ],
+    "editableFields": [
+      "texts",
+      "links"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "title",
+          "text": "Your turn"
+        },
+        {
+          "id": "subtitle",
+          "text": "in front of the lens."
+        }
+      ],
+      "images": [],
+      "links": [
+        {
+          "id": "booking",
+          "label": "Explore sessions & book",
+          "href": "/booking.html"
+        }
+      ]
+    },
+    "presentation": {
+      "selector": ".home-inquiry",
+      "assetBaseUrl": "https://jazzrphotography.com/",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": ".home-inquiry h2 > span"
+        },
+        {
+          "path": "texts.1.text",
+          "selector": ".home-inquiry h2 > em"
+        },
+        {
+          "path": "links.0.label",
+          "selector": ".home-inquiry > a"
+        },
+        {
+          "path": "links.0.href",
+          "selector": ".home-inquiry > a",
+          "attribute": "href"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Session booking",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Title"
+          },
+          {
+            "path": "texts.1.text",
+            "label": "Subtitle"
+          },
+          {
+            "path": "links.0",
+            "label": "Booking button"
+          }
+        ]
+      }
+    ]
+  },
+  {
     "id": "site-footer",
     "type": "strip",
     "label": "Footer",
@@ -414,47 +422,47 @@
       "bindings": [
         {
           "path": "links.0.label",
-          "selector": ".site-footer > a:nth-child(1)"
+          "selector": ".site-footer > .site-footer__brand"
         },
         {
           "path": "links.0.href",
-          "selector": ".site-footer > a:nth-child(1)",
+          "selector": ".site-footer > .site-footer__brand",
           "attribute": "href"
         },
         {
           "path": "links.1.label",
-          "selector": ".site-footer > address:nth-child(2) > a:nth-child(1)"
+          "selector": ".site-footer > address > a:nth-child(1)"
         },
         {
           "path": "links.1.href",
-          "selector": ".site-footer > address:nth-child(2) > a:nth-child(1)",
+          "selector": ".site-footer > address > a:nth-child(1)",
           "attribute": "href"
         },
         {
           "path": "links.2.label",
-          "selector": ".site-footer > address:nth-child(2) > a:nth-child(2)"
+          "selector": ".site-footer > address > a:nth-child(2)"
         },
         {
           "path": "links.2.href",
-          "selector": ".site-footer > address:nth-child(2) > a:nth-child(2)",
+          "selector": ".site-footer > address > a:nth-child(2)",
           "attribute": "href"
         },
         {
           "path": "links.3.label",
-          "selector": ".site-footer > address:nth-child(2) > a:nth-child(3)"
+          "selector": ".site-footer > address > a:nth-child(3)"
         },
         {
           "path": "links.3.href",
-          "selector": ".site-footer > address:nth-child(2) > a:nth-child(3)",
+          "selector": ".site-footer > address > a:nth-child(3)",
           "attribute": "href"
         },
         {
           "path": "links.4.label",
-          "selector": ".site-footer > address:nth-child(2) > a:nth-child(4)"
+          "selector": ".site-footer > address > a:nth-child(4)"
         },
         {
           "path": "links.4.href",
-          "selector": ".site-footer > address:nth-child(2) > a:nth-child(4)",
+          "selector": ".site-footer > address > a:nth-child(4)",
           "attribute": "href"
         }
       ]
@@ -482,6 +490,52 @@
           {
             "path": "links.4",
             "label": "Messenger"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "site-service-areas",
+    "type": "strip",
+    "label": "Footer service areas",
+    "pageIds": [
+      "home",
+      "portfolio",
+      "about",
+      "contact",
+      "booking"
+    ],
+    "editableFields": [
+      "texts"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [
+        {
+          "id": "areas",
+          "text": "Jazzr Photography proudly serves NW Arkansas and SE Missouri."
+        }
+      ],
+      "images": [],
+      "links": []
+    },
+    "presentation": {
+      "selector": ".site-footer__service-areas",
+      "bindings": [
+        {
+          "path": "texts.0.text",
+          "selector": ".site-footer__service-areas"
+        }
+      ]
+    },
+    "editorGroups": [
+      {
+        "label": "Service areas",
+        "fields": [
+          {
+            "path": "texts.0.text",
+            "label": "Service area sentence"
           }
         ]
       }

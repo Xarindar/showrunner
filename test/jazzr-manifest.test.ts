@@ -12,3 +12,13 @@ test("Jazzr registers each public page with valid defaults and field bindings", 
     }
   }
 });
+
+test("Jazzr editorial homepage omits retired sections and registers booking and footer copy", () => {
+  const ids = jazzrContentManifest.blocks.map(block => block.id);
+  assert.ok(!ids.includes("home-service-categories"));
+  assert.ok(!ids.includes("home-service-areas"));
+  assert.ok(ids.includes("home-inquiry"));
+  assert.ok(ids.includes("site-service-areas"));
+  const footer = jazzrContentManifest.blocks.find(block => block.id === "site-footer")!;
+  assert.ok(footer.presentation!.bindings!.every(binding => !binding.selector.includes("address:nth-child") && !binding.selector.startsWith(".site-footer > a:nth-child")));
+});

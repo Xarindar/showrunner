@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { jazzrContentManifest } from "../clients/jazzr/content-manifest";
 import { emptyPayload, payloadSchema } from "../modules/content/studio/registry";
-import { validateManifest } from "../modules/content/studio/manifest";
+import { configuredBlock, validateManifest } from "../modules/content/studio/manifest";
 import { resolveServiceCategories, validateServiceCategories } from "../modules/content/studio/service-categories";
 import { validateBlockUpdate } from "../modules/content/studio/state";
 
@@ -23,8 +23,8 @@ test("category selection rejects duplicates, cross-site and removed references",
   assert.throws(() => validateServiceCategories(rows, []), /unavailable for this site/);
 });
 
-test("Jazzr owns a fixed section with removable catalog selections and strict fields", () => {
-  const block = jazzrContentManifest.blocks[0];
+test("category sections allow removable catalog selections and enforce strict fields", () => {
+  const block = configuredBlock("test-categories", "serviceCategories", ["home"], { source: "categories", presentation: { selector: "#photography-categories" } });
   assert.equal(block.presentation?.selector, "#photography-categories");
   assert.equal(payloadSchema("serviceCategories").safeParse({ ...emptyPayload("serviceCategories"), items: rows }).success, true);
   assert.equal(payloadSchema("serviceCategories").safeParse({ heading: "Title", items: [{ ...rows[0], name: "Spoofed" }] }).success, false);
