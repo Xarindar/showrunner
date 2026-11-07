@@ -1,6 +1,8 @@
 import { formatTime } from "@/lib/format";
-import { readBookingRules, validateBookingRuleAnswers } from "@/lib/scheduling/booking-rules";
+import { BookingRuleAnswerError, validateBookingRuleAnswers } from "@/lib/scheduling/booking-rules";
 import "server-only";
+import { listBookingDocuments } from "./booking-document-store";
+import { resolveBookingRequirements, validateBookingRequirementsRevision } from "./booking-documents";
 import { servicePriceCents } from "@/lib/scheduling/pricing";
 
 import { BookingStatus, Prisma, SchedulingCalendarOwnerType } from "@prisma/client";
@@ -425,10 +427,10 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
       throw new Error("That service is not configured for online booking.");
     }
 
-    if (service.requirePolicy && service.policyText?.trim() && !input.policyAccepted) {
-      throw new Error("Please agree to the Booking Terms & Conditions before booking.");
-    }
-    const intakeResponse = service.bookingRules == null ? input.intakeResponse : validateBookingRuleAnswers(readBookingRules(service.bookingRules), input.intakeAnswers, input);
+    const requirements=resolveBookingRequirements(service,await listBookingDocuments(siteId));
+    validateBookingRequirementsRevision(requirements,input.bookingRequirementsRevision);
+    if (requirements.requirePolicy && !input.policyAccepted) throw new Error("Please agree to the Booking Terms & Conditions before booking.");
+    const intakeResponse = requirements.bookingRules == null ? input.intakeResponse : validateBookingRuleAnswers(requirements.rules,input.intakeAnswers,input);
 
     const offeredSlots = await nativeSchedulingAdapter.getAvailableSlots(input.serviceId, input.startsAt, {
       siteId,
@@ -494,6 +496,10 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
             throw new Error("That time was just booked or blocked. Please choose another time.");
           }
 
+          const currentService=await tx.service.findFirst({where:{id:service.id,siteId}});
+          if (!currentService) throw new Error("That service is not available.");
+          const currentRequirements=resolveBookingRequirements(currentService,await listBookingDocuments(siteId,tx));
+          if (currentRequirements.revision !== requirements.revision) throw new BookingRuleAnswerError("The booking form or terms changed. Reload and review them before booking.");
           const clientId = await upsertPublicClient(tx, {
             siteId: service.siteId,
             email: input.customerEmail,
@@ -519,6 +525,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
               customerPhone: input.customerPhone,
               notes: input.notes,
               intakeResponse,
+              bookingRequirementsSnapshot:{documents:requirements.documents,rules:requirements.rules,answers:requirements.bookingRules ? input.intakeAnswers ?? {} : {},policyAccepted:Boolean(input.policyAccepted),acceptedAt:input.policyAccepted && requirements.policyText ? new Date().toISOString() : null},
               policyAccepted: Boolean(input.policyAccepted),
               status: input.status || (service.requestOnly ? BookingStatus.PENDING : BookingStatus.CONFIRMED),
               resources: requiredResourceIds.length

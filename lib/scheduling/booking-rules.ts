@@ -4,7 +4,7 @@ export const bookingRuleSchema = z.object({
   id: z.string().min(1).max(100),
   kind: z.enum(["intake", "policy"]),
   category: z.string().trim().min(1).max(80).transform(value => /^contracts?$/i.test(value) ? "Booking Terms & Conditions" : value),
-  label: z.string().trim().min(1, "Add a question or booking terms.").max(2000),
+  label: z.string().trim().min(1, "Add a question or booking terms.").max(20000),
   type: z.enum(["TEXT", "RADIO", "SELECT"]),
   required: z.boolean(),
   placeholder: z.string().max(200).default(""),
@@ -12,6 +12,7 @@ export const bookingRuleSchema = z.object({
   options: z.array(z.string().trim().min(1).max(200)).max(30),
   contactField: z.enum(["customerName", "customerEmail", "customerPhone"]).optional()
 }).superRefine((rule, ctx) => {
+  if (rule.kind === "intake" && rule.label.length > 2000) ctx.addIssue({code:"custom",message:"Questions must be 2,000 characters or less."});
   if (rule.kind === "intake" && rule.type !== "TEXT" && (rule.options.length < 2 || new Set(rule.options.map(value => value.toLowerCase())).size !== rule.options.length)) {
     ctx.addIssue({ code: "custom", path: ["options"], message: "Add at least two different choices." });
   }
@@ -38,7 +39,7 @@ export function readBookingRules(value: unknown, legacy: { intakePrompt?: string
   ].map(rule => ({ ...rule, type: "TEXT", required: false, placeholder: "", helpText: "", options: [] }));
 }
 
-export const intakeAnswersSchema = z.record(z.string().min(1).max(100), z.string().trim().max(4000)).refine(value => Object.keys(value).length <= 40, "Too many answers.");
+export const intakeAnswersSchema = z.record(z.string().min(1).max(100), z.string().trim().max(4000)).refine(value => Object.keys(value).length <= 100, "Too many answers.");
 export class BookingRuleAnswerError extends Error {}
 
 export function validateBookingRuleAnswers(rules: BookingRule[], input: unknown, contact: { customerName: string; customerEmail: string; customerPhone?: string }) {

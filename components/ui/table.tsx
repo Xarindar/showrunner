@@ -1,5 +1,6 @@
 import type { TableHTMLAttributes } from "react";
 import { cx } from "./utils";
+import { ResponsiveTableFrame } from "./responsive-table";
 
 type TableProps = TableHTMLAttributes<HTMLTableElement> & {
   tableClassName?: string;
@@ -7,8 +8,8 @@ type TableProps = TableHTMLAttributes<HTMLTableElement> & {
 
 export function Table({ className, tableClassName, ...props }: TableProps) {
   return (
-    <div className={cx("ui-table-wrap", className)} tabIndex={0} role="region" aria-label={props["aria-label"] || "Scrollable table"}>
+    <ResponsiveTableFrame className={cx("ui-table-wrap", className)} tabIndex={0} role="region" aria-label={props["aria-label"] || "Scrollable table"}>
       <table className={cx("ui-table", tableClassName)} {...props} />
-    </div>
+    </ResponsiveTableFrame>
   );
 }

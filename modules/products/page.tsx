@@ -1,3 +1,4 @@
+import { ResponsiveTableFrame } from "@/components/ui/responsive-table";
 import { tablePageSize } from "@/lib/admin-table-pagination";
 import { Notification } from "@/components/ui/notifications";
 import NextImage from "next/image";
@@ -260,7 +261,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             showClear={Boolean(searchQuery || statusFilter !== "all")}
           />
 
-          <div className="catalog-table-scroll">
+          <ResponsiveTableFrame className="catalog-table-scroll">
             <table className="catalog-product-table">
               <thead>
                 <tr>
@@ -360,7 +361,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 ) : null}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTableFrame>
 
           <Pagination
             pageSize={pageSize}

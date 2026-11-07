@@ -122,6 +122,7 @@ model Service {
   slotIntervalMinutes Int       @default(30)
   intakePrompt        String?
   bookingRules        Json?
+  bookingDocumentSelection Json?
   policyText          String?
   requirePolicy       Boolean   @default(false)
   requestOnly         Boolean   @default(false)
@@ -352,6 +353,7 @@ model Booking {
   customerEmail      String
   customerPhone      String?
   notes              String?
+  bookingRequirementsSnapshot Json?
   intakeResponse     String?
   policyAccepted     Boolean       @default(false)
   adminNotes         String?

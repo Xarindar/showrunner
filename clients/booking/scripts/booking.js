@@ -546,7 +546,7 @@
     els.confirmSummary.innerHTML = summaryMarkup(service, slot);
     els.submitBooking.textContent = service.requestOnly ? "Send request" : "Confirm booking";
 
-    window.ShowrunnerBookingRules.render(els.form, service.bookingRules, service.id);
+    window.ShowrunnerBookingRules.render(els.form, service.bookingRules, service.id, {title:service.bookingFormTitle,revision:service.bookingRequirementsRevision});
     if (service.intakePrompt && !Array.isArray(service.bookingRules)) {
       els.intakeField.hidden = false;
       els.intakeLabel.textContent = service.intakePrompt;
@@ -558,9 +558,16 @@
       els.policyField.hidden = false;
       els.policyText.textContent = service.policyText;
       const checkbox = els.policyField.querySelector("input");
+      const policyKey = service.id + ":" + (service.bookingRequirementsRevision || "") + ":" + service.policyText;
+      if (els.policyField.dataset.policyKey !== policyKey) checkbox.checked = false;
+      els.policyField.dataset.policyKey = policyKey;
       checkbox.required = Boolean(service.requirePolicy);
     } else {
       els.policyField.hidden = true;
+      const checkbox = els.policyField.querySelector("input");
+      checkbox.required = false;
+      checkbox.checked = false;
+      delete els.policyField.dataset.policyKey;
     }
   }
 
@@ -666,6 +673,7 @@
       notes: String(formData.get("notes") || "").trim(),
       intakeResponse: String(formData.get("intakeResponse") || "").trim(),
       intakeAnswers: window.ShowrunnerBookingRules.answers(els.form),
+      bookingRequirementsRevision: service.bookingRequirementsRevision || undefined,
       policyAccepted: formData.get("policyAccepted") === "on",
       companyWebsite: String(formData.get("companyWebsite") || "")
     };
@@ -851,6 +859,8 @@
         slotIntervalMinutes: service.slotIntervalMinutes,
         intakePrompt: service.intakePrompt || "",
         bookingRules: Array.isArray(service.bookingRules) ? service.bookingRules : null,
+        bookingFormTitle: service.bookingFormTitle || "",
+        bookingRequirementsRevision: service.bookingRequirementsRevision || "",
         policyText: service.policyText || "",
         requirePolicy: Boolean(service.requirePolicy),
         requestOnly: Boolean(service.requestOnly),

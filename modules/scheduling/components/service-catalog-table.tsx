@@ -1,9 +1,10 @@
 "use client";
 
+import { ResponsiveTableFrame } from "@/components/ui/responsive-table";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
-import { Eye, EyeOff, MoreHorizontal, Pencil, Search, X } from "lucide-react";
+import { Eye, EyeOff, Pencil, Search, X } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Pagination } from "@/components/ui/pagination";
@@ -191,35 +192,7 @@ export function ServiceCatalogTable({
         </div>
       </div>
 
-      <ul data-viewport-table-frame aria-label="Sessions" className="service-mobile-list">
-        {pagedServices.map((service) => (
-          <li data-viewport-row key={service.id}>
-            <div className="service-mobile-summary">
-              <Link className="service-mobile-name" href={`/admin/modules/services/${service.id}`}>{service.name}</Link>
-              <div className="service-mobile-meta">
-                <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
-                <span>{serviceDurationLabel(service.durationMinutes)}</span>
-                <span>{service.pricing}</span>
-                <span aria-label={`Packages: ${service.packageCount}`}>{service.packageCount}</span>
-              </div>
-            </div>
-            <ButtonLink aria-label={`Edit ${service.name}`} className="service-mobile-edit" href={`/admin/modules/services/${service.id}`} size="sm" variant="secondary">
-              <Pencil aria-hidden="true" size={14} /> Edit
-            </ButtonLink>
-            <details className="service-mobile-actions">
-              <summary aria-label={`More actions for ${service.name}`}><MoreHorizontal aria-hidden="true" size={18} /></summary>
-              <ButtonLink aria-haspopup="dialog" href={`${servicesHref}?statusService=${encodeURIComponent(service.id)}`} size="sm" variant="ghost">
-                {service.isActive ? "Mark draft" : "Mark active"}
-              </ButtonLink>
-            </details>
-          </li>
-        ))}
-        {!filteredServices.length ? <li className="service-mobile-empty">
-          <strong>{hasServices ? "No sessions found" : "No sessions yet"}</strong>
-          {hasServices ? <p>Adjust the current filters.</p> : emptyCreateAction || <p>Create a session to get started.</p>}
-        </li> : null}
-      </ul>
-      <div aria-label="Sessions table" className="catalog-table-scroll catalog-viewport-table service-desktop-table" role="region" tabIndex={0}>
+      <ResponsiveTableFrame aria-label="Sessions table" className="catalog-table-scroll catalog-viewport-table service-desktop-table" role="region" tabIndex={0}>
         <table className="catalog-product-table">
           <thead>
             <tr>
@@ -315,7 +288,7 @@ export function ServiceCatalogTable({
             ) : null}
           </tbody>
         </table>
-      </div>
+      </ResponsiveTableFrame>
       <Pagination
         onPageSizeChange={resizePage}
         className="catalog-table-pagination"

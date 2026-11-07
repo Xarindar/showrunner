@@ -1,5 +1,6 @@
 "use client";
 
+import { ResponsiveTableFrame } from "@/components/ui/responsive-table";
 import { useMemo, useState } from "react";
 import { Boxes, Pencil, Plus, Search, X } from "lucide-react";
 import Link from "next/link";
@@ -159,7 +160,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
         </div>
       </div>
 
-      <div className="catalog-table-scroll catalog-viewport-table">
+      <ResponsiveTableFrame className="catalog-table-scroll catalog-viewport-table">
         <table className="catalog-product-table service-package-table">
           <thead>
             <tr>
@@ -251,7 +252,7 @@ export function ServicePackageTable({ categoryOptions, packages, tagOptions }: S
             ) : null}
           </tbody>
         </table>
-      </div>
+      </ResponsiveTableFrame>
       <Pagination
         onPageSizeChange={resizePage}
         className="catalog-table-pagination"

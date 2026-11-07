@@ -17,6 +17,7 @@ export * from "./states";
 export * from "./switch";
 export * from "./switch-reveal";
 export * from "./table";
+export * from "./responsive-table";
 export * from "./table-filter-bar";
 export * from "./tabs";
 export * from "./tooltip";

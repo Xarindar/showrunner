@@ -666,7 +666,6 @@
 .filterPopover .selectControl { display: grid; gap: var(--sd-space-4); padding: 0; border: 0; background: transparent; }
 .filterPopover .selectControl select { appearance: auto; width: 100%; min-width: 0; font-weight: var(--sd-type-weight-regular); }
 .sortMenu { flex-shrink: 0; }
-.sortMenu :global(.ui-select-label) { display: none; }
 @media (max-width: 860px) {
   .libraryWorkspace .toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
   .libraryWorkspace .toolbar .librarySearch { grid-column: 1 / -1; }

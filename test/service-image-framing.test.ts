@@ -10,6 +10,7 @@ import { centeredFraming, imageFramingSchema } from "../modules/content/studio/i
 test("booking crop saves require authorization, valid framing and the current tenant revision", async () => {
   let writes = 0, count = 1, authorized = true;
   const mocks: Record<string, unknown> = {
+    "@/lib/scheduling/booking-document-store": {}, "@/lib/scheduling/booking-documents": {},
     "@/modules/content/studio/image-framing": { imageFramingSchema },
     "@/lib/scheduling/session-input": {}, "@/lib/scheduling/session-offering": {}, "@/lib/scheduling/service-library-store": {},
     "next/cache": { revalidatePath() {} }, "next/navigation": {},

@@ -62,6 +62,7 @@ export type BookingRequest = {
   intakeResponse?: string;
   intakeAnswers?: Record<string, string>;
   policyAccepted?: boolean;
+  bookingRequirementsRevision?: string;
   status?: BookingStatus;
 };
 

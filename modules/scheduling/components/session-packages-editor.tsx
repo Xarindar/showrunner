@@ -1,5 +1,6 @@
 "use client";
 
+import { ResponsiveTableFrame } from "@/components/ui/responsive-table";
 import { useId, useState } from "react";
 import { flushSync } from "react-dom";
 import { Copy, Pencil, Plus, X } from "lucide-react";
@@ -143,7 +144,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     <input type="hidden" name="price" value={firstTier ? tierPrice(firstTier) : ""} />
     <section className="studio-panel ui-section-card ui-table-card" aria-labelledby={`${listId}-packages-title`}>
     <div className="ui-section-header"><h2 id={`${listId}-packages-title`}>Packages</h2><Button type="button" variant="secondary" size="sm" disabled={draft.tiers.length >= 10} onClick={() => addTier()}><Plus aria-hidden="true" size={16} />Add package</Button></div>
-    <div className={`catalog-table-scroll ${styles.servicesTable} ${styles.packagesTable}`} role="region" aria-label="Packages table" tabIndex={0}>
+    <ResponsiveTableFrame className={`catalog-table-scroll ${styles.servicesTable} ${styles.packagesTable}`} role="region" aria-label="Packages table" tabIndex={0}>
       <table className="catalog-product-table"><thead><tr><th scope="col">Package</th><th scope="col">Price</th><th scope="col">Duration</th><th scope="col">Actions</th></tr></thead><tbody>
         {draft.tiers.filter(tier => !newTiers.has(tier.id)).map(tier => <tr key={tier.id}>
           <td><button type="button" className={styles.packageName} aria-haspopup="dialog" onClick={() => setExpandedTiers(new Set([tier.id]))}>{tier.name}</button></td>
@@ -153,7 +154,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
         </tr>)}
       </tbody></table>
       {!draft.tiers.some(tier => !newTiers.has(tier.id)) && <p className={styles.servicesEmpty}>No packages added</p>}
-    </div>
+    </ResponsiveTableFrame>
       {draft.tiers.map((tier, index) => {
         const services = draft.coverageItems.filter(item => tier.coverageIds.includes(item.id));
         const totalMinutes = Number(tier.durationMinutes);
@@ -163,6 +164,8 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
         const content = (
           <div className={styles.tierBody}>
           <div className={styles.tierFields}>
+          <section className={styles.packageSection} aria-labelledby={`${listId}-basics-${tier.id}`}>
+          <h3 className="ui-zero" id={`${listId}-basics-${tier.id}`}>Name &amp; pricing</h3>
           <Field label="Package name"><Input id={`${listId}-${tier.id}`} aria-label={`Package ${index + 1} name`} value={tier.name} autoFocus required maxLength={120} onChange={event => updateTier(tier.id, { name: event.target.value })} /></Field>
           <div className={styles.tierNumbers}>
             <ServicePricingFields pricingType={tier.pricingType ?? "FLAT_RATE"} hourlyRateId={tier.hourlyRateId ?? ""} rates={rates}
@@ -174,6 +177,9 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
               </Field>}
             />
           </div>
+          </section>
+          <section className={styles.packageSection} aria-labelledby={`${listId}-coverage-${tier.id}`}>
+          <h3 className="ui-zero" id={`${listId}-coverage-${tier.id}`}>Session coverage</h3>
           <div className={styles.deliverables}>
             <div className={styles.duration} role="group" aria-labelledby={durationLabelId}>
               <span className="ui-field-label" id={durationLabelId}>Duration</span>
@@ -206,6 +212,9 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
               </Field>
             ))}
           </div>
+          </section>
+          <section className={styles.packageSection} aria-labelledby={`${listId}-booking-${tier.id}`}>
+          <h3 className="ui-zero" id={`${listId}-booking-${tier.id}`}>Booking settings</h3>
           <div className={styles.bookingOptions} role="group" aria-label="Booking settings">
             {([
               ["bufferBeforeMinutes", "Time Before", "min", "minutes", 0, 1440],
@@ -219,14 +228,15 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
               </span>
             </Field>)}
           </div>
+          </section>
           <section className={styles.tierServices} aria-labelledby={`${listId}-service-title-${tier.id}`}>
             <div className={styles.heading}>
-              <h3 id={`${listId}-service-title-${tier.id}`}>Services</h3>
+              <h3 className="ui-zero" id={`${listId}-service-title-${tier.id}`}>Services</h3>
               <Button id={`${listId}-services-${tier.id}`} type="button" size="sm" variant="secondary" onClick={() => setLibraryPicker({ tierId: tier.id })}>
                 <Plus aria-hidden="true" size={15} />Add Services
               </Button>
             </div>
-            <div className={`catalog-table-scroll ${styles.servicesTable}`} tabIndex={0} role="region" aria-label="Package services table">
+            <ResponsiveTableFrame className={`catalog-table-scroll ${styles.servicesTable}`} tabIndex={0} role="region" aria-label="Package services table">
               <table className="catalog-product-table">
                 <thead><tr><th scope="col">Service</th><th scope="col" className={styles.serviceActions}>Actions</th></tr></thead>
                 <tbody>
@@ -234,7 +244,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
                 </tbody>
               </table>
               {!services.length && <p className={styles.servicesEmpty}>No services added</p>}
-            </div>
+            </ResponsiveTableFrame>
           </section>
           </div>
           <div className={`ui-inline-actions ${styles.actions}`}>
@@ -262,7 +272,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
         <h2 id={`${listId}-optional-title`} tabIndex={-1}>Suggested Add-Ons</h2>
         <Button type="button" variant="secondary" size="sm" disabled={draft.addOns.length >= 50} onClick={() => { setLibraryPicker({ optional: true }); }}><Plus size={16} />Add add-on</Button>
       </div>
-      <div className={`catalog-table-scroll ${styles.servicesTable} ${styles.suggestionsTable}`} tabIndex={0} role="region" aria-label="Suggested add-ons table">
+      <ResponsiveTableFrame className={`catalog-table-scroll ${styles.servicesTable} ${styles.suggestionsTable}`} tabIndex={0} role="region" aria-label="Suggested add-ons table">
         <table className="catalog-product-table"><thead><tr><th scope="col">Service</th><th scope="col">Add-on price</th><th scope="col">Actions</th></tr></thead><tbody>
           {draft.addOns.map((item, index) => <tr key={item.id}>
             <td>{item.name || `Add-on ${index + 1}`}</td>
@@ -271,7 +281,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
           </tr>)}
         </tbody></table>
         {!draft.addOns.length && <p className={styles.servicesEmpty}>No suggested add-ons</p>}
-      </div>
+      </ResponsiveTableFrame>
     </section>
     {libraryPicker && !libraryPicker.tierId && <ServiceLibraryPicker optional={libraryPicker.optional} rates={rates} onRateSaved={onRateSaved} selectedItems={libraryPicker.optional ? draft.addOns : draft.coverageItems} editingItem={libraryPicker.editingItem} onChoose={items => chooseLibraryItems(items)} onClose={closeLibrary} />}
     {removal && <Modal open title={`Remove "${removal.name}"?`} onClose={() => setRemoval(null)}>
