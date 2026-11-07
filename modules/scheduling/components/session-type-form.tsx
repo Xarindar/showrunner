@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, type ComponentProps, type ReactNode } from "react";
+import { useActionState, type ComponentProps } from "react";
 import type { Service } from "@prisma/client";
 import { ArrowLeft, Save } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -23,8 +23,8 @@ import styles from "../service-editor.module.css";
 
 type InitialSession = Pick<Service, "id" | "updatedAt" | "name" | "description" | "category" | "tags" | "isActive" | "location" | "durationMinutes" | "priceCents" | "pricingType" | "hourlyRateId" | "bufferBeforeMinutes" | "bufferAfterMinutes" | "minimumNoticeHours" | "maxAdvanceDays" | "slotIntervalMinutes" | "bookingRules" | "intakePrompt" | "policyText" | "requirePolicy" | "requestOnly" | "waitlistEnabled">;
 
-export function SessionTypeForm({ businessHours, timezone, canUpload, schedulingRules, rates, tags, categoryOptions = [], availableRules, intakeOptions, policyOptions, initialService, initialOffering, initialMedia }: {
-  businessHours: string[]; timezone: string; canUpload: boolean; schedulingRules: ReactNode; rates: HourlyRate[]; tags: string[]; categoryOptions?: string[];
+export function SessionTypeForm({ canUpload, rates, tags, categoryOptions = [], availableRules, intakeOptions, policyOptions, initialService, initialOffering, initialMedia }: {
+  canUpload: boolean; rates: HourlyRate[]; tags: string[]; categoryOptions?: string[];
   availableRules?: BookingRule[]; intakeOptions?: string[]; policyOptions?: string[];
   initialService?: InitialSession; initialOffering?: SessionOffering | null; initialMedia?: Omit<ComponentProps<typeof ServiceMediaFields>, "canUpload">;
 }) {
@@ -49,7 +49,7 @@ export function SessionTypeForm({ businessHours, timezone, canUpload, scheduling
         <section className="studio-panel ui-section-card" aria-labelledby={detailsId}>
           <div className="ui-section-header"><h2 id={detailsId}>Session details</h2></div>
           <div className="ui-section-body">
-            <Field label="Session name"><Input name="name" defaultValue={initialService?.name ?? ""} required placeholder="Family session" /></Field>
+            <Field label="Session name"><Input name="name" autoComplete="off" defaultValue={initialService?.name ?? ""} required placeholder="Family session" /></Field>
             <Field label="Description"><Textarea id="service-description" name="description" defaultValue={initialService?.description ?? ""} rows={3} /></Field>
             <ServicePresetField defaultValue={initialService?.category ?? ""} emptyLabel="Uncategorized" id="service-category" label="Category" name="category" newLabel="New category" newPlaceholder="Category name" options={categoryOptions} />
             <ServiceMediaFields canUpload={canUpload} {...initialMedia} />
@@ -57,8 +57,7 @@ export function SessionTypeForm({ businessHours, timezone, canUpload, scheduling
             <ServiceTagsField tags={tags} initialTags={nonEmptyStringArrayFromUnknown(initialService?.tags)} />
           </div>
         </section>
-        <SessionPackagesEditor initialRates={rates} isNew={!initialService} initialOffering={initialOffering} durationMinutes={initialService?.durationMinutes} priceCents={initialService?.priceCents} initialPricingType={initialService?.pricingType} initialHourlyRateId={initialService?.hourlyRateId ?? ""} initialScheduling={initialService}
-          bookingAvailability={<><p className="muted-text ui-zero">{businessHours.length ? `Uses shared business hours (${timezone}).` : `Set business hours (${timezone}) before activating this session.`} Booking settings apply to every package in this session.</p>{schedulingRules}</>} />
+        <SessionPackagesEditor initialRates={rates} isNew={!initialService} initialOffering={initialOffering} durationMinutes={initialService?.durationMinutes} priceCents={initialService?.priceCents} initialPricingType={initialService?.pricingType} initialHourlyRateId={initialService?.hourlyRateId ?? ""} initialScheduling={initialService} />
         <ServiceBookingRulesTable idPrefix={initialService ? "service" : "new-session"} availableRules={availableRules} intakeOptions={intakeOptions} policyOptions={policyOptions}
           defaultRules={initialService?.bookingRules} defaultIntakePrompt={initialService?.intakePrompt} defaultPolicyText={initialService?.policyText} defaultRequirePolicy={initialService?.requirePolicy} defaultRequestOnly={initialService?.requestOnly} defaultWaitlistEnabled={initialService?.waitlistEnabled} />
       </main>

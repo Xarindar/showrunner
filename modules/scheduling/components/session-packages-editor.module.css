@@ -24,7 +24,7 @@
   padding: var(--space-4);
 }
 .tierFields {
-  grid-template-rows: auto auto auto minmax(var(--sd-space-96), 1fr);
+  grid-template-rows: auto auto auto auto minmax(var(--sd-space-96), 1fr);
   overflow-y: auto;
   scrollbar-gutter: auto;
   padding: 0;
@@ -87,9 +87,10 @@
 .packageName { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 :global(.showrunner-admin) .packagesTable :global(.catalog-product-table) th:nth-child(2) { width: 22%; }
 
-.booking { display: grid; gap: var(--sd-space-8); min-width: 0; }
-.booking h3 { margin: 0; font-size: var(--sd-type-heading-size); font-weight: var(--sd-type-weight-medium); }
-.booking > :global(.ui-button) { justify-self: start; }
-.bookingOptions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sd-space-12); padding-top: var(--sd-space-12); }
-
-.tierFields:has(.booking) { grid-template-rows: auto auto auto auto minmax(var(--sd-space-96), 1fr); }
+.bookingOptions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sd-space-12); }
+.unitField { position: relative; display: block; min-width: 0; }
+.editor .unitField input { padding-inline-end: var(--sd-space-64); }
+.unit { position: absolute; inset-inline-end: var(--sd-space-32); top: 50%; transform: translateY(-50%); color: var(--color-muted); pointer-events: none; }
+@media (max-width: 600px) {
+  .bookingOptions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

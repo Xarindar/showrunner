@@ -1,4 +1,3 @@
-import { formatTimeValue, minutesToTime } from "@/lib/format";
 import { Notification } from "@/components/ui/notifications";
 import { readImageFraming } from "@/modules/content/studio/image-framing";
 import { SessionTypeForm } from "./components/session-type-form";
@@ -15,8 +14,6 @@ import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { type AssetPickerAsset } from "@/components/ui";
 import { bookingRuleSchema, readBookingRules } from "@/lib/scheduling/booking-rules";
-import { AvailabilityPanel } from "./components/availability-panel";
-import { ServiceSchedulingRules } from "./components/service-scheduling-rules";
 
 type ServiceEditPageProps = {
   searchParams: Promise<{ error?: string; saved?: string; tab?: string }>;
@@ -58,16 +55,12 @@ function serviceMediaUrl(service: ServiceWithBuilderData) {
 export default async function ServiceEditPage({ searchParams, serviceId }: ServiceEditPageProps) {
   const user = await requireAdmin("scheduling:manage");
   const [params, settings] = await Promise.all([searchParams, getSiteSettings()]);
-  const [availability, staff, resources, rates, mediaTags, sessionTags] = await Promise.all([
-    prisma.availabilityRule.findMany({ where: { siteId: settings.siteId }, include: { resource: true, staff: true }, orderBy: [{ weekday: "asc" }, { startMinutes: "asc" }] }),
-    prisma.staffMember.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
-    prisma.resource.findMany({ where: { siteId: settings.siteId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
+  const [rates, mediaTags, sessionTags] = await Promise.all([
     prisma.hourlyRate.findMany({ where: { siteId: settings.siteId }, orderBy: { name: "asc" }, select: { id: true, name: true, amountCents: true } }),
     prisma.mediaAsset.findMany({ where: await getAccessibleMediaWhere(user, settings.siteId, { deletedAt: null }), select: { tags: true }, take: 5000 }),
     prisma.service.findMany({ where: { siteId: settings.siteId }, select: { tags: true } })
   ]);
   const tagOptions = summarizeMediaTags([...mediaTags, ...sessionTags], 5000).map(tag => tag.name);
-  const schedulingRules = <ServiceSchedulingRules><AvailabilityPanel availability={availability} resources={resources} staff={staff} timezone={settings.timezone} /></ServiceSchedulingRules>;
   const taxonomyServicesPromise = prisma.service.findMany({
     where: { siteId: settings.siteId, isOneOff: false },
     select: { category: true, intakePrompt: true, location: true, policyText: true, bookingRules: true }
@@ -109,10 +102,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     const parsed = bookingRuleSchema.safeParse({ id: field.id, kind: "intake", category: contactField ? "Contact" : field.form.name.slice(0, 80), label: field.label, type: field.type === "RADIO" || field.type === "SELECT" ? field.type : "TEXT", required: field.isRequired, options: Array.isArray(field.options) ? field.options : [], placeholder: field.placeholder, helpText: field.helpText, contactField });
     return parsed.success ? [parsed.data] : [];
   })];
-  const rules = availability.filter(rule => !rule.staffId && !rule.resourceId);
-  const timeLabel = (minutes: number) => formatTimeValue(minutesToTime(minutes));
-  const businessHours = rules.map(rule => `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][rule.weekday]} ${timeLabel(rule.startMinutes)}–${timeLabel(rule.endMinutes)}`);
-  const formProps = { availableRules, intakeOptions, policyOptions, tags: tagOptions, rates, businessHours, timezone: settings.timezone, canUpload: isMediaUploadDriverConfigured(settings.mediaDriver), schedulingRules, categoryOptions };
+  const formProps = { availableRules, intakeOptions, policyOptions, tags: tagOptions, rates, canUpload: isMediaUploadDriverConfigured(settings.mediaDriver), categoryOptions };
   if (serviceId === "new") return <SessionTypeForm {...formProps} />;
   if (!service) notFound();
   const offering = await hydrateSessionServiceLibrary(readSessionOffering(service.sessionOffering), settings.siteId);
