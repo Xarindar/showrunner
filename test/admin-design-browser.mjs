@@ -33,6 +33,7 @@ await build({
     import {Tooltip} from './components/ui/tooltip';
     import {NotificationProvider} from './components/ui/notifications';
     import {AvailabilityPanel} from './modules/scheduling/components/availability-panel';
+    import {ServiceSchedulingRules} from './modules/scheduling/components/service-scheduling-rules';
     import {BlockoutsPanel} from './modules/scheduling/components/blockouts-panel';
     import scheduleStyles from './modules/appointments/schedule.module.css';
     import serviceStyles from './modules/scheduling/service-editor.module.css';
@@ -149,7 +150,8 @@ await build({
         <TableStyleFixtures />
         <ModalAuditFixtures />
         <Modal title="Shared dialog" open={open} onClose={()=>setOpen(false)}><Field label="Dialog field"><Input /></Field><div className="module-modal-actions"><Button variant="secondary" onClick={()=>setOpen(false)}>Cancel dialog</Button><Button>Confirm</Button></div></Modal>
-        <section aria-label="New session builder fixture"><SessionTypeForm businessHours={["Monday"]} timezone="America/Chicago" canUpload={false} schedulingRules={null} rates={[]} tags={[]} /></section>
+        <section aria-label="New session builder fixture"><SessionTypeForm businessHours={["Monday"]} timezone="America/Chicago" canUpload={false} schedulingRules={<ServiceSchedulingRules><AvailabilityPanel availability={[]} resources={[]} staff={[]} timezone="America/Chicago" /></ServiceSchedulingRules>} rates={[]} tags={[]} /></section>
+        <section aria-label="Edit session builder fixture"><SessionTypeForm businessHours={["Monday"]} timezone="America/Chicago" canUpload={false} schedulingRules={<ServiceSchedulingRules><AvailabilityPanel availability={[]} resources={[]} staff={[]} timezone="America/Chicago" /></ServiceSchedulingRules>} rates={[]} tags={[]} initialService={{id:'saved-session',updatedAt:new Date('2026-11-07T00:00:00Z'),name:'Saved session',description:'Saved description',category:'Photography',tags:['Portraits'],isActive:true,location:'Studio',durationMinutes:90,priceCents:10000,pricingType:'FLAT_RATE',hourlyRateId:null,bufferBeforeMinutes:10,bufferAfterMinutes:20,minimumNoticeHours:48,maxAdvanceDays:90,slotIntervalMinutes:15,bookingRules:null,intakePrompt:null,policyText:null,requirePolicy:false,requestOnly:false,waitlistEnabled:false}} /></section>
       </main></NotificationProvider></div>;
     }
     createRoot(document.getElementById('root')).render(location.pathname==='/workspace-fixture'?<WorkspaceFixture />:<Fixture />);
@@ -168,7 +170,7 @@ await build({
     build.onResolve({ filter: /^\.\/actions$/ }, args => args.importer.endsWith("editor.tsx") ? {path:"actions",namespace:"image-fixture"} : undefined);
     build.onLoad({filter: /.*/, namespace:"image-fixture"}, args => ({contents: args.path === "actions" ? "export async function uploadStudioAsset() {}" : `import React from 'react'; export function AssetPicker({children,triggerClassName,onSelectAsset,onUploadedAssets}) {return <><button className={triggerClassName} onClick={()=>onSelectAsset({id:'chosen-photo',filename:'Selected photo',url:'/replacement-photo.svg',thumbnailUrl:'/replacement-photo.svg',alt:'Selected photo'})}>{children}</button><button onClick={()=>onUploadedAssets([1,2,3,4,5].map(id=>({id:'photo-'+id,filename:'Photo '+id,url:'/uploaded-photo.svg',thumbnailUrl:'/uploaded-photo.svg',alt:'Uploaded photo'})))}>Complete upload</button></>}`,loader:"tsx",resolveDir:process.cwd()}));
     build.onResolve({ filter: /^\.\.\/actions$/ }, args => args.importer.includes("scheduling") ? { path: "schedule-actions", namespace: "fixture" } : undefined);
-    build.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({ contents: "export async function saveWeeklyHoursAction() { return { error: '', success: 'Hours saved.' }; } export async function createBlockoutAction() {} export async function deleteBlockoutAction() {} export async function createServiceAction() {} export async function uploadServiceMediaAssetAction() {}", loader: "js" }));
+    build.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({ contents: "export async function saveWeeklyHoursAction() { return { error: '', success: 'Hours saved.' }; } export async function createBlockoutAction() {} export async function deleteBlockoutAction() {} export async function createServiceAction() {} export async function updateSessionTypeAction() {} export async function uploadServiceMediaAssetAction() {}", loader: "js" }));
   } }],
   define: { "process.env.NODE_ENV": '"production"', "process.env": "{}" }, logLevel: "silent"
 });
@@ -335,6 +337,12 @@ try {
   });
   assert(emptyAlignment.every(offset => offset < 3), 'Empty services message is centered in the table body');
   await newPackage.screenshot({path:`${captures}/new-package-empty.png`});
+  const durationAlignment=await newPackage.evaluate(modal => {
+    const hours=modal.querySelector('select[aria-label="Hours"]').getBoundingClientRect();
+    const locations=[...modal.querySelectorAll('label')].find(label=>label.textContent==='Locations').querySelector('input').getBoundingClientRect();
+    return Math.abs(hours.top-locations.top);
+  });
+  assert(durationAlignment<1,'Duration selects align with deliverable inputs');
   const emptyPackageLayout = await packageLayout();
   assert(emptyPackageLayout[1] > 160, 'Services table grows into the available desktop modal space');
   const tableToActionsGap = await servicesTable.evaluate(table => {
@@ -855,6 +863,42 @@ try {
     await newSession.screenshot({path:captures+'/session-mobile-refinement-'+width+'.png'});
   }
   const builder=page.getByRole('region',{name:'New session builder fixture',exact:true});
+  assert.equal(await builder.locator('.product-studio-sidecar').count(),0,'Booking settings have no create-only sidebar');
+  await builder.getByRole('button',{name:'Add package',exact:true}).click();
+  const bookingPackage=page.getByRole('dialog',{name:'New package',exact:true});
+  const availability=bookingPackage.getByRole('region',{name:'Booking availability',exact:true});
+  assert(await availability.isVisible(),'Booking availability lives inside the package editor');
+  await availability.getByRole('button',{name:'Business hours',exact:true}).click();
+  const businessHoursDialog=page.getByRole('dialog',{name:'Scheduling rules',exact:true});
+  assert(await businessHoursDialog.getByRole('region',{name:'Weekly hours',exact:true}).isVisible(),'Shared business hours can be opened from a package');
+  await businessHoursDialog.getByRole('button',{name:'Close dialog',exact:true}).click();
+  assert(await bookingPackage.isVisible(),'Closing business hours returns to the package draft');
+
+  await availability.getByText('Booking options',{exact:true}).click();
+  await availability.getByRole('spinbutton',{name:'Minimum notice (hours)',exact:true}).fill('24');
+  await bookingPackage.getByRole('button',{name:'Cancel',exact:true}).click();
+  assert.equal(await builder.locator('input[name="minimumNoticeHours"]').inputValue(),'24','Booking settings submit even after the package modal closes');
+
+
+  const editBuilder=page.getByRole('region',{name:'Edit session builder fixture',exact:true});
+  assert.equal(await editBuilder.locator('.product-studio-sidecar').count(),0);
+  const fieldNames=scope=>scope.locator('input[name], textarea[name], select[name]').evaluateAll(elements=>elements.map(element=>element.name).filter(name=>!['id','updatedAt','location'].includes(name)).sort());
+  assert.deepEqual(await fieldNames(editBuilder),await fieldNames(builder),'New and edit use identical session fields');
+  await editBuilder.getByRole('button',{name:'Edit Standard',exact:true}).click();
+  const savedPackage=page.getByRole('dialog',{name:'Edit Standard',exact:true});
+  assert(await savedPackage.getByRole('region',{name:'Booking availability',exact:true}).isVisible(),'Existing packages expose booking availability too');
+  await savedPackage.getByText('Booking options',{exact:true}).click();
+  assert.equal(await savedPackage.getByRole('spinbutton',{name:'Minimum notice (hours)',exact:true}).inputValue(),'48','Edit loads saved scheduling values');
+  await savedPackage.getByRole('spinbutton',{name:'Minimum notice (hours)',exact:true}).fill('72');
+  await savedPackage.getByText('Booking options',{exact:true}).click();
+  for (const width of [1440,390]) {
+    await page.setViewportSize({width,height:844});
+    assert.equal(await savedPackage.evaluate(element=>element.scrollWidth>element.clientWidth),false,'Package booking settings fit '+width+'px');
+    assert(await savedPackage.evaluate(modal=>Math.abs(modal.querySelector('select[aria-label="Hours"]').getBoundingClientRect().top-[...modal.querySelectorAll('label')].find(label=>label.textContent==='Locations').querySelector('input').getBoundingClientRect().top)<1),'Duration and locations align at '+width+'px');
+    await savedPackage.screenshot({path:captures+'/package-booking-'+width+'.png'});
+  }
+  await savedPackage.getByRole('button',{name:'Done',exact:true}).click();
+  assert.equal(await editBuilder.locator('input[name="minimumNoticeHours"]').inputValue(),'72','Edited settings remain in the saved session payload after closing');
   const active=builder.getByRole('switch',{name:'Active',exact:true});
   assert(await active.evaluate(element=>!!element.closest('[aria-labelledby="new-session-details-title"]')),'Active lives in Session details');
   await active.check();
@@ -868,7 +912,7 @@ try {
   await active.uncheck();
   assert.deepEqual(await active.evaluate(element=>new FormData(element.form).getAll('isActive')),[],'Draft omits the active flag');
   const builderCards=await builder.locator('.studio-panel').evaluateAll(elements=>elements.map(element=>({card:element.classList.contains('ui-section-card'),header:!!element.querySelector('.ui-section-header')})));
-  assert(builderCards.length>=6&&builderCards.every(card=>card.card&&card.header),'Every builder card uses the shared black header');
+  assert(builderCards.length===4&&builderCards.every(card=>card.card&&card.header),'Every builder card uses the shared black header');
   await builder.getByPlaceholder('Find or add tags').focus();
   const newTag=builder.getByRole('button',{name:'New Tag',exact:true});
   assert(await newTag.evaluate(element=>{const b=element.getBoundingClientRect();return element.contains(document.elementFromPoint(b.x+b.width/2,b.y+b.height/2));}),'Card headers do not clip the organization tag popup');

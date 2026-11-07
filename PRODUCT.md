@@ -87,7 +87,7 @@ Cottage616 and The Hive team sections use editable member lists: clients can add
 
 On mobile, navigation opens from the existing module page header beside its title. There is no additional Showrunner bar or floating menu over Save controls; a compact fallback appears only while a route has no page header. Section-header add actions retain a compact 28px visual pill inside a 44px touch target.
 
-The session Active switch lives in Session details for both new and existing sessions. The redundant Status summary card is removed from existing-session editing. New-session activation still validates and, when needed, collects business hours.
+The session Active switch lives in Session details for both new and existing sessions. The redundant Status summary card is removed from existing-session editing. New-session activation still validates business hours. New and edit sessions share one builder form; booking availability and scheduling options live beneath duration and deliverables in each package modal, with no booking sidebar. These options apply to every package in the session and retain saved values; Business hours edits the shared schedule.
 
 Tags appears directly below Active in Session details; there is no separate Organization card. The shared tag picker uses the standard form-label typography and 8px label-to-input gap. Embedded table cards retain the same minimum body height when their first row is added.
 

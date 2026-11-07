@@ -7,7 +7,6 @@
   display: block;
   width: 100%;
   min-width: 0;
-  margin-top: var(--sd-space-6);
   scroll-margin-block: 80px;
 }
 .actions { justify-content: flex-end; margin-top: var(--sd-space-8); }
@@ -87,3 +86,10 @@
 .packagesTable :global(.catalog-product-table) td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .packageName { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 :global(.showrunner-admin) .packagesTable :global(.catalog-product-table) th:nth-child(2) { width: 22%; }
+
+.booking { display: grid; gap: var(--sd-space-8); min-width: 0; }
+.booking h3 { margin: 0; font-size: var(--sd-type-heading-size); font-weight: var(--sd-type-weight-medium); }
+.booking > :global(.ui-button) { justify-self: start; }
+.bookingOptions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sd-space-12); padding-top: var(--sd-space-12); }
+
+.tierFields:has(.booking) { grid-template-rows: auto auto auto auto minmax(var(--sd-space-96), 1fr); }
