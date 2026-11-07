@@ -88,8 +88,8 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
     <div className="ui-section-header">
       <h2 id={`${idPrefix}-rules-title`}>Intake and Booking Terms &amp; Conditions</h2>
       <div className="booking-rule-actions">
-        <Button type="button" variant="secondary" onClick={() => open("library")}><Plus size={15} />Add rule</Button>
         <ButtonLink href="/admin/modules/appointments/forms-terms" variant="secondary">Manage forms &amp; terms</ButtonLink>
+        <Button type="button" variant="secondary" onClick={() => open("library")}><Plus size={15} />Add rule</Button>
       </div>
     </div>
     <div className="ui-section-body booking-document-choices">
