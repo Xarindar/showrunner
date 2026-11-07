@@ -12,7 +12,7 @@ import { catalogMediaUrl } from "@/lib/catalog-media-url";
 import { contentWebsiteUrl, resolveContentManifest } from "@/clients/content-manifests";
 import { notFound } from "next/navigation";
 import { MediaVariantType, type MediaAsset, type Prisma } from "@prisma/client";
-import { ArrowLeft, Boxes, FileText } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { ServiceTagsField } from "./components/service-tags-field";
 import { summarizeMediaTags } from "@/lib/media-tags";
 import { requireAdmin, getAccessibleMediaWhere } from "@/lib/auth";
@@ -24,7 +24,6 @@ import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
 import { ServiceBookingRulesTable } from "./components/service-booking-rules-table";
 import { bookingRuleSchema, readBookingRules } from "@/lib/scheduling/booking-rules";
 import { ServicePresetField } from "./components/service-preset-field";
-import { ServiceWorkspaceTabs, type ServiceWorkspaceTab } from "./components/service-workspace-tabs";
 import { AvailabilityPanel } from "./components/availability-panel";
 import { ServiceSchedulingRules } from "./components/service-scheduling-rules";
 
@@ -36,11 +35,6 @@ type ServiceEditPageProps = {
 type ServiceWithBuilderData = Prisma.ServiceGetPayload<{
   include: {
     mediaAsset: true;
-    packageItems: {
-      include: {
-        package: true;
-      };
-    };
   };
 }>;
 
@@ -124,11 +118,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
       include: {
         mediaAsset: true,
         rectangularMediaAsset: true,
-        galleryAssets: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
-        packageItems: {
-          include: { package: true },
-          orderBy: [{ package: { sortOrder: "asc" } }, { createdAt: "asc" }]
-        }
+        galleryAssets: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] }
       }
     }),
     taxonomyServicesPromise,
@@ -154,7 +144,6 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   const offering = await hydrateSessionServiceLibrary(readSessionOffering(service.sessionOffering), settings.siteId);
   const savedMessage = savedServiceMessage(params.saved);
   const errorMessage = params.error || null;
-  const packageCount = service.packageItems.length;
   const canUpload = isMediaUploadDriverConfigured(settings.mediaDriver);
   const toPickerAsset = (asset: MediaAsset): AssetPickerAsset => ({
     alt: asset.alt || asset.filename,
@@ -235,67 +224,6 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     </>
   );
 
-  const packagesContent = (
-    <section className="studio-panel ui-section-card">
-      <div className="ui-section-header">
-        <div>
-          <h2>Session Bundles</h2>
-        </div>
-        <Boxes size={20} />
-      </div>
-
-      <div className="ui-section-body">{service.packageItems.length ? (
-        <div className="catalog-table-scroll">
-          <table className="catalog-product-table">
-            <thead>
-              <tr>
-                <th>Bundle</th>
-                <th>Status</th>
-                <th>Quantity</th>
-                <th>Sort</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {service.packageItems.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <span className="catalog-cell-text" title={item.package.name}>{item.package.name}</span>
-                  </td>
-                  <td>
-                    <span className={serviceStatusClass(item.package.isActive)}>{item.package.isActive ? "active" : "draft"}</span>
-                  </td>
-                  <td>{item.quantity}</td>
-                  <td>{item.sortOrder}</td>
-                  <td>
-                    <ButtonLink href={`/admin/modules/services/packages/${item.package.id}`} size="sm" variant="secondary">
-                      Edit bundle
-                    </ButtonLink>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="catalog-empty-state">
-          <Boxes size={28} />
-          <h3>No session bundles</h3>
-          <p>Open a bundle to combine this session with other sessions.</p>
-          <ButtonLink href="/admin/modules/services?tab=packages" variant="secondary">
-            Open session bundles
-          </ButtonLink>
-        </div>
-      )}
-      </div>
-    </section>
-  );
-
-  const tabs: ServiceWorkspaceTab[] = [
-    { content: detailsContent, icon: <FileText size={15} />, id: "details", label: "Session & packages" },
-    ...(packageCount ? [{ content: packagesContent, icon: <Boxes size={15} />, id: "packages", label: "Session Bundles" }] : [])
-  ];
-
   return (
     <div className={`${styles.page} stack product-studio-page product-editor-page service-editor-page has-mobile-shell-header`}>
       <AdminMobileHeaderSlot backHref="/admin/modules/services" title={service.name} />
@@ -317,7 +245,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
       {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
       {errorMessage ? <Notification tone="danger" queryKey="error">{errorMessage}</Notification> : null}
 
-      <ServiceWorkspaceTabs initialTab={params.tab} tabs={tabs} />
+      {detailsContent}
     </div>
   );
 }

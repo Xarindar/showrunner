@@ -792,6 +792,7 @@ try {
         assert.equal(Math.round((await family.getByRole('cell').boundingBox()).height),80,'Empty tables use the compact empty-state token');
       } else {
         const rows=family.locator('tbody tr');
+        for (const row of await rows.all()) assert.deepEqual(await row.locator('td').first().evaluate(element=>{const style=getComputedStyle(element);return [style.borderBottomWidth,style.borderBottomColor];}),['1px','rgb(221, 221, 221)'],key+' keeps a visible boundary below every record, including the final row');
         assert.equal(await rows.first().evaluate(element=>getComputedStyle(element).backgroundColor),'rgb(255, 255, 255)',key+' rows are white');
         assert.notEqual(await rows.last().evaluate(element=>getComputedStyle(element).backgroundColor),'rgb(255, 255, 255)',key+' retains its selected state');
         const action=family.getByRole('button',{name:'Edit fixture',exact:true});
@@ -812,6 +813,12 @@ try {
       assert(await header.evaluate(element=>element.scrollWidth<=element.clientWidth),'Actions header fits without clipping at '+width+'px');
       assert.equal(await header.evaluate(element=>getComputedStyle(element).whiteSpace),'nowrap');
       assert.equal(Math.round((await header.boundingBox()).height),32,'Column labels never create a second line');
+      const records=table.locator('tbody tr');
+      if (await records.count()) {
+        const bodySpace=(await table.boundingBox()).height-(await table.locator('thead').boundingBox()).height;
+        assert(bodySpace>=(await records.first().boundingBox()).height*2-1,'Table cards reserve room for a second row at '+width+'px');
+      }
+
     }
     await packageList.screenshot({path:captures+'/package-columns-'+width+'.png'});
   }

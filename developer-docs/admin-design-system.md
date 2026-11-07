@@ -281,3 +281,7 @@ The calendar marks its heading with `data-admin-page-header` and retains its mob
 Booking-option label/switch pairs hug their contents with an 8px internal gap and are centered together on desktop. Mobile stacks each pair in one of three equal columns. At mobile widths, the visible policy label shortens to Require T&C; its accessible name remains Require T&C Acceptance. Desktop retains the full label.
 
 `MediaTagPicker` composes the shared `Field` recipe so Tags uses the normal 13px label scale and 8px control gap wherever it is embedded. Media inspector metadata retains its deliberately smaller scale. Session details places Tags after Active; an editor without a sidecar spans the available form columns.
+
+Every populated table row keeps a 1px bottom divider, including the final row above reserved space. `--data-table-row-divider` uses the standard border tone rather than the subtle border tone, so record boundaries stay visible without hover. Empty placeholder cells do not receive a record-ending divider. This rule applies to all shared admin table families.
+
+Table cards reserve at least two standard rows through `--data-table-reserved-rows`, with the 80px empty-state height as a floor. The calculation includes cell padding, dividers and the responsive row-control height, so the second row also fits beside mobile touch-sized actions. Cards grow naturally beyond that minimum; this reservation does not add dummy records.
