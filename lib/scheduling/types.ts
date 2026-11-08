@@ -60,7 +60,7 @@ export type BookingRequest = {
   customerPhone?: string;
   notes?: string;
   intakeResponse?: string;
-  intakeAnswers?: Record<string, string>;
+  intakeAnswers?: Record<string, string | string[]>;
   policyAccepted?: boolean;
   bookingRequirementsRevision?: string;
   status?: BookingStatus;

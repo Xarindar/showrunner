@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import styles from "./booking-question-choices.module.css";
 
-export function BookingQuestionChoices({ value, onChange }: { value: string[]; onChange: (choices: string[]) => void }) {
+export function BookingQuestionChoices({ value, onChange, minimumChoices = 2 }: { value: string[]; onChange: (choices: string[]) => void; minimumChoices?: 1 | 2 }) {
   const list = useRef<HTMLDivElement>(null);
   const previousLength = useRef(value.length);
   useEffect(() => {
@@ -23,6 +23,6 @@ export function BookingQuestionChoices({ value, onChange }: { value: string[]; o
       </div>)}
     </div>
     <Button variant="secondary" size="sm" className={styles.add} disabled={value.length >= 30} onClick={() => onChange([...value, ""])}><Plus size={16} />Add choice</Button>
-    <span className="ui-field-hint">Add at least two different choices.</span>
+    <span className="ui-field-hint">{minimumChoices === 1 ? "Add at least one choice. Keep choices different." : "Add at least two different choices."}</span>
   </fieldset>;
 }

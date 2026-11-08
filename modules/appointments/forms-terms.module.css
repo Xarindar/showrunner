@@ -17,8 +17,3 @@
 
 .table { position: relative; min-height: calc(var(--table-row-height, 48px) * 3); }
 .empty { margin: 0; min-height: 96px; display: grid; place-items: center; padding: var(--space-4); color: var(--color-text-muted); text-align: center; }
-
-.content > :global(.ui-table-card).questions { display: flex; flex-direction: column; flex: 1; min-height: 12rem; }
-.questions > .table { display: flex; flex-direction: column; flex: 1; min-height: 0; min-block-size: 0; overflow: auto; }
-.questions > .table > table { flex-shrink: 0; }
-.questions .empty { flex: 1; min-height: 0; }

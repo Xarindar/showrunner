@@ -192,18 +192,18 @@ export function ServiceCatalogTable({
         </div>
       </div>
 
-      <ResponsiveTableFrame aria-label="Sessions table" className="catalog-table-scroll catalog-viewport-table service-desktop-table" role="region" tabIndex={0}>
+      <ResponsiveTableFrame mobileLayout="columns" aria-label="Sessions table" className="catalog-table-scroll catalog-viewport-table service-desktop-table" role="region" tabIndex={0}>
         <table className="catalog-product-table">
           <thead>
             <tr>
-              <th>Session</th>
-              <th>Status</th>
+              <th data-mobile-column>Session</th>
+              <th data-mobile-column>Status</th>
               <th>Category</th>
               <th>Tags</th>
               <th>Duration</th>
               <th>Price</th>
-              <th>Packages</th>
-              <th>Actions</th>
+              <th data-mobile-column>Packages</th>
+              <th data-mobile-column>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -212,12 +212,12 @@ export function ServiceCatalogTable({
               const tagsLabel = service.tags.join(", ") || "No tags";
               return (
                 <tr key={service.id}>
-                  <td data-label="Session">
+                  <td data-mobile-column data-label="Session">
                     <div className="catalog-row-copy">
                       <Link className="catalog-cell-text" href={`/admin/modules/services/${service.id}`} title={service.name}>{service.name}</Link>
                     </div>
                   </td>
-                  <td data-label="Status">
+                  <td data-mobile-column data-label="Status">
                     <span className={serviceStatusClass(service.isActive)}>{service.isActive ? "active" : "draft"}</span>
                   </td>
                   <td data-label="Category">
@@ -232,8 +232,8 @@ export function ServiceCatalogTable({
                   <td data-label="Price">
                     <span className="catalog-cell-text" title={service.pricing === "-" ? "Price not set" : service.pricing}>{service.pricing}</span>
                   </td>
-                  <td data-label="Packages">{service.packageCount}</td>
-                  <td data-label="Actions">
+                  <td data-mobile-column data-label="Packages">{service.packageCount}</td>
+                  <td data-mobile-column data-label="Actions">
                     <div className="catalog-row-actions">
                       <Tooltip content="Edit session" focusable={false}>
                         <ButtonLink

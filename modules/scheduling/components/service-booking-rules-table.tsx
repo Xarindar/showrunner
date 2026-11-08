@@ -14,7 +14,7 @@ import { bookingDocumentSelectionSchema, type BookingDocument } from "@/lib/sche
 import { listBookingRuleSets, saveBookingRuleSet } from "../booking-rule-actions";
 
 type Props = { documents?: BookingDocument[]; initialSelection?: unknown; defaultRules?: unknown; defaultIntakePrompt?: string | null; defaultPolicyText?: string | null; defaultRequirePolicy?: boolean; defaultRequestOnly?: boolean; defaultWaitlistEnabled?: boolean; idPrefix: string; intakeOptions?: string[]; policyOptions?: string[]; availableRules?: BookingRule[] };
-const typeLabels = { TEXT: "Text box", RADIO: "Radio buttons", SELECT: "Dropdown" };
+const typeLabels = { TEXT: "Text box", RADIO: "Radio buttons", SELECT: "Dropdown", CHECKBOX: "Checkboxes", DATE: "Date" };
 
 export function ServiceBookingRulesTable({ documents = [], initialSelection, defaultRules, defaultIntakePrompt, defaultPolicyText, defaultRequirePolicy = false, defaultRequestOnly = false, defaultWaitlistEnabled = false, idPrefix, intakeOptions = [], policyOptions = [], availableRules = [] }: Props) {
   const [rules, setRules] = useState(() => readBookingRules(defaultRules, { intakePrompt: defaultIntakePrompt, policyText: defaultPolicyText }));
@@ -65,7 +65,7 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
     setRules(parsed.data); setMode(null); notify("Rules added to this draft. Save the session to keep them.");
   }
   function saveRule() {
-    const parsed = bookingRuleSchema.safeParse({ ...draft, options: draft?.type === "TEXT" ? [] : choices.map(value => value.trim()).filter(Boolean) });
+    const parsed = bookingRuleSchema.safeParse({ ...draft, options: draft && ["RADIO", "SELECT", "CHECKBOX"].includes(draft.type) ? choices.map(value => value.trim()).filter(Boolean) : [] });
     if (!parsed.success) { setError(parsed.error.issues[0].message); return; }
     const next = bookingRulesSchema.safeParse(rules.some(rule => rule.id === parsed.data.id) ? rules.map(rule => rule.id === parsed.data.id ? parsed.data : rule) : [...rules, parsed.data]);
     if (!next.success) { setError(next.error.issues[0].message); return; }
@@ -140,7 +140,8 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
         {draft.kind === "intake" && <>
           <Field label="Answer type"><Select disabled={Boolean(draft.contactField)} value={draft.type} onChange={event => setDraft({ ...draft, type: event.target.value as BookingRule["type"] })}>{Object.entries(typeLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</Select></Field>
           {draft.contactField && <p className="ui-field-hint">Uses the existing booking contact field, without asking the client twice.</p>}
-          {draft.type !== "TEXT" ? <BookingQuestionChoices value={choices} onChange={setChoices} /> : <Field label="Placeholder"><Input value={draft.placeholder} maxLength={200} onChange={event => setDraft({ ...draft, placeholder: event.target.value })} /></Field>}
+          {["RADIO", "SELECT", "CHECKBOX"].includes(draft.type) && <BookingQuestionChoices value={choices} minimumChoices={draft.type === "CHECKBOX" ? 1 : 2} onChange={setChoices} />}
+          {draft.type === "TEXT" && <Field label="Placeholder"><Input value={draft.placeholder} maxLength={200} onChange={event => setDraft({ ...draft, placeholder: event.target.value })} /></Field>}
           <Field label="Help text"><Input value={draft.helpText} maxLength={500} onChange={event => setDraft({ ...draft, helpText: event.target.value })} /></Field>
           <Switch label="Required answer" disabled={draft.contactField === "customerName" || draft.contactField === "customerEmail"} checked={draft.contactField === "customerName" || draft.contactField === "customerEmail" || draft.required} onChange={event => setDraft({ ...draft, required: event.target.checked })} />
         </>}

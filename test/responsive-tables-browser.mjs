@@ -46,7 +46,12 @@ try{
   await page.setViewportSize({width,height:1000});
   if(width!==677) await page.waitForFunction(expected=>document.querySelector('[aria-label="Editable records"]').dataset.tableLayout===expected,width===1440?'table':'cards');
   else await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  assert.equal(await small.getAttribute('data-table-layout'),'table','Small tables stay tables on phones');
+  await page.waitForFunction(expected=>document.querySelector('[aria-label="Small table"]').dataset.tableLayout===expected,width<=860?'cards':'table');
+  assert.equal(await small.getAttribute('data-table-layout'),width<=860?'cards':'table','Phones use simplified rows even when a small table would fit');
+  if(width<=860) {
+    assert.equal(await small.locator('tbody tr').evaluate(el=>getComputedStyle(el).display),'grid');
+    assert.equal(await small.locator('td').last().getAttribute('data-table-label'),'Count');
+  }
   assert.equal(await frame.getByRole('spinbutton',{name:'Quantity'}).getAttribute('data-original'),'yes','The same controls survive layout changes');
   assert.equal(await frame.getByRole('spinbutton',{name:'Quantity'}).inputValue(),'3');
   assert.equal(await frame.locator('table').count(),1,'No separate mobile table or sizing probe remains');
@@ -56,6 +61,11 @@ try{
  await frame.getByRole('button',{name:'Save',exact:true}).click();
  assert.deepEqual(await page.evaluate(()=>window.submitted),{quantity:'3'},'Sizing probes do not add submitted fields');
  assert.equal(await page.getByLabel('Quantity',{exact:true}).count(),1);
+ const touch=await browser.newPage({viewport:{width:932,height:430},hasTouch:true,isMobile:true});
+ await touch.setContent('<style>'+css+'</style><div id="root">'+html+'</div>');await touch.addScriptTag({content:js});
+ await touch.waitForFunction(()=>Array.from(document.querySelectorAll('[data-responsive-table-frame]')).every(el=>el.dataset.tableLayout==='cards'));
+ assert.equal(await touch.getByRole('region',{name:'Small table',exact:true}).getAttribute('data-table-layout'),'cards','Landscape touch devices also use simplified rows');
+ await touch.close();
  assert.deepEqual(await page.evaluate(()=>window.recoverable),[]);
  assert.deepEqual(errors,[]);
  console.log('Passed: one shared renderer, SSR hydration, content fit, small tables on mobile, retained edits/actions and clean form submission.');

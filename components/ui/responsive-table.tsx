@@ -21,7 +21,7 @@ function minimumWidth(table: HTMLTableElement, frame: HTMLElement) {
   return width;
 }
 
-export function ResponsiveTableFrame({ children, ...props }: HTMLAttributes<HTMLDivElement>) {
+export function ResponsiveTableFrame({ children, mobileLayout = "cards", ...props }: HTMLAttributes<HTMLDivElement> & { mobileLayout?: "cards" | "columns" }) {
   const root = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState("table");
   useLayoutEffect(() => {
@@ -30,6 +30,7 @@ export function ResponsiveTableFrame({ children, ...props }: HTMLAttributes<HTML
     if (!table || !frame) return;
     let scheduled = 0;
     let active = true;
+    const mobile = window.matchMedia("(max-width: 860px), (pointer: coarse)");
     function measure() {
       if (!table || !frame) return;
       const headers = Array.from(table.tHead?.rows.item((table.tHead?.rows.length ?? 1) - 1)?.cells ?? []).flatMap(cell => Array<string>(cell.colSpan).fill(cell.textContent?.trim() ?? ""));
@@ -52,18 +53,23 @@ export function ResponsiveTableFrame({ children, ...props }: HTMLAttributes<HTML
       }
       const style = getComputedStyle(frame);
       const available = frame.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      if (mobile.matches) {
+        setLayout(mobileLayout === "columns" ? "compact" : "cards");
+        return;
+      }
       setLayout(available > 0 && minimumWidth(table, frame) > available + 1 ? "cards" : "table");
     }
     const schedule = () => { if (!active) return; cancelAnimationFrame(scheduled); scheduled = requestAnimationFrame(measure); };
     const resize = new ResizeObserver(schedule);
     const mutations = new MutationObserver(schedule);
     measure();
+    mobile.addEventListener("change", schedule);
     resize.observe(frame);
     resize.observe(table);
     mutations.observe(table, { childList: true, subtree: true, characterData: true });
     void document.fonts.ready.then(schedule);
-    return () => { active = false; resize.disconnect(); mutations.disconnect(); cancelAnimationFrame(scheduled); };
-  }, [children]);
+    return () => { active = false; mobile.removeEventListener("change", schedule); resize.disconnect(); mutations.disconnect(); cancelAnimationFrame(scheduled); };
+  }, [children, mobileLayout]);
 
   return <div {...props} ref={root} data-responsive-table-frame data-table-layout={layout}>{children}</div>;
 }
