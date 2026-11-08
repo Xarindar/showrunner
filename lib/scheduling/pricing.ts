@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { optionalRecordId } from "../record-id";
 import { formatMoney } from "../format";
 import { sessionPrice } from "./session-input";
 
@@ -8,7 +9,7 @@ export type AddOnPricingType = z.infer<typeof addOnPricingTypeSchema>;
 export type PricingType = z.infer<typeof pricingTypeSchema>;
 export type HourlyRate = { id: string; name: string; amountCents: number };
 export const hourlyRateInputSchema = z.object({
-  id: z.string().min(1).max(100).optional(),
+  id: optionalRecordId,
   name: z.string().trim().min(1, "Enter a rate name.").max(120),
   amount: sessionPrice
 });

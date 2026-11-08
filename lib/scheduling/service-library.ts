@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { nullableRecordId, optionalRecordId } from "../record-id";
 import { sessionOfferingSchema, type SessionOffering } from "./session-offering";
 import { addOnPricingTypeSchema } from "./pricing";
 import { sessionPrice } from "./session-input";
@@ -11,7 +12,7 @@ export const serviceLibraryItemSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(60)).max(20),
   pricingType: addOnPricingTypeSchema.default("FLAT_RATE"),
   priceCents: z.number().int().min(0).max(999999999).nullable().default(null),
-  hourlyRateId: z.string().min(1).max(100).nullable().default(null)
+  hourlyRateId: nullableRecordId.default(null)
 });
 
 export type ServiceLibraryItem = z.infer<typeof serviceLibraryItemSchema>;
@@ -20,7 +21,7 @@ export const serviceLibraryInputSchema = z.preprocess(input => {
   if (typeof input === "object" && input !== null && "availableAsAddOn" in input && input.availableAsAddOn === false) return { ...input, pricingType: "FLAT_RATE", price: "", hourlyRateId: "" };
   return input;
 }, serviceLibraryItemSchema.omit({ id: true, tags: true, priceCents: true, hourlyRateId: true }).extend({
-  id: serviceLibraryItemSchema.shape.id.optional(),
+  id: optionalRecordId,
   availableAsAddOn: z.boolean().optional(),
   tags: z.string().max(1500).transform(value => [...new Set(value.split(",").map(tag => tag.trim().toLowerCase()).filter(Boolean))])
     .pipe(serviceLibraryItemSchema.shape.tags),

@@ -107,7 +107,7 @@ export const serviceFormSchema = z
     pricingType: pricingTypeSchema.default("FLAT_RATE"),
     hourlyRateId: z.string().max(100).default(""),
     sessionOffering: sessionOfferingFormSchema.optional(),
-    name: requiredText,
+    name: z.string().trim().min(1, "Enter a session name."),
     slug: optionalText.optional(),
     description: optionalStoredText,
     durationMinutes: z.coerce.number().int().min(1).max(24 * 60),
@@ -142,7 +142,7 @@ export const serviceFormSchema = z
     isActive: value.isActive === "on"
   }));
 
-export const serviceUpdateFormSchema = serviceFormSchema.and(z.object({ id }));
+export const serviceUpdateFormSchema = serviceFormSchema.and(z.object({ id: z.string().trim().min(1, "This session is missing its ID. Reload before saving.") }));
 
 export const availabilityFormSchema = z
   .object({

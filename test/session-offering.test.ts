@@ -4,6 +4,20 @@ import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { priceSessionOffering, sessionOfferingFormSchema, sessionOfferingDraft, sessionOfferingSchema, selectSessionPackage, sessionPackageSnapshotSchema } from "../lib/scheduling/session-offering";
 
+test("blank optional hourly-rate selections round-trip for packages, included services and add-ons", () => {
+  const saved = sessionOfferingFormSchema.parse(JSON.stringify({
+    coverageItems: [{ id: "included", name: "Coverage", hourlyRateId: "" }],
+    tiers: [{ id: "standard", name: "Standard", durationMinutes: "30", price: "", pricingType: "FLAT_RATE", hourlyRateId: "", coverageIds: ["included"] }],
+    addOns: [{ id: "extra", name: "Prints", price: "25", hourlyRateId: "" }]
+  }));
+  assert.equal(saved.tiers[0].hourlyRateId, null);
+  assert.equal(saved.coverageItems[0].hourlyRateId, null);
+  assert.equal(saved.addOns[0].hourlyRateId, null);
+  assert.equal(saved.tiers[0].priceCents, null);
+  assert.equal(saved.addOns[0].priceCents, 2500);
+  assert.throws(() => priceSessionOffering({ ...saved, tiers: [{ ...saved.tiers[0], pricingType: "HOURLY" }] }, [], { pricingType: "FLAT_RATE", hourlyRateId: "" }), /Choose an hourly rate/);
+});
+
 test("packages keep independent flat and hourly prices, validate rate ownership and retain legacy pricing", () => {
   const rates = [{ id: "rate", name: "Photography", amountCents: 12550 }];
   const fallback = { pricingType: "HOURLY" as const, hourlyRateId: "rate" };

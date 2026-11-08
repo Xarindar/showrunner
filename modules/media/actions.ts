@@ -26,7 +26,6 @@ const focalPoint = optionalStoredText
 
 const mediaMetadataSchema = z
   .object({
-    id: requiredText.optional(),
     alt: optionalStoredText,
     caption: optionalStoredText,
     credit: optionalStoredText,
@@ -50,7 +49,7 @@ const mediaMetadataSchema = z
     path: ["alt"]
   });
 
-const mediaUpdateSchema = mediaMetadataSchema.and(z.object({ id: requiredText, filename: z.string().trim().min(1).max(200).regex(/^[^/\\\u0000-\u001f\u007f]+$/).optional() }));
+const mediaUpdateSchema = mediaMetadataSchema.and(z.object({ id: requiredText, filename: z.string().trim().min(1, "Enter a file name.").max(200).regex(/^[^/\\\u0000-\u001f\u007f]+$/).optional() }));
 
 const mediaArchiveSchema = z.object({
   id: requiredText,

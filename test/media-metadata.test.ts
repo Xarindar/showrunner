@@ -35,4 +35,6 @@ test("metadata saves filename and selected tags while preserving hidden privacy 
  const saved=h.writes[0];assert.equal(saved.where.AND[0].siteId,"site");assert.equal(saved.data.filename,"Updated.jpg");
  assert.equal(JSON.stringify(saved.data.tags),JSON.stringify(["Garden","Events"]));assert.equal(saved.data.isPrivate,true);assert.equal(saved.data.focalPointX,0.2);assert.equal(saved.data.focalPointY,0.8);assert.equal(saved.data.usageContext,"existing");
  const invalid=harness();invalid.data.set("filename","../invalid.jpg");assert.ok((await invalid.save(invalid.data)).error);assert.equal(invalid.writes.length,0);
+ const missingId=harness();missingId.data.set("id","");assert.ok((await missingId.save(missingId.data)).error);assert.equal(missingId.writes.length,0,'Updating an existing asset still requires its ID');
+ const blankName=harness();blankName.data.set("filename","");assert.equal((await blankName.save(blankName.data)).error,'Enter a file name.');assert.equal(blankName.writes.length,0);
 });

@@ -38,7 +38,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
   const [draft, setDraft] = useState<SessionOfferingDraft>(() => {
     if (isNew && !initialOffering) return { coverageItems: [], tiers: [], addOns: [] };
     const offering = sessionOfferingDraft(initialOffering, durationMinutes, priceCents);
-    return { ...offering, tiers: offering.tiers.map(tier => ({ ...tier, pricingType: tier.pricingType ?? initialPricingType, hourlyRateId: tier.pricingType ? tier.hourlyRateId : initialHourlyRateId })) };
+    return { ...offering, tiers: offering.tiers.map(tier => ({ ...tier, pricingType: tier.pricingType ?? initialPricingType, hourlyRateId: (tier.pricingType ? tier.hourlyRateId : initialHourlyRateId) || null })) };
   });
   const [scheduling, setScheduling] = useState(() => ({
     bufferBeforeMinutes: String(initialScheduling?.bufferBeforeMinutes ?? 0),
@@ -94,7 +94,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     const id = crypto.randomUUID();
     flushSync(() => {
       setExpandedTiers(new Set());
-      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? String(durationMinutes), pricingType: source?.pricingType ?? "FLAT_RATE", hourlyRateId: source?.hourlyRateId ?? "", deliverables: source?.deliverables, coverageIds: [...(source?.coverageIds ?? [])] }] });
+      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? String(durationMinutes), pricingType: source?.pricingType ?? "FLAT_RATE", hourlyRateId: source?.hourlyRateId || null, deliverables: source?.deliverables, coverageIds: [...(source?.coverageIds ?? [])] }] });
       setNewTiers(current => new Set([...current, id]));
     });
   }
@@ -169,7 +169,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
           <Field label="Package name"><Input id={`${listId}-${tier.id}`} aria-label={`Package ${index + 1} name`} value={tier.name} autoFocus required maxLength={120} onChange={event => updateTier(tier.id, { name: event.target.value })} /></Field>
           <div className={styles.tierNumbers}>
             <ServicePricingFields pricingType={tier.pricingType ?? "FLAT_RATE"} hourlyRateId={tier.hourlyRateId ?? ""} rates={rates}
-              onChange={(pricingType, hourlyRateId) => updateTier(tier.id, { pricingType, hourlyRateId })} onRateSaved={onRateSaved}
+              onChange={(pricingType, hourlyRateId) => updateTier(tier.id, { pricingType, hourlyRateId: hourlyRateId || null })} onRateSaved={onRateSaved}
               priceField={<Field label="Price (USD)">
                 <Input aria-label={`${tier.name} price (USD)`} type="number" inputMode="decimal" min="0" max="9999999.99" step="0.01"
                   required={isNew || multi}

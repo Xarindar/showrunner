@@ -1,21 +1,23 @@
 import { z } from "zod";
+import { optionalRecordId } from "../record-id";
 import { BookingRuleAnswerError, bookingRuleSchema, bookingRulesSchema, readBookingRules, type BookingRule } from "./booking-rules";
 
 export const bookingDocumentKindSchema = z.enum(["INTAKE", "TERMS"]);
 export type BookingDocumentKind = z.infer<typeof bookingDocumentKindSchema>;
 export type BookingDocument = { id: string; name: string; kind: BookingDocumentKind; version: number; isDefault: boolean; rules: BookingRule[] };
-export const bookingDocumentSelectionSchema = z.object({ intake: z.string().min(1).max(100).default("default"), terms: z.string().min(1).max(100).default("default") });
+export const bookingDocumentSelectionSchema = z.object({ intake: z.string().min(1,"Choose an intake form, the global default, or none.").max(100).default("default"), terms: z.string().min(1,"Choose booking terms, the global default, or none.").max(100).default("default") });
 export const bookingDocumentSelectionFormSchema = z.string().max(1000).transform((value, ctx) => {
   try { return JSON.parse(value) as unknown; } catch { ctx.addIssue({code:"custom",message:"Choose valid booking forms and terms."}); return z.NEVER; }
 }).pipe(bookingDocumentSelectionSchema);
 export const bookingDocumentInputSchema = z.object({
-  id: z.string().min(1).max(100).optional(), version: z.number().int().positive().optional(),
+  id: optionalRecordId, version: z.number().int().positive().optional(),
   name: z.string().trim().min(1,"Name this form or terms document.").max(100),
   kind: bookingDocumentKindSchema, isDefault: z.boolean(), rules: bookingRulesSchema.min(1,"Add a question or terms before saving.")
 }).superRefine((value, ctx) => {
   if (value.rules.some(rule=>rule.contactField)) ctx.addIssue({code:"custom",message:"Contact details are already required by the booking flow."});
   if (value.kind === "TERMS" && value.rules.some(rule=>rule.kind !== "policy")) ctx.addIssue({code:"custom",message:"Terms documents contain booking terms only."});
   if (value.id && !value.version) ctx.addIssue({code:"custom",message:"Reload this document before editing."});
+  if (value.version && !value.id) ctx.addIssue({code:"custom",message:"This document is missing its ID. Reopen it before saving."});
 });
 export const effectiveBookingRulesSchema = z.array(bookingRuleSchema).max(120);
 

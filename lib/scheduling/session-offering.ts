@@ -1,15 +1,16 @@
 import { z } from "zod";
+import { nullableRecordId, optionalRecordId } from "../record-id";
 import { sessionPrice, addOnQuantitiesSchema } from "./session-input";
 import { hourlyPriceCents, pricingTypeSchema, addOnPricingTypeSchema, type HourlyRate, type PricingType } from "./pricing";
 
-const itemId = z.string().min(1).max(100);
+const itemId = z.string().min(1, "Choose a saved service or package, then try again.").max(100);
 const itemName = z.string().trim().min(1, "Give each included item, package, and extra a name.").max(120);
 const coverageItem = z.object({
   id: itemId, name: itemName,
-  libraryItemId: itemId.optional(),
+  libraryItemId: optionalRecordId,
   pricingType: addOnPricingTypeSchema.optional(),
   priceCents: z.number().int().min(0).max(999999999).nullable().optional(),
-  hourlyRateId: itemId.nullable().optional(),
+  hourlyRateId: nullableRecordId,
   description: z.string().trim().max(2000).optional(),
   category: z.string().trim().max(120).optional(),
   tags: z.array(z.string().trim().min(1).max(60)).max(20).optional()
@@ -27,12 +28,12 @@ const tier = z.object({
   durationMinutes: z.number().int().min(1).max(1440),
   priceCents: z.number().int().min(0).max(999999999).nullable(),
   pricingType: pricingTypeSchema.optional(),
-  hourlyRateId: itemId.nullable().optional(),
+  hourlyRateId: nullableRecordId,
   deliverables,
   coverageIds: z.array(itemId).max(100)
 });
 const hourlyRateSnapshot = z.object({ id: itemId, name: itemName, amountCents: z.number().int().min(0).max(999999999) });
-const addOn = z.object({ id: itemId, name: itemName, libraryItemId: itemId.optional(), priceCents: z.number().int().min(0).max(999999999), pricingType: addOnPricingTypeSchema.optional(), hourlyRateId: itemId.nullable().optional(), hourlyRate: hourlyRateSnapshot.optional() });
+const addOn = z.object({ id: itemId, name: itemName, libraryItemId: optionalRecordId, priceCents: z.number().int().min(0).max(999999999), pricingType: addOnPricingTypeSchema.optional(), hourlyRateId: nullableRecordId, hourlyRate: hourlyRateSnapshot.optional() });
 
 export const sessionOfferingSchema = z.object({
   coverageItems: z.array(coverageItem).max(100),
