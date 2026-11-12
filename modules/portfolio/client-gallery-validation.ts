@@ -146,3 +146,9 @@ export function clientSessionPhotoFilename(clientName: string, date: string, ori
   const extension = originalName.match(/\.[a-z0-9]+$/i)?.[0].toLowerCase() || "";
   return `${name}-${date}-${uniqueId.replaceAll("-", "").slice(0, 12)}${extension}`;
 }
+
+export function clientGalleryLocalImageStatus(serverStatus: string | undefined, uploading: boolean, rows: readonly { status: string }[]) {
+  if (uploading) return "Images processing";
+  if (rows.some(row => row.status !== "done")) return "Needs attention";
+  return serverStatus || "Awaiting photos";
+}
