@@ -210,4 +210,3 @@ try {
   assert.deepEqual(errors, []);
   console.log('Passed: session modal, editable default date, description, sequential uploads tied to saved session, table browsing, private client link, desktop/mobile layouts.');
 } finally { await browser.close(); }
-
