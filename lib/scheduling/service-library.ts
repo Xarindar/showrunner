@@ -1,9 +1,11 @@
 import { z } from "zod";
-import { sessionOfferingSchema, type SessionOffering } from "./session-offering";
+import { nullableRecordId, optionalRecordId } from "../record-id";
+import { sessionOfferingSchema, sessionDeliverablesSchema, type SessionOffering } from "./session-offering";
 import { addOnPricingTypeSchema } from "./pricing";
 import { sessionPrice } from "./session-input";
 
 export const serviceLibraryItemSchema = z.object({
+  deliverables: sessionDeliverablesSchema.optional(),
   id: z.string().min(1).max(100),
   name: z.string().trim().min(1, "Enter a service name.").max(120),
   description: z.string().trim().max(2000),
@@ -11,7 +13,7 @@ export const serviceLibraryItemSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(60)).max(20),
   pricingType: addOnPricingTypeSchema.default("FLAT_RATE"),
   priceCents: z.number().int().min(0).max(999999999).nullable().default(null),
-  hourlyRateId: z.string().min(1).max(100).nullable().default(null)
+  hourlyRateId: nullableRecordId.default(null)
 });
 
 export type ServiceLibraryItem = z.infer<typeof serviceLibraryItemSchema>;
@@ -20,7 +22,7 @@ export const serviceLibraryInputSchema = z.preprocess(input => {
   if (typeof input === "object" && input !== null && "availableAsAddOn" in input && input.availableAsAddOn === false) return { ...input, pricingType: "FLAT_RATE", price: "", hourlyRateId: "" };
   return input;
 }, serviceLibraryItemSchema.omit({ id: true, tags: true, priceCents: true, hourlyRateId: true }).extend({
-  id: serviceLibraryItemSchema.shape.id.optional(),
+  id: optionalRecordId,
   availableAsAddOn: z.boolean().optional(),
   tags: z.string().max(1500).transform(value => [...new Set(value.split(",").map(tag => tag.trim().toLowerCase()).filter(Boolean))])
     .pipe(serviceLibraryItemSchema.shape.tags),
@@ -59,6 +61,9 @@ export function resolveIncludedServices(offering: SessionOffering, library: Serv
     const saved = library.find(row => row.id === item.libraryItemId);
     if (!saved) throw new Error("An optional service is no longer available. Remove it and choose another.");
     if (!isServiceAddOn(saved)) throw new Error(`"${saved.name}" is no longer available as an add-on. Remove it from Suggested Add-Ons.`);
-    return { ...item, name: saved.name, priceCents: saved.priceCents ?? 0, pricingType: saved.pricingType, hourlyRateId: saved.hourlyRateId };
+    const next = { ...item, name: saved.name, priceCents: saved.priceCents ?? 0, pricingType: saved.pricingType, hourlyRateId: saved.hourlyRateId };
+    if (saved.deliverables) next.deliverables = saved.deliverables;
+    else delete next.deliverables;
+    return next;
   }) });
 }

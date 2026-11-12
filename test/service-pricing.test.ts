@@ -18,6 +18,14 @@ test("named rates validate money and hourly totals round only at the final cent"
   assert.throws(() => servicePriceCents({ pricingType: "HOURLY", priceCents: null, durationMinutes: 60 }), /Choose an hourly rate/);
 });
 
+test("a new hourly rate accepts an empty optional edit ID without weakening name or amount validation", () => {
+  const rate = hourlyRateInputSchema.parse({ id: "", name: "Photography", amount: "125.50" });
+  assert.equal(rate.id, undefined);
+  assert.equal(rate.amount, 12550);
+  assert.equal(hourlyRateInputSchema.safeParse({ id: "", name: " ", amount: "125" }).success, false);
+  assert.equal(hourlyRateInputSchema.safeParse({ id: "", name: "Photography", amount: "" }).success, false);
+});
+
 test("session catalog prices show the lowest configured amount and preserve free sessions", () => {
   assert.equal(sessionCatalogPriceLabel([null]), "-");
   assert.equal(sessionCatalogPriceLabel([0]), "$0.00");

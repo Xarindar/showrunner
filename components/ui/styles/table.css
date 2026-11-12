@@ -290,7 +290,7 @@
   .showrunner-admin :is(.ui-table-card, .ui-data-table-shell) { --data-table-row-control-height: var(--sd-layout-touch-target); }
 }
 
-/* Fit the containing workspace; row cards are selected by measured content width. */
+/* Phones always use row cards; wider workspaces also switch when content cannot fit. */
 .showrunner-admin [data-responsive-table-frame] { position: relative; min-width: 0; }
 .showrunner-admin [data-responsive-table-frame] > table { min-width: 0; table-layout: auto; }
 .showrunner-admin [data-responsive-table-frame] > table :is(th,td) { padding-inline: var(--data-table-compact-cell-x); }
@@ -315,3 +315,6 @@
 .showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) > tbody > tr > td[colspan] { text-align: center; }
 
 .showrunner-admin [data-responsive-table-frame] > table th[data-table-actions] { width: 1%; }
+.showrunner-admin [data-responsive-table-frame][data-table-layout="compact"] > table :is(th,td):not([data-mobile-column]):not([colspan]) { display: none; }
+.showrunner-admin [data-responsive-table-frame][data-table-layout="compact"] > table :is(th,td) { padding-inline: var(--sd-space-4); }
+.showrunner-admin [data-responsive-table-frame][data-table-layout="compact"] > table .catalog-cell-text { white-space: normal; overflow-wrap: anywhere; }

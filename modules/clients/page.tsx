@@ -1,6 +1,5 @@
 import { tablePageSize } from "@/lib/admin-table-pagination";
 import { Notification } from "@/components/ui/notifications";
-import { clientServiceId } from "@/lib/clients/service-selection";
 import { getClientStatusSettings } from "@/lib/clients/configuration";
 import Link from "next/link";
 import { ClientPipelineStage, Prisma } from "@prisma/client";
@@ -11,8 +10,7 @@ import {
   Save,
   Search,
   Trash2,
-  Upload,
-  UsersRound
+  Upload
 } from "lucide-react";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
 import { clientStatusLabel, clientStatusOptions as allClientStatusOptions, normalizeClientStatus } from "@/lib/clients/status";
@@ -34,8 +32,7 @@ import { ClientsActionModals } from "./clients-action-modals";
 export const dynamic = "force-dynamic";
 
 const clientMetricOptions = [
-  { heading: "Appts", id: "appointments", label: "Appointments" },
-  { heading: "Orders", id: "orders", label: "Orders" }
+  { heading: "Appts", id: "appointments", label: "Appointments" }
 ] as const;
 type ClientMetricId = (typeof clientMetricOptions)[number]["id"];
 const defaultClientMetricIds = clientMetricOptions.map((option) => option.id);
@@ -220,9 +217,8 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
     prisma.client.findMany({
       where,
       include: {
-        _count: { select: { bookings: true, orders: true } },
+        _count: { select: { bookings: true } },
         bookings: { orderBy: { startsAt: "desc" }, take: 1 },
-        tags: { orderBy: { label: "asc" }, take: 6 }
       },
       orderBy: { updatedAt: "desc" },
       skip: (page - 1) * pageSize,
@@ -322,10 +318,10 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
         {!usesDefaultMetrics(selectedMetricIds) ? selectedMetricIds.length ? selectedMetricIds.map(metric => <input key={metric} type="hidden" name="metrics" value={metric} />) : <input type="hidden" name="metrics" value="none" /> : null}
         <label className="ui-field" htmlFor="clients-status-filter"><span className="ui-field-label">Client status</span>
               <select aria-label="Filter clients by status" id="clients-status-filter" name="status" defaultValue={selectedStatus || ""}>
-                <option value="">All statuses</option>
+                <option value="">All statuses ({baseClientCount})</option>
                 {clientStatusOptions.map((status) => (
                   <option key={status.value} value={status.value}>
-                    {status.label}
+                    {status.label} ({statusCount(status.value)})
                   </option>
                 ))}
               </select>
@@ -508,29 +504,15 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                 : null}
               <input aria-label="Search clients" id="clients-search" name="q" placeholder="Search clients" defaultValue={query} />
               {selectedStatus ? <input type="hidden" name="status" value={selectedStatus} /> : null}
-              <Button size="sm" type="submit" variant="secondary">
-                <Search size={15} />
-                Search
-              </Button>
+              <Button aria-label="Search clients" title="Search clients" size="sm" type="submit" variant="secondary"><Search aria-hidden="true" size={15} /></Button>
             </form>
           </div>
         </div>
 
-        <Table className="ui-data-table-scroll clients-table-wrap" tableClassName="ui-data-table clients-table">
-          <colgroup>
-            <col className="clients-col-client" />
-            <col className="clients-col-email" />
-            <col className="clients-col-phone" />
-            {activeMetricOptions.map((metric) => (
-              <col className={`clients-col-metric clients-col-metric-${metric.id}`} key={metric.id} />
-            ))}
-            <col className="clients-col-date" />
-            <col className="clients-col-status" />
-            <col className="clients-col-actions" />
-          </colgroup>
+        <Table mobileLayout="columns" aria-label="Clients table" className="ui-data-table-scroll clients-table-wrap" tableClassName="ui-data-table clients-table">
           <thead>
             <tr>
-              <th>Client</th>
+              <th data-mobile-column>Client</th>
               <th>Email</th>
               <th>Phone</th>
               {activeMetricOptions.map((metric) => (
@@ -539,27 +521,24 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                 </th>
               ))}
               <th>Last appointment</th>
-              <th>Status</th>
-              <th className="clients-actions-heading">Actions</th>
+              <th data-mobile-column>Status</th>
+              <th data-mobile-column className="clients-actions-heading">Actions</th>
             </tr>
           </thead>
           <tbody>
             {clients.map((client) => {
-              const visibleTags = client.tags.slice(0, 3);
-              const hiddenTagCount = Math.max(0, client.tags.length - visibleTags.length);
               const vipSummary = vipSummaries.get(client.id);
               const metricCounts: Record<ClientMetricId, number> = {
-                appointments: client._count.bookings,
-                orders: client._count.orders
+                appointments: client._count.bookings
               };
               const detailHref = `/admin/clients/${client.id}`;
 
               return (
                 <tr className="clients-clickable-row" key={client.id}>
-                  <td>
+                  <td data-mobile-column>
                     <Link className="clients-row-link clients-primary-cell" href={detailHref}>
                       <span className="clients-name-line">
-                        <strong>{client.name}</strong>
+                        <strong title={client.name}>{client.name}</strong>
                         {vipSummary?.qualifies ? (
                           <Tooltip content={vipSummary.tooltip} focusable={false}>
                             <span aria-label="VIP qualified" className="clients-vip-crown">
@@ -568,17 +547,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                           </Tooltip>
                         ) : null}
                       </span>
-                      <span className="muted-text">{client.companyName || client.familyName || "Individual client"}</span>
-                      {visibleTags.length ? (
-                        <span className="clients-tag-row">
-                          {visibleTags.map((tag) => (
-                            <span className="ui-badge" key={tag.id}>
-                              {tag.label}
-                            </span>
-                          ))}
-                          {hiddenTagCount ? <span className="ui-badge">+{hiddenTagCount}</span> : null}
-                        </span>
-                      ) : null}
+
                     </Link>
                   </td>
                   <td className="clients-email-cell">
@@ -603,13 +572,12 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
                       {client.bookings[0] ? formatDateTime(client.bookings[0].startsAt, settings.timezone) : "None yet"}
                     </Link>
                   </td>
-                  <td>
+                  <td data-mobile-column>
                     <Link className="clients-row-link clients-status-cell" href={detailHref}>
                       <span className="ui-badge">{clientStatusLabel(client.status, configuredStatusOptions)}</span>
-                      {clientServiceId(client.preferences) ? <span className="muted-text">{services.find((service) => service.id === clientServiceId(client.preferences))?.name || "Service unavailable"}</span> : null}
                     </Link>
                   </td>
-                  <td>
+                  <td data-mobile-column>
                     <ClientRowActions
                       alternateEmails={stringArrayFromUnknown(client.alternateEmails)}
                       alternatePhones={stringArrayFromUnknown(client.alternatePhones)}
@@ -656,16 +624,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
           />
         </div>
 
-        <div className="ui-data-table-stats" role="region" aria-label="Client summary" tabIndex={0}>
-          <div className="ui-data-table-stat-pill ui-data-table-stat-pill-primary">
-            <UsersRound size={16} />
-            <strong>{baseClientCount}</strong>
-            <span>Clients</span>
-          </div>
-          {configuredStatusOptions.map((status) => <div className="ui-data-table-stat-pill" key={status.value}>
-            <strong>{statusCount(status.value)}</strong><span>{status.label}</span>
-          </div>)}
-        </div>
+
       </section>
     </div>
   );

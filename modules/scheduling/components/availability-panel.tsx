@@ -67,7 +67,7 @@ export function AvailabilityPanel({ availability, resources, staff, timezone, fi
     <Card bodyClassName={styles.rows}>
       {weekdays.map((name, day) => <div className={styles.row} key={name}>
         <strong>{name}</strong>
-        <span>{rules.filter(rule => rule.weekday === day).sort((a, b) => a.startMinutes - b.startMinutes).map(rule => `${formatTimeValue(minutesToTime(rule.startMinutes))} – ${formatTimeValue(minutesToTime(rule.endMinutes))}`).join(", ") || (staffId || resourceId ? "No hours set" : "Closed")}</span>
+        <span>{rules.filter(rule => rule.weekday === day).sort((a, b) => a.startMinutes - b.startMinutes).map(rule => `${formatTimeValue(minutesToTime(rule.startMinutes))} – ${formatTimeValue(minutesToTime(rule.endMinutes % 1440))}`).join(", ") || (staffId || resourceId ? "No hours set" : "Closed")}</span>
         <Button type="button" variant="ghost" aria-label={`Edit ${name} hours`} disabled={owner?.isActive === false} onClick={() => setEditing({ day, rules: rules.map(rule => ({ ...rule })), staffId, resourceId })}>Edit</Button>
       </div>)}
     </Card>

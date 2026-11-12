@@ -1294,3 +1294,10 @@ p {
 .booking-rule-fields legend { margin-bottom: 8px; font-weight: 600; }
 .booking-rule-fields .booking-rule-choice { display: flex; align-items: center; gap: 8px; }
 .booking-rule-fields .booking-rule-choice input { width: auto; flex: 0 0 auto; }
+.booking-rule-fields .booking-rule-group { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.booking-rule-fields [data-booking-rule-width] { grid-column: span 12; }
+.booking-rule-fields [data-booking-rule-width="HALF"] { grid-column: span 6; }
+.booking-rule-fields [data-booking-rule-width="THIRD"] { grid-column: span 4; }
+@media (max-width: 600px) {
+  .booking-rule-fields [data-booking-rule-width] { grid-column: 1 / -1; }
+}

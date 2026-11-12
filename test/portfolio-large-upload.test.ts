@@ -49,7 +49,7 @@ function uploadHarness(directory: string) {
     createMany: async ({ data }: { data: typeof links }) => { links.push(...data); return { count: data.length }; }
   };
   const galleries = {
-    findFirst: async () => ({ id: "gallery-large", title: "High-resolution shoot", slug: "high-resolution-shoot" }),
+    findFirst: async () => ({ id: "gallery-large", title: "High-resolution shoot", slug: "high-resolution-shoot", mediaFolder: { id: "session-folder", name: "Clients/Test client/High-resolution shoot 11-11-2026" } }),
     updateMany: async () => ({ count: 1 })
   };
   const variantRows = new Map<string, unknown>();
@@ -86,9 +86,12 @@ function uploadHarness(directory: string) {
   }, directory);
   const scopedWhere = async (_user: unknown, siteId: string, where: Record<string, unknown>) => ({ ...where, siteId });
   const actions = loadMocked<typeof import("../modules/portfolio/client-actions")>("modules/portfolio/client-actions.ts", {
+    "@/lib/email": { queueEmail: async () => { throw new Error("Uploads must never send email"); } },
+    "@/lib/env": { publicAppBaseUrl: () => "https://admin.example.test" },
     "next/cache": { revalidatePath: () => {} },
     "@/lib/prisma": { prisma },
     "@/lib/media": media,
+    "@/lib/timezone": { getZonedDateKey: () => "2026-11-11" },
     "@/lib/slug": { slugify },
     "@/lib/site": { getSiteSettings: async () => ({ siteId: "site-large", mediaDriver: "SERVER_ASSETS", enabledModuleIds: ["portfolio", "media"] }) },
     "@/lib/auth": {

@@ -16,7 +16,7 @@ function Fixture(){const [screen,setScreen]=useState('loading');const [route,set
 useEffect(()=>{window.setScreen=setScreen;window.setRoute=setRoute;},[]);
 return <div className="showrunner-admin"><div className="admin-root">
 <AdminMobileMenu routeKey={route} fallbackTitle="Sessions"><button className="admin-menu-toggle admin-page-menu" aria-label="Open admin menu" onClick={()=>window.menuClicks=(window.menuClicks||0)+1}>Menu</button></AdminMobileMenu>
-<main className="admin-main">{screen==='editor'?<header className="page-header"><h1>Design Session</h1></header>:screen==='index'?<header className="page-header"><div><h1>Sessions</h1></div><button className="ui-button">New session</button></header>:screen==='custom'?<header><h1>Photo albums</h1></header>:screen==='calendar'?<header className="appointments-subtle-header" data-admin-page-header><div className="appointments-subtle-title"><span>Appointments</span><strong>November 5</strong></div><nav className="appointments-header-nav">Calendar range</nav><div className="appointments-header-actions">Calendar tools</div></header>:screen==='product'?<header className="product-studio-header"><h1>Product editor</h1></header>:null}
+<main className="admin-main">{screen==='detail'?<header className="page-header"><a href="/admin/modules/clients"><svg className="lucide-arrow-left" width="15" height="15"/>Ruby Anderson</a><h1>Faux upload test session</h1></header>:screen==='config'?<div className="has-mobile-shell-header"><header className="page-header"><h1>Package settings</h1></header></div>:screen==='editor'?<header className="page-header"><h1>Design Session</h1></header>:screen==='index'?<header className="page-header"><div><h1>Sessions</h1></div><button className="ui-button">New session</button></header>:screen==='custom'?<header><h1>Photo albums</h1></header>:screen==='calendar'?<header className="appointments-subtle-header" data-admin-page-header><div className="appointments-subtle-title"><span>Appointments</span><strong>November 5</strong></div><nav className="appointments-header-nav">Calendar range</nav><div className="appointments-header-actions">Calendar tools</div></header>:screen==='product'?<header className="product-studio-header"><h1>Product editor</h1></header>:null}
 <section className="product-studio-page"><div style={{minHeight:1100}}>Editor content</div><footer className="product-studio-sticky-footer"><button className="ui-button">Save session</button></footer></section></main>
 </div></div>};createRoot(document.getElementById('root')).render(<Fixture/>);
 `},bundle:true,outfile:output+'.js',define:{'process.env.NODE_ENV':'"production"'},logLevel:'silent'});
@@ -46,6 +46,13 @@ try{
   }
  }
  assert.equal(await page.evaluate(()=>window.menuClicks),10,'The anchored menu remains keyboard operable');
+ for(const screen of ['detail','config']) {
+  await page.evaluate(screen=>window.setScreen(screen),screen);
+  await page.getByRole('heading',{name:screen==='detail'?'Faux upload test session':'Package settings',exact:true}).waitFor({state:'attached'});
+  await menu.waitFor({state:'hidden'});
+  assert.equal(await page.locator('.admin-mobile-bar').count(),0,'Details use only their own contextual header');
+  await page.screenshot({path:captures+'/'+screen+'-390.png'});
+ }
  await page.evaluate(()=>{window.setScreen('loading');window.setRoute('b')});
  await page.locator('.admin-mobile-bar').waitFor();assert.equal(await page.locator('[data-admin-menu-host]').count(),0,'Removed headers release the menu');
  await page.evaluate(()=>window.setScreen('editor'));

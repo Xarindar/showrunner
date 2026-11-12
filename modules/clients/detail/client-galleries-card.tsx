@@ -1,21 +1,28 @@
 "use client";
 import { useNotify } from "@/components/ui/notifications";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
-import { Check, Copy, ExternalLink, ImagePlus, Images, Plus, Search, Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import Link from "next/link";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, Folder, ImagePlus, Mail, Search, Upload, X } from "lucide-react";
+import { Button, ButtonAnchor, ButtonLink } from "@/components/ui/button";
+import { childMediaFolders } from "@/lib/media-folders";
+import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
+import { SkeletonBlock } from "@/components/ui/states";
+import { Dialog } from "@/components/ui/dialog";
 import { Modal } from "@/components/ui/modal";
 import {
-  addClientGalleryMediaAction, browseClientGalleryMediaAction, createClientGalleryAction, createClientGalleryLinkAction,
-  getClientGalleryWorkspace, uploadClientGalleryPhotoAction
+  addClientGalleryMediaAction, browseClientGalleryMediaAction, createClientGalleryAction, createClientGalleryLinkAction, configureClientGalleryProofingAction,
+  getClientGalleryWorkspace, sendClientGalleryEmailAction, uploadClientGalleryPhotoAction
 } from "@/modules/portfolio/client-actions";
-import { clientGalleryBatchError, clientGalleryImageTypes, clientGalleryUploadMaxBytes, type ClientGalleryPhotoPage, type ClientGalleryWorkspace } from "@/modules/portfolio/client-gallery-validation";
+import { clientGalleryBatchError, clientGalleryPageSize, clientGalleryImageTypes, clientGalleryUploadMaxBytes, type ClientGalleryPhotoPage, type ClientGalleryWorkspace } from "@/modules/portfolio/client-gallery-validation";
 import styles from "./client-galleries.module.css";
+import { ServiceLibraryPicker } from "@/modules/scheduling/components/service-library-picker";
+import type { ServiceLibraryItem } from "@/lib/scheduling/service-library";
+import mediaStyles from "@/modules/media/media-library.module.css";
 
 type UploadRow = { file: File; status: "ready" | "uploading" | "done" | "failed"; error?: string };
-const emptyPage: ClientGalleryPhotoPage = { assets: [], total: 0, page: 1, pageCount: 1 };
+const emptyPage: ClientGalleryPhotoPage = { assets: [], folders: [], total: 0, page: 1, pageCount: 1 };
 
 function currencyAmount(cents: number | null, currency: string | null) {
   if (cents === null || !currency) return "Not configured";
@@ -23,23 +30,44 @@ function currencyAmount(cents: number | null, currency: string | null) {
   catch { return `${(cents / 100).toFixed(2)} ${currency}`; }
 }
 
-export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: string; initialWorkspace: ClientGalleryWorkspace }) {
+export function ClientSessionDetail({ clientId, initialWorkspace, initialGalleryId = "", initialBookingId = "", openUpload = false }: {
+  clientId: string; initialWorkspace: ClientGalleryWorkspace; initialGalleryId?: string; initialBookingId?: string; openUpload?: boolean;
+}) {
   const [workspace, setWorkspace] = useState(initialWorkspace);
-  const [galleryId, setGalleryId] = useState(initialWorkspace.galleries[0]?.id || "");
-  const [creating, setCreating] = useState(false);
-  const [requestId, setRequestId] = useState("");
+  const [galleryId, setGalleryId] = useState(initialGalleryId);
+  const [creating, setCreating] = useState(openUpload);
+  const [requestId, setRequestId] = useState(() => crypto.randomUUID());
+  const [bookingId, setBookingId] = useState(initialBookingId);
+  const [uploadTargetId, setUploadTargetId] = useState(openUpload ? initialGalleryId : "");
   const [packageKey, setPackageKey] = useState("");
   const [allowance, setAllowance] = useState("");
   const [extraPrice, setExtraPrice] = useState("");
   const [currency, setCurrency] = useState("");
   const [busy, setBusy] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
+  const [proofSettingsOpen, setProofSettingsOpen] = useState(false);
+  const [addOnPicker, setAddOnPicker] = useState(false);
+  const [editingProofAddOn, setEditingProofAddOn] = useState(false);
+  const [proofAddOn, setProofAddOn] = useState<ServiceLibraryItem | null>(null);
+  const [sendRequestId, setSendRequestId] = useState(() => crypto.randomUUID());
+  const [emailNotice, setEmailNotice] = useState("");
   const notify = useNotify();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState("");
   const [query, setQuery] = useState("");
+  const [folder, setFolder] = useState("");
   const [page, setPage] = useState(1);
   const [photos, setPhotos] = useState<ClientGalleryPhotoPage>(emptyPage);
-  const [photosLoading, setPhotosLoading] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [previewPhotos, setPreviewPhotos] = useState<ClientGalleryPhotoPage>(emptyPage);
+  const [previewError, setPreviewError] = useState("");
+  const [loadedPreviewId, setLoadedPreviewId] = useState("");
+  const [failedPreviewId, setFailedPreviewId] = useState("");
+  const previewPage = previewIndex === null ? 1 : Math.floor(previewIndex / clientGalleryPageSize) + 1;
+  const previewLoading = previewPhotos.page !== previewPage;
+  const previewPhoto = previewIndex === null || previewLoading ? null : previewPhotos.assets[previewIndex % clientGalleryPageSize];
+  const [photosLoading, setPhotosLoading] = useState(Boolean(initialGalleryId && initialWorkspace.canManageMedia));
   const [photosError, setPhotosError] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [revision, setRevision] = useState(0);
@@ -47,8 +75,21 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
   const [uploading, setUploading] = useState(false);
   const stopUpload = useRef(false);
   const uploadInput = useRef<HTMLInputElement>(null);
+  const uploadTarget = workspace.galleries.find(item => item.id === uploadTargetId);
   const gallery = workspace.galleries.find((item) => item.id === galleryId);
+  const sessionTitle = gallery?.title || workspace.sessions.find(session => session.id === initialBookingId)?.name || "Session";
+  const imageStatus = uploading ? "Images processing" : gallery?.imageStatus || "Awaiting photos";
+  const processingImages = imageStatus === "Images processing";
+  const finishedUploads = uploads.filter(row => row.status === "done" || row.status === "failed").length;
+  const showGallerySkeleton = !pickerOpen && (photosLoading || processingImages);
+  const selectedProofAddOn = proofAddOn || gallery?.extraPhotoAddOn;
   const selectedPackage = workspace.packages.find((item) => `${item.orderId}:${item.productId}` === packageKey);
+
+  const scopeWorkspace = useCallback((next: ClientGalleryWorkspace): ClientGalleryWorkspace => ({
+    ...next,
+    galleries: next.galleries.filter(item => initialBookingId ? item.bookingId === initialBookingId : item.id === initialGalleryId),
+    sessions: next.sessions.filter(item => item.id === initialBookingId)
+  }), [initialBookingId, initialGalleryId]);
 
   useEffect(() => () => { stopUpload.current = true; }, []);
 
@@ -59,7 +100,7 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
       if (!current) return;
       setPhotosLoading(true);
       setPhotosError("");
-      return browseClientGalleryMediaAction({ clientId, galleryId, query, page, mode: pickerOpen ? "library" : "gallery" });
+      return browseClientGalleryMediaAction({ clientId, galleryId, query, page, folder, mode: pickerOpen ? "library" : "gallery" });
     })
       .then((result) => {
         if (!current || !result) return;
@@ -68,23 +109,40 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
       }).catch(() => { if (current) setPhotosError("Photos could not be loaded. Try again."); })
       .finally(() => { if (current) setPhotosLoading(false); });
     return () => { current = false; };
-  }, [clientId, galleryId, query, page, pickerOpen, revision, workspace.canManageMedia]);
+  }, [clientId, galleryId, query, page, folder, pickerOpen, revision, workspace.canManageMedia]);
 
   useEffect(() => {
     if (!uploading) return;
     const preventExit = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    const preventNavigation = (event: MouseEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest("a[href]")) return;
+      event.preventDefault(); event.stopPropagation();
+      notify("Images are still processing. Wait for the batch to finish, or stop after the current photo.", "neutral");
+    };
     window.addEventListener("beforeunload", preventExit);
-    return () => window.removeEventListener("beforeunload", preventExit);
-  }, [uploading]);
+    document.addEventListener("click", preventNavigation, true);
+    return () => { window.removeEventListener("beforeunload", preventExit); document.removeEventListener("click", preventNavigation, true); };
+  }, [uploading, notify]);
+
+  useEffect(() => {
+    if (uploading || gallery?.imageStatus !== "Images processing") return;
+    let current = true;
+    const timer = setInterval(() => { void getClientGalleryWorkspace(clientId).then(next => {
+      if (current) { setWorkspace(scopeWorkspace(next)); setRevision(value => value + 1); }
+    }).catch(() => {}); }, 3000);
+    return () => { current = false; clearInterval(timer); };
+  }, [clientId, gallery?.imageStatus, uploading, scopeWorkspace]);
 
   async function reload() {
-    setWorkspace(await getClientGalleryWorkspace(clientId));
+    setWorkspace(scopeWorkspace(await getClientGalleryWorkspace(clientId)));
     setRevision((value) => value + 1);
   }
 
-  function resetBrowse() { setSearchDraft(""); setQuery(""); setPage(1); setSelected([]); }
-  function openCreate() {
-    setRequestId(crypto.randomUUID()); setPackageKey(""); setAllowance(""); setExtraPrice(""); setCurrency("");
+  function resetBrowse() { setFolder(""); setSearchDraft(""); setQuery(""); setPage(1); setSelected([]); }
+  function openCreate(sessionId: string, targetGalleryId = "") {
+    setUploadTargetId(targetGalleryId);
+    if (targetGalleryId) setGalleryId(targetGalleryId);
+    setUploads([]); setBookingId(sessionId); setRequestId(crypto.randomUUID()); setPackageKey(""); setAllowance(""); setExtraPrice(""); setCurrency("");
     setCreating(true);
   }
 
@@ -98,17 +156,25 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
 
   async function createGallery(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || !selectedPackage) return;
+    if (busy || (!bookingId && !uploadTargetId)) return;
+    if (uploadTargetId) {
+      setBusy(true); setCreating(false);
+      try { await uploadBatch(uploadTargetId); }
+      finally { setBusy(false); }
+      return;
+    }
     const form = new FormData(event.currentTarget);
     setBusy(true);
     try {
       const result = await createClientGalleryAction({
-        clientId, requestId, title: String(form.get("title") || ""), packageProductId: selectedPackage.productId,
-        purchasedOrderId: selectedPackage.orderId, selectionAllowance: allowance, extraPhotoPrice: extraPrice, selectionCurrency: currency
+        clientId, requestId, bookingId, title: String(form.get("title") || ""),
+        description: String(form.get("description") || ""), sessionDate: String(form.get("sessionDate") || ""),
+        ...(selectedPackage ? { packageProductId: selectedPackage.productId, purchasedOrderId: selectedPackage.orderId,
+          selectionAllowance: allowance, extraPhotoPrice: extraPrice, selectionCurrency: currency } : {})
       });
       if (!result.ok) { notify(result.error, "danger"); return; }
       await reload(); setGalleryId(result.data.galleryId); resetBrowse(); setCreating(false);
-      notify("Private shoot gallery created.");
+      await uploadBatch(result.data.galleryId);
     } catch { notify("The gallery could not be created. Check your connection and try again.", "danger"); }
     finally { setBusy(false); }
   }
@@ -125,8 +191,15 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
     finally { setBusy(false); }
   }
 
-  async function uploadBatch() {
-    if (uploading || busy || !uploads.some((row) => row.status === "ready")) return;
+  function selectUploads(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || []);
+    const batchError = clientGalleryBatchError(files);
+    if (batchError) { setUploads([]); notify(batchError, "danger"); event.target.value = ""; return; }
+    setUploads(files.map((file) => ({ file, status: file.size > clientGalleryUploadMaxBytes || !(clientGalleryImageTypes as readonly string[]).includes(file.type) ? "failed" : "ready", error: file.size > clientGalleryUploadMaxBytes ? "Exceeds 25 MiB per photo." : !(clientGalleryImageTypes as readonly string[]).includes(file.type) ? "Use JPG, PNG, WebP, or GIF." : undefined })));
+  }
+
+  async function uploadBatch(targetGalleryId = galleryId) {
+    if (uploading || !uploads.some((row) => row.status === "ready")) return;
     const batchError = clientGalleryBatchError(uploads.map(row => row.file));
     if (batchError) { notify(batchError, "danger"); return; }
     stopUpload.current = false; setUploading(true);
@@ -138,7 +211,7 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
         if (rows[index].status !== "ready") continue;
         rows[index] = { ...rows[index], status: "uploading" }; setUploads([...rows]);
         const form = new FormData();
-        form.set("clientId", clientId); form.set("galleryId", galleryId); form.set("file", rows[index].file);
+        form.set("clientId", clientId); form.set("galleryId", targetGalleryId); form.set("file", rows[index].file);
         try {
           const result = await uploadClientGalleryPhotoAction(form);
           rows[index] = { ...rows[index], status: result.ok ? "done" : "failed", error: result.ok ? undefined : result.error };
@@ -173,24 +246,81 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
     finally { setBusy(false); }
   }
 
+  async function saveProofSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setBusy(true);
+    try {
+      const result = await configureClientGalleryProofingAction({ clientId, galleryId, includedCount: Number(form.get("includedCount")), addOnId: proofAddOn?.id || gallery?.extraPhotoAddOnId, currency: String(form.get("currency")) });
+      if (!result.ok) { notify(result.error, "danger"); return; }
+      await reload(); setProofSettingsOpen(false); notify("Photo selection settings saved.");
+    } catch { notify("Selection settings could not be saved. Try again.", "danger"); }
+    finally { setBusy(false); }
+  }
+
+  async function sendEmail() {
+    if (sending || busy || uploading || imageStatus !== "Ready") return;
+    setSending(true);
+    try {
+      const result = await sendClientGalleryEmailAction({ clientId, galleryId, requestId: sendRequestId });
+      if (!result.ok) { notify(result.error, "danger"); return; }
+      setEmailNotice(`Email queued for ${result.data.recipientEmail}. Track delivery in Communications.`);
+      setSendRequestId(crypto.randomUUID()); setSendOpen(false);
+      notify("Session photo email queued.");
+    } catch { notify("Email status is uncertain. Check Communications before retrying.", "danger"); }
+    finally { setSending(false); }
+  }
+
+  useEffect(() => {
+    if (previewIndex === null) return;
+    const navigatePhoto = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        setPreviewIndex(index => index === null ? null : Math.max(0, Math.min(previewPhotos.total - 1, index + (event.key === "ArrowRight" ? 1 : -1))));
+      }
+    };
+    window.addEventListener("keydown", navigatePhoto);
+    return () => window.removeEventListener("keydown", navigatePhoto);
+  }, [previewIndex, previewPhotos.total]);
+
+  useEffect(() => {
+    if (previewIndex === null || previewPhotos.page === previewPage) return;
+    let current = true;
+    Promise.resolve().then(() => {
+      if (!current) return;
+      setPreviewError("");
+      return browseClientGalleryMediaAction({ clientId, galleryId, query, page: previewPage, folder: "", mode: "gallery" });
+    }).then(result => {
+      if (!current || !result) return;
+      if (result.ok && result.data.assets.length) setPreviewPhotos(result.data);
+      else setPreviewError(result.ok ? "This photo is no longer available." : result.error);
+    }).catch(() => { if (current) setPreviewError("The photo could not load. Go back or close the viewer and try again."); });
+    return () => { current = false; };
+  }, [clientId, galleryId, query, previewPage, previewPhotos.page, previewIndex]);
+
   const photoGrid = (
     <>
-      {photosLoading ? <p className={styles.status} role="status">Loading photos…</p> : null}
+      {photosLoading && pickerOpen ? <p className={styles.status} role="status">Loading photos…</p> : null}
       {photosError ? <div className="error" role="alert">{photosError} <Button size="sm" type="button" variant="ghost" onClick={() => setRevision((value) => value + 1)}>Try again</Button></div> : null}
-      {!photosLoading && !photosError && !photos.assets.length ? <p className={styles.empty}>{query ? "No private photos match this search. Try another name or folder." : pickerOpen ? "No private photos are available yet. Upload this shoot’s originals first." : "Add this shoot’s photos from Media, or upload a batch of originals below."}</p> : null}
-      <div aria-busy={photosLoading} className={styles.photoGrid}>
-        {!photosLoading && !photosError ? photos.assets.map((photo) => {
+      {!showGallerySkeleton && !photosLoading && !photosError && !photos.assets.length && !(pickerOpen && !query && childMediaFolders(photos.folders.map(name => ({ name, count: 0 })), folder).length) ? <p className={styles.empty}>{query ? "No private photos match this search. Try another name or folder." : pickerOpen ? "No private photos are available yet. Upload this shoot’s originals first." : "Upload photos or choose from Media to get started."}</p> : null}
+      {pickerOpen ? <nav aria-label="Media folders" className={styles.actions}><Button type="button" variant="ghost" onClick={() => { setFolder(""); setPage(1); }}>Media Home</Button>{folder.split("/").filter(Boolean).map((part, index, parts) => <Button key={index} type="button" variant="ghost" onClick={() => { setFolder(parts.slice(0, index + 1).join("/")); setPage(1); }}>{part}</Button>)}</nav> : null}
+      <div aria-label={showGallerySkeleton ? "Loading session photos" : undefined} aria-busy={photosLoading || processingImages} className={pickerOpen ? styles.photoGrid : styles.galleryGrid}>
+        {showGallerySkeleton ? Array.from({ length: 8 }, (_, index) => <SkeletonBlock aria-hidden="true" className={styles.photoSkeleton} key={index} />) : null}
+        {pickerOpen && !query && !photosLoading ? childMediaFolders(photos.folders.map(name => ({ name, count: 0 })), folder).map(item => <Button key={item.name} type="button" variant="secondary" onClick={() => { setFolder(item.name); setPage(1); }}><Folder aria-hidden="true" size={24} />{item.label}</Button>) : null}
+        {!showGallerySkeleton && !photosLoading && !photosError ? photos.assets.map((photo, index) => {
           const checked = selected.includes(photo.id);
-          const content = <><Image alt={photo.alt} height={150} loading="lazy" src={photo.thumbnailUrl} unoptimized width={200} /><span className={styles.photoName}>{photo.filename}</span>{photo.folder ? <small>{photo.folder}</small> : null}</>;
+          const content = <><Image alt={photo.alt} height={150} loading="lazy" src={photo.thumbnailUrl} unoptimized width={200} /><span className={styles.photoName} title={photo.filename}>{photo.filename}</span>{pickerOpen && photo.folder ? <small>{photo.folder}</small> : null}</>;
           return pickerOpen ? (
             <label className={`${styles.photo} ${checked ? styles.selectedPhoto : ""} ${photo.alreadyAdded ? styles.addedPhoto : ""}`} key={photo.id}>
               {content}
               <span className={styles.photoChoice}><input aria-label={`Add ${photo.filename}`} checked={checked || photo.alreadyAdded} disabled={photo.alreadyAdded || busy || (!checked && selected.length >= 100)} onChange={() => setSelected((ids) => ids.includes(photo.id) ? ids.filter((id) => id !== photo.id) : [...ids, photo.id])} type="checkbox" />{photo.alreadyAdded ? "In this shoot" : checked ? "Selected" : "Select photo"}</span>
             </label>
-          ) : <figure className={styles.photo} key={photo.id}>{content}</figure>;
+          ) : <button aria-label={`View ${photo.filename}`} className={styles.galleryTile} key={photo.id} onClick={() => { setPreviewPhotos(photos); setPreviewError(""); setPreviewIndex((photos.page - 1) * clientGalleryPageSize + index); }} type="button">
+            <span className={`${mediaStyles.thumb} ${styles.galleryThumb}`}><Image alt={photo.alt} height={300} loading={index < 6 ? "eager" : "lazy"} src={photo.thumbnailUrl} unoptimized width={400} /></span>
+          </button>;
         }) : null}
       </div>
-      {photos.pageCount > 1 && !photosLoading ? <nav aria-label={pickerOpen ? "Media pages" : "Shoot photo pages"} className={styles.pagination}>
+      {photos.pageCount > 1 && !photosLoading && !showGallerySkeleton ? <nav aria-label={pickerOpen ? "Media pages" : "Shoot photo pages"} className={styles.pagination}>
         <Button disabled={photos.page <= 1 || busy} onClick={() => setPage(photos.page - 1)} size="sm" type="button" variant="secondary">Previous</Button>
         <span>Page {photos.page} of {photos.pageCount} · {photos.total} photos</span>
         <Button disabled={photos.page >= photos.pageCount || busy} onClick={() => setPage(photos.page + 1)} size="sm" type="button" variant="secondary">Next</Button>
@@ -199,62 +329,120 @@ export function ClientGalleriesCard({ clientId, initialWorkspace }: { clientId: 
   );
 
   return (
-    <Card as="section" bodyClassName={styles.body} id="client-galleries" minHeight="none">
-      <header className={styles.header}>
-        <div><h2 className="section-title">Shoot galleries</h2><p className="ui-zero muted-text">Private photos, package selections, and delivery for this client.</p></div>
-        <Button disabled={busy || uploading || creating} onClick={openCreate} size="sm" type="button" variant="secondary"><Plus aria-hidden="true" size={16} /> New shoot</Button>
-      </header>
-
-      {creating ? <form className={styles.createForm} onSubmit={createGallery}>
-        <h3>New private shoot</h3>
-        {!workspace.packages.length ? <p className={styles.empty}>This client needs a paid or fulfilled service-package order before a shoot gallery can be created.</p> : <>
-          <label className={styles.field}><span>Shoot name</span><input autoFocus maxLength={160} name="title" placeholder="e.g. Autumn family portraits" required /></label>
-          <label className={styles.field}><span>Purchased package</span><select onChange={(event) => choosePackage(event.target.value)} required value={packageKey}><option value="">Choose a paid package</option>{workspace.packages.map((item) => <option key={`${item.orderId}:${item.productId}`} value={`${item.orderId}:${item.productId}`}>{item.name} · Order {item.orderNumber}</option>)}</select></label>
-          <div className={styles.termsFields}>
-            <label className={styles.field}><span>Included photos</span><input inputMode="numeric" max={10000} min={0} onChange={(event) => setAllowance(event.target.value)} required step={1} type="number" value={allowance} /></label>
-            <label className={styles.field}><span>Price per extra photo</span><input inputMode="decimal" min={0} onChange={(event) => setExtraPrice(event.target.value)} required step="0.01" type="number" value={extraPrice} /></label>
-            <label className={styles.field}><span>Currency</span><input maxLength={3} onChange={(event) => setCurrency(event.target.value.toUpperCase())} pattern="[A-Za-z]{3}" placeholder="USD" required value={currency} /></label>
-          </div>
-          <p className={styles.help}>Review the package values before saving. These terms are fixed for this shoot; enter any missing values explicitly. Only selected, entitled originals can be downloaded.</p>
-        </>}
-        <footer className={styles.actions}><Button disabled={busy} onClick={() => setCreating(false)} size="sm" type="button" variant="ghost">Cancel</Button>{workspace.packages.length ? <Button disabled={busy || !selectedPackage} size="sm" type="submit">{busy ? "Creating…" : "Create private shoot"}</Button> : null}</footer>
-      </form> : null}
-
-      {!creating && !workspace.galleries.length ? <div className={styles.empty}><Images aria-hidden="true" size={28} /><p>No shoot galleries yet. Create one from a purchased package, then add the client’s photos.</p></div> : null}
-      {gallery && !creating ? <>
+    <div className={`${styles.body} ${mediaStyles.libraryWorkspace} stack has-mobile-shell-header`}>
+      <AdminMobileHeaderSlot backHref={`/admin/clients/${clientId}`} title={sessionTitle} />
+      <header className={`page-header clients-detail-header ${styles.sessionHeader}`}><div className={`clients-detail-heading ${styles.sessionHeading}`}><ButtonLink href={`/admin/clients/${clientId}`} size="sm" variant="ghost"><ArrowLeft aria-hidden="true" size={15} /><span className={styles.clientBackName}>{workspace.clientName || "Client"}</span><span className={styles.mobileBackLabel}>Back</span></ButtonLink><h1 title={sessionTitle}>{sessionTitle}</h1></div><div className={styles.headerActions}>
+        <Button aria-label="Upload photos" disabled={busy || uploading || sending || (!workspace.canUpload && !workspace.canManageMedia)} onClick={() => openCreate(initialBookingId, gallery?.id || "")} size="sm" type="button" variant="secondary"><Upload aria-hidden="true" size={15} /><span className={styles.headerActionLabel}>Upload</span></Button>
+        <Button aria-label="Send to client" disabled={!gallery || busy || uploading || sending || imageStatus !== "Ready"} onClick={() => setSendOpen(true)} size="sm" type="button"><Mail aria-hidden="true" size={15} /><span className={styles.headerActionLabel}>Send</span></Button>
+      </div></header>
+      {processingImages ? <aside className={`ui-card ${styles.processingNotice}`}>
+        <p role="status">Client Images Processing</p>
+        <div aria-label="Image processing progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={uploading && uploads.length ? Math.round(finishedUploads / uploads.length * 100) : undefined} aria-valuetext={uploading && uploads.length ? `${finishedUploads} of ${uploads.length} files finished` : "Preparing image previews"} className="ui-progress" role="progressbar">
+          <span className={`ui-progress-fill ${!uploading ? styles.processingIndeterminate : ""}`} style={uploading ? { width: `${uploads.length ? finishedUploads / uploads.length * 100 : 0}%` } : undefined} />
+        </div>
+      </aside> : null}
+      {imageStatus === "Needs attention" ? <p className={styles.uploadError} role="alert">Some client images could not be processed. Check the upload results or retry from Media.</p> : null}
+      <Modal open={sendOpen} title="Send to client" onClose={() => { if (!sending && !busy) setSendOpen(false); }}>
+        <div className={styles.deliveryBody}>
+          <p><strong>{workspace.clientName}</strong><br />{workspace.clientEmail || "Add an email in the client profile to send photos."}</p>
+          {gallery ? <>
+            <p className={styles.help}>{gallery.photoCount} photos · Private gallery link</p>
+            {gallery.selectionAllowance !== null ? <p className={styles.help}>{gallery.packageName}: {gallery.selectionAllowance} included photos / {currencyAmount(gallery.extraPhotoPriceCents, gallery.selectionCurrency)} per extra photo</p> : null}
+            <p className={styles.help}>Only share this link with the client. Photos are viewed in the gallery, not attached to the email.</p>
+            {gallery.bookingId && (gallery.selectionAllowance === null || gallery.extraPhotoAddOnId) ? <Button disabled={busy || sending || uploading} onClick={() => { setSendOpen(false); setProofAddOn(null); setProofSettingsOpen(true); }} size="sm" type="button" variant="secondary">Photo selection settings</Button> : null}
+            <div className={styles.actions}>
+              {gallery.accessPath ? <><Button disabled={busy || uploading || sending} onClick={copyLink} size="sm" type="button" variant="secondary"><Copy aria-hidden="true" size={15} />Copy client link</Button><a className={styles.openLink} href={gallery.accessPath} rel="noreferrer" target="_blank">Preview gallery <ExternalLink aria-hidden="true" size={14} /></a></> : <Button disabled={busy || uploading || sending} onClick={createLink} size="sm" type="button" variant="secondary">Create client link</Button>}
+            </div>
+            {imageStatus !== "Ready" ? <p className={styles.help}>Email becomes available once all session images are ready.</p> : !workspace.canSendEmail ? <p className={styles.help}>Email delivery requires Communications and a valid client email.</p> : null}
+          </> : null}
+          <footer className="module-modal-actions"><Button disabled={sending || busy} onClick={() => setSendOpen(false)} type="button" variant="secondary">Cancel</Button><Button disabled={sending || busy || uploading || !workspace.canSendEmail || imageStatus !== "Ready"} onClick={sendEmail} type="button"><Mail aria-hidden="true" size={15} />{sending ? "Queuing…" : "Send email"}</Button></footer>
+        </div>
+      </Modal>
+      <Modal open={proofSettingsOpen} title="Photo selection settings" onClose={() => { if (!busy) setProofSettingsOpen(false); }}>
+        <form className={styles.createForm} onSubmit={saveProofSettings}>
+          <label className={styles.field}><span>Included photos</span><input defaultValue={gallery?.selectionAllowance ?? workspace.sessions.find(session => session.id === initialBookingId)?.includedPhotos ?? ""} min={0} max={10000} name="includedCount" required type="number" /></label>
+          <div className={styles.field}><span>Extra-photo pricing add-on</span><Button onClick={() => { setEditingProofAddOn(false); setAddOnPicker(true); }} type="button" variant="secondary">{proofAddOn?.name || gallery?.extraPhotoAddOnName || "Choose a per-unit add-on"}</Button>{selectedProofAddOn ? <Button onClick={() => { setEditingProofAddOn(true); setAddOnPicker(true); }} size="sm" type="button" variant="ghost">Edit add-on</Button> : null}</div>
+          <p className={styles.help}>{proofAddOn?.priceCents != null ? `${currencyAmount(proofAddOn.priceCents, gallery?.selectionCurrency || "USD")} per extra photo.` : "Choose or create a per-unit add-on that adds one photo. Its saved price is used for each extra photo."}</p>
+          <label className={styles.field}><span>Currency</span><input defaultValue={gallery?.selectionCurrency || "USD"} maxLength={3} name="currency" pattern="[A-Za-z]{3}" required /></label>
+          <footer className="module-modal-actions"><Button disabled={busy} onClick={() => setProofSettingsOpen(false)} type="button" variant="secondary">Cancel</Button><Button disabled={busy || !(proofAddOn?.id || gallery?.extraPhotoAddOnId)} type="submit">{busy ? "Saving…" : "Save settings"}</Button></footer>
+        </form>
+      </Modal>
+      {addOnPicker ? <ServiceLibraryPicker optional editingItem={editingProofAddOn && selectedProofAddOn ? { ...selectedProofAddOn, libraryItemId: selectedProofAddOn.id } : undefined} rates={[]} onRateSaved={() => {}} selectedItems={[]} onChoose={items => { if (items.length !== 1 || items[0].pricingType !== "PER_UNIT" || items[0].priceCents === null) { notify("Choose one per-unit add-on with a saved price.", "danger"); return; } setProofAddOn(items[0]); setAddOnPicker(false); }} onClose={() => setAddOnPicker(false)} /> : null}
+      <section aria-label="Session photos" className={styles.galleryWorkspace}>
         <div className={styles.galleryToolbar}>
-          <label className={styles.field}><span>Shoot</span><select disabled={busy || uploading} onChange={(event) => { setGalleryId(event.target.value); resetBrowse(); setUploads([]); if (uploadInput.current) uploadInput.current.value = ""; }} value={galleryId}>{workspace.galleries.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.photoCount} photos</option>)}</select></label>
-          <span className="ui-badge">Private</span>
+          <span className={styles.help}>{gallery ? `${gallery.photoCount} photos` : "No photos yet"}</span>
+          {gallery && workspace.canManageMedia ? <form className={styles.gallerySearch} onSubmit={event => { event.preventDefault(); setPage(1); setQuery(searchDraft.trim()); }}>
+            <input aria-label="Search session photos" maxLength={180} onChange={event => setSearchDraft(event.target.value)} placeholder="Search photos" type="search" value={searchDraft} />
+            <Button aria-label="Search session photos" disabled={busy || uploading} size="sm" type="submit" variant="ghost"><Search aria-hidden="true" size={16} /></Button>
+          </form> : null}
         </div>
-        <div className={styles.terms}>
-          <p><strong>{gallery.packageName}</strong><span>{gallery.selectionAllowance === null ? "Allowance not configured" : `${gallery.selectionAllowance} included photos`} · {currencyAmount(gallery.extraPhotoPriceCents, gallery.selectionCurrency)} per extra photo</span></p>
-          <div className={styles.actions}>{gallery.accessPath ? <><Button disabled={busy || uploading} onClick={copyLink} size="sm" type="button" variant="secondary"><Copy aria-hidden="true" size={15} /> Copy client link</Button><a className={styles.openLink} href={gallery.accessPath} rel="noreferrer" target="_blank">Open private gallery <ExternalLink aria-hidden="true" size={14} /></a></> : <Button disabled={busy || uploading} onClick={createLink} size="sm" type="button" variant="secondary">Create client link</Button>}</div>
-        </div>
-        <p className={styles.help}>Keep the client link private. Photos stay in shared Media as private originals. Your public Portfolio remains separately curated.</p>
-        <div className={styles.photosHeader}><h3>{gallery.photoCount} shoot photo{gallery.photoCount === 1 ? "" : "s"}</h3>{workspace.canManageMedia ? <Button disabled={busy || uploading} onClick={() => { resetBrowse(); setPickerOpen(true); }} size="sm" type="button" variant="secondary"><ImagePlus aria-hidden="true" size={16} /> Choose from Media</Button> : null}</div>
-        {!pickerOpen && workspace.canManageMedia ? photoGrid : null}
-        {workspace.canManageMedia ? <section className={styles.uploadSection} aria-label="Upload shoot photos">
-          <h3>Upload originals</h3>
-          <p className={styles.help}>JPG, PNG, WebP, or GIF originals: up to 25 MiB and 80 megapixels each. Choose at most 100 photos totaling 250 MiB per batch. Files upload one at a time; RAW files are not supported.</p>
-          {!workspace.canUpload ? <p className="error">Private photo uploads are unavailable. Contact support to enable them.</p> : <>
-            <label className={styles.field}><span>Photo files</span><input accept={clientGalleryImageTypes.join(",")} disabled={uploading || busy} multiple onChange={(event) => {
-              const files = Array.from(event.target.files || []);
-              const batchError = clientGalleryBatchError(files);
-              if (batchError) { setUploads([]); notify(batchError, "danger"); event.target.value = ""; return; }
-              setUploads(files.map((file) => ({ file, status: file.size > clientGalleryUploadMaxBytes || !(clientGalleryImageTypes as readonly string[]).includes(file.type) ? "failed" : "ready", error: file.size > clientGalleryUploadMaxBytes ? "Exceeds 25 MiB per photo." : !(clientGalleryImageTypes as readonly string[]).includes(file.type) ? "Use JPG, PNG, WebP, or GIF." : undefined })));
-            }} ref={uploadInput} type="file" /></label>
-            {uploads.length ? <ul aria-live="polite" className={styles.uploadList}>{uploads.map((row, index) => <li key={`${row.file.name}-${index}`}><span className={styles.uploadFilename}>{row.file.name}</span><span>{row.status === "done" ? <><Check aria-hidden="true" size={14} /> Added</> : row.status === "uploading" ? "Uploading…" : row.status === "failed" ? "Needs attention" : "Ready"}</span>{row.error ? <small className={styles.uploadError}>{row.error}</small> : null}</li>)}</ul> : null}
-            <div className={styles.actions}><Button disabled={uploading || busy || !uploads.some((row) => row.status === "ready")} onClick={uploadBatch} size="sm" type="button"><Upload aria-hidden="true" size={16} />{uploading ? "Uploading…" : "Upload photos"}</Button>{uploading ? <Button onClick={() => { stopUpload.current = true; notify("Stopping after the current photo finishes.", "neutral"); }} size="sm" type="button" variant="ghost">Stop after this photo</Button> : uploads.length ? <Button onClick={() => { setUploads([]); if (uploadInput.current) uploadInput.current.value = ""; }} size="sm" type="button" variant="ghost">Clear file list</Button> : null}</div>
+        <div className={styles.galleryContent}>
+        {emailNotice ? <p className={styles.help} role="status">{emailNotice}</p> : null}
+        {!gallery ? <p>No photos yet. Upload this session’s photos to get started.</p> : null}
+      <Modal open={creating} title={uploadTarget ? `Upload photos: ${uploadTarget.title}` : "Upload session photos"} onClose={() => { if (!busy && !uploading) setCreating(false); }}>
+        <form className={styles.createForm} onSubmit={createGallery}>
+          {!workspace.sessions.length && !uploadTargetId ? <p className={styles.empty}>Schedule a session for this client before adding photos. <Link href="/admin/appointments/new">Schedule a session</Link></p> : <>
+            {!uploadTarget ? <>
+            <label className={styles.field}><span>Session name</span><input autoFocus defaultValue={workspace.sessions.find(session => session.id === bookingId)?.name || ""} disabled={busy} maxLength={160} name="title" placeholder="e.g. Wedding Shoot" required /></label>
+            <label className={styles.field}><span>Description (optional)</span><textarea disabled={busy} maxLength={4000} name="description" rows={3} /></label>
+            <label className={styles.field}><span>Date</span><input defaultValue={workspace.today} disabled={busy} name="sessionDate" required type="date" /></label>
+            {workspace.packages.length ? <label className={styles.field}><span>Photo-selection package (optional)</span><select disabled={busy} onChange={event => choosePackage(event.target.value)} value={packageKey}><option value="">Deliver all session photos</option>{workspace.packages.map(item => <option key={`${item.orderId}:${item.productId}`} value={`${item.orderId}:${item.productId}`}>{item.name} · Order {item.orderNumber}</option>)}</select></label> : null}
+            {selectedPackage ? <div className={styles.termsFields}>
+              <label className={styles.field}><span>Included photos</span><input disabled={busy} min={0} max={10000} onChange={event => setAllowance(event.target.value)} required step={1} type="number" value={allowance} /></label>
+              <label className={styles.field}><span>Price per extra photo</span><input disabled={busy} min={0} onChange={event => setExtraPrice(event.target.value)} required step="0.01" type="number" value={extraPrice} /></label>
+              <label className={styles.field}><span>Currency</span><input disabled={busy} maxLength={3} onChange={event => setCurrency(event.target.value.toUpperCase())} pattern="[A-Za-z]{3}" required value={currency} /></label>
+            </div> : null}
+            </> : null}
+            {uploadTarget && workspace.canManageMedia ? <Button disabled={busy} onClick={() => { setCreating(false); resetBrowse(); setPickerOpen(true); }} size="sm" type="button" variant="secondary"><ImagePlus aria-hidden="true" size={16} />Choose from Media</Button> : null}
+            <label className={styles.field}><span>Photos</span><input accept={clientGalleryImageTypes.join(",")} disabled={busy} multiple onChange={selectUploads} ref={uploadInput} required type="file" /></label>
+            {uploads.filter(row => row.error).map((row, index) => <p className="error" key={index} role="alert">{row.file.name}: {row.error}</p>)}
+            {!workspace.canUpload ? <p className="error" role="alert">Private photo uploads are unavailable. Contact support to enable them.</p> : null}
+            <p className={styles.help}>Up to 100 JPG, PNG, WebP, or GIF photos; 25 MiB per photo and 250 MiB per batch. Originals stay private in Media.</p>
           </>}
-        </section> : <p className={styles.help}>Media permission is required to browse or add shoot photos.</p>}
+          <footer className="module-modal-actions"><Button disabled={busy} onClick={() => setCreating(false)} type="button" variant="secondary">Cancel</Button><Button disabled={busy || (!bookingId && !uploadTargetId) || !workspace.canUpload || !uploads.some(row => row.status === "ready")} type="submit">{busy ? "Saving…" : "Save photos"}</Button></footer>
+        </form>
+      </Modal>
+
+      {gallery && !creating ? <>
+        {gallery.description ? <p>{gallery.description}</p> : null}
+        {workspace.galleries.length > 1 ? <div className={styles.galleryToolbar}>
+          <label className={styles.field}><span>Photo collection</span><select disabled={busy || uploading || sending} onChange={(event) => { setGalleryId(event.target.value); setEmailNotice(""); setSendRequestId(crypto.randomUUID()); resetBrowse(); setUploads([]); if (uploadInput.current) uploadInput.current.value = ""; }} value={galleryId}>{workspace.galleries.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.photoCount} photos</option>)}</select></label>
+          <span className="ui-badge">Private</span>
+        </div> : null}
+        {!pickerOpen && workspace.canManageMedia ? photoGrid : null}
       </> : null}
 
+        {uploads.length ? <details aria-label="Upload results" className={styles.uploadSection} open={uploading || uploads.some(row => row.status === "failed")}>
+          <summary>{uploading ? "Images processing…" : `${uploads.filter(row => row.status === "done").length} of ${uploads.length} photos uploaded`}</summary>
+          <ul aria-live="polite" className={styles.uploadList}>{uploads.map((row, index) => <li key={`${row.file.name}-${index}`}><span className={styles.uploadFilename}>{row.file.name}</span><span>{row.status === "done" ? <><Check aria-hidden="true" size={14} /> Ready</> : row.status === "uploading" ? "Images processing…" : row.status === "failed" ? "Needs attention" : "Queued"}</span>{row.error ? <small className={styles.uploadError}>{row.error}</small> : null}</li>)}</ul>
+          {uploading ? <Button onClick={() => { stopUpload.current = true; }} size="sm" type="button" variant="secondary">Stop after this photo</Button> : <Button onClick={() => setUploads([])} size="sm" type="button" variant="ghost">Clear file list</Button>}
+        </details> : null}
+        </div>
+      </section>
+      <Dialog aria-label="Photo preview" className={styles.fullscreen} fullScreen open={previewIndex !== null} onClose={() => setPreviewIndex(null)}>
+        {previewIndex !== null ? <>
+          <header className={styles.viewerHeader}>
+            <span className={styles.viewerName} title={previewPhoto?.filename}>{previewPhoto?.filename || "Photo preview"}</span>
+            <div className={styles.viewerActions}>
+              {previewPhoto ? <ButtonAnchor aria-label="Download photo" download={previewPhoto.filename} href={previewPhoto.downloadUrl} size="sm" variant="ghost"><Download aria-hidden="true" size={18} /></ButtonAnchor> : null}
+              <Button aria-label="Send session to client" disabled={busy || uploading || sending || imageStatus !== "Ready"} onClick={() => { setPreviewIndex(null); setSendOpen(true); }} size="sm" type="button" variant="ghost"><Mail aria-hidden="true" size={18} /></Button>
+              <Button aria-label="Close photo preview" onClick={() => setPreviewIndex(null)} size="sm" type="button" variant="ghost"><X aria-hidden="true" size={20} /></Button>
+            </div>
+          </header>
+          <div aria-busy={previewLoading && !previewError} className={styles.viewerImage}>{previewError ? <p role="alert">{previewError}</p> : previewPhoto ? <><Image alt={previewPhoto.alt} height={1600} key={previewPhoto.id} onLoad={() => { setLoadedPreviewId(previewPhoto.id); setFailedPreviewId(""); }} onError={() => setFailedPreviewId(previewPhoto.id)} src={previewPhoto.previewUrl} unoptimized width={2000} />{failedPreviewId === previewPhoto.id ? <p role="alert">Photo could not load. Close the viewer and try again.</p> : loadedPreviewId !== previewPhoto.id ? <p role="status">Loading photo…</p> : null}</> : <p role="status">Loading photo…</p>}</div>
+          <footer className={styles.viewerFooter}>
+            <Button aria-label="Previous photo" disabled={previewIndex === 0} onClick={() => setPreviewIndex(index => Math.max(0, (index || 0) - 1))} size="sm" type="button" variant="ghost"><ChevronLeft aria-hidden="true" size={22} /></Button>
+            <span>{(previewIndex || 0) + 1} / {previewPhotos.total}</span>
+            <Button aria-label="Next photo" disabled={previewIndex >= previewPhotos.total - 1} onClick={() => setPreviewIndex(index => Math.min(previewPhotos.total - 1, (index || 0) + 1))} size="sm" type="button" variant="ghost"><ChevronRight aria-hidden="true" size={22} /></Button>
+          </footer>
+        </> : null}
+      </Dialog>
       <Modal bodyClassName={styles.pickerBody} className={styles.picker} onClose={() => { if (!busy) { setPickerOpen(false); resetBrowse(); } }} open={pickerOpen} title="Choose private photos from Media">
         <p className={styles.help}>Search across your private Media library by filename, description, folder, or exact tag. Selections stay checked as you browse pages.</p>
         <form className={styles.search} onSubmit={(event) => { event.preventDefault(); setPage(1); setQuery(searchDraft.trim()); }}><label className={styles.field}><span>Search private photos</span><input maxLength={180} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search photos or folders" type="search" value={searchDraft} /></label><Button disabled={busy} size="sm" type="submit" variant="secondary"><Search aria-hidden="true" size={16} /> Search</Button></form>
         {photoGrid}
         <footer className={styles.pickerFooter}><span>{selected.length} selected{selected.length === 100 ? " · Add this batch to select more" : ""}</span><div className={`module-modal-actions ${styles.actions}`}><Button disabled={busy} onClick={() => { setPickerOpen(false); resetBrowse(); }} size="sm" type="button" variant="ghost">Cancel</Button><Button disabled={busy || !selected.length} onClick={addSelected} size="sm" type="button">{busy ? "Adding…" : `Add ${selected.length || "selected"} photo${selected.length === 1 ? "" : "s"}`}</Button></div></footer>
       </Modal>
-    </Card>
+    </div>
   );
 }

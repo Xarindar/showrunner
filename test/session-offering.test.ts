@@ -4,6 +4,20 @@ import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { priceSessionOffering, sessionOfferingFormSchema, sessionOfferingDraft, sessionOfferingSchema, selectSessionPackage, sessionPackageSnapshotSchema } from "../lib/scheduling/session-offering";
 
+test("blank optional hourly-rate selections round-trip for packages, included services and add-ons", () => {
+  const saved = sessionOfferingFormSchema.parse(JSON.stringify({
+    coverageItems: [{ id: "included", name: "Coverage", hourlyRateId: "" }],
+    tiers: [{ id: "standard", name: "Standard", durationMinutes: "30", price: "", pricingType: "FLAT_RATE", hourlyRateId: "", coverageIds: ["included"] }],
+    addOns: [{ id: "extra", name: "Prints", price: "25", hourlyRateId: "" }]
+  }));
+  assert.equal(saved.tiers[0].hourlyRateId, null);
+  assert.equal(saved.coverageItems[0].hourlyRateId, null);
+  assert.equal(saved.addOns[0].hourlyRateId, null);
+  assert.equal(saved.tiers[0].priceCents, null);
+  assert.equal(saved.addOns[0].priceCents, 2500);
+  assert.throws(() => priceSessionOffering({ ...saved, tiers: [{ ...saved.tiers[0], pricingType: "HOURLY" }] }, [], { pricingType: "FLAT_RATE", hourlyRateId: "" }), /Choose an hourly rate/);
+});
+
 test("packages keep independent flat and hourly prices, validate rate ownership and retain legacy pricing", () => {
   const rates = [{ id: "rate", name: "Photography", amountCents: 12550 }];
   const fallback = { pricingType: "HOURLY" as const, hourlyRateId: "rate" };
@@ -100,4 +114,21 @@ test("tier migration is additive and leaves old services, packages and bookings 
     assert.deepEqual((await db.query('SELECT * FROM "Booking"')).rows[0], { id: "booked", priceCents: 15000, packageSnapshot: null });
     assert.equal((await db.query('SELECT * FROM "ServicePackage"')).rows.length, 1);
   } finally { await db.close(); }
+});
+
+
+test("user-created services and add-ons increase booked deliverables by selected quantity", () => {
+  const source = {
+    coverageItems: [{ id: "location", name: "Custom location service", deliverables: { locations: 1 } }],
+    tiers: [{ id: "base", name: "Portraits", durationMinutes: 60, priceCents: 10000, coverageIds: ["location"], deliverables: { finalPhotos: 2, locations: 1, outfitChanges: 1 } }],
+    addOns: [{ id: "custom", name: "Whatever the photographer calls it", libraryItemId: "library-extra", priceCents: 750, pricingType: "PER_UNIT", deliverables: { finalPhotos: 1, outfitChanges: 1 } }]
+  };
+  const quoted = selectSessionPackage(source, "base", ["custom"], undefined, { custom: 3 });
+  assert.deepEqual(quoted?.deliverables, { finalPhotos: 5, locations: 2, outfitChanges: 4 });
+  assert.equal(quoted?.priceCents, 12250);
+  assert.equal(quoted?.extras[0].libraryItemId, "library-extra");
+  const saved = sessionPackageSnapshotSchema.parse(quoted);
+  source.addOns[0].deliverables.finalPhotos = 100;
+  assert.equal(saved.deliverables?.finalPhotos, 5, "Booked totals remain an immutable snapshot");
+  assert.throws(() => selectSessionPackage({ ...source, addOns: [{ ...source.addOns[0], deliverables: { finalPhotos: 10000 } }] }, "base", ["custom"], undefined, { custom: 2 }), /10,000/);
 });

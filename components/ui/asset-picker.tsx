@@ -161,7 +161,7 @@ export function AssetPicker({
   const visibleAssets = useMemo(() => {
     const search = normalizedSearchValue(query);
     return libraryAssets.filter((asset) => {
-      if (folder && asset.folder !== folder) return false;
+      if ((folder || (libraryFilter === "all" && !selectedTag && !search)) && (asset.folder || "") !== folder) return false;
       if (!loadFromServer && libraryFilter === "recent" && !assetWasAddedRecently(asset)) return false;
       if (selectedTag && !(asset.tags || []).includes(selectedTag)) return false;
       if (!search) return true;
@@ -184,7 +184,7 @@ export function AssetPicker({
     if (filter === "recent") return [];
     const normalizedSearch = normalizedSearchValue(search);
     return supplementalAssets.filter((asset) => {
-      if (selectedFolder && asset.folder !== selectedFolder) return false;
+      if ((selectedFolder || (filter === "all" && !tag && !normalizedSearch)) && (asset.folder || "") !== selectedFolder) return false;
       if (tag && !(asset.tags || []).includes(tag)) return false;
       if (!normalizedSearch) return true;
       return [asset.filename, asset.alt, asset.folder || "", ...(asset.tags || [])]
@@ -393,7 +393,7 @@ export function AssetPicker({
                   <label><span className="ui-sr-only">Tag</span><select aria-label="Tag" value={selectedTag || ""} onChange={event => chooseTag(event.currentTarget.value)}><option value="">All tags</option>{tagSummaries.map(tag => <option key={tag.name} value={tag.name}>{tag.name} ({tag.count})</option>)}</select></label>
                 </div>
                 <nav aria-label="Folder path" className={styles.breadcrumbs}>
-                  <Button type="button" variant="ghost" onClick={() => chooseFolder("")} aria-current={!folder ? "page" : undefined}>All images</Button>
+                  <Button type="button" variant="ghost" onClick={() => chooseFolder("")} aria-current={!folder ? "page" : undefined}>Media Home</Button>
                   {folder.split("/").filter(Boolean).map((part, index, parts) => <span key={index}><ChevronRight size={14} aria-hidden="true" /><Button type="button" variant="ghost" aria-current={index === parts.length - 1 ? "page" : undefined} onClick={() => chooseFolder(parts.slice(0, index + 1).join("/"))}>{part}</Button></span>)}
                 </nav>
                 <div className={styles.resultMeta} role="status">

@@ -45,7 +45,7 @@ export function SessionForm({ services, clients, staff, timezone, rates }: { ser
     const counts = quantitiesFor(extras, quantities);
     if (Object.values(counts).some(value => !Number.isInteger(value) || value < 1 || value > 10000)) return;
     const duration = Number(details.duration);
-    const pack = selectSessionPackage(selected?.sessionOffering, id, extras, preserveDetails && Number.isInteger(duration) && duration >= 1 && duration <= 1440 ? duration : undefined, counts);
+    const pack = selectSessionPackage(selected?.sessionOffering, id, extras, preserveDetails && Number.isInteger(duration) && duration >= 1 && duration <= 2880 ? duration : undefined, counts);
     if (pack && selected) setDetails(current => ({ ...(preserveDetails ? current : { name: selected.name, duration: String(pack.durationMinutes) }), price: pack.priceCents == null ? "" : (pack.priceCents / 100).toFixed(2) }));
   }
   const selectedTier = selected?.sessionOffering?.tiers.find(tier => tier.id === tierId);
@@ -86,7 +86,7 @@ export function SessionForm({ services, clients, staff, timezone, rates }: { ser
         </>}
         <label>Session name<input name="name" required placeholder="Family photos" value={details.name} onChange={event => setDetails({ ...details, name: event.target.value })} /></label>
         <div className={styles.row}><label>Date<input type="date" name="date" defaultValue={state.date || ""} required /></label><label>Time <small>({timezone})</small><TimeInput name="time" defaultValue={state.time || ""} required /></label></div>
-        <div className={styles.row}><label>Duration <small>(minutes)</small><input type="number" name="durationMinutes" min="1" max="1440" required value={details.duration} onChange={event => setDetails({ ...details, duration: event.target.value })} /></label><label>Price <small>(USD)</small><input inputMode="decimal" type="number" name="price" min="0" max="9999999.99" step="0.01" placeholder="0.00" required readOnly={Boolean(hourly)} value={hourly ? calculatedPrice : details.price} onChange={event => setDetails({ ...details, price: event.target.value })} /></label></div>
+        <div className={styles.row}><label>Duration <small>(minutes)</small><input type="number" name="durationMinutes" min="1" max={selectedTier?.pricingType === "TIME_FRAME" ? 2880 : 1440} required value={details.duration} onChange={event => setDetails({ ...details, duration: event.target.value })} /></label><label>Price <small>(USD)</small><input inputMode="decimal" type="number" name="price" min="0" max="9999999.99" step="0.01" placeholder="0.00" required readOnly={Boolean(hourly)} value={hourly ? calculatedPrice : details.price} onChange={event => setDetails({ ...details, price: event.target.value })} /></label></div>
         {hourly && <p className={styles.hint}>{hourly.name}: ${(hourly.amountCents / 100).toFixed(2)} / hour × booked duration{extrasCents ? " + optional extras" : ""}.</p>}
         <p className={styles.hint}>Arrange the location with your client after booking.</p>
         {team.length > 0 && <label>Team member<select key={serviceId} name="staffId" required={Boolean(selected?.staffAssignments.length)} value={staffId} onChange={event => setStaffId(event.target.value)}><option value="">Choose a team member</option>{team.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}

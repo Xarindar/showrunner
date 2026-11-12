@@ -1,3 +1,5 @@
+import * as sessionOffering from "../lib/scheduling/session-offering";
+import * as timeFrames from "../lib/scheduling/service-time-frame";
 import * as bookingDocuments from "../lib/scheduling/booking-documents";
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -43,10 +45,10 @@ function harness(options: { existing?: boolean; failBooking?: boolean; conflict?
     return exports;
   }
   const client = load("../lib/clients/public-client.ts", { "server-only": {}, "@/lib/objects": { isRecord }, "@/lib/clients/status-settings": { normalizeClientStatusSettings } });
-  const native = load("../lib/scheduling/native.ts", { "./booking-documents": bookingDocuments, "./booking-document-store": {listBookingDocuments:async(_siteId:string,transaction?:unknown)=>transaction&&options.changedDocuments ? (options.documents??[]).map(doc=>({...doc,version:doc.version+1})) : options.documents??[]}, "server-only": {}, "@/lib/clients/public-client": client, "@/lib/email": { queueBookingCreatedEmails: async () => {} }, "@/lib/prisma": { prisma: db }, "@/lib/scheduling/google-calendar": {}, "@/lib/site": {}, "@/lib/timezone": {} });
+  const native = load("../lib/scheduling/native.ts", { "./session-offering": sessionOffering, "./service-time-frame": timeFrames, "./booking-documents": bookingDocuments, "./booking-document-store": {listBookingDocuments:async(_siteId:string,transaction?:unknown)=>transaction&&options.changedDocuments ? (options.documents??[]).map(doc=>({...doc,version:doc.version+1})) : options.documents??[]}, "server-only": {}, "@/lib/clients/public-client": client, "@/lib/email": { queueBookingCreatedEmails: async () => {} }, "@/lib/prisma": { prisma: db }, "@/lib/scheduling/google-calendar": {}, "@/lib/site": {}, "@/lib/timezone": {} });
   const adapter = native.nativeSchedulingAdapter as { getAvailableSlots: () => Promise<unknown[]>; createBooking: (input: unknown) => Promise<{ clientId: string; serviceId: string }> };
   const startsAt = new Date("2030-05-01T15:00:00Z");
-  adapter.getAvailableSlots = async () => [{ startsAt, resourceIds: [] }];
+  adapter.getAvailableSlots = async () => [{ startsAt, endsAt: new Date("2030-05-01T16:00:00Z"), resourceIds: [] }];
   const book = (extra:Record<string,unknown>={}) => adapter.createBooking({ siteId: "jazzr", serviceId: "portrait", startsAt, customerName: "New client", customerEmail: "CLIENT@EXAMPLE.COM", customerPhone: "12345", ...extra });
   return { book, committed, writes, settingQueries, serviceQueries, bookingWrites };
 }

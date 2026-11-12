@@ -3,7 +3,9 @@
 import { useLayoutEffect, useState, type ReactNode } from "react";
 
 export function AdminMobileMenu({ children, fallbackTitle, routeKey }: { children: ReactNode; fallbackTitle: string; routeKey: string }) {
+  const [detailPage, setDetailPage] = useState(false);
   const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
+  const anchored = position !== null;
   useLayoutEffect(() => {
     const main = document.querySelector<HTMLElement>(".admin-main");
     if (!main) return;
@@ -12,6 +14,7 @@ export function AdminMobileMenu({ children, fallbackTitle, routeKey }: { childre
     const update = () => {
       const next = Array.from(main.querySelectorAll<HTMLElement>("header:has(h1), .product-studio-header, [data-admin-page-header]"))
         .find(element => element.getClientRects().length > 0) ?? null;
+      setDetailPage(Boolean(main.querySelector(".has-mobile-shell-header")) || Boolean(next?.querySelector("a[href] svg.lucide-arrow-left")));
       if (next !== current) {
         if (current) resize.unobserve(current);
         if (next) resize.observe(next);
@@ -34,8 +37,8 @@ export function AdminMobileMenu({ children, fallbackTitle, routeKey }: { childre
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [routeKey]);
+  }, [routeKey, anchored, detailPage]);
 
   // Page headers may still be hydrating: anchor beside them without changing their DOM.
-  return position ? <div className="admin-page-menu-anchor" style={position}>{children}</div> : <header className="admin-mobile-bar"><strong className="brand">{fallbackTitle}</strong>{children}</header>;
+  return detailPage ? null : position ? <div className="admin-page-menu-anchor" style={position}>{children}</div> : <header className="admin-mobile-bar"><strong className="brand">{fallbackTitle}</strong>{children}</header>;
 }

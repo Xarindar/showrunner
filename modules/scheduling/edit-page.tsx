@@ -76,7 +76,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
     where: {
       form: { siteId: settings.siteId },
       isHidden: false,
-      type: { in: ["TEXT", "TEXTAREA", "EMAIL", "PHONE", "RADIO", "SELECT"] }
+      type: { in: ["TEXT", "TEXTAREA", "EMAIL", "PHONE", "RADIO", "SELECT", "CHECKBOX", "DATE"] }
     },
     select: { id: true, label: true, type: true, fieldRole: true, isRequired: true, options: true, placeholder: true, helpText: true, form: { select: { name: true } } },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }]
@@ -101,7 +101,7 @@ export default async function ServiceEditPage({ searchParams, serviceId }: Servi
   const policyOptions = uniqueSortedStrings(taxonomyServices.filter(service => service.bookingRules == null).map((item: ServiceTaxonomyOption) => item.policyText));
   const availableRules = [...taxonomyServices.flatMap(service => service.bookingRules == null ? [] : readBookingRules(service.bookingRules)), ...intakeFormFields.flatMap(field => {
     const contactField = field.fieldRole === "SUBMITTER_NAME" ? "customerName" : field.fieldRole === "SUBMITTER_EMAIL" || field.type === "EMAIL" ? "customerEmail" : field.type === "PHONE" ? "customerPhone" : undefined;
-    const parsed = bookingRuleSchema.safeParse({ id: field.id, kind: "intake", category: contactField ? "Contact" : field.form.name.slice(0, 80), label: field.label, type: field.type === "RADIO" || field.type === "SELECT" ? field.type : "TEXT", required: field.isRequired, options: Array.isArray(field.options) ? field.options : [], placeholder: field.placeholder, helpText: field.helpText, contactField });
+    const parsed = bookingRuleSchema.safeParse({ id: field.id, kind: "intake", category: contactField ? "Contact" : field.form.name.slice(0, 80), label: field.label, type: field.type === "RADIO" || field.type === "SELECT" || field.type === "CHECKBOX" || field.type === "DATE" ? field.type : "TEXT", required: field.isRequired, options: Array.isArray(field.options) ? field.options : [], placeholder: field.placeholder, helpText: field.helpText, contactField });
     return parsed.success ? [parsed.data] : [];
   })];
   const formProps = { bookingDocuments, availableRules, intakeOptions, policyOptions, tags: tagOptions, rates, canUpload: isMediaUploadDriverConfigured(settings.mediaDriver), categoryOptions };

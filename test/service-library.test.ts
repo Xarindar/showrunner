@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { PGlite } from "@electric-sql/pglite";
-import { resolveIncludedServices, serviceLibraryInputSchema } from "../lib/scheduling/service-library";
+import { resolveIncludedServices, serviceLibraryInputSchema, serviceLibraryItemSchema } from "../lib/scheduling/service-library";
 import { priceSessionOffering, sessionOfferingDraft, sessionOfferingFormSchema, sessionOfferingSchema, sessionPackageSnapshotSchema, selectSessionPackage, suggestedSessionAddOns } from "../lib/scheduling/session-offering";
 
 const offering = { coverageItems: [{ id: "legacy-ceremony", name: "Ceremony" }], tiers: [{ id: "standard", name: "Standard", durationMinutes: 60, priceCents: 10000, coverageIds: ["legacy-ceremony"] }], addOns: [] };
@@ -71,7 +71,7 @@ test("optional-only offerings hydrate library references within the current site
   let queries = 0;
   runInNewContext(ts.transpileModule(readFileSync("lib/scheduling/service-library-store.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports, require: (id: string) => {
     if (id === "server-only") return {};
-    if (id === "./service-library") return { resolveIncludedServices };
+    if (id === "./service-library") return { resolveIncludedServices, serviceLibraryItemSchema };
     if (id === "@/lib/prisma") return { prisma: { serviceLibraryItem: { findMany: async ({ where }: { where: { siteId: string; OR: Array<{ id?: { in: string[] } }> } }) => {
       queries++;
       assert.equal(where.siteId, "site-a");
@@ -130,4 +130,17 @@ test("per-unit library migration preserves existing flat and hourly pricing", as
     await db.exec(`INSERT INTO "ServiceLibraryItem" VALUES ('per-unit','PER_UNIT'); INSERT INTO "ServiceLibraryItem" (id) VALUES ('default');`);
     assert.deepEqual((await db.query('SELECT id, "pricingType" FROM "ServiceLibraryItem" ORDER BY id')).rows, [{ id: "default", pricingType: "FLAT_RATE" }, { id: "flat", pricingType: "FLAT_RATE" }, { id: "hourly", pricingType: "HOURLY" }, { id: "per-unit", pricingType: "PER_UNIT" }]);
   } finally { await db.close(); }
+});
+
+
+test("reusable service effects survive library hydration, editing and form round trips", () => {
+  const saved = serviceLibraryInputSchema.parse({ name: "Custom upgrade", description: "", category: "", tags: "", availableAsAddOn: true, pricingType: "PER_UNIT", price: "8.50", deliverables: { finalPhotos: 1, locations: 2 } });
+  assert.deepEqual(saved.deliverables, { finalPhotos: 1, locations: 2 });
+  const linked = { ...offering, addOns: [{ id: "extra", libraryItemId: "saved-upgrade", name: "Old name", priceCents: 0 }] };
+  const hydrated = resolveIncludedServices(sessionOfferingSchema.parse(linked), [{ ...saved, id: "saved-upgrade" }]);
+  assert.deepEqual(hydrated.addOns[0].deliverables, { finalPhotos: 1, locations: 2 });
+  assert.equal(hydrated.addOns[0].priceCents, 850);
+  const roundTrip = sessionOfferingFormSchema.parse(JSON.stringify(sessionOfferingDraft(hydrated, 60, 10000)));
+  assert.deepEqual(roundTrip.addOns[0].deliverables, { finalPhotos: 1, locations: 2 });
+  assert.equal(serviceLibraryInputSchema.safeParse({ ...saved, deliverables: { finalPhotos: -1 } }).success, false);
 });

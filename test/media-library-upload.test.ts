@@ -50,6 +50,12 @@ test("library uploads preserve privacy and ownership and use the authenticated s
   const failed = harness({ fail: true }); assert.equal((await failed.upload(failed.data)).error, "Storage unavailable");
 });
 
+test("new uploads ignore an empty create-form ID while keeping update IDs separate", async () => {
+  const app = harness(); app.data.set("id", "");
+  assert.equal((await app.upload(app.data)).asset?.id, "asset-a");
+  assert.equal(app.writes[0].metadata.id, undefined);
+});
+
  test("library video uploads use a filename description without bypassing permissions", async () => {
   const h = harness(); h.data.set("file", new File(["video"], "tour.mp4", { type: "video/mp4" })); h.data.set("alt", "");
   assert.ok((await h.upload(h.data)).asset); assert.equal(h.writes[0].metadata.alt,"tour.mp4");

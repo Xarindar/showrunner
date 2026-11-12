@@ -112,20 +112,26 @@ test("actual proofs shrink pixels, burn visible marks into every quadrant, strip
   const metadata = await sharp(rendered.data).metadata();
   assert.equal(metadata.format, "webp");
   assert.equal(metadata.width, galleryProofMaxEdge);
-  assert.equal(metadata.height, 1050);
+  assert.equal(metadata.height, 480);
   assert.equal(metadata.exif, undefined);
   assert.deepEqual(original, snapshot);
   assert.equal((await sharp(original).metadata()).width, 3200);
-  for (const top of [0, 525]) for (const left of [0, 700]) {
-    const region = await sharp(rendered.data).extract({ top, left, width: 700, height: 400 }).stats();
+  for (const top of [0, 240]) for (const left of [0, 320]) {
+    const region = await sharp(rendered.data).extract({ top, left, width: 320, height: 200 }).stats();
     assert.ok(region.channels[0].max - region.channels[0].min > 60, "watermark is embedded in each image region");
   }
   const small = await sharp({ create: { width: 200, height: 100, channels: 3, background: "gray" } }).png().toBuffer();
   assert.equal((await renderGalleryProof(small)).info.width, 150);
-  assert.ok((await renderGalleryProof(original, "thumbnail")).info.width <= 420);
+  const thumbnail = await renderGalleryProof(original, "thumbnail");
+  assert.equal(thumbnail.info.width, 320);
+  assert.equal(thumbnail.info.height, 240);
+  const portrait = await sharp({ create: { width: 2400, height: 3600, channels: 3, background: "gray" } }).jpeg().toBuffer();
+  const portraitProof = await renderGalleryProof(portrait);
+  assert.equal(portraitProof.info.height, 640);
+  assert.equal(portraitProof.info.width, 427);
   await assert.rejects(renderGalleryProof(Buffer.from("%PDF-not-an-image")));
   assert.notEqual(galleryProofObjectKey({ id: "a", key: "a.jpg" }, "preview"), galleryProofObjectKey({ id: "a", key: "replacement.jpg" }, "preview"));
-  assert.ok(galleryProofObjectKey({ id: "a", key: "../../original.jpg" }, "preview").startsWith("private/proofs/burned-proof-v1/"));
+  assert.ok(galleryProofObjectKey({ id: "a", key: "../../original.jpg" }, "preview").startsWith("private/proofs/burned-proof-v3-640/"));
 });
 
 test("shared media counts and write guards include galleries and immutable purchased selections", () => {
@@ -161,7 +167,7 @@ test("real private proof delivery caches separately and never returns the source
     assert.equal(proof.headers.get("x-media-variant"), "WATERMARKED_PROOF");
     assert.equal(proof.headers.get("location"), null);
     const bytes = Buffer.from(await proof.arrayBuffer());
-    assert.ok((await sharp(bytes).metadata()).width! < 1800);
+    assert.equal((await sharp(bytes).metadata()).width, 640);
     assert.deepEqual(await readFile(path.join(directory, "original.jpg")), original);
     assert.deepEqual(await readFile(path.join(directory, galleryProofObjectKey(source, "preview"))), bytes);
     const cached = await media.galleryProofResponse(source, "CARD") as Response;

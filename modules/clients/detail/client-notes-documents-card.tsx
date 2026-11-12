@@ -3,7 +3,6 @@
 import { Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 
 type ClientWorkspaceTab = "notes" | "documents";
@@ -25,24 +24,27 @@ export function ClientNotesDocumentsCard({
   documentsTable,
   documentForm,
   documentsPagination,
+  initialActiveTab = "notes",
   noteForm,
   noteCount,
   notesPagination,
   notesTable
 }: ClientNotesDocumentsCardProps) {
+  const [activeTab, setActiveTab] = useState<ClientWorkspaceTab>(initialActiveTab);
   const [activeForm, setActiveForm] = useState<ClientWorkspaceTab | null>(null);
   return <>
-    <Card as="section" id="client-notes-documents" className="clients-detail-grid-card clients-notes-documents-card" minHeight="none" bodyClassName="clients-notes-documents-card-body">
-      <h2 className="section-title">Notes &amp; documents</h2>
-      <section className="clients-records-section" id="client-notes-panel" aria-labelledby="client-notes-title">
-        <div className="clients-notes-documents-header"><h3 id="client-notes-title">Notes <span className="ui-badge">{noteCount}</span></h3><Button type="button" variant="secondary" size="sm" onClick={() => setActiveForm("notes")}><Plus size={16} />Add note</Button></div>
-        {noteCount ? <>{notesTable}{notesPagination}</> : <p className="ui-muted-flush">No notes yet.</p>}
-      </section>
-      <section className="clients-records-section" id="client-documents-panel" aria-labelledby="client-documents-title">
-        <div className="clients-notes-documents-header"><h3 id="client-documents-title">Documents <span className="ui-badge">{documentCount}</span></h3><Button type="button" variant="secondary" size="sm" onClick={() => setActiveForm("documents")}><Plus size={16} />Add document</Button></div>
-        {documentCount ? <>{documentsTable}{documentsPagination}</> : <p className="ui-muted-flush">No documents yet.</p>}
-      </section>
-    </Card>
+    <section className="ui-data-table-shell" id="client-notes-documents" aria-labelledby="client-records-title">
+      <div className="ui-data-table-titlebar"><h2 id="client-records-title">Documents &amp; notes</h2><div className="ui-inline-actions">
+        <Button type="button" variant="secondary" size="sm" onClick={() => setActiveForm("notes")}><Plus aria-hidden="true" size={16} />Add note</Button>
+        <Button type="button" variant="secondary" size="sm" onClick={() => setActiveForm("documents")}><Plus aria-hidden="true" size={16} />Add document</Button>
+      </div></div>
+      <div className="ui-table-filter-bar" role="group" aria-label="Show client records">
+        <Button aria-pressed={activeTab === "notes"} type="button" variant="ghost" size="sm" onClick={() => setActiveTab("notes")}>Notes ({noteCount})</Button>
+        <Button aria-pressed={activeTab === "documents"} type="button" variant="ghost" size="sm" onClick={() => setActiveTab("documents")}>Documents ({documentCount})</Button>
+      </div>
+      {activeTab === "notes" ? notesTable : documentsTable}
+      {(activeTab === "notes" ? noteCount : documentCount) ? <div className="ui-data-table-footer">{activeTab === "notes" ? notesPagination : documentsPagination}</div> : null}
+    </section>
     <Modal open={activeForm !== null} title={activeForm === "notes" ? "Add note" : "Add document"} className="clients-add-record-modal" onClose={() => setActiveForm(null)}>
       {activeForm === "notes" ? noteForm : activeForm === "documents" ? documentForm : null}
     </Modal>

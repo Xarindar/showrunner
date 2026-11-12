@@ -14,10 +14,11 @@ import { bookingDocumentSelectionSchema, type BookingDocument } from "@/lib/sche
 import { listBookingRuleSets, saveBookingRuleSet } from "../booking-rule-actions";
 
 type Props = { documents?: BookingDocument[]; initialSelection?: unknown; defaultRules?: unknown; defaultIntakePrompt?: string | null; defaultPolicyText?: string | null; defaultRequirePolicy?: boolean; defaultRequestOnly?: boolean; defaultWaitlistEnabled?: boolean; idPrefix: string; intakeOptions?: string[]; policyOptions?: string[]; availableRules?: BookingRule[] };
-const typeLabels = { TEXT: "Text box", RADIO: "Radio buttons", SELECT: "Dropdown" };
+const typeLabels = { TEXT: "Text box", RADIO: "Radio buttons", SELECT: "Dropdown", CHECKBOX: "Checkboxes", DATE: "Date" };
 
 export function ServiceBookingRulesTable({ documents = [], initialSelection, defaultRules, defaultIntakePrompt, defaultPolicyText, defaultRequirePolicy = false, defaultRequestOnly = false, defaultWaitlistEnabled = false, idPrefix, intakeOptions = [], policyOptions = [], availableRules = [] }: Props) {
   const [rules, setRules] = useState(() => readBookingRules(defaultRules, { intakePrompt: defaultIntakePrompt, policyText: defaultPolicyText }));
+  const [documentKind, setDocumentKind] = useState<"intake" | "terms" | null>(null);
   const [selection,setSelection]=useState(()=>bookingDocumentSelectionSchema.parse(initialSelection ?? {}));
   const selectedDocuments=(["INTAKE","TERMS"] as const).flatMap(kind=>{
     const value=selection[kind==="INTAKE"?"intake":"terms"];
@@ -65,7 +66,7 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
     setRules(parsed.data); setMode(null); notify("Rules added to this draft. Save the session to keep them.");
   }
   function saveRule() {
-    const parsed = bookingRuleSchema.safeParse({ ...draft, options: draft?.type === "TEXT" ? [] : choices.map(value => value.trim()).filter(Boolean) });
+    const parsed = bookingRuleSchema.safeParse({ ...draft, options: draft && ["RADIO", "SELECT", "CHECKBOX"].includes(draft.type) ? choices.map(value => value.trim()).filter(Boolean) : [] });
     if (!parsed.success) { setError(parsed.error.issues[0].message); return; }
     const next = bookingRulesSchema.safeParse(rules.some(rule => rule.id === parsed.data.id) ? rules.map(rule => rule.id === parsed.data.id ? parsed.data : rule) : [...rules, parsed.data]);
     if (!next.success) { setError(next.error.issues[0].message); return; }
@@ -85,22 +86,23 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
     {requiresDocumentPolicy&&requirePolicy&&<input name="requirePolicy" type="hidden" value="on"/>}
     <input name="bookingRules" type="hidden" value={JSON.stringify(rules)} />
     <input name="intakePrompt" type="hidden" value={intakePrompt} /><input name="policyText" type="hidden" value={policyText} />
-    <div className="ui-section-header"><h2 id={`${idPrefix}-rules-title`}>Intake and Booking Terms &amp; Conditions</h2><Button type="button" variant="secondary" onClick={() => open("library")}><Plus size={15} />Add rule</Button></div>
-    <div className="ui-section-body booking-document-choices">
-      {([["intake","INTAKE","Intake form"],["terms","TERMS","Booking terms"]] as const).map(([key,kind,label])=>{
-        const global=documents.find(document=>document.kind===kind&&document.isDefault);
-        return <Field key={key} label={label}>
-          <Select aria-label={label} value={selection[key]} onChange={event=>setSelection({...selection,[key]:event.target.value})}>
-            <option value="default">Use global default{global?` — ${global.name}`:" — none"}</option><option value="none">None for this session</option>
-            {documents.filter(document=>document.kind===kind).map(document=><option key={document.id} value={document.id}>{document.name}</option>)}
-          </Select>
-        </Field>;
-      })}
-      <ButtonLink href="/admin/modules/appointments/forms-terms" size="sm" variant="ghost">Manage forms &amp; terms</ButtonLink>
+    <div className="ui-section-header">
+      <h2 id={`${idPrefix}-rules-title`}>Intake and Booking Terms &amp; Conditions</h2>
+      <div className="booking-rule-actions">
+        <ButtonLink href="/admin/modules/appointments/forms-terms" variant="secondary">Manage forms &amp; terms</ButtonLink>
+        <Button type="button" variant="secondary" onClick={() => open("library")}><Plus size={15} />Add rule</Button>
+      </div>
     </div>
     <ResponsiveTableFrame className="catalog-table-scroll booking-rules-table" role="region" aria-label="Selected booking rules" tabIndex={0}>
       <table className="catalog-product-table"><thead><tr><th scope="col">Rule</th><th scope="col">Actions</th></tr></thead><tbody>
-        {documentRules.map(({document,rule},index)=><tr key={`${document.id}-${index}`}><td><div className="booking-rule-type-cell"><strong>{rule.kind==="policy"?"Booking Terms & Conditions":rule.label}</strong><small>{document.name}</small></div><span className="booking-rule-copy" title={rule.label}>{rule.kind==="policy"?rule.label:rule.helpText}</span></td><td><span className="muted-text">{document.name}</span></td></tr>)}
+        {([["intake", "INTAKE", "Intake form"], ["terms", "TERMS", "Booking T&C"]] as const).map(([key, kind, label]) => {
+          const document = selectedDocuments.find(item => item.kind === kind);
+          const summary = selection[key] === "none" ? "None for this session" : document?.name ?? (selection[key] === "default" ? "No global default set" : "Selected document unavailable");
+          return <tr key={key}>
+            <td><div className="booking-rule-type-cell"><strong>{label}</strong><small>{summary}{selection[key] === "default" && document ? " · Global default" : ""}</small></div></td>
+            <td><div className="booking-rule-actions"><Button type="button" variant="ghost" className="booking-rule-icon-button" aria-label={`Choose ${label}`} onClick={() => setDocumentKind(key)}><Pencil size={15} /></Button></div></td>
+          </tr>;
+        })}
 
       {rules.map(rule => <tr key={rule.id}>
         <td><div className="booking-rule-type-cell"><strong>{rule.kind === "policy" ? "Booking Terms & Conditions" : rule.label}</strong><small>{rule.kind === "policy" ? (requirePolicy ? "Acceptance required" : "Shown at booking") : `${rule.category} · ${typeLabels[rule.type]}`}{rule.required ? " · Required" : ""}</small></div>
@@ -108,11 +110,21 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
         <td><div className="booking-rule-actions"><Button type="button" variant="ghost" className="booking-rule-icon-button" aria-label={`Edit ${rule.label}`} onClick={() => edit(rule)}><Pencil size={15} /></Button><Button type="button" variant="ghost" className="booking-rule-icon-button" aria-label={`Remove ${rule.kind === "policy" ? "Booking T&C" : "intake question"}: ${rule.label}`} onClick={() => { const next = rules.filter(saved => saved.id !== rule.id); setRules(next); if (!next.some(saved => saved.kind === "policy")) setRequirePolicy(false); }}><Trash2 size={15} /></Button></div></td>
       </tr>)}
       </tbody></table>
-      {!rules.length && !documentRules.length && <p className="booking-rules-empty">No intake question or Booking Terms &amp; Conditions added</p>}
     </ResponsiveTableFrame>
     <div className="ui-section-body booking-rules-settings">
     <div className="studio-toggle-strip booking-rules-toggle-strip"><Switch checked={requiresDocumentPolicy || Boolean(requirePolicy && policyText)} disabled={requiresDocumentPolicy || !policyText} label={<>Require T&amp;C<span className="booking-rules-desktop-label"> Acceptance</span></>} aria-label="Require T&C Acceptance" name="requirePolicy" onChange={event => setRequirePolicy(event.currentTarget.checked)} variant="inline" /><Switch checked={requestOnly} label="Require Approval" name="requestOnly" onChange={event => setRequestOnly(event.currentTarget.checked)} variant="inline" /><Switch checked={waitlistEnabled} label="Offer Waitlist" name="waitlistEnabled" onChange={event => setWaitlistEnabled(event.currentTarget.checked)} variant="inline" /></div>
     </div>
+    <Modal open={documentKind !== null} title={documentKind === "intake" ? "Choose intake form" : "Choose Booking T&C"} onClose={() => setDocumentKind(null)}>
+      {documentKind && <>
+        <Field label={documentKind === "intake" ? "Intake form" : "Booking T&C"}>
+          <Select aria-label={documentKind === "intake" ? "Intake form" : "Booking T&C"} value={selection[documentKind]} onChange={event => setSelection(current => ({ ...current, [documentKind]: event.target.value }))}>
+            <option value="default">Use global default</option><option value="none">None for this session</option>
+            {documents.filter(document => document.kind === (documentKind === "intake" ? "INTAKE" : "TERMS")).map(document => <option key={document.id} value={document.id}>{document.name}</option>)}
+          </Select>
+        </Field>
+        <div className="module-modal-actions"><Button type="button" onClick={() => setDocumentKind(null)}>Done</Button></div>
+      </>}
+    </Modal>
     <Modal open={mode !== null} title={mode === "library" ? "Add booking rule" : mode === "save-set" ? "Save rule set" : "Configure booking rule"} className="booking-rule-modal" bodyClassName="booking-rule-modal-body" onClose={() => { if (!pending) setMode(null); }}>
       <div ref={modalBody} className="booking-rule-modal-body" onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) { event.preventDefault(); if (mode === "save-set" && !pending) void saveSet(); } }}>
       {mode === "library" && <>
@@ -135,7 +147,8 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
         {draft.kind === "intake" && <>
           <Field label="Answer type"><Select disabled={Boolean(draft.contactField)} value={draft.type} onChange={event => setDraft({ ...draft, type: event.target.value as BookingRule["type"] })}>{Object.entries(typeLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</Select></Field>
           {draft.contactField && <p className="ui-field-hint">Uses the existing booking contact field, without asking the client twice.</p>}
-          {draft.type !== "TEXT" ? <BookingQuestionChoices value={choices} onChange={setChoices} /> : <Field label="Placeholder"><Input value={draft.placeholder} maxLength={200} onChange={event => setDraft({ ...draft, placeholder: event.target.value })} /></Field>}
+          {["RADIO", "SELECT", "CHECKBOX"].includes(draft.type) && <BookingQuestionChoices value={choices} minimumChoices={draft.type === "CHECKBOX" ? 1 : 2} onChange={setChoices} />}
+          {draft.type === "TEXT" && <Field label="Placeholder"><Input value={draft.placeholder} maxLength={200} onChange={event => setDraft({ ...draft, placeholder: event.target.value })} /></Field>}
           <Field label="Help text"><Input value={draft.helpText} maxLength={500} onChange={event => setDraft({ ...draft, helpText: event.target.value })} /></Field>
           <Switch label="Required answer" disabled={draft.contactField === "customerName" || draft.contactField === "customerEmail"} checked={draft.contactField === "customerName" || draft.contactField === "customerEmail" || draft.required} onChange={event => setDraft({ ...draft, required: event.target.checked })} />
         </>}

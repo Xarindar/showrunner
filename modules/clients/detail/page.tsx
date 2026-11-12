@@ -4,9 +4,9 @@ import { getClientStatusSettings } from "@/lib/clients/configuration";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BookingStatus, ClientPipelineStage, MediaDriver, MediaVariantType, type Prisma } from "@prisma/client";
-import { GitMerge, Save, Search } from "lucide-react";
+import { ArrowLeft, Eye, GitMerge, Save, Search } from "lucide-react";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
-import { clientStatusLabel, clientStatusOptions as allClientStatusOptions, normalizeClientStatus } from "@/lib/clients/status";
+import { clientStatusOptions as allClientStatusOptions, normalizeClientStatus } from "@/lib/clients/status";
 import { prisma } from "@/lib/prisma";
 import { formatTime, enumLabel, formatDateTime, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
 import { isMediaUploadDriverConfigured, mediaAssetDisplayUrl, privateMediaUploadMimeTypes, supportsPrivateMediaDriver } from "@/lib/media";
@@ -20,10 +20,12 @@ import {
   deleteClientNoteAction,
   mergeClientsAction,
   updateClientAction } from "../actions";
-import { Button, ButtonLink, Card, EqualGrid, Pagination, Switch, Table, UploadField } from "@/components/ui";
+import { Button, ButtonLink, EqualGrid, Pagination, Switch, Table, Tooltip, UploadField } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 import { ClientNotesDocumentsCard } from "./client-notes-documents-card";
+import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
 import { ClientProfileCard } from "./client-profile-card";
+import { ServicePresetField } from "@/modules/scheduling/components/service-preset-field";
 import { ClientGalleriesSection } from "./client-galleries-section";
 
 export const dynamic = "force-dynamic";
@@ -351,6 +353,10 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
   });
 
   if (!client) notFound();
+  const documentCategories = await prisma.clientFile.findMany({
+    where: { siteId: settings.siteId, client: await getAccessibleClientWhere(user, settings.siteId), category: { not: "" } },
+    select: { category: true }, distinct: ["category"], orderBy: { category: "asc" }
+  });
 
   const clientEmails = clientEmailSet(client);
   const clientPhones = clientPhoneSet(client);
@@ -449,7 +455,6 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
   const address = formattedAddress(client);
   const alternateEmails = stringArrayCsv(client.alternateEmails);
   const alternatePhones = stringArrayCsv(client.alternatePhones);
-  const clientAffiliation = client.companyName || client.familyName || "Individual client";
   const clientDocumentAccept = privateMediaUploadMimeTypes.join(",");
   const clientDocumentUploadEnabled = canUploadClientDocuments(settings.mediaDriver);
   const currentAppointment = client.bookings
@@ -718,10 +723,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           <label htmlFor="client-document-title">Title</label>
           <input id="client-document-title" name="title" required />
         </div>
-        <div className="ui-field">
-          <label htmlFor="client-document-category">Category</label>
-          <input id="client-document-category" name="category" placeholder="Booking T&C, release, gallery" />
-        </div>
+        <ServicePresetField id="client-document-category" label="Category" name="category" emptyLabel="Uncategorized" newLabel="New Category" newPlaceholder="Category name" options={documentCategories.map(item => item.category)} />
       </EqualGrid>
       <UploadField
         id="client-document-file"
@@ -746,22 +748,22 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
     </form>
   );
   const notesTable = (
-    <Table className="clients-records-table-wrap" tableClassName="ui-data-table clients-records-table">
+    <Table mobileLayout="columns" className="clients-records-table-wrap" tableClassName="ui-data-table clients-records-table">
       <thead>
         <tr>
-          <th>Note</th>
+          <th data-mobile-column>Note</th>
           <th>Created</th>
-          <th>Action</th>
+          <th data-mobile-column>Actions</th>
         </tr>
       </thead>
       <tbody>
         {visibleNotes.map((note) => (
           <tr key={note.id}>
-            <td>
-              <p className="clients-records-text">{note.content}</p>
+            <td data-mobile-column>
+              <details><summary className="clients-detail-cell-text">{truncate(note.content, 72)}</summary><p className="clients-records-text">{note.content}</p></details>
             </td>
             <td>{formatDateTime(note.createdAt, settings.timezone)}</td>
-            <td className="clients-records-action-cell">
+            <td data-mobile-column className="clients-records-action-cell">
               <form action={deleteClientNoteAction} className="clients-records-action-form">
                 <input type="hidden" name="id" value={note.id} />
                 <input type="hidden" name="clientId" value={client.id} />
@@ -784,13 +786,13 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
     </Table>
   );
   const documentsTable = (
-    <Table className="clients-records-table-wrap" tableClassName="ui-data-table clients-records-table">
+    <Table mobileLayout="columns" className="clients-records-table-wrap" tableClassName="ui-data-table clients-records-table">
       <thead>
         <tr>
-          <th>Document</th>
+          <th data-mobile-column>Document</th>
           <th>Category</th>
           <th>Uploaded</th>
-          <th>Action</th>
+          <th data-mobile-column>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -799,15 +801,15 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
 
           return (
             <tr key={file.id}>
-              <td>
-                <a href={documentHref}>
+              <td data-mobile-column>
+                <a className="clients-detail-cell-text" title={[file.title, file.notes].filter(Boolean).join(" / ")} href={documentHref}>
                   <strong>{file.title}</strong>
                 </a>
-                {file.notes ? <p className="clients-records-text muted-text">{truncate(file.notes, 84)}</p> : null}
+                {file.notes ? <details><summary>Notes</summary><p className="clients-records-text">{file.notes}</p></details> : null}
               </td>
               <td>{file.category || "document"}</td>
               <td>{formatDateTime(file.uploadedAt, settings.timezone)}</td>
-              <td className="clients-records-action-cell">
+              <td data-mobile-column className="clients-records-action-cell">
                 <form action={deleteClientFileAction} className="clients-records-action-form">
                   <input type="hidden" name="id" value={file.id} />
                   <input type="hidden" name="clientId" value={client.id} />
@@ -936,15 +938,11 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
   );
 
   return (
-    <div className="stack">
-      <header className="page-header">
-        <div>
-          <h1>Client Details</h1>
-        </div>
+    <div className="stack clients-detail-page has-mobile-shell-header">
+      <AdminMobileHeaderSlot backHref="/admin/modules/clients" title={client.name} />
+      <header className="page-header clients-detail-header">
+        <div className="clients-detail-heading"><ButtonLink href="/admin/modules/clients" size="sm" variant="ghost"><ArrowLeft aria-hidden="true" size={15} />Clients</ButtonLink><h1>{client.name}</h1></div>
         <div className="module-card-header-actions">
-          <ButtonLink href="/admin/modules/clients" variant="secondary">
-            Back to clients
-          </ButtonLink>
           <ModuleActionModals
             className="clients-detail-overflow-actions"
             initialActiveId={openMergeModal ? "merge" : undefined}
@@ -968,7 +966,6 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
 
       <section className="clients-detail-card-grid">
         <ClientProfileCard
-          affiliation={clientAffiliation}
           details={profileDetails}
           editForm={profileForm}
           email={client.email}
@@ -976,54 +973,10 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           phone={client.phone || ""}
           photoUrl={client.photoUrl}
           pipeline={enumLabel(client.pipelineStage)}
-          status={clientStatusLabel(client.status, configuredStatusOptions)}
         />
-        <Card
-          as="section"
-          className="clients-detail-grid-card clients-detail-activity-card"
-          minHeight="none"
-          bodyClassName="clients-activity-card-body">
-          <div className="clients-activity-header">
-            <div>
-              <h2 className="section-title">Client activity</h2>
-              <p className="ui-zero">Current and recent appointments.</p>
-            </div>
-          </div>
-          <div className="clients-recent-appointments">
-            <div className="clients-activity-subhead">
-              <h3>Appointments</h3>
-              <span>{client.bookings.length} total</span>
-            </div>
-            {activityAppointments.length ? (
-              <ul className="clients-activity-list">
-                {activityAppointments.map((booking) => {
-                  const isCurrent = booking.id === currentAppointment?.id;
+        <ClientGalleriesSection clientId={client.id} settings={settings} user={user} />
+      </section>
 
-                  return (
-                    <li className={isCurrent ? "clients-activity-row is-current" : "clients-activity-row"} key={booking.id}>
-                      <Link href={`/admin/appointments/${booking.id}`}>
-                        <span className="clients-activity-date">
-                          <strong>{formatAppointmentActivityDate(booking.startsAt, now, settings.timezone)}</strong>
-                          {isCurrent ? <small>Current appointment</small> : null}
-                        </span>
-                        <span>
-                          <strong>{booking.service.name}</strong>
-                        </span>
-                        {isCurrent ? (
-                          <span className="ui-badge clients-activity-current-badge">Current</span>
-                        ) : (
-                          <span className="ui-badge">{enumLabel(booking.status)}</span>
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="ui-zero muted-text">No appointments yet.</p>
-            )}
-          </div>
-        </Card>
         <ClientNotesDocumentsCard
           documentCount={client.files.length}
           documentForm={documentForm}
@@ -1037,23 +990,27 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           notesTable={notesTable}
         />
 
-      </section>
+        <section className="ui-data-table-shell" aria-labelledby="client-appointments-title">
+          <div className="ui-data-table-titlebar"><h2 id="client-appointments-title">Appointment history</h2></div>
+          <Table mobileLayout="columns" aria-label="Client appointments" tableClassName="ui-data-table">
+            <thead><tr><th data-mobile-column>Session</th><th data-mobile-column>Date</th><th>Status</th><th data-mobile-column>Actions</th></tr></thead>
+            <tbody>{activityAppointments.map(booking => <tr key={booking.id}>
+              <td data-mobile-column><Link className="clients-detail-cell-text" href={`/admin/appointments/${booking.id}`} title={booking.service.name}>{booking.service.name}</Link></td>
+              <td data-mobile-column>{formatAppointmentActivityDate(booking.startsAt, now, settings.timezone)}</td>
+              <td><span className="ui-badge">{enumLabel(booking.status)}</span></td>
+              <td data-mobile-column><Tooltip content="Open appointment" focusable={false}><ButtonLink aria-label={`Open ${booking.service.name} appointment`} href={`/admin/appointments/${booking.id}`} size="sm" variant="secondary"><Eye aria-hidden="true" size={15} /></ButtonLink></Tooltip></td>
+            </tr>)}{!activityAppointments.length ? <tr><td colSpan={4}>No appointments yet.</td></tr> : null}</tbody>
+          </Table>
+        </section>
 
-      <ClientGalleriesSection clientId={client.id} settings={settings} user={user} />
-
-      <Card as="section" bodyClassName="ui-stack">
-        <div className="page-header compact-header">
-          <div>
-            <h2 className="section-title">Communication</h2>
-            <p className="ui-zero">Emails, texts, and phone calls matched to this client.</p>
-          </div>
-        </div>
-        <Table>
+      <section className="ui-data-table-shell" aria-labelledby="client-communication-title">
+        <div className="ui-data-table-titlebar"><h2 id="client-communication-title">Communications</h2></div>
+        <Table mobileLayout="columns" aria-label="Client communication" tableClassName="ui-data-table">
           <thead>
             <tr>
-              <th>Type</th>
+              <th data-mobile-column>Type</th>
               <th>Contact</th>
-              <th>Summary</th>
+              <th data-mobile-column>Summary</th>
               <th>Related</th>
               <th>Date</th>
             </tr>
@@ -1065,20 +1022,15 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
 
               return (
                 <tr key={row.id}>
-                  <td>
+                  <td data-mobile-column>
                     <span className="ui-badge">{row.typeLabel}</span>
                   </td>
                   <td>
                     {row.contact ? <strong>{row.contact}</strong> : <span className="muted-text">No contact recorded</span>}
                   </td>
-                  <td>
-                    <strong>{row.title}</strong>
-                    {row.detail && row.detail !== row.title ? (
-                      <>
-                        <br />
-                        <span className="muted-text">{truncate(row.detail, 96)}</span>
-                      </>
-                    ) : null}
+                  <td data-mobile-column>
+                    {row.detail && row.detail !== row.title ? <details><summary className="clients-detail-cell-text">{row.title}</summary><p>{row.detail}</p></details> : <span className="clients-detail-cell-text">{row.title}</span>}
+
                   </td>
                   <td>{relatedHref ? <Link href={relatedHref}>{relatedLabel}</Link> : relatedLabel}</td>
                   <td>{formatDateTime(row.occurredAt, settings.timezone)}</td>
@@ -1092,7 +1044,8 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             ) : null}
           </tbody>
         </Table>
-      </Card>
+      </section>
+
 
     </div>);
 

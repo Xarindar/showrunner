@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { SessionOffering } from "./session-offering";
-import { resolveIncludedServices } from "./service-library";
+import { resolveIncludedServices, serviceLibraryItemSchema } from "./service-library";
 
 export async function hydrateSessionServiceLibrary(offering: SessionOffering | null, siteId: string) {
   if (!offering || (!offering.coverageItems.length && !offering.addOns.some(item => item.libraryItemId))) return offering;
@@ -11,5 +11,5 @@ export async function hydrateSessionServiceLibrary(offering: SessionOffering | n
       { nameKey: { in: offering.coverageItems.filter(item => !item.libraryItemId).map(item => item.name.trim().toLowerCase()) } }
     ] }
   });
-  return resolveIncludedServices(offering, items);
+  return resolveIncludedServices(offering, items.map(item => serviceLibraryItemSchema.parse(item)));
 }
