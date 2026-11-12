@@ -4,6 +4,8 @@ import "server-only";
 import { listBookingDocuments } from "./booking-document-store";
 import { resolveBookingRequirements, validateBookingRequirementsRevision } from "./booking-documents";
 import { servicePriceCents } from "@/lib/scheduling/pricing";
+import { readSessionOffering } from "./session-offering";
+import { timeFrameMinutes, timeFrameDays, timeFrameCovered } from "./service-time-frame";
 
 import { BookingStatus, Prisma, SchedulingCalendarOwnerType } from "@prisma/client";
 import { upsertPublicClient } from "@/lib/clients/public-client";
@@ -122,6 +124,9 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
 
     if (!service) return null;
 
+    const timeFrame = readSessionOffering(service.sessionOffering)?.tiers[0].timeFrame;
+    const fixedWindow = timeFrame ? timeFrameMinutes(timeFrame) : null;
+
     const messages: string[] = [];
     if (!service.isActive) {
       messages.push("This service is inactive, so public booking will not offer any slots.");
@@ -135,6 +140,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     }
 
     const weekday = getZonedWeekday(date, settings.timezone);
+    const frameDays = timeFrame?.endsNextDay ? timeFrameDays(timeFrame, weekday) : [];
     const assignedStaff = service.staffAssignments.map((assignment) => assignment.staff);
     const assignedResources = service.resourceAssignments.map((assignment) => assignment.resource);
     const selectedStaff = options?.staffId ? assignedStaff.find((staff) => staff.id === options.staffId) : null;
@@ -152,7 +158,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     const rules = await prisma.availabilityRule.findMany({
       where: {
         siteId: service.siteId,
-        weekday,
+        weekday: frameDays.length ? { in: [...new Set(frameDays.map(day => day.weekday))] } : weekday,
         OR: [
           { staffId: null, resourceId: null },
           ...(staffIds.length ? [{ staffId: { in: staffIds } }] : []),
@@ -204,7 +210,11 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
       };
     }
 
-    const { start, end } = getZonedDayBounds(date, settings.timezone);
+    const { start, end: dayEnd } = getZonedDayBounds(date, settings.timezone);
+    const frameEnd = timeFrame?.endsNextDay && fixedWindow ? addMinutesToZonedDay(start, fixedWindow.end, settings.timezone) : null;
+    const end = frameEnd ?? dayEnd;
+    const queryStart = new Date(start.getTime() - service.bufferBeforeMinutes * 60000);
+    const queryEnd = new Date(end.getTime() + service.bufferAfterMinutes * 60000);
     const slotOwners = slotStaff.length ? slotStaff : [{ id: "", name: "" }];
     const [bookings, blocks, googleCalendarBusy] = await Promise.all([
       prisma.booking.findMany({
@@ -212,8 +222,8 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
           siteId: service.siteId,
           ...(options?.excludeBookingId ? { id: { not: options.excludeBookingId } } : {}),
           status: { not: BookingStatus.CANCELED },
-          startsAt: { lt: end },
-          endsAt: { gt: start }
+          startsAt: { lt: queryEnd },
+          endsAt: { gt: queryStart }
         },
         include: {
           resources: { select: { resourceId: true } },
@@ -228,15 +238,15 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
       prisma.blockedTime.findMany({
         where: {
           siteId: service.siteId,
-          startsAt: { lt: end },
-          endsAt: { gt: start }
+          startsAt: { lt: queryEnd },
+          endsAt: { gt: queryStart }
         }
       }),
       listGoogleBusyWindows({
-        end,
+        end: queryEnd,
         siteId: service.siteId,
         staffIds: slotOwners.map((owner) => owner.id).filter(Boolean),
-        start,
+        start: queryStart,
         timeZone: settings.timezone
       })
     ]);
@@ -256,17 +266,18 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
         : requiredResources[0]
           ? rules.filter((rule) => rule.resourceId === requiredResources[0].id)
           : rules.filter((rule) => !rule.staffId && !rule.resourceId);
-      const rulesForOwner = ownerRules;
+      const rulesForOwner = frameDays.length && fixedWindow
+        ? timeFrameCovered(frameDays, ownerRules) ? [{ startMinutes: fixedWindow.start, endMinutes: fixedWindow.end }] : []
+        : ownerRules;
 
       for (const rule of rulesForOwner) {
         for (
-          let minutes = rule.startMinutes;
-          minutes + service.durationMinutes <= rule.endMinutes;
+          let minutes = fixedWindow?.start ?? rule.startMinutes;
+          minutes >= rule.startMinutes && minutes + service.durationMinutes <= rule.endMinutes && (!fixedWindow || minutes === fixedWindow.start);
           minutes += slotInterval
         ) {
         const startsAt = addMinutesToZonedDay(start, minutes, settings.timezone);
-        const endsAt = new Date(startsAt);
-        endsAt.setMinutes(endsAt.getMinutes() + service.durationMinutes);
+        const endsAt = frameEnd ?? (fixedWindow ? addMinutesToZonedDay(start, fixedWindow.end, settings.timezone) : new Date(startsAt.getTime() + service.durationMinutes * 60000));
         const { bufferedStart, bufferedEnd } = getBufferedWindow(
           startsAt,
           endsAt,
@@ -291,7 +302,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
         }
 
         for (const resource of requiredResources) {
-          if (!resourceRuleCoversSlot(rules, resource.id, minutes, service.durationMinutes)) {
+          if (!(frameDays.length ? timeFrameCovered(frameDays, rules.filter(rule => rule.resourceId === resource.id)) : resourceRuleCoversSlot(rules, resource.id, minutes, service.durationMinutes))) {
             reasons.push({
               code: "blockout_conflict",
               message: `${resource.name} is not available for this full time window.`
@@ -350,7 +361,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
         slots.push({
           startsAt,
           endsAt,
-          label: owner.id ? `${makeSlotLabel(startsAt, settings.timezone)} with ${owner.name}` : makeSlotLabel(startsAt, settings.timezone),
+          label: `${timeFrame ? makeTimeRangeLabel(startsAt, endsAt, settings.timezone) : makeSlotLabel(startsAt, settings.timezone)}${timeFrame?.endsNextDay ? " (next day)" : ""}${owner.id ? ` with ${owner.name}` : ""}`,
           resourceIds,
           resourceNames: requiredResources.map((resource) => resource.name),
           staffId: owner.id || undefined,
@@ -446,8 +457,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
       throw new Error("That time is no longer available. Please choose another time.");
     }
 
-    const endsAt = new Date(input.startsAt);
-    endsAt.setMinutes(endsAt.getMinutes() + service.durationMinutes);
+    const endsAt = matchingSlot.endsAt;
     const { bufferedStart, bufferedEnd } = getBufferedWindow(
       input.startsAt,
       endsAt,

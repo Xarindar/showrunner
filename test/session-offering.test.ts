@@ -115,3 +115,20 @@ test("tier migration is additive and leaves old services, packages and bookings 
     assert.equal((await db.query('SELECT * FROM "ServicePackage"')).rows.length, 1);
   } finally { await db.close(); }
 });
+
+
+test("user-created services and add-ons increase booked deliverables by selected quantity", () => {
+  const source = {
+    coverageItems: [{ id: "location", name: "Custom location service", deliverables: { locations: 1 } }],
+    tiers: [{ id: "base", name: "Portraits", durationMinutes: 60, priceCents: 10000, coverageIds: ["location"], deliverables: { finalPhotos: 2, locations: 1, outfitChanges: 1 } }],
+    addOns: [{ id: "custom", name: "Whatever the photographer calls it", libraryItemId: "library-extra", priceCents: 750, pricingType: "PER_UNIT", deliverables: { finalPhotos: 1, outfitChanges: 1 } }]
+  };
+  const quoted = selectSessionPackage(source, "base", ["custom"], undefined, { custom: 3 });
+  assert.deepEqual(quoted?.deliverables, { finalPhotos: 5, locations: 2, outfitChanges: 4 });
+  assert.equal(quoted?.priceCents, 12250);
+  assert.equal(quoted?.extras[0].libraryItemId, "library-extra");
+  const saved = sessionPackageSnapshotSchema.parse(quoted);
+  source.addOns[0].deliverables.finalPhotos = 100;
+  assert.equal(saved.deliverables?.finalPhotos, 5, "Booked totals remain an immutable snapshot");
+  assert.throws(() => selectSessionPackage({ ...source, addOns: [{ ...source.addOns[0], deliverables: { finalPhotos: 10000 } }] }, "base", ["custom"], undefined, { custom: 2 }), /10,000/);
+});

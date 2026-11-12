@@ -812,10 +812,11 @@
 .showrunner-admin .admin-page-menu,
 .showrunner-admin .admin-page-menu-anchor { display: none; }
 @media (max-width: 860px) {
-  .showrunner-admin .admin-root .admin-main :is(header:has(h1), .product-studio-header, [data-admin-page-header]):not(.appointments-subtle-header) {
+  .showrunner-admin .admin-root .admin-main :is(header:has(h1), .product-studio-header, [data-admin-page-header]):not(.appointments-subtle-header):not(:has(a[href] svg.lucide-arrow-left)):not(.has-mobile-shell-header > *) {
     min-block-size: var(--sd-layout-touch-target);
     padding-inline-end: calc(var(--space-4) + var(--sd-layout-touch-target) + var(--space-3));
   }
+  .showrunner-admin .admin-root:has(.has-mobile-shell-header) > :is(.admin-mobile-bar, .admin-page-menu-anchor) { display: none; }
   .showrunner-admin .appointments-subtle-title { padding-inline-end: calc(var(--sd-layout-touch-target) + var(--space-3)); }
   .showrunner-admin .admin-page-menu-anchor { display: flex; position: fixed; z-index: 5; transform: translate(calc(-1 * var(--space-4)), -50%); }
   .showrunner-admin .admin-page-menu-anchor .admin-page-menu,

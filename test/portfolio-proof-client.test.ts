@@ -143,9 +143,9 @@ function clientMarkup(view: ProofSelectionView) {
 
 test("proof UI uses watermarked media routes without originals before finalization", () => {
   const html = clientMarkup(initialView);
-  assert.match(html, /variant=CARD/);
-  assert.match(html, /Watermarked previews/);
-  assert.match(html, /\$25\.00/);
+  assert.match(html, /variant=THUMBNAIL/);
+  assert.match(html, /Select 2 Photos/);
+
   assert.match(html, /Review selection/);
   assert.doesNotMatch(html, /variant=DOWNLOAD|Your selected originals/);
 });

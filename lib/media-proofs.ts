@@ -3,8 +3,8 @@ import sharp from "sharp";
 
 // Increment when the rendering policy changes. Proofs never share the ordinary
 // MediaAssetVariant cache, which can contain clean, full-resolution derivatives.
-export const galleryProofVersion = "burned-proof-v1";
-export const galleryProofMaxEdge = 1400;
+export const galleryProofVersion = "burned-proof-v3-640";
+export const galleryProofMaxEdge = 640;
 
 // Embedded vector lettering keeps the watermark present on minimal server
 // images too; no installed font or network font lookup is required.
@@ -31,7 +31,7 @@ export async function renderGalleryProof(source: Buffer, size: "thumbnail" | "pr
 
   // Even a small original is reduced; EXIF orientation is applied before resize.
   const sourceEdge = Math.max(metadata.width, metadata.height);
-  const edge = Math.max(1, Math.min(size === "thumbnail" ? 420 : galleryProofMaxEdge, Math.floor(sourceEdge * 0.75)));
+  const edge = Math.max(1, Math.min(size === "thumbnail" ? 320 : galleryProofMaxEdge, Math.floor(sourceEdge * 0.75)));
   const resized = await image.rotate().resize({ width: edge, height: edge, fit: "inside", withoutEnlargement: true }).png().toBuffer({ resolveWithObject: true });
   const { width, height } = resized.info;
   const fontSize = Math.max(12, Math.round(Math.min(width, height) / 15));
@@ -49,5 +49,5 @@ export async function renderGalleryProof(source: Buffer, size: "thumbnail" | "pr
     <g transform="translate(${(width - 82 * scale) / 2} ${height - fontSize * 1.75}) scale(${scale})" fill="none" stroke="white" stroke-width="0.65" stroke-linecap="round" stroke-linejoin="round">${watermarkPaths}</g>
   </svg>`);
 
-  return sharp(resized.data).composite([{ input: overlay }]).webp({ quality: 70, effort: 4 }).toBuffer({ resolveWithObject: true });
+  return sharp(resized.data).composite([{ input: overlay }]).webp({ quality: 50, effort: 4 }).toBuffer({ resolveWithObject: true });
 }

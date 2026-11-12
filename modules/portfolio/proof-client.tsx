@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Download, Expand, ImageOff, LoaderCircle, LockKeyhole, RefreshCw } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, X, ImageOff, LoaderCircle, RefreshCw } from "lucide-react";
 import { Button, ButtonAnchor } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Modal } from "@/components/ui/modal";
 import type { ProofSelectionView } from "@/lib/portfolio/purchases";
 import styles from "./proof-client.module.css";
@@ -25,12 +27,15 @@ function checkoutDestination(value: string | null) {
   }
 }
 
-export function ProofClient({ initialView, token }: { initialView: ProofSelectionView; token: string }) {
+export function ProofClient({ initialView, token, brand = { name: "Photography", logoUrl: "" } }: { initialView: ProofSelectionView; token: string; brand?: { name: string; logoUrl: string } }) {
   const [view, setView] = useState(initialView);
   const [selection, setSelection] = useState<string[]>(initialView.purchase?.selectedItemIds || []);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "selected">("all");
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingExtraId, setPendingExtraId] = useState<string | null>(null);
+  const [extrasConsentVersion, setExtrasConsentVersion] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [reviewedTermsVersion, setReviewedTermsVersion] = useState(initialView.termsVersion);
   const [submitting, setSubmitting] = useState(false);
@@ -39,6 +44,8 @@ export function ProofClient({ initialView, token }: { initialView: ProofSelectio
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [failedImages, setFailedImages] = useState<string[]>([]);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const swiped = useRef(false);
   const submitLock = useRef(false);
   const refreshLock = useRef(false);
   const endpoint = `/api/portfolio/proofs/${encodeURIComponent(token)}`;
@@ -50,11 +57,62 @@ export function ProofClient({ initialView, token }: { initialView: ProofSelectio
   const includedCount = purchase?.includedCount ?? view.includedCount;
   const extraPrice = purchase?.extraImagePriceCents ?? view.extraImagePriceCents;
   const extraCount = purchase?.extraCount ?? Math.max(0, selection.length - includedCount);
+  const remainingCount = Math.max(0, includedCount - selectedIds.length);
   const total = purchase?.totalCents ?? extraCount * extraPrice;
   const currency = purchase?.currency || view.currency;
   const previewIndex = view.items.findIndex((item) => item.id === previewId);
   const preview = view.items[previewIndex];
   const displayed = view.items.filter((item) => filter === "all" || selected.has(item.id));
+
+  useEffect(() => {
+    let current = true;
+    Promise.resolve().then(() => {
+      if (!current) return;
+      try { setHelpOpen(localStorage.getItem("portfolio:proof-help:v1") !== "dismissed"); }
+      catch { setHelpOpen(true); }
+    });
+    return () => { current = false; };
+  }, []);
+
+  useEffect(() => {
+    // Preserve Next's history state; only gallery layers add entries, not each photo.
+    window.history.replaceState({ ...window.history.state, proofGallery: { id: initialView.gallery.id, filter: "all", previewId: null } }, "");
+    const restore = (event: PopStateEvent) => {
+      const state = event.state?.proofGallery;
+      const sameGallery = state?.id === initialView.gallery.id;
+      setFilter(sameGallery && state.filter === "selected" ? "selected" : "all");
+      setPreviewId(sameGallery && typeof state.previewId === "string" ? state.previewId : null);
+      setPendingExtraId(null);
+      setConfirmOpen(false);
+      setConfirmed(false);
+    };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [initialView.gallery.id]);
+
+  function openPreview(id: string) {
+    window.history.pushState({ ...window.history.state, proofGallery: { id: view.gallery.id, filter, previewId: id } }, "");
+    setPreviewId(id);
+  }
+
+  function closePreview() {
+    window.history.back();
+  }
+
+  function changeFilter(next: "all" | "selected") {
+    if (next === filter) return;
+    if (next === "all") window.history.back();
+    else {
+      window.history.pushState({ ...window.history.state, proofGallery: { id: view.gallery.id, filter: next, previewId: null } }, "");
+      setFilter(next);
+    }
+  }
+
+  function dismissHelp() {
+    setHelpOpen(false);
+    try { localStorage.setItem("portfolio:proof-help:v1", "dismissed"); }
+    catch { /* Instructions still dismiss for this visit when storage is unavailable. */ }
+  }
 
   const refresh = useCallback(async (silent = false) => {
     if (refreshLock.current) return null;
@@ -112,15 +170,29 @@ export function ProofClient({ initialView, token }: { initialView: ProofSelectio
     return () => window.clearInterval(timer);
   }, [purchase?.status, refresh, unavailable]);
 
-  function proofUrl(itemId: string) {
-    return `/api/portfolio/galleries/${encodeURIComponent(view.gallery.slug)}/media/${encodeURIComponent(itemId)}?access=${encodeURIComponent(token)}&variant=CARD`;
+  function proofUrl(itemId: string, thumbnail = false) {
+    return `/api/portfolio/galleries/${encodeURIComponent(view.gallery.slug)}/media/${encodeURIComponent(itemId)}?access=${encodeURIComponent(token)}&variant=${thumbnail ? "THUMBNAIL" : "CARD"}`;
   }
 
   function toggle(itemId: string) {
     if (locked || submitting) return;
-    setSelection((current) => current.includes(itemId) ? current.filter((id) => id !== itemId) : [...current, itemId]);
+    if (!selected.has(itemId) && selection.length >= includedCount && extrasConsentVersion !== view.termsVersion) {
+      setPendingExtraId(itemId);
+      return;
+    }
+    setSelection(current => current.includes(itemId) ? current.filter(id => id !== itemId) : [...current, itemId]);
     setError("");
     setNotice("");
+  }
+
+  function acceptExtras() {
+    if (!pendingExtraId || locked || submitting) return;
+    if (view.items.some(item => item.id === pendingExtraId) && !failedImages.includes(pendingExtraId)) {
+      setExtrasConsentVersion(view.termsVersion);
+      setSelection(current => current.includes(pendingExtraId) ? current : [...current, pendingExtraId]);
+      setError(""); setNotice("");
+    }
+    setPendingExtraId(null);
   }
 
   function closeConfirm() {
@@ -180,6 +252,30 @@ export function ProofClient({ initialView, token }: { initialView: ProofSelectio
     }
   }
 
+  const navigatePreview = useCallback((direction: number) => {
+    const index = view.items.findIndex(item => item.id === previewId);
+    const nextId = view.items[(index + direction + view.items.length) % view.items.length]?.id || null;
+    window.history.replaceState({ ...window.history.state, proofGallery: { id: view.gallery.id, filter, previewId: nextId } }, "");
+    setPreviewId(nextId);
+  }, [view.items, view.gallery.id, filter, previewId]);
+
+  useEffect(() => {
+    if (!previewId || confirmOpen || pendingExtraId) return;
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); navigatePreview(event.key === "ArrowRight" ? 1 : -1); }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [previewId, confirmOpen, pendingExtraId, navigatePreview]);
+
+  function selectionControl(item: ProofSelectionView["items"][number], index: number) {
+    const isSelected = selected.has(item.id);
+    return <label className={styles.selectPhoto} title={isSelected ? "Remove from selection" : "Select photo"}>
+      <input aria-label={`${isSelected ? "Remove" : "Select"} ${photoLabel(item, index)}`} checked={isSelected} disabled={locked || submitting || failedImages.includes(item.id)} onChange={() => toggle(item.id)} type="checkbox" />
+      <span>{isSelected ? <><Check aria-hidden="true" size={15} />Selected</> : "Select"}</span>
+    </label>;
+  }
+
   if (unavailable) {
     return <main className={styles.unavailable}><h1>This proof link is unavailable</h1><p>It may have expired or been replaced. Ask your photographer for a new private link.</p></main>;
   }
@@ -187,23 +283,23 @@ export function ProofClient({ initialView, token }: { initialView: ProofSelectio
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <div>
-          <h1>{view.gallery.title}</h1>
-          {view.gallery.description ? <p className={styles.description}>{view.gallery.description}</p> : null}
-          <p className={styles.instructions}>{locked ? "Your final photo selection is saved." : "Choose the photos you’d like to keep. You can change your choices until you finalize."}</p>
-        </div>
-        <span className={styles.privateLabel}><LockKeyhole size={15} aria-hidden="true" /> Private gallery</span>
+        <div className={styles.brand}>{brand.logoUrl ? <Image alt={brand.name} height={70} width={280} src={brand.logoUrl} unoptimized referrerPolicy="no-referrer" /> : <span>{brand.name}</span>}</div>
+        <h1 className={styles.srOnly}>{view.gallery.title}</h1>
       </header>
 
       <div className={styles.workspace}>
         <section aria-label="Photo proofs" className={styles.photos}>
           <div className={styles.galleryToolbar}>
             <div aria-label="Show photos" className={styles.filters}>
-              <button aria-pressed={filter === "all"} onClick={() => setFilter("all")} type="button">All photos <span>{view.items.length}</span></button>
-              <button aria-pressed={filter === "selected"} onClick={() => setFilter("selected")} type="button">Selected <span>{selectedIds.length}</span></button>
+              <button aria-pressed={filter === "all"} onClick={() => changeFilter("all")} type="button">All photos <span>{view.items.length}</span></button>
+              <button aria-pressed={filter === "selected"} onClick={() => changeFilter("selected")} type="button">Selected <span>{selectedIds.length}</span></button>
             </div>
-            <span className={styles.proofNotice}>Watermarked previews</span>
+            <div className={styles.galleryHelp}><span className={styles.proofNotice}>{view.gallery.title}</span>{!locked && view.items.length > 0 ? <button className={styles.helpButton} onClick={() => setHelpOpen(true)} type="button">How to choose</button> : null}</div>
           </div>
+          {helpOpen && !locked && view.items.length > 0 ? <aside aria-label="How to choose photos" className={styles.helpTip} role="note">
+            <p>Tap <strong>Select</strong> to choose a photo. Tap the photo to view it larger. We’ll ask before adding paid extras.</p>
+            <button aria-label="Dismiss instructions" className={styles.helpButton} onClick={dismissHelp} type="button"><X aria-hidden="true" size={18} /></button>
+          </aside> : null}
           {displayed.length ? (
             <div className={styles.grid}>
               {displayed.map((item) => {
@@ -213,20 +309,16 @@ export function ProofClient({ initialView, token }: { initialView: ProofSelectio
                 const failed = failedImages.includes(item.id);
                 return (
                   <figure className={`${styles.photo} ${isSelected ? styles.selected : ""}`} key={item.id}>
-                    <div className={styles.photoFrame}>
-                      <label className={styles.photoSelect}>
-                        <input aria-label={`${isSelected ? "Remove" : "Select"} ${label}`} checked={isSelected} disabled={locked || submitting || failed} onChange={() => toggle(item.id)} type="checkbox" />
-                        {failed ? <span className={styles.imageFailure}><ImageOff size={24} aria-hidden="true" /> Preview unavailable</span> : (
-                          // The authenticated media endpoint performs the optimization and
-                          // watermarking. Never put capability URLs through the image proxy.
+                    <div className={styles.photoFrame} onContextMenu={event => event.preventDefault()} onCopy={event => event.preventDefault()}>
+                      <button aria-label={`View larger proof of ${label}`} className={styles.photoOpen} disabled={failed} onClick={() => openPreview(item.id)} type="button">
+                        {failed ? <span className={styles.imageFailure}><ImageOff size={24} aria-hidden="true" />Preview unavailable</span> : (
+                          // Private thumbnails are small, burned-in proofs; originals never enter the grid.
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt={item.altText || label} decoding="async" draggable={false} loading={index < 4 ? "eager" : "lazy"} onError={() => setFailedImages((ids) => ids.includes(item.id) ? ids : [...ids, item.id])} referrerPolicy="no-referrer" src={proofUrl(item.id)} />
+                          <img alt={item.altText || label} decoding="async" draggable={false} loading={index < 8 ? "eager" : "lazy"} onError={() => setFailedImages(ids => ids.includes(item.id) ? ids : [...ids, item.id])} referrerPolicy="no-referrer" src={proofUrl(item.id, true)} />
                         )}
-                        <span aria-hidden="true" className={styles.checkmark}>{isSelected ? <Check size={17} /> : null}</span>
-                      </label>
-                      {!failed ? <button aria-label={`View larger proof of ${label}`} className={styles.expand} onClick={() => setPreviewId(item.id)} type="button"><Expand size={17} aria-hidden="true" /></button> : null}
+                      </button>
+                      {selectionControl(item, index)}
                     </div>
-                    <figcaption><span>{label}</span>{isSelected ? <span className={styles.selectedLabel}>Selected</span> : null}</figcaption>
                   </figure>
                 );
               })}
@@ -235,22 +327,10 @@ export function ProofClient({ initialView, token }: { initialView: ProofSelectio
         </section>
 
         <aside aria-label="Selection summary" className={styles.summary}>
-          <h2>{locked ? "Your final selection" : "Your selection"}</h2>
-          <dl className={styles.totals} aria-live="polite" aria-atomic="true">
-            <div><dt>Photos selected</dt><dd>{selectedIds.length}</dd></div>
-            <div><dt>Included in your shoot</dt><dd>{includedCount}</dd></div>
-            <div><dt>Extra photos{extraCount ? ` × ${money(extraPrice, currency)}` : ""}</dt><dd>{extraCount}</dd></div>
-            <div className={styles.total}><dt>Extra photo total</dt><dd>{money(total, currency)}</dd></div>
-          </dl>
-          {!locked ? (
-            <>
-              <p className={styles.summaryHelp}>{extraCount ? `You’ve selected ${extraCount} extra ${extraCount === 1 ? "photo" : "photos"}. Keep them and continue to checkout, or remove extras to stay within your allowance.` : `Your shoot includes up to ${includedCount} photos. Additional photos are ${money(extraPrice, currency)} each.`}</p>
-              {extraCount > 0 ? <Button disabled={submitting} onClick={() => { setSelection((ids) => ids.slice(0, includedCount)); setNotice("The most recently selected extra photos were removed. Review your remaining selection."); }} type="button" variant="secondary">Remove {extraCount} extra {extraCount === 1 ? "photo" : "photos"}</Button> : null}
-              <Button disabled={!selectedIds.length || submitting} onClick={() => { setConfirmed(false); setReviewedTermsVersion(view.termsVersion); setConfirmOpen(true); }} type="button">Review selection</Button>
-              <p className={styles.finePrint}>Finalized selections cannot be changed.</p>
-            </>
-          ) : (
-            <section aria-label="Delivery status" className={styles.delivery}>
+          {!locked ? <>
+            <div aria-live="polite" aria-atomic="true"><strong>Select {remainingCount} {remainingCount === 1 ? "Photo" : "Photos"}</strong></div>
+            <Button disabled={!selectedIds.length || submitting} onClick={() => { setConfirmed(false); setReviewedTermsVersion(view.termsVersion); setConfirmOpen(true); }} type="button">{extraCount ? `Review cart · ${money(total, currency)}` : "Review selection"}</Button>
+          </> :             <section aria-label="Delivery status" className={styles.delivery}>
               {purchase?.status === "RELEASED" ? (
                 <><h3><Check size={18} aria-hidden="true" /> Originals ready</h3><p>Download the original files for your final selection below.</p></>
               ) : purchase?.status === "PENDING" ? (
@@ -263,8 +343,7 @@ export function ProofClient({ initialView, token }: { initialView: ProofSelectio
               {canRetryCheckout ? <Button disabled={submitting} onClick={() => void finalize()} type="button">{submitting ? <><LoaderCircle className={styles.spinner} size={16} aria-hidden="true" /> Checking checkout…</> : "Resume or renew checkout"}</Button> : null}
               <Button disabled={refreshing || submitting} onClick={() => void refresh()} type="button" variant="secondary"><RefreshCw className={refreshing ? styles.spinner : ""} size={15} aria-hidden="true" /> {refreshing ? "Checking…" : "Refresh status"}</Button>
               {purchase?.status === "PENDING" ? <p className={styles.finePrint}>Already paid? Confirmation can take a moment. You can safely return to this link later.</p> : null}
-            </section>
-          )}
+            </section>}
           {error && !confirmOpen ? <p className={styles.error} role="alert">{error}</p> : null}
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
         </aside>
@@ -290,13 +369,28 @@ export function ProofClient({ initialView, token }: { initialView: ProofSelectio
         </div>
       </Modal>
 
-      <Modal className={styles.previewDialog} onClose={() => setPreviewId(null)} open={Boolean(preview)} title={preview ? photoLabel(preview, previewIndex) : "Photo proof"}>
-        {preview ? <div className={styles.previewBody}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img alt={preview.altText || photoLabel(preview, previewIndex)} draggable={false} referrerPolicy="no-referrer" src={proofUrl(preview.id)} />
-          <p>This is a watermarked proof. Originals become available after your selection is finalized{extraCount ? " and payment is verified" : ""}.</p>
-          {!locked ? <Button aria-pressed={selected.has(preview.id)} disabled={submitting} onClick={() => toggle(preview.id)} type="button" variant={selected.has(preview.id) ? "secondary" : "primary"}>{selected.has(preview.id) ? "Remove from selection" : "Select this photo"}</Button> : null}
-        </div> : null}
+      <Dialog aria-label="Photo proof" className={styles.viewer} fullScreen onClose={closePreview} open={Boolean(preview)}>
+        {preview ? <>
+          <header className={styles.viewerHeader} onClick={event => { if (event.target === event.currentTarget) closePreview(); }}><button aria-label="Close photo proof" className={styles.viewerControl} onClick={closePreview} type="button"><X size={24} /></button><span>{previewIndex + 1} / {view.items.length}</span></header>
+          <div className={styles.viewerImage} onClick={event => { const moved = swiped.current; swiped.current = false; if (event.target === event.currentTarget && !moved) closePreview(); }} onContextMenu={event => event.preventDefault()} onCopy={event => event.preventDefault()} onTouchStart={event => { swiped.current = false; const point = event.touches[0]; swipeStart.current = { x: point.clientX, y: point.clientY }; }} onTouchEnd={event => { const start = swipeStart.current; swipeStart.current = null; const end = event.changedTouches[0]; swiped.current = Boolean(start && (Math.abs(end.clientX - start.x) > 10 || Math.abs(end.clientY - start.y) > 10)); if (start && Math.abs(end.clientX - start.x) > 50 && Math.abs(end.clientX - start.x) > Math.abs(end.clientY - start.y)) navigatePreview(end.clientX < start.x ? 1 : -1); }}>
+            <div className={`${styles.viewerPhoto} ${selected.has(preview.id) ? styles.selected : ""}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img alt={preview.altText || photoLabel(preview, previewIndex)} draggable={false} referrerPolicy="no-referrer" src={proofUrl(preview.id)} />
+            </div>
+          </div>
+          <nav aria-label="Photo navigation" className={styles.viewerNavigation} onClick={event => { if (event.target === event.currentTarget) closePreview(); }}>
+          <button aria-label="Previous photo" className={styles.viewerControl} disabled={view.items.length < 2} onClick={() => navigatePreview(-1)} type="button"><ChevronLeft size={28} /></button>
+          {selectionControl(preview, previewIndex)}
+          <button aria-label="Next photo" className={styles.viewerControl} disabled={view.items.length < 2} onClick={() => navigatePreview(1)} type="button"><ChevronRight size={28} /></button>
+          </nav>
+        </> : null}
+      </Dialog>
+      <Modal className={styles.confirmDialog} onClose={() => setPendingExtraId(null)} open={pendingExtraId !== null} title="Package limit reached">
+        <div className={styles.confirmBody}>
+          <p>You’ve reached your package limit. Add this photo for <strong>{money(extraPrice, currency)}</strong>?</p>
+          <p>After you accept, additional photos will be added to your cart at {money(extraPrice, currency)} each without asking again.</p>
+          <div className={styles.confirmActions}><Button onClick={() => setPendingExtraId(null)} type="button" variant="secondary">Keep my package</Button><Button disabled={locked || submitting} onClick={acceptExtras} type="button">Add photo for {money(extraPrice, currency)}</Button></div>
+        </div>
       </Modal>
     </main>
   );

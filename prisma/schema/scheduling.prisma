@@ -145,6 +145,10 @@ model Service {
 }
 
 model ServiceLibraryItem {
+  deliverables Json @default("{}")
+  proofGalleries PortfolioGallery[]
+  commerceProductId String? @unique
+  commerceProduct Product? @relation(fields: [commerceProductId], references: [id], onDelete: Restrict)
   id          String   @id @default(cuid())
   siteId      String
   site        Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
@@ -334,6 +338,7 @@ model BlockedTime {
 }
 
 model Booking {
+  shootGalleries PortfolioGallery[]
   id                 String        @id @default(cuid())
   siteId             String
   site               Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)

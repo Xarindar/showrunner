@@ -112,15 +112,17 @@
 .showrunner-admin .clients-search-form {
   align-items: center;
   display: flex;
-  flex: 1 1 320px;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
   gap: var(--space-2);
   max-width: 720px;
-  min-width: min(100%, 280px);
+  min-width: 0;
 }
-.showrunner-admin .clients-search-form input { flex: 1 1 260px; width: 100%; }
+.showrunner-admin .clients-search-form input { flex: 1 1 auto; min-width: 0; width: 100%; }
+.showrunner-admin .clients-search-form .ui-button { flex-shrink: 0; }
 .showrunner-admin .clients-search-form select { flex: 0 0 210px; }
 .showrunner-admin .clients-list-body { gap: 0; overflow: auto; }
-.showrunner-admin .clients-table td { height: auto; vertical-align: top; }
+.showrunner-admin .clients-table td { vertical-align: middle; }
 .showrunner-admin .clients-table th { vertical-align: middle; }
 .showrunner-admin .clients-primary-cell,
 .showrunner-admin .clients-status-cell { display: grid; gap: var(--sd-space-4); min-width: 0; }
@@ -140,7 +142,7 @@
   color: inherit;
   display: block;
   margin: calc(-1 * var(--sd-space-8));
-  min-height: calc(100% + 20px);
+
   padding: var(--sd-space-8);
 }
 .showrunner-admin .clients-row-link:focus-visible { border-radius: var(--radius-control); box-shadow: var(--sd-shadow-focus); outline: 0; }
@@ -167,8 +169,8 @@
 .showrunner-admin .clients-metric-cell { text-align: center; }
 .showrunner-admin .clients-metric-cell strong { font-family: var(--font-mono); font-size: var(--sd-type-heading-size); }
 .showrunner-admin .clients-actions-heading { text-align: center; }
-.showrunner-admin .clients-row-actions { align-items: flex-start; gap: var(--sd-space-6); justify-content: center; }
-.showrunner-admin .clients-row-actions .clients-action-icon { min-width: 34px; padding: 0; width: 34px; }
+.showrunner-admin .clients-row-actions { align-items: center; flex-wrap: nowrap; gap: var(--sd-space-6); justify-content: center; }
+.showrunner-admin .clients-row-actions .clients-action-icon { flex-shrink: 0; padding: 0; min-width: var(--sd-layout-control-height); width: var(--sd-layout-control-height); }
 .showrunner-admin .clients-modal { max-width: min(760px, calc(100vw - var(--space-6))); }
 .showrunner-admin .clients-modal:not([open]) { display: none; }
 .showrunner-admin .clients-modal-body,
@@ -205,32 +207,26 @@
   .showrunner-admin .clients-records-pagination { justify-self: stretch; }
   .showrunner-admin .clients-records-pagination.ui-pagination-round { justify-content: center; }
   .showrunner-admin .clients-data-table { min-height: 0; }
-  .showrunner-admin .clients-data-table .ui-data-table-stats {
-    flex-wrap: nowrap;
-    margin-inline: calc(var(--space-3) * -1);
-    overflow-x: auto;
-    padding-inline: var(--space-3);
-    scrollbar-gutter: stable;
-  }
-  .showrunner-admin .clients-data-table .ui-data-table-stat-pill {
-    flex: 0 0 auto;
-    min-width: max-content;
-    padding-inline: var(--sd-space-16);
-  }
 }
 @media (max-width: 560px) {
   .showrunner-admin .clients-modal-actions .ui-button { flex: 1 1 100%; }
   .showrunner-admin .clients-card-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
   .showrunner-admin .clients-card-actions .ui-button { min-width: 0; width: 100%; }
-  .showrunner-admin .clients-search-form,
-.showrunner-admin .clients-modal-actions { align-items: stretch; display: grid; }
+  .showrunner-admin .clients-modal-actions { align-items: stretch; display: grid; }
   .showrunner-admin .clients-search-form select { width: 100%; }
 }
 .showrunner-admin .clients-table { min-width: 0; }
 .showrunner-admin .clients-name-line strong { font-weight: var(--sd-type-weight-medium); }
-.showrunner-admin .clients-action-label { display: none; }
-@media(max-width:860px) {
-  .showrunner-admin .clients-action-label { display: inline; }
-  .showrunner-admin .clients-search-form { max-width: none; }
-}
+
 .showrunner-admin #client-note-content { min-height: 144px; resize: none; }
+
+.showrunner-admin .clients-primary-cell { max-width: 24ch; }
+.showrunner-admin .clients-status-cell { max-width: 20ch; }
+.showrunner-admin .clients-status-cell .ui-badge { justify-self: start; white-space: normal; }
+@media (max-width: 860px), (pointer: coarse) {
+  .showrunner-admin .clients-row-actions .clients-action-icon { min-width: var(--sd-layout-touch-target); width: var(--sd-layout-touch-target); }
+  .showrunner-admin .clients-primary-cell > .muted-text,
+  .showrunner-admin .clients-tag-row,
+  .showrunner-admin .clients-status-cell > .muted-text { display: none; }
+  .showrunner-admin .clients-primary-cell { max-width: 14ch; }
+}

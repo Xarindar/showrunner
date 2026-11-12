@@ -147,3 +147,10 @@ test("staff profile saves and validation return to Staff, with site-scoped write
   await assert.rejects(h.actions.createStaffMemberAction(form), /Redirect:\/admin\/modules\/appointments\/staff\?error=/);
   assert.equal(h.writes.length, 2);
 });
+
+
+test("business hours can end at midnight so overnight packages can span two days", () => {
+  const hours = weeklyHoursSchema.parse({ staffId: "", resourceId: "", days: [6], ranges: [{ start: "22:00", end: "00:00" }], revision: "[]" });
+  assert.equal(hours.ranges[0].start, 1320);
+  assert.equal(hours.ranges[0].end, 1440);
+});

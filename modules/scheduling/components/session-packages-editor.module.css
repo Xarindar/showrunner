@@ -96,3 +96,6 @@
 @media (max-width: 860px), (pointer: coarse) {
   .unit { font-size: var(--sd-type-input-touch-size); }
 }
+
+.timeFrame { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: var(--sd-space-12); }
+@media (max-width: 600px) { .timeFrame { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

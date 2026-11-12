@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { nullableRecordId, optionalRecordId } from "../record-id";
-import { sessionOfferingSchema, type SessionOffering } from "./session-offering";
+import { sessionOfferingSchema, sessionDeliverablesSchema, type SessionOffering } from "./session-offering";
 import { addOnPricingTypeSchema } from "./pricing";
 import { sessionPrice } from "./session-input";
 
 export const serviceLibraryItemSchema = z.object({
+  deliverables: sessionDeliverablesSchema.optional(),
   id: z.string().min(1).max(100),
   name: z.string().trim().min(1, "Enter a service name.").max(120),
   description: z.string().trim().max(2000),
@@ -60,6 +61,9 @@ export function resolveIncludedServices(offering: SessionOffering, library: Serv
     const saved = library.find(row => row.id === item.libraryItemId);
     if (!saved) throw new Error("An optional service is no longer available. Remove it and choose another.");
     if (!isServiceAddOn(saved)) throw new Error(`"${saved.name}" is no longer available as an add-on. Remove it from Suggested Add-Ons.`);
-    return { ...item, name: saved.name, priceCents: saved.priceCents ?? 0, pricingType: saved.pricingType, hourlyRateId: saved.hourlyRateId };
+    const next = { ...item, name: saved.name, priceCents: saved.priceCents ?? 0, pricingType: saved.pricingType, hourlyRateId: saved.hourlyRateId };
+    if (saved.deliverables) next.deliverables = saved.deliverables;
+    else delete next.deliverables;
+    return next;
   }) });
 }

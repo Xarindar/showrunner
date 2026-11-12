@@ -54,10 +54,16 @@ model PortfolioGallery {
   id              String                       @id @default(cuid())
   siteId          String
   site            Site                         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  mediaFolderId   String?                      @unique
+  mediaFolder     MediaFolder?                 @relation("SessionMediaFolder", fields: [mediaFolderId], references: [id], onDelete: SetNull)
+  bookingId       String?
+  booking         Booking?                     @relation(fields: [bookingId], references: [id], onDelete: Restrict)
   clientId        String?
   client          Client? @relation(fields: [clientId], references: [id], onDelete: Restrict)
   packageProductId String?
   packageProduct Product? @relation(fields: [packageProductId], references: [id], onDelete: Restrict)
+  extraPhotoAddOnId String?
+  extraPhotoAddOn ServiceLibraryItem? @relation(fields: [extraPhotoAddOnId], references: [id], onDelete: Restrict)
   purchasedOrderId String?
   purchasedOrder Order? @relation("GalleryPackageOrder", fields: [purchasedOrderId], references: [id], onDelete: Restrict)
   selectionAllowance Int?
@@ -69,6 +75,9 @@ model PortfolioGallery {
   slug            String                       @default(cuid())
   title           String
   description     String                       @default("")
+  processingUploads Int                        @default(0)
+  processingStartedAt DateTime?
+  processingError String                       @default("")
   status          PortfolioGalleryStatus       @default(DRAFT)
   visibility      PortfolioGalleryVisibility   @default(PUBLIC)
   layout          PortfolioGalleryLayout       @default(GRID)
@@ -282,7 +291,8 @@ model PortfolioSelectionPurchase {
   gallery PortfolioGallery @relation(fields: [galleryId], references: [id], onDelete: Restrict)
   siteId String
   clientId String
-  packageProductId String
+  packageProductId String?
+  extraPhotoAddOnId String?
   packageName String
   allowance Int
   extraPriceCents Int

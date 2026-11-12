@@ -22,20 +22,53 @@ const purchaseInclude = { selections: { include: { mediaAsset: true, item: true 
 
 type Tx = Prisma.TransactionClient;
 async function activeAccess(db: Tx, token: string, siteId: string) {
-  return db.portfolioGalleryAccess.findFirst({
+  const access = await db.portfolioGalleryAccess.findFirst({
     where: { siteId, accessToken: token, status: "ACTIVE", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }], gallery: { siteId, status: "PUBLISHED", visibility: "PRIVATE", clientId: { not: null } } },
-    include: { gallery: { include: { packageProduct: true, purchasedOrder: { include: { items: true, gallerySelectionPurchase: { select: { id: true } } } }, items: { include: { mediaAsset: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }, purchase: { include: purchaseInclude } } } }
+    include: { gallery: { include: { booking: { select: { siteId: true, clientId: true, status: true } }, extraPhotoAddOn: { include: { commerceProduct: true } }, packageProduct: true, purchasedOrder: { include: { items: true, gallerySelectionPurchase: { select: { id: true } } } }, items: { include: { mediaAsset: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }, purchase: { include: purchaseInclude } } } }
   });
+  if (access?.gallery.extraPhotoAddOn) {
+    access.gallery.extraPhotoPriceCents = access.gallery.purchase?.extraPriceCents ?? access.gallery.extraPhotoAddOn.priceCents;
+    access.gallery.selectionCurrency = access.gallery.purchase?.currency || access.gallery.extraPhotoAddOn.commerceProduct?.currency || null;
+  }
+  return access;
 }
 function validAccess(access: Awaited<ReturnType<typeof activeAccess>>) {
-  return Boolean(access && access.clientId && access.clientId === access.gallery.clientId && access.gallery.proofingEnabled && access.gallery.selectionAllowance !== null && access.gallery.extraPhotoPriceCents !== null && access.gallery.selectionCurrency && access.gallery.packageProductId);
+  return Boolean(access && access.clientId && access.clientId === access.gallery.clientId && access.gallery.proofingEnabled && access.gallery.selectionAllowance !== null && access.gallery.extraPhotoPriceCents !== null && access.gallery.selectionCurrency && (access.gallery.packageProductId || access.gallery.extraPhotoAddOnId));
 }
+function directSessionDelivery(access: Awaited<ReturnType<typeof activeAccess>>) {
+  const gallery = access?.gallery;
+  return Boolean(access?.clientId && gallery && access.clientId === gallery.clientId && gallery.bookingId &&
+    gallery.booking?.siteId === gallery.siteId && gallery.booking.clientId === gallery.clientId && gallery.booking.status !== "CANCELED" &&
+    !gallery.proofingEnabled && !gallery.packageProductId && !gallery.purchasedOrderId && !gallery.purchase && gallery.downloadEnabled);
+}
+
+export async function getClientSessionDelivery(token: string) {
+  const settings = await getSiteSettings();
+  if (!settings.enabledModuleIds.includes("portfolio") || !token || token.length > 256) return null;
+  const access = await activeAccess(prisma, token, settings.siteId);
+  if (!access || !directSessionDelivery(access)) return null;
+  const gallery = access.gallery;
+  return {
+    title: gallery.title, description: gallery.description,
+    photos: gallery.items.filter(item => item.type === "IMAGE" && item.isDownloadable && item.mediaAsset?.siteId === settings.siteId &&
+      item.mediaAsset.isPrivate && !item.mediaAsset.deletedAt && ["S3", "R2", "SERVER_ASSETS"].includes(item.mediaAsset.driver)).map(item => {
+      const url = `/api/portfolio/galleries/${encodeURIComponent(gallery.slug)}/media/${encodeURIComponent(item.id)}?access=${encodeURIComponent(token)}`;
+      return { id: item.id, name: item.mediaAsset!.filename, thumbnail: `${url}&variant=THUMBNAIL`, preview: `${url}&variant=FULL`, download: `${url}&variant=DOWNLOAD&download=1` };
+    })
+  };
+}
+
 function validPackage(gallery: NonNullable<Awaited<ReturnType<typeof activeAccess>>>["gallery"]) {
+  if (gallery.extraPhotoAddOnId) {
+    const addon = gallery.extraPhotoAddOn;
+    return Boolean(!gallery.packageProductId && !gallery.purchasedOrderId && gallery.bookingId && gallery.booking?.siteId === gallery.siteId && gallery.booking.clientId === gallery.clientId && gallery.booking.status !== "CANCELED" &&
+      addon?.siteId === gallery.siteId && addon.commerceProduct?.siteId === gallery.siteId && (Boolean(gallery.purchase) || addon.pricingType === "PER_UNIT" && addon.priceCents !== null && addon.priceCents >= 0 && addon.commerceProduct.type === "DIGITAL" && ["ACTIVE", "DRAFT"].includes(addon.commerceProduct.status) && (addon.deliverables as { finalPhotos?: number } | null)?.finalPhotos === 1));
+  }
   const order = gallery.purchasedOrder;
   return Boolean(order && !order.gallerySelectionPurchase && order.siteId === gallery.siteId && order.clientId === gallery.clientId && ["PAID", "FULFILLED"].includes(order.status) && order.items.some(item => item.productId === gallery.packageProductId) && gallery.packageProduct?.siteId === gallery.siteId && gallery.packageProduct.type === "SERVICE_PACKAGE");
 }
-function termsVersion(gallery: { selectionAllowance: number | null; extraPhotoPriceCents: number | null; selectionCurrency: string | null; packageProductId: string | null; purchasedOrderId?: string | null }) {
-  return createHash("sha256").update(JSON.stringify([gallery.selectionAllowance, gallery.extraPhotoPriceCents, gallery.selectionCurrency, gallery.packageProductId, gallery.purchasedOrderId])).digest("hex");
+function termsVersion(gallery: { selectionAllowance: number | null; extraPhotoPriceCents: number | null; selectionCurrency: string | null; packageProductId: string | null; purchasedOrderId?: string | null; extraPhotoAddOnId?: string | null }) {
+  return createHash("sha256").update(JSON.stringify([gallery.selectionAllowance, gallery.extraPhotoPriceCents, gallery.selectionCurrency, gallery.packageProductId, gallery.purchasedOrderId, ...(gallery.extraPhotoAddOnId ? [gallery.extraPhotoAddOnId] : [])])).digest("hex");
 }
 function releaseStatus(purchase: Prisma.PortfolioSelectionPurchaseGetPayload<{ include: typeof purchaseInclude }>) {
   if (purchase.revokedAt) return "REFUNDED";
@@ -71,6 +104,9 @@ export async function authorizeGalleryOriginal(input: { siteId: string; galleryI
   const access = await prisma.portfolioGalleryAccess.findFirst({ where: { id: input.accessId, siteId: input.siteId, galleryId: input.galleryId, status: "ACTIVE", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, select: { accessToken: true } });
   if (!access) return false;
   const full = await activeAccess(prisma, access.accessToken, input.siteId);
+  if (full && directSessionDelivery(full)) return full.gallery.items.some(item => item.id === input.itemId && item.galleryId === input.galleryId &&
+    (!input.mediaAssetId || item.mediaAssetId === input.mediaAssetId) && item.type === "IMAGE" && item.isDownloadable &&
+    item.mediaAsset?.siteId === input.siteId && item.mediaAsset.isPrivate && !item.mediaAsset.deletedAt && ["S3", "R2", "SERVER_ASSETS"].includes(item.mediaAsset.driver));
   if (!full || !validAccess(full) || !validPackage(full.gallery) || !full.gallery.downloadEnabled) return false;
   const purchase = full.gallery.purchase;
   if (!purchase || purchase.siteId !== input.siteId || purchase.clientId !== full.clientId || releaseStatus(purchase) !== "RELEASED") return false;
@@ -105,10 +141,10 @@ export async function finalizeProofSelection(input: { token: string; itemIds: st
     if (provider && !["STRIPE", "SQUARE", "PAYPAL"].includes(provider)) throw new ProofSelectionError("Online payment is unavailable.", 503);
     const order = quote.totalCents > 0 ? await tx.order.create({ data: {
       siteId: settings.siteId, clientId: client.id, orderNumber: `PHOTO-${randomUUID()}`, customerName: client.name, customerEmail: client.email, status: "PENDING", currency: gallery.selectionCurrency!, subtotalCents: quote.totalCents, totalCents: quote.totalCents,
-      items: { create: { productId: gallery.packageProductId!, name: `${gallery.title}: extra selected photos`, quantity: quote.extraCount, unitPriceCents: gallery.extraPhotoPriceCents!, lineTotalCents: quote.totalCents } },
+      items: { create: { productId: gallery.extraPhotoAddOn?.commerceProductId || gallery.packageProductId!, name: gallery.extraPhotoAddOn?.name || `${gallery.title}: extra selected photos`, quantity: quote.extraCount, unitPriceCents: gallery.extraPhotoPriceCents!, lineTotalCents: quote.totalCents } },
       payments: { create: { provider: provider!, status: "PENDING", amountCents: quote.totalCents, currency: gallery.selectionCurrency! } }
     } }) : null;
-    return tx.portfolioSelectionPurchase.create({ data: { galleryId: gallery.id, siteId: settings.siteId, clientId: client.id, packageProductId: gallery.packageProductId!, packageName: gallery.packageProduct!.name, allowance: gallery.selectionAllowance!, extraPriceCents: gallery.extraPhotoPriceCents!, currency: gallery.selectionCurrency!, ...quote, selectedCount: selected.length, orderId: order?.id, selections: { create: selected.map(item => ({ itemId: item!.id, mediaAssetId: item!.mediaAssetId! })) } }, include: purchaseInclude });
+    return tx.portfolioSelectionPurchase.create({ data: { galleryId: gallery.id, siteId: settings.siteId, clientId: client.id, packageProductId: gallery.packageProductId, extraPhotoAddOnId: gallery.extraPhotoAddOnId, packageName: gallery.extraPhotoAddOn?.name || gallery.packageProduct!.name, allowance: gallery.selectionAllowance!, extraPriceCents: gallery.extraPhotoPriceCents!, currency: gallery.selectionCurrency!, ...quote, selectedCount: selected.length, orderId: order?.id, selections: { create: selected.map(item => ({ itemId: item!.id, mediaAssetId: item!.mediaAssetId! })) } }, include: purchaseInclude });
   }, { timeout: 15000 });
   const status = releaseStatus(purchase);
   if (status === "RELEASED" || status === "REFUNDED" || !purchase.orderId) return { purchaseId: purchase.id, checkoutUrl: null, status };

@@ -1,12 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState, type ReactNode } from "react";
-import { flushSync } from "react-dom";
+import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 
 type ClientProfileCardProps = {
-  affiliation: string;
   details: ReactNode;
   editForm: ReactNode;
   email: string;
@@ -14,17 +13,12 @@ type ClientProfileCardProps = {
   phone: string;
   photoUrl: string;
   pipeline: string;
-  status: string;
 };
 
 type ClientProfileSummaryItem = {
   href?: string;
   label: string;
   value: string;
-};
-
-type ViewTransitionDocument = Document & {
-  startViewTransition?: (callback: () => void) => void;
 };
 
 function initialsFor(name: string, email: string) {
@@ -44,17 +38,15 @@ function phoneHref(value: string) {
 }
 
 export function ClientProfileCard({
-  affiliation,
   details,
   editForm,
   email,
   name,
   phone,
   photoUrl,
-  pipeline,
-  status
+  pipeline
 }: ClientProfileCardProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const initials = useMemo(() => initialsFor(name, email), [email, name]);
   const summaryItems: ClientProfileSummaryItem[] = [
@@ -63,57 +55,19 @@ export function ClientProfileCard({
     { label: "Pipeline", value: pipeline }
   ];
 
-  function handleToggleDetails() {
-    const nextExpanded = !expanded;
-    const updateExpandedState = () => {
-      setExpanded(nextExpanded);
-      if (!nextExpanded) setEditing(false);
-    };
-    const transitionDocument =
-      typeof document === "undefined" ? null : (document as ViewTransitionDocument);
-
-    if (transitionDocument?.startViewTransition) {
-      transitionDocument.startViewTransition(() => {
-        flushSync(updateExpandedState);
-      });
-      return;
-    }
-
-    updateExpandedState();
-  }
-
   return (
-    <Card
-      as="article"
-      className={expanded ? "clients-profile-card is-expanded" : "clients-profile-card"}
-      minHeight="none"
-      bodyClassName="clients-profile-card-body">
+    <>
+    <section className="studio-panel ui-section-card clients-profile-card" aria-labelledby="client-profile-title">
+      <div className="ui-section-header"><h2 id="client-profile-title">Client details</h2></div>
+      <div className="ui-section-body clients-profile-card-body">
       <div className="clients-profile-card-head">
         <div className="clients-profile-card-main">
           <div className="clients-profile-photo" aria-hidden="true">
-            {photoUrl ? <img alt="" src={photoUrl} /> : <span>{initials}</span>}
+            {photoUrl ? <Image alt="" src={photoUrl} width={64} height={64} unoptimized /> : <span>{initials}</span>}
           </div>
           <div className="clients-profile-card-copy">
             <h2>{name}</h2>
-            <span>{affiliation}</span>
-            <span className="ui-badge">{status}</span>
           </div>
-        </div>
-        <div className="clients-profile-card-actions">
-          <Button
-            aria-expanded={expanded}
-            className="clients-profile-toggle"
-            onClick={handleToggleDetails}
-            size="sm"
-            type="button"
-            variant="secondary">
-            {expanded ? "Hide details" : "Show details"}
-          </Button>
-          {expanded ? (
-            <Button onClick={() => setEditing((current) => !current)} size="sm" type="button" variant="ghost">
-              {editing ? "Close edit" : "Edit profile"}
-            </Button>
-          ) : null}
         </div>
       </div>
       <dl className="clients-profile-quick-list" aria-label="Client highlights">
@@ -124,15 +78,15 @@ export function ClientProfileCard({
           </div>
         ))}
       </dl>
-      <div className="clients-profile-expanded" aria-hidden={!expanded}>
-        <div className="clients-profile-expanded-inner">
-          <div className="clients-profile-expanded-header">
-            <span>Profile details</span>
-          </div>
-          {details}
-          {editing ? <div className="clients-profile-details-body">{editForm}</div> : null}
-        </div>
+      <div className="clients-profile-footer"><Button aria-haspopup="dialog" onClick={() => setDetailsOpen(true)} size="sm" type="button" variant="secondary">Show details</Button></div>
       </div>
-    </Card>
+    </section>
+    <Modal open={detailsOpen} title={`${name} — Client details`} className="clients-modal" onClose={() => { setDetailsOpen(false); setEditing(false); }}>
+      <div className="ui-stack">
+        {editing ? editForm : details}
+        <div className="module-modal-actions"><Button onClick={() => setEditing(current => !current)} size="sm" type="button" variant="secondary">{editing ? "View details" : "Edit profile"}</Button></div>
+      </div>
+    </Modal>
+    </>
   );
 }

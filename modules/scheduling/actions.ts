@@ -179,7 +179,7 @@ async function servicePricingData(input: { pricingType: PricingType; hourlyRateI
     const rates = await prisma.hourlyRate.findMany({ where: { siteId } });
     Object.assign(offering, priceSessionOffering(offering, rates, input));
     const first = offering.tiers[0];
-    return { pricingType: first.pricingType!, hourlyRateId: first.hourlyRateId ?? null, priceCents: first.priceCents };
+    return { durationMinutes: first.durationMinutes, pricingType: first.pricingType === "TIME_FRAME" ? "FLAT_RATE" as const : first.pricingType!, hourlyRateId: first.hourlyRateId ?? null, priceCents: first.priceCents };
   }
   if (input.pricingType !== "HOURLY") return { pricingType: input.pricingType, hourlyRateId: null };
   const rate = await prisma.hourlyRate.findFirst({ where: { id: input.hourlyRateId, siteId } });

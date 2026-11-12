@@ -4,11 +4,12 @@ import { useEffect, useLayoutEffect, useRef, type DialogHTMLAttributes, type Mou
 
 type DialogProps = Omit<DialogHTMLAttributes<HTMLDialogElement>, "open" | "onClose" | "onCancel" | "onPointerDown" | "onClick"> & {
   open: boolean;
+  fullScreen?: boolean;
   onClose: () => void;
 };
 
 /** Native focus management, Escape and backdrop dismissal for every dialog layout. */
-export function Dialog({ open, onClose, ...props }: DialogProps) {
+export function Dialog({ open, onClose, fullScreen = false, ...props }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const startedOutside = useRef(false);
 
@@ -21,7 +22,7 @@ export function Dialog({ open, onClose, ...props }: DialogProps) {
     const dialog = ref.current;
     const admin = dialog?.closest(".showrunner-admin");
     const workspace = dialog?.closest(".admin-main") ?? admin?.querySelector(".admin-main");
-    if (!open || !dialog || !workspace) return;
+    if (!open || !dialog || !workspace || fullScreen) return;
     const original = { left: dialog.style.left, right: dialog.style.right, top: dialog.style.top, bottom: dialog.style.bottom, maxWidth: dialog.style.maxWidth, maxHeight: dialog.style.maxHeight };
     function align() {
       if (!dialog || !workspace) return;
@@ -44,7 +45,7 @@ export function Dialog({ open, onClose, ...props }: DialogProps) {
     observer.observe(workspace);
     window.addEventListener("resize", align);
     return () => { observer.disconnect(); window.removeEventListener("resize", align); Object.assign(dialog.style, original); };
-  }, [open]);
+  }, [open, fullScreen]);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -52,6 +53,13 @@ export function Dialog({ open, onClose, ...props }: DialogProps) {
     if (open && !dialog.open) dialog.showModal();
     if (!open && dialog.open) dialog.close();
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !fullScreen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [open, fullScreen]);
 
   return <dialog {...props} ref={ref}
     onCancel={event => {

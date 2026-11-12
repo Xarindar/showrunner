@@ -110,7 +110,7 @@ export const serviceFormSchema = z
     name: z.string().trim().min(1, "Enter a session name."),
     slug: optionalText.optional(),
     description: optionalStoredText,
-    durationMinutes: z.coerce.number().int().min(1).max(24 * 60),
+    durationMinutes: z.coerce.number().int().min(1).max(2880),
     location: optionalStoredText,
     category: optionalStoredText,
     tags: optionalStoredText,
@@ -128,6 +128,7 @@ export const serviceFormSchema = z
     waitlistEnabled: z.literal("on").optional(),
     isActive: z.literal("on").optional()
   })
+  .refine(value => value.durationMinutes <= 1440 || value.sessionOffering?.tiers[0].pricingType === "TIME_FRAME", "Duration-based sessions can be up to 24 hours.")
   .transform((value) => ({
     ...value,
     ...(value.bookingRules ? { intakePrompt: value.bookingRules.filter(rule => rule.kind === "intake" && !rule.contactField).map(rule => rule.label).join("\n"), policyText: value.bookingRules.filter(rule => rule.kind === "policy").map(rule => rule.label).join("\n\n") } : {}),
@@ -148,7 +149,7 @@ export const availabilityFormSchema = z
   .object({
     weekday: z.coerce.number().int().min(0).max(6),
     startTime: timeSchema,
-    endTime: timeSchema
+    endTime: timeSchema.transform(minutes => minutes === 0 ? 1440 : minutes)
   })
   .refine((value) => value.endTime > value.startTime, {
     message: "Availability must end after it starts.",

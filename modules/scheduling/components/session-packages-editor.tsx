@@ -1,5 +1,8 @@
 "use client";
 
+import { TimeInput } from "@/components/ui/time-input";
+import { formatTimeValue } from "@/lib/format";
+import { serviceTimeFrameSchema, timeFrameMinutes, editTimeFrame } from "@/lib/scheduling/service-time-frame";
 import { ResponsiveTableFrame } from "@/components/ui/responsive-table";
 import { useId, useState } from "react";
 import { flushSync } from "react-dom";
@@ -35,11 +38,18 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
   initialRates?: HourlyRate[]; initialPricingType?: PricingType; initialHourlyRateId?: string;
   initialScheduling?: { bufferBeforeMinutes: number; bufferAfterMinutes: number; minimumNoticeHours: number; maxAdvanceDays: number; slotIntervalMinutes: number };
 }) {
-  const [draft, setDraft] = useState<SessionOfferingDraft>(() => {
+  const [storedDraft, setDraft] = useState<SessionOfferingDraft>(() => {
     if (isNew && !initialOffering) return { coverageItems: [], tiers: [], addOns: [] };
     const offering = sessionOfferingDraft(initialOffering, durationMinutes, priceCents);
     return { ...offering, tiers: offering.tiers.map(tier => ({ ...tier, pricingType: tier.pricingType ?? initialPricingType, hourlyRateId: (tier.pricingType ? tier.hourlyRateId : initialHourlyRateId) || null })) };
   });
+  const draft = { ...storedDraft, tiers: storedDraft.tiers.map(tier => {
+    const frame = tier.pricingType === "TIME_FRAME" ? serviceTimeFrameSchema.safeParse(tier.timeFrame) : null;
+    if (!frame?.success) return tier;
+    const { start, end } = timeFrameMinutes(frame.data);
+    return { ...tier, durationMinutes: String(end - start) };
+  }) };
+  const timeFrameLabel = (tier: SessionOfferingDraft["tiers"][number]) => `${formatTimeValue(tier.timeFrame?.start ?? "")} – ${formatTimeValue(tier.timeFrame?.end ?? "")}${tier.timeFrame?.endsNextDay ? " (next day)" : ""}`;
   const [scheduling, setScheduling] = useState(() => ({
     bufferBeforeMinutes: String(initialScheduling?.bufferBeforeMinutes ?? 0),
     bufferAfterMinutes: String(initialScheduling?.bufferAfterMinutes ?? 15),
@@ -94,14 +104,14 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     const id = crypto.randomUUID();
     flushSync(() => {
       setExpandedTiers(new Set());
-      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? String(durationMinutes), pricingType: source?.pricingType ?? "FLAT_RATE", hourlyRateId: source?.hourlyRateId || null, deliverables: source?.deliverables, coverageIds: [...(source?.coverageIds ?? [])] }] });
+      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? String(durationMinutes), pricingType: source?.pricingType ?? "FLAT_RATE", timeFrame: source?.timeFrame, hourlyRateId: source?.hourlyRateId || null, deliverables: source?.deliverables, coverageIds: [...(source?.coverageIds ?? [])] }] });
       setNewTiers(current => new Set([...current, id]));
     });
   }
 
   function chooseLibraryItems(items: ServiceLibraryItem[], candidate = libraryPicker?.editingItem?.id || null) {
     if (libraryPicker?.optional) {
-      setDraft(current => ({ ...current, addOns: [...current.addOns, ...items.filter(item => !current.addOns.some(row => row.libraryItemId === item.id || row.name.toLowerCase() === item.name.toLowerCase())).map(item => ({ id: crypto.randomUUID(), libraryItemId: item.id, name: item.name, price: ((item.priceCents ?? 0) / 100).toFixed(2), pricingType: item.pricingType, hourlyRateId: item.hourlyRateId }))].slice(0, 50) }));
+      setDraft(current => ({ ...current, addOns: [...current.addOns, ...items.filter(item => !current.addOns.some(row => row.libraryItemId === item.id || row.name.toLowerCase() === item.name.toLowerCase())).map(item => ({ id: crypto.randomUUID(), libraryItemId: item.id, deliverables: item.deliverables, name: item.name, price: ((item.priceCents ?? 0) / 100).toFixed(2), pricingType: item.pricingType, hourlyRateId: item.hourlyRateId }))].slice(0, 50) }));
       closeLibrary();
       notify("Suggested add-ons added to this draft.");
       return;
@@ -137,7 +147,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
 
   return <div className={styles.editor}>
     {Object.entries(scheduling).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
-    <input type="hidden" name="pricingType" value={firstTier?.pricingType ?? "FLAT_RATE"} />
+    <input type="hidden" name="pricingType" value={firstTier?.pricingType === "TIME_FRAME" ? "FLAT_RATE" : firstTier?.pricingType ?? "FLAT_RATE"} />
     <input type="hidden" name="hourlyRateId" value={firstTier?.pricingType === "HOURLY" ? firstTier.hourlyRateId ?? "" : ""} />
     <input type="hidden" name="sessionOffering" value={JSON.stringify({ ...draft, tiers: draft.tiers.map(tier => ({ ...tier, price: tierPrice(tier) })) })} />
     <input type="hidden" name="durationMinutes" value={firstTier?.durationMinutes ?? durationMinutes} />
@@ -149,7 +159,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
         {draft.tiers.filter(tier => !newTiers.has(tier.id)).map(tier => <tr key={tier.id}>
           <td><button type="button" className={styles.packageName} aria-haspopup="dialog" onClick={() => setExpandedTiers(new Set([tier.id]))}>{tier.name}</button></td>
           <td>{tierPrice(tier) ? Number(tierPrice(tier)).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "—"}</td>
-          <td>{packageDurationLabel(tier.durationMinutes)}</td>
+          <td>{tier.pricingType === "TIME_FRAME" ? timeFrameLabel(tier) : packageDurationLabel(tier.durationMinutes)}</td>
           <td><Button type="button" variant="ghost" size="sm" aria-label={`Edit ${tier.name}`} onClick={() => setExpandedTiers(new Set([tier.id]))}><Pencil aria-hidden="true" size={15} /></Button></td>
         </tr>)}
       </tbody></table>
@@ -168,8 +178,8 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
           <h3 className="ui-zero" id={`${listId}-basics-${tier.id}`}>Name &amp; pricing</h3>
           <Field label="Package name"><Input id={`${listId}-${tier.id}`} aria-label={`Package ${index + 1} name`} value={tier.name} autoFocus required maxLength={120} onChange={event => updateTier(tier.id, { name: event.target.value })} /></Field>
           <div className={styles.tierNumbers}>
-            <ServicePricingFields pricingType={tier.pricingType ?? "FLAT_RATE"} hourlyRateId={tier.hourlyRateId ?? ""} rates={rates}
-              onChange={(pricingType, hourlyRateId) => updateTier(tier.id, { pricingType, hourlyRateId: hourlyRateId || null })} onRateSaved={onRateSaved}
+            <ServicePricingFields allowTimeFrame pricingType={tier.pricingType ?? "FLAT_RATE"} hourlyRateId={tier.hourlyRateId ?? ""} rates={rates}
+              onChange={(pricingType, hourlyRateId) => updateTier(tier.id, { pricingType, hourlyRateId: hourlyRateId || null, timeFrame: pricingType === "TIME_FRAME" ? tier.timeFrame ?? { start: "13:00", end: "15:00", endsNextDay: false } : undefined })} onRateSaved={onRateSaved}
               priceField={<Field label="Price (USD)">
                 <Input aria-label={`${tier.name} price (USD)`} type="number" inputMode="decimal" min="0" max="9999999.99" step="0.01"
                   required={isNew || multi}
@@ -180,8 +190,15 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
           </section>
           <section className={styles.packageSection} aria-labelledby={`${listId}-coverage-${tier.id}`}>
           <h3 className="ui-zero" id={`${listId}-coverage-${tier.id}`}>Session coverage</h3>
+          <p className="muted-text">Base counts below are increased by any included services and selected add-ons.</p>
           <div className={styles.deliverables}>
-            <div className={styles.duration} role="group" aria-labelledby={durationLabelId}>
+            {tier.pricingType === "TIME_FRAME" ? <div className={styles.timeFrame}>
+              <Field label="Ends"><Select aria-label="End day" value={tier.timeFrame?.endsNextDay ? "NEXT_DAY" : "SAME_DAY"} onChange={event => updateTier(tier.id, { timeFrame: { start: tier.timeFrame?.start ?? "", end: tier.timeFrame?.end ?? "", ...tier.timeFrame, endsNextDay: event.target.value === "NEXT_DAY" } })}>
+                <option value="SAME_DAY">Same Day</option><option value="NEXT_DAY">Next Day</option>
+              </Select></Field>
+              <Field label="Start Time"><TimeInput className="ui-input" required value={tier.timeFrame?.start ?? ""} onValueChange={start => updateTier(tier.id, { timeFrame: editTimeFrame(tier.timeFrame ?? { start: "", end: "" }, { start }) })} /></Field>
+              <Field label="End Time"><TimeInput className="ui-input" required value={tier.timeFrame?.end ?? ""} onValueChange={end => updateTier(tier.id, { timeFrame: editTimeFrame(tier.timeFrame ?? { start: "", end: "" }, { end }) })} /></Field>
+            </div> : <div className={styles.duration} role="group" aria-labelledby={durationLabelId}>
               <span className="ui-field-label" id={durationLabelId}>Duration</span>
               <div className={styles.durationControls}>
                 <Select compact aria-label="Hours" value={hours} onChange={event => {
@@ -198,7 +215,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
                   {durationMinutesOfHour.slice(1).map(minute => <option key={minute} value={minute}>{minute} M</option>)}
                 </Select>
               </div>
-            </div>
+            </div>}
             {deliverableFields.map(([key, label]) => (
               <Field key={key} label={label}>
                 <Input type="number" inputMode="numeric" min="0" max={Number.MAX_SAFE_INTEGER} step="1"

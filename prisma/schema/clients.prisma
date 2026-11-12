@@ -14,6 +14,8 @@ model Client {
   id                      String              @id @default(cuid())
   siteId                  String
   site                    Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  mediaFolderId           String?             @unique
+  mediaFolder             MediaFolder?        @relation("ClientMediaFolder", fields: [mediaFolderId], references: [id], onDelete: SetNull)
   name                    String
   email                   String
   phone                   String?

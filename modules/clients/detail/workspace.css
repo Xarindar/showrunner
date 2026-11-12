@@ -372,3 +372,39 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Shared tokens theme the existing profile and activity containers. */
+.showrunner-admin .clients-detail-page { gap: var(--space-4); }
+.showrunner-admin .clients-detail-header,
+.showrunner-admin .clients-detail-heading { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.showrunner-admin .clients-detail-header { justify-content: space-between; }
+.showrunner-admin .clients-detail-heading { flex-wrap: wrap; }
+.showrunner-admin .clients-detail-heading h1 { margin: 0; overflow-wrap: anywhere; }
+.showrunner-admin .clients-profile-card .clients-profile-card-body { padding: var(--space-4); }
+.showrunner-admin .clients-records-stack { display: grid; grid-column: 1 / -1; gap: var(--space-4); min-width: 0; }
+.showrunner-admin .clients-detail-cell-text { display: block; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.showrunner-admin .clients-detail-page .clients-records-table-wrap { border: 0; border-radius: 0; }
+@media (max-width: 860px), (pointer: coarse) {
+  .showrunner-admin .clients-detail-cell-text { max-width: 16ch; }
+}
+
+.showrunner-admin .clients-detail-activity-card { grid-template-rows: auto 1fr; }
+
+.showrunner-admin .clients-detail-header .module-card-header-actions { flex: 0 0 auto; }
+.showrunner-admin .clients-detail-overflow-actions .ui-button { white-space: nowrap; }
+
+.showrunner-admin .clients-detail-sessions { grid-column: span 2; min-width: 0; }
+@media (max-width: 860px) {
+  .showrunner-admin .clients-detail-sessions { grid-column: span 1; }
+}
+
+.showrunner-admin .clients-profile-footer { padding-top: var(--space-3); }
+.showrunner-admin .clients-profile-footer .ui-button { width: 100%; }
+.showrunner-admin .clients-detail-sessions { align-self: stretch; }
+.showrunner-admin .clients-detail-sessions > .ui-data-table-shell { display: flex; flex-direction: column; }
+.showrunner-admin .clients-detail-sessions > .ui-data-table-shell > .ui-table-wrap { flex: 1; min-height: 0; }
+.showrunner-admin .clients-detail-sessions > .ui-data-table-shell > .ui-table-wrap > table:has(tbody td[colspan]) { height: 100%; }
+
+.showrunner-admin .clients-session-index { display: flex; flex-direction: column; }
+.showrunner-admin .clients-session-index > .ui-table-wrap { flex: 1; min-height: 0; }
+.showrunner-admin .clients-session-index > .ui-table-wrap > table:has(tbody td[colspan]) { height: 100%; }

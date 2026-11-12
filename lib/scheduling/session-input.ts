@@ -25,7 +25,7 @@ export const manualSessionSchema = z.object({
   customerEmail: z.email("Enter a valid client email.").transform(value => value.toLowerCase()),
   customerPhone: z.string().trim().optional(),
   startsAt: z.string().min(1, "Choose a date and time."),
-  durationMinutes: z.coerce.number().int().min(1).max(1440),
+  durationMinutes: z.coerce.number().int().min(1).max(2880),
   price: sessionPrice,
   location: z.string().trim().max(500).default(""),
   staffId: z.string().optional(),

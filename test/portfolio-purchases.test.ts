@@ -116,3 +116,62 @@ test("client shoots stay separate from public Portfolio embeds, even with a toke
   assert.equal(queries[0].where.clientId, null);
   await assert.rejects(exports.getPublicGallery({ siteId: "site-a", slug: "shoot", accessToken: "valid-token" }), /Gallery not found/);
 });
+
+test("manual session delivery permits only its active client link and private session originals", async () => {
+  function deliveryFixture() {
+    const f = fixture();
+    Object.assign(f.gallery, { slug: "wedding", title: "Wedding", description: "Evening", proofingEnabled: false, packageProductId: null, purchasedOrderId: null, purchase: null, bookingId: "booking-a", booking: { siteId: "site-a", clientId: "client-a", status: "COMPLETED" } });
+    return f;
+  }
+  const valid = deliveryFixture();
+  const api = load({ portfolioGalleryAccess: { findFirst: async () => valid.access } });
+  assert.equal(await api.authorizeGalleryOriginal({ ...request, mediaAssetId: "asset-a" }), true);
+  assert.equal(await api.authorizeGalleryOriginal({ ...request, mediaAssetId: "wrong-asset" }), false);
+  assert.equal(await api.authorizeGalleryOriginal({ ...request, itemId: "foreign-photo" }), false);
+  const delivery = await api.getClientSessionDelivery("token-a");
+  assert.equal(delivery.photos.length, 1); assert.match(delivery.photos[0].download, /variant=DOWNLOAD&download=1/);
+  const changes = [
+    (f: any) => { f.gallery.booking.status = "CANCELED"; },
+    (f: any) => { f.gallery.booking.clientId = "other-client"; },
+    (f: any) => { f.gallery.booking.siteId = "other-site"; },
+    (f: any) => { f.gallery.bookingId = null; },
+    (f: any) => { f.gallery.packageProductId = "paid-package"; },
+    (f: any) => { f.gallery.proofingEnabled = true; },
+    (f: any) => { f.access.clientId = "other-client"; },
+    (f: any) => { f.gallery.downloadEnabled = false; }
+  ];
+  for (const change of changes) {
+    const f = deliveryFixture(); change(f);
+    const blocked = load({ portfolioGalleryAccess: { findFirst: async () => f.access } });
+    assert.equal(await blocked.authorizeGalleryOriginal(request), false);
+    assert.equal(await blocked.getClientSessionDelivery("token-a"), null);
+  }
+  for (const change of [(f: any) => { f.asset.isPrivate = false; }, (f: any) => { f.asset.deletedAt = new Date(); }, (f: any) => { f.asset.siteId = "foreign-site"; }]) {
+    const f = deliveryFixture(); change(f);
+    const blocked = load({ portfolioGalleryAccess: { findFirst: async () => f.access } });
+    assert.equal(await blocked.authorizeGalleryOriginal(request), false);
+    assert.equal((await blocked.getClientSessionDelivery("token-a")).photos.length, 0);
+  }
+  const revoked = load({ portfolioGalleryAccess: { findFirst: async () => null } });
+  assert.equal(await revoked.authorizeGalleryOriginal(request), false);
+  assert.equal(await revoked.getClientSessionDelivery("token-a"), null);
+});
+
+
+test("session proof pricing follows the selected user-created add-on and detects price changes", async () => {
+  const f = fixture();
+  Object.assign(f.gallery, { packageProductId: null, purchasedOrder: null, purchasedOrderId: null, packageProduct: null, purchase: null,
+    extraPhotoAddOnId: "user-addon", bookingId: "booking-a", booking: { siteId: "site-a", clientId: "client-a", status: "CONFIRMED" },
+    extraPhotoAddOn: { id: "user-addon", siteId: "site-a", name: "My own label", deliverables: { finalPhotos: 1 }, pricingType: "PER_UNIT", priceCents: 1350, commerceProductId: "digital-product", commerceProduct: { siteId: "site-a", currency: "USD", type: "DIGITAL", status: "ACTIVE" } } });
+  const db = { portfolioGalleryAccess: { findFirst: async () => f.access } };
+  const api = load(db);
+  const first = await api.getProofSelection("token-a");
+  assert.equal(first.extraImagePriceCents, 1350);
+  (f.gallery as any).extraPhotoAddOn.priceCents = 2250;
+  const next = await api.getProofSelection("token-a");
+  assert.equal(next.extraImagePriceCents, 2250);
+  assert.notEqual(first.termsVersion, next.termsVersion);
+  assert.equal(await api.authorizeGalleryOriginal(request), false, "No unfinalized originals leak through the old direct delivery path");
+  (f.gallery as any).extraPhotoAddOn.siteId = "other-site";
+  assert.equal(await api.getProofSelection("token-a"), null);
+});

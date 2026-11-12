@@ -4,6 +4,8 @@ import { formatMoney } from "../format";
 import { sessionPrice } from "./session-input";
 
 export const pricingTypeSchema = z.enum(["FLAT_RATE", "HOURLY"]);
+export const packagePricingTypeSchema = z.enum(["FLAT_RATE", "HOURLY", "TIME_FRAME"]);
+export type PackagePricingType = z.infer<typeof packagePricingTypeSchema>;
 export const addOnPricingTypeSchema = z.enum(["FLAT_RATE", "HOURLY", "PER_UNIT"]);
 export type AddOnPricingType = z.infer<typeof addOnPricingTypeSchema>;
 export type PricingType = z.infer<typeof pricingTypeSchema>;
@@ -16,7 +18,7 @@ export const hourlyRateInputSchema = z.object({
 
 export function hourlyPriceCents(amountCents: number, durationMinutes: number) {
   const total = Math.round(amountCents * durationMinutes / 60);
-  if (!Number.isInteger(amountCents) || amountCents < 0 || !Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440 || total > 999999999) {
+  if (!Number.isInteger(amountCents) || amountCents < 0 || !Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 2880 || total > 999999999) {
     throw new Error("The hourly rate and duration must produce a price of $9,999,999.99 or less.");
   }
   return total;

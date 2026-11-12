@@ -31,6 +31,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
   const notify = useNotify();
   const [view, setView] = useState<"library" | "edit">(editingItem ? "edit" : "library");
   const [form, setForm] = useState({ id: editingItem?.libraryItemId, name: editingItem?.name || "", description: editingItem?.description || "", category: editingItem?.category || "", tags: editingItem?.tags?.join(", ") || "", pricingType: (editingItem?.pricingType ?? "FLAT_RATE") as AddOnPricingType, hourlyRateId: editingItem?.hourlyRateId ?? "", price: editingItem?.priceCents == null ? "" : (editingItem.priceCents / 100).toFixed(2) });
+  const [deliverableChanges, setDeliverableChanges] = useState(editingItem?.deliverables || {});
   const [availableAsAddOn, setAvailableAsAddOn] = useState(isServiceAddOn(editingItem ?? {}));
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
@@ -77,7 +78,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
   }
 
   async function save() {
-    const parsed = serviceLibraryInputSchema.safeParse({ ...form, availableAsAddOn });
+    const parsed = serviceLibraryInputSchema.safeParse({ ...form, deliverables: deliverableChanges, availableAsAddOn });
     if (!parsed.success) {
       setError(parsed.error.issues[0].message);
       document.getElementById(`${id}-${String(parsed.error.issues[0].path[0])}`)?.focus();
@@ -87,7 +88,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
     setSaving(true);
     setError("");
     try {
-      const result = await saveServiceLibraryItemAction({ ...form, availableAsAddOn });
+      const result = await saveServiceLibraryItemAction({ ...form, deliverables: deliverableChanges, availableAsAddOn });
       if (result.error) { notify(result.error, "danger"); return; }
       if (result.item) {
         const selection = [...picked.filter(item => item.id !== result.item.id), result.item];
@@ -168,6 +169,11 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
           <ServicePricingFields allowPerUnit pricingType={form.pricingType} hourlyRateId={form.hourlyRateId} rates={rates} onRateSaved={onRateSaved} onChange={(pricingType, hourlyRateId) => setForm({ ...form, pricingType, hourlyRateId })}
             priceField={<Field label={form.pricingType === "PER_UNIT" ? "Price per unit (USD)" : "Add-on price (USD)"}><Input id={`${id}-price`} required type="number" min="0" max="9999999.99" step="0.01" inputMode="decimal" value={form.price} disabled={saving} onChange={event => setForm({ ...form, price: event.target.value })} /></Field>} />
         </div>}
+        <details>
+          <summary>Adds to the session</summary>
+          <p className={styles.hint}>Add these amounts when this service is included or selected. Per-unit add-ons multiply them by the chosen quantity.</p>
+          {([ ["finalPhotos", "Additional photos"], ["locations", "Additional locations"], ["outfitChanges", "Additional outfit changes"] ] as const).map(([key, label]) => <Field key={key} label={label}><Input type="number" min={0} max={10000} step={1} disabled={saving} value={deliverableChanges[key] ?? ""} onChange={event => setDeliverableChanges({ ...deliverableChanges, [key]: event.target.value === "" ? undefined : Number(event.target.value) })} /></Field>)}
+        </details>
         <Field label="Category" hint="For example, Weddings or Portraits."><Input id={`${id}-category`} value={form.category} maxLength={120} disabled={saving} onChange={event => setForm({ ...form, category: event.target.value })} /></Field>
         <Field label="Tags" hint="Separate tags with commas."><Input id={`${id}-tags`} value={form.tags} maxLength={1500} disabled={saving} onChange={event => setForm({ ...form, tags: event.target.value })} /></Field>
         {error && <p id={`${id}-error`} tabIndex={-1} role="alert" className={styles.error}>{error}</p>}

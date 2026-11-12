@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   ]);
   const folders = [...new Set([...savedFolders.map(row => row.name), ...folderGroups.map(row => row.folder).filter((name): name is string => Boolean(name))])].sort((a, b) => a.localeCompare(b));
   const clauses: Prisma.MediaAssetWhereInput[] = [baseWhere];
-  if (folder) clauses.push({ folder });
+  if (folder || (scope === "all" && !tag && !query)) clauses.push({ folder });
 
   if (scope === "recent") {
     clauses.push({ createdAt: { gte: new Date(Date.now() - recentWindowDays * 24 * 60 * 60 * 1000) } });

@@ -41,10 +41,10 @@ export function ClientRowActions({ alternateEmails, alternatePhones, detailHref,
           type="button"
           variant="secondary"
         >
-          <Mail size={15} /><span className="clients-action-label">Contact</span>
+          <Mail aria-hidden="true" size={15} />
         </Button>
         <ButtonLink aria-label={`Open ${name}`} className="clients-action-icon" href={detailHref} size="sm" title="Open client" variant="secondary">
-          <Eye size={15} /><span className="clients-action-label">Open</span>
+          <Eye aria-hidden="true" size={15} />
         </ButtonLink>
       </div>
 
