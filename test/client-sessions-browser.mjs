@@ -30,8 +30,8 @@ export let workspace={clientName:'Abe',clientEmail:'abe@example.test',canSendEma
 window.calls=[];window.libraryCalls=[];window.fixtureWorkspace=workspace;
 export async function getClientGalleryWorkspace(){return structuredClone({...workspace,galleries:[...workspace.galleries,{id:"other-gallery",bookingId:"other-booking",title:"Another session",photoCount:0,imageStatus:"Ready"}]})}
 export async function createClientGalleryAction(input){window.calls.push({type:'create',input}); const id=input.requestId; workspace.galleries.push({id,bookingId:input.bookingId,title:input.title,description:input.description,sessionDate:input.sessionDate,photoCount:0,imageStatus:'Ready',packageName:'Session photos',selectionAllowance:null,extraPhotoPriceCents:null,selectionCurrency:null,accessPath:'/proofs/session-token'});return {ok:true,data:{galleryId:id}}}
-export async function uploadClientGalleryPhotoAction(form){window.calls.push({type:'upload',galleryId:form.get('galleryId'),name:form.get('file').name});const gallery=workspace.galleries.find(g=>g.id===form.get('galleryId'));gallery.imageStatus='Images processing';await new Promise(resolve=>setTimeout(resolve,window.uploadDelay||200));gallery.photoCount++;gallery.imageStatus='Ready';return {ok:true,data:{assetId:'asset-a',added:1}}}
-export async function browseClientGalleryMediaAction(input){if(window.browseDelay)await new Promise(resolve=>setTimeout(resolve,window.browseDelay));const assets=input.mode==='gallery' ? (window.multiplePages ? (input.page===2 ? ['last.jpg'] : ['one.jpg','two.jpg',...Array.from({length:22},(_,i)=>'photo-'+i+'.jpg')]) : ['one.jpg','two.jpg']).filter(name=>!input.query||name.includes(input.query)).map((filename,index)=>({id:'asset-'+index,filename,alt:filename,folder:'Clients/Abe/Wedding',thumbnailUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',previewUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',downloadUrl:'/download-image',alreadyAdded:true})) : [];return {ok:true,data:{assets,folders:input.mode==='library'?['Clients/Abe/Wedding']:[],total:window.multiplePages?25:assets.length,page:input.page,pageCount:window.multiplePages?2:1}}}
+export async function uploadClientGalleryPhotoAction(form){window.calls.push({type:'upload',galleryId:form.get('galleryId'),name:form.get('file').name});const gallery=workspace.galleries.find(g=>g.id===form.get('galleryId'));gallery.imageStatus='Images processing';await new Promise(resolve=>setTimeout(resolve,window.uploadDelay||200));if(window.failUpload){gallery.imageStatus='Ready';return {ok:false,error:'Upload failed before saving'}}gallery.photoCount++;gallery.imageStatus='Ready';return {ok:true,data:{assetId:'asset-a',added:1}}}
+export async function browseClientGalleryMediaAction(input){if(window.failPreviewPage && input.page===2)return {ok:false,error:'Page temporarily unavailable'};if(window.browseDelay)await new Promise(resolve=>setTimeout(resolve,window.browseDelay));const assets=input.mode==='gallery' ? (window.multiplePages ? (input.page===2 ? ['last.jpg'] : ['one.jpg','two.jpg',...Array.from({length:22},(_,i)=>'photo-'+i+'.jpg')]) : ['one.jpg','two.jpg']).filter(name=>!input.query||name.includes(input.query)).map((filename,index)=>({id:'asset-'+index,filename,alt:filename,folder:'Clients/Abe/Wedding',thumbnailUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',previewUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',downloadUrl:'/download-image',alreadyAdded:true})) : [];return {ok:true,data:{assets,folders:input.mode==='library'?['Clients/Abe/Wedding']:[],total:window.multiplePages?25:assets.length,page:input.page,pageCount:window.multiplePages?2:1}}}
 export async function addClientGalleryMediaAction(){return {ok:true,data:{added:0}}}
 export async function configureClientGalleryProofingAction(){return {ok:true,data:{galleryId:"gallery"}}}
 export async function sendClientGalleryEmailAction(input){window.calls.push({type:'email',input});return {ok:true,data:{recipientEmail:'abe@example.test'}}}
@@ -119,6 +119,13 @@ try {
   await page.getByRole('button', {name:'Search session photos',exact:true}).click();
   await page.getByRole('button', {name:'View one.jpg',exact:true}).waitFor();
   await page.getByRole('button', {name:'View photo-21.jpg',exact:true}).click();
+  await page.evaluate(()=>window.failPreviewPage=true);
+  await preview.getByRole('button', {name:'Next photo'}).click();
+  await preview.getByRole('alert').filter({hasText:'Page temporarily unavailable'}).waitFor();
+  await preview.getByRole('button', {name:'Previous photo'}).click();
+  await preview.getByRole('img', {name:'photo-21.jpg',exact:true}).waitFor();
+  assert.equal(await preview.getByRole('alert').count(),0,'Cached-page navigation clears the previous page error');
+  await page.evaluate(()=>window.failPreviewPage=false);
   await preview.getByRole('button', {name:'Next photo'}).click();
   await preview.getByRole('img', {name:'last.jpg',exact:true}).waitFor();
   await preview.getByText('25 / 25', {exact:true}).waitFor();
@@ -207,6 +214,24 @@ try {
   await page.getByRole('button',{name:'View one.jpg',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Send to client',exact:true}).isEnabled(),true,'Send enables only after processing finishes');
 
+  await page.evaluate(()=>window.failUpload=true);
+  await page.getByRole('button',{name:'Upload photos',exact:true}).click();
+  const failedUpload=page.getByRole('dialog',{name:'Upload photos: '+longTitle,exact:true});
+  await failedUpload.getByLabel('Photos',{exact:true}).setInputFiles({name:'failed.jpg',mimeType:'image/jpeg',buffer:Buffer.from('failed')});
+  await failedUpload.getByRole('button',{name:'Save photos',exact:true}).click();
+  await page.getByText('Upload failed before saving',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Send to client',exact:true}).isEnabled(),false,'Failed batch does not allow sending an apparently Ready gallery');
+  await page.getByRole('button',{name:'Clear file list',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'Send to client',exact:true}).isEnabled(),true);
+  await page.evaluate(()=>{window.fixtureWorkspace.galleries=[];window.fixtureWorkspace.canUpload=false;});
+  await page.getByRole('link',{name:'Back',exact:true}).click();
+  await table.getByRole('link',{name:'Upload photos to Wedding',exact:true}).click();
+  const mediaCreate=page.getByRole('dialog',{name:'Upload session photos',exact:true});
+  await mediaCreate.getByLabel('Photo source',{exact:true}).selectOption('media');
+  assert.equal(await mediaCreate.locator('input[type=file]').count(),0);
+  await mediaCreate.getByRole('button',{name:'Choose photos',exact:true}).click();
+  await page.getByRole('dialog',{name:'Choose private photos from Media',exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.type==='create').length),2,'Existing Media can initialize a gallery without uploading');
   assert.deepEqual(errors, []);
   console.log('Passed: session modal, editable default date, description, sequential uploads tied to saved session, table browsing, private client link, desktop/mobile layouts.');
 } finally { await browser.close(); }

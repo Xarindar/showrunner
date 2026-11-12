@@ -15,7 +15,7 @@ import {
   addClientGalleryMediaAction, browseClientGalleryMediaAction, createClientGalleryAction, createClientGalleryLinkAction, configureClientGalleryProofingAction,
   getClientGalleryWorkspace, sendClientGalleryEmailAction, uploadClientGalleryPhotoAction
 } from "@/modules/portfolio/client-actions";
-import { clientGalleryBatchError, clientGalleryPageSize, clientGalleryImageTypes, clientGalleryUploadMaxBytes, type ClientGalleryPhotoPage, type ClientGalleryWorkspace } from "@/modules/portfolio/client-gallery-validation";
+import { clientGalleryLocalImageStatus, clientGalleryBatchError, clientGalleryPageSize, clientGalleryImageTypes, clientGalleryUploadMaxBytes, type ClientGalleryPhotoPage, type ClientGalleryWorkspace } from "@/modules/portfolio/client-gallery-validation";
 import styles from "./client-galleries.module.css";
 import { ServiceLibraryPicker } from "@/modules/scheduling/components/service-library-picker";
 import type { ServiceLibraryItem } from "@/lib/scheduling/service-library";
@@ -36,6 +36,7 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
   const [workspace, setWorkspace] = useState(initialWorkspace);
   const [galleryId, setGalleryId] = useState(initialGalleryId);
   const [creating, setCreating] = useState(openUpload);
+  const [photoSource, setPhotoSource] = useState<"upload" | "media">("upload");
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [bookingId, setBookingId] = useState(initialBookingId);
   const [uploadTargetId, setUploadTargetId] = useState(openUpload ? initialGalleryId : "");
@@ -78,7 +79,7 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
   const uploadTarget = workspace.galleries.find(item => item.id === uploadTargetId);
   const gallery = workspace.galleries.find((item) => item.id === galleryId);
   const sessionTitle = gallery?.title || workspace.sessions.find(session => session.id === initialBookingId)?.name || "Session";
-  const imageStatus = uploading ? "Images processing" : gallery?.imageStatus || "Awaiting photos";
+  const imageStatus = clientGalleryLocalImageStatus(gallery?.imageStatus, uploading, uploads);
   const processingImages = imageStatus === "Images processing";
   const finishedUploads = uploads.filter(row => row.status === "done" || row.status === "failed").length;
   const showGallerySkeleton = !pickerOpen && (photosLoading || processingImages);
@@ -140,6 +141,7 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
 
   function resetBrowse() { setFolder(""); setSearchDraft(""); setQuery(""); setPage(1); setSelected([]); }
   function openCreate(sessionId: string, targetGalleryId = "") {
+    setPhotoSource("upload");
     setUploadTargetId(targetGalleryId);
     if (targetGalleryId) setGalleryId(targetGalleryId);
     setUploads([]); setBookingId(sessionId); setRequestId(crypto.randomUUID()); setPackageKey(""); setAllowance(""); setExtraPrice(""); setCurrency("");
@@ -174,7 +176,8 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
       });
       if (!result.ok) { notify(result.error, "danger"); return; }
       await reload(); setGalleryId(result.data.galleryId); resetBrowse(); setCreating(false);
-      await uploadBatch(result.data.galleryId);
+      if (photoSource === "media") setPickerOpen(true);
+      else await uploadBatch(result.data.galleryId);
     } catch { notify("The gallery could not be created. Check your connection and try again.", "danger"); }
     finally { setBusy(false); }
   }
@@ -284,11 +287,12 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
   }, [previewIndex, previewPhotos.total]);
 
   useEffect(() => {
-    if (previewIndex === null || previewPhotos.page === previewPage) return;
+    if (previewIndex === null) return;
     let current = true;
     Promise.resolve().then(() => {
       if (!current) return;
       setPreviewError("");
+      if (previewPhotos.page === previewPage) return;
       return browseClientGalleryMediaAction({ clientId, galleryId, query, page: previewPage, folder: "", mode: "gallery" });
     }).then(result => {
       if (!current || !result) return;
@@ -394,12 +398,13 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
             </div> : null}
             </> : null}
             {uploadTarget && workspace.canManageMedia ? <Button disabled={busy} onClick={() => { setCreating(false); resetBrowse(); setPickerOpen(true); }} size="sm" type="button" variant="secondary"><ImagePlus aria-hidden="true" size={16} />Choose from Media</Button> : null}
-            <label className={styles.field}><span>Photos</span><input accept={clientGalleryImageTypes.join(",")} disabled={busy} multiple onChange={selectUploads} ref={uploadInput} required type="file" /></label>
+            {!uploadTarget && workspace.canManageMedia ? <label className={styles.field}><span>Photo source</span><select disabled={busy} value={photoSource} onChange={event => { setPhotoSource(event.target.value as "upload" | "media"); setUploads([]); }}><option value="upload">Upload new photos</option><option value="media">Choose from Media</option></select></label> : null}
+            {photoSource === "upload" ? <><label className={styles.field}><span>Photos</span><input accept={clientGalleryImageTypes.join(",")} disabled={busy} multiple onChange={selectUploads} ref={uploadInput} required type="file" /></label>
             {uploads.filter(row => row.error).map((row, index) => <p className="error" key={index} role="alert">{row.file.name}: {row.error}</p>)}
             {!workspace.canUpload ? <p className="error" role="alert">Private photo uploads are unavailable. Contact support to enable them.</p> : null}
-            <p className={styles.help}>Up to 100 JPG, PNG, WebP, or GIF photos; 25 MiB per photo and 250 MiB per batch. Originals stay private in Media.</p>
+            <p className={styles.help}>Up to 100 JPG, PNG, WebP, or GIF photos; 25 MiB per photo and 250 MiB per batch. Originals stay private in Media.</p></> : <p className={styles.help}>Save this session gallery, then choose existing private photos from Media.</p>}
           </>}
-          <footer className="module-modal-actions"><Button disabled={busy} onClick={() => setCreating(false)} type="button" variant="secondary">Cancel</Button><Button disabled={busy || (!bookingId && !uploadTargetId) || !workspace.canUpload || !uploads.some(row => row.status === "ready")} type="submit">{busy ? "Saving…" : "Save photos"}</Button></footer>
+          <footer className="module-modal-actions"><Button disabled={busy} onClick={() => setCreating(false)} type="button" variant="secondary">Cancel</Button><Button disabled={busy || (!bookingId && !uploadTargetId) || (photoSource === "media" ? !workspace.canManageMedia : !workspace.canUpload || !uploads.some(row => row.status === "ready"))} type="submit">{busy ? "Saving…" : photoSource === "media" ? "Choose photos" : "Save photos"}</Button></footer>
         </form>
       </Modal>
 
