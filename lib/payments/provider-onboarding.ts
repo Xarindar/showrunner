@@ -2,6 +2,7 @@ import "server-only";
 
 import { PaymentGatewayConnectionStatus, PaymentProvider, Prisma } from "@prisma/client";
 import Stripe from "stripe";
+import { provisionStripeWebhook } from "./stripe-webhook-setup";
 import { publicAppBaseUrl } from "@/lib/env";
 import { revokeStripeOAuthProvider } from "@/lib/payments/connect/broker-client";
 import { decryptGatewaySecret, encryptGatewaySecret, getConnectedGatewayCredential, upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
@@ -42,48 +43,66 @@ export function paypalApiBaseUrl(environment: PayPalEnvironment) {
 // Stripe
 // ---------------------------------------------------------------------------
 
-export async function saveStripeCredentials(input: { apiKey: string; siteId: string; webhookSecret: string }) {
+export async function saveStripeCredentials(input: { apiKey: string; siteId: string; webhookSecret?: string; useForCheckout?: boolean }) {
   const apiKey = requireValue(input.apiKey, "Paste your Stripe secret key (starts with sk_ or rk_).");
   if (!/^(sk|rk)_(test|live)_/.test(apiKey)) {
     throw new Error("That does not look like a Stripe secret key. It should start with sk_live_, sk_test_, rk_live_, or rk_test_.");
   }
-  const webhookSecret = requireValue(input.webhookSecret, "Paste your Stripe webhook signing secret (starts with whsec_).");
-  if (!webhookSecret.startsWith("whsec_")) {
+  let webhookSecret = (input.webhookSecret || "").trim();
+  if (webhookSecret && !webhookSecret.startsWith("whsec_")) {
     throw new Error("That does not look like a Stripe webhook signing secret. It should start with whsec_.");
   }
 
+  encryptGatewaySecret(apiKey); // Check deployment encryption before creating anything at the provider.
+  const stripe = new Stripe(apiKey, { maxNetworkRetries: 2, timeout: 10_000 });
   let account: Stripe.Account;
   try {
-    account = await new Stripe(apiKey).accounts.retrieveCurrent();
+    account = await stripe.accounts.retrieveCurrent();
   } catch (error) {
     const message = error instanceof Stripe.errors.StripeError ? error.message : "Stripe rejected that secret key.";
     throw new Error(`Stripe could not verify that secret key: ${message}`);
   }
 
-  if (!account.charges_enabled) {
+  const livemode = apiKey.includes("_live_");
+  if (livemode && !account.charges_enabled) {
     throw new Error("This Stripe account cannot accept charges yet. Finish Stripe's account activation, then save again.");
   }
 
   const displayName = account.business_profile?.name || account.settings?.dashboard?.display_name || account.email || account.id;
-  const livemode = apiKey.includes("_live_");
 
-  await upsertConnectedGatewayCredential({
-    displayName,
-    encryptedMetadata: {
-      chargesEnabled: account.charges_enabled,
-      country: account.country || "",
-      defaultCurrency: account.default_currency || "",
-      keyMode: livemode ? "live" : "test",
-      onboarding: "stripe_api_key"
-    } satisfies Prisma.InputJsonObject,
-    externalAccountId: account.id,
-    provider: PaymentProvider.STRIPE,
-    secretKey: apiKey,
-    siteId: input.siteId,
-    supportedWallets: stripeWallets,
-    webhookSecret,
-    webhookSecretHint: secretHint(webhookSecret)
-  });
+  const previous = await getConnectedGatewayCredential(input.siteId, PaymentProvider.STRIPE);
+  const metadata = metadataObject(previous?.metadata ?? {});
+  const reuse = metadata.onboarding === "stripe_api_key" && previous?.externalAccountId === account.id && metadata.keyMode === (livemode ? "live" : "test") &&
+    typeof metadata.webhookEndpointId === "string" && previous.encryptedWebhookSecret
+    ? { id: metadata.webhookEndpointId, secret: decryptGatewaySecret(previous.encryptedWebhookSecret) } : null;
+  const webhook = webhookSecret ? null : await provisionStripeWebhook(stripe, reuse);
+  webhookSecret = webhook?.secret || webhookSecret;
+  try {
+    await upsertConnectedGatewayCredential({
+      accessToken: "", refreshToken: "", expiresAt: null,
+      useForCheckout: input.useForCheckout,
+      displayName,
+      encryptedMetadata: {
+        ...(previous?.externalAccountId === account.id && metadata.keyMode === (livemode ? "live" : "test") && metadata.paymentMethods ? { paymentMethods: metadata.paymentMethods } : {}),
+        chargesEnabled: account.charges_enabled,
+        country: account.country || "",
+        defaultCurrency: account.default_currency || "",
+        keyMode: livemode ? "live" : "test",
+        onboarding: "stripe_api_key",
+        webhookEndpointId: webhook?.id || ""
+      } satisfies Prisma.InputJsonObject,
+      externalAccountId: account.id,
+      provider: PaymentProvider.STRIPE,
+      secretKey: apiKey,
+      siteId: input.siteId,
+      supportedWallets: stripeWallets,
+      webhookSecret,
+      webhookSecretHint: secretHint(webhookSecret)
+    });
+  } catch (error) {
+    if (webhook?.created) await stripe.webhookEndpoints.del(webhook.id).catch(() => undefined);
+    throw error;
+  }
 
   return { displayName, livemode };
 }
@@ -125,20 +144,23 @@ export async function saveSquareCredentials(input: {
   environment: SquareEnvironment;
   locationId?: string;
   siteId: string;
-  webhookSignatureKey: string;
+  webhookSignatureKey?: string;
+  useForCheckout?: boolean;
 }) {
   const accessToken = requireValue(input.accessToken, "Paste your Square access token.");
-  const webhookSignatureKey = requireValue(input.webhookSignatureKey, "Paste your Square webhook signature key.");
+  const webhookSignatureKey = (input.webhookSignatureKey || "").trim();
   const environment: SquareEnvironment = input.environment === "sandbox" ? "sandbox" : "production";
 
   const locations = await squareVerify(environment, accessToken);
   const usable = locations.filter((location) => location.id && location.status !== "INACTIVE");
   const requestedLocationId = (input.locationId || "").trim();
-  const location =
-    (requestedLocationId ? usable.find((item) => item.id === requestedLocationId) : undefined) || usable[0] || locations.find((item) => item.id);
-  if (!location?.id) throw new Error("Square did not return an active location for that access token.");
+  const location = requestedLocationId ? usable.find((item) => item.id === requestedLocationId) : usable.length === 1 ? usable[0] : undefined;
+  if (!location?.id) throw new Error(requestedLocationId ? "That Square location is not active on this account." : "Choose an active Square location before connecting.");
+  if (!location.merchant_id) throw new Error("Square did not return a merchant for this location. Check the account and try again.");
 
   await upsertConnectedGatewayCredential({
+    refreshToken: "", secretKey: "", expiresAt: null,
+    useForCheckout: input.useForCheckout,
     displayName: location.name || location.merchant_id || "Square",
     encryptedMetadata: {
       environment,
@@ -199,6 +221,7 @@ async function paypalVerify(environment: PayPalEnvironment, clientId: string, cl
   if (!response.ok || !body.access_token) {
     throw new Error(body.error_description || "PayPal rejected that client ID / secret pair.");
   }
+  return body.access_token;
 }
 
 export async function savePayPalCredentials(input: {
@@ -206,32 +229,68 @@ export async function savePayPalCredentials(input: {
   clientSecret: string;
   environment: PayPalEnvironment;
   siteId: string;
-  webhookId: string;
+  webhookId?: string;
+  useForCheckout?: boolean;
 }) {
   const clientId = requireValue(input.clientId, "Paste your PayPal app client ID.");
   const clientSecret = requireValue(input.clientSecret, "Paste your PayPal app secret.");
-  const webhookId = requireValue(input.webhookId, "Paste your PayPal webhook ID so we can verify payment notifications.");
+  let webhookId = (input.webhookId || "").trim();
   const environment: PayPalEnvironment = input.environment === "live" ? "live" : "sandbox";
 
-  await paypalVerify(environment, clientId, clientSecret);
-
-  await upsertConnectedGatewayCredential({
-    displayName: `PayPal (${environment})`,
-    encryptedMetadata: {
-      environment,
-      onboarding: "paypal_rest_app",
-      webhookId
-    } satisfies Prisma.InputJsonObject,
-    externalAccountId: clientId,
-    merchantId: clientId,
-    provider: PaymentProvider.PAYPAL,
-    secretKey: clientSecret,
-    siteId: input.siteId,
-    supportedWallets: [],
-    webhookSecret: "",
-    webhookSecretHint: secretHint(webhookId)
-  });
-
+  encryptGatewaySecret(clientSecret);
+  const token = await paypalVerify(environment, clientId, clientSecret);
+  const url = `${publicAppBaseUrl().replace(/\/$/, "")}/api/webhooks/paypal`;
+  let created = false;
+  if (!webhookId) {
+    if (new URL(url).protocol !== "https:") throw new Error("PayPal needs a public HTTPS Showrunner address for payment updates. Configure the deployment address, then try again.");
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const listed = await fetch(`${paypalApiBaseUrl(environment)}/v1/notifications/webhooks`, { headers, signal: AbortSignal.timeout(10_000) });
+    if (!listed.ok) throw new Error("PayPal could not check payment notifications. Check this app's permissions and try again.");
+    const body = await listed.json() as { webhooks?: { id: string; url: string; event_types?: { name: string }[] }[] };
+    const events = ["CHECKOUT.ORDER.APPROVED", "PAYMENT.CAPTURE.COMPLETED", "PAYMENT.CAPTURE.DENIED", "PAYMENT.CAPTURE.REFUNDED"];
+    const existing = body.webhooks?.find((item) => item.url === url);
+    if (existing && events.every((name) => existing.event_types?.some((event) => event.name === name || event.name === "*"))) webhookId = existing.id;
+    else if (existing) {
+      const names = [...new Set([...(existing.event_types || []).map((event) => event.name), ...events])];
+      const response = await fetch(`${paypalApiBaseUrl(environment)}/v1/notifications/webhooks/${encodeURIComponent(existing.id)}`, { method: "PATCH", headers,
+        body: JSON.stringify([{ op: "replace", path: "/event_types", value: names.map((name) => ({ name })) }]), signal: AbortSignal.timeout(10_000) });
+      if (!response.ok) throw new Error("PayPal could not update payment notifications. Check this app's permissions and try again.");
+      webhookId = existing.id;
+    }
+    else {
+      const response = await fetch(`${paypalApiBaseUrl(environment)}/v1/notifications/webhooks`, { method: "POST", headers,
+        body: JSON.stringify({ url, event_types: events.map((name) => ({ name })) }), signal: AbortSignal.timeout(10_000) });
+      const webhook = await response.json() as { id?: string };
+      if (!response.ok || !webhook.id) throw new Error("PayPal could not create payment notifications. Check this app's permissions and try again.");
+      webhookId = webhook.id;
+      created = true;
+    }
+  }
+  try {
+    await upsertConnectedGatewayCredential({
+      accessToken: "", refreshToken: "", expiresAt: null,
+      useForCheckout: input.useForCheckout,
+      displayName: `PayPal (${environment})`,
+      encryptedMetadata: {
+        environment,
+        onboarding: "paypal_rest_app",
+        webhookId
+      } satisfies Prisma.InputJsonObject,
+      externalAccountId: clientId,
+      merchantId: clientId,
+      provider: PaymentProvider.PAYPAL,
+      secretKey: clientSecret,
+      siteId: input.siteId,
+      supportedWallets: [],
+      webhookSecret: "",
+      webhookSecretHint: secretHint(webhookId)
+    });
+  } catch (error) {
+    if (created) await fetch(`${paypalApiBaseUrl(environment)}/v1/notifications/webhooks/${encodeURIComponent(webhookId)}`, {
+      method: "DELETE", headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000)
+    }).catch(() => undefined);
+    throw error;
+  }
   return { environment };
 }
 
@@ -312,7 +371,7 @@ export async function reverifyPaymentProvider(input: { provider: PaymentProvider
         : (credential.encryptedSecretKey ? decryptGatewaySecret(credential.encryptedSecretKey) : "");
       if (!apiKey) throw new Error("No stored Stripe secret key to re-check.");
       const account = await new Stripe(apiKey).accounts.retrieveCurrent();
-      if (!account.charges_enabled) throw new Error("Stripe account can no longer accept charges.");
+      if (!account.charges_enabled && (metadata.keyMode === "live" || apiKey.includes("_live_"))) throw new Error("Stripe account can no longer accept charges.");
     } else if (input.provider === PaymentProvider.SQUARE) {
       const accessToken = credential.encryptedAccessToken ? decryptGatewaySecret(credential.encryptedAccessToken) : "";
       if (!accessToken) throw new Error("No stored Square access token to re-check.");

@@ -381,7 +381,7 @@ export function ManageProviderModal({
       {provider === "STRIPE" && webhookMissing ? (
         <p className="error ui-zero">
           Stripe is connected, but the payment webhook could not be created automatically, so payment
-          updates will not arrive. Click &quot;Reconnect with Stripe&quot; to retry the webhook setup.
+          updates will not arrive. Choose &quot;Replace connection&quot; to repair payment notifications.
         </p>
       ) : null}
 
@@ -413,7 +413,7 @@ export function ManageProviderModal({
         {onReplace ? (
           <Button onClick={onReplace} type="button" variant="secondary">
             <KeyRound size={16} />
-            {oauthReconnectHref ? "Paste keys instead" : "Replace credentials"}
+            Replace connection
           </Button>
         ) : null}
         <form action={recheckAction}>

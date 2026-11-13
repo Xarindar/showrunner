@@ -111,3 +111,14 @@ test("maintenance leaves a seller locked by another replica alone, then refreshe
   await h.maintain();
   assert.equal(h.requests.length, 3, "a recent successful scan suppresses the other replica's tick");
 });
+
+test("client-owned Square tokens reconcile payments without OAuth renewal or a shared app", async () => {
+  const h = harness();
+  h.credential.metadata.onboarding = "square_access_token";
+  h.credential.metadata.tokenFlow = "";
+  const result = await h.maintain();
+  assert.equal(result.checked, 1);
+  assert.equal(result.failures.length, 0);
+  assert.equal(h.refreshed, 0);
+  assert.equal(h.events.length, 2);
+});

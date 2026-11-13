@@ -77,7 +77,7 @@ type PaymentCredentialMetadata = Prisma.JsonObject & {
 };
 
 async function getStripeForSite(siteId: string) {
-  const apiKey = (await getStripeApiKeyForSite(siteId)) || process.env.STRIPE_SECRET_KEY || "";
+  const apiKey = await getStripeApiKeyForSite(siteId);
   if (!apiKey) throw new Error("Connect Stripe before verifying Stripe payment methods.");
   return new Stripe(apiKey);
 }

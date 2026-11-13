@@ -136,3 +136,7 @@ Appointment details shows the clickable client name in its first table row; the 
 Appointment internal notes and client notes use the same notes table with dated, expandable entries, Add note dialogs and confirmed removal. Appointment notes remain booking-scoped and staff-only. Existing appointment admin notes migrate into dated entries without changing their original text.
 
 Appointment location editing offers debounced Photon/OpenStreetMap address suggestions, permits free-text locations when search is unavailable, and links the saved location to Google Maps. No IP geolocation is used.
+
+## Client-owned payment connection
+
+Payments uses a modal wizard for Stripe, Square and PayPal, with Next/Back, blank credential inputs, direct provider dashboard links and a final review. Clients use their own provider credentials; normal setup has no shared Showrunner OAuth app or Admit One Connect dependency. Stripe and PayPal payment notifications are registered automatically. Square loads active locations for explicit selection and automatically reconciles payment/refund updates. Optional checkout selection saves atomically with credentials. No setup charge is made. Manage allows owners to replace or disconnect the connection themselves. Existing OAuth connections remain compatible and are identified as using a shared app until replaced. See developer-docs/payments-setup.md.

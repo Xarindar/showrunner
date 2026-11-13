@@ -13,6 +13,7 @@ function harness(existing: boolean, failSave: boolean, squareLocations = [{ id: 
     accounts = { retrieveCurrent: async () => ({ charges_enabled: true, id: "acct_same" }) };
     webhookEndpoints = {
       retrieve: async () => ({ id: "old", url: "https://client.example/api/webhooks/stripe", status: "enabled" }),
+      update: async () => ({}),
       create: async () => { effects.push("create"); return { id: "new", secret: "whsec_new" }; },
       del: async (id: string) => { effects.push(`delete:${id}`); }
     };
@@ -37,11 +38,17 @@ function harness(existing: boolean, failSave: boolean, squareLocations = [{ id: 
     "./broker-client": { revokeStripeOAuthProvider: async () => { effects.push("revoke"); } },
     "./config": {}, "./square-refresh": { exchangeSquarePkceCode: async () => ({ accessToken: "square-access", refreshToken: "square-refresh", merchantId: "merchant", expiresAt: new Date(), refreshTokenExpiresAt: new Date() }) }, "./tokens": {}
   };
+  const webhookExports: any = {};
+  const realRequire = createRequire(import.meta.url);
+  const webhookSource = ts.transpileModule(readFileSync("lib/payments/stripe-webhook-setup.ts", "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true }
+  }).outputText;
+  runInNewContext(webhookSource, { exports: webhookExports, URL, require: (id: string) => id in mocks ? mocks[id] : realRequire(id) });
+  mocks["@/lib/payments/stripe-webhook-setup"] = webhookExports;
   const source = ts.transpileModule(readFileSync("lib/payments/connect/flow.ts", "utf8") + "\nexports.completeStripeHandoff = completeStripeHandoff; exports.completeSquareHandoff = completeSquareHandoff;", {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true }
   }).outputText;
   const exports: any = {};
-  const realRequire = createRequire(import.meta.url);
   runInNewContext(source, { exports, console, Date, Error, URL, Buffer, process, require: (id: string) => id in mocks ? mocks[id] : realRequire(id) });
   return { effects, run: () => exports.completeStripeHandoff("site", { accessToken: "test", stripeUserId: "acct_same", scope: "read_write", livemode: false }),
     square: () => exports.completeSquareHandoff("site", { authorizationCode: "code", clientId: "app", redirectUri: "https://connect.example/callback", squareVersion: "2026-05-20" }, "verifier") };
