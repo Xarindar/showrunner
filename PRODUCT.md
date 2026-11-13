@@ -29,6 +29,10 @@ The editor uses open-source Puck inside Showrunner's existing admin shell. Draft
 
 Header Button settings offer Left, Center, and Right alignment. Mobile edits use the existing overrides so desktop alignment stays independent. The Content overview uses a compact toolbar above its website preview.
 
+## Customer email connection
+
+Settings → Email keeps the page compact and opens setup in the shared modal. Neutral square provider tiles offer Gmail/Google Workspace, IONOS Mail, and Other SMTP, using checked-in transparent brand PNGs and existing admin tokens. Gmail asks whether 2-Step Verification is enabled: Yes opens app-password instructions, while No first guides enabling it. Owners must enter a non-blank app password before advancing, including when editing. IONOS supplies its secure SMTP settings automatically and asks only for the mailbox address/password. Back sits beside step progress; Yes/No and the next action sit in the footer, with the modal X for dismissal. Replies and test emails always use the configured sender address. Send test email checks delivery without changing the working connection; Done saves only after a recent successful test of the unchanged details. No Google OAuth email app, callback, central account, or Showrunner-operated broker is required. Non-marketing messages use the connected sender; marketing retains its existing setup. Saved secrets never return to the browser. See developer-docs/email-provider-setup.md.
+
 ## Stack
 Next.js App Router, React, TypeScript, Puck, Prisma and PostgreSQL. Websites consume Showrunner's public content API and the shared preview bridge. Existing hosting is Railway.
 

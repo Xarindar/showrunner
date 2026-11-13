@@ -275,6 +275,28 @@ model EmailRecipient {
   @@index([isActive])
 }
 
+enum EmailDeliveryProvider {
+  SMTP
+  CONNECTED
+}
+
+model EmailProviderConnection {
+  siteId                String   @id
+  site                  Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  kind                  String
+  fromName              String
+  fromEmail             String
+  replyToEmail          String
+  smtpHost              String   @default("")
+  smtpPort              Int      @default(587)
+  smtpUser              String   @default("")
+  encryptedSecret       String
+  connectionError       String   @default("")
+  verifiedAt            DateTime
+  revision              Int      @default(1)
+  updatedAt             DateTime @updatedAt
+}
+
 model EmailOutbox {
   id                String               @id @default(cuid())
   siteId            String
@@ -293,6 +315,7 @@ model EmailOutbox {
   recipientName     String               @default("")
   fromName          String
   fromEmail         String
+  deliveryProvider  EmailDeliveryProvider @default(SMTP)
   replyToEmail      String               @default("")
   subject           String
   previewText       String               @default("")

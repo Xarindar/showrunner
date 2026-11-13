@@ -1,0 +1,100 @@
+.form {
+  display: grid;
+  gap: var(--space-4);
+  max-width: var(--sd-layout-content-max);
+  min-width: 0;
+}
+
+.step {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.step:not([hidden]) {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.progress {
+  color: var(--color-muted);
+  font-size: var(--type-caption);
+  margin: 0;
+}
+
+.step p {
+  color: var(--color-muted);
+  max-width: 70ch;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.providers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.providers button.provider {
+  aspect-ratio: 1;
+  border-radius: var(--radius-control);
+  flex-direction: column;
+  justify-content: center;
+  justify-self: stretch;
+  gap: var(--space-3);
+  height: auto;
+  min-height: var(--sd-layout-touch-target);
+  padding: var(--space-4);
+  text-align: center;
+  white-space: normal;
+  width: 100%;
+}
+
+.providerIcon {
+  align-items: center;
+  display: inline-flex;
+  flex: none;
+  justify-content: center;
+}
+
+.providerIcon :is(img, svg) {
+  display: block;
+  height: var(--space-8);
+  width: var(--space-8);
+  object-fit: contain;
+}
+
+.providerIcon img.wordmark {
+  width: var(--space-11);
+}
+
+.stepHeader {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+}
+
+@media (max-width: 600px) {
+  .providers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.instructions {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding-inline-start: var(--space-5);
+}
+
+.error {
+  color: var(--color-danger);
+  margin: 0;
+}
+.dialog {
+  width: var(--sd-layout-dialog-width);
+}
+
