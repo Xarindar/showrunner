@@ -68,24 +68,24 @@ export default async function SchedulePage({ searchParams }: { searchParams?: Pr
     <AvailabilityPanel availability={availability} resources={resources} staff={[]} timezone={settings.timezone} />
     <BlockoutsPanel blockouts={blockouts} resources={resources} timezone={settings.timezone} />
     <section aria-label="Schedule settings" className={styles.settings}>
-      <details open={params.tab === "team"}>
-        <summary>Resources <span>{resources.length} resources</span></summary>
-        <div className={styles.section}>
+      <section className="studio-panel ui-section-card"><details open={params.tab === "team"}>
+        <summary className="ui-section-header">Resources</summary>
+        <div className="ui-section-body">
           <ResourcesPanel resources={resources} assignedResourceIds={assignedResourceIds} resourceIdsWithAvailability={resourceIdsWithAvailability} />
         </div>
-      </details>
-      <details open={params.tab === "calendar"}>
-        <summary>Calendar connections <span>Google Calendar & calendar feeds</span></summary>
-        <div className={styles.section}><CalendarFeedsPanel
+      </details></section>
+      <section className="studio-panel ui-section-card"><details open={params.tab === "calendar"}>
+        <summary className="ui-section-header">Calendar connections</summary>
+        <div className="ui-section-body"><CalendarFeedsPanel
           googleConnections={googleCalendarConnections.map(connection => ({ connection, staff: staff.find(member => member.id === connection.ownerId) || null }))}
           siteFeedUrl={absoluteCalendarUrl(baseUrl, icsCalendarAdapter.feedPath({ siteId: settings.siteId }))}
           staff={staff} staffFeedUrls={staff.map(member => ({ staff: member, url: absoluteCalendarUrl(baseUrl, icsCalendarAdapter.feedPath({ siteId: settings.siteId, staffId: member.id })) }))}
         /></div>
-      </details>
-      <details open={params.saved === "reminders" || Boolean(params.error && params.tab === "calendar")}>
-        <summary>Reminders <span>{(schedulingSettings?.bookingReminderEnabled ?? true) ? "On" : "Off"}</span></summary>
-        <div className={styles.section}><RemindersPanel enabled={schedulingSettings?.bookingReminderEnabled ?? true} leadMinutes={schedulingSettings?.bookingReminderLeadMinutes ?? 1440} /></div>
-      </details>
+      </details></section>
+      <section className="studio-panel ui-section-card"><details open={params.saved === "reminders" || Boolean(params.error && params.tab === "calendar")}>
+        <summary className="ui-section-header">Reminders</summary>
+        <div className="ui-section-body"><RemindersPanel enabled={schedulingSettings?.bookingReminderEnabled ?? true} leadMinutes={schedulingSettings?.bookingReminderLeadMinutes ?? 1440} /></div>
+      </details></section>
     </section>
     <SlotDiagnosticsPanel defaultOpen={Boolean(params.diagnosticServiceId)} diagnostics={diagnostics} resources={resources}
       selectedDate={selectedDiagnosticDate} selectedResourceId={selectedDiagnosticResourceId} selectedServiceId={selectedDiagnosticServiceId}

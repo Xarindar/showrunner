@@ -1,7 +1,7 @@
 import type { Resource } from "@prisma/client";
 import { Box, Save } from "lucide-react";
 import { createResourceAction, updateResourceAction } from "../actions";
-import { Button, Card, EqualGrid, Switch } from "@/components/ui";
+import { Button, EqualGrid, Switch } from "@/components/ui";
 
 type ResourcesPanelProps = {
   resources: Resource[];
@@ -12,8 +12,8 @@ type ResourcesPanelProps = {
 export function ResourcesPanel({ assignedResourceIds, resources, resourceIdsWithAvailability }: ResourcesPanelProps) {
   return (
     <EqualGrid as="section">
-      <Card action={createResourceAction} as="form" minHeight="none" bodyClassName="form-grid">
-        <h2 className="section-title">Add resource</h2>
+      <form action={createResourceAction} className="studio-panel ui-section-card">
+        <div className="ui-section-header"><h2>Add resource</h2></div><div className="ui-section-body form-grid">
         <EqualGrid>
           <div className="ui-field">
             <label htmlFor="resource-name">Name</label>
@@ -43,11 +43,12 @@ export function ResourcesPanel({ assignedResourceIds, resources, resourceIdsWith
           <Box size={18} />
           Add resource
         </Button>
-      </Card>
+        </div>
+      </form>
 
-      <Card>
-        <h2 className="section-title">Rooms and equipment</h2>
-        <div className="stack">
+      <section className="studio-panel ui-section-card">
+        <div className="ui-section-header"><h2>Rooms and equipment</h2></div>
+        <div className="ui-section-body stack">
           {resources.map((resource) => {
             const needsAvailability =
             resource.isActive && assignedResourceIds.has(resource.id) && !resourceIdsWithAvailability.has(resource.id);
@@ -102,7 +103,7 @@ export function ResourcesPanel({ assignedResourceIds, resources, resourceIdsWith
           })}
           {!resources.length ? <p className="empty-state">No rooms or equipment have been added.</p> : null}
         </div>
-      </Card>
+      </section>
     </EqualGrid>);
 
 }

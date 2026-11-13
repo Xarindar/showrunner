@@ -5,6 +5,7 @@ import { isRecord } from "@/lib/objects";
 import crypto from "node:crypto";
 import { PaymentGatewayConnectionStatus, PaymentProvider, type Prisma } from "@prisma/client";
 import Stripe from "stripe";
+import { provisionStripeWebhook } from "@/lib/payments/stripe-webhook-setup";
 import { publicAppBaseUrl } from "@/lib/env";
 import { decryptGatewaySecret, encryptGatewaySecret, upsertConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { secretHint, squareApiVersion, squareVerify, type SquareEnvironment } from "@/lib/payments/provider-onboarding";
@@ -32,15 +33,6 @@ const NONCE_COOKIE_TYPE = "admitone.nonce";
 const HANDOFF_TYPE = "admitone.handoff";
 
 const stripeWallets = ["APPLE_PAY", "GOOGLE_PAY", "CASH_APP_PAY"];
-
-// The same checkout lifecycle events the paste-keys wizard asks merchants to select manually.
-const stripeWebhookEvents: Stripe.WebhookEndpointCreateParams.EnabledEvent[] = [
-  "checkout.session.completed",
-  "checkout.session.async_payment_succeeded",
-  "checkout.session.expired",
-  "payment_intent.payment_failed",
-  "charge.refunded"
-];
 
 export function isOAuthConnectProvider(value: string): value is OAuthConnectProvider {
   return value === "stripe" || value === "square";
@@ -194,26 +186,6 @@ export async function completeConnectHandoff(input: {
 // that is the whole point of one-click connect.
 // ---------------------------------------------------------------------------
 
-async function provisionStripeWebhook(stripe: Stripe, previous: { id: string; secret: string } | null) {
-  const url = `${publicAppBaseUrl()}/api/webhooks/stripe`;
-  if (previous) {
-    try {
-      const endpoint = await stripe.webhookEndpoints.retrieve(previous.id);
-      if (endpoint.url === url && endpoint.status === "enabled") return { ...previous, created: false };
-    } catch (error) {
-      if (!(error instanceof Stripe.errors.StripeError) || error.statusCode !== 404) throw error;
-    }
-  }
-
-  const endpoint = await stripe.webhookEndpoints.create({
-    description: "Showrunner checkout events (created by one-click connect)",
-    enabled_events: stripeWebhookEvents,
-    url
-  });
-  if (!endpoint.secret) throw new Error("Stripe did not return a webhook signing secret.");
-  return { id: endpoint.id, secret: endpoint.secret, created: true };
-}
-
 async function completeStripeHandoff(siteId: string, data: Record<string, unknown>) {
   const accessToken = requireString(data, "accessToken");
   const stripeUserId = requireString(data, "stripeUserId");
@@ -252,7 +224,7 @@ async function completeStripeHandoff(siteId: string, data: Record<string, unknow
         onboarding: "oauth",
         scope,
         webhookAutoCreated: true,
-        webhookEndpointId
+        webhookEndpointId: webhook.id
       } satisfies Prisma.InputJsonObject,
       externalAccountId: stripeUserId,
       provider: PaymentProvider.STRIPE,

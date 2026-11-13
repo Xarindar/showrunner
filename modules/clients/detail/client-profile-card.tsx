@@ -4,15 +4,19 @@ import Image from "next/image";
 import { useMemo, useState, type ReactNode } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { MoreHorizontal } from "lucide-react";
 
 type ClientProfileCardProps = {
-  details: ReactNode;
+  actions: ReactNode;
+  initialActionsOpen?: boolean;
+  address: string;
+  company: string;
   editForm: ReactNode;
   email: string;
   name: string;
   phone: string;
   photoUrl: string;
-  pipeline: string;
+  permissions: ReactNode;
 };
 
 type ClientProfileSummaryItem = {
@@ -38,21 +42,24 @@ function phoneHref(value: string) {
 }
 
 export function ClientProfileCard({
-  details,
+  actions,
+  initialActionsOpen = false,
+  address,
+  company,
   editForm,
   email,
   name,
   phone,
   photoUrl,
-  pipeline
+  permissions
 }: ClientProfileCardProps) {
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(initialActionsOpen);
   const [editing, setEditing] = useState(false);
   const initials = useMemo(() => initialsFor(name, email), [email, name]);
   const summaryItems: ClientProfileSummaryItem[] = [
     phone ? { href: phoneHref(phone), label: "Phone", value: phone } : { label: "Phone", value: "No phone" },
     { href: `mailto:${email}`, label: "Email", value: email },
-    { label: "Pipeline", value: pipeline }
+    { label: "Address", value: address || "No address" }
   ];
 
   return (
@@ -67,6 +74,7 @@ export function ClientProfileCard({
           </div>
           <div className="clients-profile-card-copy">
             <h2>{name}</h2>
+            {company ? <span>{company}</span> : null}
           </div>
         </div>
       </div>
@@ -77,14 +85,15 @@ export function ClientProfileCard({
             <dd>{item.href ? <a href={item.href}>{item.value}</a> : item.value}</dd>
           </div>
         ))}
+        <div><dt>Permissions</dt><dd className="clients-profile-badge-list">{permissions}</dd></div>
       </dl>
-      <div className="clients-profile-footer"><Button aria-haspopup="dialog" onClick={() => setDetailsOpen(true)} size="sm" type="button" variant="secondary">Show details</Button></div>
+      <div className="clients-profile-footer"><Button aria-haspopup="dialog" onClick={() => setActionsOpen(true)} size="sm" type="button" variant="secondary"><MoreHorizontal aria-hidden="true" size={15} />More</Button></div>
       </div>
     </section>
-    <Modal open={detailsOpen} title={`${name} — Client details`} className="clients-modal" onClose={() => { setDetailsOpen(false); setEditing(false); }}>
+    <Modal open={actionsOpen} title={editing ? `Edit ${name}` : "Client actions"} className="clients-modal" onClose={() => { setActionsOpen(false); setEditing(false); }}>
       <div className="ui-stack">
-        {editing ? editForm : details}
-        <div className="module-modal-actions"><Button onClick={() => setEditing(current => !current)} size="sm" type="button" variant="secondary">{editing ? "View details" : "Edit profile"}</Button></div>
+        {editing ? editForm : actions}
+        <div className="module-modal-actions"><Button onClick={() => setEditing(current => !current)} size="sm" type="button" variant="secondary">{editing ? "Back" : "Edit profile"}</Button></div>
       </div>
     </Modal>
     </>

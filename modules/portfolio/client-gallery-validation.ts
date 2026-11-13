@@ -65,6 +65,8 @@ export type ClientShootGallery = {
   sessionDate: string;
   photoCount: number;
   imageStatus: ReturnType<typeof clientGalleryImageStatus>;
+  selectionComplete?: boolean;
+  photosSent?: boolean;
   packageName: string;
   extraPhotoAddOnId?: string | null;
   extraPhotoAddOnName?: string | null;
@@ -133,11 +135,11 @@ export function clientSessionRows(workspace: Pick<ClientGalleryWorkspace, "sessi
   const sessions = workspace.sessions.map(session => {
     const galleries = workspace.galleries.filter(gallery => gallery.bookingId === session.id);
     const photoCount = galleries.reduce((count, gallery) => count + gallery.photoCount, 0);
-    const imageStatus = galleries.some(gallery => gallery.imageStatus === "Images processing") ? "Images processing" : galleries.some(gallery => gallery.imageStatus === "Needs attention") ? "Needs attention" : photoCount ? "Ready" : "Awaiting photos";
+    const imageStatus = galleries.some(gallery => gallery.imageStatus === "Images processing") ? "Images processing" : galleries.some(gallery => gallery.imageStatus === "Needs attention") ? "Needs attention" : galleries.length && galleries.every(gallery => gallery.selectionComplete && gallery.imageStatus === "Ready") ? "Complete" : galleries.some(gallery => gallery.photosSent && !gallery.selectionComplete && gallery.imageStatus === "Ready") ? "Awaiting Client" : photoCount ? "Ready" : "Awaiting photos";
     return { id: session.id, title: session.name, date: session.date, photoCount, imageStatus };
   });
   return [...sessions, ...workspace.galleries.filter(gallery => !workspace.sessions.some(session => session.id === gallery.bookingId)).map(gallery => ({
-    id: gallery.id, title: gallery.title, date: gallery.sessionDate, photoCount: gallery.photoCount, imageStatus: gallery.imageStatus
+    id: gallery.id, title: gallery.title, date: gallery.sessionDate, photoCount: gallery.photoCount, imageStatus: gallery.imageStatus === "Ready" ? gallery.selectionComplete ? "Complete" : gallery.photosSent ? "Awaiting Client" : "Ready" : gallery.imageStatus
   }))];
 }
 

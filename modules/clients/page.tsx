@@ -15,7 +15,7 @@ import {
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
 import { clientStatusLabel, clientStatusOptions as allClientStatusOptions, normalizeClientStatus } from "@/lib/clients/status";
 import { getClientVipSettings, getClientVipSummaries } from "@/lib/clients/vip";
-import { enumLabel, formatDateTime, stringArrayFromUnknown } from "@/lib/format";
+import { formatDateTime, stringArrayFromUnknown } from "@/lib/format";
 import { isRecord } from "@/lib/objects";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -408,17 +408,6 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps = {
               {clientStatusOptions.map((status) => (
                 <option key={status.value} value={status.value}>
                   {status.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="ui-field">
-            <label htmlFor="client-filter-stage">Pipeline</label>
-            <select id="client-filter-stage" name="pipelineStage" defaultValue="">
-              <option value="">Any stage</option>
-              {Object.values(ClientPipelineStage).map((stage) => (
-                <option key={stage} value={stage}>
-                  {enumLabel(stage)}
                 </option>
               ))}
             </select>

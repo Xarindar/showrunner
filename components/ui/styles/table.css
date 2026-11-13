@@ -41,6 +41,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Keep spare table height in the body; Firefox otherwise expands the header. */
+.showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody { height: 100%; }
 .showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody tr { background: var(--data-table-row-bg); }
 .showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody tr:not(:has(> td[colspan])):hover { background: var(--data-table-row-hover); }
 .showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody tr[data-state="selected"] { background: var(--data-table-row-selected); }
@@ -51,11 +53,11 @@
   text-align: center;
 }
 .showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody .ui-button-secondary:has(> svg:only-child):not(:disabled):not([aria-disabled="true"]) {
-  background: var(--data-table-action-bg);
+  background-color: var(--data-table-action-bg);
   color: var(--data-table-action-color);
   box-shadow: none;
 }
-.showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody .ui-button-secondary:has(> svg:only-child):not(:disabled):hover { background: var(--data-table-action-hover); }
+.showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody .ui-button-secondary:has(> svg:only-child):not(:disabled):hover { background-color: var(--data-table-action-hover); }
 .showrunner-admin .ui-data-table-shell, .showrunner-admin .ui-table-card {
   background: var(--data-table-shell-bg);
   border: 1px solid var(--data-table-shell-border);
@@ -85,10 +87,10 @@
 }
 .showrunner-admin .ui-data-table-titlebar :is(p, .ui-button-ghost) { color: inherit; }
 .showrunner-admin .ui-data-table-titlebar .ui-button:not(.ui-button-ghost):not(.ui-button-danger):not(:disabled) {
-  background: var(--data-table-title-action-bg); color: var(--data-table-title-action-color); box-shadow: none;
+  background-color: var(--data-table-title-action-bg); color: var(--data-table-title-action-color); box-shadow: none;
 }
-.showrunner-admin .ui-data-table-titlebar .ui-button:not(.ui-button-ghost):not(.ui-button-danger):not(:disabled):hover { background: var(--sd-color-fill-secondary-hover); }
-.showrunner-admin .ui-data-table-titlebar .ui-button-ghost:not(:disabled):hover { background: var(--sd-color-inverse-fill-hover); }
+.showrunner-admin .ui-data-table-titlebar .ui-button:not(.ui-button-ghost):not(.ui-button-danger):not(:disabled):hover { background-color: var(--sd-color-fill-secondary-hover); }
+.showrunner-admin .ui-data-table-titlebar .ui-button-ghost:not(:disabled):hover { background-color: var(--sd-color-inverse-fill-hover); }
 .showrunner-admin .ui-data-table-toolbar { padding: var(--sd-space-12) var(--data-table-toolbar-x); }
 .showrunner-admin .ui-data-table-scroll { max-height: var(--data-table-scroll-height); overflow: auto; }
 .showrunner-admin .ui-data-table-shell > .ui-table-wrap { border: 0; border-radius: 0; }
@@ -96,6 +98,7 @@
 .showrunner-admin [data-viewport-table] > :is(.catalog-table-scroll, .ui-table-wrap, [data-viewport-table-frame]),
 .showrunner-admin [data-viewport-table] > .ui-card-body > .ui-table-wrap { padding-block-end: var(--viewport-table-fill, 0px); }
 .showrunner-admin .ui-data-table { min-width: 0; }
+.showrunner-admin .ui-notes-content { white-space: pre-wrap; overflow-wrap: anywhere; }
 .showrunner-admin .ui-data-table thead th { position: sticky; top: 0; z-index: 1; }
 .showrunner-admin .ui-data-table-footer { border-top: 1px solid var(--data-table-row-divider); padding: var(--space-2) var(--data-table-toolbar-x); }
 .showrunner-admin .ui-pagination {
@@ -238,9 +241,8 @@
 }
 .showrunner-admin .ui-data-table-stat-pill-primary strong { color: var(--data-table-row-color); }
 @media (max-width: 860px) {
-  .showrunner-admin .ui-data-table-titlebar,
-.showrunner-admin .ui-data-table-toolbar,
-.showrunner-admin .ui-data-table-footer {
+  .showrunner-admin .ui-data-table-toolbar,
+  .showrunner-admin .ui-data-table-footer {
     align-items: stretch;
     flex-direction: column;
   }
@@ -272,7 +274,7 @@
   line-height: var(--data-table-title-line);
 }
 .showrunner-admin .ui-table-card .ui-section-header .ui-button-secondary:not(:disabled) {
-  background: var(--section-header-action-bg);
+  background-color: var(--section-header-action-bg);
   color: var(--data-table-title-action-color);
 }
 

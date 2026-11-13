@@ -362,6 +362,7 @@ model Booking {
   intakeResponse     String?
   policyAccepted     Boolean       @default(false)
   adminNotes         String?
+  staffNotes         BookingNote[]
   cancellationReason String?
   startsAt           DateTime
   endsAt             DateTime
@@ -375,6 +376,16 @@ model Booking {
   @@index([serviceId, startsAt])
   @@index([staffId, startsAt])
   @@index([clientId])
+}
+
+model BookingNote {
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([bookingId, createdAt])
 }
 
 model BookingWaitlistEntry {

@@ -1,16 +1,24 @@
 import { DateTimeInput } from "@/components/ui/time-input";
 import { Notification } from "@/components/ui/notifications";
-import Link from "next/link";
+
 import { notFound } from "next/navigation";
-import { CalendarClock, ChevronDown, Save } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import { FormAttachmentTargetType } from "@prisma/client";
 import { getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatTime, formatDateTime } from "@/lib/format";
 import { getSiteSettings } from "@/lib/site";
 import { sessionPackageSnapshotSchema } from "@/lib/scheduling/session-offering";
-import { rescheduleBookingAction, updateBookingDetailAction, updateBookingStatusAction } from "../actions";
-import { Button, ButtonLink, Card, Table } from "@/components/ui";
+import { addBookingNoteAction, deleteBookingNoteAction, updateBookingDetailAction } from "../actions";
+import { Button, ButtonLink, Switch, Table } from "@/components/ui";
+
+import { NotesTable } from "@/components/ui/notes-table";
+import { LocationInput } from "@/components/ui/location-input";
+import { locationMapHref } from "@/lib/locations";
+import { AppointmentNotes } from "./appointment-notes";
+import { AppointmentContact, AppointmentEdit } from "./appointment-overview";
+import { AppointmentActions } from "./appointment-actions";
+import styles from "./detail.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +50,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
     where: await getAccessibleBookingWhere(user, settings.siteId, { id }),
     include: {
       resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
+      staffNotes: { orderBy: { createdAt: "desc" } },
       service: true,
       staff: true,
       client: true
@@ -64,128 +73,88 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
   });
 
   return (
-    <div className="stack">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Appointment</p>
-          <h1>{booking.customerName}</h1>
-          <p>
-            {(booking.sessionName || booking.service.name)} - {formatDateTime(booking.startsAt, settings.timezone)}
-          </p>
+    <div className={`stack ${styles.page}`}>
+      <header className="page-header" data-admin-page-header>
+        <h1 className="ui-sr-only">Appointment details</h1>
+        <div className="ui-inline-actions">
+          <ButtonLink href="/admin/modules/appointments" variant="ghost" size="sm"><ArrowLeft aria-hidden="true" size={15} />Bookings</ButtonLink>
+
         </div>
-        <ButtonLink href="/admin/modules/appointments" variant="secondary">
-          Back to appointments
-        </ButtonLink>
       </header>
 
       {saved ? <Notification tone="success" queryKey="saved">{saved === "created" ? "Session created." : saved === "reschedule-notify" || saved === "reschedule-silent" ? "Appointment rescheduled." : "Appointment updated."}</Notification> : null}
       {error ? <Notification tone="danger" queryKey="error">{error}</Notification> : null}
 
-      <section aria-label="Status actions" className="appointment-detail-toolbar">
-        <span className="ui-badge">{booking.status.toLowerCase()}</span>
-        {(["CONFIRMED", "CANCELED", "COMPLETED"] as const).map((status) =>
-        <form key={status} action={updateBookingStatusAction}>
-            <input type="hidden" name="id" value={booking.id} />
-            <input type="hidden" name="status" value={status} />
-            <Button size="sm" type="submit" variant={status === "CANCELED" ? "danger" : "secondary"}>
-              {status === "CONFIRMED" ? "Confirm" : status === "CANCELED" ? "Cancel" : "Complete"}
-            </Button>
-          </form>
-        )}
-      </section>
-
-      <Card as="section" minHeight="none">
-        <h2 className="section-title">Appointment details</h2>
-          <Table>
+      <div className={styles.overview}>
+        <section className="ui-data-table-shell" aria-labelledby="appointment-details-title">
+          <AppointmentEdit key={booking.updatedAt.toISOString()}>
+              <form action={updateBookingDetailAction} className="form-grid">
+                <input type="hidden" name="id" value={booking.id} />
+                <div className="ui-field"><label htmlFor="session-name">Session</label><input id="session-name" name="sessionName" defaultValue={booking.sessionName || booking.service.name} required maxLength={200} /></div>
+                <div className="ui-field">
+                  <label htmlFor="startsAt">Date and time</label>
+                  <DateTimeInput aria-label="Appointment" id="startsAt" name="startsAt" defaultValue={formatDateTimeLocalInput(booking.startsAt, settings.timezone)} required />
+                </div>
+                <div className="ui-field"><label htmlFor="session-location">Location (optional)</label><LocationInput id="session-location" name="sessionLocation" defaultValue={booking.sessionLocation ?? booking.service.location ?? ""} placeholder="Search for a place or address" /></div>
+                <div className="ui-field"><label htmlFor="agreed-price">Agreed price ($)</label><input id="agreed-price" name="agreedPrice" inputMode="decimal" defaultValue={booking.priceCents == null ? "" : (booking.priceCents / 100).toFixed(2)} /></div>
+                <Switch label="Email customer if date or time changes" name="notifyCustomer" defaultChecked variant="inline" />
+                <div className="module-modal-actions"><Button type="submit">Save changes</Button></div>
+              </form>
+          </AppointmentEdit>
+          <Table aria-label="Appointment details" mobileLayout="columns" className={styles.facts} tableClassName="ui-data-table">
             <tbody>
-              <tr>
-                <td>Status</td>
-                <td>
-                  <span className="ui-badge">{booking.status.toLowerCase()}</span>
-                </td>
-              </tr>
-              <tr>
-                <td>Customer</td>
-                <td>
-                  {booking.client ?
-                  <Link href={`/admin/clients/${booking.client.id}`}>{booking.client.name}</Link> :
-
-                  booking.customerName
-                  }
-                  <br />
-                  <span className="muted-text">{booking.customerEmail}</span>
-                </td>
-              </tr>
-              <tr>
-                <td>Phone</td>
-                <td>{booking.customerPhone || "Not provided"}</td>
-              </tr>
-              <tr>
-                <td>Service</td>
-                <td>{(booking.sessionName || booking.service.name)}</td>
-              </tr>
-                {packageSnapshot.success && <>
-                  <tr><td>Package</td><td>{packageSnapshot.data.name}</td></tr>
-                  {packageSnapshot.data.hourlyRate && <tr><td>Hourly rate</td><td>{packageSnapshot.data.hourlyRate.name} · ${(packageSnapshot.data.hourlyRate.amountCents / 100).toFixed(2)} / hour</td></tr>}
-                  <tr><td>Included coverage</td><td>{packageSnapshot.data.coverage.join(" · ") || "No coverage items specified"}</td></tr>
-                  {packageSnapshot.data.extras.length > 0 && <tr><td>Extras</td><td>{packageSnapshot.data.extras.map(item => item.name).join(" · ")}</td></tr>}
-                </>}
-              <tr>
-                <td>Price</td>
-                <td>{booking.priceCents == null ? "Not set" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(booking.priceCents / 100)}</td>
-              </tr>
-              <tr>
-                <td>Location</td>
-                <td>{(booking.sessionLocation ?? booking.service.location) || "To be arranged"}</td>
-              </tr>
-              <tr>
-                <td>Staff</td>
-                <td>{booking.staff?.name || "Any staff"}</td>
-              </tr>
-              <tr>
-                <td>Resources</td>
-                <td>{booking.resources.length ? booking.resources.map((assignment) => assignment.resource.name).join(", ") : "None"}</td>
-              </tr>
-              <tr>
-                <td>Time</td>
-                <td>
-                  {formatDateTime(booking.startsAt, settings.timezone)} -{" "}
-                  {formatTime(booking.endsAt, settings.timezone)}
-                </td>
-              </tr>
-              <tr>
-                <td>Customer notes</td>
-                <td>{booking.notes || "None"}</td>
-              </tr>
-              <tr>
-                <td>Intake response</td>
-                <td>{booking.intakeResponse || "None"}</td>
-              </tr>
-              <tr>
-                <td>Policy accepted</td>
-                <td>{booking.policyAccepted ? "Yes" : "No"}</td>
-              </tr>
+              <tr><th scope="row" data-mobile-column>Client</th><td data-mobile-column><AppointmentContact name={booking.client?.name || booking.customerName}>
+            <div className="ui-stack">
+              <div className={styles.contactHeading}><h2>{booking.client?.name || booking.customerName}</h2>{booking.client?.companyName ? <p className="muted-text">{booking.client.companyName}</p> : null}</div>
+              <Table aria-label="Client contact" mobileLayout="columns" className={styles.facts} tableClassName="ui-data-table"><tbody>
+                <tr><th scope="row" data-mobile-column>Email</th><td data-mobile-column><a href={`mailto:${booking.customerEmail}`}>{booking.customerEmail}</a></td></tr>
+                <tr><th scope="row" data-mobile-column>Phone</th><td data-mobile-column>{booking.customerPhone ? <a href={`tel:${booking.customerPhone.replace(/[^\d+]/g, "")}`}>{booking.customerPhone}</a> : "Not provided"}</td></tr>
+                <tr><th scope="row" data-mobile-column>Address</th><td data-mobile-column>{booking.client ? [booking.client.addressLine1, booking.client.addressLine2, booking.client.city, booking.client.region, booking.client.postalCode, booking.client.country].filter(Boolean).join(", ") || "Not provided" : "Not provided"}</td></tr>
+              </tbody></Table>
+              {booking.client ? <ButtonLink href={`/admin/clients/${booking.client.id}`} variant="secondary">Open client profile</ButtonLink> : null}
+            </div>
+          </AppointmentContact></td></tr>
+              <tr><th scope="row" data-mobile-column>Session</th><td data-mobile-column>{booking.sessionName || booking.service.name}</td></tr>
+              <tr><th scope="row" data-mobile-column>When</th><td data-mobile-column>{formatDateTime(booking.startsAt, settings.timezone)} – {formatTime(booking.endsAt, settings.timezone)}</td></tr>
+              <tr><th scope="row" data-mobile-column>Location</th><td data-mobile-column>{(booking.sessionLocation ?? booking.service.location) ? <a href={locationMapHref((booking.sessionLocation ?? booking.service.location)!)} target="_blank" rel="noreferrer">{booking.sessionLocation ?? booking.service.location} · Open map</a> : "To be arranged"}</td></tr>
+              <tr><th scope="row" data-mobile-column>Agreed price</th><td data-mobile-column>{booking.priceCents == null ? "Not set" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(booking.priceCents / 100)}</td></tr>
             </tbody>
           </Table>
-      </Card>
 
-      <Card as="section" bodyClassName="ui-stack">
-        <h2 className="section-title">Session location</h2>
-        <p className="muted-text">Agree on a location with your client, then add or change it here.</p>
-        <form action={updateBookingDetailAction} className="form-grid">
-          <input type="hidden" name="id" value={booking.id} />
-          <div className="ui-field">
-            <label htmlFor="session-location">Location <span className="muted-text">(optional)</span></label>
-            <input id="session-location" name="sessionLocation" defaultValue={booking.sessionLocation ?? booking.service.location ?? ""} maxLength={500} placeholder="To be arranged" />
+        </section>
+        <aside className="ui-data-table-shell" aria-labelledby="appointment-actions-title">
+          <div className="ui-data-table-titlebar"><h2 id="appointment-actions-title">Actions</h2></div>
+          <div className="ui-section-body">
+          <AppointmentActions bookingId={booking.id} cancellationReason={booking.cancellationReason} />
           </div>
-          <Button type="submit">Save location</Button>
-        </form>
-      </Card>
+        </aside>
+      </div>
+
+      <section className="ui-data-table-shell" aria-labelledby="appointment-booking-title">
+        <div className="ui-data-table-titlebar"><h2 id="appointment-booking-title">Booking details</h2></div>
+        <Table aria-label="Booking details" mobileLayout="columns" className={styles.facts} tableClassName="ui-data-table">
+          <tbody>
+            {packageSnapshot.success && <>
+              <tr><th scope="row" data-mobile-column>Package</th><td data-mobile-column>{packageSnapshot.data.name}</td></tr>
+              {packageSnapshot.data.hourlyRate && <tr><th scope="row" data-mobile-column>Hourly rate</th><td data-mobile-column>{packageSnapshot.data.hourlyRate.name} · ${(packageSnapshot.data.hourlyRate.amountCents / 100).toFixed(2)} / hour</td></tr>}
+              <tr><th scope="row" data-mobile-column>Included coverage</th><td data-mobile-column>{packageSnapshot.data.coverage.join(" · ") || "No coverage items specified"}</td></tr>
+              {packageSnapshot.data.extras.length > 0 && <tr><th scope="row" data-mobile-column>Extras</th><td data-mobile-column>{packageSnapshot.data.extras.map(item => item.name).join(" · ")}</td></tr>}
+            </>}
+            <tr><th scope="row" data-mobile-column>Staff</th><td data-mobile-column>{booking.staff?.name || "Any staff"}</td></tr>
+            <tr><th scope="row" data-mobile-column>Resources</th><td data-mobile-column>{booking.resources.length ? booking.resources.map((assignment) => assignment.resource.name).join(", ") : "None"}</td></tr>
+            {booking.notes ? <tr><th scope="row" data-mobile-column>Customer notes</th><td data-mobile-column>{booking.notes}</td></tr> : null}
+            {booking.intakeResponse ? <tr><th scope="row" data-mobile-column>Intake response</th><td data-mobile-column>{booking.intakeResponse}</td></tr> : null}
+            <tr><th scope="row" data-mobile-column>Policy accepted</th><td data-mobile-column>{booking.policyAccepted ? "Yes" : "No"}</td></tr>
+          </tbody>
+        </Table>
+      </section>
+
+
 
       {formAttachments.length ?
-      <Card as="section" bodyClassName="ui-stack">
-          <h2 className="section-title">Attached forms</h2>
-          <Table>
+      <section className="ui-data-table-shell" aria-labelledby="appointment-forms-title">
+          <div className="ui-data-table-titlebar"><h2 id="appointment-forms-title">Attached forms</h2></div>
+          <Table aria-label="Attached forms" tableClassName="ui-data-table">
             <thead>
               <tr>
                 <th>Form</th>
@@ -207,73 +176,34 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
                   </td>
                   <td>{attachment._count.submissions}</td>
                   <td>
-                    <Link href={`/admin/modules/forms?form=${attachment.formId}`}>Open form record</Link>
+                    <ButtonLink href={`/admin/modules/forms?form=${attachment.formId}`} variant="ghost" size="sm">Open form record</ButtonLink>
                   </td>
                 </tr>
             )}
             </tbody>
           </Table>
-        </Card> :
+        </section> :
       null}
 
-      <details className="ui-disclosure">
-        <summary>
-          <span>Reschedule</span>
-          <small>Checked against availability, buffers, blockouts, and conflicts</small>
-          <ChevronDown aria-hidden="true" className="ui-disclosure-caret" size={16} />
-        </summary>
-        <form action={rescheduleBookingAction} className="form-grid">
-          <input type="hidden" name="id" value={booking.id} />
-          <div className="ui-field">
-            <label htmlFor="startsAt">New start time</label>
-            <DateTimeInput aria-label="New start"
-              id="startsAt"
-              name="startsAt"
 
-              defaultValue={formatDateTimeLocalInput(booking.startsAt, settings.timezone)}
-              required />
 
-          </div>
-          <label><input type="checkbox" name="notifyCustomer" defaultChecked /> Email the customer about this new appointment time</label>
-          <p className="ui-help">Uncheck to reschedule without a customer email.</p>
-          <div>
-            <Button type="submit" variant="secondary">
-              <CalendarClock size={18} />
-              Reschedule appointment
-            </Button>
-          </div>
+      <AppointmentNotes key={booking.staffNotes.length} noteForm={
+        <form action={addBookingNoteAction} className="form-grid">
+          <input type="hidden" name="id" value={booking.id} />
+          <div className="ui-field"><label htmlFor="appointment-note-content">Note (staff only)</label><textarea id="appointment-note-content" name="content" required /></div>
+          <div className="module-modal-actions"><Button type="submit"><Save size={18} aria-hidden="true" />Save note</Button></div>
         </form>
-      </details>
+      }>
+        <NotesTable notes={booking.staffNotes} timezone={settings.timezone} renderActions={note => (
+          <form action={deleteBookingNoteAction} className="ui-inline-actions">
+            <input type="hidden" name="id" value={booking.id} />
+            <input type="hidden" name="noteId" value={note.id} />
+            <Switch label="Confirm" name="confirmDelete" variant="inline" />
+            <Button size="sm" type="submit" variant="secondary">Delete</Button>
+          </form>
+        )} />
+      </AppointmentNotes>
 
-      <details className="ui-disclosure" open={Boolean(booking.adminNotes)}>
-        <summary>
-          <span>Internal notes</span>
-          <small>{booking.adminNotes ? "Notes saved" : "No notes yet"}</small>
-          <ChevronDown aria-hidden="true" className="ui-disclosure-caret" size={16} />
-        </summary>
-        <form action={updateBookingDetailAction} className="form-grid">
-          <input type="hidden" name="id" value={booking.id} />
-          <div className="ui-field">
-            <label htmlFor="adminNotes">Admin notes (staff only)</label>
-            <textarea id="adminNotes" name="adminNotes" defaultValue={booking.adminNotes || ""} />
-          </div>
-          <div>
-            <Button type="submit">
-              <Save size={18} />
-              Save appointment notes
-            </Button>
-          </div>
-        </form>
-      </details>
-      <details className="ui-disclosure" open={Boolean(booking.cancellationReason)}>
-        <summary><span>Customer-facing cancellation reason</span><small>Included in the cancellation email</small></summary>
-        <form action={updateBookingDetailAction} className="form-grid">
-          <input type="hidden" name="id" value={booking.id} />
-          <div className="ui-field"><label htmlFor="cancellationReason">Reason shared with the customer</label><input id="cancellationReason" name="cancellationReason" defaultValue={booking.cancellationReason || ""} /></div>
-          <p>Save this reason before canceling. Editing it after cancellation does not send another email.</p>
-          <Button type="submit">Save cancellation reason</Button>
-        </form>
-      </details>
     </div>);
 
 }

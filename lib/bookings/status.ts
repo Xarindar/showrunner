@@ -6,7 +6,7 @@ import { emitModuleEvent } from "@/lib/events/emit";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
 
-export async function updateBookingStatus(input: { bookingId: string; status: BookingStatus; siteId?: string }) {
+export async function updateBookingStatus(input: { bookingId: string; status: BookingStatus; siteId?: string; cancellationReason?: string }) {
   const siteId = input.siteId || (await getCurrentSiteId());
   const current = await prisma.booking.findFirst({
     where: { id: input.bookingId, siteId },
@@ -17,7 +17,7 @@ export async function updateBookingStatus(input: { bookingId: string; status: Bo
 
   const updated = await prisma.booking.update({
     where: { id: current.id },
-    data: { status: input.status },
+    data: { status: input.status, ...(input.status === BookingStatus.CANCELED && input.cancellationReason !== undefined ? { cancellationReason: input.cancellationReason } : {}) },
     include: { service: true }
   });
 

@@ -9,17 +9,20 @@ import listPlugin from "@fullcalendar/list";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import type { EventClickArg, EventDropArg, EventInput } from "@fullcalendar/core";
-import Link from "next/link";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Table } from "@/components/ui/table";
+import detailStyles from "../detail/detail.module.css";
+import styles from "./appointment-popup.module.css";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { AlertTriangle, Ban, CalendarClock, Check, ExternalLink, Mail, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
-import { Tab, Tabs } from "@/components/ui/tabs";
 import { rescheduleBookingFromCalendarAction, updateBookingStatusAction } from "../actions";
+import { bindCalendarScrollNavigation } from "./calendar-scroll-navigation";
+import { AppointmentDayOverview } from "./appointment-day-overview";
 import { AppointmentEventChip } from "./appointment-event-chip";
 
-const calendarViews = ["month", "week", "day", "agenda"] as const;
-const calendarViewInputId = "appointment-calendar-view-input";
+type CalendarView = "month" | "week" | "day" | "agenda";
 
 type AppointmentCalendarClient = {
   affiliation: string;
@@ -69,6 +72,7 @@ export type AppointmentCalendarDay = {
 };
 
 type AppointmentCalendarProps = {
+  rangeControls: ReactNode;
   bookings: AppointmentCalendarBooking[];
   days: AppointmentCalendarDay[];
   hours: number[];
@@ -89,62 +93,11 @@ type PendingReschedule = {
 
 type ConfirmStage = "" | "change" | "email";
 
-function dateKeyToUtcDate(dateKey: string) {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
-}
-
 function dateKeyFromUtcDate(date: Date) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
 }
 
-function addDaysToDateKey(dateKey: string, days: number) {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  return dateKeyFromUtcDate(new Date(Date.UTC(year, month - 1, day + days)));
-}
-
-function startOfWeekKey(dateKey: string) {
-  const date = dateKeyToUtcDate(dateKey);
-  return addDaysToDateKey(dateKey, -date.getUTCDay());
-}
-
-function startOfMonthKey(dateKey: string) {
-  const date = dateKeyToUtcDate(dateKey);
-  return dateKeyFromUtcDate(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)));
-}
-
-function viewWindow(view: (typeof calendarViews)[number], dateKey: string) {
-  if (view === "month") {
-    const monthStart = startOfMonthKey(dateKey);
-    const gridStart = startOfWeekKey(monthStart);
-    return { endKey: addDaysToDateKey(gridStart, 42), startKey: gridStart };
-  }
-
-  if (view === "week") {
-    const weekStart = startOfWeekKey(dateKey);
-    return { endKey: addDaysToDateKey(weekStart, 7), startKey: weekStart };
-  }
-
-  if (view === "agenda") {
-    return { endKey: addDaysToDateKey(dateKey, 14), startKey: dateKey };
-  }
-
-  return { endKey: addDaysToDateKey(dateKey, 1), startKey: dateKey };
-}
-
-function daysForView(days: AppointmentCalendarDay[], view: (typeof calendarViews)[number], selectedDateKey: string) {
-  const range = viewWindow(view, selectedDateKey);
-  return days.filter((day) => day.dateKey >= range.startKey && day.dateKey < range.endKey);
-}
-
-function rangeSummary(view: (typeof calendarViews)[number], days: AppointmentCalendarDay[], appointmentCount: number) {
-  const appointmentLabel = appointmentCount === 1 ? "appointment" : "appointments";
-  if (!days.length) return `${appointmentCount} ${appointmentLabel}`;
-  if (view === "day") return `${days[0].label} | ${appointmentCount} ${appointmentLabel}`;
-  return `${days[0].shortLabel} - ${days[days.length - 1].shortLabel} | ${appointmentCount} ${appointmentLabel}`;
-}
-
-function fullCalendarViewFor(view: (typeof calendarViews)[number]) {
+function fullCalendarViewFor(view: CalendarView) {
   if (view === "month") return "dayGridMonth";
   if (view === "week") return "timeGridWeek";
   if (view === "agenda") return "appointmentAgenda";
@@ -252,123 +205,100 @@ function AppointmentExpandedDetails({ booking, dayLabel }: { booking: Appointmen
   const statusActions = quickStatuses(booking);
 
   return (
-    <div className="appointment-event-expanded" aria-live="polite" onClick={(event) => event.stopPropagation()}>
-      <section className="appointment-expanded-column">
-        <div className="appointment-expanded-heading">
-          <span>Client info</span>
-          {booking.client ? (
-            <Link className="appointment-panel-link" href={`/admin/clients/${booking.client.id}`}>
-              <ExternalLink size={14} />
-              Open client
-            </Link>
-          ) : null}
+    <div className={styles.columns}>
+      <section className="ui-data-table-shell" aria-labelledby="calendar-client-title">
+        <div className="ui-data-table-titlebar">
+          <h2 id="calendar-client-title">Client details</h2>
+          {booking.client ? <ButtonLink variant="secondary" size="sm" href={`/admin/clients/${booking.client.id}`}>
+            <ExternalLink size={14} aria-hidden="true" />Open client
+          </ButtonLink> : null}
         </div>
-        <div className="appointment-expanded-client-card clients-profile-card-body">
-          <div className="clients-profile-card-main">
-            <div className="clients-profile-photo" aria-hidden="true">
-              {client.photoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img alt="" src={client.photoUrl} />
-              ) : (
-                <span>{initials}</span>
-              )}
-            </div>
-            <div className="clients-profile-card-copy">
+        <div className="ui-section-body">
+          <div className="ui-object-cell">
+            {client.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="ui-object-thumb" alt="" src={client.photoUrl} />
+            ) : <span className="ui-object-thumb ui-object-thumb-empty" aria-hidden="true">{initials}</span>}
+            <div className={`ui-object-copy ${detailStyles.contactHeading}`}>
               <h2>{client.name}</h2>
-              <span>{client.affiliation}</span>
-              <span className="ui-badge">{client.status}</span>
+              <span className="muted-text">{client.affiliation}</span>
             </div>
           </div>
-          <dl className="appointment-expanded-list" aria-label="Selected appointment client highlights">
-            {clientItems.map((item) => (
-              <div key={item.label}>
-                <dt>{item.label}</dt>
-                <dd>{"href" in item ? <a href={item.href}>{item.value}</a> : item.value}</dd>
-              </div>
-            ))}
-          </dl>
         </div>
+        <Table aria-label="Client details" mobileLayout="columns" className={detailStyles.facts} tableClassName="ui-data-table">
+          <tbody>{clientItems.map(item => <tr key={item.label}>
+            <th scope="row" data-mobile-column>{item.label}</th>
+            <td data-mobile-column>{"href" in item ? <a href={item.href}>{item.value}</a> : item.value}</td>
+          </tr>)}</tbody>
+        </Table>
       </section>
-      <section className="appointment-expanded-column">
-        <div className="appointment-expanded-heading">
-          <span>Appointment info</span>
-          <Link className="appointment-panel-link" href={`/admin/appointments/${booking.id}`}>
-            <ExternalLink size={14} />
-            Open appointment
-          </Link>
-        </div>
-        <dl className="appointment-expanded-list">
-          {appointmentItems.map((item) => (
-            <div key={item.label}>
-              <dt>{item.label}</dt>
-              <dd>{item.value}</dd>
-            </div>
-          ))}
-        </dl>
-        {booking.warnings.length ? (
-          <div className="appointment-selection-warning">
-            <AlertTriangle size={16} />
-            {booking.warnings.join(" ")}
+      <div className="ui-stack">
+        <section className="ui-data-table-shell" aria-labelledby="calendar-appointment-title">
+          <div className="ui-data-table-titlebar">
+            <h2 id="calendar-appointment-title">Appointment details</h2>
+            <ButtonLink variant="secondary" size="sm" href={`/admin/appointments/${booking.id}`}>
+              <ExternalLink size={14} aria-hidden="true" />Open appointment
+            </ButtonLink>
           </div>
-        ) : null}
-        {statusActions.length ? (
-          <div className="appointment-calendar-event-actions">
-            {statusActions.map((action) => {
+          <Table aria-label="Appointment details" mobileLayout="columns" className={detailStyles.facts} tableClassName="ui-data-table">
+            <tbody>{appointmentItems.map(item => <tr key={item.label}>
+              <th scope="row" data-mobile-column>{item.label}</th>
+              <td data-mobile-column>{item.value}</td>
+            </tr>)}</tbody>
+          </Table>
+        </section>
+        {booking.warnings.length ? <div className="appointment-selection-warning" role="status">
+          <AlertTriangle size={16} aria-hidden="true" />{booking.warnings.join(" ")}
+        </div> : null}
+        {statusActions.length ? <section className="ui-data-table-shell" aria-labelledby="calendar-actions-title">
+          <div className="ui-data-table-titlebar"><h2 id="calendar-actions-title">Actions</h2></div>
+          <div className="ui-section-body"><div className="ui-inline-actions">
+            {statusActions.map(action => {
               const Icon = action.icon;
-              return (
-                <form action={updateBookingStatusAction} key={action.status}>
-                  <input name="id" type="hidden" value={booking.id} />
-                  <input name="status" type="hidden" value={action.status} />
-                  <button className={action.status === "CANCELED" ? "ui-button ui-button-danger" : "ui-button ui-button-secondary"} type="submit">
-                    <Icon size={14} />
-                    {action.label}
-                  </button>
-                </form>
-              );
+              return <form action={updateBookingStatusAction} key={action.status}>
+                <input name="id" type="hidden" value={booking.id} />
+                <input name="status" type="hidden" value={action.status} />
+                <Button variant={action.status === "CANCELED" ? "danger" : "secondary"} size="sm" type="submit">
+                  <Icon size={14} aria-hidden="true" />{action.label}
+                </Button>
+              </form>;
             })}
-          </div>
-        ) : null}
-      </section>
+          </div></div>
+        </section> : null}
+      </div>
     </div>
   );
 }
 
-function AppointmentFloatingDetails({
-  booking,
-  dayLabel,
-  onClose
-}: {
+function AppointmentFloatingDetails({ booking, dayLabel, onClose }: {
   booking: AppointmentCalendarBooking;
   dayLabel: string;
   onClose: () => void;
 }) {
-  return (
-    <div className="appointment-floating-layer" onClick={onClose}>
-      <section
-        aria-label="Appointment details"
-        aria-modal="false"
-        className="appointment-floating-card"
-        onClick={(event) => event.stopPropagation()}
-        role="dialog"
-      >
-        <div className="appointment-floating-card-head">
-          <div>
-            <span>{booking.timeLabel} - {booking.endTimeLabel}</span>
-            <h2>{booking.serviceName}</h2>
-          </div>
-          <button aria-label="Close appointment details" className="appointment-event-close" onClick={onClose} type="button">
-            <X size={17} />
-          </button>
-        </div>
+  return <div className={styles.layer} onClick={onClose}>
+    <section aria-labelledby="calendar-popup-title" aria-modal="false" role="dialog"
+      className={`ui-dialog ui-modal ${styles.card} ${detailStyles.page}`} onClick={event => event.stopPropagation()}>
+      <div className={`ui-modal-head ui-dialog-header ${styles.header}`}>
+        <h2 className="ui-dialog-title" id="calendar-popup-title">{booking.serviceName}</h2>
+        <Button aria-label="Close appointment details" className="ui-dialog-close" variant="ghost" size="sm" onClick={onClose} type="button">
+          <X size={16} aria-hidden="true" />
+        </Button>
+      </div>
+      <div className={`ui-dialog-body ${styles.body}`}>
         <AppointmentExpandedDetails booking={booking} dayLabel={dayLabel} />
-      </section>
-    </div>
-  );
+      </div>
+    </section>
+  </div>;
 }
 
-export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, view }: AppointmentCalendarProps) {
+export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, view, rangeControls }: AppointmentCalendarProps) {
   const router = useRouter();
   const calendarRef = useRef<FullCalendar | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!root.current || (view !== "day" && view !== "week")) return;
+    return bindCalendarScrollNavigation(root.current, href => router.replace(href));
+  }, [router, selectedDateKey, view]);
   const notify = useNotify();
   const [selectedBookingId, setSelectedBookingId] = useState("");
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(null);
@@ -376,15 +306,8 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
   const [isPending, startTransition] = useTransition();
   const bookingById = useMemo(() => new Map(bookings.map((booking) => [booking.id, booking])), [bookings]);
   const dayLabels = useMemo(() => new Map(days.map((day) => [day.dateKey, day.label])), [days]);
-  const visibleDays = useMemo(() => daysForView(days, view, selectedDateKey), [days, selectedDateKey, view]);
-  const visibleDateKeys = useMemo(() => new Set(visibleDays.map((day) => day.dateKey)), [visibleDays]);
-  const visibleBookings = useMemo(
-    () => bookings.filter((booking) => visibleDateKeys.has(booking.dateKey)),
-    [bookings, visibleDateKeys]
-  );
   const selectedBooking = selectedBookingId ? bookingById.get(selectedBookingId) || null : null;
   const selectedDayLabel = selectedBooking ? dayLabels.get(selectedBooking.dateKey) || selectedBooking.dateKey : "";
-  const viewSummary = rangeSummary(view, visibleDays, visibleBookings.length);
   const slotMinHour = Math.max(0, Math.min(...hours, 7));
   const slotMaxHour = Math.min(24, Math.max(...hours, 19) + 1);
 
@@ -435,21 +358,6 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [selectedBookingId]);
-
-  function changeView(nextView: (typeof calendarViews)[number]) {
-    setSelectedBookingId("");
-    setConfirmStage("");
-    setPendingReschedule(null);
-
-    const viewInput = document.getElementById(calendarViewInputId);
-    if (viewInput instanceof HTMLInputElement) {
-      viewInput.value = nextView;
-    }
-
-    const url = new URL(window.location.href);
-    url.searchParams.set("view", nextView);
-    router.replace(`${url.pathname}${url.search}`);
-  }
 
   function cancelReschedule() {
     setConfirmStage("");
@@ -512,19 +420,6 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
     setConfirmStage("change");
     info.revert();
   }
-
-  const viewControls = (
-    <div className="appointment-calendar-client-bar">
-      <Tabs className="appointment-calendar-view-tabs" aria-label="Calendar view">
-        {calendarViews.map((item) => (
-          <Tab aria-selected={item === view} key={item} onClick={() => changeView(item)}>
-            {item}
-          </Tab>
-        ))}
-      </Tabs>
-      <p className="ui-zero">{viewSummary}</p>
-    </div>
-  );
 
   const floatingDetails = selectedBooking ? (
     <AppointmentFloatingDetails
@@ -598,10 +493,18 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
   ) : null;
 
   return (
-    <div className="appointment-calendar">
+    <div className="appointment-calendar" ref={root}>
       {isPending && <p role="status">Checking conflicts…</p>}
-      {viewControls}
-      <div className="appointment-fullcalendar">
+      <div className="appointments-calendar-context">
+        {rangeControls}
+      </div>
+      {view === "week" || view === "month" ? <AppointmentDayOverview bookings={bookings} days={days} selectedDateKey={selectedDateKey} view={view} onSelect={dateKey => {
+        const url = new URL(window.location.href);
+        url.searchParams.set("date", dateKey);
+        url.searchParams.set("view", "day");
+        router.replace(`${url.pathname}${url.search}`);
+      }} /> : null}
+      <div className="appointment-fullcalendar" data-overview={view === "week" || view === "month" ? "true" : undefined}>
         <FullCalendar
           slotLabelFormat={{ hour: "numeric", minute: "2-digit", hour12: true, meridiem: true }}
           eventTimeFormat={{ hour: "numeric", minute: "2-digit", hour12: true, meridiem: true }}
@@ -642,6 +545,7 @@ export function AppointmentCalendar({ bookings, days, hours, selectedDateKey, vi
           slotEventOverlap
           timeZone="UTC"
           views={{
+            timeGridDay: { dayHeaders: false },
             appointmentAgenda: {
               buttonText: "agenda",
               duration: { days: 14 },

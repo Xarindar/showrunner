@@ -4,3 +4,5 @@ export type PaymentActionState =
   | { status: "error"; message: string };
 
 export const initialPaymentActionState: PaymentActionState = { status: "idle" };
+
+export type SquareLocationState = PaymentActionState & { locations?: { id: string; name: string }[]; inspectionVersion?: string };

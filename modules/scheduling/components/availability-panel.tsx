@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import type { AvailabilityRule, Resource, StaffMember } from "@prisma/client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Table } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
 import { Notification, useNotify } from "@/components/ui/notifications";
 import { formatTimeValue, minutesToTime } from "@/lib/format";
@@ -54,7 +54,7 @@ function DayEditor({ day, rules, staffId, resourceId, onClose }: {
   </form>;
 }
 
-export function AvailabilityPanel({ availability, resources, staff, timezone, fixedStaffId }: Props) {
+export function AvailabilityPanel({ availability, resources, staff, fixedStaffId }: Props) {
   const [scope, setScope] = useState("");
   const [editing, setEditing] = useState<{ day: number; rules: Props["availability"]; staffId: string; resourceId: string } | null>(null);
   const staffId = fixedStaffId || (scope.startsWith("staff:") ? scope.slice(6) : "");
@@ -62,15 +62,17 @@ export function AvailabilityPanel({ availability, resources, staff, timezone, fi
   const rules = availability.filter(rule => (rule.staffId || "") === staffId && (rule.resourceId || "") === resourceId);
   const owner = staff.find(member => member.id === staffId) || resources.find(resource => resource.id === resourceId);
   return <section className={styles.week} aria-label="Weekly hours">
-    <div className={styles.heading}><h2>Weekly hours</h2>{timezone && <span className="muted-text">{timezone.replaceAll("_", " ")}</span>}</div>
     {scope && !fixedStaffId && <div className={styles.heading}><strong>{owner?.name}</strong><Button type="button" variant="secondary" onClick={() => setScope("")}>Back to business hours</Button></div>}
-    <Card bodyClassName={styles.rows}>
-      {weekdays.map((name, day) => <div className={styles.row} key={name}>
-        <strong>{name}</strong>
-        <span>{rules.filter(rule => rule.weekday === day).sort((a, b) => a.startMinutes - b.startMinutes).map(rule => `${formatTimeValue(minutesToTime(rule.startMinutes))} – ${formatTimeValue(minutesToTime(rule.endMinutes % 1440))}`).join(", ") || (staffId || resourceId ? "No hours set" : "Closed")}</span>
-        <Button type="button" variant="ghost" aria-label={`Edit ${name} hours`} disabled={owner?.isActive === false} onClick={() => setEditing({ day, rules: rules.map(rule => ({ ...rule })), staffId, resourceId })}>Edit</Button>
-      </div>)}
-    </Card>
+    <section className="ui-data-table-shell">
+      <div className="ui-data-table-titlebar"><h2>Weekly hours</h2></div>
+      <Table aria-label="Weekly hours" tableClassName="ui-data-table"><thead><tr><th>Day</th><th>Hours</th><th>Actions</th></tr></thead><tbody>
+      {weekdays.map((name, day) => <tr key={name}>
+        <td>{name}</td>
+        <td>{rules.filter(rule => rule.weekday === day).sort((a, b) => a.startMinutes - b.startMinutes).map(rule => `${formatTimeValue(minutesToTime(rule.startMinutes))} – ${formatTimeValue(minutesToTime(rule.endMinutes % 1440))}`).join(", ") || (staffId || resourceId ? "No hours set" : "Closed")}</td>
+        <td><Button type="button" variant="ghost" aria-label={`Edit ${name} hours`} disabled={owner?.isActive === false} onClick={() => setEditing({ day, rules: rules.map(rule => ({ ...rule })), staffId, resourceId })}>Edit</Button></td>
+      </tr>)}
+      </tbody></Table>
+    </section>
     {!fixedStaffId && (staff.length > 0 || resources.length > 0) && <details>
       <summary>{staff.length ? "Staff & resource hours" : "Resource hours"}</summary>
       <p className="muted-text">{staff.length ? "Staff and resources use" : "Resources use"} their own hours. Business hours do not replace these schedules.</p>

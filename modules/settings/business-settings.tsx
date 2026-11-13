@@ -37,7 +37,7 @@ export function BusinessSettings({
     <section className="subpanel form-grid">
       <div>
         <h2 className="compact-title">Business</h2>
-        <p>Identity, contact email, timezone, and the reusable logo shown across client-facing surfaces.</p>
+        <p>Identity, contact email, and the reusable logo shown across client-facing surfaces.</p>
       </div>
 
       <div className="ui-logo-field">
@@ -96,10 +96,7 @@ export function BusinessSettings({
         </div>
       </EqualGrid>
 
-      <div className="ui-field">
-        <label htmlFor="timezone">Timezone</label>
-        <input id="timezone" name="timezone" defaultValue={settings.timezone} readOnly={contactInContent} required />
-      </div>
+      <input type="hidden" name="timezone" value={settings.timezone} />
       {contactInContent ? <Link href="/admin/modules/content?section=business-info">Edit contact details in Content → Contact / Business Info</Link> : null}
     </section>
   );

@@ -311,12 +311,25 @@
 }
 .showrunner-admin .ui-select-option span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .showrunner-admin .ui-select-option:hover,
+.showrunner-admin .ui-select-option.is-active,
 .showrunner-admin .ui-select-option:focus-visible {
   background: var(--sd-color-fill-hover);
   outline: 0;
 }
 .showrunner-admin .ui-select-option.is-selected { background: var(--sd-color-fill-active); color: var(--sd-color-text-secondary); }
 .showrunner-admin .ui-select-option svg { color: var(--sd-color-text-secondary); }
+.showrunner-admin .ui-location-options { position: fixed; inset: auto; margin: 0; }
+.showrunner-admin .ui-location-options .ui-select-option {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: var(--control-height);
+  padding-block: var(--space-2);
+  font: var(--sd-type-body-weight) var(--type-body)/var(--sd-type-body-line) var(--font-sans);
+}
+.showrunner-admin .ui-location-options .ui-select-option span { white-space: normal; overflow-wrap: anywhere; }
+.showrunner-admin .ui-location-options .ui-location-status { cursor: default; color: var(--color-muted); }
+@media (max-width: 860px), (pointer: coarse) {
+  .showrunner-admin .ui-location-options .ui-select-option { min-height: var(--sd-layout-touch-target); }
+}
 .showrunner-admin .ui-dialog {
   background: var(--color-surface);
   border: 0;
@@ -487,16 +500,16 @@
 }
 .showrunner-admin .ui-dialog-header .ui-dialog-title { color: var(--sd-color-on-primary); }
 .showrunner-admin .ui-dialog-header .ui-button-ghost {
-  background: transparent;
+  background-color: transparent;
   color: var(--sd-color-on-primary);
 }
-.showrunner-admin .ui-dialog-header .ui-button-ghost:not(:disabled):hover { background: var(--sd-color-inverse-fill-hover); }
+.showrunner-admin .ui-dialog-header .ui-button-ghost:not(:disabled):hover { background-color: var(--sd-color-inverse-fill-hover); }
 .showrunner-admin .ui-dialog-header .ui-button:not(.ui-button-ghost):not(.ui-button-secondary):not(.ui-button-danger):not(:disabled) {
-  background: var(--sd-color-on-primary);
+  background-color: var(--sd-color-on-primary);
   color: var(--sd-color-primary);
   box-shadow: none;
 }
-.showrunner-admin .ui-dialog-header .ui-button:not(.ui-button-ghost):not(.ui-button-danger):not(:disabled):hover { background: var(--sd-color-fill-secondary-hover); }
+.showrunner-admin .ui-dialog-header .ui-button:not(.ui-button-ghost):not(.ui-button-danger):not(:disabled):hover { background-color: var(--sd-color-fill-secondary-hover); }
 .showrunner-admin .ui-onboarding-header.ui-dialog-header {
   margin: calc(-1 * var(--sd-space-16)) calc(-1 * var(--sd-space-16)) 0;
   padding: var(--sd-space-8) var(--sd-space-16);

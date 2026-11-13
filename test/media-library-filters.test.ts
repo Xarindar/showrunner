@@ -12,6 +12,9 @@ test("media preserves bookmarked categories and filters", () => {
   }).outputText, { exports, require: () => ({}) });
   const filters = exports.filtersFromParams!;
   assert.equal(filters({}).scope, "all");
+  assert.equal(filters({ folder: "Clients/Ruby" }).folderFilter, false);
+  assert.equal(filters({ folder: "Clients/Ruby", folderFilter: "1" }).folderFilter, true);
+  assert.equal(filters({ folderFilter: "1" }).folderFilter, false);
   assert.equal(filters({ scope: "home", page: "2" }).scope, "all");
   assert.equal(filters({ scope: "unknown" }).scope, "all");
   const bookmarked = filters({ scope: "private", tag: " Venue ", q: " Garden ", page: "2", sort: "name" });

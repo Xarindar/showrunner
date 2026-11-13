@@ -3,7 +3,7 @@ import { clientServiceId } from "@/lib/clients/service-selection";
 import { getClientStatusSettings } from "@/lib/clients/configuration";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BookingStatus, ClientPipelineStage, MediaDriver, MediaVariantType, type Prisma } from "@prisma/client";
+import { BookingStatus, MediaDriver, MediaVariantType, type Prisma } from "@prisma/client";
 import { ArrowLeft, Eye, GitMerge, Save, Search } from "lucide-react";
 import { getAccessibleClientWhere, requireAdmin } from "@/lib/auth";
 import { clientStatusOptions as allClientStatusOptions, normalizeClientStatus } from "@/lib/clients/status";
@@ -21,7 +21,7 @@ import {
   mergeClientsAction,
   updateClientAction } from "../actions";
 import { Button, ButtonLink, EqualGrid, Pagination, Switch, Table, Tooltip, UploadField } from "@/components/ui";
-import { ModuleActionModals } from "@/components/ui/module-action-modals";
+import { NotesTable } from "@/components/ui/notes-table";
 import { ClientNotesDocumentsCard } from "./client-notes-documents-card";
 import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
 import { ClientProfileCard } from "./client-profile-card";
@@ -58,17 +58,6 @@ type ClientMergeCandidate = {
   name: string;
   phone: string | null;
   updatedAt: Date;
-};
-
-type ProfileDetailItem = {
-  href?: string;
-  label: string;
-  value: string;
-};
-
-type ProfileDetailSection = {
-  items: ProfileDetailItem[];
-  title: string;
 };
 
 type ClientCommunicationEmailOutbox = {
@@ -125,10 +114,6 @@ const mergeCandidateSelect = {
   updatedAt: true
 } satisfies Prisma.ClientSelect;
 
-function truncate(value: string, length = 140) {
-  return value.length > length ? `${value.slice(0, length - 1)}...` : value;
-}
-
 function dateInputValue(value: Date | null | undefined) {
   return value ? value.toISOString().slice(0, 10) : "";
 }
@@ -173,10 +158,6 @@ function canUploadClientDocuments(driver: MediaDriver) {
   return supportsPrivateMediaDriver(driver) && isMediaUploadDriverConfigured(driver);
 }
 
-function formatDateOnly(value: Date | null | undefined) {
-  return value ? new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" }).format(value) : "";
-}
-
 function formatTimeOnly(value: Date, timeZone: string) {
   return formatTime(value, timeZone);
 }
@@ -191,19 +172,6 @@ function formatAppointmentActivityDate(value: Date, now: Date, timeZone: string)
   if (appointmentKey === addDaysToDateKey(todayKey, -1)) return `Yesterday, ${time}`;
 
   return formatDateTime(value, timeZone);
-}
-
-function profileDetailItem(label: string, value: string | null | undefined, href?: string): ProfileDetailItem | null {
-  if (!value) return null;
-  return href ? { href, label, value } : { label, value };
-}
-
-function profileDetailItems(items: Array<ProfileDetailItem | null>): ProfileDetailItem[] {
-  return items.filter((item): item is ProfileDetailItem => Boolean(item));
-}
-
-function profileDetailSections(sections: ProfileDetailSection[]): ProfileDetailSection[] {
-  return sections.filter((section) => section.items.length);
 }
 
 function preferencesNotes(value: unknown) {
@@ -453,8 +421,6 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
   const savedMessage = saved === "merged" ? "Client records merged." : saved ? "Client record updated." : "";
   const now = new Date();
   const address = formattedAddress(client);
-  const alternateEmails = stringArrayCsv(client.alternateEmails);
-  const alternatePhones = stringArrayCsv(client.alternatePhones);
   const clientDocumentAccept = privateMediaUploadMimeTypes.join(",");
   const clientDocumentUploadEnabled = canUploadClientDocuments(settings.mediaDriver);
   const currentAppointment = client.bookings
@@ -473,32 +439,6 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
   const documentsPage = clampPage(pageNumber(queryParams.documentsPage), documentsPageCount);
   const visibleNotes = client.notes.slice((notesPage - 1) * recordsPageSize, notesPage * recordsPageSize);
   const visibleDocuments = client.files.slice((documentsPage - 1) * recordsPageSize, documentsPage * recordsPageSize);
-  const profileSections = profileDetailSections([
-    {
-      title: "Additional contact",
-      items: profileDetailItems([
-        profileDetailItem("Alternate emails", alternateEmails),
-        profileDetailItem("Alternate phones", alternatePhones)
-      ])
-    },
-    {
-      title: "Record",
-      items: profileDetailItems([
-        profileDetailItem("Company", client.companyName),
-        profileDetailItem("Family or household", client.familyName)
-      ])
-    },
-    {
-      title: "Profile",
-      items: profileDetailItems([
-        profileDetailItem("Address", address),
-        profileDetailItem("Timezone", client.timezone),
-        profileDetailItem("Pronouns", client.pronouns),
-        profileDetailItem("Birthday", formatDateOnly(client.birthday)),
-        profileDetailItem("Anniversary", formatDateOnly(client.anniversary))
-      ])
-    }
-  ]);
   const consentBadges = [
     client.emailOptIn ? "Email opt-in" : "",
     client.smsOptIn ? "SMS opt-in" : "",
@@ -556,22 +496,11 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             {services.filter((service) => service.isActive || service.id === clientServiceId(client.preferences)).map((service) => <option key={service.id} value={service.id}>{service.name}{service.isActive ? "" : " (inactive)"}</option>)}
           </select>
         </div>
-      <EqualGrid>
-        <div className="ui-field">
-          <label htmlFor="pipelineStage">Pipeline</label>
-          <select id="pipelineStage" name="pipelineStage" defaultValue={client.pipelineStage}>
-            {Object.values(ClientPipelineStage).map((stage) =>
-            <option key={stage} value={stage}>
-                {enumLabel(stage)}
-              </option>
-            )}
-          </select>
-        </div>
-        <div className="ui-field">
-          <label htmlFor="tags">Tags</label>
-          <input id="tags" name="tags" defaultValue={client.tags.map((tag) => tag.label).join(", ")} />
-        </div>
-      </EqualGrid>
+      <input type="hidden" name="pipelineStage" value={client.pipelineStage} />
+      <div className="ui-field">
+        <label htmlFor="tags">Tags</label>
+        <input id="tags" name="tags" defaultValue={client.tags.map((tag) => tag.label).join(", ")} />
+      </div>
       <EqualGrid>
         <div className="ui-field">
           <label htmlFor="alternateEmails">Alternate emails</label>
@@ -611,10 +540,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
           <label htmlFor="country">Country</label>
           <input id="country" name="country" defaultValue={client.country} />
         </div>
-        <div className="ui-field">
-          <label htmlFor="timezone">Timezone</label>
-          <input id="timezone" name="timezone" defaultValue={client.timezone} placeholder={settings.timezone} />
-        </div>
+        <input type="hidden" name="timezone" value={client.timezone} />
         <div className="ui-field">
           <label htmlFor="pronouns">Pronouns</label>
           <input id="pronouns" name="pronouns" defaultValue={client.pronouns} />
@@ -653,54 +579,6 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
         Save profile
       </Button>
     </form>
-  );
-  const profileDetails = (
-    <div className="clients-profile-detail-panel" aria-label="Client profile details">
-      <section className="clients-profile-detail-section"><h3>Service</h3><p>{services.find((service) => service.id === clientServiceId(client.preferences))?.name || "No service selected"}</p></section>
-      {profileSections.map((section) => (
-        <section className="clients-profile-detail-section" key={section.title}>
-          <h3>{section.title}</h3>
-          <dl className="clients-profile-detail-list">
-            {section.items.map((item) => (
-              <div key={item.label}>
-                <dt>{item.label}</dt>
-                <dd>{item.href ? <a href={item.href}>{item.value}</a> : item.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      ))}
-      {client.tags.length ? (
-        <section className="clients-profile-detail-section">
-          <h3>Tags</h3>
-          <div className="clients-profile-badge-list">
-            {client.tags.map((tag) => (
-              <span className="ui-badge" key={tag.id}>
-                {tag.label}
-              </span>
-            ))}
-          </div>
-        </section>
-      ) : null}
-      {consentBadges.length ? (
-        <section className="clients-profile-detail-section">
-          <h3>Permissions</h3>
-          <div className="clients-profile-badge-list">
-            {consentBadges.map((badge) => (
-              <span className={badge.includes("requested") ? "ui-badge ui-badge-danger" : "ui-badge ui-badge-success"} key={badge}>
-                {badge}
-              </span>
-            ))}
-          </div>
-        </section>
-      ) : null}
-      {client.privateNotes ? (
-        <section className="clients-profile-detail-section clients-profile-note-section">
-          <h3>Private summary</h3>
-          <p className="ui-zero">{client.privateNotes}</p>
-        </section>
-      ) : null}
-    </div>
   );
   const noteForm = (
     <form action={addClientNoteAction} className="clients-tab-form form-grid">
@@ -748,42 +626,14 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
     </form>
   );
   const notesTable = (
-    <Table mobileLayout="columns" className="clients-records-table-wrap" tableClassName="ui-data-table clients-records-table">
-      <thead>
-        <tr>
-          <th data-mobile-column>Note</th>
-          <th>Created</th>
-          <th data-mobile-column>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {visibleNotes.map((note) => (
-          <tr key={note.id}>
-            <td data-mobile-column>
-              <details><summary className="clients-detail-cell-text">{truncate(note.content, 72)}</summary><p className="clients-records-text">{note.content}</p></details>
-            </td>
-            <td>{formatDateTime(note.createdAt, settings.timezone)}</td>
-            <td data-mobile-column className="clients-records-action-cell">
-              <form action={deleteClientNoteAction} className="clients-records-action-form">
-                <input type="hidden" name="id" value={note.id} />
-                <input type="hidden" name="clientId" value={client.id} />
-                <Switch label="Confirm" name="confirmDelete" variant="inline" />
-                <Button size="sm" type="submit" variant="secondary">
-                  Delete
-                </Button>
-              </form>
-            </td>
-          </tr>
-        ))}
-        {!client.notes.length ? (
-          <tr>
-            <td className="ui-data-table-empty" colSpan={3}>
-              No notes yet.
-            </td>
-          </tr>
-        ) : null}
-      </tbody>
-    </Table>
+    <NotesTable notes={visibleNotes} timezone={settings.timezone} renderActions={note => (
+      <form action={deleteClientNoteAction} className="ui-inline-actions">
+        <input type="hidden" name="id" value={note.id} />
+        <input type="hidden" name="clientId" value={client.id} />
+        <Switch label="Confirm" name="confirmDelete" variant="inline" />
+        <Button size="sm" type="submit" variant="secondary">Delete</Button>
+      </form>
+    )} />
   );
   const documentsTable = (
     <Table mobileLayout="columns" className="clients-records-table-wrap" tableClassName="ui-data-table clients-records-table">
@@ -942,23 +792,6 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
       <AdminMobileHeaderSlot backHref="/admin/modules/clients" title={client.name} />
       <header className="page-header clients-detail-header">
         <div className="clients-detail-heading"><ButtonLink href="/admin/modules/clients" size="sm" variant="ghost"><ArrowLeft aria-hidden="true" size={15} />Clients</ButtonLink><h1>{client.name}</h1></div>
-        <div className="module-card-header-actions">
-          <ModuleActionModals
-            className="clients-detail-overflow-actions"
-            initialActiveId={openMergeModal ? "merge" : undefined}
-            items={[
-              {
-                content: mergeClientModal,
-                icon: "more",
-                id: "merge",
-                label: "More",
-                title: "Client actions",
-                variant: "ghost"
-              }
-            ]}
-            toolbarLabel="Client actions"
-          />
-        </div>
       </header>
 
       {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
@@ -966,29 +799,19 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
 
       <section className="clients-detail-card-grid">
         <ClientProfileCard
-          details={profileDetails}
+          actions={mergeClientModal}
+          initialActionsOpen={openMergeModal}
+          address={address}
+          company={client.companyName}
           editForm={profileForm}
           email={client.email}
           name={client.name}
           phone={client.phone || ""}
           photoUrl={client.photoUrl}
-          pipeline={enumLabel(client.pipelineStage)}
+          permissions={consentBadges.length ? consentBadges.map((badge) => <span className={badge.includes("requested") ? "ui-badge ui-badge-danger" : "ui-badge ui-badge-success"} key={badge}>{badge}</span>) : "No opt-ins recorded"}
         />
         <ClientGalleriesSection clientId={client.id} settings={settings} user={user} />
       </section>
-
-        <ClientNotesDocumentsCard
-          documentCount={client.files.length}
-          documentForm={documentForm}
-          documentsPagination={documentsPagination}
-          documentsTable={documentsTable}
-          initialActiveTab={initialRecordsTab}
-          key={`client-records-${initialRecordsTab}`}
-          noteForm={noteForm}
-          noteCount={client.notes.length}
-          notesPagination={notesPagination}
-          notesTable={notesTable}
-        />
 
         <section className="ui-data-table-shell" aria-labelledby="client-appointments-title">
           <div className="ui-data-table-titlebar"><h2 id="client-appointments-title">Appointment history</h2></div>
@@ -1002,6 +825,19 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
             </tr>)}{!activityAppointments.length ? <tr><td colSpan={4}>No appointments yet.</td></tr> : null}</tbody>
           </Table>
         </section>
+
+        <ClientNotesDocumentsCard
+          documentCount={client.files.length}
+          documentForm={documentForm}
+          documentsPagination={documentsPagination}
+          documentsTable={documentsTable}
+          initialActiveTab={initialRecordsTab}
+          key={`client-records-${initialRecordsTab}`}
+          noteForm={noteForm}
+          noteCount={client.notes.length}
+          notesPagination={notesPagination}
+          notesTable={notesTable}
+        />
 
       <section className="ui-data-table-shell" aria-labelledby="client-communication-title">
         <div className="ui-data-table-titlebar"><h2 id="client-communication-title">Communications</h2></div>

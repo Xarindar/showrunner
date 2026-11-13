@@ -11,7 +11,7 @@ type ConnectedCredentialInput = {
   accessToken?: string;
   displayName?: string;
   encryptedMetadata?: Prisma.InputJsonValue;
-  expiresAt?: Date;
+  expiresAt?: Date | null;
   externalAccountId?: string;
   merchantId?: string;
   provider: PaymentProvider;
@@ -21,6 +21,7 @@ type ConnectedCredentialInput = {
   supportedWallets?: string[];
   webhookSecret?: string;
   webhookSecretHint?: string;
+  useForCheckout?: boolean;
 };
 
 export type PayPalSiteCredentials = {
@@ -32,47 +33,51 @@ export type PayPalSiteCredentials = {
 };
 
 export async function upsertConnectedGatewayCredential(input: ConnectedCredentialInput) {
-  return prisma.paymentGatewayCredential.upsert({
-    where: {
-      siteId_provider: {
+  return prisma.$transaction(async (tx) => {
+    const credential = await tx.paymentGatewayCredential.upsert({
+      where: {
+        siteId_provider: {
+          siteId: input.siteId,
+          provider: input.provider
+        }
+      },
+      update: {
+        connectedAt: new Date(),
+        displayName: input.displayName?.trim() || "",
+        encryptedAccessToken: input.accessToken === undefined ? undefined : encryptGatewaySecret(input.accessToken),
+        encryptedRefreshToken: input.refreshToken === undefined ? undefined : encryptGatewaySecret(input.refreshToken),
+        encryptedSecretKey: input.secretKey === undefined ? undefined : encryptGatewaySecret(input.secretKey),
+        encryptedWebhookSecret: input.webhookSecret === undefined ? undefined : encryptGatewaySecret(input.webhookSecret),
+        expiresAt: input.expiresAt,
+        externalAccountId: input.externalAccountId?.trim() || "",
+        lastVerifiedAt: new Date(),
+        merchantId: input.merchantId?.trim() || "",
+        metadata: input.encryptedMetadata ?? {},
+        status: PaymentGatewayConnectionStatus.CONNECTED,
+        supportedWallets: input.supportedWallets ?? [],
+        webhookSecretHint: input.webhookSecretHint?.trim() || ""
+      },
+      create: {
+        connectedAt: new Date(),
+        displayName: input.displayName?.trim() || "",
+        encryptedAccessToken: encryptGatewaySecret(input.accessToken || ""),
+        encryptedRefreshToken: encryptGatewaySecret(input.refreshToken || ""),
+        encryptedSecretKey: encryptGatewaySecret(input.secretKey || ""),
+        encryptedWebhookSecret: encryptGatewaySecret(input.webhookSecret || ""),
+        expiresAt: input.expiresAt,
+        externalAccountId: input.externalAccountId?.trim() || "",
+        lastVerifiedAt: new Date(),
+        merchantId: input.merchantId?.trim() || "",
+        metadata: input.encryptedMetadata ?? {},
+        provider: input.provider,
         siteId: input.siteId,
-        provider: input.provider
+        status: PaymentGatewayConnectionStatus.CONNECTED,
+        supportedWallets: input.supportedWallets ?? [],
+        webhookSecretHint: input.webhookSecretHint?.trim() || ""
       }
-    },
-    update: {
-      connectedAt: new Date(),
-      displayName: input.displayName?.trim() || "",
-      encryptedAccessToken: input.accessToken === undefined ? undefined : encryptGatewaySecret(input.accessToken),
-      encryptedRefreshToken: input.refreshToken === undefined ? undefined : encryptGatewaySecret(input.refreshToken),
-      encryptedSecretKey: input.secretKey === undefined ? undefined : encryptGatewaySecret(input.secretKey),
-      encryptedWebhookSecret: input.webhookSecret === undefined ? undefined : encryptGatewaySecret(input.webhookSecret),
-      expiresAt: input.expiresAt,
-      externalAccountId: input.externalAccountId?.trim() || "",
-      lastVerifiedAt: new Date(),
-      merchantId: input.merchantId?.trim() || "",
-      metadata: input.encryptedMetadata ?? {},
-      status: PaymentGatewayConnectionStatus.CONNECTED,
-      supportedWallets: input.supportedWallets ?? [],
-      webhookSecretHint: input.webhookSecretHint?.trim() || ""
-    },
-    create: {
-      connectedAt: new Date(),
-      displayName: input.displayName?.trim() || "",
-      encryptedAccessToken: encryptGatewaySecret(input.accessToken || ""),
-      encryptedRefreshToken: encryptGatewaySecret(input.refreshToken || ""),
-      encryptedSecretKey: encryptGatewaySecret(input.secretKey || ""),
-      encryptedWebhookSecret: encryptGatewaySecret(input.webhookSecret || ""),
-      expiresAt: input.expiresAt,
-      externalAccountId: input.externalAccountId?.trim() || "",
-      lastVerifiedAt: new Date(),
-      merchantId: input.merchantId?.trim() || "",
-      metadata: input.encryptedMetadata ?? {},
-      provider: input.provider,
-      siteId: input.siteId,
-      status: PaymentGatewayConnectionStatus.CONNECTED,
-      supportedWallets: input.supportedWallets ?? [],
-      webhookSecretHint: input.webhookSecretHint?.trim() || ""
-    }
+    });
+    if (input.useForCheckout) await tx.siteSettings.update({ where: { siteId: input.siteId }, data: { checkoutProvider: input.provider } });
+    return credential;
   });
 }
 
@@ -102,8 +107,7 @@ function isConnected(credential: { encryptedSecretKey?: string; status: PaymentG
 
 // Stripe API key for this site (direct-charge model): either the key the merchant pasted or the
 // OAuth access token from one-click connect (Stripe Connect Standard tokens act as the merchant's
-// own secret key). Empty string when not configured; callers fall back to the STRIPE_SECRET_KEY env
-// var for self-hosted-by-Cosmic demos.
+// own secret key). Empty string when this site has no connected credential.
 export async function getStripeApiKeyForSite(siteId: string) {
   const credential = await getConnectedGatewayCredential(siteId, PaymentProvider.STRIPE);
   if (!isConnected(credential) || !credential) return "";

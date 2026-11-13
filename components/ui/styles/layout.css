@@ -10,6 +10,9 @@
 .showrunner-admin .ui-gap-6 { gap: var(--space-6); }
 .showrunner-admin .ui-gap-7 { gap: var(--space-7); }
 .showrunner-admin .ui-cluster { display: flex; flex-wrap: wrap; min-width: 0; }
+.showrunner-admin .ui-action-stack { display: grid; align-content: start; align-items: start; gap: var(--space-2); min-width: 0; }
+.showrunner-admin .ui-action-stack > :is(form, .ui-button),
+.showrunner-admin .ui-action-stack > form > .ui-button { width: 100%; justify-self: stretch; }
 .showrunner-admin .ui-equal-grid {
   align-items: stretch;
   display: grid;
@@ -138,42 +141,58 @@
   z-index: 2;
 }
 .showrunner-admin .ui-tabs {
+  position: relative;
   align-items: center;
-  background: var(--sd-color-surface-subtle);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
+  background: var(--sd-color-fill-secondary);
+  border: 0;
+  border-radius: var(--radius-pill);
   display: inline-flex;
   min-height: var(--control-height);
-  padding: var(--space-1);
+  padding: var(--sd-space-2);
 }
 .showrunner-admin .ui-tab {
+  position: relative;
+  z-index: 1;
   align-items: center;
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: calc(var(--radius-control) - 2px);
-  color: var(--color-muted);
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
   cursor: pointer;
   display: inline-flex;
   flex: 0 0 auto;
-  font-size: var(--type-small);
-  font-weight: var(--sd-type-weight-strong);
+  font: var(--sd-type-label-weight) var(--sd-type-label-size)/var(--sd-type-label-line) var(--font-sans);
+  letter-spacing: var(--sd-type-label-tracking);
   gap: var(--space-2);
   justify-content: center;
-  line-height: 1;
-  min-height: 32px;
+  min-height: var(--sd-layout-button-height);
   min-width: 0;
   padding: 0 var(--space-3);
   text-decoration: none;
-  transition: background 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
+.showrunner-admin .ui-tab:hover { background: var(--sd-color-fill-secondary-hover); }
 .showrunner-admin .ui-tab[aria-selected="true"] {
-  background: var(--color-surface);
-  border-color: var(--color-border);
-  color: var(--color-text);
+  background: var(--sd-color-primary);
+  color: var(--sd-color-on-primary);
+  box-shadow: var(--sd-shadow-button-primary);
 }
-.showrunner-admin .ui-tab:focus-visible { outline: 2px solid var(--sd-color-surface-subtle); outline-offset: 2px; }
+.showrunner-admin .ui-tab[aria-selected="true"]:hover { background: var(--sd-color-primary-hover); }
+.showrunner-admin .ui-tabs-indicator {
+  display: none;
+  position: absolute;
+  left: 0;
+  pointer-events: none;
+  border-radius: var(--radius-pill);
+  background: var(--sd-color-primary);
+  box-shadow: var(--sd-shadow-button-primary);
+  /* The pill is out of flow, so its movement never resizes the tabs. */
+  transition: transform var(--motion-standard) var(--motion-ease), width var(--motion-standard) var(--motion-ease);
+}
+.showrunner-admin .ui-tabs[data-indicator="true"] .ui-tabs-indicator { display: block; }
+.showrunner-admin .ui-tabs[data-indicator="true"] .ui-tab[aria-selected="true"] { background: transparent; box-shadow: none; }
+.showrunner-admin .ui-tabs[data-indicator="true"]:has(.ui-tab[aria-selected="true"]:hover) .ui-tabs-indicator { background: var(--sd-color-primary-hover); }
+.showrunner-admin .ui-tab:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .showrunner-admin .ui-tab svg { flex: 0 0 auto; }
 .showrunner-admin .ui-tab[aria-selected="true"] .ui-tab-count { background: var(--sd-color-fill-active); color: var(--color-brand-dark); }
 .showrunner-admin .ui-skeleton-line,

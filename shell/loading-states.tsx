@@ -70,34 +70,29 @@ export function AppointmentsSkeleton() {
       <section className="appointments-calendar-shell">
         <header className="appointments-subtle-header appointments-skeleton-header" aria-hidden="true">
           <div className="appointments-subtle-title appointments-skeleton-title">
-            <SkeletonLine className="appointments-skeleton-eyebrow" />
             <SkeletonLine className="appointments-skeleton-range" />
-            <SkeletonLine className="appointments-skeleton-count" />
           </div>
 
-          <div className="appointments-header-nav appointments-skeleton-header-nav">
+
+        </header>
+
+        <div className="appointments-calendar-canvas" aria-hidden="true">
+        <div className="appointments-toolbar" aria-hidden="true">
+          <div className="appointments-toolbar-leading"><div className="appointments-toolbar-search"><SkeletonBlock className="appointments-skeleton-control" /></div><SkeletonBlock className="appointments-skeleton-control compact" /></div>
+          <div className="appointments-skeleton-tabs">
+            {Array.from({ length: 3 }, (_, index) => <SkeletonBlock className="appointments-skeleton-tab" key={index} />)}
+          </div>
+          <div className="appointments-toolbar-actions"><SkeletonBlock className="appointments-skeleton-control" /><SkeletonBlock className="appointments-skeleton-control action" /></div>
+        </div>
+
+          <div className="appointment-calendar">
+            <div className="appointments-calendar-context">
+          <div className="appointments-range-nav">
             <SkeletonBlock className="appointments-skeleton-control compact" />
             <SkeletonBlock className="appointments-skeleton-control today" />
             <SkeletonBlock className="appointments-skeleton-control compact" />
           </div>
 
-          <div className="appointments-header-actions appointments-skeleton-header-actions">
-            {Array.from({ length: 4 }, (_, index) => (
-              <SkeletonBlock className="appointments-skeleton-control action" key={index} />
-            ))}
-            <SkeletonBlock className="appointments-skeleton-control compact" />
-          </div>
-        </header>
-
-        <div className="appointments-calendar-canvas" aria-hidden="true">
-          <div className="appointment-calendar">
-            <div className="appointment-calendar-client-bar appointments-skeleton-client-bar">
-              <div className="appointments-skeleton-tabs">
-                {Array.from({ length: 4 }, (_, index) => (
-                  <SkeletonBlock className="appointments-skeleton-tab" key={index} />
-                ))}
-              </div>
-              <SkeletonLine className="appointments-skeleton-summary" />
             </div>
 
             <div className="appointment-fullcalendar appointments-skeleton-calendar">

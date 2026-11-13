@@ -5,11 +5,13 @@
   justify-content: center;
   gap: var(--sd-space-8);
   min-width: 0;
+  max-width: 100%;
+  justify-self: start;
   min-height: var(--sd-layout-button-height);
   padding: var(--sd-space-6) var(--sd-space-12);
   border: 0;
   border-radius: var(--sd-radius-pill);
-  background: var(--sd-color-primary);
+  background-color: var(--sd-color-primary);
   color: var(--sd-color-on-primary);
   box-shadow: var(--sd-shadow-button-primary);
   font: var(--sd-type-label-weight) var(--sd-type-label-size)/var(--sd-type-label-line) var(--font-sans);
@@ -23,38 +25,40 @@
   transition: background-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
 }
 .showrunner-admin :is(.ui-button, .button):hover {
-  background: var(--sd-color-primary-hover);
+  background-color: var(--sd-color-primary-hover);
   box-shadow: var(--sd-shadow-button-primary-hover);
 }
 .showrunner-admin :is(.ui-button, .button):active {
-  background: var(--sd-color-primary-active);
+  background-color: var(--sd-color-primary-active);
   box-shadow: var(--sd-shadow-button-primary-inset);
 }
 .showrunner-admin :is(.ui-button-secondary, .button.secondary) {
-  background: var(--sd-color-fill-secondary);
+  background-color: var(--sd-color-fill-secondary);
   color: var(--sd-color-text);
   box-shadow: none;
 }
 .showrunner-admin :is(.ui-button-secondary, .button.secondary):hover {
-  background: var(--sd-color-fill-secondary-hover);
+  background-color: var(--sd-color-fill-secondary-hover);
   box-shadow: none;
 }
-.showrunner-admin :is(.ui-button-ghost, .button.ghost) { background: transparent; color: var(--sd-color-text); box-shadow: none; }
-.showrunner-admin :is(.ui-button-ghost, .button.ghost):hover { background: var(--sd-color-fill-hover); box-shadow: none; }
+.showrunner-admin :is(.ui-button-ghost, .button.ghost) { background-color: transparent; color: var(--sd-color-text); box-shadow: none; }
+.showrunner-admin :is(.ui-button-ghost, .button.ghost):hover { background-color: var(--sd-color-fill-hover); box-shadow: none; }
 .showrunner-admin :is(.ui-button-danger, .button.danger) {
-  background: var(--sd-color-critical-action);
+  background-color: var(--sd-color-critical-action);
   color: var(--sd-color-on-primary);
   box-shadow: none;
 }
-.showrunner-admin :is(.ui-button-danger, .button.danger):hover { background: var(--sd-color-critical-text); box-shadow: none; }
+.showrunner-admin :is(.ui-button-danger, .button.danger):hover { background-color: var(--sd-color-critical-text); box-shadow: none; }
 .showrunner-admin :is(.ui-button, .button):is(:disabled, [aria-disabled="true"]) {
-  background: var(--sd-color-fill);
+  background-color: var(--sd-color-fill);
   color: var(--sd-color-text-disabled);
   box-shadow: none;
   cursor: not-allowed;
   opacity: 1;
 }
 .showrunner-admin :is(.ui-button, .button):focus-visible { outline: 2px solid var(--sd-color-focus); outline-offset: -2px; }
+/* Inline counts follow the button text metrics so badges do not enlarge the control. */
+.showrunner-admin .ui-button .ui-badge { font: inherit; padding-block: 0; }
 .showrunner-admin .ui-button-lg { padding: var(--sd-space-8) var(--sd-space-16); }
 /* Plain wrapped fields share label spacing; explicit module layouts can override this default. */
 .showrunner-admin :where(label:has(> :is(select, textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"])))) {
@@ -150,6 +154,15 @@
 .showrunner-admin input::placeholder, .showrunner-admin textarea::placeholder { color: var(--sd-color-text-tertiary); opacity: 1; }
 @media (max-width: 860px), (pointer: coarse) {
   .showrunner-admin :is(.ui-button, .button, .ui-tab) { min-height: var(--sd-layout-touch-target); }
+  .showrunner-admin :is(.ui-button, .button) {
+    border-block: calc((var(--sd-layout-touch-target) - var(--sd-layout-button-height)) / 2) solid transparent;
+    /* Match the visible pill's horizontal radius to its height inside the touch target. */
+    border-radius: calc(var(--sd-layout-button-height) / 2) / calc(var(--sd-layout-touch-target) / 2);
+    background-clip: padding-box;
+    box-shadow: none;
+  }
+  .showrunner-admin :is(.ui-button, .button):is(:hover, :active) { box-shadow: none; }
+  .showrunner-admin :is(.ui-button, .button):focus-visible { outline-offset: calc((var(--sd-layout-button-height) - var(--sd-layout-touch-target)) / 2); }
   .showrunner-admin :is(.admin-main, .login-wrap) :is(input:where(:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="range"]):not([type="color"])), select, textarea) {
     min-height: var(--sd-layout-touch-target);
     font-size: var(--sd-type-input-touch-size);
@@ -173,4 +186,34 @@
     padding-inline: var(--select-compact-option-padding-x);
   }
   .showrunner-admin select.ui-select-compact option::checkmark { display: none; }
+}
+
+/* Scope the anchor so multiple pickers can share the same recipe. */
+.showrunner-admin .ui-date-picker { anchor-scope: --ui-date-picker; }
+.showrunner-admin .ui-date-picker > .ui-button { anchor-name: --ui-date-picker; }
+.showrunner-admin .ui-date-picker-popover {
+  position: fixed;
+  position-anchor: --ui-date-picker;
+  position-area: bottom;
+  position-try-fallbacks: flip-block;
+  margin: var(--sd-space-8) 0;
+  padding: var(--sd-space-12);
+  width: min(300px, calc(100vw - 24px));
+  border: 0;
+  border-radius: var(--sd-radius-input);
+  background: var(--sd-color-surface);
+  color: var(--sd-color-text);
+  box-shadow: var(--sd-shadow-popover);
+  font: var(--sd-type-label-weight) var(--sd-type-label-size)/var(--sd-type-label-line) var(--font-sans);
+}
+.showrunner-admin .ui-date-picker-header { display: flex; align-items: center; justify-content: space-between; gap: var(--sd-space-8); margin-bottom: var(--sd-space-8); }
+.showrunner-admin .ui-date-picker-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--sd-space-4); }
+.showrunner-admin .ui-date-picker-grid > .ui-button { justify-self: stretch; padding-inline: 0; min-height: var(--sd-space-32); }
+.showrunner-admin .ui-date-picker-grid [data-outside="true"]:not([aria-pressed="true"]) { color: var(--color-muted); }
+.showrunner-admin .ui-date-picker-weekday { text-align: center; color: var(--color-muted); padding-block: var(--sd-space-4); }
+
+.showrunner-admin .ui-date-picker-label-compact { display: none; }
+@media (max-width: 860px) {
+  .showrunner-admin .ui-date-picker-label-full { display: none; }
+  .showrunner-admin .ui-date-picker-label-compact { display: inline; }
 }

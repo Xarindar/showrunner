@@ -11,13 +11,13 @@ import { normalizeClientStatusSettings } from "../lib/clients/status-settings";
 import { isRecord } from "../lib/objects";
 
 type Query = { where?: Record<string, unknown>; data?: Record<string, unknown> };
-function harness(options: { existing?: boolean; failBooking?: boolean; conflict?: boolean; documents?: bookingDocuments.BookingDocument[]; changedDocuments?: boolean } = {}) {
+function harness(options: { existing?: boolean; existingCompany?: string; failBooking?: boolean; conflict?: boolean; documents?: bookingDocuments.BookingDocument[]; changedDocuments?: boolean } = {}) {
   const committed: Query[] = [];
   const writes: Query[] = [];
   const bookingWrites: Query[] = [];
   const settingQueries: Query[] = [];
   const serviceQueries: Query[] = [];
-  const existing = { id: "client-a", name: "Saved name", phone: "Saved phone", preferences: { notes: "Keep notes", serviceId: "old-service" } };
+  const existing = { id: "client-a", name: "Saved name", phone: "Saved phone", companyName: options.existingCompany || "", preferences: { notes: "Keep notes", serviceId: "old-service" } };
   const service = { id: "portrait", siteId: "jazzr", name: "Portrait session", isActive: true, durationMinutes: 60, slotIntervalMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, resourceAssignments: [], staffAssignments: [] };
   const tx = {
     service: {findFirst:async()=>service},
@@ -108,4 +108,20 @@ test("public bookings require effective document answers and acceptance, and ret
  const changed=harness({documents,changedDocuments:true});
  await assert.rejects(changed.book({bookingRequirementsRevision:requirements.revision,policyAccepted:true,intakeAnswers:answers}),/changed/);
  assert.equal(changed.writes.length,0,'Terms changed during availability cannot commit a booking or client');
+});
+
+
+test("booking company is optional, fills blank client companies and preserves saved companies", async () => {
+  const added = harness();
+  await added.book({ customerCompany: "  Client Studio  " });
+  assert.equal(added.committed[0].data!.companyName, "Client Studio");
+  const blank = harness({ existing: true });
+  await blank.book({ customerCompany: "Client Studio" });
+  assert.equal(blank.committed[0].data!.companyName, "Client Studio");
+  const saved = harness({ existing: true, existingCompany: "Saved Company" });
+  await saved.book({ customerCompany: "Another Company" });
+  assert.equal(saved.committed[0].data!.companyName, undefined);
+  const omitted = harness();
+  await omitted.book();
+  assert.equal(omitted.committed[0].data!.companyName, "");
 });

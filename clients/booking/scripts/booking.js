@@ -670,6 +670,7 @@
       customerName: String(formData.get("customerName") || "").trim(),
       customerEmail: String(formData.get("customerEmail") || "").trim(),
       customerPhone: String(formData.get("customerPhone") || "").trim(),
+      customerCompany: String(formData.get("customerCompany") || "").trim(),
       notes: String(formData.get("notes") || "").trim(),
       intakeResponse: String(formData.get("intakeResponse") || "").trim(),
       intakeAnswers: window.ShowrunnerBookingRules.answers(els.form),

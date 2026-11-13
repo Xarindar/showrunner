@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Eye, Upload } from "lucide-react";
+import { Eye, Plus, Upload } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Table } from "@/components/ui/table";
 import { getClientGalleryWorkspace } from "@/modules/portfolio/client-actions";
 import { clientSessionPath, clientSessionRows, type ClientGalleryWorkspace } from "@/modules/portfolio/client-gallery-validation";
 
-export function ClientSessionsTable({ clientId, initialWorkspace }: { clientId: string; initialWorkspace: ClientGalleryWorkspace }) {
+export function ClientSessionsTable({ clientId, initialWorkspace, canCreateSession = false }: { clientId: string; initialWorkspace: ClientGalleryWorkspace; canCreateSession?: boolean }) {
   const [workspace, setWorkspace] = useState(initialWorkspace);
   const processing = workspace.galleries.some(gallery => gallery.imageStatus === "Images processing");
   useEffect(() => {
@@ -19,7 +19,7 @@ export function ClientSessionsTable({ clientId, initialWorkspace }: { clientId: 
   }, [clientId, processing]);
   const rows = clientSessionRows(workspace);
   return <section className="ui-data-table-shell clients-detail-sessions clients-session-index" aria-labelledby="client-sessions-title">
-    <header className="ui-data-table-titlebar"><h2 id="client-sessions-title">Sessions</h2></header>
+    <header className="ui-data-table-titlebar"><h2 id="client-sessions-title">Sessions</h2>{canCreateSession ? <ButtonLink href={`/admin/appointments/new?clientId=${encodeURIComponent(clientId)}`} size="sm" variant="secondary"><Plus aria-hidden="true" size={16} />New Session</ButtonLink> : null}</header>
     <Table mobileLayout="columns" aria-label="Client sessions" tableClassName="ui-data-table">
       <thead><tr><th data-mobile-column>Session</th><th>Date</th><th data-mobile-column>Status</th><th>Photos</th><th data-mobile-column>Actions</th></tr></thead>
       <tbody>{rows.map(row => <tr key={row.id}>

@@ -58,6 +58,7 @@ export type BookingRequest = {
   customerName: string;
   customerEmail: string;
   customerPhone?: string;
+  customerCompany?: string;
   notes?: string;
   intakeResponse?: string;
   intakeAnswers?: Record<string, string | string[]>;

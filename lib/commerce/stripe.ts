@@ -26,10 +26,9 @@ import { updateOrderStatus } from "./orders";
 const STRIPE_EVENT_STALE_PROCESSING_MS = 5 * 60 * 1000;
 
 // Build a Stripe client from the merchant's own pasted secret key for this site (direct-charge model:
-// no Connect, no stripeAccount). Falls back to a STRIPE_SECRET_KEY env var for Cosmic-hosted demos,
-// and throws a clear setup message if neither is configured.
-async function getStripeForSite(siteId?: string) {
-  const apiKey = (siteId ? await getStripeApiKeyForSite(siteId) : "") || process.env.STRIPE_SECRET_KEY || "";
+// no Connect, no stripeAccount). Never charge a different account when this site is disconnected.
+async function getStripeForSite(siteId: string) {
+  const apiKey = await getStripeApiKeyForSite(siteId);
   if (!apiKey) {
     throw new Error("Connect Stripe in Settings → Payments before creating Stripe Checkout.");
   }

@@ -47,6 +47,7 @@ export function AppointmentEventChip({ event, view }: EventContentArg) {
 
   const density = densityFor(booking.durationMinutes);
   const variant = variantFor(view.type);
+  const compact = view.type === "timeGridWeek" || variant === "month";
   const time = eventTimeParts(booking.timeLabel, booking.endTimeLabel);
   const status = booking.status.toLowerCase();
   const conflictLabel = booking.warnings.length ? `Conflict: ${booking.warnings.join(" ")}` : "";
@@ -64,11 +65,12 @@ export function AppointmentEventChip({ event, view }: EventContentArg) {
   return (
     <div
       aria-label={accessibleLabel}
-      className={`appointment-event-chip appointment-event-chip--${variant} appointment-event-chip--${density}`}
+      className={`appointment-event-chip appointment-event-chip--${variant} appointment-event-chip--${density}${compact ? " appointment-event-chip--summary" : ""}`}
       role="group"
       title={[booking.customerName, booking.serviceName, time.fullLabel, conflictLabel].filter(Boolean).join(" · ")}
     >
       <time aria-label={time.fullLabel} className="appointment-event-chip__time" dateTime={booking.startsAt}>
+        {compact ? booking.timeLabel : <>
         <span aria-hidden="true" className="appointment-event-chip__time-start">
           {time.fullStart}
         </span>
@@ -84,14 +86,15 @@ export function AppointmentEventChip({ event, view }: EventContentArg) {
         <span aria-hidden="true" className="appointment-event-chip__time-end">
           {time.end}
         </span>
+        </>}
       </time>
 
-      <strong className="appointment-event-chip__client">{booking.customerName}</strong>
+      <strong className="appointment-event-chip__title">{booking.serviceName}</strong>
 
-      <div className="appointment-event-chip__meta">
-        <span className="appointment-event-chip__service">{booking.serviceName}</span>
+      {!compact ? <div className="appointment-event-chip__meta">
+        <span className="appointment-event-chip__customer">{booking.customerName}</span>
         {booking.staffName ? <span className="appointment-event-chip__staff">{booking.staffName}</span> : null}
-      </div>
+      </div> : null}
 
       <span className="ui-sr-only">Status: {status}</span>
     </div>

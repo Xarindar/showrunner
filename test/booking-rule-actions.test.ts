@@ -45,6 +45,7 @@ test("public bookings forward structured answers and report rule validation as a
     "@/lib/embed/gateway": { EmbedRequestError: RequestError },
     "@/lib/scheduling/native": { nativeSchedulingAdapter: { createBooking: async (input: { siteId: string; customerName: string; customerEmail: string; intakeAnswers?: Record<string, string> }) => {
       assert.equal(input.siteId, "site-a");
+      assert.equal((input as { customerCompany?: string }).customerCompany, "Client Studio");
       assert.equal((input as { customerPhone?: string }).customerPhone, "+1 (555) 123-4567");
       bookingRules.validateBookingRuleAnswers([rule], input.intakeAnswers, input);
       throw new Error("Reached booking transaction");
@@ -52,10 +53,11 @@ test("public bookings forward structured answers and report rule validation as a
   };
   const exports: Record<string, (input: unknown) => Promise<unknown>> = {};
   runInNewContext(ts.transpileModule(readFileSync("lib/embed/public-scheduling.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports, URL, require: (id: string) => id in mocks ? mocks[id] : id.startsWith("@/") ? {} : require(id) });
-  const body = { serviceId: "service", startsAt: "2030-01-01T15:00:00Z", customerName: "Test Client", customerEmail: "test@example.com", customerPhone: " +1 (555) 123-4567 " };
+  const body = { serviceId: "service", startsAt: "2030-01-01T15:00:00Z", customerName: "Test Client", customerEmail: "test@example.com", customerPhone: " +1 (555) 123-4567 ", customerCompany: "  Client Studio  " };
   for (const customerPhone of [undefined, null, "", "   "]) {
     await assert.rejects(exports.createPublicSchedulingBooking({ siteId: "site-a", body: { ...body, customerPhone, intakeAnswers: { style: "Candid" } } }), error => error instanceof RequestError && error.status === 400 && /phone number/.test(error.message));
   }
+  for (const customerCompany of [123, "x".repeat(201)]) await assert.rejects(exports.createPublicSchedulingBooking({ siteId: "site-a", body: { ...body, customerCompany } }), error => error instanceof RequestError && error.status === 400);
   for (const intakeAnswers of [{}, { style: "Forged" }]) await assert.rejects(exports.createPublicSchedulingBooking({ siteId: "site-a", body: { ...body, intakeAnswers } }), error => error instanceof RequestError && error.status === 400);
   await assert.rejects(exports.createPublicSchedulingBooking({ siteId: "site-a", body: { ...body, intakeAnswers: { style: "Candid" } } }), /Reached booking transaction/);
 });

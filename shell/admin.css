@@ -564,6 +564,7 @@
   padding: var(--admin-page-inset);
 }
 .showrunner-admin .admin-main:has(> .stack > .page-header),
+.showrunner-admin .admin-main:has(.appointments-workspace),
 .showrunner-admin .admin-main:has(> .product-studio-page > .product-studio-header) {
   padding-top: 0;
 }

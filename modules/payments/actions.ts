@@ -17,13 +17,14 @@ import {
   saveSquareCredentials,
   saveSquareWebhookSignatureKey,
   saveStripeCredentials,
+  squareVerify,
   type PayPalEnvironment,
   type SquareEnvironment
 } from "@/lib/payments/provider-onboarding";
 import { prisma } from "@/lib/prisma";
 import { defaultEnabledModules } from "@/shell/modules";
 import { resolveCurrentSite } from "@/lib/site";
-import type { PaymentActionState } from "./state";
+import type { PaymentActionState, SquareLocationState } from "./state";
 
 // All payment actions return a small serializable state so the guided modals can show inline success
 // and errors with useActionState — no full-page redirects that would tear down the wizard mid-flow.
@@ -92,8 +93,8 @@ export async function connectStripeAction(
   try {
     const result = await saveStripeCredentials({
       apiKey: String(formData.get("stripeApiKey") || ""),
-      siteId: site.id,
-      webhookSecret: String(formData.get("stripeWebhookSecret") || "")
+      useForCheckout: formData.get("useForCheckout") === "on",
+      siteId: site.id
     });
     await auditPaymentProvider(user, site.id, site.name, "settings.payment_provider.connected", PaymentProvider.STRIPE, {
       keyMode: result.livemode ? "live" : "test"
@@ -232,6 +233,23 @@ export async function updateCheckoutTotalsAction(
   return { status: "success", message: "Checkout totals saved." };
 }
 
+export async function inspectSquareLocationsAction(
+  _prev: SquareLocationState,
+  formData: FormData
+): Promise<SquareLocationState> {
+  await requireAdmin("settings:update");
+  const token = String(formData.get("squareAccessToken") || "").trim();
+  if (!token) return { status: "error", message: "Paste your Square access token first." };
+  try {
+    const locations = (await squareVerify(formData.get("squareEnvironment") === "sandbox" ? "sandbox" : "production", token))
+      .filter((item) => item.id && item.status !== "INACTIVE")
+      .map((item) => ({ id: item.id!, name: item.name || item.id! }));
+    return locations.length ? { status: "success", locations, inspectionVersion: String(formData.get("inspectionVersion") || "") } : { status: "error", message: "Square did not return an active location. Add one in Square, then try again." };
+  } catch {
+    return { status: "error", message: "Square could not verify this token. Copy the personal access token for the selected environment and try again." };
+  }
+}
+
 export async function connectSquareAction(
   _prev: PaymentActionState,
   formData: FormData
@@ -244,11 +262,11 @@ export async function connectSquareAction(
 
   try {
     await saveSquareCredentials({
+      useForCheckout: formData.get("useForCheckout") === "on",
       accessToken: String(formData.get("squareAccessToken") || ""),
       environment,
       locationId: String(formData.get("squareLocationId") || ""),
-      siteId: site.id,
-      webhookSignatureKey: String(formData.get("squareWebhookSignatureKey") || "")
+      siteId: site.id
     });
     await auditPaymentProvider(user, site.id, site.name, "settings.payment_provider.connected", PaymentProvider.SQUARE, {
       environment
@@ -295,11 +313,11 @@ export async function connectPayPalAction(
 
   try {
     await savePayPalCredentials({
+      useForCheckout: formData.get("useForCheckout") === "on",
       clientId: String(formData.get("paypalClientId") || ""),
       clientSecret: String(formData.get("paypalClientSecret") || ""),
       environment,
-      siteId: site.id,
-      webhookId: String(formData.get("paypalWebhookId") || "")
+      siteId: site.id
     });
     await auditPaymentProvider(user, site.id, site.name, "settings.payment_provider.connected", PaymentProvider.PAYPAL, {
       environment

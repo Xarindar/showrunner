@@ -1,7 +1,7 @@
 import type { Resource, Service, StaffMember } from "@prisma/client";
 import { Search } from "lucide-react";
 import type { SlotDiagnostics } from "@/lib/scheduling/types";
-import { Button, Card, EqualGrid, Table } from "@/components/ui";
+import { Button, EqualGrid, Table } from "@/components/ui";
 
 type SlotDiagnosticsPanelProps = {
   defaultOpen?: boolean;
@@ -35,10 +35,10 @@ export function SlotDiagnosticsPanel({
   const hiddenSlotCount = Math.max(0, (diagnostics?.slots.length || 0) - shownSlots.length);
 
   return (
-    <Card as="section" bodyClassName="ui-stack">
+    <section className="studio-panel ui-section-card">
       <details open={defaultOpen} className="admin-slot-diagnostics">
-        <summary>Check availability</summary>
-        <div className="ui-stack">
+        <summary className="ui-section-header">Check availability</summary>
+        <div className="ui-section-body ui-stack">
           <p className="ui-zero">Trace generated openings and the rules blocking unavailable times.</p>
 
       <form action="/admin/modules/appointments/schedule" className="subpanel form-grid">
@@ -96,14 +96,13 @@ export function SlotDiagnosticsPanel({
             <span className="ui-badge">{diagnostics.ruleCount} rules</span>
             <span className="ui-badge ui-badge-success">{diagnostics.availableCount} available</span>
             <span className="ui-badge">{diagnostics.slotCount} generated</span>
-            <span className="ui-badge">{diagnostics.timezone}</span>
           </div>
           {diagnostics.messages.length ?
         <div className="error ui-zero">
               {diagnostics.messages.join(" ")}
             </div> :
         null}
-          <Table>
+          <section className="ui-data-table-shell"><div className="ui-data-table-titlebar"><h2>Availability results</h2></div><Table aria-label="Availability results" tableClassName="ui-data-table">
             <thead>
               <tr>
                 <th>Time</th>
@@ -133,7 +132,7 @@ export function SlotDiagnosticsPanel({
                 </tr> :
             null}
             </tbody>
-          </Table>
+          </Table></section>
           {hiddenSlotCount ?
         <p className="ui-zero">{hiddenSlotCount} additional slots hidden.</p> :
         null}
@@ -143,6 +142,6 @@ export function SlotDiagnosticsPanel({
       }
         </div>
       </details>
-    </Card>);
+    </section>);
 
 }

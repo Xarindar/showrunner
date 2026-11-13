@@ -129,7 +129,6 @@
                 <div class="booking-time-section">
                   <div class="booking-slot-head">
                     <h3 data-slot-heading>Time</h3>
-                    <span data-timezone-label></span>
                   </div>
                   <div class="booking-slot-grid" data-slot-grid></div>
                   <p class="booking-empty" data-slot-empty hidden>No times are available for this date.</p>
@@ -156,6 +155,10 @@
                   <label>
                     <span>Name</span>
                     <input name="customerName" type="text" autocomplete="name" required />
+                  </label>
+                  <label>
+                    <span>Company (optional)</span>
+                    <input name="customerCompany" type="text" autocomplete="organization" maxlength="200" />
                   </label>
                   <label>
                     <span>Email</span>

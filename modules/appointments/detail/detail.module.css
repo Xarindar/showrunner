@@ -1,0 +1,56 @@
+.overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--workspace-rail-width));
+  align-items: start;
+  gap: var(--space-4);
+}
+
+:global(.showrunner-admin) .page :global(.ui-data-table-titlebar) {
+  min-height: var(--sd-layout-touch-target);
+  padding-block: 0;
+}
+
+:global(.showrunner-admin) .facts {
+  --data-table-compact-cell-x: var(--space-4);
+  border: 0;
+  border-radius: 0;
+}
+
+:global(.showrunner-admin) .facts table :is(th, td) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: var(--sd-type-body-line);
+}
+
+:global(.showrunner-admin) .facts table th[scope="row"] {
+  width: var(--sd-layout-stat-min);
+  color: var(--color-muted);
+  font-weight: var(--sd-type-body-weight);
+}
+
+:global(.showrunner-admin) .facts table td {
+  font-variant-numeric: tabular-nums;
+}
+
+:global(.showrunner-admin) .contactTrigger {
+  padding-inline: 0;
+  font: inherit;
+  text-align: start;
+  justify-content: flex-start;
+}
+
+.contactHeading h2 {
+  margin: 0;
+  font-size: var(--type-h2);
+  font-weight: var(--sd-type-heading-weight);
+  line-height: var(--sd-type-heading-line);
+}
+
+.contactHeading p { margin: var(--space-1) 0 0; }
+
+@media (max-width: 860px) {
+  .overview { grid-template-columns: minmax(0, 1fr); }
+  :global(.showrunner-admin) .facts table th[scope="row"] {
+    width: var(--sd-space-96);
+  }
+}

@@ -2,13 +2,13 @@
 import { Notification } from "@/components/ui/notifications";
 
 import { useMemo, useState } from "react";
-import { TicketPlus, Zap } from "lucide-react";
+import { TicketPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { SettingRow, SettingsGroup } from "@/components/ui/settings";
 import { Table } from "@/components/ui/table";
 import { ProviderMark } from "./brand-marks";
-import { buildConnectWizards, ConnectWizard, type WebhookUrls } from "./connect-wizard";
+import { buildConnectWizards, ConnectWizard } from "./connect-wizard";
 import {
   CheckoutModal,
   CheckoutTotalsModal,
@@ -30,19 +30,11 @@ export type ProviderCard = {
   needsAttention: boolean;
   headline: string;
   manageDetail: string;
-  // One-click OAuth connect through the AdmitOne Connect broker (Stripe/Square only).
-  oauthConnect?: boolean;
-  // Rendered as the de-emphasized "paste your own keys" option (PayPal when OAuth is on).
-  advanced?: boolean;
   // Manual Square connections need a signing key; Stripe repairs missing webhooks on reconnect.
   webhookMissing?: boolean;
 };
 
 export type ConnectNotice = { kind: "success" | "error"; message: string };
-
-function connectStartHref(provider: ProviderKey) {
-  return `/api/payments/connect/${provider.toLowerCase()}/start`;
-}
 
 export type ActiveCoupon = {
   amountCents: number | null;
@@ -71,7 +63,6 @@ export type PaymentsWorkspaceProps = {
   coupons: ActiveCoupon[];
   featuredConnected: boolean;
   notice?: ConnectNotice | null;
-  webhooks: WebhookUrls;
 };
 
 type ActiveModal =
@@ -119,27 +110,17 @@ export function PaymentsWorkspace({
   methods,
   notice,
   providers,
-  timezone,
-  webhooks
+  timezone
 }: PaymentsWorkspaceProps) {
   const [active, setActive] = useState<ActiveModal>(null);
   const close = () => setActive(null);
-  const oneClickAvailable = providers.some((provider) => provider.oauthConnect);
 
-  const wizards = useMemo(() => buildConnectWizards(webhooks), [webhooks]);
+  const wizards = useMemo(() => buildConnectWizards(), []);
   const connectedCount = providers.filter((provider) => provider.connected).length;
 
   const enabledMethodLabels = methods.options
     .filter((option) => methods.enabledKeys.includes(option.key))
     .map((option) => option.label);
-
-  // Guided "set up" progress: connect an account → turn on ways to pay → pick the checkout account.
-  const steps = [
-    connectedCount > 0,
-    methods.connected && methods.enabledKeys.length > 0,
-    Boolean(checkout.active) && !checkout.disconnected
-  ];
-  const done = steps.filter(Boolean).length;
 
   const manageProvider = active?.kind === "manage" ? providers.find((p) => p.provider === active.provider) : undefined;
   const connectConfig = active?.kind === "connect" ? wizards[active.provider] : undefined;
@@ -174,15 +155,8 @@ export function PaymentsWorkspace({
         <div>
           <p className="eyebrow">Payments</p>
           <h1>Payments</h1>
-          <p>
-            {oneClickAvailable
-              ? "Connect your own payment accounts with one click and choose how customers pay. Tokens are stored encrypted, and charges settle directly to your own account."
-              : "Connect your own payment accounts and choose how customers pay. Credentials are verified live, stored encrypted, and charges settle to your own account."}
-          </p>
         </div>
-        <span className={done === steps.length ? "guided-progress guided-progress-done" : "guided-progress"}>
-          {done} of {steps.length} set up
-        </span>
+        <span className="ui-badge">{connectedCount} connected</span>
       </header>
 
       {notice ? <Notification tone={notice.kind === "success" ? "success" : "danger"} queryKey={notice.kind === "success" ? "connected" : "connectError"}>{notice.message}</Notification> : null}
@@ -221,22 +195,13 @@ export function PaymentsWorkspace({
               <Button onClick={() => setActive({ kind: "manage", provider: provider.provider })} size="sm" type="button" variant="secondary">
                 Manage
               </Button>
-            ) : provider.oauthConnect ? (
-              // One-click OAuth: navigate directly to the provider-hosted login. OAuth providers
-              // do not expose the manual credential path because reconnecting must repeat OAuth.
-              <a
-                className={`ui-button ui-button-sm${provider.recommended && connectedCount === 0 ? "" : " ui-button-secondary"}`}
-                href={connectStartHref(provider.provider)}>
-                <Zap size={15} />
-                {provider.needsAttention ? "Reconnect" : "Connect"}
-              </a>
             ) : (
               <Button
                 onClick={() => setActive({ kind: "connect", provider: provider.provider })}
                 size="sm"
                 type="button"
-                variant={provider.recommended && connectedCount === 0 && !provider.advanced ? undefined : "secondary"}>
-                {provider.advanced ? "Connect (paste keys)" : "Connect"}
+                variant={provider.recommended && connectedCount === 0 ? undefined : "secondary"}>
+                {provider.needsAttention ? "Replace connection" : "Set up"}
               </Button>
             )}
           </SettingRow>
@@ -370,7 +335,7 @@ export function PaymentsWorkspace({
       </section>
 
       {active?.kind === "connect" && connectConfig ? (
-        <ConnectWizard config={connectConfig} key={`connect-${active.provider}`} onClose={close} open={true} />
+        <ConnectWizard config={connectConfig} defaultUseForCheckout={!checkout.anyConnected || checkout.active === active.provider} key={`connect-${active.provider}`} onClose={close} open={true} />
       ) : null}
 
       <Modal className="pay-dialog" onClose={close} open={simpleModalOpen} title={modalTitle}>
@@ -379,9 +344,8 @@ export function PaymentsWorkspace({
             detail={manageProvider.manageDetail}
             key={`manage-${active.provider}`}
             name={manageProvider.name}
-            oauthReconnectHref={manageProvider.oauthConnect ? connectStartHref(manageProvider.provider) : undefined}
             onClose={close}
-            onReplace={manageProvider.oauthConnect ? undefined : () => setActive({ kind: "connect", provider: manageProvider.provider })}
+            onReplace={() => setActive({ kind: "connect", provider: manageProvider.provider })}
             provider={manageProvider.provider}
             webhookMissing={manageProvider.webhookMissing} />
         ) : null}

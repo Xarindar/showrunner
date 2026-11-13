@@ -8,6 +8,10 @@ import { isOAuthSquareCredential, refreshSquareCredentialDirect, squareRefreshRe
 
 type SquareUpdate = { id: string; updated_at: string; status?: string; order_id?: string; payment_id?: string; location_id?: string };
 
+function canMaintain(credential: Parameters<typeof isOAuthSquareCredential>[0]) {
+  return isOAuthSquareCredential(credential) || (isRecord(credential.metadata) && credential.metadata.onboarding === "square_access_token");
+}
+
 // Read authenticated merchant data directly: no application-wide webhook feed or broker dependency.
 export async function reconcileSquare(siteId: string) {
   const { accessToken, environment, credential } = await getSquareAccessToken(siteId);
@@ -70,16 +74,16 @@ export async function maintainSquareConnections() {
     status: { in: [PaymentGatewayConnectionStatus.CONNECTED, PaymentGatewayConnectionStatus.ERROR] } } });
   const failures: string[] = [];
   for (const credential of credentials) {
-    if (!isOAuthSquareCredential(credential)) continue;
+    if (!canMaintain(credential)) continue;
     try {
       await prisma.$transaction(async (tx) => {
         const lock = await tx.$queryRaw<Array<{ acquired: boolean }>>`SELECT pg_try_advisory_xact_lock(hashtextextended(${`square-maintenance:${credential.siteId}`}, 0)) AS acquired`;
         if (!lock[0]?.acquired) return;
         const current = await tx.paymentGatewayCredential.findUnique({ where: { id: credential.id } });
-        if (!current || !isOAuthSquareCredential(current) || (current.status !== PaymentGatewayConnectionStatus.CONNECTED && current.status !== PaymentGatewayConnectionStatus.ERROR)) return;
+        if (!current || !canMaintain(current) || (current.status !== PaymentGatewayConnectionStatus.CONNECTED && current.status !== PaymentGatewayConnectionStatus.ERROR)) return;
         const metadata = isRecord(current.metadata) ? current.metadata : {};
         if (typeof metadata.squareSyncedAt === "string" && Date.parse(metadata.squareSyncedAt) > Date.now() - 45_000) return;
-        if (!squareRefreshRequiresReconnect(current)) await refreshSquareCredentialDirect(current);
+        if (isOAuthSquareCredential(current) && !squareRefreshRequiresReconnect(current)) await refreshSquareCredentialDirect(current);
         await reconcileSquare(current.siteId);
         if (squareRefreshRequiresReconnect(current)) throw new Error("Square requires reconnection.");
       // shortcut: each seller's scan must finish within four minutes; use durable paged jobs for higher volumes.
@@ -89,7 +93,7 @@ export async function maintainSquareConnections() {
       console.error("[payments:square] maintenance failed", { siteId: credential.siteId, name: error instanceof Error ? error.name : "UnknownError" });
     }
   }
-  return { checked: credentials.filter(isOAuthSquareCredential).length, failures };
+  return { checked: credentials.filter(canMaintain).length, failures };
 }
 
 export function startSquareMaintenance() {

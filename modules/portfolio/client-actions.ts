@@ -11,7 +11,7 @@ import { getSiteSettings } from "@/lib/site";
 import { getZonedDateKey } from "@/lib/timezone";
 import { serviceLibraryItemSchema } from "@/lib/scheduling/service-library";
 import { sessionPackageSnapshotSchema, sessionDeliverablesSchema } from "@/lib/scheduling/session-offering";
-import { supportsPhotoCurrency } from "@/lib/portfolio/selection-policy";
+import { purchaseReleaseStatus, supportsPhotoCurrency } from "@/lib/portfolio/selection-policy";
 import { slugify } from "@/lib/slug";
 import { queueEmail } from "@/lib/email";
 import { publicAppBaseUrl } from "@/lib/env";
@@ -65,11 +65,12 @@ function refresh(clientId: string) {
 export async function getClientGalleryWorkspace(clientId: string): Promise<ClientGalleryWorkspace> {
   const ctx = await context();
   const client = await accessibleClient(ctx, clientId);
-  const [galleries, orderItems, bookings] = await Promise.all([
+  const [galleries, orderItems, bookings, sentEmails] = await Promise.all([
     prisma.portfolioGallery.findMany({
       where: await getAccessibleGalleryWhere(ctx.user, ctx.siteId, { clientId, visibility: PortfolioGalleryVisibility.PRIVATE, status: PortfolioGalleryStatus.PUBLISHED }),
       include: {
         _count: { select: { items: true } },
+        purchase: { include: { order: { include: { payments: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] } } } } },
         packageProduct: { select: { name: true } },
         extraPhotoAddOn: { include: { commerceProduct: true } },
         accesses: {
@@ -95,6 +96,10 @@ export async function getClientGalleryWorkspace(clientId: string): Promise<Clien
       where: await getAccessibleBookingWhere(ctx.user, ctx.siteId, { clientId, status: { notIn: ["CANCELED"] } }),
       select: { id: true, sessionName: true, packageSnapshot: true, startsAt: true, service: { select: { name: true } } },
       orderBy: { startsAt: "desc" }
+    }),
+    prisma.emailOutbox.findMany({
+      where: { siteId: ctx.siteId, relatedType: "client", relatedId: clientId, templateKey: "portfolio.session.ready", status: "SENT", idempotencyKey: { startsWith: "gallery-ready:" } },
+      select: { idempotencyKey: true }
     })
   ]);
   const canManageMedia = hasAdminPermission(ctx.user, "media:manage") && ctx.settings.enabledModuleIds.includes("media");
@@ -105,13 +110,22 @@ export async function getClientGalleryWorkspace(clientId: string): Promise<Clien
     canSendEmail: ctx.settings.enabledModuleIds.includes("communications") && z.email().safeParse(client.email).success,
     today: getZonedDateKey(new Date(), ctx.settings.timezone),
     sessions: bookings.map(booking => ({ id: booking.id, name: booking.sessionName || booking.service.name, date: getZonedDateKey(booking.startsAt, ctx.settings.timezone), includedPhotos: sessionPackageSnapshotSchema.safeParse(booking.packageSnapshot).data?.deliverables?.finalPhotos })),
-    galleries: galleries.map((gallery) => ({
-      id: gallery.id, bookingId: gallery.bookingId, title: gallery.title, description: gallery.description, sessionDate: gallery.shotAt?.toISOString().slice(0, 10) || "", photoCount: gallery._count.items, packageName: gallery.packageProduct?.name || "Session photos",
-      imageStatus: clientGalleryImageStatus({ ...gallery, photoCount: gallery._count.items }),
-      extraPhotoAddOnId: gallery.extraPhotoAddOnId, extraPhotoAddOnName: gallery.extraPhotoAddOn?.name || null, extraPhotoAddOn: gallery.extraPhotoAddOn ? serviceLibraryItemSchema.parse(gallery.extraPhotoAddOn) : null,
-      selectionAllowance: gallery.selectionAllowance, extraPhotoPriceCents: gallery.extraPhotoAddOn?.priceCents ?? gallery.extraPhotoPriceCents, selectionCurrency: gallery.extraPhotoAddOn?.commerceProduct?.currency || gallery.selectionCurrency,
-      accessPath: gallery.accesses[0] ? `/proofs/${encodeURIComponent(gallery.accesses[0].accessToken)}` : null
-    })),
+    galleries: galleries.map((gallery) => {
+      const purchase = gallery.purchase;
+      const selectionComplete = Boolean(purchase && purchase.selectedCount > 0 && !purchase.revokedAt &&
+        purchase.siteId === ctx.siteId && purchase.clientId === clientId &&
+        (!purchase.order || purchase.order.siteId === ctx.siteId && purchase.order.clientId === clientId) &&
+        purchaseReleaseStatus(purchase) === "RELEASED");
+      return {
+        id: gallery.id, bookingId: gallery.bookingId, title: gallery.title, description: gallery.description, sessionDate: gallery.shotAt?.toISOString().slice(0, 10) || "", photoCount: gallery._count.items, packageName: gallery.packageProduct?.name || "Session photos",
+        imageStatus: clientGalleryImageStatus({ ...gallery, photoCount: gallery._count.items }),
+        selectionComplete,
+        photosSent: sentEmails.some(email => email.idempotencyKey.startsWith(`gallery-ready:${gallery.id}:`)),
+        extraPhotoAddOnId: gallery.extraPhotoAddOnId, extraPhotoAddOnName: gallery.extraPhotoAddOn?.name || null, extraPhotoAddOn: gallery.extraPhotoAddOn ? serviceLibraryItemSchema.parse(gallery.extraPhotoAddOn) : null,
+        selectionAllowance: gallery.selectionAllowance, extraPhotoPriceCents: gallery.extraPhotoAddOn?.priceCents ?? gallery.extraPhotoPriceCents, selectionCurrency: gallery.extraPhotoAddOn?.commerceProduct?.currency || gallery.selectionCurrency,
+        accessPath: gallery.accesses[0] ? `/proofs/${encodeURIComponent(gallery.accesses[0].accessToken)}` : null
+      };
+    }),
     packages: orderItems.filter((item) => {
       const key = `${item.orderId}:${item.productId}`;
       if (seen.has(key)) return false;

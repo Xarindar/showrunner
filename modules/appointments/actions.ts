@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import { getAccessibleBookingWaitlistWhere, getAccessibleBookingWhere, requireAdmin } from "@/lib/auth";
 import {
   bookingDetailFormSchema,
+  bookingNoteFormSchema,
+  bookingNoteDeleteFormSchema,
   bookingRescheduleFormSchema,
   bookingStatusFormSchema,
   bookingWaitlistPromoteFormSchema,
@@ -40,9 +42,10 @@ export async function updateBookingStatusAction(formData: FormData) {
     redirect("/admin/modules/appointments?error=Appointment%20not%20found.");
   }
 
-  await updateBookingStatus({ bookingId: input.id, status: input.status as BookingStatus, siteId: settings.siteId });
+  await updateBookingStatus({ bookingId: input.id, status: input.status as BookingStatus, siteId: settings.siteId, cancellationReason: input.cancellationReason });
 
   refreshAppointments();
+  revalidatePath(`/admin/appointments/${input.id}`);
 }
 
 export async function updateBookingDetailAction(formData: FormData) {
@@ -52,23 +55,68 @@ export async function updateBookingDetailAction(formData: FormData) {
   const bookingWhere = await getAccessibleBookingWhere(user, settings.siteId, { id: input.id });
   const booking = await prisma.booking.findFirst({
     where: bookingWhere,
-    select: { id: true }
+    select: { id: true, startsAt: true, endsAt: true }
   });
 
   if (!booking) {
     redirect("/admin/modules/appointments?error=Appointment%20not%20found.");
   }
 
-  await prisma.booking.updateMany({
-    where: bookingWhere,
-    data: {
+  const data = {
+      ...(input.sessionName !== undefined ? { sessionName: input.sessionName } : {}),
+      ...(input.agreedPrice !== undefined ? { priceCents: input.agreedPrice } : {}),
       ...(input.sessionLocation !== undefined ? { sessionLocation: input.sessionLocation } : {}),
       ...(input.adminNotes !== undefined ? { adminNotes: input.adminNotes } : {}),
       ...(input.cancellationReason !== undefined ? { cancellationReason: input.cancellationReason } : {})
+  };
+  const startsAt = input.startsAt === undefined ? undefined : parseZonedDateTimeInput(input.startsAt, settings.timezone);
+  const detailPath = `/admin/appointments/${input.id}`;
+  if (startsAt === null) redirect(`${detailPath}?error=${encodeURIComponent("Choose a valid appointment date and time.")}`);
+
+  if (startsAt && startsAt.getTime() !== booking.startsAt.getTime()) {
+    let updated;
+    try {
+      updated = await rescheduleBookingWithAvailability({ bookingId: booking.id, siteId: settings.siteId, startsAt, details: data });
+    } catch (error) {
+      redirect(`${detailPath}?error=${encodeURIComponent(error instanceof Error ? error.message : "Unable to update appointment.")}`);
     }
-  });
+    await emitModuleEvent("booking.rescheduled", {
+      actorEmail: updated.customerEmail,
+      metadata: {
+        notifyCustomer: input.notifyCustomer,
+        previousEndsAt: booking.endsAt.toISOString(),
+        previousStartsAt: booking.startsAt.toISOString(),
+        serviceId: updated.serviceId,
+        serviceName: updated.service.name,
+        staffId: updated.staffId,
+        startsAt: updated.startsAt.toISOString()
+      },
+      relatedId: updated.id,
+      relatedType: "booking"
+    });
+  } else {
+    await prisma.booking.updateMany({ where: bookingWhere, data });
+  }
 
   refreshAppointments();
+  revalidatePath(`/admin/appointments/${input.id}`);
+}
+
+export async function addBookingNoteAction(formData: FormData) {
+  const user = await requireAdmin("appointments:manage");
+  const input = await parseForm(bookingNoteFormSchema, formData);
+  const settings = await getSiteSettings();
+  const booking = await prisma.booking.findFirst({ where: await getAccessibleBookingWhere(user, settings.siteId, { id: input.id }), select: { id: true } });
+  if (!booking) redirect("/admin/modules/appointments?error=Appointment%20not%20found.");
+  await prisma.bookingNote.create({ data: { bookingId: booking.id, content: input.content } });
+  revalidatePath(`/admin/appointments/${booking.id}`);
+}
+
+export async function deleteBookingNoteAction(formData: FormData) {
+  const user = await requireAdmin("appointments:manage");
+  const input = await parseForm(bookingNoteDeleteFormSchema, formData);
+  const settings = await getSiteSettings();
+  await prisma.bookingNote.deleteMany({ where: { id: input.noteId, bookingId: input.id, booking: await getAccessibleBookingWhere(user, settings.siteId, { id: input.id }) } });
   revalidatePath(`/admin/appointments/${input.id}`);
 }
 

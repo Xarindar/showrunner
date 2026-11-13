@@ -84,3 +84,6 @@
 }
 .showrunner-admin .pay-step-actions { display: flex; flex-wrap: wrap; gap: var(--sd-space-8); justify-content: space-between; }
 .showrunner-admin .pay-spin { animation: pay-spin 0.8s linear infinite; }
+
+.showrunner-admin .pay-wizard-progress { align-items: center; display: flex; gap: var(--space-3); }
+.showrunner-admin .pay-instructions { color: var(--color-muted); display: grid; gap: var(--space-2); margin: 0; padding-inline-start: var(--space-5); }

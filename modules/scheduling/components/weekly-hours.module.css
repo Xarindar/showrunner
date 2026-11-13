@@ -1,7 +1,6 @@
 .week, .editor { display: grid; gap: var(--space-4); min-width: 0; }
 .heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .heading h2 { margin: 0; }
-.rows { padding-block: var(--space-2); }
 .row { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(0, 2fr) auto; align-items: center; gap: var(--space-3); padding-block: var(--space-2); }
 .row + .row { border-top: 1px solid var(--color-border); }
 .row span { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }

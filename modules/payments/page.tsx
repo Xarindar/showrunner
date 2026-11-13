@@ -1,7 +1,5 @@
 import { PaymentGatewayConnectionStatus, type PaymentGatewayCredential, PaymentProvider, Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
-import { publicAppBaseUrl } from "@/lib/env";
-import { isConnectBrokerConfigured } from "@/lib/payments/connect/config";
 import { squareRefreshRequiresReconnect } from "@/lib/payments/connect/square-refresh";
 import { getConnectedGatewayCredential } from "@/lib/payments/credentials";
 import { getStripePaymentMethodSettings } from "@/lib/payments/methods";
@@ -60,7 +58,6 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
   await requireAdmin("settings:update");
   const settings = await getSiteSettings();
   const notice = connectNotice(searchParams ? await searchParams : {});
-  const oauthEnabled = isConnectBrokerConfigured();
 
   const [stripeMethods, squareCredential, paypalCredential, coupons] = await Promise.all([
     getStripePaymentMethodSettings(settings.siteId),
@@ -92,11 +89,12 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
   const paypalEnv = metadataString(paypalCredential, "environment") === "live" ? "Live" : "Sandbox";
 
   const squareOAuth = metadataString(squareCredential, "onboarding") === "oauth";
+  const squareAutomatic = squareOAuth || metadataString(squareCredential, "onboarding") === "square_access_token";
   const squareSyncAt = metadataString(squareCredential, "squareSyncedAt");
   // eslint-disable-next-line react-hooks/purity -- This async server page reports health at request time.
-  const squareSyncStale = squareConnected && squareOAuth && Date.now() - new Date(squareSyncAt || squareCredential!.connectedAt || squareCredential!.createdAt).getTime() > 5 * 60_000;
+  const squareSyncStale = squareConnected && squareAutomatic && Date.now() - new Date(squareSyncAt || squareCredential!.connectedAt || squareCredential!.createdAt).getTime() > 5 * 60_000;
   const squareLocations = pendingSquareLocations(squareCredential);
-  const squareWebhookMissing = squareConnected && !squareOAuth && !squareCredential?.webhookSecretHint;
+  const squareWebhookMissing = squareConnected && !squareAutomatic && !squareCredential?.webhookSecretHint;
   // Paste-flow Stripe always has a webhook secret; this only trips when one-click connect
   // could not create the webhook endpoint automatically (the admin retries via Reconnect).
   const stripeWebhookMissing = stripeConnected && !stripeCredential?.webhookSecretHint;
@@ -108,13 +106,10 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
       recommended: true,
       connected: stripeConnected,
       needsAttention: needsAttention(stripeCredential),
-      oauthConnect: oauthEnabled,
       webhookMissing: stripeWebhookMissing,
       headline: stripeConnected
         ? `${stripeCredential?.displayName || "Stripe account"} · ${stripeMode}.${lastChecked(stripeCredential)}`
-        : oauthEnabled
-          ? "One click: sign in to Stripe and you're set — cards, Apple Pay, Google Pay, Cash App Pay, and Affirm. No keys to copy."
-          : "Cards, Apple Pay, Google Pay, Cash App Pay, and Affirm — all from one connection.",
+        : "Connect your own Stripe account with guided setup for cards and eligible wallets.",
       manageDetail: stripeConnected
         ? `${stripeCredential?.displayName || "Stripe account"} · ${stripeMode}.${lastChecked(stripeCredential)}`
         : "Stripe is not connected yet."
@@ -124,19 +119,16 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
       name: "Square",
       connected: squareConnected,
       needsAttention: needsAttention(squareCredential) || squareSyncStale,
-      oauthConnect: oauthEnabled,
       webhookMissing: squareWebhookMissing,
       headline: squareReconnectRequired
         ? `Square's refresh authorization was lost. Reconnect now; the current access token expires on ${squareCredential?.expiresAt?.toISOString().slice(0, 10) || "its existing expiry date"}.`
         : squareConnected
         ? `${squareCredential?.displayName || "Square"} · ${squareEnv}.${lastChecked(squareCredential)}`
-        : oauthEnabled
-          ? "Optional. One click: sign in to Square for hosted checkout with cards, wallets, and Cash App Pay."
-          : "Optional. Square-hosted checkout with cards, wallets, and Cash App Pay.",
+        : "Connect your own Square account. Payment updates are checked automatically.",
       manageDetail: squareReconnectRequired
         ? `Square's refresh authorization was lost. Reconnect now; the current access token expires on ${squareCredential?.expiresAt?.toISOString().slice(0, 10) || "its existing expiry date"}.`
         : squareConnected
-        ? `${squareCredential?.displayName || "Square"} · ${squareEnv}.${squareOAuth ? squareSyncStale ? " Automatic payment updates are delayed. Contact support; you do not need to paste a webhook key." : " Payment and refund updates are checked automatically, usually within a minute." : lastChecked(squareCredential)}`
+        ? `${squareCredential?.displayName || "Square"} · ${squareEnv}.${squareAutomatic ? squareSyncStale ? " Automatic payment updates are delayed. Re-check the connection or replace its credentials." : " Payment and refund updates are checked automatically, usually within a minute." : lastChecked(squareCredential)}`
         : "Square is not connected yet."
     },
     {
@@ -144,15 +136,19 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
       name: "PayPal",
       connected: paypalConnected,
       needsAttention: needsAttention(paypalCredential),
-      advanced: oauthEnabled,
       headline: paypalConnected
         ? `${paypalEnv} app connected.${lastChecked(paypalCredential)}`
-        : oauthEnabled
-          ? "Advanced — paste your own PayPal REST app keys. Settles to your PayPal business account."
-          : "Optional. PayPal checkout settled to your own PayPal business account.",
+        : "Connect your own PayPal Business account with guided setup.",
       manageDetail: paypalConnected ? `${paypalEnv} app connected.${lastChecked(paypalCredential)}` : "PayPal is not connected yet."
     }
   ];
+
+  for (const provider of providers) {
+    const credential = provider.provider === "STRIPE" ? stripeCredential : provider.provider === "SQUARE" ? squareCredential : paypalCredential;
+    if (metadataString(credential, "onboarding") === "oauth") {
+      provider.manageDetail += " This existing connection uses a shared provider app. Choose Replace connection to move to credentials you own.";
+    }
+  }
 
   const checkoutProviders = [
     { value: PaymentProvider.STRIPE, label: "Stripe", connected: stripeConnected },
@@ -174,7 +170,6 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
           : undefined
     : settings.checkoutProvider || undefined;
 
-  const baseUrl = publicAppBaseUrl().replace(/\/$/, "");
 
   return (
     <>
@@ -242,11 +237,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
         }))
       }}
       providers={providers}
-      webhooks={{
-        paypal: `${baseUrl}/api/webhooks/paypal`,
-        square: `${baseUrl}/api/webhooks/square`,
-        stripe: `${baseUrl}/api/webhooks/stripe`
-      }} />
+ />
     </>
   );
 }

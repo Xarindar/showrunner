@@ -515,6 +515,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
             email: input.customerEmail,
             name: input.customerName,
             phone: input.customerPhone,
+            companyName: input.customerCompany,
             serviceId: service.id
           });
 
