@@ -8,7 +8,7 @@ export const getHealth: ModuleHealthCheck = async ({ settings, now }) => {
   const warnings = [];
   const staleEmailCutoff = new Date(now.getTime() - 15 * 60 * 1000);
 
-  const [failedEmailCount, staleQueuedEmailCount, verifiedSenderCount, failingSendingDomainCount] = await Promise.all([
+  const [failedEmailCount, staleQueuedEmailCount, verifiedSenderCount, failingSendingDomainCount, emailConnection] = await Promise.all([
     prisma.emailOutbox.count({ where: { siteId: settings.siteId, status: EmailOutboxStatus.FAILED } }),
     prisma.emailOutbox.count({ where: { siteId: settings.siteId, status: EmailOutboxStatus.QUEUED, nextAttemptAt: { lt: staleEmailCutoff } } }),
     prisma.emailSenderIdentity.count({ where: { siteId: settings.siteId, isVerified: true } }),
@@ -22,19 +22,24 @@ export const getHealth: ModuleHealthCheck = async ({ settings, now }) => {
           { dmarcStatus: EmailCheckStatus.FAIL }
         ]
       }
-    })
+    }),
+    prisma.emailProviderConnection.findUnique({ where: { siteId: settings.siteId }, select: { connectionError: true } })
   ]);
 
-  if (!process.env.SMTP_HOST) {
+  if (!process.env.SMTP_HOST && !emailConnection) {
     warnings.push(
       warning(
-        "SMTP not configured",
-        "Transactional email will log in development and fail in production until SMTP_HOST and sender settings are configured.",
+        "Connect an email address",
+        "Open Settings → Email to connect your own email provider before relying on customer email delivery.",
         process.env.NODE_ENV === "production" ? "critical" : "warning",
         "communications",
-        "/admin/modules/communications"
+        "/admin/modules/settings/email"
       )
     );
+  }
+
+  if (emailConnection?.connectionError) {
+    warnings.push(warning("Email provider needs attention", emailConnection.connectionError, "critical", "communications", "/admin/modules/settings/email"));
   }
 
   if (envLooksDefault(process.env.EMAIL_WORKER_SECRET)) {

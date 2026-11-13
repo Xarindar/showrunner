@@ -26,6 +26,7 @@ import {
 } from "@/lib/email-builder/document";
 import { renderEmailBuilderHtml } from "@/lib/email-builder/render";
 import { queueTemplateTestEmail } from "@/lib/email";
+import { resolveSender } from "@/lib/email/sender";
 import { extractEmailTemplateTokens, hasBuilderJson } from "@/lib/email/render";
 import { sanitizeEmailHtml } from "@/lib/email/sanitize";
 import { stringArrayFromUnknown } from "@/lib/format";
@@ -696,20 +697,23 @@ export async function resendEmailOutboxAction(formData: FormData) {
   });
   const now = new Date();
 
+  const sender = await resolveSender({ category: row.category, siteId: row.siteId, senderIdentityId: row.senderIdentityId || undefined });
+
   await prisma.emailOutbox.create({
     data: {
       siteId: row.siteId,
       idempotencyKey: `${row.idempotencyKey}:resend:${now.getTime()}`,
       templateId: row.templateId,
       templateKey: row.templateKey,
-      senderIdentityId: row.senderIdentityId,
+      senderIdentityId: sender.senderIdentityId,
+      deliveryProvider: sender.deliveryProvider,
       campaignId: row.campaignId,
       subscriberId: row.subscriberId,
       recipientEmail: row.recipientEmail,
       recipientName: row.recipientName,
-      fromName: row.fromName,
-      fromEmail: row.fromEmail,
-      replyToEmail: row.replyToEmail,
+      fromName: sender.fromName,
+      fromEmail: sender.fromEmail,
+      replyToEmail: sender.replyToEmail,
       subject: row.subject,
       previewText: row.previewText,
       htmlBody: row.htmlBody,
