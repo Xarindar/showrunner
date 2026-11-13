@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/back-link";
 import { Notification } from "@/components/ui/notifications";
 import { clientServiceId } from "@/lib/clients/service-selection";
 import { getClientStatusSettings } from "@/lib/clients/configuration";
@@ -791,7 +792,7 @@ export default async function ClientDetailPage({ params, searchParams }: ClientD
     <div className="stack clients-detail-page has-mobile-shell-header">
       <AdminMobileHeaderSlot backHref="/admin/modules/clients" title={client.name} />
       <header className="page-header clients-detail-header">
-        <div className="clients-detail-heading"><ButtonLink href="/admin/modules/clients" size="sm" variant="ghost"><ArrowLeft aria-hidden="true" size={15} />Clients</ButtonLink><h1>{client.name}</h1></div>
+        <div className="clients-detail-heading"><BackLink href="/admin/modules/clients" size="sm" variant="ghost"><ArrowLeft aria-hidden="true" size={15} />Clients</BackLink><h1>{client.name}</h1></div>
       </header>
 
       {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}

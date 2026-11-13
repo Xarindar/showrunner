@@ -257,7 +257,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
               <table className="catalog-product-table">
                 <thead><tr><th scope="col">Service</th><th scope="col" className={styles.serviceActions}>Actions</th></tr></thead>
                 <tbody>
-                  {services.map(item => <tr key={item.id}><td>{item.name}</td><td className={styles.serviceActions}><Button id={`${listId}-edit-${tier.id}-${item.id}`} type="button" variant="secondary" size="sm" aria-label={`Edit ${item.name}`} onClick={() => setLibraryPicker({ tierId: tier.id, editingItem: item })}><Pencil aria-hidden="true" size={15} /></Button></td></tr>)}
+                  {services.map(item => <tr key={item.id}><td>{item.name}</td><td className={styles.serviceActions}><Button id={`${listId}-edit-${tier.id}-${item.id}`} type="button" variant="secondary" size="sm" aria-label={`Edit ${item.name}`} onClick={() => setLibraryPicker({ tierId: tier.id, editingItem: item })}><Pencil aria-hidden="true" size={15} /></Button><Button type="button" variant="ghost" size="sm" aria-label={`Remove ${item.name} from ${tier.name}`} onClick={() => updateTier(tier.id, { coverageIds: tier.coverageIds.filter(id => id !== item.id) })}><X aria-hidden="true" size={15} /></Button></td></tr>)}
                 </tbody>
               </table>
               {!services.length && <p className={styles.servicesEmpty}>No services added</p>}

@@ -1,9 +1,10 @@
 "use client";
+import { BackLink } from "@/components/ui/back-link";
 
 import { useActionState, type ComponentProps } from "react";
 import type { Service } from "@prisma/client";
 import { ArrowLeft, Save } from "lucide-react";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import { Notification } from "@/components/ui/notifications";
@@ -36,7 +37,7 @@ export function SessionTypeForm({ canUpload, rates, tags, bookingDocuments = [],
   return <div className={`${styles.page} stack product-studio-page product-editor-page service-editor-page has-mobile-shell-header`}>
     <AdminMobileHeaderSlot backHref="/admin/modules/services" title={title} />
     <header className="page-header service-studio-header"><div className={styles.heading}>
-      <ButtonLink href="/admin/modules/services" size="sm" variant="ghost"><ArrowLeft size={15} />Services</ButtonLink>
+      <BackLink href="/admin/modules/services" size="sm" variant="ghost"><ArrowLeft size={15} />Services</BackLink>
       <h1>{title}</h1>
       {initialService && <span className={initialService.isActive ? "ui-badge ui-badge-success" : "ui-badge"}>{initialService.isActive ? "active" : "draft"}</span>}
     </div></header>

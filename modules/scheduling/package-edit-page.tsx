@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/back-link";
 import { Notification } from "@/components/ui/notifications";
 import styles from "./service-editor.module.css";
 import { redirect } from "next/navigation";
@@ -7,7 +8,7 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
-import { Button, ButtonLink, Switch } from "@/components/ui";
+import { Button, Switch } from "@/components/ui";
 import {
   addServicePackageItemAction,
   createServicePackageAction,
@@ -130,10 +131,10 @@ export default async function ServicePackageEditPage({ packageId, searchParams }
         <AdminMobileHeaderSlot backHref="/admin/modules/services?tab=packages" title="New session bundle" />
         <header className="page-header service-studio-header">
           <div className={styles.heading}>
-            <ButtonLink href="/admin/modules/services?tab=packages" size="sm" variant="ghost">
+            <BackLink href="/admin/modules/services?tab=packages" size="sm" variant="ghost">
               <ArrowLeft size={15} />
               Session Bundles
-            </ButtonLink>
+            </BackLink>
             <div>
               <h1>New session bundle</h1>
             </div>
@@ -174,10 +175,10 @@ export default async function ServicePackageEditPage({ packageId, searchParams }
       <AdminMobileHeaderSlot backHref="/admin/modules/services?tab=packages" title={servicePackage.name} />
       <header className="page-header service-studio-header">
         <div className={styles.heading}>
-          <ButtonLink href="/admin/modules/services?tab=packages" size="sm" variant="ghost">
+          <BackLink href="/admin/modules/services?tab=packages" size="sm" variant="ghost">
             <ArrowLeft size={15} />
             Session Bundles
-          </ButtonLink>
+          </BackLink>
           <div>
             <h1>{servicePackage.name}</h1>
           </div>

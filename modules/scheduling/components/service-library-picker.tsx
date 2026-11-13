@@ -111,7 +111,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
     {view === "library" ? <>
       <div className={styles.toolbar}>
         <Field label="Search services"><Input id={`${id}-search`} type="search" value={q} maxLength={120} placeholder="Name, description or tag" onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }} onChange={event => changeFilter(setQ, event.target.value)} /></Field>
-        <Button type="button" variant="secondary" disabled={picked.length >= remaining} onClick={() => { setForm({ id: undefined, name: "", description: "", category: "", tags: "", pricingType: "FLAT_RATE", hourlyRateId: "", price: "" }); setAvailableAsAddOn(optional); setError(""); setView("edit"); }}><Plus size={16} />New service</Button>
+        <Button type="button" variant="secondary" disabled={picked.length >= remaining} onClick={() => { setForm({ id: undefined, name: q.trim(), description: "", category: "", tags: "", pricingType: "FLAT_RATE", hourlyRateId: "", price: "" }); setAvailableAsAddOn(optional); setError(""); setView("edit"); }}><Plus size={16} />New service</Button>
       </div>
       <div className={styles.filters}>
         <Field label="Category"><Select value={category} onChange={event => changeFilter(setCategory, event.target.value)}><option value="">All categories</option>{results.categories.map(value => <option key={value}>{value}</option>)}</Select></Field>

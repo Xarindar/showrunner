@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/back-link";
 import { DateTimeInput } from "@/components/ui/time-input";
 import { Notification } from "@/components/ui/notifications";
 
@@ -77,7 +78,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
       <header className="page-header" data-admin-page-header>
         <h1 className="ui-sr-only">Appointment details</h1>
         <div className="ui-inline-actions">
-          <ButtonLink href="/admin/modules/appointments" variant="ghost" size="sm"><ArrowLeft aria-hidden="true" size={15} />Bookings</ButtonLink>
+          <BackLink href="/admin/modules/appointments" variant="ghost" size="sm"><ArrowLeft aria-hidden="true" size={15} />Bookings</BackLink>
 
         </div>
       </header>

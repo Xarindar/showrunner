@@ -25,7 +25,7 @@ function harness(overrides: { client?: boolean; package?: boolean; gallery?: boo
     client: { update: record("lockClient", { id: "client-a", name: "Example client", mediaFolder: null }), findFirst: record("client", overrides.client === false ? null : { id: "client-a", name: "Example client", email: "client@example.test" }) },
     orderItem: { findFirst: record("package", overrides.package === false ? null : { id: "purchased-item" }) },
     portfolioGallery: {
-      findFirst: record("gallery", overrides.gallery === false ? null : { id: "gallery-a", title: "Family shoot", slug: "family-shoot", bookingId: "booking-a", processingUploads: 0, processingStartedAt: null, processingError: "", _count: { items: 7 }, mediaFolder: { id: "folder-a", name: "Clients/Example client/Family shoot 11-11-2026" } }),
+      findFirst: record("gallery", overrides.gallery === false ? null : { id: "gallery-a", title: "Family shoot", slug: "family-shoot", proofingEnabled: true, selectionAllowance: 2, extraPhotoPriceCents: 1000, selectionCurrency: "USD", extraPhotoAddOnId: "addon-a", bookingId: "booking-a", processingUploads: 0, processingStartedAt: null, processingError: "", _count: { items: 7 }, mediaFolder: { id: "folder-a", name: "Clients/Example client/Family shoot 11-11-2026" } }),
       update: record("saveGallery", {}),
       create: record("createGallery", { id: createInput.requestId }),
       updateMany: record("lockGallery", { count: 1 })
@@ -452,4 +452,16 @@ test("sent gallery email moves only its client session to Awaiting Client", asyn
   assert.equal(status({ selectionComplete: true }), "Complete");
   assert.equal(status({ imageStatus: "Images processing" }), "Images processing");
   assert.equal(status({ imageStatus: "Needs attention" }), "Needs attention");
+});
+
+
+test("sharing and emailing a gallery require configured selection terms", async () => {
+  const { actions, calls, db } = harness();
+  db.portfolioGallery.findFirst = async () => ({ id: "gallery-a", processingUploads: 0, processingError: "", _count: { items: 7 }, proofingEnabled: false, selectionAllowance: null });
+  const input = { clientId: "client-a", galleryId: "gallery-a", requestId: createInput.requestId };
+  for (const action of [actions.createClientGalleryLinkAction, actions.sendClientGalleryEmailAction]) {
+    const result = await action(input);
+    assert.equal(result.ok, false); assert.match(result.error, /Photo selection settings/);
+  }
+  assert.equal(calls.some(call => call.name === "email" || call.name === "access"), false);
 });

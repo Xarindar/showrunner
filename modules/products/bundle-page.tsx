@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/back-link";
 import { Notification } from "@/components/ui/notifications";
 import { notFound } from "next/navigation";
 import { ProductStatus } from "@prisma/client";
@@ -62,10 +63,10 @@ export default async function ProductBundlePage({ productId, searchParams }: Pro
     <div className="product-studio-page bundle-flow-page">
       <header className="product-studio-header">
         <div className="product-studio-title">
-          <ButtonLink href={`/admin/modules/products/${product.id}`} size="sm" variant="ghost">
+          <BackLink href={`/admin/modules/products/${product.id}`} size="sm" variant="ghost">
             <ArrowLeft size={16} />
             Product
-          </ButtonLink>
+          </BackLink>
           <div>
             <p className="catalog-kicker">Bundle builder</p>
             <h1>{product.name}</h1>

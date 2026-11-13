@@ -66,6 +66,7 @@ export type ClientShootGallery = {
   photoCount: number;
   imageStatus: ReturnType<typeof clientGalleryImageStatus>;
   selectionComplete?: boolean;
+  selectionReady?: boolean;
   photosSent?: boolean;
   packageName: string;
   extraPhotoAddOnId?: string | null;

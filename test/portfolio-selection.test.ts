@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canSettleCanceledGalleryOrder, purchaseReleaseStatus, sameSelection, selectionQuote } from "../lib/portfolio/selection-policy";
+import { canSettleCanceledGalleryOrder, hasPhotoSelectionTerms, purchaseReleaseStatus, sameSelection, selectionQuote } from "../lib/portfolio/selection-policy";
 
 test("package selection calculates exact included/extras; examples are never defaults", () => {
   assert.deepEqual(selectionQuote(3, 3, 750, "USD"), { extraCount: 0, totalCents: 0 });
@@ -40,4 +40,13 @@ test("late paid callbacks settle only gallery canceled orders with exact verifie
   assert.equal(canSettleCanceledGalleryOrder({ ...input, providerConfirmed: false }), false);
   assert.equal(canSettleCanceledGalleryOrder({ ...input, order: { ...input.order, payments: [{ ...evidence, providerVerifiedAt: null }] } }), false);
   assert.equal(canSettleCanceledGalleryOrder({ ...input, order: { ...input.order, payments: [{ ...evidence, currency: "EUR" }] } }), false);
+});
+
+
+test("client links require explicit valid photo selection and pricing terms", () => {
+  const terms = { proofingEnabled: true, selectionAllowance: 0, extraPhotoPriceCents: 0, selectionCurrency: "USD", extraPhotoAddOnId: "extra-photo" };
+  assert.equal(hasPhotoSelectionTerms(terms), true);
+  for (const invalid of [{ proofingEnabled: false }, { selectionAllowance: null }, { selectionAllowance: -1 }, { extraPhotoPriceCents: null }, { selectionCurrency: "bad" }, { extraPhotoAddOnId: null }]) {
+    assert.equal(hasPhotoSelectionTerms({ ...terms, ...invalid }), false);
+  }
 });

@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/back-link";
 import { Notification } from "@/components/ui/notifications";
 import NextImage from "next/image";
 import { notFound } from "next/navigation";
@@ -752,10 +753,10 @@ export default async function ProductEditPage({ productId, searchParams }: Produ
     <div className="product-studio-page product-editor-page">
       <header className="product-studio-header">
         <div className="product-studio-title">
-          <ButtonLink href="/admin/modules/products" size="sm" variant="ghost">
+          <BackLink href="/admin/modules/products" size="sm" variant="ghost">
             <ArrowLeft size={16} />
             Products
-          </ButtonLink>
+          </BackLink>
           <div>
             <p className="catalog-kicker">Product editor</p>
             <h1>{product.name}</h1>

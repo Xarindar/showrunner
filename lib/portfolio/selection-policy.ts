@@ -4,6 +4,15 @@ export function supportsPhotoCurrency(currency: string) {
   } catch { return false; }
 }
 
+export function hasPhotoSelectionTerms(gallery: {
+  proofingEnabled?: boolean; selectionAllowance?: number | null; extraPhotoPriceCents?: number | null;
+  selectionCurrency?: string | null; packageProductId?: string | null; extraPhotoAddOnId?: string | null;
+}) {
+  return Boolean(gallery.proofingEnabled && Number.isSafeInteger(gallery.selectionAllowance) && gallery.selectionAllowance! >= 0 &&
+    Number.isSafeInteger(gallery.extraPhotoPriceCents) && gallery.extraPhotoPriceCents! >= 0 &&
+    gallery.selectionCurrency && supportsPhotoCurrency(gallery.selectionCurrency) && (gallery.packageProductId || gallery.extraPhotoAddOnId));
+}
+
 /** Shared pure policy. All prices are integer minor units, never client supplied. */
 export function selectionQuote(count: number, allowance: number, extraPriceCents: number, currency: string) {
   if (![count, allowance, extraPriceCents].every(Number.isSafeInteger) || count < 1 || count > 2000 || allowance < 0 || extraPriceCents < 0 || (!/^[A-Z]{3}$/.test(currency) || !supportsPhotoCurrency(currency))) {
