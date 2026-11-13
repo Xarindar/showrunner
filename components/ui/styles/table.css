@@ -41,6 +41,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Keep spare table height in the body; Firefox otherwise expands the header. */
+.showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody { height: 100%; }
 .showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody tr { background: var(--data-table-row-bg); }
 .showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody tr:not(:has(> td[colspan])):hover { background: var(--data-table-row-hover); }
 .showrunner-admin :is(.ui-table, .catalog-product-table, .table) tbody tr[data-state="selected"] { background: var(--data-table-row-selected); }
