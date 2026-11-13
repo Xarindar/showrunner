@@ -1,11 +1,12 @@
 "use client";
+import { BackLink } from "@/components/ui/back-link";
 import { useNotify } from "@/components/ui/notifications";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, Folder, ImagePlus, Mail, Search, Upload, X } from "lucide-react";
-import { Button, ButtonAnchor, ButtonLink } from "@/components/ui/button";
+import { Button, ButtonAnchor } from "@/components/ui/button";
 import { childMediaFolders } from "@/lib/media-folders";
 import { AdminMobileHeaderSlot } from "@/shell/admin-mobile-header";
 import { SkeletonBlock } from "@/components/ui/states";
@@ -92,7 +93,6 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
     sessions: next.sessions.filter(item => item.id === initialBookingId)
   }), [initialBookingId, initialGalleryId]);
 
-  useEffect(() => () => { stopUpload.current = true; }, []);
 
   useEffect(() => {
     if (!galleryId || !workspace.canManageMedia) return;
@@ -112,18 +112,6 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
     return () => { current = false; };
   }, [clientId, galleryId, query, page, folder, pickerOpen, revision, workspace.canManageMedia]);
 
-  useEffect(() => {
-    if (!uploading) return;
-    const preventExit = (event: BeforeUnloadEvent) => { event.preventDefault(); };
-    const preventNavigation = (event: MouseEvent) => {
-      if (!(event.target instanceof Element) || !event.target.closest("a[href]")) return;
-      event.preventDefault(); event.stopPropagation();
-      notify("Images are still processing. Wait for the batch to finish, or stop after the current photo.", "neutral");
-    };
-    window.addEventListener("beforeunload", preventExit);
-    document.addEventListener("click", preventNavigation, true);
-    return () => { window.removeEventListener("beforeunload", preventExit); document.removeEventListener("click", preventNavigation, true); };
-  }, [uploading, notify]);
 
   useEffect(() => {
     if (uploading || gallery?.imageStatus !== "Images processing") return;
@@ -206,6 +194,8 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
     const batchError = clientGalleryBatchError(uploads.map(row => row.file));
     if (batchError) { notify(batchError, "danger"); return; }
     stopUpload.current = false; setUploading(true);
+    const preventExit = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener("beforeunload", preventExit);
     const rows = [...uploads];
     let completed = 0;
     try {
@@ -227,7 +217,7 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
       await reload();
       if (completed) notify(`${completed} photo${completed === 1 ? "" : "s"} added to this shoot.`);
     } catch { notify("The photo list could not refresh. Check the file statuses below before retrying.", "danger"); }
-    finally { setUploading(false); }
+    finally { window.removeEventListener("beforeunload", preventExit); setUploading(false); }
   }
 
   async function copyLink() {
@@ -256,7 +246,7 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
     try {
       const result = await configureClientGalleryProofingAction({ clientId, galleryId, includedCount: Number(form.get("includedCount")), addOnId: proofAddOn?.id || gallery?.extraPhotoAddOnId, currency: String(form.get("currency")) });
       if (!result.ok) { notify(result.error, "danger"); return; }
-      await reload(); setProofSettingsOpen(false); notify("Photo selection settings saved.");
+      await reload(); setProofSettingsOpen(false); setSendOpen(true); notify("Photo selection settings saved.");
     } catch { notify("Selection settings could not be saved. Try again.", "danger"); }
     finally { setBusy(false); }
   }
@@ -335,9 +325,9 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
   return (
     <div className={`${styles.body} ${mediaStyles.libraryWorkspace} stack has-mobile-shell-header`}>
       <AdminMobileHeaderSlot backHref={`/admin/clients/${clientId}`} title={sessionTitle} />
-      <header className={`page-header clients-detail-header ${styles.sessionHeader}`}><div className={`clients-detail-heading ${styles.sessionHeading}`}><ButtonLink href={`/admin/clients/${clientId}`} size="sm" variant="ghost"><ArrowLeft aria-hidden="true" size={15} /><span className={styles.clientBackName}>{workspace.clientName || "Client"}</span><span className={styles.mobileBackLabel}>Back</span></ButtonLink><h1 title={sessionTitle}>{sessionTitle}</h1></div><div className={styles.headerActions}>
+      <header className={`page-header clients-detail-header ${styles.sessionHeader}`}><div className={`clients-detail-heading ${styles.sessionHeading}`}><BackLink href={`/admin/clients/${clientId}`} size="sm" variant="ghost"><ArrowLeft aria-hidden="true" size={15} /><span className={styles.clientBackName}>{workspace.clientName || "Client"}</span><span className={styles.mobileBackLabel}>Back</span></BackLink><h1 title={sessionTitle}>{sessionTitle}</h1></div><div className={styles.headerActions}>
         <Button aria-label="Upload photos" disabled={busy || uploading || sending || (!workspace.canUpload && !workspace.canManageMedia)} onClick={() => openCreate(initialBookingId, gallery?.id || "")} size="sm" type="button" variant="secondary"><Upload aria-hidden="true" size={15} /><span className={styles.headerActionLabel}>Upload</span></Button>
-        <Button aria-label="Send to client" disabled={!gallery || busy || uploading || sending || imageStatus !== "Ready"} onClick={() => setSendOpen(true)} size="sm" type="button"><Mail aria-hidden="true" size={15} /><span className={styles.headerActionLabel}>Send</span></Button>
+        <Button aria-label="Send to client" disabled={!gallery || busy || uploading || sending || imageStatus !== "Ready"} onClick={() => { if (!gallery?.selectionReady) setProofSettingsOpen(true); else setSendOpen(true); }} size="sm" type="button"><Mail aria-hidden="true" size={15} /><span className={styles.headerActionLabel}>Send</span></Button>
       </div></header>
       {processingImages ? <aside className={`ui-card ${styles.processingNotice}`}>
         <p role="status">Client Images Processing</p>
@@ -430,7 +420,7 @@ export function ClientSessionDetail({ clientId, initialWorkspace, initialGallery
             <span className={styles.viewerName} title={previewPhoto?.filename}>{previewPhoto?.filename || "Photo preview"}</span>
             <div className={styles.viewerActions}>
               {previewPhoto ? <ButtonAnchor aria-label="Download photo" download={previewPhoto.filename} href={previewPhoto.downloadUrl} size="sm" variant="ghost"><Download aria-hidden="true" size={18} /></ButtonAnchor> : null}
-              <Button aria-label="Send session to client" disabled={busy || uploading || sending || imageStatus !== "Ready"} onClick={() => { setPreviewIndex(null); setSendOpen(true); }} size="sm" type="button" variant="ghost"><Mail aria-hidden="true" size={18} /></Button>
+              <Button aria-label="Send session to client" disabled={busy || uploading || sending || imageStatus !== "Ready"} onClick={() => { setPreviewIndex(null); if (!gallery?.selectionReady) setProofSettingsOpen(true); else setSendOpen(true); }} size="sm" type="button" variant="ghost"><Mail aria-hidden="true" size={18} /></Button>
               <Button aria-label="Close photo preview" onClick={() => setPreviewIndex(null)} size="sm" type="button" variant="ghost"><X aria-hidden="true" size={20} /></Button>
             </div>
           </header>

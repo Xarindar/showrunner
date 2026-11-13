@@ -27,11 +27,11 @@ createRoot(document.getElementById('root')).render(<Demo/>);
   b.onResolve({ filter: /(?:appointments\/|^\.\/)create-action$/ }, () => ({ path: 'create-action', namespace: 'fixture' }));
   b.onResolve({ filter: /^next\/link$/ }, () => ({ path: 'link', namespace: 'fixture' }));
   b.onResolve({ filter: /^next\/image$/ }, () => ({ path: 'image', namespace: 'fixture' }));
-  b.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ loader: 'tsx', resolveDir: process.cwd(), contents: args.path === 'create-action' ? 'export async function createSessionAction(){return {error:"Fixture does not save bookings"}}' : args.path === 'library-actions' ? 'export async function saveServiceLibraryItemAction(input){window.libraryCalls.push(input);return {item:{...input,id:"created-addon",priceCents:Math.round(Number(input.price)*100)}}} export async function saveHourlyRateAction(){return {error:"Unused"}}' : args.path === 'notify' ? 'export const useNotify=()=>()=>{};export const Notification=()=>null' : args.path === 'link' ? `import React from 'react';export default function Link({href,...props}){return <a {...props} href={href} onClick={event=>{if(href.startsWith('/admin/')){event.preventDefault();history.pushState({},'',href);window.dispatchEvent(new PopStateEvent('popstate'))}}}/>} ` : args.path === 'image' ? `import React from 'react'; export default function Image({unoptimized,...props}){return <img {...props}/>} ` : `
+  b.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ loader: 'tsx', resolveDir: process.cwd(), contents: args.path === 'create-action' ? 'export async function createSessionAction(){return {error:"Fixture does not save bookings"}}' : args.path === 'library-actions' ? 'export async function saveServiceLibraryItemAction(input){window.libraryCalls.push(input);return {item:{...input,id:"created-addon",priceCents:Math.round(Number(input.price)*100)}}} export async function saveHourlyRateAction(){return {error:"Unused"}}' : args.path === 'notify' ? 'export const useNotify=()=>()=>{};export const Notification=()=>null' : args.path === 'link' ? `import React from 'react';export default function Link({href,...props}){return <a {...props} href={href} onClick={event=>{props.onClick?.(event);if(!event.defaultPrevented&&href.startsWith('/admin/')){event.preventDefault();history.pushState({},'',href);window.dispatchEvent(new PopStateEvent('popstate'))}}}/>} ` : args.path === 'image' ? `import React from 'react'; export default function Image({unoptimized,...props}){return <img {...props}/>} ` : `
 export let workspace={clientName:'Abe',clientEmail:'abe@example.test',canSendEmail:true,galleries:[],sessions:[{id:'booking-a',name:'Wedding',date:'2026-11-11'}],today:'2026-11-11',packages:[],canUpload:true,canManageMedia:true};
 window.calls=[];window.libraryCalls=[];window.fixtureWorkspace=workspace;
 export async function getClientGalleryWorkspace(){return structuredClone({...workspace,galleries:[...workspace.galleries,{id:"other-gallery",bookingId:"other-booking",title:"Another session",photoCount:0,imageStatus:"Ready"}]})}
-export async function createClientGalleryAction(input){window.calls.push({type:'create',input}); const id=input.requestId; workspace.galleries.push({id,bookingId:input.bookingId,title:input.title,description:input.description,sessionDate:input.sessionDate,photoCount:0,imageStatus:'Ready',packageName:'Session photos',selectionAllowance:null,extraPhotoPriceCents:null,selectionCurrency:null,accessPath:'/proofs/session-token'});return {ok:true,data:{galleryId:id}}}
+export async function createClientGalleryAction(input){window.calls.push({type:'create',input}); const id=input.requestId; workspace.galleries.push({id,bookingId:input.bookingId,title:input.title,description:input.description,sessionDate:input.sessionDate,photoCount:0,imageStatus:'Ready',selectionReady:true,packageName:'Session photos',selectionAllowance:null,extraPhotoPriceCents:null,selectionCurrency:null,accessPath:'/proofs/session-token'});return {ok:true,data:{galleryId:id}}}
 export async function uploadClientGalleryPhotoAction(form){window.calls.push({type:'upload',galleryId:form.get('galleryId'),name:form.get('file').name});const gallery=workspace.galleries.find(g=>g.id===form.get('galleryId'));gallery.imageStatus='Images processing';await new Promise(resolve=>setTimeout(resolve,window.uploadDelay||200));if(window.failUpload){gallery.imageStatus='Ready';return {ok:false,error:'Upload failed before saving'}}gallery.photoCount++;gallery.imageStatus='Ready';return {ok:true,data:{assetId:'asset-a',added:1}}}
 export async function browseClientGalleryMediaAction(input){if(window.failPreviewPage && input.page===2)return {ok:false,error:'Page temporarily unavailable'};if(window.browseDelay)await new Promise(resolve=>setTimeout(resolve,window.browseDelay));const assets=input.mode==='gallery' ? (window.multiplePages ? (input.page===2 ? ['last.jpg'] : ['one.jpg','two.jpg',...Array.from({length:22},(_,i)=>'photo-'+i+'.jpg')]) : ['one.jpg','two.jpg']).filter(name=>!input.query||name.includes(input.query)).map((filename,index)=>({id:'asset-'+index,filename,alt:filename,folder:'Clients/Abe/Wedding',thumbnailUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',previewUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',downloadUrl:'/download-image',alreadyAdded:true})) : [];return {ok:true,data:{assets,folders:input.mode==='library'?['Clients/Abe/Wedding']:[],total:window.multiplePages?25:assets.length,page:input.page,pageCount:window.multiplePages?2:1}}}
 export async function addClientGalleryMediaAction(){return {ok:true,data:{added:0}}}
@@ -109,9 +109,12 @@ try {
   await page.getByRole('status').filter({hasText:'Client Images Processing'}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Send to client',exact:true}).isEnabled(),false);
   await page.getByRole('progressbar',{name:'Image processing progress'}).filter({has:page.locator('[style]')}).waitFor();
-  await page.waitForFunction(()=>document.querySelector('[role=progressbar]')?.getAttribute('aria-valuenow')==='50');
   assert.equal(await page.locator('[aria-label="Loading session photos"] .ui-skeleton-block').count(),8);
   await page.screenshot({path:captures+'/processing-batch.png'});
+  await page.getByRole('link',{name:'Abe',exact:true}).click();
+  await page.getByRole('table',{name:'Client sessions',exact:true}).waitFor();
+  await page.waitForFunction(()=>window.fixtureWorkspace.galleries[0]?.photoCount===2);
+  await page.getByRole('link',{name:'Open Wedding',exact:true}).click();
   await page.waitForFunction(() => window.calls.filter(c => c.type === 'upload').length === 2);
   await page.getByText('2 photos', { exact: true }).waitFor();
   assert.equal(await page.getByRole('combobox', { name: 'Photo collection' }).count(), 0, 'Reload cannot expose other sessions in this detail page');
@@ -180,8 +183,10 @@ try {
   const proofSettings = page.getByRole('dialog', {name:'Photo selection settings',exact:true});
   await proofSettings.getByLabel('Included photos', {exact:true}).fill('2');
   await proofSettings.getByRole('button', {name:'Choose a per-unit add-on',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Search services',exact:true}).fill('User created image upgrade');
   await page.getByRole('button', {name:'New service',exact:true}).click();
   const serviceEditor=page.getByRole('dialog',{name:'New service',exact:true});
+  assert.equal(await serviceEditor.getByLabel('Service name',{exact:true}).inputValue(),'User created image upgrade');
   await serviceEditor.getByLabel('Service name',{exact:true}).fill('User created image upgrade');
   await serviceEditor.getByRole('combobox',{name:'Pricing type',exact:true}).selectOption('PER_UNIT');
   await serviceEditor.getByLabel('Price per unit (USD)',{exact:true}).fill('12.34');
@@ -192,6 +197,7 @@ try {
   assert.deepEqual(await page.evaluate(()=>window.libraryCalls[0].deliverables),{finalPhotos:1});
   await proofSettings.getByRole('button',{name:'Save settings',exact:true}).click();
   await proofSettings.waitFor({state:'hidden'});
+  await page.getByRole('dialog',{name:'Send to client',exact:true}).getByRole('button',{name:'Cancel',exact:true}).click();
   await page.getByRole('link', { name: 'Abe', exact: true }).click();
   const table = page.getByRole('table', { name: 'Client sessions' });
   assert.equal(await table.locator('tbody tr').count(), 1, 'Collections stay grouped under their booking');

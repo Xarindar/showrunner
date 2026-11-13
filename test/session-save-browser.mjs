@@ -9,7 +9,7 @@ const bundle=await build({stdin:{resolveDir:process.cwd(),loader:'tsx',contents:
   import {sessionOfferingFormSchema} from './lib/scheduling/session-offering';
   import './app/globals.css';import './app/admin/design-tokens.css';import './app/admin/design-system.css';
   window.submits=0;
-  function Fixture(){return <div className="showrunner-admin"><main className="admin-main"><NotificationProvider>{['Existing session','New session'].map(label=><section aria-label={label} key={label}><h1>{label}</h1><form onSubmit={event=>{event.preventDefault();window.submits++;const result=sessionOfferingFormSchema.safeParse(new FormData(event.currentTarget).get('sessionOffering'));window.saved=result.success?result.data:result.error.issues;}}><SessionPackagesEditor isNew={label==='New session'} durationMinutes={30}/><button type="submit">Save session</button></form></section>)}</NotificationProvider></main></div>}
+  function Fixture(){return <div className="showrunner-admin"><main className="admin-main"><NotificationProvider>{['Existing session','New session'].map(label=><section aria-label={label} key={label}><h1>{label}</h1><form onSubmit={event=>{event.preventDefault();window.submits++;const result=sessionOfferingFormSchema.safeParse(new FormData(event.currentTarget).get('sessionOffering'));window.saved=result.success?result.data:result.error.issues;}}><SessionPackagesEditor isNew={label==='New session'} durationMinutes={30} initialOffering={label==='Existing session'?{coverageItems:[{id:'coverage-a',libraryItemId:'library-a',name:'Portrait coverage',description:'Portraits',priceCents:0}],tiers:[{id:'base',name:'Standard',priceCents:0,durationMinutes:30,hourlyRateId:null,coverageIds:['coverage-a']}],addOns:[]}:null}/><button type="submit">Save session</button></form></section>)}</NotificationProvider></main></div>}
   createRoot(document.getElementById('root')).render(<Fixture/>);
 `},bundle:true,write:false,outdir:'.tmp/session-save-test',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"','process.env':'{}'},logLevel:'silent',plugins:[{name:'local-rates',setup(build){
   build.onResolve({filter:/^\.\.\/rate-actions$/},()=>({path:'rates',namespace:'local-rates'}));
@@ -23,16 +23,29 @@ try{
   const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
   page.setDefaultTimeout(8000);
   page.on('pageerror',error=>errors.push(error.message));
-  await page.route('https://session.test/**',route=>route.fulfill({contentType:'text/html',body:`<style>${css}</style><div id="root"></div>`}));
+  await page.route('https://session.test/**',route=>route.request().url().includes('/api/scheduling/service-library')?route.fulfill({contentType:'application/json',body:JSON.stringify({items:[],categories:[],tags:[],total:0,page:1,pageCount:1})}):route.fulfill({contentType:'text/html',body:`<style>${css}</style><div id="root"></div>`}));
   await page.goto('https://session.test/');await page.addScriptTag({content:js});
   const existing=page.getByRole('region',{name:'Existing session',exact:true});
   await existing.getByRole('button',{name:'Save session',exact:true}).click();
   assert.equal((await page.evaluate(()=>window.saved)).tiers[0].hourlyRateId,null,'An untouched older flat-rate session submits valid data');
+  await existing.getByRole('button',{name:'Edit Standard',exact:true}).click();
+  const included=page.getByRole('dialog');
+  await included.getByRole('button',{name:'Remove Portrait coverage from Standard',exact:true}).click();
+  assert.equal(await included.getByRole('region',{name:'Package services table'}).locator('tbody tr').count(),0);
+  await included.getByRole('button',{name:'Done',exact:true}).click();
+  await existing.getByRole('button',{name:'Save session',exact:true}).click();
+  assert.deepEqual((await page.evaluate(()=>window.saved)).tiers[0].coverageIds,[]);
+  assert.equal((await page.evaluate(()=>window.saved)).coverageItems.length,1,'Removing from one package preserves the reusable service');
   const fresh=page.getByRole('region',{name:'New session',exact:true});
   await fresh.getByRole('button',{name:'Add package',exact:true}).click();
   let dialog=page.getByRole('dialog');
   await dialog.getByRole('textbox',{name:'Package 1 name',exact:true}).fill('Portrait');
   await dialog.getByRole('spinbutton',{name:'Portrait price (USD)',exact:true}).fill('100');
+  await dialog.getByRole('button',{name:'Add Services',exact:true}).click();
+  await dialog.getByRole('searchbox',{name:'Search services',exact:true}).fill('Family portraits');
+  await dialog.getByRole('button',{name:'New service',exact:true}).click();
+  assert.equal(await dialog.getByRole('textbox',{name:'Service name',exact:true}).inputValue(),'Family portraits');
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
   await dialog.getByRole('button',{name:'Done',exact:true}).click();
   await fresh.getByRole('button',{name:'Save session',exact:true}).click();
   assert.equal((await page.evaluate(()=>window.saved)).tiers[0].hourlyRateId,null,'A new flat-rate package submits valid data');

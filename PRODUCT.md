@@ -140,3 +140,10 @@ Appointment location editing offers debounced Photon/OpenStreetMap address sugge
 ## Client-owned payment connection
 
 Payments uses a modal wizard for Stripe, Square and PayPal, with Next/Back, blank credential inputs, direct provider dashboard links and a final review. Clients use their own provider credentials; normal setup has no shared Showrunner OAuth app or Admit One Connect dependency. Stripe and PayPal payment notifications are registered automatically. Square loads active locations for explicit selection and automatically reconciles payment/refund updates. Optional checkout selection saves atomically with credentials. No setup charge is made. Manage allows owners to replace or disconnect the connection themselves. Existing OAuth connections remain compatible and are identified as using a shared app until replaced. See developer-docs/payments-setup.md.
+
+
+Client gallery links require a configured included-photo count and extra-photo pricing before sharing or sending. Send opens Photo selection settings when these are missing. Existing unconfigured links use the branded preparation state instead of the legacy direct-download page; configured links retain the shared selection grid, checkmarks, header, and footer. Existing gallery access and purchase/download authorization remain unchanged.
+
+Production web processes deliver the persisted email outbox automatically on startup and every minute, reusing database claims, retry schedules and stable message IDs. Queued messages do not require a separately configured external worker.
+
+Package services can be removed from an individual package without deleting the reusable service. New service forms start with the library search text. Admin Back links follow browser history and retain a fallback for direct entry. Session photo batches continue during in-app navigation; closing or reloading the browser still warns while uploads remain unfinished.

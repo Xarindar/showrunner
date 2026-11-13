@@ -1,9 +1,10 @@
 "use client";
+import { BackLink } from "@/components/ui/back-link";
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Grid2X2, Grid3X3, Image as ImageIcon, ImagePlus, Settings, Upload } from "lucide-react";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useNotify } from "@/components/ui/notifications";
@@ -106,7 +107,7 @@ export function AlbumPhotos({ galleryId, title, status, visibility, photos, chil
     }}>
     {dragging && <div className={styles.dropTarget}><div><Upload size={28} /><span>Drop photos to upload</span></div></div>}
     <header className={styles.galleryToolbar}>
-      <ButtonLink className={styles.galleryIcon} size="sm" variant="ghost" href="/admin/modules/portfolio" aria-label="All albums" title="All albums"><ArrowLeft size={16} aria-hidden="true" /></ButtonLink>
+      <BackLink className={styles.galleryIcon} size="sm" variant="ghost" href="/admin/modules/portfolio" aria-label="All albums" title="All albums"><ArrowLeft size={16} aria-hidden="true" /></BackLink>
       <div className={styles.galleryTitle}>
         <h1 title={title}>{title}</h1>
         <span className={styles.photoCount} role="img" aria-label={`${photos.length} photos`}><ImageIcon size={16} aria-hidden="true" /><span aria-hidden="true">{photos.length}</span></span>

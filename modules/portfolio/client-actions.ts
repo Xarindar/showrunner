@@ -11,7 +11,7 @@ import { getSiteSettings } from "@/lib/site";
 import { getZonedDateKey } from "@/lib/timezone";
 import { serviceLibraryItemSchema } from "@/lib/scheduling/service-library";
 import { sessionPackageSnapshotSchema, sessionDeliverablesSchema } from "@/lib/scheduling/session-offering";
-import { purchaseReleaseStatus, supportsPhotoCurrency } from "@/lib/portfolio/selection-policy";
+import { hasPhotoSelectionTerms, purchaseReleaseStatus, supportsPhotoCurrency } from "@/lib/portfolio/selection-policy";
 import { slugify } from "@/lib/slug";
 import { queueEmail } from "@/lib/email";
 import { publicAppBaseUrl } from "@/lib/env";
@@ -51,7 +51,7 @@ async function accessibleGallery(ctx: Awaited<ReturnType<typeof context>>, clien
   const where = await getAccessibleGalleryWhere(ctx.user, ctx.siteId, {
     id: galleryId, clientId, visibility: PortfolioGalleryVisibility.PRIVATE, status: PortfolioGalleryStatus.PUBLISHED
   });
-  const gallery = await prisma.portfolioGallery.findFirst({ where, select: { id: true, title: true, slug: true, shotAt: true, bookingId: true, processingUploads: true, processingStartedAt: true, processingError: true, _count: { select: { items: true } }, mediaFolder: { select: { id: true, name: true } } } });
+  const gallery = await prisma.portfolioGallery.findFirst({ where, select: { id: true, title: true, slug: true, shotAt: true, bookingId: true, processingUploads: true, processingStartedAt: true, processingError: true, proofingEnabled: true, selectionAllowance: true, extraPhotoPriceCents: true, selectionCurrency: true, packageProductId: true, extraPhotoAddOnId: true, _count: { select: { items: true } }, mediaFolder: { select: { id: true, name: true } } } });
   if (!gallery) throw new GalleryInputError("This private client gallery is unavailable or outside your access scope.");
   return { gallery, where, client };
 }
@@ -122,7 +122,7 @@ export async function getClientGalleryWorkspace(clientId: string): Promise<Clien
         selectionComplete,
         photosSent: sentEmails.some(email => email.idempotencyKey.startsWith(`gallery-ready:${gallery.id}:`)),
         extraPhotoAddOnId: gallery.extraPhotoAddOnId, extraPhotoAddOnName: gallery.extraPhotoAddOn?.name || null, extraPhotoAddOn: gallery.extraPhotoAddOn ? serviceLibraryItemSchema.parse(gallery.extraPhotoAddOn) : null,
-        selectionAllowance: gallery.selectionAllowance, extraPhotoPriceCents: gallery.extraPhotoAddOn?.priceCents ?? gallery.extraPhotoPriceCents, selectionCurrency: gallery.extraPhotoAddOn?.commerceProduct?.currency || gallery.selectionCurrency,
+        selectionReady: hasPhotoSelectionTerms(gallery), selectionAllowance: gallery.selectionAllowance, extraPhotoPriceCents: gallery.extraPhotoAddOn?.priceCents ?? gallery.extraPhotoPriceCents, selectionCurrency: gallery.extraPhotoAddOn?.commerceProduct?.currency || gallery.selectionCurrency,
         accessPath: gallery.accesses[0] ? `/proofs/${encodeURIComponent(gallery.accesses[0].accessToken)}` : null
       };
     }),
@@ -375,6 +375,7 @@ export async function createClientGalleryLinkAction(raw: unknown): Promise<Clien
     const client = await accessibleClient(ctx, input.clientId);
     const { gallery, where } = await accessibleGallery(ctx, input.clientId, input.galleryId);
     if (!z.email().safeParse(client.email).success) throw new GalleryInputError("Add a valid client email before creating a private access link.");
+    if (!hasPhotoSelectionTerms(gallery)) throw new GalleryInputError("Set the included-photo count and extra-photo pricing in Photo selection settings before sharing this gallery.");
     const access = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const locked = await tx.portfolioGallery.updateMany({ where, data: { updatedAt: new Date() } });
       if (!locked.count) throw new GalleryInputError("The gallery is no longer available.");
