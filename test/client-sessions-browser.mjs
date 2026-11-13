@@ -264,7 +264,7 @@ try {
   await table.getByRole('link',{name:'Open Wedding',exact:true}).click();
   await page.getByRole('button',{name:'Upload photos',exact:true}).click();
   const mediaCreate=page.getByRole('dialog',{name:'Upload session photos',exact:true});
-  await mediaCreate.getByLabel('Photo source',{exact:true}).selectOption('media');
+  await mediaCreate.getByLabel('Photo source').selectOption('media');
   assert.equal(await mediaCreate.locator('input[type=file]').count(),0);
   await mediaCreate.getByRole('button',{name:'Choose photos',exact:true}).click();
   await page.getByRole('dialog',{name:'Choose private photos from Media',exact:true}).waitFor();
