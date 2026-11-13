@@ -1,4 +1,4 @@
-import { EmailCategory } from "@prisma/client";
+import { EmailCategory, EmailDeliveryProvider } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
 
@@ -27,6 +27,18 @@ function parseAddress(value: string | undefined) {
 export async function resolveSender(input: ResolveSenderInput) {
   const settings = input.siteId ? await getSiteSettingsForSite(input.siteId) : await getSiteSettings();
   const siteId = settings.siteId;
+  if (input.category !== EmailCategory.MARKETING) {
+    const connection = await prisma.emailProviderConnection.findUnique({ where: { siteId } });
+    if (connection) {
+      return {
+        deliveryProvider: EmailDeliveryProvider.CONNECTED,
+        senderIdentityId: undefined,
+        fromName: connection.fromName,
+        fromEmail: connection.fromEmail,
+        replyToEmail: connection.fromEmail
+      };
+    }
+  }
   const requestedId = input.senderIdentityId || input.templateSenderIdentityId || undefined;
   const sender = requestedId
     ? await prisma.emailSenderIdentity.findFirst({ where: { id: requestedId, siteId } })
@@ -41,6 +53,7 @@ export async function resolveSender(input: ResolveSenderInput) {
     }
 
     return {
+      deliveryProvider: EmailDeliveryProvider.SMTP,
       senderIdentityId: sender.id,
       fromName: sender.name,
       fromEmail: sender.fromEmail.toLowerCase(),
@@ -56,6 +69,7 @@ export async function resolveSender(input: ResolveSenderInput) {
   }
 
   return {
+    deliveryProvider: EmailDeliveryProvider.SMTP,
     senderIdentityId: undefined,
     fromName: envSender?.name || settings.businessName,
     fromEmail,

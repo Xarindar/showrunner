@@ -1,6 +1,7 @@
 import { EmailOutboxStatus } from "@prisma/client";
 import { prisma } from "../prisma";
 import { createSmtpProvider } from "./provider";
+import { sendConnectedEmail } from "./provider-connection";
 import { cleanError, jsonHeaders } from "./shared";
 import type { EmailProvider, ProcessEmailOutboxResult } from "./types";
 
@@ -75,7 +76,7 @@ export async function processEmailOutbox(options: { limit?: number; provider?: E
   for (const row of rows) {
     try {
       const stableMessageId = messageId(row.id, row.fromEmail);
-      const sendResult = await provider.sendEmail({
+      const emailInput = {
         messageId: stableMessageId,
         fromName: row.fromName,
         fromEmail: row.fromEmail,
@@ -86,7 +87,10 @@ export async function processEmailOutbox(options: { limit?: number; provider?: E
         htmlBody: row.htmlBody,
         textBody: row.textBody,
         headers: jsonHeaders(row.headers)
-      });
+      };
+      const sendResult = row.deliveryProvider === "CONNECTED" && !options.provider
+        ? await sendConnectedEmail(row.siteId, emailInput)
+        : await provider.sendEmail(emailInput);
 
       await prisma.emailOutbox.update({
         where: { id: row.id },

@@ -20,15 +20,16 @@ export const manifest = {
   },
   capabilities: [
     { label: "Business identity", status: "live" },
+    { label: "Client-owned email provider", status: "live" },
     { label: "Theme and media settings", status: "live" },
     { label: "Module toggles", status: "live" },
     { label: "Tenant/site boundary", status: "foundation" },
     { label: "Policy controls", status: "planned" },
     { label: "Role and audit controls", status: "foundation" }
   ],
-  adminRoutes: ["/admin/modules/settings", "/admin/modules/settings/modules"],
+  adminRoutes: ["/admin/modules/settings", "/admin/modules/settings/modules", "/admin/modules/settings/email"],
   dependencies: ["dashboard"],
-  dataModels: ["SiteSettings"],
+  dataModels: ["SiteSettings", "EmailProviderConnection"],
   permissions: ["settings:update"],
   settingsSections: ["Business", "Module enablement", "Module settings", "Theme", "Media", "Security", "Data"],
   healthChecks: ["module-enabled-state", "required-module-state"]

@@ -25,7 +25,7 @@ import {
   updateMessageTemplateBuilderAction,
   updateMessageTemplateStatusAction } from "./actions";
 import { EmailTemplateBuilder } from "./components/email-template-builder";
-import { Button, Card, EqualGrid, Switch, Table } from "@/components/ui";
+import { Button, ButtonLink, Card, EqualGrid, Switch, Table } from "@/components/ui";
 import { ModuleActionModals } from "@/components/ui/module-action-modals";
 
 export const dynamic = "force-dynamic";
@@ -444,6 +444,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
           <h1>Communications</h1>
           <p>Email templates, manual delivery logs, and suppression controls for transactional and marketing guardrails.</p>
         </div>
+        <ButtonLink href="/admin/modules/settings/email" variant="secondary">Connect or change email</ButtonLink>
       </header>
 
       {savedMessage ? <Notification tone="success" queryKey="saved">{savedMessage}</Notification> : null}
