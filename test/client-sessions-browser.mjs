@@ -261,7 +261,8 @@ try {
   assert.equal(await page.getByRole('button',{name:'Send to client',exact:true}).isEnabled(),true);
   await page.evaluate(()=>{window.fixtureWorkspace.galleries=[];window.fixtureWorkspace.canUpload=false;});
   await page.getByRole('link',{name:'Back',exact:true}).click();
-  await table.getByRole('link',{name:'Upload photos to Wedding',exact:true}).click();
+  await table.getByRole('link',{name:'Open Wedding',exact:true}).click();
+  await page.getByRole('button',{name:'Upload photos',exact:true}).click();
   const mediaCreate=page.getByRole('dialog',{name:'Upload session photos',exact:true});
   await mediaCreate.getByLabel('Photo source',{exact:true}).selectOption('media');
   assert.equal(await mediaCreate.locator('input[type=file]').count(),0);
