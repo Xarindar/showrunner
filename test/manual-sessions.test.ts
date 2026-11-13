@@ -125,7 +125,10 @@ test("manual rescheduling preserves the agreed duration without requiring public
     "@/lib/scheduling/google-calendar": { listGoogleBusyWindows: async () => ({ busy: [] }) },
     "@/lib/site": { getSiteSettingsForSite: async () => ({ timezone: "America/Chicago" }) }
   });
-  const updated = await api.rescheduleBookingWithAvailability({ bookingId: "booking", siteId: "site-a", startsAt: new Date("2099-01-02T14:00:00Z") });
+  const updated = await api.rescheduleBookingWithAvailability({ bookingId: "booking", siteId: "site-a", startsAt: new Date("2099-01-02T14:00:00Z"), details: { sessionName: "Updated session", sessionLocation: "Studio", priceCents: 12300 } });
+  assert.equal(updated.sessionName, "Updated session");
+  assert.equal(updated.sessionLocation, "Studio");
+  assert.equal(updated.priceCents, 12300);
   assert.equal(checked, true);
   assert.equal(updated.endsAt.getTime() - updated.startsAt.getTime(), 45 * 60000);
 });

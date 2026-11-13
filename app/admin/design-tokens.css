@@ -165,7 +165,6 @@
   --data-table-title-line: var(--sd-type-heading-line);
   --data-table-title-weight: var(--sd-type-heading-weight);
   --section-header-action-bg: var(--sd-color-on-primary);
-  --section-header-action-visual-height: var(--sd-layout-button-height);
   --data-table-title-action-bg: var(--sd-color-on-primary);
   --data-table-title-action-color: var(--sd-color-primary);
   --data-table-toolbar-x: var(--sd-space-16);

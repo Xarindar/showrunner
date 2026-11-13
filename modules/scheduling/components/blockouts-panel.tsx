@@ -4,7 +4,6 @@ import { Plus, Trash2 } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import { createBlockoutAction, deleteBlockoutAction } from "../actions";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { EqualGrid } from "@/components/ui/layout";
 import { Table } from "@/components/ui/table";
 
@@ -18,9 +17,10 @@ export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPane
   return (
     <section className="ui-stack" aria-label="Closures">
 
-      <Card>
-        <h2 className="section-title">Upcoming closures</h2>
-        <Table>
+      <section className="ui-data-table-shell">
+        <div className="ui-data-table-titlebar"><h2>Upcoming closures</h2></div>
+        <Table aria-label="Upcoming closures" tableClassName="ui-data-table">
+          <thead><tr><th>Closure</th><th>Actions</th></tr></thead>
           <tbody>
             {blockouts.map((block) =>
             <tr key={block.id}>
@@ -44,14 +44,14 @@ export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPane
             )}
             {!blockouts.length ?
             <tr>
-                <td>No upcoming closures.</td>
+                <td colSpan={2}>No upcoming closures.</td>
               </tr> :
             null}
           </tbody>
         </Table>
-      </Card>
-      <details><summary>Add closure</summary>
-      <Card action={createBlockoutAction} as="form" minHeight="none" bodyClassName="form-grid">
+      </section>
+      <section className="studio-panel ui-section-card"><details><summary className="ui-section-header">Add closure</summary>
+      <form action={createBlockoutAction} className="ui-section-body form-grid">
 
         <EqualGrid>
           <div className="ui-field">
@@ -82,9 +82,9 @@ export function BlockoutsPanel({ blockouts, resources, timezone }: BlockoutsPane
           <Plus size={18} />
           Save closure
         </Button>
-      </Card>
+      </form>
 
-      </details>
+      </details></section>
     </section>);
 
 }

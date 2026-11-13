@@ -3,8 +3,8 @@ import sharp from "sharp";
 
 // Increment when the rendering policy changes. Proofs never share the ordinary
 // MediaAssetVariant cache, which can contain clean, full-resolution derivatives.
-export const galleryProofVersion = "burned-proof-v3-640";
-export const galleryProofMaxEdge = 640;
+export const galleryProofVersion = "burned-proof-v5-560";
+export const galleryProofMaxEdge = 560;
 
 // Embedded vector lettering keeps the watermark present on minimal server
 // images too; no installed font or network font lookup is required.

@@ -23,7 +23,7 @@ import {
   Upload,
   X
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonAnchor } from "@/components/ui/button";
 import { SelectMenu } from "@/components/ui/select-menu";
 import { Modal } from "@/components/ui/modal";
 import type { MediaTagSummary } from "@/lib/media-tags";
@@ -74,6 +74,7 @@ export type MediaLibraryAsset = {
 
 export type MediaLibraryFilters = {
   folder: string;
+  folderFilter?: boolean;
   kind: "all" | "image" | "video" | "other";
   page: number;
   q: string;
@@ -118,10 +119,11 @@ function dateLabel(value: string) {
 }
 
 function hrefWithParams(changes: Record<string, string | number | null>, filters: MediaLibraryFilters) {
-  const next = { ...filters } as MediaLibraryFilters;
+  const next = { folderFilter: false, ...filters };
   Object.entries(changes).forEach(([key, value]) => {
     if (!(key in next)) return;
-    if (key === "page") next.page = typeof value === "number" ? value : 1;
+    if (key === "folderFilter") next.folderFilter = value === "1";
+    else if (key === "page") next.page = typeof value === "number" ? value : 1;
     else (next as unknown as Record<string, string>)[key] = value === null ? "" : String(value);
   });
 
@@ -129,6 +131,7 @@ function hrefWithParams(changes: Record<string, string | number | null>, filters
   if (next.q) params.set("q", next.q);
   if (next.scope && next.scope !== "all") params.set("scope", next.scope);
   if (next.folder) params.set("folder", next.folder);
+  if (next.folder && next.folderFilter) params.set("folderFilter", "1");
   if (next.tag) params.set("tag", next.tag);
   if (next.kind && next.kind !== "all") params.set("kind", next.kind);
   if (next.sort && next.sort !== "newest") params.set("sort", next.sort);
@@ -392,7 +395,7 @@ export function MediaLibraryWorkspace({
   }, []);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
-  const filterCount = Number(filters.scope !== "all") + Number(Boolean(filters.folder)) + Number(Boolean(filters.tag)) + Number(filters.kind !== "all");
+  const filterCount = Number(filters.scope !== "all") + Number(Boolean(filters.folder && filters.folderFilter)) + Number(Boolean(filters.tag)) + Number(filters.kind !== "all");
   useEffect(() => {
     const dismiss = (event: PointerEvent) => {
       if (!filterRef.current?.contains(event.target as Node)) setFiltersOpen(false);
@@ -618,7 +621,7 @@ export function MediaLibraryWorkspace({
               </label>
               {folders.length ? <label className={styles.selectControl}>
                 <span >Folder</span>
-                <select aria-label="Folder" value={filters.folder} onChange={event => navigate({ folder: event.currentTarget.value || null })}>
+                <select aria-label="Folder" value={filters.folder} onChange={event => navigate({ folder: event.currentTarget.value || null, folderFilter: event.currentTarget.value ? "1" : null })}>
                   <option value="">All folders</option>
                   {folders.filter(folder => folder.name).map(folder => <option key={folder.name} value={folder.name}>{folder.name} ({folder.count})</option>)}
                 </select>
@@ -660,17 +663,15 @@ export function MediaLibraryWorkspace({
 
           </div>
 
-          <div className={styles.activeFilters}>
-            {filters.q || filterCount ? (<>
+          {filters.q || filterCount ? <div className={styles.activeFilters} role="group" aria-label="Active filters">
               <span>Filtered by</span>
               {filters.scope !== "all" ? <button onClick={() => navigate({ scope: "all" })} type="button">{({home: "All files", recent: "Recently added", private: "Private", "needs-alt": "Needs alt text", "built-in": "Built-in", archived: "Archived"})[filters.scope]}<X size={12} /></button> : null}
               {filters.q ? <button onClick={() => navigate({ q: null })} type="button">Search: {filters.q}<X size={12} /></button> : null}
-              {filters.folder ? <button onClick={() => navigate({ folder: null })} type="button">Folder: {filters.folder}<X size={12} /></button> : null}
+              {filters.folder && filters.folderFilter ? <button onClick={() => navigate({ folder: null, folderFilter: null })} type="button">Folder: {filters.folder}<X size={12} /></button> : null}
               {filters.tag ? <button onClick={() => navigate({ tag: null })} type="button">Tag: {filters.tag}<X size={12} /></button> : null}
               {filters.kind !== "all" ? <button onClick={() => navigate({ kind: null })} type="button">Type: {filters.kind}<X size={12} /></button> : null}
-              <button className={styles.clearFilters} onClick={() => navigate({ scope: "all", folder: null, kind: null, q: null, tag: null })} type="button">Clear all</button>
-            </>) : null}
-          </div>
+              <button className={styles.clearFilters} onClick={() => navigate({ scope: "all", folder: filters.folderFilter ? null : filters.folder, folderFilter: null, kind: null, q: null, tag: null })} type="button">Clear all</button>
+          </div> : null}
 
           {selectedIds.length > 0 && <div className={styles.selectionActions}>
             <span role="status">{selectedIds.length} selected</span>
@@ -688,13 +689,13 @@ export function MediaLibraryWorkspace({
             onPointerDown={beginGesture} onPointerMove={updateGesture} onPointerUp={event => finishGesture(event)}
             onPointerCancel={event => finishGesture(event, true)} onLostPointerCapture={event => { if (gesture.current) finishGesture(event, true); }} onDragStart={event => event.preventDefault()}>
             <nav aria-label="Folder path" className={styles.folderPath}>
-              <Button type="button" variant="secondary" aria-label="Back to parent folder" disabled={!filters.folder || moveBusy}
-                onClick={() => navigate({ folder: filters.folder.split("/").slice(0, -1).join("/") || null })}><ChevronLeft size={16} aria-hidden="true" />Back</Button>
+              <ButtonAnchor variant="secondary" aria-label="Back to parent folder" aria-disabled={!filters.folder || moveBusy}
+                href={filters.folder && !moveBusy ? hrefWithParams({ page: null, folderFilter: null, folder: filters.folder.split("/").slice(0, -1).join("/") || null }, filters) : undefined}><ChevronLeft size={16} aria-hidden="true" />Back</ButtonAnchor>
               <ol>
-                <li><Button type="button" variant="ghost" className={styles.breadcrumb} data-folder-path="" data-drop-active={dropFolder === "" || externalDropFolder === ""} aria-current={!filters.folder ? "page" : undefined} onClick={() => navigate({ folder: null })}>Media home</Button></li>
+                <li><ButtonAnchor variant="ghost" className={styles.breadcrumb} data-folder-path="" data-drop-active={dropFolder === "" || externalDropFolder === ""} aria-current={!filters.folder ? "page" : undefined} href={moveBusy ? undefined : hrefWithParams({ page: null, folderFilter: null, folder: null }, filters)}>Media home</ButtonAnchor></li>
                 {filters.folder.split("/").filter(Boolean).map((part, index, parts) => {
                   const path = parts.slice(0, index + 1).join("/");
-                  return <li key={path}><ChevronRight size={14} aria-hidden="true" /><Button type="button" variant="ghost" className={styles.breadcrumb} data-folder-path={path} data-drop-active={dropFolder === path || externalDropFolder === path} aria-current={path === filters.folder ? "page" : undefined} onClick={() => navigate({ folder: path })}>{part}</Button></li>;
+                  return <li key={path}><ChevronRight size={14} aria-hidden="true" /><ButtonAnchor variant="ghost" className={styles.breadcrumb} data-folder-path={path} data-drop-active={dropFolder === path || externalDropFolder === path} aria-current={path === filters.folder ? "page" : undefined} href={moveBusy ? undefined : hrefWithParams({ page: null, folderFilter: null, folder: path }, filters)}>{part}</ButtonAnchor></li>;
                 })}
               </ol>
             </nav>
@@ -702,15 +703,14 @@ export function MediaLibraryWorkspace({
             {childFolders.length > 0 && <nav aria-label="Media folders" className={styles.folderBrowser} aria-busy={moveBusy}>
               {childFolders.map(folder => (
                 <div key={folder.name} className={styles.assetTile} data-folder-path={folder.name}>
-                <button className={`${styles.assetCard} ${styles.folderTarget} ${view === "list" ? styles.assetRow : ""}`}
-                  type="button" data-folder-path={folder.name}
-                  aria-pressed={filters.folder === folder.name} data-drop-active={dropFolder === folder.name || externalDropFolder === folder.name}
-                  disabled={moveBusy} title={`Open ${folder.name}, or drop a file here`}
-                  onClick={() => navigate({ folder: folder.name })}
+                <a className={`${styles.assetCard} ${styles.folderTarget} ${view === "list" ? styles.assetRow : ""}`}
+                  href={moveBusy ? undefined : hrefWithParams({ page: null, folderFilter: null, folder: folder.name }, filters)} data-folder-path={folder.name}
+                  data-drop-active={dropFolder === folder.name || externalDropFolder === folder.name}
+                  aria-disabled={moveBusy} title={`Open ${folder.name}, or drop a file here`}
                   >
                   <span className={`${styles.thumb} ${styles.folderThumb}`}><FolderOpen aria-hidden="true" size={64} strokeWidth={1.5} /></span>
                   <span className={styles.assetCopy}><strong title={folder.label}>{folder.label}</strong><small>{folder.count} {folder.count === 1 ? "file" : "files"}</small></span>
-                </button>
+                </a>
                 <CardMenu name={folder.label} disabled={moveBusy || cardBusy} onAction={operation => openCardAction({ kind: "folder", id: folder.name, name: folder.label, folder: filters.folder, operation })} />
                 </div>
               ))}
@@ -730,7 +730,7 @@ export function MediaLibraryWorkspace({
                 <h3>{filters.q || filters.tag || filters.kind !== "all" ? "No assets match this view" : filters.folder ? "This folder is empty" : filters.scope === "archived" ? "Your archive is empty" : filters.scope === "all" ? "No files yet" : "No files in this category"}</h3>
                 <p>{filters.q || filters.tag || filters.kind !== "all" ? "Try another search or clear your filters." : filters.folder ? "Upload media here, or assign existing files to this folder in their details." : filters.scope === "archived" ? "Assets you archive will stay recoverable here." : filters.scope === "all" ? "Upload media to use across your website and business." : "Choose another category to browse your files."}</p>
                 {filters.q || filters.tag || filters.kind !== "all" ? (
-                  <Button onClick={() => navigate({ scope: "all", folder: null, kind: null, q: null, tag: null })} size="sm" type="button" variant="secondary">Clear filters</Button>
+                  <Button onClick={() => navigate({ scope: "all", folder: filters.folderFilter ? null : filters.folder, folderFilter: null, kind: null, q: null, tag: null })} size="sm" type="button" variant="secondary">Clear filters</Button>
                 ) : filters.scope === "all" ? (
                   <Button onClick={() => openUpload()} size="sm" type="button"><Upload size={15} /> Upload media</Button>
                 ) : null}

@@ -8,7 +8,12 @@ import { checkManualSessionTime } from "@/lib/bookings/manual";
 import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
 import { getSiteSettingsForSite } from "@/lib/site";
 
-export async function rescheduleBookingWithAvailability(input: { bookingId: string; siteId: string; startsAt: Date }) {
+export async function rescheduleBookingWithAvailability(input: {
+  bookingId: string;
+  siteId: string;
+  startsAt: Date;
+  details?: Pick<Prisma.BookingUpdateInput, "sessionName" | "priceCents" | "sessionLocation" | "adminNotes" | "cancellationReason">;
+}) {
   const booking = await prisma.booking.findFirst({
     where: { id: input.bookingId, siteId: input.siteId },
     include: {
@@ -40,7 +45,7 @@ export async function rescheduleBookingWithAvailability(input: { bookingId: stri
       await checkManualSessionTime(tx, { siteId: booking.siteId, startsAt: input.startsAt, endsAt, staffId: booking.staffId,
         resourceIds: booking.resources.map(resource => resource.resourceId), bufferBeforeMinutes: booking.service.bufferBeforeMinutes,
         bufferAfterMinutes: booking.service.bufferAfterMinutes, excludeBookingId: booking.id });
-      return tx.booking.update({ where: { id: booking.id }, data: { startsAt: input.startsAt, endsAt },
+      return tx.booking.update({ where: { id: booking.id }, data: { ...input.details, startsAt: input.startsAt, endsAt },
         include: { resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } }, service: true, staff: true } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
@@ -98,6 +103,7 @@ export async function rescheduleBookingWithAvailability(input: { bookingId: stri
       return tx.booking.update({
         where: { id: booking.id },
         data: {
+          ...input.details,
           endsAt: matchingSlot.endsAt,
           resources: requiredResourceIds.length
             ? {

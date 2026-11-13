@@ -56,7 +56,7 @@ function NotificationItem({ notice, dismiss }: { notice: Notice; dismiss: (id: n
   }, []);
   useEffect(() => {
     const duration = notificationDuration(notice.tone, notice.message);
-    if (duration === null || hovered || focused || hidden) return;
+    if (hovered || focused || hidden) return;
     const timer = window.setTimeout(() => dismiss(notice.id), duration);
     return () => window.clearTimeout(timer);
   }, [notice, dismiss, hovered, focused, hidden]);

@@ -116,12 +116,42 @@ test("separate notes forms preserve omitted fields and rescheduling requires a d
   assert.equal("adminNotes" in location, false);
   assert.equal("cancellationReason" in location, false);
   assert.equal((notes.parse({ id: "booking", sessionLocation: "" }) as Record<string, unknown>).sessionLocation, "");
+  const details = notes.parse({ id: "booking", sessionName: "  Portrait session  ", agreedPrice: "125.50" }) as Record<string, unknown>;
+  assert.equal(details.sessionName, "Portrait session");
+  assert.equal(details.agreedPrice, 12550);
+  assert.equal((notes.parse({ id: "booking", agreedPrice: "" }) as Record<string, unknown>).agreedPrice, null);
+  assert.equal("agreedPrice" in parsed, false);
+  assert.throws(() => notes.parse({ id: "booking", agreedPrice: "-10" }));
+  assert.throws(() => notes.parse({ id: "booking", sessionName: " " }));
   const reason = notes.parse({ id: "booking", cancellationReason: "Weather" }) as Record<string, unknown>;
   assert.equal("adminNotes" in reason, false);
   const reschedule = validation.bookingRescheduleFormSchema as unknown as ZodType;
   for (const [notifyCustomer, expected] of [["on", true], ["off", false], [undefined, false]]) {
     assert.equal((reschedule.parse({ id: "booking", startsAt: "2026-10-20T10:00", ...(notifyCustomer ? { notifyCustomer } : {}) }) as Record<string, unknown>).notifyCustomer, expected);
   }
+});
+
+test("cancellation saves its reason with the status before queuing the customer email", async () => {
+  const current = { id: "booking", siteId: "site", status: "CONFIRMED", cancellationReason: "Old reason", service: { name: "Session" } };
+  const emails: Record<string, unknown>[] = [];
+  const writes: Record<string, unknown>[] = [];
+  const loaded = loadMocked("lib/bookings/status.ts", {
+    "server-only": {},
+    "@/lib/email": { queueBookingStatusEmail: async (booking: Record<string, unknown>) => { emails.push(booking); } },
+    "@/lib/events/emit": { emitModuleEvent: async () => {} },
+    "@/lib/site": {},
+    "@/lib/prisma": { prisma: { booking: {
+      findFirst: async () => current,
+      update: async ({ data }: { data: Record<string, unknown> }) => { writes.push(data); return { ...current, ...data }; }
+    } } }
+  });
+  await loaded.updateBookingStatus({ bookingId: "booking", siteId: "site", status: "CANCELED", cancellationReason: "Weather" });
+  assert.equal(writes[0].cancellationReason, "Weather");
+  assert.equal(emails[0].cancellationReason, "Weather");
+  await loaded.updateBookingStatus({ bookingId: "booking", siteId: "site", status: "CONFIRMED", cancellationReason: "Ignored" });
+  assert.equal("cancellationReason" in writes[1], false);
+  await loaded.updateBookingStatus({ bookingId: "booking", siteId: "site", status: "CANCELED" });
+  assert.equal("cancellationReason" in writes[2], false, "Existing callers preserve the saved reason when omitted");
 });
 
 test("reschedule notifications use the explicit-false gate without sending real mail", async () => {

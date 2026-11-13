@@ -13,19 +13,21 @@ await build({ stdin: { resolveDir: process.cwd(), loader: "tsx", contents: `
 import React, {useEffect,useState} from 'react'; import {createRoot} from 'react-dom/client';
 import {ClientSessionDetail} from './modules/clients/detail/client-galleries-card';
 import {ClientSessionsTable} from './modules/clients/detail/client-sessions-table';
+import {SessionForm} from './modules/appointments/session-form';
 import {ClientProfileCard} from './modules/clients/detail/client-profile-card';
 import {ServicePresetField} from './modules/scheduling/components/service-preset-field';
 import {workspace} from '@/modules/portfolio/client-actions';
 import './app/globals.css'; import './app/admin/design-tokens.css'; import './app/admin/design-system.css';
-function Demo(){const [path,setPath]=useState(window.location.pathname+window.location.search);useEffect(()=>{const change=()=>setPath(window.location.pathname+window.location.search);window.addEventListener('popstate',change);return()=>window.removeEventListener('popstate',change)},[]);return <div className="showrunner-admin"><main className="admin-main">{path.includes('/sessions/')?<ClientSessionDetail key={path} clientId="client-a" initialWorkspace={structuredClone(workspace)} initialBookingId="booking-a" initialGalleryId={workspace.galleries[0]?.id||""} openUpload={path.includes('upload=1')}/>:<section className="clients-detail-card-grid"><ClientProfileCard name="Abe" email="abe@example.test" phone="555-0123" photoUrl="" pipeline="Booked" details={<p>Full client details</p>} editForm={<form><label>Client name<input name="name" defaultValue="Abe" /></label><ServicePresetField id="test-category" label="Category" name="category" emptyLabel="Uncategorized" newLabel="New Category" newPlaceholder="Category name" options={['Release']}/></form>}/><ClientSessionsTable clientId="client-a" initialWorkspace={structuredClone(workspace)}/></section>}</main></div>}
+function Demo(){const [path,setPath]=useState(window.location.pathname+window.location.search);useEffect(()=>{const change=()=>setPath(window.location.pathname+window.location.search);window.addEventListener('popstate',change);return()=>window.removeEventListener('popstate',change)},[]);return <div className="showrunner-admin"><main className="admin-main">{path.includes('/appointments/new')?<SessionForm services={[]} clients={[{id:'client-a',name:'Abe',email:'abe@example.test',phone:'555-0123'}]} staff={[]} timezone="America/Chicago" rates={[]} initialClientId="client-a"/>:path.includes('/sessions/')?<ClientSessionDetail key={path} clientId="client-a" initialWorkspace={structuredClone(workspace)} initialBookingId="booking-a" initialGalleryId={workspace.galleries[0]?.id||""} openUpload={path.includes('upload=1')}/>:<section className="clients-detail-card-grid"><ClientProfileCard name="Abe" email="abe@example.test" phone="555-0123" photoUrl="" permissions={<><span className="ui-badge ui-badge-success">Email opt-in</span><span className="ui-badge ui-badge-success">SMS opt-in</span></>} address="Chicago, IL, US" company="Abe Photography" actions={<p>Merge client records</p>} editForm={<form><label>Client name<input name="name" defaultValue="Abe" /></label><ServicePresetField id="test-category" label="Category" name="category" emptyLabel="Uncategorized" newLabel="New Category" newPlaceholder="Category name" options={['Release']}/></form>}/><ClientSessionsTable canCreateSession clientId="client-a" initialWorkspace={structuredClone(workspace)}/></section>}</main></div>}
 createRoot(document.getElementById('root')).render(<Demo/>);
 ` }, bundle: true, outfile: output + '.js', plugins: [{ name: 'fixture', setup(b) {
   b.onResolve({ filter: /modules\/portfolio\/client-actions$/ }, () => ({ path: 'actions', namespace: 'fixture' }));
   b.onResolve({ filter: /(?:service-library|rate)-actions$/ }, () => ({ path: 'library-actions', namespace: 'fixture' }));
   b.onResolve({ filter: /ui\/notifications$/ }, () => ({ path: 'notify', namespace: 'fixture' }));
+  b.onResolve({ filter: /(?:appointments\/|^\.\/)create-action$/ }, () => ({ path: 'create-action', namespace: 'fixture' }));
   b.onResolve({ filter: /^next\/link$/ }, () => ({ path: 'link', namespace: 'fixture' }));
   b.onResolve({ filter: /^next\/image$/ }, () => ({ path: 'image', namespace: 'fixture' }));
-  b.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ loader: 'tsx', resolveDir: process.cwd(), contents: args.path === 'library-actions' ? 'export async function saveServiceLibraryItemAction(input){window.libraryCalls.push(input);return {item:{...input,id:"created-addon",priceCents:Math.round(Number(input.price)*100)}}} export async function saveHourlyRateAction(){return {error:"Unused"}}' : args.path === 'notify' ? 'export const useNotify=()=>()=>{}' : args.path === 'link' ? `import React from 'react';export default function Link({href,...props}){return <a {...props} href={href} onClick={event=>{if(href.startsWith('/admin/')){event.preventDefault();history.pushState({},'',href);window.dispatchEvent(new PopStateEvent('popstate'))}}}/>} ` : args.path === 'image' ? `import React from 'react'; export default function Image({unoptimized,...props}){return <img {...props}/>} ` : `
+  b.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ loader: 'tsx', resolveDir: process.cwd(), contents: args.path === 'create-action' ? 'export async function createSessionAction(){return {error:"Fixture does not save bookings"}}' : args.path === 'library-actions' ? 'export async function saveServiceLibraryItemAction(input){window.libraryCalls.push(input);return {item:{...input,id:"created-addon",priceCents:Math.round(Number(input.price)*100)}}} export async function saveHourlyRateAction(){return {error:"Unused"}}' : args.path === 'notify' ? 'export const useNotify=()=>()=>{};export const Notification=()=>null' : args.path === 'link' ? `import React from 'react';export default function Link({href,...props}){return <a {...props} href={href} onClick={event=>{if(href.startsWith('/admin/')){event.preventDefault();history.pushState({},'',href);window.dispatchEvent(new PopStateEvent('popstate'))}}}/>} ` : args.path === 'image' ? `import React from 'react'; export default function Image({unoptimized,...props}){return <img {...props}/>} ` : `
 export let workspace={clientName:'Abe',clientEmail:'abe@example.test',canSendEmail:true,galleries:[],sessions:[{id:'booking-a',name:'Wedding',date:'2026-11-11'}],today:'2026-11-11',packages:[],canUpload:true,canManageMedia:true};
 window.calls=[];window.libraryCalls=[];window.fixtureWorkspace=workspace;
 export async function getClientGalleryWorkspace(){return structuredClone({...workspace,galleries:[...workspace.galleries,{id:"other-gallery",bookingId:"other-booking",title:"Another session",photoCount:0,imageStatus:"Ready"}]})}
@@ -45,16 +47,41 @@ try {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => route.request().url().includes('/api/scheduling/service-library') ? route.fulfill({contentType:'application/json',body:JSON.stringify({items:[],categories:[],tags:[],total:0,page:1,pageCount:1})}) : route.fulfill({ contentType: 'text/html', body: '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>' + css + '</style></head><body><div id="root"></div><script>' + js + '</script></body></html>' }));
   await page.goto('http://localhost:4179');
+  for (const width of [1239, 390]) {
+    await page.setViewportSize({width,height:812});
+    const add = page.getByRole('link', {name:'New Session',exact:true});
+    assert.equal(await add.getAttribute('href'), '/admin/appointments/new?clientId=client-a');
+    await add.click();
+    assert.equal(await page.getByLabel('Existing client').inputValue(), 'client-a');
+    assert.equal(await page.getByLabel('Name', {exact:true}).inputValue(), 'Abe');
+    assert.equal(await page.getByLabel('Email', {exact:true}).inputValue(), 'abe@example.test');
+    assert.equal(await page.getByLabel('Phone', {exact:false}).inputValue(), '555-0123');
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth), false);
+    await page.screenshot({path:captures+'/new-client-session-'+width+'.png'});
+    await page.getByRole('link', {name:'Cancel',exact:true}).click();
+    await add.waitFor();
+    await page.screenshot({path:captures+'/client-session-button-'+width+'.png'});
+  }
+  await page.setViewportSize({width:1440,height:1000});
   const profile = page.getByRole('region', { name: 'Client details', exact: true });
   const sessions = page.getByRole('region', { name: 'Sessions', exact: true });
   const profileBox = await profile.boundingBox(), sessionsBox = await sessions.boundingBox();
   assert(Math.abs(profileBox.y + profileBox.height - sessionsBox.y - sessionsBox.height) <= 1, 'Sessions reaches the bottom of the client card');
+  assert(!/Pipeline/i.test(await profile.innerText()));
+  assert.match(await profile.innerText(), /Permissions/i);
+  assert.match(await profile.innerText(), /Email opt-in/);
+  assert.match(await profile.innerText(), /SMS opt-in/);
   const summaryBox = await profile.getByRole('definition').last().boundingBox();
-  const showButton = profile.getByRole('button', { name: 'Show details' });
+  const showButton = profile.getByRole('button', { name: 'More', exact:true });
+  assert.equal(await profile.getByRole('button',{name:'Show details'}).count(),0);
+  assert.match(await profile.innerText(), /Abe Photography/);
+  const labels=await profile.locator('dt').allTextContents();
+  assert(labels.indexOf('Address')===labels.indexOf('Email')+1);
+  assert.match(await profile.innerText(), /Chicago, IL, US/);
   assert((await showButton.boundingBox()).y > summaryBox.y, 'Show details sits below the summary');
   await showButton.click();
-  const profileDialog = page.getByRole('dialog', { name: /Abe.*Client details/ });
-  await profileDialog.getByText('Full client details', { exact: true }).waitFor();
+  const profileDialog = page.locator('dialog.clients-modal');
+  await profileDialog.getByText('Merge client records', { exact: true }).waitFor();
   await profileDialog.getByRole('button', { name: 'Edit profile' }).click();
   await profileDialog.getByLabel('Client name', { exact: true }).waitFor();
   await profileDialog.getByLabel('Category', { exact: true }).selectOption('__new__');
@@ -64,7 +91,7 @@ try {
   assert.equal(await profileDialog.locator('input[name="category"]').inputValue(), 'Wedding paperwork');
   await profileDialog.getByRole('button', { name: 'Close dialog', exact: true }).click();
   await showButton.click();
-  await profileDialog.getByText('Full client details', { exact: true }).waitFor();
+  await profileDialog.getByText('Merge client records', { exact: true }).waitFor();
   await profileDialog.getByRole('button', { name: 'Close dialog', exact: true }).click();
   const scheduledRow = page.getByRole('table', { name: 'Client sessions' }).getByRole('row').filter({ hasText: 'Wedding' });
   assert.match(await scheduledRow.innerText(), /Awaiting photos/);
@@ -207,6 +234,14 @@ try {
   await page.getByRole('button',{name:'View one.jpg',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Send to client',exact:true}).isEnabled(),true,'Send enables only after processing finishes');
 
+  await page.evaluate(()=>{window.fixtureWorkspace.galleries[0].photosSent=true;});
+  await page.getByRole('link',{name:'Back',exact:true}).click();
+  await table.getByRole('status').filter({hasText:'Awaiting Client'}).waitFor();
+  await table.getByRole('link',{name:'Open Wedding',exact:true}).click();
+  await page.evaluate(()=>{window.fixtureWorkspace.galleries[0].selectionComplete=true;});
+  await page.getByRole('link',{name:'Back',exact:true}).click();
+  await table.getByRole('status').filter({hasText:'Complete'}).waitFor();
+  assert.equal(await table.getByRole('row').filter({hasText:'Complete'}).count(),1);
   assert.deepEqual(errors, []);
   console.log('Passed: session modal, editable default date, description, sequential uploads tied to saved session, table browsing, private client link, desktop/mobile layouts.');
 } finally { await browser.close(); }

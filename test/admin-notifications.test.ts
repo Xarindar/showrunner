@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { consumeNotification, notificationDuration } from "../lib/admin-notifications";
 
-test("errors persist and confirmations allow time to read long messages", () => {
-  assert.equal(notificationDuration("danger", "Save failed"), null);
+test("all toast tones expire with enough time to read errors and long messages", () => {
+  assert.equal(notificationDuration("danger", "Save failed"), 8000);
+  assert.equal(notificationDuration("danger", "x".repeat(120)), 10000);
   assert.equal(notificationDuration("success", "Saved"), 5000);
   assert.equal(notificationDuration("neutral", "x".repeat(120)), 10000);
 });

@@ -10,8 +10,6 @@
 }
 .showrunner-admin .booking-rule-option-list { border: 1px solid var(--sd-color-border-subtle); border-radius: var(--sd-radius-input); min-width: 0; }
 .showrunner-admin .service-booking-rules { gap: 0; }
-.showrunner-admin .service-booking-rules .ui-section-header h2 { flex: 1 1 auto; }
-.showrunner-admin .service-booking-rules .ui-section-header .booking-rule-actions { flex-wrap: wrap; gap: var(--sd-space-8); }
 .showrunner-admin .service-booking-rules .booking-rules-table th:last-child {  text-align: center; }
 .showrunner-admin .booking-rule-type-cell { display: grid; min-width: 0; }
 .showrunner-admin .booking-rule-type-cell strong,

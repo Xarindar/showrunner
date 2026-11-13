@@ -2,7 +2,7 @@ import { formatDateTime } from "@/lib/format";
 import { CalendarClock } from "lucide-react";
 import { SchedulingCalendarConnectionStatus, SchedulingCalendarOwnerType, type SchedulingCalendarConnection, type StaffMember } from "@prisma/client";
 import { googleCalendarConnectPath, googleCalendarConnectionLabel } from "@/lib/scheduling/google-calendar";
-import { ButtonAnchor, Card, EqualGrid, Table } from "@/components/ui";
+import { ButtonAnchor, EqualGrid, Table } from "@/components/ui";
 
 type CalendarFeedsPanelProps = {
   googleConnections: Array<{
@@ -43,9 +43,9 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
   const siteGoogleConnection = connectionFor(googleConnections, SchedulingCalendarOwnerType.SITE);
 
   return (
-    <Card as="section" minHeight="none" bodyClassName="form-grid">
+    <section className="studio-panel ui-section-card">
+      <div className="ui-section-header"><h2>Calendars</h2></div><div className="ui-section-body form-grid">
       <div>
-        <h2 className="section-title">Calendars</h2>
         <p className="ui-zero">
           Subscribe to bookings with ICS feeds and connect Google Calendar to remove busy time from public availability.
         </p>
@@ -70,7 +70,7 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
         <p className="ui-zero">{connectionDetail(siteGoogleConnection)}</p>
 
         {staff.length ?
-        <Table>
+        <section className="ui-data-table-shell"><div className="ui-data-table-titlebar"><h2>Staff calendars</h2></div><Table aria-label="Staff calendars" tableClassName="ui-data-table">
             <thead>
               <tr>
                 <th>Staff</th>
@@ -98,7 +98,7 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
 
             })}
             </tbody>
-          </Table> :
+          </Table></section> :
         null}
       </div>
 
@@ -113,7 +113,7 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
       </div>
 
       {staffFeedUrls.length ?
-      <Table>
+      <section className="ui-data-table-shell"><div className="ui-data-table-titlebar"><h2>Staff feeds</h2></div><Table aria-label="Staff feeds" tableClassName="ui-data-table">
           <thead>
             <tr>
               <th>Staff</th>
@@ -133,10 +133,11 @@ export function CalendarFeedsPanel({ googleConnections, siteFeedUrl, staff, staf
               </tr>
           )}
           </tbody>
-        </Table> :
+        </Table></section> :
 
       <p className="empty-state">Add staff to create staff-specific calendar feeds.</p>
       }
-    </Card>);
+      </div>
+    </section>);
 
 }

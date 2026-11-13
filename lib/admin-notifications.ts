@@ -1,7 +1,7 @@
 export type NotificationTone = "success" | "danger" | "neutral";
 
 export function notificationDuration(tone: NotificationTone, message: string) {
-  return tone === "danger" ? null : Math.max(5000, Math.ceil(message.length / 12) * 1000);
+  return Math.max(tone === "danger" ? 8000 : 5000, Math.ceil(message.length / 12) * 1000);
 }
 
 // Consume only the originating flash flag; keep filters, selection and fragments.

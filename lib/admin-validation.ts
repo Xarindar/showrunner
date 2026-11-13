@@ -165,15 +165,23 @@ export const blockoutFormSchema = z
 
 export const bookingStatusFormSchema = z.object({
   id,
-  status: z.enum(BookingStatus)
+  status: z.enum(BookingStatus),
+  cancellationReason: optionalStoredText.optional()
 });
 
 export const bookingDetailFormSchema = z.object({
   id,
+  startsAt: requiredText.optional(),
+  notifyCustomer: z.enum(["on", "off"]).default("off").transform(value => value === "on"),
+  sessionName: z.string().trim().min(1).max(200).optional(),
+  agreedPrice: optionalMoneyCents.transform(value => value ?? null).optional(),
   sessionLocation: z.string().trim().max(500).optional(),
   adminNotes: optionalStoredText.optional(),
   cancellationReason: optionalStoredText.optional()
 });
+
+export const bookingNoteFormSchema = z.object({ id, content: requiredText });
+export const bookingNoteDeleteFormSchema = z.object({ id, noteId: id, confirmDelete: z.literal("on") });
 
 export const bookingRescheduleFormSchema = z.object({
   id,

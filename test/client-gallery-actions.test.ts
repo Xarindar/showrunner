@@ -33,7 +33,7 @@ function harness(overrides: { client?: boolean; package?: boolean; gallery?: boo
     portfolioGalleryItem: { findMany: record("items", overrides.existing || []), createMany: record("addItems", { count: assets.length }) },
     portfolioGalleryAccess: { findFirst: record("access", { accessToken: "private-token" }) },
     messageTemplate: { upsert: record("template", {}) },
-    emailOutbox: { findFirst: record("outbox", { status: "QUEUED" }) },
+    emailOutbox: { findFirst: record("outbox", { status: "QUEUED" }), findMany: record("sentEmails", []) },
     serviceLibraryItem: { updateMany: record("lockAddon", { count: 1 }), findFirst: record("addon", { id: "custom-addon", siteId: "site-a", name: "User created name", pricingType: "PER_UNIT", priceCents: 1234, deliverables: { finalPhotos: 1 }, commerceProduct: null }), update: record("linkProduct", {}) },
     product: { upsert: record("product", { id: "internal-digital-product" }) },
     mediaAsset: { findMany: record("assets", assets), groupBy: record("folderGroups", [{ folder: "Shoots/Autumn" }]), count: record("assetCount", 100) }
@@ -388,4 +388,68 @@ test("proof settings link a scoped user-created per-unit add-on rather than acce
   assert.equal(calls.find(call => call.name === "product")!.query.create.status, "DRAFT", "Internal checkout product is not published in the store");
   db.serviceLibraryItem.findFirst = async () => ({ id: "custom-addon", priceCents: 10, deliverables: { finalPhotos: 5 } });
   assert.equal((await actions.configureClientGalleryProofingAction(input)).ok, false, "Five-photo bundles cannot be silently priced as individual proofs");
+});
+
+
+test("client workspace completes only finalized selections with cleared payment", async () => {
+  const { actions, db } = harness();
+  const payment = { provider: "STRIPE", status: "PAID", amountCents: 800, currency: "USD", refundedCents: 0, providerVerifiedAt: new Date(), externalPaymentId: "verified-payment" };
+  const order = { siteId: "site-a", clientId: "client-a", status: "PAID", totalCents: 800, currency: "USD", payments: [payment] };
+  const purchase = { siteId: "site-a", clientId: "client-a", selectedCount: 2, totalCents: 800, currency: "USD", revokedAt: null, order };
+  const purchases = [
+    null, purchase, { ...purchase, totalCents: 0, order: null },
+    { ...purchase, order: { ...order, status: "PENDING" } },
+    { ...purchase, order: { ...order, payments: [{ ...payment, providerVerifiedAt: null }] } },
+    { ...purchase, order: { ...order, payments: [{ ...payment, refundedCents: 1 }] } },
+    { ...purchase, revokedAt: new Date() }, { ...purchase, selectedCount: 0 },
+    { ...purchase, clientId: "other-client" }, { ...purchase, order: { ...order, siteId: "other-site" } }
+  ];
+  db.portfolioGallery.findMany = async (query: Query) => {
+    assert.equal(query.include.purchase.include.order.include.payments.orderBy[0].createdAt, "desc");
+    return purchases.map((purchase, i) => ({ id: `gallery-${i}`, title: "Photos", bookingId: null, _count: { items: 2 }, accesses: [], purchase }));
+  };
+  db.orderItem.findMany = async () => [];
+  const workspace = await actions.getClientGalleryWorkspace("client-a") as validation.ClientGalleryWorkspace;
+  assert.deepEqual(workspace.galleries.map(gallery => gallery.selectionComplete), [false, true, true, false, false, false, false, false, false, false]);
+  assert.equal(validation.clientSessionRows(workspace)[1].imageStatus, "Complete");
+});
+
+test("a session completes only when all its collections are complete and ready", () => {
+  const gallery = { id: "gallery-a", bookingId: "booking-a", title: "Photos", sessionDate: "2026-11-11", photoCount: 3, imageStatus: "Ready", selectionComplete: true } as validation.ClientShootGallery;
+  const sessions = [{ id: "booking-a", name: "Wedding", date: "2026-11-12" }];
+  const status = (galleries: validation.ClientShootGallery[]) => validation.clientSessionRows({ sessions, galleries })[0].imageStatus;
+  assert.equal(status([gallery]), "Complete");
+  assert.equal(status([gallery, { ...gallery, id: "gallery-b", selectionComplete: false }]), "Ready");
+  assert.equal(status([gallery, { ...gallery, id: "gallery-b", imageStatus: "Images processing" }]), "Images processing");
+  assert.equal(status([{ ...gallery, imageStatus: "Needs attention" }]), "Needs attention");
+  assert.equal(status([]), "Awaiting photos");
+});
+
+
+test("sent gallery email moves only its client session to Awaiting Client", async () => {
+  const { actions, db, calls } = harness();
+  db.portfolioGallery.findMany = async () => ["gallery-a", "gallery-ab"].map(id => ({ id, title: "Photos", bookingId: null, _count: { items: 3 }, accesses: [] }));
+  db.orderItem.findMany = async () => [];
+  db.emailOutbox.findMany = async (query: Query) => {
+    calls.push({ name: "sentEmails", query });
+    return [{ idempotencyKey: "gallery-ready:gallery-a:request-id" }];
+  };
+  const workspace = await actions.getClientGalleryWorkspace("client-a") as validation.ClientGalleryWorkspace;
+  const query = calls.find(call => call.name === "sentEmails")!.query;
+  assert.equal(query.where.siteId, "site-a");
+  assert.equal(query.where.relatedId, "client-a");
+  assert.equal(query.where.relatedType, "client");
+  assert.equal(query.where.templateKey, "portfolio.session.ready");
+  assert.equal(query.where.status, "SENT", "Queued, failed and suppressed emails do not count as sent");
+  assert.equal(workspace.galleries[0].photosSent, true);
+  assert.equal(workspace.galleries[1].photosSent, false, "Gallery ID prefixes do not match other galleries");
+  assert.equal(validation.clientSessionRows(workspace)[0].imageStatus, "Awaiting Client");
+  assert.equal(validation.clientSessionRows(workspace)[1].imageStatus, "Ready");
+  const sessions = [{ id: "booking-a", name: "Wedding", date: "2026-11-12" }];
+  const gallery = { ...workspace.galleries[0], bookingId: "booking-a" };
+  const status = (patch: Partial<validation.ClientShootGallery>) => validation.clientSessionRows({ sessions, galleries: [{ ...gallery, ...patch }] })[0].imageStatus;
+  assert.equal(status({}), "Awaiting Client");
+  assert.equal(status({ selectionComplete: true }), "Complete");
+  assert.equal(status({ imageStatus: "Images processing" }), "Images processing");
+  assert.equal(status({ imageStatus: "Needs attention" }), "Needs attention");
 });

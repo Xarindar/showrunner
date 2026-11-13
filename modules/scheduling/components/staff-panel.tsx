@@ -3,7 +3,6 @@ import { AvailabilityPanel } from "./availability-panel";
 import { Link2, Plus, Save } from "lucide-react";
 import { createStaffMemberAction, linkStaffMemberAdminUserAction, updateStaffMemberAction } from "../actions";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { EqualGrid } from "@/components/ui/layout";
 import { Switch } from "@/components/ui/switch";
 
@@ -20,9 +19,9 @@ type StaffPanelProps = {
 export function StaffPanel({ availability, timezone, staff, assignedStaffIds, staffIdsWithAvailability, adminUsers, canLinkStaffAccounts }: StaffPanelProps) {
   return (
     <section className="form-grid">
-      <details>
-        <summary>Add staff</summary>
-      <Card action={createStaffMemberAction} as="form" minHeight="none" bodyClassName="form-grid">
+      <section className="studio-panel ui-section-card"><details>
+        <summary className="ui-section-header">Add staff</summary>
+      <form action={createStaffMemberAction} className="ui-section-body form-grid">
         <EqualGrid>
           <div className="ui-field">
             <label htmlFor="staff-name">Name</label>
@@ -52,11 +51,11 @@ export function StaffPanel({ availability, timezone, staff, assignedStaffIds, st
           <Plus size={18} />
           Add staff
         </Button>
-      </Card>
-      </details>
+      </form>
+      </details></section>
 
-      <section className="form-grid">
-        <h2 className="section-title">Staff roster</h2>
+      <section className="studio-panel ui-section-card">
+        <div className="ui-section-header"><h2>Staff roster</h2></div><div className="ui-section-body form-grid">
             {staff.map((member) => {
               const needsAvailability = member.isActive && assignedStaffIds.has(member.id) && !staffIdsWithAvailability.has(member.id);
               return (
@@ -137,6 +136,7 @@ export function StaffPanel({ availability, timezone, staff, assignedStaffIds, st
             {!staff.length ?
             <p>No staff members yet. Services can still use business-wide availability.</p> :
             null}
+        </div>
       </section>
     </section>);
 

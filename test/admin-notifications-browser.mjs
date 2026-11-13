@@ -73,9 +73,10 @@ try {
   await page.getByRole("button", { name: "Try save", exact: true }).click();
   await page.getByRole("alert").getByText("Save failed. Try again.", { exact: true }).waitFor();
   assert.equal(await notices.count(), 1, "Identical responses from another attempt must be announced again");
-  await page.clock.runFor(30000);
-  assert.equal(await notices.count(), 1, "Errors stay until dismissed");
-  await dismiss();
+  await page.clock.runFor(7999);
+  assert.equal(await notices.count(), 1, "Errors allow at least eight seconds to read");
+  await page.clock.runFor(1);
+  assert.equal(await notices.count(), 0, "Errors dismiss automatically");
 
   await page.getByRole("button", { name: "Show success", exact: true }).click();
   await page.getByText("Saved.", { exact: true }).waitFor();
@@ -118,5 +119,5 @@ try {
   assert(dismissSize.width >= 44 && dismissSize.height >= 44, "Mobile dismissal keeps a touch target");
   await page.screenshot({ path: `${captures}/error-mobile.png`, animations: "disabled" });
   assert.deepEqual(errors, []);
-  console.log("Passed: repeat action errors, deduplication, redirect consumption, persistent errors, hover/focus pause, dialog hosting/focus, contrast and mobile targets.");
+  console.log("Passed: repeat action errors, deduplication, redirect consumption, error timeout, hover/focus pause, dialog hosting/focus, contrast and mobile targets.");
 } finally { await browser.close(); }

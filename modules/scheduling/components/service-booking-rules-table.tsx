@@ -88,7 +88,7 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
     <input name="intakePrompt" type="hidden" value={intakePrompt} /><input name="policyText" type="hidden" value={policyText} />
     <div className="ui-section-header">
       <h2 id={`${idPrefix}-rules-title`}>Intake and Booking Terms &amp; Conditions</h2>
-      <div className="booking-rule-actions">
+      <div className="ui-inline-actions">
         <ButtonLink href="/admin/modules/appointments/forms-terms" variant="secondary">Manage forms &amp; terms</ButtonLink>
         <Button type="button" variant="secondary" onClick={() => open("library")}><Plus size={15} />Add rule</Button>
       </div>

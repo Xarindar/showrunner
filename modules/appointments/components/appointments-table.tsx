@@ -2,7 +2,7 @@ import type { Booking, BookingResource, Resource, Service, StaffMember } from "@
 import Link from "next/link";
 import { formatDateTime } from "@/lib/format";
 import { updateBookingStatusAction } from "../actions";
-import { Table } from "@/components/ui";
+import { Button, Table } from "@/components/ui";
 
 type BookingWithService = Booking & {
   resources: Array<BookingResource & {resource: Resource;}>;
@@ -17,8 +17,9 @@ type AppointmentsTableProps = {
 
 export function AppointmentsTable({ bookings, timezone }: AppointmentsTableProps) {
   return (
-    <div>
-      <Table>
+    <section className="ui-data-table-shell">
+      <div className="ui-data-table-titlebar"><h2>Appointments</h2></div>
+      <Table aria-label="Appointments" tableClassName="ui-data-table">
         <thead>
           <tr>
             <th>Customer</th>
@@ -54,14 +55,14 @@ export function AppointmentsTable({ bookings, timezone }: AppointmentsTableProps
                 <span className="ui-badge">{booking.status.toLowerCase()}</span>
               </td>
               <td>
-                <div className="ui-zero">
+                <div className="ui-inline-actions">
                   {(["CONFIRMED", "CANCELED", "COMPLETED"] as const).map((status) =>
                 <form key={status} action={updateBookingStatusAction}>
                       <input type="hidden" name="id" value={booking.id} />
                       <input type="hidden" name="status" value={status} />
-                      <button className={status === "CANCELED" ? "ui-button ui-button-danger" : "ui-button ui-button-secondary"} type="submit">
+                      <Button size="sm" variant={status === "CANCELED" ? "danger" : "secondary"} type="submit">
                         {status.toLowerCase()}
-                      </button>
+                      </Button>
                     </form>
                 )}
                 </div>
@@ -75,6 +76,6 @@ export function AppointmentsTable({ bookings, timezone }: AppointmentsTableProps
           null}
         </tbody>
       </Table>
-    </div>);
+    </section>);
 
 }

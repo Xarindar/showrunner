@@ -9,13 +9,14 @@ type PublicClientInput = {
   email: string;
   name?: string | null;
   phone?: string | null;
+  companyName?: string;
   serviceId?: string;
 };
 
 /**
  * Create-or-fill-blank upsert for clients created from anonymous public input
  * (booking, waitlist, etc.). It NEVER overwrites an existing client's stored
- * name/phone from public input — it only fills fields that are currently empty —
+ * name/phone/company from public input — it only fills fields that are currently empty —
  * matching the create-only rule the §7/§8 audits established for the forms and
  * testimonials public paths. Returns the client id.
  *
@@ -28,16 +29,18 @@ export async function upsertPublicClient(tx: Prisma.TransactionClient, input: Pu
   const email = input.email.trim().toLowerCase();
   const name = input.name?.trim() || "";
   const phone = input.phone?.trim() || "";
+  const companyName = input.companyName?.trim() || "";
 
   const existing = await tx.client.findUnique({
     where: { siteId_email: { siteId: input.siteId, email } },
-    select: { id: true, name: true, phone: true, preferences: true }
+    select: { id: true, name: true, phone: true, companyName: true, preferences: true }
   });
 
   if (existing) {
-    const data: { name?: string; phone?: string; preferences?: Prisma.InputJsonObject } = {};
+    const data: { name?: string; phone?: string; companyName?: string; preferences?: Prisma.InputJsonObject } = {};
     if (!existing.name && name) data.name = name;
     if (!existing.phone && phone) data.phone = phone;
+    if (!existing.companyName && companyName) data.companyName = companyName;
     if (input.serviceId) data.preferences = { ...(isRecord(existing.preferences) ? existing.preferences : {}), serviceId: input.serviceId };
     if (Object.keys(data).length > 0) {
       await tx.client.update({ where: { id: existing.id }, data });
@@ -53,6 +56,7 @@ export async function upsertPublicClient(tx: Prisma.TransactionClient, input: Pu
       email,
       name: name || email,
       phone: phone || undefined,
+      companyName,
       status: statuses.defaultStatus,
       preferences: input.serviceId ? { serviceId: input.serviceId } : {}
     },

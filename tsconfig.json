@@ -35,7 +35,11 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     ".next-card-preview/types/**/*.ts",
-    ".next-card-preview/dev/types/**/*.ts"
+    ".next-card-preview/dev/types/**/*.ts",
+    ".next-client-sessions/types/**/*.ts",
+    ".next-client-sessions/dev/types/**/*.ts",
+    ".next-client-detail/types/**/*.ts",
+    ".next-client-detail/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

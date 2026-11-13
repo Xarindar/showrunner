@@ -55,6 +55,7 @@ function filtersFromParams(params: Record<string, string | undefined>): MediaLib
 
   return {
     folder: (params.folder || "").trim().slice(0, 200),
+    folderFilter: params.folderFilter === "1" && Boolean(params.folder?.trim()),
     kind: oneOf(params.kind, ["all", "image", "video", "other"] as const, "all"),
     page: positiveInteger(params.page),
     q: (params.q || "").trim().slice(0, 180),
@@ -218,7 +219,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
           caption: asset.caption,
           createdAt: asset.createdAt.toISOString(),
           credit: asset.credit,
-          displayUrl: mediaAssetDisplayUrl(asset, MediaVariantType.CARD),
+          displayUrl: mediaAssetDisplayUrl(asset, MediaVariantType.THUMBNAIL),
           driver: asset.driver,
           filename: asset.filename,
           focalPointX: asset.focalPointX,
