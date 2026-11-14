@@ -9,9 +9,28 @@ export async function GET(request: Request) {
   }).toString().replaceAll("&", "&amp;");
   if (query.get("inline") === "1") {
     return new Response(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Save to Google Drive</title>
-<style>body{margin:0;display:grid;place-items:center;height:46px;font:14px Arial,sans-serif}a{color:#211f1d}</style>
-<div class="g-savetodrive" data-src="${source}" data-filename="Selected-photos.zip" data-sitename="Jazzr Photography"></div>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html,body{margin:0;overflow:hidden}.drive{position:absolute;inset:0}.drive iframe[data-gapiattached]{opacity:0;transform-origin:top left}</style>
+<div class="drive"><div class="g-savetodrive" data-src="${source}" data-filename="Selected-photos.zip" data-sitename="Jazzr Photography"></div></div>
 <noscript><a href="${source}">Download ZIP</a></noscript>
+<script>
+  const host = document.querySelector(".drive");
+  const resize = new ResizeObserver(() => {
+    const button = host.querySelector("iframe[data-gapiattached]");
+    if (button?.offsetWidth && button.offsetHeight) {
+      button.style.transform = "scale(" + innerWidth / button.offsetWidth + "," + innerHeight / button.offsetHeight + ")";
+    }
+  });
+  resize.observe(host);
+  // Match the visible Jazzr row to Google's live hit area so the browser delivers the actual click.
+  new MutationObserver(() => {
+    const button = host.querySelector("iframe[data-gapiattached]");
+    if (button) {
+      button.title = "Save to Google Drive";
+      resize.observe(button);
+    }
+  }).observe(host, {childList: true, subtree: true});
+</script>
 <script async src="https://apis.google.com/js/platform.js" referrerpolicy="no-referrer"></script></html>`, {
       headers: { ...proofBundleHeaders, "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex, nofollow",
         "Content-Security-Policy": "frame-ancestors https://admin.jazzrphotography.com" }

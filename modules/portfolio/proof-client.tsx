@@ -50,8 +50,13 @@ function JazzrDriveButton({ endpoint }: { endpoint: string }) {
 
   if (failed) return <p role="status">Google Drive is unavailable. Use Download ZIP.</p>;
   if (!source) return <Button disabled variant="secondary">Loading Google Drive…</Button>;
-  return <iframe className={styles.driveFrame} src={source} title="Save to Google Drive" referrerPolicy="no-referrer"
-    sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-downloads" />;
+  return <div className={styles.driveControl}>
+    <div className={`ui-button ui-button-secondary ${styles.driveAction}`} aria-hidden="true">
+      <Image src="/proof-delivery/google-drive.png" width={24} height={24} alt="" unoptimized /> Save to Google Drive
+    </div>
+    <iframe className={styles.driveFrame} src={source} title="Save to Google Drive" referrerPolicy="no-referrer"
+      sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-downloads" />
+  </div>;
 }
 
 export function ProofClient({ initialView, token, brand = { name: "Photography", logoUrl: "" } }: { initialView: ProofSelectionView; token: string; brand?: { name: string; logoUrl: string; theme?: "jazzr"; firstName?: string } }) {

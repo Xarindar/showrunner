@@ -222,7 +222,13 @@ assert.equal(await page.getByRole('link',{name:'Download ZIP',exact:true}).count
 await page.getByText('Taylor, thank you for choosing Jazzr Photography. We hope you enjoyed your shoot and love your photos!', {exact:true}).waitFor();
 assert.equal(await page.getByRole('navigation',{name:'Contact Jazzr Photography'}).getByRole('link').count(),3);
 const deliveryUrl = page.url();
-const drive = page.frameLocator('iframe[title="Save to Google Drive"]');
+const driveFrame = page.locator('iframe[title="Save to Google Drive"]');
+const drive = driveFrame.contentFrame();
+await page.getByText('Save to Google Drive',{exact:true}).waitFor();
+const driveBounds = await driveFrame.boundingBox();
+const zipBounds = await page.getByRole('link',{name:'Download ZIP',exact:true}).boundingBox();
+assert.equal(driveBounds.width,zipBounds.width,'Drive fills the same width as Download ZIP');
+assert.equal(driveBounds.height,zipBounds.height,'Drive matches the height of Download ZIP');
 await drive.getByRole('button',{name:'Save to Google Drive',exact:true}).click();
 await drive.getByRole('button',{name:'Drive save started',exact:true}).waitFor();
 assert.equal(page.url(),deliveryUrl,'Drive save stays on the delivery page');
