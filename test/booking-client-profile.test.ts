@@ -1,6 +1,7 @@
 import * as sessionOffering from "../lib/scheduling/session-offering";
 import * as timeFrames from "../lib/scheduling/service-time-frame";
 import * as bookingDocuments from "../lib/scheduling/booking-documents";
+import { bookingRuleSchema } from "../lib/scheduling/booking-rules";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
@@ -45,7 +46,7 @@ function harness(options: { existing?: boolean; existingCompany?: string; failBo
     return exports;
   }
   const client = load("../lib/clients/public-client.ts", { "server-only": {}, "@/lib/objects": { isRecord }, "@/lib/clients/status-settings": { normalizeClientStatusSettings } });
-  const native = load("../lib/scheduling/native.ts", { "./session-offering": sessionOffering, "./service-time-frame": timeFrames, "./booking-documents": bookingDocuments, "./booking-document-store": {listBookingDocuments:async(_siteId:string,transaction?:unknown)=>transaction&&options.changedDocuments ? (options.documents??[]).map(doc=>({...doc,version:doc.version+1})) : options.documents??[]}, "server-only": {}, "@/lib/clients/public-client": client, "@/lib/email": { queueBookingCreatedEmails: async () => {} }, "@/lib/prisma": { prisma: db }, "@/lib/scheduling/google-calendar": {}, "@/lib/site": {}, "@/lib/timezone": {} });
+  const native = load("../lib/scheduling/native.ts", { "./session-offering": sessionOffering, "./service-time-frame": timeFrames, "./booking-documents": bookingDocuments, "./booking-document-store": {listBookingDocuments:async(_siteId:string,transaction?:unknown)=>transaction&&options.changedDocuments ? (options.documents??[]).map(doc=>({...doc,version:doc.version+1})) : options.documents??[]}, "server-only": {}, "@/lib/clients/public-client": client, "@/lib/email": { queueBookingCreatedEmails: async () => {} }, "@/lib/prisma": { prisma: db }, "@/lib/scheduling/google-calendar": {}, "@/lib/site": {getSiteSettingsForSite:async()=>({timezone:"America/Chicago"})}, "@/lib/timezone": {} });
   const adapter = native.nativeSchedulingAdapter as { getAvailableSlots: () => Promise<unknown[]>; createBooking: (input: unknown) => Promise<{ clientId: string; serviceId: string }> };
   const startsAt = new Date("2030-05-01T15:00:00Z");
   adapter.getAvailableSlots = async () => [{ startsAt, endsAt: new Date("2030-05-01T16:00:00Z"), resourceIds: [] }];
@@ -144,4 +145,19 @@ test("public bookings persist the selected tier and server-priced extras, includ
   assert.equal(snapshot.tierId,"gold");
   assert.equal(snapshot.deliverables?.finalPhotos,null);
   assert.equal(snapshot.extras[0].quantity,2);
+});
+
+test("rich terms must match the accepted text and are saved as immutable rendered copies",async()=>{
+  const rule=bookingRuleSchema.parse({id:"terms",kind:"policy",category:"Terms",type:"TEXT",required:true,options:[],label:"[Client name] books [Package name] for [Booking total]",richText:{type:"doc",content:[{type:"paragraph",content:[{type:"dynamicField",attrs:{field:"clientName"}},{type:"text",text:" books "},{type:"dynamicField",attrs:{field:"packageName"}},{type:"text",text:" for "},{type:"dynamicField",attrs:{field:"total"}}]}]}});
+  const document:bookingDocuments.BookingDocument={id:"terms",name:"Default",version:1,kind:"TERMS",isDefault:true,rules:[rule]};
+  const h=harness({documents:[document]});
+  Object.assign(h.service,{sessionOffering:{coverageItems:[],tiers:[{id:"gold",name:"Gold",durationMinutes:60,priceCents:30000,coverageIds:[]}],addOns:[]}});
+  const input={tierId:"gold",policyAccepted:true,bookingRequirementsRevision:bookingDocuments.resolveBookingRequirements({...h.service,bookingDocumentSelection:undefined},[document]).revision};
+  await assert.rejects(h.book({...input,acceptedTerms:"Old terms"}),/Review and accept/);
+  assert.equal(h.bookingWrites.length,0);
+  await h.book({...input,acceptedTerms:"New client books Gold for $300.00"});
+  const saved=h.bookingWrites[0].data?.bookingRequirementsSnapshot as {renderedTerms:{text:string;html:string}};
+  assert.equal(saved.renderedTerms.text,"New client books Gold for $300.00");
+  document.rules[0].label="Changed later";
+  assert.match(saved.renderedTerms.html,/Gold for \$300.00/);
 });

@@ -1,0 +1,9 @@
+.editor { display: grid; gap: var(--sd-space-12); min-width: 0; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sd-space-4); padding: var(--sd-space-8); border: 1px solid var(--color-border); border-radius: var(--sd-space-8); }
+.editor .toolbar :global(select.ui-input) { width: auto; max-width: 100%; flex: 0 1 auto; }
+.toolbar button[aria-pressed="true"] { background: var(--color-border); }
+.document { min-height: 26rem; outline: none; padding: var(--sd-space-16); border: 1px solid var(--color-border); border-radius: var(--sd-space-8); overflow-wrap: anywhere; }
+.document:focus { outline: 2px solid var(--color-text); outline-offset: 2px; }
+.document p { margin: 0 0 var(--sd-space-12); min-height: 1.5em; }
+.document h2,.document h3 { margin-block: var(--sd-space-16) var(--sd-space-8); }
+.document [data-terms-field] { display: inline; background: var(--color-border); padding: var(--sd-space-4); border-radius: var(--sd-space-4); white-space: normal; }

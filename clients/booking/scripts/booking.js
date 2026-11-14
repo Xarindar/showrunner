@@ -1,3 +1,4 @@
+import { bookingTermsValues, renderBookingTerms } from "./booking-terms.js";
 (function () {
   const config = window.BookingClientConfig || {};
   const assets = window.BookingAssets || {};
@@ -152,6 +153,7 @@
     els.weekNext?.addEventListener("click", () => shiftDateRail(1));
     els.earliestAvailable?.addEventListener("click", jumpToEarliestAvailableDate);
     els.form?.addEventListener("submit", submitBooking);
+    els.form?.addEventListener("input",event=>{if(["customerName","customerEmail","customerPhone"].includes(event.target.name)&&selectedService())renderPolicy(selectedService());});
   }
 
   function renderAll() {
@@ -618,11 +620,20 @@
       els.intakeField.hidden = true;
     }
 
-    if (service.policyText) {
+    renderPolicy(service);
+  }
+
+  function renderPolicy(service) {
+    const values=bookingTermsValues({serviceName:serviceById(state.serviceId)?.name||service.name, package:service.packages?.length ? {...service,name:service.packages.find(pack=>pack.id===state.tierId)?.name} : null, priceCents:service.priceCents,durationMinutes:service.durationMinutes, startsAt:state.selectedSlot?.startsAt,timezone:config.business?.timezone||"America/Chicago",customerName:els.form.elements.customerName.value,customerEmail:els.form.elements.customerEmail.value,customerPhone:els.form.elements.customerPhone.value});
+    const rich=service.bookingRules?.some(rule=>rule.kind==="policy"&&rule.richText);
+    els.policyText.classList.toggle("booking-rich-terms",Boolean(rich));
+    const rendered=rich?renderBookingTerms(service.bookingRules,values):{text:service.policyText,html:""};
+    if (rendered.text) {
       els.policyField.hidden = false;
-      els.policyText.textContent = service.policyText;
+      if(rich) els.policyText.innerHTML=rendered.html; else els.policyText.textContent=rendered.text;
+      els.policyText.dataset.acceptedTerms=rich?rendered.text:"";
       const checkbox = els.policyField.querySelector("input");
-      const policyKey = service.id + ":" + (service.bookingRequirementsRevision || "") + ":" + service.policyText;
+      const policyKey = service.id + ":" + state.tierId + ":" + JSON.stringify(state.addOnIds) + ":" + (service.bookingRequirementsRevision || "") + ":" + rendered.text;
       if (els.policyField.dataset.policyKey !== policyKey) checkbox.checked = false;
       els.policyField.dataset.policyKey = policyKey;
       checkbox.required = Boolean(service.requirePolicy);
@@ -748,6 +759,7 @@
       intakeResponse: String(formData.get("intakeResponse") || "").trim(),
       intakeAnswers: window.ShowrunnerBookingRules.answers(els.form),
       bookingRequirementsRevision: service.bookingRequirementsRevision || undefined,
+      acceptedTerms: els.policyText.dataset.acceptedTerms || undefined,
       policyAccepted: formData.get("policyAccepted") === "on",
       companyWebsite: String(formData.get("companyWebsite") || "")
     };
@@ -1065,7 +1077,10 @@
     if (!pack) return service;
     const extras = (pack.addOns || []).filter(extra => state.addOnIds.includes(extra.id));
     const priceCents = pack.priceCents == null ? null : pack.priceCents + extras.reduce((total, extra) => total + extra.priceCents * (state.addOnQuantities[extra.id] || 1), 0);
-    return { ...service, name: `${service.name} — ${pack.name}`, durationMinutes: pack.durationMinutes, unlimitedDuration: pack.unlimitedDuration, priceCents, addOns: pack.addOns, extras, deliverables: pack.deliverables, coverage: pack.coverage };
+    const deliverables={...pack.deliverables};
+    for(const extra of extras) for(const [key,count] of Object.entries(extra.deliverables||{})) if(deliverables[key]!==null) deliverables[key]=(deliverables[key]||0)+count*(state.addOnQuantities[extra.id]||1);
+    const selectedExtras=extras.map(extra=>({...extra,quantity:state.addOnQuantities[extra.id]||1}));
+    return { ...service, name: `${service.name} — ${pack.name}`, durationMinutes: pack.durationMinutes, unlimitedDuration: pack.unlimitedDuration, priceCents, addOns: pack.addOns, extras:selectedExtras, deliverables, coverage: pack.coverage };
 
   }
 

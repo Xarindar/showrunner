@@ -5,6 +5,7 @@ import { listBookingDocuments } from "./booking-document-store";
 import { resolveBookingRequirements, validateBookingRequirementsRevision } from "./booking-documents";
 import { servicePriceCents } from "@/lib/scheduling/pricing";
 import { readSessionOffering, selectSessionPackage } from "./session-offering";
+import { bookingTermsValues, renderBookingTerms } from "@/clients/booking/scripts/booking-terms.js";
 import { timeFrameMinutes, timeFrameDays, timeFrameCovered } from "./service-time-frame";
 
 import { BookingStatus, Prisma, SchedulingCalendarOwnerType } from "@prisma/client";
@@ -474,6 +475,13 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
 
     const endsAt = matchingSlot.endsAt;
     if (packageSnapshot?.unlimitedDuration) packageSnapshot.durationMinutes = (endsAt.getTime() - input.startsAt.getTime()) / 60000;
+    const hasRichTerms = requirements.rules.some(rule => rule.richText);
+    const renderedTerms = renderBookingTerms(requirements.rules, bookingTermsValues({
+      serviceName: service.name, package: packageSnapshot, priceCents: servicePriceCents(service), durationMinutes: service.durationMinutes,
+      startsAt: input.startsAt, timezone: hasRichTerms ? (await getSiteSettingsForSite(siteId)).timezone : "UTC",
+      customerName: input.customerName, customerEmail: input.customerEmail, customerPhone: input.customerPhone
+    }));
+    if (hasRichTerms && input.acceptedTerms !== renderedTerms.text) throw new BookingRuleAnswerError("The booking details changed. Review and accept the updated terms before booking.");
     const { bufferedStart, bufferedEnd } = getBufferedWindow(
       input.startsAt,
       endsAt,
@@ -553,7 +561,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
               customerPhone: input.customerPhone,
               notes: input.notes,
               intakeResponse,
-              bookingRequirementsSnapshot:{documents:requirements.documents,rules:requirements.rules,answers:requirements.bookingRules ? input.intakeAnswers ?? {} : {},policyAccepted:Boolean(input.policyAccepted),acceptedAt:input.policyAccepted && requirements.policyText ? new Date().toISOString() : null},
+              bookingRequirementsSnapshot:{documents:requirements.documents,rules:requirements.rules,renderedTerms,answers:requirements.bookingRules ? input.intakeAnswers ?? {} : {},policyAccepted:Boolean(input.policyAccepted),acceptedAt:input.policyAccepted && requirements.policyText ? new Date().toISOString() : null},
               policyAccepted: Boolean(input.policyAccepted),
               status: input.status || (service.requestOnly ? BookingStatus.PENDING : BookingStatus.CONFIRMED),
               resources: requiredResourceIds.length
