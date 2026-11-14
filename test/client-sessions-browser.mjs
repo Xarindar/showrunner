@@ -265,6 +265,14 @@ try {
   assert.equal(await page.getByRole('button',{name:'Send to client',exact:true}).isEnabled(),false,'Failed batch does not allow sending an apparently Ready gallery');
   await page.getByRole('button',{name:'Clear file list',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:'Send to client',exact:true}).isEnabled(),true);
+  await page.evaluate(()=>{Object.assign(window.fixtureWorkspace.galleries[0],{allPhotosIncluded:true,selectionReady:true});});
+  await page.getByRole('link',{name:'Back',exact:true}).click();
+  await table.getByRole('link',{name:'Open Wedding',exact:true}).click();
+  await page.getByRole('button',{name:'Send to client',exact:true}).click();
+  const allPhotosDialog=page.getByRole('dialog',{name:'Send to client',exact:true});
+  assert.equal(await allPhotosDialog.getByRole('button',{name:'Photo selection settings',exact:true}).count(),0);
+  assert.match(await allPhotosDialog.innerText(),/all.*photos/i);
+  await allPhotosDialog.getByRole('button',{name:'Cancel',exact:true}).click();
   await page.evaluate(()=>{window.fixtureWorkspace.galleries=[];window.fixtureWorkspace.canUpload=false;});
   await page.getByRole('link',{name:'Back',exact:true}).click();
   await table.getByRole('link',{name:'Open Wedding',exact:true}).click();

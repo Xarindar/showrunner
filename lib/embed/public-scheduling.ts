@@ -2,6 +2,8 @@ import "server-only";
 import { listBookingDocuments } from "@/lib/scheduling/booking-document-store";
 import { resolveBookingRequirements } from "@/lib/scheduling/booking-documents";
 import { BookingRuleAnswerError, intakeAnswersSchema, readBookingRules } from "@/lib/scheduling/booking-rules";
+import { readSessionOffering, selectSessionPackage, suggestedSessionAddOns, sessionAddOnPriceCents } from "@/lib/scheduling/session-offering";
+import { addOnQuantitiesSchema } from "@/lib/scheduling/session-input";
 import { servicePriceCents } from "@/lib/scheduling/pricing";
 import { readImageFraming } from "@/modules/content/studio/image-framing";
 
@@ -26,6 +28,10 @@ const hiddenHoneypotField = "companyWebsite";
 
 const bookingSchema = z.object({
   serviceId: z.string().min(1, "Choose a service."),
+  tierId: z.string().min(1).max(100).optional(),
+  addOnIds: z.array(z.string().min(1).max(100)).max(50).optional(),
+  addOnQuantities: addOnQuantitiesSchema.optional(),
+  serviceRevision: z.string().max(100).optional(),
   staffId: z.string().trim().optional(),
   resourceIds: z.array(z.string().trim().min(1)).optional(),
   startsAt: z.string().min(1).refine((value) => !Number.isNaN(new Date(value).getTime()), "Choose a valid appointment time."),
@@ -126,11 +132,21 @@ export function serializePublicSlotDiagnostics(diagnostics: SlotDiagnostics) {
 }
 
 export function serializePublicService(service: PublicService, categoryRecord?: PublicServiceCategory) {
+  const offering = readSessionOffering(service.sessionOffering);
+  const packages = offering?.tiers.map(tier => {
+    const snapshot = selectSessionPackage(offering, tier.id)!;
+    return { id: tier.id, name: tier.name, durationMinutes: tier.durationMinutes, priceCents: snapshot.priceCents,
+      deliverables: snapshot.deliverables, coverage: snapshot.coverage,
+      addOns: suggestedSessionAddOns(offering, tier.id).map(item => ({ id: item.id, name: item.name,
+        priceCents: sessionAddOnPriceCents(item, tier.durationMinutes), pricingType: item.pricingType, deliverables: item.deliverables })) };
+  }) || [];
   const category = cleanOptionalString(service.category);
   const fallbackCategoryId = category ? slugify(category) || "general" : "general";
   return {
     id: service.id,
     slug: service.slug,
+    packages,
+    serviceRevision: service.updatedAt?.toISOString(),
     categoryId: categoryRecord?.slug || fallbackCategoryId,
     categoryName: category,
     name: service.name,
@@ -248,6 +264,7 @@ export async function listPublicSchedulingServices(siteId: string) {
 
 export async function getPublicSchedulingDiagnostics(input: {
   date: string | null;
+  tierId?: string;
   resourceId?: string;
   serviceId: string | null;
   siteId: string;
@@ -261,10 +278,11 @@ export async function getPublicSchedulingDiagnostics(input: {
   if (!day) throw new EmbedRequestError("Choose a valid date in YYYY-MM-DD format.", 400);
 
   const diagnostics = await nativeSchedulingAdapter.getSlotDiagnostics(input.serviceId, day, {
+    tierId: input.tierId,
     resourceId: input.resourceId,
     siteId: input.siteId,
     staffId: input.staffId
-  });
+  }).catch(mapPublicBookingError);
   if (!diagnostics) throw new EmbedRequestError("That service is not available.", 404);
 
   return serializePublicSlotDiagnostics(diagnostics);
@@ -289,6 +307,10 @@ export async function createPublicSchedulingBooking(input: {
     booking = await nativeSchedulingAdapter.createBooking({
       siteId: input.siteId,
       serviceId: parsed.data.serviceId,
+      tierId: parsed.data.tierId,
+      addOnIds: parsed.data.addOnIds,
+      addOnQuantities: parsed.data.addOnQuantities,
+      serviceRevision: parsed.data.serviceRevision,
       staffId: parsed.data.staffId,
       resourceIds: parsed.data.resourceIds,
       startsAt: new Date(parsed.data.startsAt),

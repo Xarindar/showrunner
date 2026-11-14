@@ -22,7 +22,12 @@ const coverageItem = z.object({
   category: z.string().trim().max(120).optional(),
   tags: z.array(z.string().trim().min(1).max(60)).max(20).optional()
 });
-const deliverables = sessionDeliverablesSchema.optional();
+// null is explicitly unlimited; omitted counts retain their existing unspecified meaning.
+const deliverables = z.object({
+  locations: sessionDeliverablesSchema.shape.locations.unwrap().nullable().optional(),
+  outfitChanges: sessionDeliverablesSchema.shape.outfitChanges.unwrap().nullable().optional(),
+  finalPhotos: sessionDeliverablesSchema.shape.finalPhotos.unwrap().nullable().optional()
+}).optional();
 
 const tierSchema = z.object({
   id: itemId,
@@ -134,7 +139,11 @@ export function sessionAddOnPriceCents(item: SessionOffering["addOns"][number], 
 export function suggestedSessionAddOns(offering: SessionOffering, tierId?: string) {
   const tier = offering.tiers.find(item => item.id === tierId);
   const included = offering.coverageItems.filter(item => tier?.coverageIds.includes(item.id));
-  return offering.addOns.filter(extra => !included.some(item => extra.libraryItemId && item.libraryItemId === extra.libraryItemId || item.name.toLowerCase() === extra.name.toLowerCase()));
+  return offering.addOns.filter(extra => {
+    const addsUnlimitedAllowance = (["finalPhotos", "locations", "outfitChanges"] as const)
+      .some(key => tier?.deliverables?.[key] === null && (extra.deliverables?.[key] ?? 0) > 0);
+    return !addsUnlimitedAllowance && !included.some(item => extra.libraryItemId && item.libraryItemId === extra.libraryItemId || item.name.toLowerCase() === extra.name.toLowerCase());
+  });
 }
 
 export function sessionOfferingDraft(value: SessionOffering | null, durationMinutes: number, priceCents: number | null): SessionOfferingDraft {
@@ -186,7 +195,7 @@ export function selectSessionPackage(value: unknown, tierId?: string, addOnIds: 
     ...extras.map(item => ({ item, quantity: item.pricingType === "PER_UNIT" ? quantities[item.id] ?? 1 : 1 }))
   ]) {
     for (const key of ["finalPhotos", "locations", "outfitChanges"] as const) {
-      if (item.deliverables?.[key] === undefined) continue;
+      if (resolvedDeliverables[key] === null || item.deliverables?.[key] === undefined) continue;
       const total = (resolvedDeliverables[key] ?? 0) + item.deliverables[key] * quantity;
       if (total > 10000) throw new Error("Session deliverables must be 10,000 or less per category.");
       resolvedDeliverables[key] = total;

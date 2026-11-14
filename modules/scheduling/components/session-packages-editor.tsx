@@ -7,6 +7,7 @@ import { ResponsiveTableFrame } from "@/components/ui/responsive-table";
 import { useId, useState } from "react";
 import { flushSync } from "react-dom";
 import { Copy, Pencil, Plus, X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
@@ -217,8 +218,9 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
               </div>
             </div>}
             {deliverableFields.map(([key, label]) => (
-              <Field key={key} label={label}>
-                <Input type="number" inputMode="numeric" min="0" max={Number.MAX_SAFE_INTEGER} step="1"
+              <div key={key}>
+              <Field label={label}>
+                <Input type="number" inputMode="numeric" min="0" max={10000} step="1" disabled={tier.deliverables?.[key] === null}
                   value={tier.deliverables?.[key] ?? ""}
                   onChange={event => {
                     const counts = { ...tier.deliverables };
@@ -227,6 +229,13 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
                     updateTier(tier.id, { deliverables: Object.keys(counts).length ? counts : undefined });
                   }} />
               </Field>
+              <Switch label="Unlimited" aria-label={`Unlimited ${label.toLowerCase()}`} variant="inline" checked={tier.deliverables?.[key] === null} onChange={event => {
+                const counts = { ...tier.deliverables };
+                if (event.target.checked) counts[key] = null;
+                else delete counts[key];
+                updateTier(tier.id, { deliverables: Object.keys(counts).length ? counts : undefined });
+              }} />
+              </div>
             ))}
           </div>
           </section>

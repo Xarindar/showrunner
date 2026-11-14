@@ -132,3 +132,26 @@ test("user-created services and add-ons increase booked deliverables by selected
   assert.equal(saved.deliverables?.finalPhotos, 5, "Booked totals remain an immutable snapshot");
   assert.throws(() => selectSessionPackage({ ...source, addOns: [{ ...source.addOns[0], deliverables: { finalPhotos: 10000 } }] }, "base", ["custom"], undefined, { custom: 2 }), /10,000/);
 });
+
+
+test("unlimited package counts survive drafts, extras and immutable booking snapshots", () => {
+  const offering = sessionOfferingSchema.parse({
+    coverageItems: [{id:"first-look",name:"First look",deliverables:{finalPhotos:10}}],
+    tiers:[{id:"gold",name:"Gold",durationMinutes:120,priceCents:50000,coverageIds:["first-look"],deliverables:{finalPhotos:null,locations:null,outfitChanges:null}},
+      {id:"basic",name:"Basic",durationMinutes:60,priceCents:20000,coverageIds:[],deliverables:{finalPhotos:15}}],
+    addOns:[{id:"extra",name:"Printed album",priceCents:1000,pricingType:"PER_UNIT"},{id:"photos",name:"Extra photos",priceCents:1000,deliverables:{finalPhotos:1}}]
+  });
+  const gold = sessionPackageSnapshotSchema.parse(selectSessionPackage(offering,"gold",["extra"],undefined,{extra:2}));
+  assert.deepEqual(gold.deliverables,{finalPhotos:null,locations:null,outfitChanges:null});
+  assert.equal(gold.priceCents,52000);
+  assert.throws(()=>selectSessionPackage(offering,"gold",["photos"]),/available extras/);
+  for (const key of ["finalPhotos", "locations", "outfitChanges"] as const) {
+    const withExtra={...offering,addOns:[{id:"extra",name:"Extra allowance",priceCents:1000,deliverables:{[key]:1}}]};
+    assert.throws(()=>selectSessionPackage(withExtra,"gold",["extra"]),/available extras/);
+    assert.equal(selectSessionPackage(withExtra,"basic",["extra"])?.priceCents,21000);
+  }
+  assert.deepEqual(selectSessionPackage(offering,"basic")?.coverage,[]);
+  const roundtrip=sessionOfferingFormSchema.parse(JSON.stringify(sessionOfferingDraft(offering,60,null)));
+  assert.equal(roundtrip.tiers[0].deliverables?.finalPhotos,null);
+  assert.equal(roundtrip.tiers[1].deliverables?.finalPhotos,15);
+});

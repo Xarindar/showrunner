@@ -46,6 +46,8 @@ export function ResponsiveTableFrame({ children, mobileLayout = "cards", ...prop
           Array.from(record.cells).forEach((cell, index) => {
             cell.setAttribute("role", cell.tagName === "TH" ? "rowheader" : "cell");
             const label = cell.colSpan === 1 ? cell.dataset.label || headers[index] : "";
+            if (/^actions?$/i.test(label)) cell.dataset.tableActions = "";
+            else delete cell.dataset.tableActions;
             if (label) cell.dataset.tableLabel = label;
             else delete cell.dataset.tableLabel;
           });

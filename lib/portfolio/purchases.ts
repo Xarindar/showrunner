@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { GalleryCheckoutRecoveryError, recoverGalleryCheckout } from "./checkout-recovery";
 import { resolvePaymentProviderForSite } from "@/lib/payments/registry";
-import { purchaseReleaseStatus, sameSelection, selectionQuote } from "./selection-policy";
+import { hasAllPhotosDelivery, purchaseReleaseStatus, sameSelection, selectionQuote } from "./selection-policy";
 
 export const proofArchivePrefix = "proof-zips/v2/";
 
@@ -26,7 +26,7 @@ type Tx = Prisma.TransactionClient;
 async function activeAccess(db: Tx, token: string, siteId: string) {
   const access = await db.portfolioGalleryAccess.findFirst({
     where: { siteId, accessToken: token, status: "ACTIVE", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }], gallery: { siteId, status: "PUBLISHED", visibility: "PRIVATE", clientId: { not: null } } },
-    include: { gallery: { include: { booking: { select: { siteId: true, clientId: true, status: true } }, extraPhotoAddOn: { include: { commerceProduct: true } }, packageProduct: true, purchasedOrder: { include: { items: true, gallerySelectionPurchase: { select: { id: true } } } }, items: { include: { mediaAsset: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }, purchase: { include: purchaseInclude } } } }
+    include: { gallery: { include: { booking: { select: { siteId: true, clientId: true, status: true, packageSnapshot: true } }, extraPhotoAddOn: { include: { commerceProduct: true } }, packageProduct: true, purchasedOrder: { include: { items: true, gallerySelectionPurchase: { select: { id: true } } } }, items: { include: { mediaAsset: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }, purchase: { include: purchaseInclude } } } }
   });
   if (access?.gallery.extraPhotoAddOn) {
     access.gallery.extraPhotoPriceCents = access.gallery.purchase?.extraPriceCents ?? access.gallery.extraPhotoAddOn.priceCents;
@@ -35,6 +35,7 @@ async function activeAccess(db: Tx, token: string, siteId: string) {
   return access;
 }
 function validAccess(access: Awaited<ReturnType<typeof activeAccess>>) {
+  if (access?.clientId === access?.gallery.clientId && access && hasAllPhotosDelivery(access.gallery)) return true;
   return Boolean(access && access.clientId && access.clientId === access.gallery.clientId && access.gallery.proofingEnabled && access.gallery.selectionAllowance !== null && access.gallery.extraPhotoPriceCents !== null && access.gallery.selectionCurrency && (access.gallery.packageProductId || access.gallery.extraPhotoAddOnId));
 }
 function directSessionDelivery(access: Awaited<ReturnType<typeof activeAccess>>) {
@@ -56,6 +57,7 @@ export async function getClientSessionDelivery(token: string) {
 }
 
 function validPackage(gallery: NonNullable<Awaited<ReturnType<typeof activeAccess>>>["gallery"]) {
+  if (hasAllPhotosDelivery(gallery)) return Boolean(gallery.purchase && gallery.purchase.totalCents === 0 && !gallery.purchase.orderId && !gallery.purchase.packageProductId && !gallery.purchase.extraPhotoAddOnId);
   if (gallery.extraPhotoAddOnId) {
     const addon = gallery.extraPhotoAddOn;
     return Boolean(!gallery.packageProductId && !gallery.purchasedOrderId && gallery.bookingId && gallery.booking?.siteId === gallery.siteId && gallery.booking.clientId === gallery.clientId && gallery.booking.status !== "CANCELED" &&
@@ -88,7 +90,7 @@ export async function getProofSelection(token: string): Promise<ProofSelectionVi
   return {
     gallery: { id: gallery.id, slug: gallery.slug, title: gallery.title, description: gallery.description },
     termsVersion: termsVersion(gallery),
-    includedCount: gallery.selectionAllowance!, extraImagePriceCents: gallery.extraPhotoPriceCents!, currency: gallery.selectionCurrency!,
+    includedCount: purchase?.allowance ?? gallery.selectionAllowance!, extraImagePriceCents: purchase?.extraPriceCents ?? gallery.extraPhotoPriceCents!, currency: purchase?.currency ?? gallery.selectionCurrency!,
     items: gallery.items.filter(item => item.type === "IMAGE" && item.isDownloadable && item.mediaAsset?.isPrivate && !item.mediaAsset.deletedAt && item.mediaAsset.siteId === settings.siteId && ["S3", "R2", "SERVER_ASSETS"].includes(item.mediaAsset.driver)).map(item => ({ id: item.id, title: item.title, altText: item.altText })),
     purchase: purchase ? {
       id: purchase.id, status, selectedItemIds: purchase.selections.map(s => s.itemId), includedCount: purchase.allowance, extraCount: purchase.extraCount, extraImagePriceCents: purchase.extraPriceCents, totalCents: purchase.totalCents, currency: purchase.currency,
@@ -117,6 +119,26 @@ export async function getReleasedProofBundle(token: string, siteId: string) {
   const assets = releasedAssets(purchase, access.galleryId, siteId);
   if (!assets) return null;
   return { accessId: access.id, purchaseId: purchase.id, assets };
+}
+
+
+/** Called by the authenticated send flow inside its gallery-locking transaction. */
+export async function releaseAllSessionPhotos(tx: Tx, token: string, siteId: string) {
+  const access = await activeAccess(tx, token, siteId);
+  if (!access || access.clientId !== access.gallery.clientId || !hasAllPhotosDelivery(access.gallery)) throw new ProofSelectionError("This package does not include all photos.", 409);
+  const gallery = access.gallery;
+  if (gallery.purchase) {
+    if (!validPackage(gallery) || gallery.purchase.clientId !== access.clientId || gallery.purchase.siteId !== siteId || releaseStatus(gallery.purchase) !== "RELEASED") throw new ProofSelectionError("This gallery already has a different or revoked delivery.", 409);
+    return;
+  }
+  if (gallery.processingUploads || gallery.processingError) throw new ProofSelectionError("Wait until all session images are ready before sharing.", 409);
+  const items = gallery.items;
+  if (!items.length || items.some(item => item.type !== "IMAGE" || !item.isDownloadable || !item.mediaAsset?.isPrivate || item.mediaAsset.deletedAt || item.mediaAsset.siteId !== siteId || !["S3", "R2", "SERVER_ASSETS"].includes(item.mediaAsset.driver))) throw new ProofSelectionError("One or more delivery photos are unavailable.", 409);
+  await tx.portfolioSelectionPurchase.create({ data: {
+    galleryId: gallery.id, siteId, clientId: access.clientId!, packageName: "All session photos", allowance: items.length,
+    selectedCount: items.length, extraCount: 0, extraPriceCents: 0, totalCents: 0, currency: "USD",
+    selections: { create: items.map(item => ({ itemId: item.id, mediaAssetId: item.mediaAssetId! })) }
+  } });
 }
 
 /** Every individual download still requires a released selection. */

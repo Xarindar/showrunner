@@ -1,3 +1,5 @@
+import * as sessionInput from "../lib/scheduling/session-input";
+import * as sessionOffering from "../lib/scheduling/session-offering";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
@@ -161,6 +163,8 @@ test("public services retain the booking photo and expose named crops without pu
     "server-only": {},
     "@/lib/scheduling/pricing": { servicePriceCents },
     "@/lib/scheduling/booking-rules": bookingRules,
+    "@/lib/scheduling/session-input": sessionInput,
+    "@/lib/scheduling/session-offering": sessionOffering,
     "@/modules/content/studio/image-framing": { readImageFraming },
     "@/lib/env": { publicAppBaseUrl: () => "https://example.test" },
     "@/lib/media": { mediaAssetDisplayUrl: (asset: { url: string }) => asset.url }

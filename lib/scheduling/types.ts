@@ -52,6 +52,10 @@ export type ActiveService = Prisma.ServiceGetPayload<{
 export type BookingRequest = {
   siteId?: string;
   serviceId: string;
+  tierId?: string;
+  addOnIds?: string[];
+  addOnQuantities?: Record<string, number>;
+  serviceRevision?: string;
   staffId?: string;
   resourceIds?: string[];
   startsAt: Date;
@@ -87,12 +91,12 @@ export type SchedulingAdapter = {
   getAvailableSlots(
     serviceId: string,
     date: Date,
-    options?: { resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
+    options?: { tierId?: string; resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
   ): Promise<Slot[]>;
   getSlotDiagnostics(
     serviceId: string,
     date: Date,
-    options?: { resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
+    options?: { tierId?: string; resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
   ): Promise<SlotDiagnostics | null>;
   createBooking(input: BookingRequest): Promise<Booking>;
 };

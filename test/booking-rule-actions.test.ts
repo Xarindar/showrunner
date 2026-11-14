@@ -1,3 +1,5 @@
+import * as sessionInput from "../lib/scheduling/session-input";
+import * as sessionOffering from "../lib/scheduling/session-offering";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
@@ -42,6 +44,8 @@ test("public bookings forward structured answers and report rule validation as a
   const mocks: Record<string, unknown> = {
     "server-only": {}, "next/cache": {},
     "@/lib/scheduling/booking-rules": bookingRules,
+    "@/lib/scheduling/session-input": sessionInput,
+    "@/lib/scheduling/session-offering": sessionOffering,
     "@/lib/embed/gateway": { EmbedRequestError: RequestError },
     "@/lib/scheduling/native": { nativeSchedulingAdapter: { createBooking: async (input: { siteId: string; customerName: string; customerEmail: string; intakeAnswers?: Record<string, string> }) => {
       assert.equal(input.siteId, "site-a");

@@ -181,3 +181,29 @@ test("session proof pricing follows the selected user-created add-on and detects
   (f.gallery as any).extraPhotoAddOn.siteId = "other-site";
   assert.equal(await api.getProofSelection("token-a"), null);
 });
+
+
+test("all-photo delivery snapshots only photographer-approved private gallery photos and bypasses selection", async () => {
+  const f:any=fixture();
+  Object.assign(f.gallery,{proofingEnabled:false,packageProductId:null,purchasedOrderId:null,extraPhotoAddOnId:null,purchase:null,
+    bookingId:"booking-a",booking:{siteId:"site-a",clientId:"client-a",status:"COMPLETED",packageSnapshot:{tierId:"gold",name:"Gold",durationMinutes:60,priceCents:50000,coverage:[],extras:[],deliverables:{finalPhotos:null}}}});
+  let creates=0;
+  const db:any={portfolioGalleryAccess:{findFirst:async()=>f.access},portfolioProofBundle:{findUnique:async()=>null},portfolioSelectionPurchase:{create:async({data}:any)=>{
+    creates++; f.gallery.purchase={...f.purchase,...data,packageProductId:null,extraPhotoAddOnId:null,selections:f.purchase.selections};return f.gallery.purchase;
+  }}};
+  const api=load(db);
+  await api.releaseAllSessionPhotos(db,"token-a","site-a");
+  await api.releaseAllSessionPhotos(db,"token-a","site-a");
+  assert.equal(creates,1);
+  assert.equal(f.gallery.purchase.totalCents,0);
+  assert.equal(f.gallery.purchase.selectedCount,1);
+  assert.equal((await api.getProofSelection("token-a")).purchase.status,"RELEASED");
+  assert.equal(await api.authorizeGalleryOriginal(request),true);
+  f.gallery.booking.packageSnapshot.deliverables.finalPhotos=10;
+  assert.equal(await api.getProofSelection("token-a"),null);
+  await assert.rejects(api.releaseAllSessionPhotos(db,"token-a","site-a"),/does not include all photos/);
+  f.gallery.booking.packageSnapshot.deliverables.finalPhotos=null;
+  f.gallery.purchase=null;f.asset.siteId="other-site";
+  await assert.rejects(api.releaseAllSessionPhotos(db,"token-a","site-a"),/unavailable/);
+  assert.equal(creates,1);
+});

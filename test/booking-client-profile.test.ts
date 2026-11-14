@@ -50,7 +50,7 @@ function harness(options: { existing?: boolean; existingCompany?: string; failBo
   const startsAt = new Date("2030-05-01T15:00:00Z");
   adapter.getAvailableSlots = async () => [{ startsAt, endsAt: new Date("2030-05-01T16:00:00Z"), resourceIds: [] }];
   const book = (extra:Record<string,unknown>={}) => adapter.createBooking({ siteId: "jazzr", serviceId: "portrait", startsAt, customerName: "New client", customerEmail: "CLIENT@EXAMPLE.COM", customerPhone: "12345", ...extra });
-  return { book, committed, writes, settingQueries, serviceQueries, bookingWrites };
+  return { book, service, committed, writes, settingQueries, serviceQueries, bookingWrites };
 }
 
 test("session booking creates a site-scoped profile with collected details, service and configured status", async () => {
@@ -124,4 +124,24 @@ test("booking company is optional, fills blank client companies and preserves sa
   const omitted = harness();
   await omitted.book();
   assert.equal(omitted.committed[0].data!.companyName, "");
+});
+
+
+test("public bookings persist the selected tier and server-priced extras, including unlimited photos",async()=>{
+  const h=harness();
+  Object.assign(h.service,{sessionOffering:{coverageItems:[],tiers:[
+    {id:"basic",name:"Basic",durationMinutes:60,priceCents:10000,coverageIds:[]},
+    {id:"gold",name:"Gold",durationMinutes:120,priceCents:30000,coverageIds:[],deliverables:{finalPhotos:null}}],
+    addOns:[{id:"prints",name:"Prints",priceCents:500,pricingType:"PER_UNIT"}]}});
+  await assert.rejects(h.book(),/Choose a package/);
+  await assert.rejects(h.book({tierId:"wrong"}),/Choose a package/);
+  await assert.rejects(h.book({tierId:"gold",addOnIds:["foreign"]}),/available extras/);
+  await h.book({tierId:"gold",addOnIds:["prints"],addOnQuantities:{prints:2},priceCents:1});
+  const saved=h.bookingWrites[0].data;
+  assert(saved);
+  const snapshot=sessionOffering.sessionPackageSnapshotSchema.parse(saved.packageSnapshot);
+  assert.equal(saved.priceCents,31000);
+  assert.equal(snapshot.tierId,"gold");
+  assert.equal(snapshot.deliverables?.finalPhotos,null);
+  assert.equal(snapshot.extras[0].quantity,2);
 });

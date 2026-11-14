@@ -94,6 +94,17 @@
               <p class="booking-empty" data-service-empty hidden>No services match that search.</p>
             </section>
 
+            <section class="booking-panel" data-step-panel="packages" aria-labelledby="package-title" hidden>
+              <div class="booking-panel-head"><h2 id="package-title">Choose your package</h2><button class="booking-plain-button button button--secondary button--small" type="button" data-back-from-packages>Back</button></div>
+              <div class="booking-table-wrap"><table class="booking-service-table"><thead><tr><th>Package</th><th>Length</th><th>Price</th><th>Includes</th><th><span class="booking-visually-hidden">Select</span></th></tr></thead><tbody data-package-list></tbody></table></div>
+            </section>
+            <section class="booking-panel" data-step-panel="extras" aria-labelledby="extras-title" hidden>
+              <div class="booking-panel-head"><div><h2 id="extras-title">Complete your session</h2><p>Optional extras for your chosen package.</p></div><button class="booking-plain-button button button--secondary button--small" type="button" data-back-from-extras>Back</button></div>
+              <div class="booking-table-wrap"><table class="booking-service-table"><thead><tr><th>Extra</th><th>Price</th><th>Includes</th><th>Quantity</th></tr></thead><tbody data-extra-list></tbody></table></div>
+              <p data-extras-total aria-live="polite"></p>
+              <button class="booking-button button button--primary" type="button" data-continue-extras>Skip extras</button>
+            </section>
+
             <section class="booking-panel" data-step-panel="time" aria-labelledby="time-title" hidden>
               <div class="booking-panel-head">
                 <div>
