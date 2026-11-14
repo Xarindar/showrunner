@@ -8,6 +8,8 @@ import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import sharp from "sharp";
+import { ZipArchive } from "archiver";
+import type { PutObjectCommand } from "@aws-sdk/client-s3";
 import { galleryProofMaxEdge, galleryProofObjectKey, renderGalleryProof } from "../lib/media-proofs";
 import { photoVariantKey } from "../lib/photo-variants";
 import { mediaReferenceCount, unreferencedMediaWhere } from "../lib/media-usage";
@@ -178,6 +180,29 @@ test("real private proof delivery caches separately and never returns the source
     await writeFile(path.join(directory, "broken.jpg"), Buffer.from("corrupt"));
     assert.equal(await media.galleryProofResponse({ ...source, key: "broken.jpg" }, "FULL"), null);
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("the S3 uploader accepts the Archiver stream and sends a private ZIP", async () => {
+  const uploads: PutObjectCommand["input"][] = [];
+  const media = mediaHarness(os.tmpdir(), {
+    "@aws-sdk/client-s3": {
+      ...await import("@aws-sdk/client-s3"),
+      S3Client: class {
+        config = { endpoint: async () => new URL("https://storage.example"), forcePathStyle: true };
+        async send(command: PutObjectCommand) {
+          uploads.push(command.input);
+          return {};
+        }
+      }
+    }
+  }, { S3_BUCKET: "private-photos", S3_ENDPOINT: "https://storage.example", S3_ACCESS_KEY_ID: "fixture", S3_SECRET_ACCESS_KEY: "fixture" });
+  const zip = new ZipArchive({ store: true });
+  zip.append(Buffer.from("sample original"), { name: "photo.jpg" });
+  await Promise.all([media.storeProofArchive("S3", "proof-zips/sample.zip", zip, new AbortController()), zip.finalize()]);
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].CacheControl, "private, no-store");
+  assert.equal(uploads[0].ContentType, "application/zip");
+  assert.match(Buffer.from(uploads[0].Body as Uint8Array).toString(), /sample original/);
 });
 
 test("entitled object-storage originals use short-lived exact-key signed attachment URLs", async () => {

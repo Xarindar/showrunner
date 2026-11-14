@@ -1215,8 +1215,10 @@ export async function storeProofArchive(driver: MediaDriver, key: string, input:
     return pipeline(input, createWriteStream(target, { flags: "wx" }), { signal: controller.signal });
   }
   const config = getObjectStorageConfig(driver as ObjectStorageDriver);
+  // The uploader checks for a native Node stream. Archiver uses readable-stream.
+  const body = Readable.from(input, { objectMode: false, signal: controller.signal });
   const upload = new Upload({ client: getObjectStorageClient(config), abortController: controller, queueSize: 2, params: {
-    Bucket: config.bucket, Key: key, Body: input, ContentType: "application/zip", CacheControl: "private, no-store"
+    Bucket: config.bucket, Key: key, Body: body, ContentType: "application/zip", CacheControl: "private, no-store"
   } });
   await upload.done();
 }
