@@ -105,7 +105,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     const id = crypto.randomUUID();
     flushSync(() => {
       setExpandedTiers(new Set());
-      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? String(durationMinutes), pricingType: source?.pricingType ?? "FLAT_RATE", timeFrame: source?.timeFrame, hourlyRateId: source?.hourlyRateId || null, deliverables: source?.deliverables, coverageIds: [...(source?.coverageIds ?? [])] }] });
+      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? String(durationMinutes), unlimitedDuration: source?.unlimitedDuration, pricingType: source?.pricingType ?? "FLAT_RATE", timeFrame: source?.timeFrame, hourlyRateId: source?.hourlyRateId || null, deliverables: source?.deliverables, coverageIds: [...(source?.coverageIds ?? [])] }] });
       setNewTiers(current => new Set([...current, id]));
     });
   }

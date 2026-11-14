@@ -67,7 +67,11 @@ try {
     assert.equal(await dialog.evaluate(el=>el.scrollWidth>el.clientWidth),false);
     await page.screenshot({path:`.tmp/package-check/package-${width}.png`,fullPage:true});
   }
-  await dialog.getByRole('button',{name:'Done',exact:true}).click();
+  await dialog.getByRole('button',{name:'Duplicate',exact:true}).click();
+  const duplicated=JSON.parse(await page.locator('input[name=sessionOffering]').inputValue()).tiers.at(-1);
+  assert.equal(duplicated.unlimitedDuration,true);
+  assert.deepEqual(duplicated.deliverables,{finalPhotos:null,locations:null,outfitChanges:null});
+  await page.getByRole('dialog').getByRole('button',{name:'Cancel',exact:true}).click();
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:900});await page.waitForTimeout(100);
     const tops=await page.getByRole('region',{name:'Shared actions fixture'}).getByRole('button').evaluateAll(items=>items.map(item=>item.getBoundingClientRect().top));
