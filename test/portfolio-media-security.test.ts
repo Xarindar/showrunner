@@ -330,6 +330,26 @@ test("server asset folders inside Next public cannot serve as private storage", 
   assert.equal(publicStorage.supportsPrivateMediaDriver("REPO"), false);
 });
 
+test("Drive ZIP reads stream only the requested bytes and report the archive size", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "showrunner-drive-test-"));
+  try {
+    await writeFile(path.join(directory, "photos.zip"), "PK01234567");
+    const media = mediaHarness(directory);
+    const get = (range: string) => media.deliverProofArchive("SERVER_ASSETS", "photos.zip", "photos.zip", BigInt(10), true,
+      new Request("https://example.test", { headers: { range } })) as Promise<Response>;
+    const first = await get("bytes=0-3");
+    assert.equal(first.status, 206);
+    assert.equal(first.headers.get("content-range"), "bytes 0-3/10");
+    assert.equal(first.headers.get("content-length"), "4");
+    assert.equal(await first.text(), "PK01");
+    const tail = await get("bytes=-3");
+    assert.equal(await tail.text(), "567");
+    const invalid = await get("bytes=10-");
+    assert.equal(invalid.status, 416);
+    assert.equal(invalid.headers.get("content-range"), "bytes */10");
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
 test("shoot proofs and originals reject active links assigned to a different or missing client", async () => {
   for (const accessClientId of ["client-b", null]) for (const variant of ["CARD", "FULL", "DOWNLOAD"]) {
     const route = routeHarness({ accessClientId, entitled: true });

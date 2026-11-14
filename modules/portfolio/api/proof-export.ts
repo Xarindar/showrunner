@@ -22,10 +22,33 @@ export async function exportSelection(query: URLSearchParams) {
   return selection?.accessId === accessId && selection.purchaseId === purchaseId ? selection : null;
 }
 
-export async function GET(request: Request) {
+// Drive fetches the signed ZIP from a different origin. The proof link itself never enables CORS.
+const driveCorsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+  "Access-Control-Allow-Headers": "Range",
+  "Access-Control-Expose-Headers": "Accept-Ranges, Cache-Control, Content-Encoding, Content-Length, Content-Range"
+};
+
+export function OPTIONS() {
+  return new Response(null, { status: 204, headers: { ...proofBundleHeaders, ...driveCorsHeaders } });
+}
+
+async function driveDownload(request: Request) {
   const selection = await exportSelection(new URL(request.url).searchParams);
   if (!selection) return bundleUnavailable();
   const limit = await publicRateLimitMessage("proof_bundle_drive", { limit: 30, windowMinutes: 5 });
   if (limit) return new Response(limit, { status: 429, headers: proofBundleHeaders });
-  return deliverBundle(selection, true, request.signal);
+  return deliverBundle(selection, true, request);
+}
+
+export async function GET(request: Request) {
+  const response = await driveDownload(request);
+  for (const [name, value] of Object.entries(driveCorsHeaders)) response.headers.set(name, value);
+  return response;
+}
+
+export async function HEAD(request: Request) {
+  const response = await GET(request);
+  return new Response(null, { status: response.status, headers: response.headers });
 }

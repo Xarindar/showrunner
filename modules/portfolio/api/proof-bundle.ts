@@ -22,11 +22,11 @@ async function selectionFor(token: string) {
   return getReleasedProofBundle(token, settings.siteId);
 }
 
-export async function deliverBundle(selection: Selection, drive: boolean, signal: AbortSignal) {
+export async function deliverBundle(selection: Selection, drive: boolean, request: Request) {
   const archive = await prisma.portfolioProofBundle.findUnique({ where: { purchaseId: selection.purchaseId, state: "READY", key: { startsWith: proofArchivePrefix } } });
   if (!archive?.driver || !archive.key || archive.sizeBytes === null) return bundleUnavailable();
   try {
-    return await deliverProofArchive(archive.driver, archive.key, "Selected-photos.zip", archive.sizeBytes, drive, signal) || bundleUnavailable();
+    return await deliverProofArchive(archive.driver, archive.key, "Selected-photos.zip", archive.sizeBytes, drive, request) || bundleUnavailable();
   } catch {
     return new Response("The ZIP couldn’t be retrieved. Reopen your private photo link and try again.", { status: 503, headers: proofBundleHeaders });
   }
@@ -50,7 +50,7 @@ export async function GET(request: Request, { params }: Props) {
     }
     return new Response(null, { status: 303, headers: { ...proofBundleHeaders, location: `/proof-export?${query}` } });
   }
-  return deliverBundle(selection, false, request.signal);
+  return deliverBundle(selection, false, request);
 }
 
 export async function POST(request: Request, { params }: Props) {

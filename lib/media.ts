@@ -7,7 +7,7 @@ import { Upload } from "@aws-sdk/lib-storage";
 import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { mkdir, open, readFile, rm, writeFile } from "fs/promises";
 import path from "path";
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { MediaDriver, MediaVariantType, type MediaAsset } from "@prisma/client";
 import type { NextRequest } from "next/server";
@@ -785,14 +785,15 @@ function isAllowedMediaSourceUrl(url: URL, request: NextRequest) {
   return allowedHosts.has(hostname) || hostname.endsWith(".r2.cloudflarestorage.com") || hostname.endsWith(".cloudflarestorage.com");
 }
 
-async function objectStorageObjectResponse(driver: ObjectStorageDriver, asset: Pick<MediaAsset, "key" | "mimeType">, signal?: AbortSignal) {
+async function objectStorageObjectResponse(driver: ObjectStorageDriver, asset: Pick<MediaAsset, "key" | "mimeType">, signal?: AbortSignal, range?: string) {
   const config = getObjectStorageConfig(driver);
   if (!isObjectStorageConfigured(config)) return null;
 
   const object = await getObjectStorageClient(config).send(
     new GetObjectCommand({
       Bucket: config.bucket,
-      Key: asset.key
+      Key: asset.key,
+      Range: range
     }), { abortSignal: signal }
   );
 
@@ -1227,25 +1228,50 @@ export async function deleteProofArchive(driver: MediaDriver, key: string) {
   await getMediaAdapter(driver).delete?.({ key, storageProviderId: "" });
 }
 
-export async function deliverProofArchive(driver: MediaDriver, key: string, filename: string, size: bigint, drive: boolean, signal: AbortSignal) {
-  const headers = { "content-type": "application/zip", "content-length": String(size), "content-disposition": `attachment; filename="${safeFilename(filename)}"`,
-    "cache-control": "private, no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff" };
+export async function deliverProofArchive(driver: MediaDriver, key: string, filename: string, size: bigint, drive: boolean, request: Request) {
+  const headers = new Headers({ "content-type": "application/zip", "content-length": String(size), "content-disposition": `attachment; filename="${safeFilename(filename)}"`,
+    "cache-control": "private, no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff" });
+  let slice: { start: number; end: number } | undefined;
+  const range = drive && request.method === "GET" ? request.headers.get("range") : null;
+  if (drive) headers.set("accept-ranges", "bytes");
+  if (range !== null) {
+    const match = /^bytes=(\d*)-(\d*)$/i.exec(range);
+    const total = Number(size);
+    const start = match?.[1] ? Number(match[1]) : match?.[2] ? Math.max(0, total - Number(match[2])) : NaN;
+    const end = match?.[1] && match[2] ? Math.min(total - 1, Number(match[2])) : total - 1;
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= total) {
+      return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}`, "accept-ranges": "bytes", "cache-control": "private, no-store" } });
+    }
+    slice = { start, end };
+    headers.set("content-range", `bytes ${start}-${end}/${size}`);
+    headers.set("content-length", String(end - start + 1));
+  }
+  const status = slice ? 206 : 200;
   if (driver === MediaDriver.SERVER_ASSETS) {
     if (!supportsPrivateMediaDriver(driver)) return null;
     const handle = await open(serverAssetPath(key), "r");
-    return new Response(Readable.toWeb(handle.createReadStream({ signal })) as ReadableStream, { headers });
+    if (drive && request.method === "HEAD") {
+      await handle.close();
+      return new Response(null, { headers });
+    }
+    return new Response(Readable.toWeb(handle.createReadStream({ ...slice, signal: request.signal })) as ReadableStream, { headers, status });
   }
   if (driver !== MediaDriver.S3 && driver !== MediaDriver.R2) return null;
-  if (drive) {
-    const response = await objectStorageObjectResponse(driver, { key, mimeType: "application/zip" }, signal);
-    return response?.body ? new Response(response.body, { headers }) : null;
-  }
   const config = getObjectStorageConfig(driver);
+  if (drive) {
+    if (request.method === "HEAD") {
+      if (!isObjectStorageConfigured(config)) return null;
+      await getObjectStorageClient(config).send(new HeadObjectCommand({ Bucket: config.bucket, Key: key }), { abortSignal: request.signal });
+      return new Response(null, { headers });
+    }
+    const response = await objectStorageObjectResponse(driver, { key, mimeType: "application/zip" }, request.signal, slice && `bytes=${slice.start}-${slice.end}`);
+    return response?.body ? new Response(response.body, { headers, status }) : null;
+  }
   const location = await getSignedUrl(getObjectStorageClient(config), new GetObjectCommand({
-    Bucket: config.bucket, Key: key, ResponseContentDisposition: headers["content-disposition"],
-    ResponseCacheControl: headers["cache-control"], ResponseContentType: headers["content-type"]
+    Bucket: config.bucket, Key: key, ResponseContentDisposition: headers.get("content-disposition")!,
+    ResponseCacheControl: headers.get("cache-control")!, ResponseContentType: headers.get("content-type")!
   }), { expiresIn: 60 });
-  return new Response(null, { status: 307, headers: { location, "cache-control": headers["cache-control"], "referrer-policy": "no-referrer" } });
+  return new Response(null, { status: 307, headers: { location, "cache-control": "private, no-store", "referrer-policy": "no-referrer" } });
 }
 
 export function proofExportSignature(accessId: string, purchaseId: string, expires: number) {

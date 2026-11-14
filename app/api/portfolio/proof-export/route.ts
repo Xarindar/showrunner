@@ -1,1 +1,1 @@
-export { GET } from "@/modules/portfolio/api/proof-export";
+export { GET, HEAD, OPTIONS } from "@/modules/portfolio/api/proof-export";

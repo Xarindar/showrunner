@@ -15,6 +15,8 @@ export async function GET(request: Request) {
 <noscript><a href="${source}">Download ZIP</a></noscript>
 <script>
   const host = document.querySelector(".drive");
+  const widget = host.firstElementChild;
+  widget.dataset.src = new URL(widget.dataset.src, location.origin).href;
   const resize = new ResizeObserver(() => {
     const button = host.querySelector("iframe[data-gapiattached]");
     if (button?.offsetWidth && button.offsetHeight) {
