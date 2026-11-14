@@ -14,16 +14,16 @@ test("the background worker writes both selected originals with safe, unique nam
   const keys: string[] = [];
   const outputs: Buffer[] = [];
   const job = { purchaseId: "purchase", accessId: "access", purchase: { siteId: "site" }, state: "QUEUED" };
-  const selection = { purchaseId: "purchase", accessId: "access", assets: ["original-a", "original-b"].map(key => ({
-    asset: { key, driver: "S3", filename: "../portrait.jpg" }
+  const selection = { purchaseId: "purchase", accessId: "access", assets: ["original-a", "original-b"].map((key, index) => ({
+    asset: { key, driver: "S3", filename: index === 0 ? "Abe Giorgio-2026-11-13-3140acf3ed12.jpg" : "../portrait.jpg" }
   })) };
   const mocks: Record<string, unknown> = {
     "server-only": {},
     "@/lib/prisma": { prisma: {
-      portfolioProofBundle: { findFirst: async () => job, updateMany: async ({ data }: { data: object }) => { Object.assign(job, data); return { count: 1 }; } },
+      portfolioProofBundle: { findFirst: async () => ({ ...job }), updateMany: async ({ data }: { data: object }) => { Object.assign(job, data); return { count: 1 }; } },
       portfolioGalleryAccess: { findUnique: async () => ({ accessToken: "private-test-token" }) }
     } },
-    "./purchases": { getReleasedProofBundle: async () => selection },
+    "./purchases": { getReleasedProofBundle: async () => selection, proofArchivePrefix: "proof-zips/v2/" },
     "@/lib/media": { openPrivateOriginal: async ({ key }: { key: string }) => {
       keys.push(key); return Readable.from([Buffer.from(key)]);
     }, storeProofArchive: async (_driver: string, _key: string, archive: Readable) => {
@@ -42,6 +42,6 @@ test("the background worker writes both selected originals with safe, unique nam
     const payload = start + length + zip.readUInt16LE(offset + 28);
     contents.set(zip.toString("utf8", start, start + length), zip.toString("utf8", payload, payload + 10));
   }
-  assert.deepEqual([...contents], [["001-.._portrait.jpg", "original-a"], ["002-.._portrait.jpg", "original-b"]]);
+  assert.deepEqual([...contents], [["001-Abe Giorgio-2026-11-13.jpg", "original-a"], ["002-.._portrait.jpg", "original-b"]]);
   assert.notEqual(zip.indexOf(Buffer.from([0x50, 0x4b, 5, 6])), -1);
 });

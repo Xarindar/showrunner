@@ -144,6 +144,7 @@
   .jazzrDelivery .handoffActions { grid-template-columns: 1fr; }
 }
 
+.driveFrame { width: 100%; height: 48px; border: 1px solid var(--proof-border); border-radius: 4px; background: white; }
 .driveAction img { flex: none; object-fit: contain; }
 .jazzrDelivery .jazzrReady { width: min(100%, 40rem); margin-top: clamp(3rem, 10vh, 6rem); text-align: center; }
 .jazzrReady .readyIcon { display: block; margin: 0 auto 1.25rem; }

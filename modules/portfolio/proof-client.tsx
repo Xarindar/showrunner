@@ -27,6 +27,33 @@ function checkoutDestination(value: string | null) {
   }
 }
 
+function JazzrDriveButton({ endpoint }: { endpoint: string }) {
+  const [source, setSource] = useState("");
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
+      try {
+        const response = await fetch(`${endpoint}/bundle?save=drive&inline=1`, { signal: controller.signal, cache: "no-store" });
+        if (!response.ok) throw new Error("Drive export unavailable");
+        const { path } = await response.json();
+        if (typeof path !== "string" || !path.startsWith("/proof-export?")) throw new Error("Invalid Drive export");
+        // Keep Google's script on Jazzr's separate Railway origin.
+        setSource(`https://showrunner-production-a8f9.up.railway.app${path}`);
+      } catch {
+        if (!controller.signal.aborted) setFailed(true);
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, [endpoint]);
+
+  if (failed) return <p role="status">Google Drive is unavailable. Use Download ZIP.</p>;
+  if (!source) return <Button disabled variant="secondary">Loading Google Drive…</Button>;
+  return <iframe className={styles.driveFrame} src={source} title="Save to Google Drive" referrerPolicy="no-referrer"
+    sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-downloads" />;
+}
+
 export function ProofClient({ initialView, token, brand = { name: "Photography", logoUrl: "" } }: { initialView: ProofSelectionView; token: string; brand?: { name: string; logoUrl: string; theme?: "jazzr"; firstName?: string } }) {
   const [view, setView] = useState(initialView);
   const [selection, setSelection] = useState<string[]>(initialView.purchase?.selectedItemIds || []);
@@ -359,7 +386,7 @@ export function ProofClient({ initialView, token, brand = { name: "Photography",
         <div className={`${styles.handoffActions} ${ready ? styles.readyActions : ""}`}>
           {ready ? <>
             <ButtonAnchor download href={`${endpoint}/bundle`} referrerPolicy="no-referrer"><Download size={17} aria-hidden="true" /> Download ZIP</ButtonAnchor>
-            <ButtonAnchor href={`${endpoint}/bundle?save=drive`} target="_blank" rel="noopener noreferrer" variant="secondary" className={styles.driveAction}><Image src="/proof-delivery/google-drive.png" width={24} height={24} alt="" unoptimized /> Save to Google Drive</ButtonAnchor>
+            {jazzrReady ? <JazzrDriveButton endpoint={endpoint} /> : <ButtonAnchor href={`${endpoint}/bundle?save=drive`} target="_blank" rel="noopener noreferrer" variant="secondary" className={styles.driveAction}><Image src="/proof-delivery/google-drive.png" width={24} height={24} alt="" unoptimized /> Save to Google Drive</ButtonAnchor>}
             <Button onClick={() => void shareGallery()} type="button" variant="secondary"><Share2 size={17} aria-hidden="true" /> Share</Button>
           </> : <>
             {released && bundle && !preparing && <Button onClick={() => void prepareBundle(true)} type="button">Retry preparation</Button>}

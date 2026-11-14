@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { deliverProofArchive, proofExportSignature } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { processProofBundles, queueProofBundle } from "@/lib/portfolio/proof-bundles";
-import { getReleasedProofBundle } from "@/lib/portfolio/purchases";
+import { getReleasedProofBundle, proofArchivePrefix } from "@/lib/portfolio/purchases";
 import { publicRateLimitMessage } from "@/lib/public-rate-limit";
 import { getSiteSettings } from "@/lib/site";
 import { isSameOriginProofRequest, proofTokenSchema } from "./proof-request";
@@ -23,7 +23,7 @@ async function selectionFor(token: string) {
 }
 
 export async function deliverBundle(selection: Selection, drive: boolean, signal: AbortSignal) {
-  const archive = await prisma.portfolioProofBundle.findUnique({ where: { purchaseId: selection.purchaseId, state: "READY" } });
+  const archive = await prisma.portfolioProofBundle.findUnique({ where: { purchaseId: selection.purchaseId, state: "READY", key: { startsWith: proofArchivePrefix } } });
   if (!archive?.driver || !archive.key || archive.sizeBytes === null) return bundleUnavailable();
   try {
     return await deliverProofArchive(archive.driver, archive.key, "Selected-photos.zip", archive.sizeBytes, drive, signal) || bundleUnavailable();
@@ -38,11 +38,16 @@ export async function GET(request: Request, { params }: Props) {
   if (!selection) return bundleUnavailable();
   const limit = await publicRateLimitMessage("proof_bundle_download", { limit: 30, windowMinutes: 5 });
   if (limit) return new Response(limit, { status: 429, headers: proofBundleHeaders });
-  if (new URL(request.url).searchParams.get("save") === "drive") {
-    if (!await prisma.portfolioProofBundle.findUnique({ where: { purchaseId: selection.purchaseId, state: "READY" }, select: { purchaseId: true } })) return bundleUnavailable();
+  const search = new URL(request.url).searchParams;
+  if (search.get("save") === "drive") {
+    if (!await prisma.portfolioProofBundle.findUnique({ where: { purchaseId: selection.purchaseId, state: "READY", key: { startsWith: proofArchivePrefix } }, select: { purchaseId: true } })) return bundleUnavailable();
     const expires = Math.floor(Date.now() / 1000) + 300;
     const signature = proofExportSignature(selection.accessId, selection.purchaseId, expires);
     const query = new URLSearchParams({ access: selection.accessId, purchase: selection.purchaseId, expires: String(expires), signature });
+    if (search.get("inline") === "1") {
+      query.set("inline", "1");
+      return Response.json({ path: `/proof-export?${query}` }, { headers: proofBundleHeaders });
+    }
     return new Response(null, { status: 303, headers: { ...proofBundleHeaders, location: `/proof-export?${query}` } });
   }
   return deliverBundle(selection, false, request.signal);

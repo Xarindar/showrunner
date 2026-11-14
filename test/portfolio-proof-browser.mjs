@@ -31,8 +31,18 @@ const page=await context.newPage(); const errors=[]; page.on('pageerror',e=>erro
 await context.route('**/*',async route=>{const req=route.request();const url=new URL(req.url());
 if(url.hostname==='pay.example') return route.fulfill({contentType:'text/html',body:'<h1>Synthetic payment provider</h1>'});
 if(url.pathname.startsWith('/proof-delivery/') && url.pathname.endsWith('.png')) return route.fulfill({contentType:'image/png',body:readFileSync(resolve(root,'public'+url.pathname))});
+if(url.hostname==='showrunner-production-a8f9.up.railway.app' && url.pathname==='/proof-export'){
+  assert.equal(url.searchParams.get('signature'),'synthetic-export');
+  assert(!req.url().includes('synthetic-private-token'));
+  assert(!req.headers().referer);
+  return route.fulfill({contentType:'text/html',body:`<button onclick="this.textContent='Drive save started'">Save to Google Drive</button>`});
+}
 if(url.pathname.startsWith('/api/portfolio/proofs/')) {
 if(revoked) return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({error:'This proof link is unavailable.'})});
+if(url.pathname.endsWith('/bundle') && url.searchParams.get('inline')==='1') {
+  assert.equal(purchase.bundle.state,'READY');
+  return route.fulfill({json:{path:'/proof-export?inline=1&signature=synthetic-export'}});
+}
 if(url.pathname.endsWith('/bundle') && req.method()==='POST') {
   purchase={...purchase,bundle:{state:'BUILDING',sizeBytes:null}};
   return route.fulfill({status:202});
@@ -211,7 +221,11 @@ await page.getByRole('heading',{name:'Your photos are ready!',exact:true}).waitF
 assert.equal(await page.getByRole('link',{name:'Download ZIP',exact:true}).count(),1);
 await page.getByText('Taylor, thank you for choosing Jazzr Photography. We hope you enjoyed your shoot and love your photos!', {exact:true}).waitFor();
 assert.equal(await page.getByRole('navigation',{name:'Contact Jazzr Photography'}).getByRole('link').count(),3);
-await page.getByRole('link',{name:'Save to Google Drive',exact:true}).waitFor();
+const deliveryUrl = page.url();
+const drive = page.frameLocator('iframe[title="Save to Google Drive"]');
+await drive.getByRole('button',{name:'Save to Google Drive',exact:true}).click();
+await drive.getByRole('button',{name:'Drive save started',exact:true}).waitFor();
+assert.equal(page.url(),deliveryUrl,'Drive save stays on the delivery page');
 await page.getByRole('button',{name:'Share',exact:true}).click();
 assert.deepEqual(await page.evaluate(()=>window.sharedProof), {
   text:'Hey, the pictures from Jazzr Photography are ready! Check them out here!',

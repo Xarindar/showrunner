@@ -7,6 +7,16 @@ export async function GET(request: Request) {
   const source = "/api/portfolio/proof-export?" + new URLSearchParams({
     access: query.get("access")!, purchase: query.get("purchase")!, expires: query.get("expires")!, signature: query.get("signature")!
   }).toString().replaceAll("&", "&amp;");
+  if (query.get("inline") === "1") {
+    return new Response(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Save to Google Drive</title>
+<style>body{margin:0;display:grid;place-items:center;height:46px;font:14px Arial,sans-serif}a{color:#211f1d}</style>
+<div class="g-savetodrive" data-src="${source}" data-filename="Selected-photos.zip" data-sitename="Jazzr Photography"></div>
+<noscript><a href="${source}">Download ZIP</a></noscript>
+<script async src="https://apis.google.com/js/platform.js" referrerpolicy="no-referrer"></script></html>`, {
+      headers: { ...proofBundleHeaders, "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex, nofollow",
+        "Content-Security-Policy": "frame-ancestors https://admin.jazzrphotography.com" }
+    });
+  }
   return new Response(`<!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow">
 <title>Save your photo ZIP to Google Drive</title>

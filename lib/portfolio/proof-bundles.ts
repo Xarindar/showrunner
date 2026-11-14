@@ -4,12 +4,15 @@ import { once } from "node:events";
 import { ZipArchive } from "archiver";
 import { deleteProofArchive, openPrivateOriginal, storeProofArchive } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
-import { getReleasedProofBundle } from "./purchases";
+import { getReleasedProofBundle, proofArchivePrefix } from "./purchases";
 
 export async function queueProofBundle(purchaseId: string, accessId: string, retry: boolean) {
   await prisma.portfolioProofBundle.upsert({ where: { purchaseId }, create: { purchaseId, accessId }, update: {} });
   await prisma.portfolioProofBundle.updateMany({
-    where: { purchaseId, state: { in: retry ? ["QUEUED", "FAILED"] : ["QUEUED"] } },
+    where: { purchaseId, OR: [
+      { state: { in: retry ? ["QUEUED", "FAILED"] : ["QUEUED"] } },
+      { state: "READY", NOT: { key: { startsWith: proofArchivePrefix } } }
+    ] },
     data: { state: "QUEUED", accessId }
   });
 }
@@ -33,7 +36,7 @@ export async function processProofBundles() {
     }
 
     const driver = selection.assets[0].asset.driver;
-    const key = `proof-zips/${job.purchaseId}/${randomUUID()}.zip`;
+    const key = `${proofArchivePrefix}${job.purchaseId}/${randomUUID()}.zip`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12 * 60_000);
     const zip = new ZipArchive({ store: true, forceZip64: true });
@@ -45,7 +48,7 @@ export async function processProofBundles() {
     try {
       for (const [index, { asset }] of selection.assets.entries()) {
         const input = await openPrivateOriginal(asset, controller.signal);
-        const name = asset.filename.replace(/[^\w .-]/g, "_").trim().slice(-140);
+        const name = asset.filename.replace(/(-\d{4}-\d{2}-\d{2})-[a-f0-9]{12}(?=\.[a-z0-9]+$)/i, "$1").replace(/[^\w .-]/g, "_").trim().slice(-140);
         const entry = once(zip, "entry", { signal: controller.signal });
         input.on("error", error => zip.destroy(error));
         zip.append(input, { name: `${String(index + 1).padStart(3, "0")}-${name || "photo"}` });
@@ -58,6 +61,7 @@ export async function processProofBundles() {
         !(await prisma.portfolioProofBundle.updateMany({ where: claim, data: { state: "READY", leaseUntil: null, driver, key, sizeBytes: BigInt(zip.pointer()) } })).count) {
         throw new Error("Delivery changed during preparation");
       }
+      if (job.driver && job.key) await deleteProofArchive(job.driver, job.key).catch(() => {});
     } catch {
       controller.abort();
       await upload.catch(() => {});

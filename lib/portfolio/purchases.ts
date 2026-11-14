@@ -7,6 +7,8 @@ import { GalleryCheckoutRecoveryError, recoverGalleryCheckout } from "./checkout
 import { resolvePaymentProviderForSite } from "@/lib/payments/registry";
 import { purchaseReleaseStatus, sameSelection, selectionQuote } from "./selection-policy";
 
+export const proofArchivePrefix = "proof-zips/v2/";
+
 export class ProofSelectionError extends Error {
   constructor(message: string, public status: 400 | 404 | 409 | 503 = 400) { super(message); }
 }
@@ -82,6 +84,7 @@ export async function getProofSelection(token: string): Promise<ProofSelectionVi
   const canBundle = purchase && status === "RELEASED" && gallery.downloadEnabled && releasedAssets(purchase, gallery.id, settings.siteId);
   const bundle = purchase && canBundle
     ? await prisma.portfolioProofBundle.findUnique({ where: { purchaseId: purchase.id } }) : null;
+  const staleArchive = bundle?.state === "READY" && !bundle.key?.startsWith(proofArchivePrefix);
   return {
     gallery: { id: gallery.id, slug: gallery.slug, title: gallery.title, description: gallery.description },
     termsVersion: termsVersion(gallery),
@@ -92,7 +95,7 @@ export async function getProofSelection(token: string): Promise<ProofSelectionVi
       checkoutUrl: status === "PENDING" ? purchase.order?.checkoutUrl || null : null,
       canRetryCheckout: purchase.totalCents > 0 && !purchase.revokedAt && status !== "RELEASED" && status !== "REFUNDED" && Boolean(purchase.order && ["PENDING", "CANCELED"].includes(purchase.order.status) && purchase.order.siteId === settings.siteId && purchase.order.clientId === access.clientId && purchase.order.totalCents === purchase.totalCents && purchase.order.currency === purchase.currency),
       bundle: canBundle
-        ? { state: bundle?.state || "NEW", sizeBytes: bundle?.sizeBytes == null ? null : Number(bundle.sizeBytes) } : null
+        ? { state: staleArchive ? "NEW" : bundle?.state || "NEW", sizeBytes: staleArchive || bundle?.sizeBytes == null ? null : Number(bundle.sizeBytes) } : null
     } : null
   };
 }
