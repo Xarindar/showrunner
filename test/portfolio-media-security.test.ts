@@ -135,7 +135,7 @@ test("actual proofs shrink pixels, burn visible marks into every quadrant, strip
 });
 
 test("shared media counts and write guards include galleries and immutable purchased selections", () => {
-  assert.equal(mediaReferenceCount({ clientFiles: 1, productMedia: 2, services: 3, rectangularServices: 0, galleryServices: 0, serviceCategories: 4, portfolioItems: 5, purchasedSelections: 6 }), 21);
+  assert.equal(mediaReferenceCount({ emailHeaderLogos: 1, clientFiles: 1, productMedia: 2, services: 3, rectangularServices: 0, galleryServices: 0, serviceCategories: 4, portfolioItems: 5, purchasedSelections: 6 }), 22);
   assert.deepEqual(unreferencedMediaWhere.portfolioItems, { none: {} });
   assert.deepEqual(unreferencedMediaWhere.purchasedSelections, { none: {} });
 });
@@ -235,7 +235,7 @@ function actionHarness(references: number, archiveWriteCount = 1, privacy?: { de
     "@/lib/media": { mediaAssetIdFromUrl: () => "", normalizeMediaFolder: (value: string) => value, mediaTagsFromInput: () => [], supportsPrivateMediaDriver: () => true },
     "@/lib/media-usage": { mediaReferenceCount, mediaReferenceCountSelect: {}, unreferencedMediaWhere },
     "@/modules/content/hero-presentation": {},
-    "@/lib/prisma": { prisma: { mediaAsset: { findFirst: async () => ({ id: "asset-a", driver: "S3", isPrivate: privacy?.existing, clientFiles: [], portfolioItems: references ? [{ id: "item-a" }] : [], purchasedSelections: privacy?.purchased ? [{ id: "purchase-a" }] : [], _count: { clientFiles: 0, productMedia: 0, services: 0, rectangularServices: 0, galleryServices: 0, serviceCategories: 0, portfolioItems: references, purchasedSelections: 0 } }), updateMany: async (query: unknown) => { writes.push(query); return { count: archiveWriteCount }; } } } }
+    "@/lib/prisma": { prisma: { mediaAsset: { findFirst: async () => ({ id: "asset-a", driver: "S3", isPrivate: privacy?.existing, clientFiles: [], portfolioItems: references ? [{ id: "item-a" }] : [], purchasedSelections: privacy?.purchased ? [{ id: "purchase-a" }] : [], _count: { emailHeaderLogos: 0, clientFiles: 0, productMedia: 0, services: 0, rectangularServices: 0, galleryServices: 0, serviceCategories: 0, portfolioItems: references, purchasedSelections: 0 } }), updateMany: async (query: unknown) => { writes.push(query); return { count: archiveWriteCount }; } } } }
   };
   // The schemas are real Zod, so use real primitive input types even though the
   // form parser is substituted to exercise only the server-side action guard.

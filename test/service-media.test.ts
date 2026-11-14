@@ -149,7 +149,7 @@ test("migration preserves the existing booking image and protects both new media
     await db.exec(readFileSync("prisma/migrations/20261021120000_service_media/migration.sql", "utf8"));
     const result = await db.query('SELECT "imageUrl", "imageFraming", "rectangularMediaAssetId" FROM "Service"');
     assert.deepEqual(result.rows, [{ imageUrl: "/existing.jpg", imageFraming: { imageZoom: 2 }, rectangularMediaAssetId: null }]);
-    assert.equal(mediaReferenceCount({ clientFiles: 0, productMedia: 0, serviceCategories: 0, services: 0, rectangularServices: 1, galleryServices: 2, portfolioItems: 0, purchasedSelections: 0 }), 3);
+    assert.equal(mediaReferenceCount({ emailHeaderLogos: 0, clientFiles: 0, productMedia: 0, serviceCategories: 0, services: 0, rectangularServices: 1, galleryServices: 2, portfolioItems: 0, purchasedSelections: 0 }), 3);
     assert.deepEqual(unreferencedMediaWhere.rectangularServices, { none: {} });
     assert.deepEqual(unreferencedMediaWhere.galleryServices, { none: {} });
   } finally { await db.close(); }

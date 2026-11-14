@@ -51,7 +51,7 @@ async function accessibleGallery(ctx: Awaited<ReturnType<typeof context>>, clien
   const where = await getAccessibleGalleryWhere(ctx.user, ctx.siteId, {
     id: galleryId, clientId, visibility: PortfolioGalleryVisibility.PRIVATE, status: PortfolioGalleryStatus.PUBLISHED
   });
-  const gallery = await prisma.portfolioGallery.findFirst({ where, select: { id: true, title: true, slug: true, shotAt: true, bookingId: true, processingUploads: true, processingStartedAt: true, processingError: true, proofingEnabled: true, selectionAllowance: true, extraPhotoPriceCents: true, selectionCurrency: true, packageProductId: true, extraPhotoAddOnId: true, _count: { select: { items: true } }, mediaFolder: { select: { id: true, name: true } } } });
+  const gallery = await prisma.portfolioGallery.findFirst({ where, select: { id: true, title: true, slug: true, shotAt: true, bookingId: true, coverImageUrl: true, processingUploads: true, processingStartedAt: true, processingError: true, proofingEnabled: true, selectionAllowance: true, extraPhotoPriceCents: true, selectionCurrency: true, packageProductId: true, extraPhotoAddOnId: true, _count: { select: { items: true } }, mediaFolder: { select: { id: true, name: true } } } });
   if (!gallery) throw new GalleryInputError("This private client gallery is unavailable or outside your access scope.");
   return { gallery, where, client };
 }
@@ -400,19 +400,18 @@ export async function sendClientGalleryEmailAction(raw: unknown): Promise<Client
     if (!z.email().safeParse(client.email).success) throw new GalleryInputError("Add a valid client email before sending photos.");
     const { gallery } = await accessibleGallery(ctx, input.clientId, input.galleryId);
     if (clientGalleryImageStatus({ ...gallery, photoCount: gallery._count.items }) !== "Ready") throw new GalleryInputError("Wait until all session images are ready before sending photos.");
-    if (gallery.bookingId && !await prisma.booking.findFirst({ where: await getAccessibleBookingWhere(ctx.user, ctx.siteId, { id: gallery.bookingId, clientId: client.id, status: { notIn: ["CANCELED"] } }), select: { id: true } })) throw new GalleryInputError("This session is unavailable or canceled.");
+    const booking = gallery.bookingId ? await prisma.booking.findFirst({
+      where: await getAccessibleBookingWhere(ctx.user, ctx.siteId, { id: gallery.bookingId, clientId: client.id, status: { notIn: ["CANCELED"] } }),
+      select: { service: { select: { category: true } } }
+    }) : null;
+    if (gallery.bookingId && !booking) throw new GalleryInputError("This session is unavailable or canceled.");
     const link = await createClientGalleryLinkAction(input);
     if (!link.ok) return link;
     const templateKey = "portfolio.session.ready";
-    const body = "Hi {{customerName}},\n\nYour photos from {{sessionName}} are ready.\n\nView your private gallery: {{galleryUrl}}\n\nPlease keep this link private.\n\n{{businessName}}";
-    await prisma.messageTemplate.upsert({
-      where: { siteId_key: { siteId: ctx.siteId, key: templateKey } }, update: {},
-      create: { siteId: ctx.siteId, key: templateKey, name: "Session photos ready", purpose: "GALLERY_ACCESS", channel: "EMAIL", subject: "Your {{sessionName}} photos are ready", body, textBody: body, htmlBody: '<p>Hi {{customerName}},</p><p>Your photos from {{sessionName}} are ready.</p><p><a href="{{galleryUrl}}">View your private gallery</a></p><p>Please keep this link private.</p><p>{{businessName}}</p>',
-        requiredTokens: ["customerName", "sessionName", "galleryUrl", "businessName"] }
-    });
     const idempotencyKey = `gallery-ready:${gallery.id}:${input.requestId}`;
     await queueEmail({ siteId: ctx.siteId, templateKey, category: EmailCategory.TRANSACTIONAL, recipientEmail: client.email, recipientName: client.name,
       relatedType: "client", relatedId: client.id, idempotencyKey,
+      brandCategory: booking?.service?.category, galleryCoverImageUrl: gallery.coverImageUrl,
       tokens: { customerName: client.name, sessionName: gallery.title, galleryUrl: new URL(link.data.accessPath, publicAppBaseUrl()).toString(), businessName: ctx.settings.businessName } });
     const queued = await prisma.emailOutbox.findFirst({ where: { siteId: ctx.siteId, idempotencyKey }, select: { status: true } });
     if (!queued || !["QUEUED", "SENDING", "SENT"].includes(queued.status)) throw new GalleryInputError(queued?.status === "SUPPRESSED" ? "Email is blocked for this client. Check Communications before retrying." : "The email could not be queued. Check Communications for details, then try again.");

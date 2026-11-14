@@ -13,6 +13,8 @@ export type QueueEmailInput = {
   relatedType?: string;
   relatedId?: string;
   tokens: EmailTokens;
+  brandCategory?: string;
+  galleryCoverImageUrl?: string;
   senderIdentityId?: string;
   idempotencyKey: string;
   headers?: EmailHeaders;

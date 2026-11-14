@@ -28,3 +28,10 @@ Queued messages preserve their saved sender address. After an address change or 
 The earlier Google OAuth email schema migration remains in history for installations that applied it. The following migration removes that unused OAuth credential table and renames its delivery classification to CONNECTED. Google Calendar is a separate existing integration and is unaffected.
 
 Provider references: [IONOS mail settings](https://www.ionos.com/help/index.php?id=2490), [Gmail app passwords](https://support.google.com/accounts/answer/185833), [Nodemailer SMTP](https://nodemailer.com/smtp).
+## Customer email branding
+
+In Settings → Business, select an **Email header logo** beside the site logo. The picker can upload an image or reuse public media. The default appointment and private gallery emails use the email header logo, then the site logo, then the business name.
+
+Sites with named booking profiles get one logo field per profile. The content manifest maps service category slugs to profiles and can declare a default profile. Cottage 616 uses separate logo fields for Cottage 616 and The Hive. Galleries linked to a booking use that booking's profile, and standalone galleries use the default.
+
+Default appointment confirmations include the booking location and calendar link. An explicit booking location takes priority, followed by a single shared resource address or the service location. Gallery cover images must be public media, and private photos are accessed through the existing private link. Existing customized templates retain their content. Apply the email header logo migration before starting the upgraded server.

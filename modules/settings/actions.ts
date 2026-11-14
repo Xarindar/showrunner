@@ -9,6 +9,7 @@ import {
   applyDataScopePreset,
   dataScopeConfigFromFormData,
   dataScopePresets,
+  getAccessibleMediaWhere,
   getOwnerStaffIds,
   requireAdmin,
   resolveDataScopeMode,
@@ -25,6 +26,8 @@ import { normalizeModules } from "@/shell/modules";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings, resolveCurrentSite } from "@/lib/site";
 import { normalizeThemePreset } from "@/lib/theme/tokens";
+import { emailBrandProfiles } from "@/lib/email/brand-profiles";
+import { publicEmailImage } from "@/lib/email/customer-brand";
 
 function refreshSettings() {
   revalidatePath("/", "layout");
@@ -204,6 +207,47 @@ export async function attachSiteLogoAction(formData: FormData) {
 
   refreshSettings();
   redirect("/admin/modules/settings?saved=logo");
+}
+
+export async function attachEmailHeaderLogoAction(profile: string, formData: FormData) {
+  const user = await requireAdmin("settings:update");
+  const settings = await getSiteSettings();
+  const brand = emailBrandProfiles(settings).find(item => item.key === profile);
+  if (!brand) redirect("/admin/modules/settings?error=Unknown%20email%20brand.");
+  const id = String(formData.get("mediaAssetId") || "").trim();
+  const asset = id && await prisma.mediaAsset.findFirst({
+    where: await getAccessibleMediaWhere(user, settings.siteId, { ...publicEmailImage, id }),
+    select: { id: true }
+  });
+  if (!asset) redirect("/admin/modules/settings?error=Choose%20an%20active%20public%20image.");
+
+  const key = { siteId: settings.siteId, profile };
+  await prisma.emailHeaderLogo.upsert({
+    where: { siteId_profile: key },
+    create: { ...key, mediaAssetId: asset.id },
+    update: { mediaAssetId: asset.id }
+  });
+  await recordAuditLog({
+    action: "settings.email-logo.attached", actor: user, siteId: settings.siteId,
+    targetId: settings.siteId, targetLabel: brand.name, targetType: "site_settings",
+    metadata: { profile, mediaAssetId: asset.id }
+  });
+  refreshSettings();
+  redirect("/admin/modules/settings?saved=email-logo");
+}
+
+export async function removeEmailHeaderLogoAction(profile: string) {
+  const user = await requireAdmin("settings:update");
+  const settings = await getSiteSettings();
+  const brand = emailBrandProfiles(settings).find(item => item.key === profile);
+  if (!brand) redirect("/admin/modules/settings?error=Unknown%20email%20brand.");
+  await prisma.emailHeaderLogo.deleteMany({ where: { siteId: settings.siteId, profile } });
+  await recordAuditLog({
+    action: "settings.email-logo.removed", actor: user, siteId: settings.siteId,
+    targetId: settings.siteId, targetLabel: brand.name, targetType: "site_settings", metadata: { profile }
+  });
+  refreshSettings();
+  redirect("/admin/modules/settings?saved=email-logo-removed");
 }
 
 export async function removeSiteLogoAction(_formData: FormData) {

@@ -563,7 +563,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     try {
       await queueBookingCreatedEmails({
         ...booking,
-        service: { name: service.name }
+        service
       });
     } catch (error) {
       console.error("[email:booking-failed]", error);

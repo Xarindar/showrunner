@@ -21,7 +21,7 @@ function harness(overrides: { client?: boolean; package?: boolean; gallery?: boo
   const assets = overrides.assets || [{ id: "asset-a", filename: "portrait.jpg", alt: "Portrait", folder: "Shoots/Autumn", url: "/api/media/assets/asset-a", isPrivate: true }];
   const db: Query = {
     mediaFolder: { findMany: record("savedFolders", []), upsert: record("rootFolder", {}), findUnique: async () => null, create: async ({ data }: Query) => { calls.push({ name: "createFolder", query: { data } }); return { id: data.name, ...data }; } },
-    booking: { findFirst: record("booking", { id: "booking-a" }), findMany: record("bookings", []) },
+    booking: { findFirst: record("booking", { id: "booking-a", service: { category: "Portraits" } }), findMany: record("bookings", []) },
     client: { update: record("lockClient", { id: "client-a", name: "Example client", mediaFolder: null }), findFirst: record("client", overrides.client === false ? null : { id: "client-a", name: "Example client", email: "client@example.test" }) },
     orderItem: { findFirst: record("package", overrides.package === false ? null : { id: "purchased-item" }) },
     portfolioGallery: {
@@ -32,7 +32,6 @@ function harness(overrides: { client?: boolean; package?: boolean; gallery?: boo
     },
     portfolioGalleryItem: { findMany: record("items", overrides.existing || []), createMany: record("addItems", { count: assets.length }) },
     portfolioGalleryAccess: { findFirst: record("access", { accessToken: "private-token" }) },
-    messageTemplate: { upsert: record("template", {}) },
     emailOutbox: { findFirst: record("outbox", { status: "QUEUED" }), findMany: record("sentEmails", []) },
     serviceLibraryItem: { updateMany: record("lockAddon", { count: 1 }), findFirst: record("addon", { id: "custom-addon", siteId: "site-a", name: "User created name", pricingType: "PER_UNIT", priceCents: 1234, deliverables: { finalPhotos: 1 }, commerceProduct: null }), update: record("linkProduct", {}) },
     product: { upsert: record("product", { id: "internal-digital-product" }) },
@@ -329,7 +328,8 @@ test("session email is scoped, uses the stored recipient and private link, and q
   assert.equal(email.relatedType, "client"); assert.equal(email.relatedId, "client-a");
   assert.equal(email.tokens.galleryUrl, "https://admin.example.test/proofs/private-token");
   assert.equal(email.idempotencyKey, `gallery-ready:gallery-a:${createInput.requestId}`);
-  assert.equal(Object.keys(calls.find(call => call.name === "template")!.query.update).length, 0, "Never overwrite a customized template");
+  assert.equal(email.templateKey, "portfolio.session.ready");
+  assert.equal(email.brandCategory, "Portraits");
   const booking = calls.find(call => call.name === "booking")!.query.where;
   assert.equal(booking.AND[0].siteId, "site-a");
   assert.equal(booking.AND[1].clientId, "client-a");
