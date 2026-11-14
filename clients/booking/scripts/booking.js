@@ -160,6 +160,7 @@
     const visible = query ? sorted.filter((category) => categoryMatchesQuery(category, query)) : sorted;
 
     els.categoryEmpty.hidden = visible.length > 0;
+    els.categoryEmpty.textContent = query ? "No categories match that search." : "No services are currently available for booking.";
     els.categoryGrid.innerHTML = sorted
       .filter((category) => visible.includes(category))
       .map((category) => {
@@ -471,7 +472,7 @@
       els.selectedServiceKicker.textContent = service ? service.name : "Time";
     }
     if (els.slotHeading) {
-      els.slotHeading.textContent = "Time";
+      els.slotHeading.textContent = config.business?.timezone ? `Time (${config.business.timezone})` : "Time";
     }
     if (els.timezoneLabel) {
       els.timezoneLabel.textContent = "";
@@ -604,9 +605,12 @@
     if (!service || !slot) return;
 
     els.successSummary.innerHTML = summaryMarkup(service, slot, bookingResult?.booking?.id);
-    els.successCopy.textContent = service.requestOnly
+    const pending = bookingResult?.booking?.status === "PENDING" || service.requestOnly;
+    document.querySelector("#success-title").textContent = pending ? "Request received" : "You're booked";
+    document.querySelector(".booking-success .booking-kicker").textContent = pending ? "Awaiting approval" : "Confirmed";
+    els.successCopy.textContent = pending
       ? "Your appointment request has been sent. The team will follow up with confirmation."
-      : "Your appointment is confirmed. A confirmation email is on its way.";
+      : "Your appointment is confirmed.";
 
     const links = [];
     if (bookingResult?.booking?.calendarUrl) {
@@ -1077,7 +1081,9 @@
     const date = value instanceof Date ? value : new Date(value);
     return new Intl.DateTimeFormat(undefined, {
       hour: "numeric",
-      minute: "2-digit"
+      minute: "2-digit",
+      hour12: true,
+      timeZone: config.business?.timezone
     }).format(date);
   }
 
@@ -1086,7 +1092,8 @@
     return new Intl.DateTimeFormat(undefined, {
       weekday: "long",
       month: "long",
-      day: "numeric"
+      day: "numeric",
+      timeZone: typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? undefined : config.business?.timezone
     }).format(date);
   }
 
@@ -1103,24 +1110,19 @@
   }
 
   function formatSlotTime(value) {
-    const date = value instanceof Date ? value : new Date(value);
-    const hour = date.getHours() % 12 || 12;
-    return `${String(hour).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+    return formatTime(value);
   }
 
   function formatFooterDate(value) {
     const date = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? parseDateKey(value) : new Date(value);
-    const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(date);
-    const day = date.getDate();
+    const timeZone = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? undefined : config.business?.timezone;
+    const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long", timeZone }).format(date);
+    const day = Number(new Intl.DateTimeFormat("en-US", { day: "numeric", timeZone }).format(date));
     return `${weekday} ${day}${ordinalSuffix(day)}`;
   }
 
   function formatFooterTime(value) {
-    const date = value instanceof Date ? value : new Date(value);
-    const hour = date.getHours() % 12 || 12;
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    const suffix = date.getHours() < 12 ? "AM" : "PM";
-    return `${hour}:${minutes}${suffix}`;
+    return formatTime(value);
   }
 
   function ordinalSuffix(day) {

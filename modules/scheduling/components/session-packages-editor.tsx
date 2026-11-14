@@ -237,7 +237,8 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
               ["bufferBeforeMinutes", "Time Before", "min", "minutes", 0, 1440],
               ["bufferAfterMinutes", "Time After", "min", "minutes", 0, 1440],
               ["minimumNoticeHours", "Minimum Notice", "hr", "hours", 0, 8760],
-              ["maxAdvanceDays", "Book Ahead", "days", "days", 1, 3650]
+              ["maxAdvanceDays", "Book Ahead", "days", "days", 1, 3650],
+              ["slotIntervalMinutes", "Start Interval", "min", "minutes", 1, 1440]
             ] as const).map(([key, label, unit, accessibleUnit, min, max]) => <Field key={key} label={label}>
               <span className={styles.unitField}>
                 <Input aria-label={`${label} (${accessibleUnit})`} type="number" min={min} max={max} required value={scheduling[key]} onChange={event => setScheduling(current => ({ ...current, [key]: event.target.value }))} />

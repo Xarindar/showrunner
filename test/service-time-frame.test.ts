@@ -62,6 +62,24 @@ function harness() {
   return { state, adapter: exports.nativeSchedulingAdapter! };
 }
 
+test("overlapping hours produce unique, chronological starts and honor the configured interval", async () => {
+  const h = harness();
+  h.state.service.sessionOffering = null;
+  h.state.service.durationMinutes = 30;
+  h.state.service.slotIntervalMinutes = 30;
+  h.state.rules = [{ startMinutes: 720, endMinutes: 900 }, { startMinutes: 540, endMinutes: 780 }];
+  const date = new Date("2030-11-13T18:00:00Z");
+  const slots = await h.adapter.getAvailableSlots("service", date);
+  const starts = Array.from(slots, slot => slot.startsAt.getTime());
+  assert.equal(starts.length, 12);
+  assert.equal(new Set(starts).size, starts.length);
+  assert.ok(starts.every((start, index) => !index || start - starts[index - 1] === 30 * 60000));
+  h.state.rules = [{ startMinutes: 540, endMinutes: 780 }];
+  h.state.service.slotIntervalMinutes = 31;
+  const custom = await h.adapter.getAvailableSlots("service", date);
+  assert.equal(custom[1].startsAt.getTime() - custom[0].startsAt.getTime(), 31 * 60000);
+});
+
 test("fixed windows offer only the entire window and still obey hours, bookings and closures", async () => {
   const h = harness();
   const date = new Date("2030-11-12T18:00:00Z");

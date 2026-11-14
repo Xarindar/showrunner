@@ -261,6 +261,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     const slots: SlotDiagnostic[] = [];
 
     for (const owner of slotOwners) {
+      const seenStarts = new Set<number>();
       const ownerRules = owner.id
         ? rules.filter((rule) => rule.staffId === owner.id)
         : requiredResources[0]
@@ -277,6 +278,8 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
           minutes += slotInterval
         ) {
         const startsAt = addMinutesToZonedDay(start, minutes, settings.timezone);
+        if (seenStarts.has(startsAt.getTime())) continue;
+        seenStarts.add(startsAt.getTime());
         const endsAt = frameEnd ?? (fixedWindow ? addMinutesToZonedDay(start, fixedWindow.end, settings.timezone) : new Date(startsAt.getTime() + service.durationMinutes * 60000));
         const { bufferedStart, bufferedEnd } = getBufferedWindow(
           startsAt,
@@ -373,6 +376,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
       }
     }
 
+    slots.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
     const availableCount = slots.filter((slot) => slot.available).length;
     if (!availableCount && slots.length) {
       messages.push("Availability rules generated slots, but every slot is blocked by booking rules or conflicts.");

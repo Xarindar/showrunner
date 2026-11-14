@@ -980,11 +980,13 @@ try {
   assert(await settingsRow.isVisible(),'Booking settings are visible without expanding a dropdown');
   assert.equal(await bookingPackage.getByRole('heading',{name:'Booking availability',exact:true}).count(),0);
   assert.equal(await bookingPackage.getByRole('button',{name:'Business hours',exact:true}).count(),0);
-  assert.equal(await settingsRow.getByRole('spinbutton').count(),4,'Only the four compact booking fields are displayed');
-  assert.deepEqual(await settingsRow.locator('[aria-hidden="true"]').allTextContents(),['min','min','hr','days'],'Units are shown inside the inputs');
+  assert.equal(await settingsRow.getByRole('spinbutton').count(),5,'Start interval is editable alongside the booking fields');
+  assert.deepEqual(await settingsRow.locator('[aria-hidden="true"]').allTextContents(),['min','min','hr','days','min'],'Units are shown inside the inputs');
   await settingsRow.getByRole('spinbutton',{name:'Minimum Notice (hours)',exact:true}).fill('24');
+  await settingsRow.getByRole('spinbutton',{name:'Start Interval (minutes)',exact:true}).fill('30');
   await bookingPackage.getByRole('button',{name:'Cancel',exact:true}).click();
   assert.equal(await builder.locator('input[name="minimumNoticeHours"]').inputValue(),'24','Booking settings submit even after the package modal closes');
+  assert.equal(await builder.locator('input[name=slotIntervalMinutes]').inputValue(),'30');
 
 
   const editBuilder=page.getByRole('region',{name:'Edit session builder fixture',exact:true});
@@ -1001,7 +1003,7 @@ try {
     await page.setViewportSize({width,height:844});
     assert.equal(await savedPackage.evaluate(element=>element.scrollWidth>element.clientWidth),false,'Package booking settings fit '+width+'px');
     const bookingTops=await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).getByRole('spinbutton').evaluateAll(elements=>elements.map(element=>Math.round(element.getBoundingClientRect().top)));
-    assert.equal(new Set(bookingTops).size,width===1440?1:2,'Booking fields use one desktop row and two mobile rows');
+    assert.equal(new Set(bookingTops).size,width===1440?2:3,'Booking fields use two desktop rows and three mobile rows');
     assert(await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).locator('[aria-hidden="true"]').evaluateAll(elements=>elements.every(unit=>unit.getBoundingClientRect().right<=unit.previousElementSibling.getBoundingClientRect().right-28)),'Unit hints leave room for native number steppers');
     assert(await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).locator('[aria-hidden="true"]').evaluateAll(elements=>elements.every(unit=>unit.getBoundingClientRect().left-unit.previousElementSibling.getBoundingClientRect().left<60)),'Units sit beside their number instead of at the end of the input');
 
