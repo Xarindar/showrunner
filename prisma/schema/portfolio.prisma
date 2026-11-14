@@ -306,6 +306,7 @@ model PortfolioSelectionPurchase {
   revokedAt DateTime?
   createdAt DateTime @default(now())
   selections PortfolioPurchasedSelection[]
+  bundle PortfolioProofBundle?
   @@index([siteId, clientId])
 }
 
@@ -319,4 +320,16 @@ model PortfolioPurchasedSelection {
   mediaAsset MediaAsset @relation("PurchasedMedia", fields: [mediaAssetId], references: [id], onDelete: Restrict)
   @@unique([purchaseId, itemId])
   @@index([mediaAssetId])
+}
+
+model PortfolioProofBundle {
+  purchaseId String @id
+  purchase PortfolioSelectionPurchase @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  accessId String
+  state String @default("QUEUED")
+  leaseUntil DateTime?
+  driver MediaDriver?
+  key String?
+  sizeBytes BigInt?
+  @@index([state, leaseUntil])
 }

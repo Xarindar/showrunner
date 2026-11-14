@@ -1,7 +1,11 @@
 import "server-only";
 
+import { createReadStream, createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { Upload } from "@aws-sdk/lib-storage";
 import { createHmac, randomUUID, timingSafeEqual } from "crypto";
-import { mkdir, readFile, rm, writeFile } from "fs/promises";
+import { mkdir, open, readFile, rm, writeFile } from "fs/promises";
 import path from "path";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -781,7 +785,7 @@ function isAllowedMediaSourceUrl(url: URL, request: NextRequest) {
   return allowedHosts.has(hostname) || hostname.endsWith(".r2.cloudflarestorage.com") || hostname.endsWith(".cloudflarestorage.com");
 }
 
-async function objectStorageObjectResponse(driver: ObjectStorageDriver, asset: Pick<MediaAsset, "key" | "mimeType">) {
+async function objectStorageObjectResponse(driver: ObjectStorageDriver, asset: Pick<MediaAsset, "key" | "mimeType">, signal?: AbortSignal) {
   const config = getObjectStorageConfig(driver);
   if (!isObjectStorageConfigured(config)) return null;
 
@@ -789,7 +793,7 @@ async function objectStorageObjectResponse(driver: ObjectStorageDriver, asset: P
     new GetObjectCommand({
       Bucket: config.bucket,
       Key: asset.key
-    })
+    }), { abortSignal: signal }
   );
 
   if (!object.Body) return null;
@@ -1192,6 +1196,58 @@ export async function galleryProofResponse(asset: DeliverableMediaAsset, type: M
       "x-media-variant": "WATERMARKED_PROOF"
     }
   });
+}
+
+export function openPrivateOriginal(asset: DeliverableMediaAsset, signal: AbortSignal) {
+  if (asset.deletedAt || !asset.isPrivate || !supportsPrivateMediaDriver(asset.driver)) throw new Error("Private original unavailable");
+  if (asset.driver === MediaDriver.SERVER_ASSETS) return createReadStream(serverAssetPath(asset.key), { signal });
+  const driver = asset.driver as ObjectStorageDriver;
+  return objectStorageObjectResponse(driver, asset, signal).then(response => {
+    if (!response?.body) throw new Error("Private original unavailable");
+    return Readable.fromWeb(response.body as import("node:stream/web").ReadableStream, { signal });
+  });
+}
+
+export async function storeProofArchive(driver: MediaDriver, key: string, input: Readable, controller: AbortController) {
+  if (driver === MediaDriver.SERVER_ASSETS) {
+    const target = serverAssetPath(key);
+    await mkdir(path.dirname(target), { recursive: true });
+    return pipeline(input, createWriteStream(target, { flags: "wx" }), { signal: controller.signal });
+  }
+  const config = getObjectStorageConfig(driver as ObjectStorageDriver);
+  const upload = new Upload({ client: getObjectStorageClient(config), abortController: controller, queueSize: 2, params: {
+    Bucket: config.bucket, Key: key, Body: input, ContentType: "application/zip", CacheControl: "private, no-store"
+  } });
+  await upload.done();
+}
+
+export async function deleteProofArchive(driver: MediaDriver, key: string) {
+  await getMediaAdapter(driver).delete?.({ key, storageProviderId: "" });
+}
+
+export async function deliverProofArchive(driver: MediaDriver, key: string, filename: string, size: bigint, drive: boolean, signal: AbortSignal) {
+  const headers = { "content-type": "application/zip", "content-length": String(size), "content-disposition": `attachment; filename="${safeFilename(filename)}"`,
+    "cache-control": "private, no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff" };
+  if (driver === MediaDriver.SERVER_ASSETS) {
+    if (!supportsPrivateMediaDriver(driver)) return null;
+    const handle = await open(serverAssetPath(key), "r");
+    return new Response(Readable.toWeb(handle.createReadStream({ signal })) as ReadableStream, { headers });
+  }
+  if (driver !== MediaDriver.S3 && driver !== MediaDriver.R2) return null;
+  if (drive) {
+    const response = await objectStorageObjectResponse(driver, { key, mimeType: "application/zip" }, signal);
+    return response?.body ? new Response(response.body, { headers }) : null;
+  }
+  const config = getObjectStorageConfig(driver);
+  const location = await getSignedUrl(getObjectStorageClient(config), new GetObjectCommand({
+    Bucket: config.bucket, Key: key, ResponseContentDisposition: headers["content-disposition"],
+    ResponseCacheControl: headers["cache-control"], ResponseContentType: headers["content-type"]
+  }), { expiresIn: 60 });
+  return new Response(null, { status: 307, headers: { location, "cache-control": headers["cache-control"], "referrer-policy": "no-referrer" } });
+}
+
+export function proofExportSignature(accessId: string, purchaseId: string, expires: number) {
+  return signPayload(`proof-export:${accessId}:${purchaseId}`, MediaVariantType.DOWNLOAD, expires);
 }
 
 /** Call only after current access and an exact paid item entitlement were checked. */

@@ -13,7 +13,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const output = resolve(mkdtempSync(resolve(tmpdir(), 'showrunner-proof-ui-')), 'fixture');
 const captures = process.env.PROOF_SCREENSHOT_DIR || `${root}/.impeccable/review/proofs`;
 mkdirSync(captures, { recursive: true });
-await build({ stdin: { contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {ProofClient} from './modules/portfolio/proof-client'; import {ProofPaymentReturn} from './modules/portfolio/proof-payment-return'; import './app/globals.css'; import './components/public/theme.css'; import {themeToCssVars} from './lib/theme/tokens'; const view=window.__proofView; createRoot(document.getElementById('root')).render(<div className="public-theme" style={themeToCssVars({})}>{location.pathname.endsWith('/payment-return') ? <ProofPaymentReturn/> : <ProofClient initialView={view} token="synthetic-private-token"/>}</div>);`, resolveDir: root, loader: 'tsx' }, bundle: true, outfile: `${output}.js`, define: { 'process.env.NODE_ENV': '"production"', 'process.env': '{}' }, logLevel: 'silent' });
+await build({ stdin: { contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {ProofClient} from './modules/portfolio/proof-client'; import {ProofPaymentReturn} from './modules/portfolio/proof-payment-return'; import './app/globals.css'; import './components/public/theme.css'; import {themeToCssVars} from './lib/theme/tokens'; const view=window.__proofView; createRoot(document.getElementById('root')).render(<div className="public-theme" style={themeToCssVars({})}>{location.pathname.endsWith('/payment-return') ? <ProofPaymentReturn/> : <ProofClient initialView={view} token="synthetic-private-token" brand={{name:"Jazzr Photography",logoUrl:"",theme:"jazzr",firstName:"Taylor"}}/>}</div>);`, resolveDir: root, loader: 'tsx' }, bundle: true, outfile: `${output}.js`, define: { 'process.env.NODE_ENV': '"production"', 'process.env': '{}' }, logLevel: 'silent' });
 const js=readFileSync(`${output}.js`,'utf8');
 const css=readFileSync(`${output}.css`,'utf8').replace(/@import[^;]+;/g,'');
 let purchase=null, revoked=false, postCount=0, currentPrice=2500, currentTerms='a'.repeat(64);
@@ -23,12 +23,21 @@ const view=()=>({termsVersion:currentTerms,gallery:{id:'synthetic-gallery',slug:
 const html=()=>`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><style>:root,body{--color-page:#fff;--color-surface:#fff;--color-surface-sunken:#ecece9;--color-text:#20221f;--color-muted:#656a65;--color-border:#d9dbd6;--color-brand:#116466;--color-brand-dark:#164e50;--color-brand-contrast:#fff;--font-sans:Arial,sans-serif;--leading-normal:1.5;--radius-control:5px;--control-height:44px;--space-3:12px;--color-danger:#b42318;--radius-card:12px;--color-hover:#f4f5f3;--color-brand-border:#116466}</style><style>${css}</style></head><body><div id="root"></div><script>window.__proofView=${JSON.stringify(view())}</script><script>${js}</script></body></html>`;
 const browser=await chromium.launch({...(process.env.CHROMIUM_PATH ? {executablePath:process.env.CHROMIUM_PATH} : {}),headless:true});
 const context=await browser.newContext({viewport:{width:1440,height:1000}});
+await context.addInitScript(() => {
+  Object.defineProperty(navigator, 'share', { configurable: true, value: async payload => { window.sharedProof = payload; } });
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.copiedProof = text; } } });
+});
 const page=await context.newPage(); const errors=[]; page.on('pageerror',e=>errors.push(e.message));
 await context.route('**/*',async route=>{const req=route.request();const url=new URL(req.url());
 if(url.hostname==='pay.example') return route.fulfill({contentType:'text/html',body:'<h1>Synthetic payment provider</h1>'});
+if(url.pathname.startsWith('/proof-delivery/') && url.pathname.endsWith('.png')) return route.fulfill({contentType:'image/png',body:readFileSync(resolve(root,'public'+url.pathname))});
 if(url.pathname.startsWith('/api/portfolio/proofs/')) {
 if(revoked) return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({error:'This proof link is unavailable.'})});
-if(req.method()==='POST'){postCount++; assert.equal(req.headers()['x-proof-request'],'1'); const {itemIds}=req.postDataJSON(); const extras=Math.max(0,itemIds.length-2); purchase={id:'synthetic-purchase',status:extras?'PENDING':'RELEASED',canRetryCheckout:extras>0,selectedItemIds:itemIds,includedCount:2,extraCount:extras,extraImagePriceCents:2500,totalCents:extras*2500,currency:'USD',checkoutUrl:extras?'https://pay.example/checkout':null,downloads:[]}; await new Promise(r=>setTimeout(r,200));return route.fulfill({contentType:'application/json',body:JSON.stringify({purchaseId:purchase.id,status:purchase.status,checkoutUrl:purchase.checkoutUrl})}); }
+if(url.pathname.endsWith('/bundle') && req.method()==='POST') {
+  purchase={...purchase,bundle:{state:'BUILDING',sizeBytes:null}};
+  return route.fulfill({status:202});
+}
+if(req.method()==='POST'){postCount++; assert.equal(req.headers()['x-proof-request'],'1'); const {itemIds}=req.postDataJSON(); const extras=Math.max(0,itemIds.length-2); purchase={id:'synthetic-purchase',status:extras?'PENDING':'RELEASED',canRetryCheckout:extras>0,selectedItemIds:itemIds,includedCount:2,extraCount:extras,extraImagePriceCents:2500,totalCents:extras*2500,currency:'USD',checkoutUrl:extras?'https://pay.example/checkout':null,bundle:null}; await new Promise(r=>setTimeout(r,200));return route.fulfill({contentType:'application/json',body:JSON.stringify({purchaseId:purchase.id,status:purchase.status,checkoutUrl:purchase.checkoutUrl})}); }
 return route.fulfill({contentType:'application/json',body:JSON.stringify(view())}); }
 if(url.pathname.startsWith('/api/portfolio/galleries/')){const id=url.pathname.split('/').at(-1);const [w,h]=id==='photo-1'?[1200,600]:id==='photo-2'?[600,900]:id==='photo-3'?[1600,500]:[640,800];return route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="640" height="800" fill="#d4d9d1"/><text x="320" y="370" fill="#3e4b40" font-family="Arial" font-size="28" text-anchor="middle">Synthetic ${id}</text><text x="320" y="425" fill="#3e4b40" font-family="Arial" font-size="18" text-anchor="middle">WATERMARKED PROOF</text></svg>`});}
 if(url.hostname==='proof-fixture.example')return route.fulfill({contentType:'text/html',body:html()});
@@ -36,11 +45,7 @@ return route.abort();});
 try {
 await page.goto('https://proof-fixture.example/proofs/synthetic-private-token'); await page.getByText('Select 2 Photos',{exact:true}).waitFor();
 const instructions=page.getByRole('note',{name:'How to choose photos',exact:true});
-await instructions.waitFor();
-await instructions.getByRole('button',{name:'Dismiss instructions',exact:true}).click();
-assert.equal(await page.evaluate(()=>localStorage.getItem('portfolio:proof-help:v1')),'dismissed');
-await page.reload();
-await page.getByText('Select 2 Photos',{exact:true}).waitFor();
+assert.equal(await instructions.count(),0,'Help is closed on the first visit');
 await page.getByRole('button',{name:'How to choose',exact:true}).click();
 await instructions.waitFor();
 await instructions.getByRole('button',{name:'Dismiss instructions',exact:true}).click();
@@ -59,10 +64,14 @@ await page.setViewportSize({width:390,height:844});await page.getByRole('button'
 await page.waitForFunction(()=>Array.from(document.querySelectorAll('figure img')).slice(0,3).every(img=>img.complete&&img.naturalWidth));
 for(const dimensions of await page.locator('figure img').evaluateAll(images=>images.slice(0,3).map(img=>({width:img.getBoundingClientRect().width,height:img.getBoundingClientRect().height,naturalWidth:img.naturalWidth,naturalHeight:img.naturalHeight})))) assert(Math.abs(dimensions.width/dimensions.height-dimensions.naturalWidth/dimensions.naturalHeight)<.01,'Portrait, landscape and panoramic proofs retain their source aspect ratios');
 await page.setViewportSize({width:390,height:500});
+const galleryHeader = page.locator('header').first();
+const expandedHeight = (await galleryHeader.boundingBox()).height;
 await page.evaluate(()=>window.scrollTo(0,400));
 assert(await page.evaluate(()=>window.scrollY>0),'Fixture scrolls for sticky header check');
 assert(Math.abs((await page.locator('header').first().boundingBox()).y)<1,'Logo header stays at the top while scrolling');
+await page.waitForFunction(height => document.querySelector('header').getBoundingClientRect().height < height, expandedHeight);
 await page.evaluate(()=>window.scrollTo(0,0));
+await page.waitForFunction(height => document.querySelector('header').getBoundingClientRect().height === height, expandedHeight);
 await page.setViewportSize({width:1440,height:1000});
 await page.getByRole('button',{name:'View larger proof of Proof 01',exact:true}).click();
 const viewer=page.getByRole('dialog',{name:'Photo proof',exact:true});
@@ -181,17 +190,41 @@ await limitDialog.getByRole('button',{name:'Keep my package',exact:true}).click(
 currentPrice=2500;currentTerms='c'.repeat(64);
 await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
 await page.getByRole('button',{name:'Review cart · $25.00',exact:true}).click();
-assert.equal(await page.getByRole('button',{name:'Finalize & pay $25.00',exact:true}).isEnabled(),false);
-await page.getByRole('button',{name:'Keep choosing',exact:true}).click();assert.equal(await page.getByRole('checkbox',{name:'Remove Proof 03',exact:true}).isChecked(),true);
-await page.getByRole('button',{name:'Review cart · $25.00',exact:true}).click();await page.getByRole('checkbox',{name:'I’ve checked my choices'}).check();
-await page.getByRole('button',{name:'Finalize & pay $25.00',exact:true}).evaluate(button=>{button.click();button.click()});
+const confirm = page.getByRole('dialog',{name:'Finalize Selections?'});
+await confirm.getByText('You’ll pay $25.00 for 1 extra photo at checkout.').waitFor();
+await confirm.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(await page.getByRole('checkbox',{name:'Remove Proof 03',exact:true}).isChecked(),true);
+await page.getByRole('button',{name:'Review cart · $25.00',exact:true}).click();
+await confirm.getByRole('button',{name:'Finalize',exact:true}).evaluate(button=>{button.click();button.click()});
 await page.waitForURL('https://pay.example/checkout');assert.equal(postCount,1);
-await page.goto('https://proof-fixture.example/proofs/payment-return?checkout=success');await page.waitForURL('https://proof-fixture.example/proofs/synthetic-private-token');await page.getByRole('heading',{name:'Awaiting payment',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Your selected originals',exact:true}).count(),0);
-assert.equal(await page.getByRole('checkbox',{name:'Remove Proof 01',exact:true}).isDisabled(),true);
-purchase={...purchase,status:'RELEASED',canRetryCheckout:false,checkoutUrl:null,downloads:purchase.selectedItemIds.map(id=>({itemId:id,filename:`${id}.jpg`,url:`/api/portfolio/galleries/synthetic-shoot/media/${id}?variant=DOWNLOAD&access=synthetic-private-token`}))};
-await page.getByRole('button',{name:'Refresh status',exact:true}).click();await page.getByRole('heading',{name:'Your selected originals',exact:true}).waitFor();assert.equal(await page.getByRole('link',{name:/Download photo-/}).count(),3);
-await page.reload();await page.getByRole('heading',{name:'Originals ready',exact:true}).waitFor();assert.equal(await page.getByRole('checkbox',{name:'Remove Proof 01',exact:true}).isDisabled(),true);
-revoked=true;await page.getByRole('button',{name:'Refresh status',exact:true}).click();await page.getByRole('heading',{name:'This proof link is unavailable',exact:true}).waitFor();assert.equal(await page.getByRole('link',{name:/Download/}).count(),0);
+await page.goto('https://proof-fixture.example/proofs/payment-return?checkout=success');await page.waitForURL('https://proof-fixture.example/proofs/synthetic-private-token');
+await page.getByRole('heading',{name:'Awaiting payment confirmation',exact:true}).waitFor();
+assert.equal(await page.getByRole('link',{name:'Download ZIP'}).count(),0);
+assert.equal(await page.getByRole('region',{name:'Photo proofs'}).count(),0);
+purchase={...purchase,status:'RELEASED',canRetryCheckout:false,checkoutUrl:null,bundle:{state:'NEW',sizeBytes:null}};
+await page.getByRole('button',{name:'Refresh status',exact:true}).click();
+await page.getByRole('heading',{name:'Preparing your photos',exact:true}).waitFor();
+await page.screenshot({path:resolve(captures,'zip-processing-desktop.png')});
+await page.reload();
+await page.getByRole('heading',{name:'Preparing your photos',exact:true}).waitFor();
+purchase={...purchase,bundle:{state:'READY',sizeBytes:12000000}};
+await page.getByRole('heading',{name:'Your photos are ready!',exact:true}).waitFor();
+assert.equal(await page.getByRole('link',{name:'Download ZIP',exact:true}).count(),1);
+await page.getByText('Taylor, thank you for choosing Jazzr Photography. We hope you enjoyed your shoot and love your photos!', {exact:true}).waitFor();
+assert.equal(await page.getByRole('navigation',{name:'Contact Jazzr Photography'}).getByRole('link').count(),3);
+await page.getByRole('link',{name:'Save to Google Drive',exact:true}).waitFor();
+await page.getByRole('button',{name:'Share',exact:true}).click();
+assert.deepEqual(await page.evaluate(()=>window.sharedProof), {
+  text:'Hey, the pictures from Jazzr Photography are ready! Check them out here!',
+  url:'https://proof-fixture.example/proofs/synthetic-private-token'
+});
+await page.evaluate(()=>Object.defineProperty(navigator,'share',{value:undefined}));
+await page.getByRole('button',{name:'Share',exact:true}).click();
+await page.getByRole('status').filter({hasText:'Message and link copied.'}).waitFor();
+assert.equal(await page.evaluate(()=>window.copiedProof),'Hey, the pictures from Jazzr Photography are ready! Check them out here! https://proof-fixture.example/proofs/synthetic-private-token');
+await page.setViewportSize({width:390,height:844});
+await page.screenshot({path:resolve(captures,'zip-ready-mobile.png')});
+assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true);
+revoked=true;await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.getByRole('heading',{name:'This proof link is unavailable',exact:true}).waitFor();assert.equal(await page.getByRole('link',{name:/Download/}).count(),0);
 assert.deepEqual(errors,[]);
-console.log(JSON.stringify({passed:['desktop/mobile overflow','unavailable draft selections reconciled','remaining-photo countdown','one-time extra-photo consent','sticky logo header','Select/Selected labels','dismissible first-visit help and reopening','confirmation and cancel preservation','duplicate-submit prevention','safe payment return','query does not unlock downloads','verified release and reload','revoked-link fail-close'],screenshots:captures}));
+console.log(JSON.stringify({passed:['desktop/mobile overflow','unavailable draft selections reconciled','remaining-photo countdown','one-time extra-photo consent','sticky logo header','Select/Selected labels','help hidden by default and available on request','confirmation and cancel preservation','duplicate-submit prevention','safe payment return','query does not unlock downloads','verified release and reload','revoked-link fail-close'],screenshots:captures}));
 } finally {await browser.close();}

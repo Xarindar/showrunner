@@ -15,7 +15,7 @@ export type ProofSelectionView = {
   termsVersion: string;
   includedCount: number; extraImagePriceCents: number; currency: string;
   items: Array<{ id: string; title: string | null; altText: string | null }>;
-  purchase: null | { id: string; status: string; selectedItemIds: string[]; includedCount: number; extraCount: number; extraImagePriceCents: number; totalCents: number; currency: string; checkoutUrl: string | null; canRetryCheckout: boolean; downloads: Array<{ itemId: string; filename: string; url: string }> };
+  purchase: null | { id: string; status: string; selectedItemIds: string[]; includedCount: number; extraCount: number; extraImagePriceCents: number; totalCents: number; currency: string; checkoutUrl: string | null; canRetryCheckout: boolean; bundle: null | { state: string; sizeBytes: number | null } };
 };
 
 const purchaseInclude = { selections: { include: { mediaAsset: true, item: true } }, order: { include: { payments: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] } } } } satisfies Prisma.PortfolioSelectionPurchaseInclude;
@@ -49,12 +49,7 @@ export async function getClientSessionDelivery(token: string) {
   if (!access || !directSessionDelivery(access)) return null;
   const gallery = access.gallery;
   return {
-    title: gallery.title, description: gallery.description,
-    photos: gallery.items.filter(item => item.type === "IMAGE" && item.isDownloadable && item.mediaAsset?.siteId === settings.siteId &&
-      item.mediaAsset.isPrivate && !item.mediaAsset.deletedAt && ["S3", "R2", "SERVER_ASSETS"].includes(item.mediaAsset.driver)).map(item => {
-      const url = `/api/portfolio/galleries/${encodeURIComponent(gallery.slug)}/media/${encodeURIComponent(item.id)}?access=${encodeURIComponent(token)}`;
-      return { id: item.id, name: item.mediaAsset!.filename, thumbnail: `${url}&variant=THUMBNAIL`, preview: `${url}&variant=FULL`, download: `${url}&variant=DOWNLOAD&download=1` };
-    })
+    title: gallery.title
   };
 }
 
@@ -84,7 +79,9 @@ export async function getProofSelection(token: string): Promise<ProofSelectionVi
   const gallery = access.gallery;
   const purchase = gallery.purchase;
   const status = purchase && validPackage(gallery) && purchase.clientId === access.clientId && purchase.siteId === settings.siteId ? releaseStatus(purchase) : "BLOCKED";
-  const mediaBase = `/api/portfolio/galleries/${encodeURIComponent(gallery.slug)}/media/`;
+  const canBundle = purchase && status === "RELEASED" && gallery.downloadEnabled && releasedAssets(purchase, gallery.id, settings.siteId);
+  const bundle = purchase && canBundle
+    ? await prisma.portfolioProofBundle.findUnique({ where: { purchaseId: purchase.id } }) : null;
   return {
     gallery: { id: gallery.id, slug: gallery.slug, title: gallery.title, description: gallery.description },
     termsVersion: termsVersion(gallery),
@@ -94,23 +91,37 @@ export async function getProofSelection(token: string): Promise<ProofSelectionVi
       id: purchase.id, status, selectedItemIds: purchase.selections.map(s => s.itemId), includedCount: purchase.allowance, extraCount: purchase.extraCount, extraImagePriceCents: purchase.extraPriceCents, totalCents: purchase.totalCents, currency: purchase.currency,
       checkoutUrl: status === "PENDING" ? purchase.order?.checkoutUrl || null : null,
       canRetryCheckout: purchase.totalCents > 0 && !purchase.revokedAt && status !== "RELEASED" && status !== "REFUNDED" && Boolean(purchase.order && ["PENDING", "CANCELED"].includes(purchase.order.status) && purchase.order.siteId === settings.siteId && purchase.order.clientId === access.clientId && purchase.order.totalCents === purchase.totalCents && purchase.order.currency === purchase.currency),
-      downloads: status === "RELEASED" && gallery.downloadEnabled ? purchase.selections.filter(s => s.item.galleryId === gallery.id && s.item.mediaAssetId === s.mediaAssetId && s.item.isDownloadable && s.mediaAsset.isPrivate && s.mediaAsset.siteId === settings.siteId && !s.mediaAsset.deletedAt).map(s => ({ itemId: s.itemId, filename: s.mediaAsset.filename, url: `${mediaBase}${encodeURIComponent(s.itemId)}?access=${encodeURIComponent(token)}&variant=DOWNLOAD&download=1` })) : []
+      bundle: canBundle
+        ? { state: bundle?.state || "NEW", sizeBytes: bundle?.sizeBytes == null ? null : Number(bundle.sizeBytes) } : null
     } : null
   };
 }
 
-/** Every download rechecks access, immutable asset identity, verified payment, and refunds. */
+function releasedAssets(purchase: Prisma.PortfolioSelectionPurchaseGetPayload<{ include: typeof purchaseInclude }>, galleryId: string, siteId: string) {
+  if (!purchase.selections.length || purchase.selections.some(s => s.item.galleryId !== galleryId || s.item.type !== "IMAGE" ||
+    !s.item.isDownloadable || s.item.mediaAssetId !== s.mediaAssetId || s.mediaAsset.id !== s.mediaAssetId ||
+    s.mediaAsset.siteId !== siteId || !s.mediaAsset.isPrivate || s.mediaAsset.deletedAt ||
+    !["S3", "R2", "SERVER_ASSETS"].includes(s.mediaAsset.driver))) return null;
+  return purchase.selections.map(s => ({ itemId: s.itemId, asset: s.mediaAsset }));
+}
+
+export async function getReleasedProofBundle(token: string, siteId: string) {
+  if (!token || token.length > 256) return null;
+  const access = await activeAccess(prisma, token, siteId);
+  const purchase = access?.gallery.purchase;
+  if (!access || !validAccess(access) || !validPackage(access.gallery) || !access.gallery.downloadEnabled ||
+    !purchase || purchase.siteId !== siteId || purchase.clientId !== access.clientId || releaseStatus(purchase) !== "RELEASED") return null;
+  const assets = releasedAssets(purchase, access.galleryId, siteId);
+  if (!assets) return null;
+  return { accessId: access.id, purchaseId: purchase.id, assets };
+}
+
+/** Every individual download still requires a released selection. */
 export async function authorizeGalleryOriginal(input: { siteId: string; galleryId: string; itemId: string; accessId: string; mediaAssetId?: string }) {
   const access = await prisma.portfolioGalleryAccess.findFirst({ where: { id: input.accessId, siteId: input.siteId, galleryId: input.galleryId, status: "ACTIVE", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, select: { accessToken: true } });
   if (!access) return false;
-  const full = await activeAccess(prisma, access.accessToken, input.siteId);
-  if (full && directSessionDelivery(full)) return full.gallery.items.some(item => item.id === input.itemId && item.galleryId === input.galleryId &&
-    (!input.mediaAssetId || item.mediaAssetId === input.mediaAssetId) && item.type === "IMAGE" && item.isDownloadable &&
-    item.mediaAsset?.siteId === input.siteId && item.mediaAsset.isPrivate && !item.mediaAsset.deletedAt && ["S3", "R2", "SERVER_ASSETS"].includes(item.mediaAsset.driver));
-  if (!full || !validAccess(full) || !validPackage(full.gallery) || !full.gallery.downloadEnabled) return false;
-  const purchase = full.gallery.purchase;
-  if (!purchase || purchase.siteId !== input.siteId || purchase.clientId !== full.clientId || releaseStatus(purchase) !== "RELEASED") return false;
-  return purchase.selections.some(s => s.itemId === input.itemId && (!input.mediaAssetId || s.mediaAssetId === input.mediaAssetId) && s.item.galleryId === input.galleryId && s.item.mediaAssetId === s.mediaAssetId && s.item.isDownloadable && s.mediaAsset.siteId === input.siteId && s.mediaAsset.isPrivate && !s.mediaAsset.deletedAt);
+  const bundle = await getReleasedProofBundle(access.accessToken, input.siteId);
+  return Boolean(bundle?.assets.some(s => s.itemId === input.itemId && (!input.mediaAssetId || s.asset.id === input.mediaAssetId)));
 }
 
 export async function finalizeProofSelection(input: { token: string; itemIds: string[]; expectedTermsVersion: string }): Promise<{ purchaseId: string; checkoutUrl: string | null; status: string }> {

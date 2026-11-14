@@ -42,7 +42,11 @@ test("original authorization enforces client, gallery, immutable asset, tenant, 
   for (const change of [null, ...cases]) {
     const f = fixture(); change?.(f);
     const db = { portfolioGalleryAccess: { findFirst: async () => f.access } };
-    assert.equal(await load(db).authorizeGalleryOriginal(request), change === null);
+    const api = load(db);
+    assert.equal(await api.authorizeGalleryOriginal(request), change === null);
+    const bundle = await api.getReleasedProofBundle("token-a", "site-a");
+    assert.equal(bundle?.assets.length ?? 0, change === null ? 1 : 0);
+    if (bundle) assert.equal(bundle.assets[0].asset.id, f.asset.id);
   }
   const f = fixture();
   assert.equal(await load({ portfolioGalleryAccess: { findFirst: async () => f.access } }).authorizeGalleryOriginal({ ...request, itemId: "not-selected" }), false);
@@ -117,7 +121,7 @@ test("client shoots stay separate from public Portfolio embeds, even with a toke
   await assert.rejects(exports.getPublicGallery({ siteId: "site-a", slug: "shoot", accessToken: "valid-token" }), /Gallery not found/);
 });
 
-test("manual session delivery permits only its active client link and private session originals", async () => {
+test("legacy unconfigured links show preparation and cannot authorize individual originals or bundles", async () => {
   function deliveryFixture() {
     const f = fixture();
     Object.assign(f.gallery, { slug: "wedding", title: "Wedding", description: "Evening", proofingEnabled: false, packageProductId: null, purchasedOrderId: null, purchase: null, bookingId: "booking-a", booking: { siteId: "site-a", clientId: "client-a", status: "COMPLETED" } });
@@ -125,11 +129,13 @@ test("manual session delivery permits only its active client link and private se
   }
   const valid = deliveryFixture();
   const api = load({ portfolioGalleryAccess: { findFirst: async () => valid.access } });
-  assert.equal(await api.authorizeGalleryOriginal({ ...request, mediaAssetId: "asset-a" }), true);
+  assert.equal(await api.authorizeGalleryOriginal({ ...request, mediaAssetId: "asset-a" }), false);
+  assert.equal(await api.getReleasedProofBundle("token-a", "site-a"), null);
   assert.equal(await api.authorizeGalleryOriginal({ ...request, mediaAssetId: "wrong-asset" }), false);
   assert.equal(await api.authorizeGalleryOriginal({ ...request, itemId: "foreign-photo" }), false);
   const delivery = await api.getClientSessionDelivery("token-a");
-  assert.equal(delivery.photos.length, 1); assert.match(delivery.photos[0].download, /variant=DOWNLOAD&download=1/);
+  assert.equal(delivery.title, "Wedding");
+  assert.equal(delivery.photos, undefined);
   const changes = [
     (f: any) => { f.gallery.booking.status = "CANCELED"; },
     (f: any) => { f.gallery.booking.clientId = "other-client"; },
@@ -150,7 +156,7 @@ test("manual session delivery permits only its active client link and private se
     const f = deliveryFixture(); change(f);
     const blocked = load({ portfolioGalleryAccess: { findFirst: async () => f.access } });
     assert.equal(await blocked.authorizeGalleryOriginal(request), false);
-    assert.equal((await blocked.getClientSessionDelivery("token-a")).photos.length, 0);
+    assert.equal(await blocked.getReleasedProofBundle("token-a", "site-a"), null);
   }
   const revoked = load({ portfolioGalleryAccess: { findFirst: async () => null } });
   assert.equal(await revoked.authorizeGalleryOriginal(request), false);
