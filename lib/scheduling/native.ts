@@ -278,13 +278,13 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
       for (const rule of rulesForOwner) {
         for (
           let minutes = fixedWindow?.start ?? rule.startMinutes;
-          minutes >= rule.startMinutes && minutes + service.durationMinutes <= rule.endMinutes && (!fixedWindow || minutes === fixedWindow.start);
+          minutes >= rule.startMinutes && (tier?.unlimitedDuration ? minutes < rule.endMinutes : minutes + service.durationMinutes <= rule.endMinutes) && (!fixedWindow || minutes === fixedWindow.start);
           minutes += slotInterval
         ) {
         const startsAt = addMinutesToZonedDay(start, minutes, settings.timezone);
         if (seenStarts.has(startsAt.getTime())) continue;
         seenStarts.add(startsAt.getTime());
-        const endsAt = frameEnd ?? (fixedWindow ? addMinutesToZonedDay(start, fixedWindow.end, settings.timezone) : new Date(startsAt.getTime() + service.durationMinutes * 60000));
+        const endsAt = tier?.unlimitedDuration ? dayEnd : frameEnd ?? (fixedWindow ? addMinutesToZonedDay(start, fixedWindow.end, settings.timezone) : new Date(startsAt.getTime() + service.durationMinutes * 60000));
         const { bufferedStart, bufferedEnd } = getBufferedWindow(
           startsAt,
           endsAt,
@@ -309,7 +309,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
         }
 
         for (const resource of requiredResources) {
-          if (!(frameDays.length ? timeFrameCovered(frameDays, rules.filter(rule => rule.resourceId === resource.id)) : resourceRuleCoversSlot(rules, resource.id, minutes, service.durationMinutes))) {
+          if (!(frameDays.length ? timeFrameCovered(frameDays, rules.filter(rule => rule.resourceId === resource.id)) : resourceRuleCoversSlot(rules, resource.id, minutes, tier?.unlimitedDuration ? 1 : service.durationMinutes))) {
             reasons.push({
               code: "blockout_conflict",
               message: `${resource.name} is not available for this full time window.`
@@ -473,6 +473,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     }
 
     const endsAt = matchingSlot.endsAt;
+    if (packageSnapshot?.unlimitedDuration) packageSnapshot.durationMinutes = (endsAt.getTime() - input.startsAt.getTime()) / 60000;
     const { bufferedStart, bufferedEnd } = getBufferedWindow(
       input.startsAt,
       endsAt,

@@ -14,7 +14,7 @@ type RecordData = Record<string, any>;
 function load(path: string, mocks: RecordData): RecordData {
   const exports = {};
   const code = ts.transpileModule(readFileSync(path, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  runInNewContext(code, { exports, require: (id: string) => id === "server-only" ? {} : mocks[id] ?? require(id), Date, console });
+  runInNewContext(code, { exports, require: (id: string) => id === "server-only" ? {} : id === "@/lib/timezone" ? load("lib/timezone.ts", {}) : mocks[id] ?? require(id), Date, console });
   return exports;
 }
 function harness(options: { conflict?: boolean; missingService?: boolean; busy?: boolean; hourlyRate?: RecordData; offering?: RecordData } = {}) {
@@ -37,6 +37,14 @@ function harness(options: { conflict?: boolean; missingService?: boolean; busy?:
   return { api, writes };
 }
 const input = { siteId: "site-a", timezone: "America/Chicago", name: "Family photos", startsAt: new Date("2099-01-01T10:00:00Z"), durationMinutes: 45, priceCents: 17550, location: "Client's home", customerName: "Test client", customerEmail: "client@example.test", notes: "", status: "CONFIRMED" };
+
+test("manual unlimited packages reserve until local midnight",async()=>{
+  const h=harness({offering:{coverageItems:[],tiers:[{id:"gold",name:"Gold",durationMinutes:60,unlimitedDuration:true,pricingType:"FLAT_RATE",priceCents:17550,coverageIds:[]}],addOns:[]}});
+  const booking=await h.api.createManualSession({...input,serviceId:"type",tierId:"gold"});
+  assert.equal(booking.endsAt.toISOString(),"2099-01-02T06:00:00.000Z");
+  assert.equal(booking.packageSnapshot.unlimitedDuration,true);
+  assert.equal(booking.packageSnapshot.durationMinutes,1200);
+});
 
 test("bookings use the selected package's pricing even when the session default differs", async () => {
   const hourlyRate = { id: "rate", siteId: "site-a", name: "Photography", amountCents: 12550 };
@@ -112,7 +120,7 @@ test("rejects foreign or inactive session types and connected calendar conflicts
   await assert.rejects(harness({ busy: true }).api.createManualSession(input), /connected calendar/);
 });
 test("manual rescheduling preserves the agreed duration without requiring public slots", async () => {
-  const booking = { id: "booking", siteId: "site-a", isManual: true, status: "CONFIRMED", staffId: null,
+  const booking: RecordData = { id: "booking", siteId: "site-a", isManual: true, status: "CONFIRMED", staffId: null,
     startsAt: new Date("2099-01-01T10:00:00Z"), endsAt: new Date("2099-01-01T10:45:00Z"), resources: [],
     service: { durationMinutes: 90, bufferBeforeMinutes: 0, bufferAfterMinutes: 15 } };
   let checked = false;
@@ -131,6 +139,9 @@ test("manual rescheduling preserves the agreed duration without requiring public
   assert.equal(updated.priceCents, 12300);
   assert.equal(checked, true);
   assert.equal(updated.endsAt.getTime() - updated.startsAt.getTime(), 45 * 60000);
+  booking.packageSnapshot={tierId:"gold",name:"Gold",durationMinutes:1200,unlimitedDuration:true,priceCents:12300,coverage:[],extras:[]};
+  const unlimited=await api.rescheduleBookingWithAvailability({bookingId:"booking",siteId:"site-a",startsAt:new Date("2099-01-02T20:00:00Z")});
+  assert.equal(unlimited.endsAt.toISOString(),"2099-01-03T06:00:00.000Z");
 });
 test("additive session migration preserves existing links and unknown historical prices", async () => {
   const db = new PGlite();

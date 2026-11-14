@@ -33,6 +33,7 @@ const tierSchema = z.object({
   id: itemId,
   name: itemName,
   durationMinutes: z.number().int().min(1).max(maxSessionMinutes),
+  unlimitedDuration: z.boolean().optional(),
   priceCents: z.number().int().min(0).max(999999999).nullable(),
   pricingType: packagePricingTypeSchema.optional(),
   timeFrame: serviceTimeFrameSchema.optional(),
@@ -60,6 +61,7 @@ export const sessionOfferingSchema = z.object({
     if (new Set(linkedIds).size !== linkedIds.length) ctx.addIssue({ code: "custom", message: "Add each library service only once." });
   }
   for (const tier of value.tiers) {
+    if (tier.unlimitedDuration && tier.pricingType !== "FLAT_RATE") ctx.addIssue({ code: "custom", message: "Unlimited duration requires a flat package price." });
     if (tier.pricingType !== "TIME_FRAME" && !value.timeFrame && tier.durationMinutes > 1440) ctx.addIssue({ code: "custom", message: "Duration-based packages can be up to 24 hours." });
     if (tier.pricingType === "TIME_FRAME" && !tier.timeFrame && !value.timeFrame) {
       ctx.addIssue({ code: "custom", message: "Choose a start and end time for every fixed time slot package." });
@@ -140,6 +142,7 @@ export function suggestedSessionAddOns(offering: SessionOffering, tierId?: strin
   const tier = offering.tiers.find(item => item.id === tierId);
   const included = offering.coverageItems.filter(item => tier?.coverageIds.includes(item.id));
   return offering.addOns.filter(extra => {
+    if (tier?.unlimitedDuration && extra.pricingType === "HOURLY") return false;
     const addsUnlimitedAllowance = (["finalPhotos", "locations", "outfitChanges"] as const)
       .some(key => tier?.deliverables?.[key] === null && (extra.deliverables?.[key] ?? 0) > 0);
     return !addsUnlimitedAllowance && !included.some(item => extra.libraryItemId && item.libraryItemId === extra.libraryItemId || item.name.toLowerCase() === extra.name.toLowerCase());
@@ -160,6 +163,7 @@ export const sessionPackageSnapshotSchema = z.object({
   tierId: itemId,
   name: itemName,
   durationMinutes: z.number().int().positive(),
+  unlimitedDuration: z.boolean().optional(),
   priceCents: z.number().int().nonnegative().nullable(),
   pricingType: packagePricingTypeSchema.optional(),
   timeFrame: serviceTimeFrameSchema.optional(),
@@ -205,6 +209,7 @@ export function selectSessionPackage(value: unknown, tierId?: string, addOnIds: 
     tierId: tier.id,
     name: tier.name,
     durationMinutes: tier.durationMinutes,
+    ...(tier.unlimitedDuration ? { unlimitedDuration: true } : {}),
     priceCents: tier.priceCents == null ? null : sessionPriceTotal(tier.priceCents, extras),
     ...(tier.pricingType === "TIME_FRAME" ? { pricingType: tier.pricingType, timeFrame: tier.timeFrame } : {}),
     ...(Object.keys(resolvedDeliverables).length ? { deliverables: resolvedDeliverables } : {}),

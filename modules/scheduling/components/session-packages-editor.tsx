@@ -180,7 +180,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
           <Field label="Package name"><Input id={`${listId}-${tier.id}`} aria-label={`Package ${index + 1} name`} value={tier.name} autoFocus required maxLength={120} onChange={event => updateTier(tier.id, { name: event.target.value })} /></Field>
           <div className={styles.tierNumbers}>
             <ServicePricingFields allowTimeFrame pricingType={tier.pricingType ?? "FLAT_RATE"} hourlyRateId={tier.hourlyRateId ?? ""} rates={rates}
-              onChange={(pricingType, hourlyRateId) => updateTier(tier.id, { pricingType, hourlyRateId: hourlyRateId || null, timeFrame: pricingType === "TIME_FRAME" ? tier.timeFrame ?? { start: "13:00", end: "15:00", endsNextDay: false } : undefined })} onRateSaved={onRateSaved}
+              onChange={(pricingType, hourlyRateId) => updateTier(tier.id, { pricingType, unlimitedDuration: pricingType === "FLAT_RATE" ? tier.unlimitedDuration : undefined, hourlyRateId: hourlyRateId || null, timeFrame: pricingType === "TIME_FRAME" ? tier.timeFrame ?? { start: "13:00", end: "15:00", endsNextDay: false } : undefined })} onRateSaved={onRateSaved}
               priceField={<Field label="Price (USD)">
                 <Input aria-label={`${tier.name} price (USD)`} type="number" inputMode="decimal" min="0" max="9999999.99" step="0.01"
                   required={isNew || multi}
@@ -199,26 +199,26 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
               </Select></Field>
               <Field label="Start Time"><TimeInput className="ui-input" required value={tier.timeFrame?.start ?? ""} onValueChange={start => updateTier(tier.id, { timeFrame: editTimeFrame(tier.timeFrame ?? { start: "", end: "" }, { start }) })} /></Field>
               <Field label="End Time"><TimeInput className="ui-input" required value={tier.timeFrame?.end ?? ""} onValueChange={end => updateTier(tier.id, { timeFrame: editTimeFrame(tier.timeFrame ?? { start: "", end: "" }, { end }) })} /></Field>
-            </div> : <div className={styles.duration} role="group" aria-labelledby={durationLabelId}>
+            </div> : <div className={styles.allowance}><div className={styles.duration} role="group" aria-labelledby={durationLabelId}>
               <span className="ui-field-label" id={durationLabelId}>Duration</span>
               <div className={styles.durationControls}>
-                <Select compact aria-label="Hours" value={hours} onChange={event => {
+                <Select compact aria-label="Hours" disabled={tier.unlimitedDuration} value={hours} onChange={event => {
                   const nextHours = Number(event.target.value);
                   const nextMinutes = nextHours === maxDurationHours ? 0 : minutes;
                   updateTier(tier.id, { durationMinutes: String(nextHours * 60 + nextMinutes) });
                 }}>
                   {durationHours.map(hour => <option key={hour} value={hour}>{hour} H</option>)}
                 </Select>
-                <Select compact aria-label="Minutes" required disabled={hours === maxDurationHours}
+                <Select compact aria-label="Minutes" required disabled={tier.unlimitedDuration || hours === maxDurationHours}
                   value={totalMinutes === 0 ? "" : minutes}
                   onChange={event => updateTier(tier.id, { durationMinutes: String(hours * 60 + Number(event.target.value)) })}>
                   <option value={hours === 0 ? "" : 0}>{hours === 0 ? "— M" : "0 M"}</option>
                   {durationMinutesOfHour.slice(1).map(minute => <option key={minute} value={minute}>{minute} M</option>)}
                 </Select>
               </div>
-            </div>}
+            </div><Switch label="Unlimited" aria-label="Unlimited duration" variant="inline" checked={Boolean(tier.unlimitedDuration)} onChange={event => updateTier(tier.id, { unlimitedDuration: event.target.checked, ...(event.target.checked ? { pricingType: "FLAT_RATE", hourlyRateId: null, timeFrame: undefined, durationMinutes: tier.durationMinutes === "0" ? "60" : tier.durationMinutes } : {}) })} /></div>}
             {deliverableFields.map(([key, label]) => (
-              <div key={key}>
+              <div className={styles.allowance} key={key}>
               <Field label={label}>
                 <Input type="number" inputMode="numeric" min="0" max={10000} step="1" disabled={tier.deliverables?.[key] === null}
                   value={tier.deliverables?.[key] ?? ""}
@@ -238,6 +238,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
               </div>
             ))}
           </div>
+          {tier.unlimitedDuration && <p className="muted-text">Reserves the rest of the day from the appointment start time.</p>}
           </section>
           <section className={styles.packageSection} aria-labelledby={`${listId}-booking-${tier.id}`}>
           <h3 className="ui-zero" id={`${listId}-booking-${tier.id}`}>Booking settings</h3>

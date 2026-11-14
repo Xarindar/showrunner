@@ -361,7 +361,7 @@
   function renderPackages() {
     const service = serviceById(state.serviceId);
     document.querySelector("[data-package-list]").innerHTML = (service?.packages || []).map(pack => `<tr>
-      <td>${escapeHtml(pack.name)}</td><td>${pack.durationMinutes} min</td><td>${escapeHtml(formatPrice(pack.priceCents))}</td>
+      <td>${escapeHtml(pack.name)}</td><td>${pack.unlimitedDuration ? "Unlimited" : `${pack.durationMinutes} min`}</td><td>${escapeHtml(formatPrice(pack.priceCents))}</td>
       <td>${packageDetails(pack)}</td><td><button class="booking-button button button--primary" type="button" data-package-id="${escapeAttribute(pack.id)}">Select ${escapeHtml(pack.name)}</button></td></tr>`).join("");
     document.querySelectorAll("[data-package-id]").forEach(button => button.addEventListener("click", () => {
       state.tierId = button.dataset.packageId;
@@ -1065,7 +1065,7 @@
     if (!pack) return service;
     const extras = (pack.addOns || []).filter(extra => state.addOnIds.includes(extra.id));
     const priceCents = pack.priceCents == null ? null : pack.priceCents + extras.reduce((total, extra) => total + extra.priceCents * (state.addOnQuantities[extra.id] || 1), 0);
-    return { ...service, name: `${service.name} — ${pack.name}`, durationMinutes: pack.durationMinutes, priceCents, addOns: pack.addOns, extras, deliverables: pack.deliverables, coverage: pack.coverage };
+    return { ...service, name: `${service.name} — ${pack.name}`, durationMinutes: pack.durationMinutes, unlimitedDuration: pack.unlimitedDuration, priceCents, addOns: pack.addOns, extras, deliverables: pack.deliverables, coverage: pack.coverage };
 
   }
 
@@ -1116,7 +1116,7 @@
   }
 
   function summaryMarkup(service, slot, bookingId) {
-    const rows = [["Length", `${service.durationMinutes} minutes`]];
+    const rows = [["Length", service.unlimitedDuration ? "Unlimited — rest of day reserved" : `${service.durationMinutes} minutes`]];
     for (const extra of service.extras || []) rows.push([extra.name, `${state.addOnQuantities[extra.id] || 1} × ${formatPrice(extra.priceCents)}`]);
     if (slot.staffName) rows.push(["Provider", slot.staffName]);
     if (bookingId) rows.push(["Reference", bookingId]);
@@ -1126,7 +1126,7 @@
       <h3 class="booking-summary-service">${escapeHtml(service.name)}</h3>
       <p class="booking-summary-when">
         <strong>${escapeHtml(formatLongDate(slot.startsAt))}</strong>
-        <span>${escapeHtml(`${formatTime(slot.startsAt)} – ${formatTime(slot.endsAt)}`)}</span>
+        <span>${escapeHtml(`${formatTime(slot.startsAt)} – ${service.unlimitedDuration ? "end of day" : formatTime(slot.endsAt)}`)}</span>
       </p>
       <dl class="booking-summary-rows">
         ${rows

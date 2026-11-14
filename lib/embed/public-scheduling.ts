@@ -135,7 +135,7 @@ export function serializePublicService(service: PublicService, categoryRecord?: 
   const offering = readSessionOffering(service.sessionOffering);
   const packages = offering?.tiers.map(tier => {
     const snapshot = selectSessionPackage(offering, tier.id)!;
-    return { id: tier.id, name: tier.name, durationMinutes: tier.durationMinutes, priceCents: snapshot.priceCents,
+    return { id: tier.id, name: tier.name, durationMinutes: tier.durationMinutes, unlimitedDuration: tier.unlimitedDuration, priceCents: snapshot.priceCents,
       deliverables: snapshot.deliverables, coverage: snapshot.coverage,
       addOns: suggestedSessionAddOns(offering, tier.id).map(item => ({ id: item.id, name: item.name,
         priceCents: sessionAddOnPriceCents(item, tier.durationMinutes), pricingType: item.pricingType, deliverables: item.deliverables })) };

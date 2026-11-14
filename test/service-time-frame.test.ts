@@ -196,3 +196,15 @@ test("package availability uses the selected duration and rejects another servic
   assert.equal(long[0].endsAt.getTime()-long[0].startsAt.getTime(),180*60000);
   await assert.rejects(h.adapter.getAvailableSlots("service",date,{tierId:"foreign"}),/Choose a package/);
 });
+
+test("unlimited duration offers available starts and reserves the rest of the business day",async()=>{
+  const h=harness();
+  h.state.service.sessionOffering={coverageItems:[],tiers:[{id:"gold",name:"Gold",durationMinutes:60,unlimitedDuration:true,pricingType:"FLAT_RATE",priceCents:20000,coverageIds:[]}],addOns:[]};
+  h.state.rules=[{startMinutes:540,endMinutes:720}];
+  const date=new Date("2030-11-13T18:00:00Z");
+  const slots=await h.adapter.getAvailableSlots("service",date,{tierId:"gold"});
+  assert.equal(slots.length,6);
+  assert(slots.every(slot=>slot.endsAt.toISOString()==="2030-11-14T06:00:00.000Z"));
+  h.state.bookings=[{startsAt:new Date("2030-11-14T02:00:00Z"),endsAt:new Date("2030-11-14T03:00:00Z"),staffId:null,resources:[],service:{resourceAssignments:[]}}];
+  assert.equal((await h.adapter.getAvailableSlots("service",date,{tierId:"gold"})).length,0,"Later appointments prevent double booking");
+});

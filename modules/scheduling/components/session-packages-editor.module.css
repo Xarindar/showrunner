@@ -15,6 +15,8 @@
 .tierBody, .tierFields, .tierServices { display: grid; gap: var(--sd-space-12); min-width: 0; }
 .tierNumbers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sd-space-12); }
 .duration { display: grid; align-content: start; gap: var(--sd-space-8); min-width: 0; }
+.allowance { display: grid; align-content: start; gap: var(--sd-space-12); min-width: 0; }
+.allowance :global(.ui-switch-inline) { justify-content: space-between; width: 100%; }
 .editor .tierNumbers input[type="number"] { margin-top: 0; }
 .tierBody {
   box-sizing: border-box;

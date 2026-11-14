@@ -46,10 +46,15 @@ try {
   await page.getByRole('button',{name:'Done',exact:true}).click();
   await page.getByRole('button',{name:'Edit Gold',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Edit Gold'});
+  await dialog.getByRole('switch',{name:'Unlimited duration',exact:true}).check();
+  assert.equal(await dialog.getByRole('combobox',{name:'Hours',exact:true}).isDisabled(),true);
   for(const name of ['photos','locations','outfit changes']) await dialog.getByRole('switch',{name:name==='photos'?'Unlimited final photos':`Unlimited ${name}`,exact:true}).check();
   draft=JSON.parse(await page.locator('input[name=sessionOffering]').inputValue());
   assert.deepEqual(draft.tiers[0].deliverables,{finalPhotos:null,locations:null,outfitChanges:null});
   assert.equal(draft.tiers[1].deliverables,undefined);
+  assert.equal(draft.tiers[0].unlimitedDuration,true);
+  const gaps=await dialog.locator('[class*=allowance]').evaluateAll(items=>items.map(item=>parseFloat(getComputedStyle(item).rowGap)));
+  assert.equal(gaps.length,4);assert(gaps.every(gap=>gap>=12));
   for(const width of [1440,1000,390]){
     await page.setViewportSize({width,height:1000});
     await page.waitForTimeout(100);
