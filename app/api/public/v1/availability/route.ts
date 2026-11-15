@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const diagnostics = await getPublicSchedulingDiagnostics({
       date: searchParams.get("date"),
+      tierId: searchParams.get("tierId") || undefined,
       resourceId: searchParams.get("resourceId") || undefined,
       serviceId: searchParams.get("serviceId"),
       siteId: context.siteId,

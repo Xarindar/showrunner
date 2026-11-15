@@ -4,7 +4,7 @@ import { ResponsiveTableFrame } from "./responsive-table";
 
 type TableProps = TableHTMLAttributes<HTMLTableElement> & {
   tableClassName?: string;
-  mobileLayout?: "cards" | "columns";
+  mobileLayout?: "columns";
 };
 
 export function Table({ className, tableClassName, mobileLayout, ...props }: TableProps) {

@@ -192,8 +192,6 @@
   --data-table-row-height: var(--sd-layout-table-row-height);
   --data-table-cell-x: var(--sd-space-12);
   --data-table-compact-cell-x: var(--sd-space-8);
-  --data-table-mobile-columns: 2;
-  --data-table-mobile-gap: var(--sd-space-12);
   --data-table-cell-y: var(--sd-space-8);
   --admin-canvas: var(--sd-color-canvas);
   --admin-surface: var(--sd-color-surface);

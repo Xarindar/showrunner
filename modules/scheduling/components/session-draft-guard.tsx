@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { useNotify } from "@/components/ui/notifications";
 import { Modal } from "@/components/ui/modal";
 
 export function revealInvalidSessionField(event: FormEvent<HTMLFormElement>) {
@@ -22,8 +23,7 @@ export function SessionDraftGuard({ formId }: { formId: string }) {
   const allowReload = useRef(false);
   const [confirmReload, setConfirmReload] = useState(false);
   const [reloading, setReloading] = useState(false);
-  const [photoWarning, setPhotoWarning] = useState(false);
-  const warningRef = useRef<HTMLParagraphElement>(null);
+  const notify = useNotify();
   const { pending } = useFormStatus();
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export function SessionDraftGuard({ formId }: { formId: string }) {
       if (event.target === form || !event.submitter || !form.contains(event.submitter) || !changed()) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      setPhotoWarning(true);
+      notify("Save your session and package changes before changing the booking photo. Your edits are still here.", "danger");
     };
     window.addEventListener("beforeunload", leave);
     document.addEventListener("click", followLink, true);
@@ -62,9 +62,8 @@ export function SessionDraftGuard({ formId }: { formId: string }) {
       document.removeEventListener("click", followLink, true);
       document.removeEventListener("submit", submitRelatedForm, true);
     };
-  }, [formId, pending]);
+  }, [formId, pending, notify]);
 
-  useEffect(() => { if (photoWarning) warningRef.current?.focus(); }, [photoWarning]);
   function reloadPreview() {
     allowReload.current = true;
     setConfirmReload(false);
@@ -73,7 +72,6 @@ export function SessionDraftGuard({ formId }: { formId: string }) {
   }
 
   return <>
-    {photoWarning && <p className="error" ref={warningRef} role="alert" tabIndex={-1}>Save your session and package changes before changing the booking photo. Your edits are still here.</p>}
     {process.env.NODE_ENV === "development" && <>
       <Button type="button" variant="secondary" disabled={reloading} onClick={() => {
         const form = document.getElementById(formId);

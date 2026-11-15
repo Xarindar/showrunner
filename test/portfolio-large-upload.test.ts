@@ -86,6 +86,7 @@ function uploadHarness(directory: string) {
   }, directory);
   const scopedWhere = async (_user: unknown, siteId: string, where: Record<string, unknown>) => ({ ...where, siteId });
   const actions = loadMocked<typeof import("../modules/portfolio/client-actions")>("modules/portfolio/client-actions.ts", {
+    "@/lib/portfolio/purchases": { releaseAllSessionPhotos: async () => { throw new Error("Uploads must never release photos"); } },
     "@/lib/email": { queueEmail: async () => { throw new Error("Uploads must never send email"); } },
     "@/lib/env": { publicAppBaseUrl: () => "https://admin.example.test" },
     "next/cache": { revalidatePath: () => {} },

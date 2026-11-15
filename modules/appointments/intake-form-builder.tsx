@@ -11,7 +11,7 @@ import { moveFormField } from "@/lib/scheduling/form-fields";
 import styles from "./intake-form-builder.module.css";
 
 type FormDraft = { name: string; rules: BookingRule[]; isDefault: boolean };
-type Props = { value: FormDraft; onChange: (value: FormDraft) => void; onSave: () => void; onCancel: () => void; pending: boolean; error: string };
+type Props = { value: FormDraft; onChange: (value: FormDraft) => void; onSave: () => void; onCancel: () => void; pending: boolean };
 const fieldTypes = [
   { type: "TEXT", label: "Text answer", icon: AlignLeft },
   { type: "RADIO", label: "Single choice", icon: CircleDot },
@@ -25,7 +25,7 @@ const fieldWidths = [
   { value: "FULL", label: "Full width", fraction: 1 }
 ] as const;
 
-export function IntakeFormBuilder({ value, onChange, onSave, onCancel, pending, error }: Props) {
+export function IntakeFormBuilder({ value, onChange, onSave, onCancel, pending }: Props) {
   const [selectedId, setSelectedId] = useState(value.rules[0]?.id ?? "");
   const [dragging, setDragging] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -101,7 +101,6 @@ export function IntakeFormBuilder({ value, onChange, onSave, onCancel, pending, 
         onSave();
       }}>{pending ? "Saving…" : "Save form"}</Button>
     </header>
-    {error && <p className={styles.error} role="alert">{error}</p>}
     <p className="ui-sr-only" id={instructionsId}>Drag a field by its handle to reorder it. With a handle focused, use the up and down arrow keys to move the field.</p>
     <p className="ui-sr-only" role="status">{announcement}</p>
     <fieldset className={styles.layout} disabled={pending}>

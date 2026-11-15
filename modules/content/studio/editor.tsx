@@ -37,7 +37,7 @@ export function Fields({ headerId, canUpload = false, fixedRows = false, assetBa
       return <div key={key} className={styles.contentList}>
         {key !== "slides" && <h3>{field.label}</h3>}
         {rows.map((row, index) => <details key={String(row.id)} className={styles.contentGroup} open onFocusCapture={() => { if (key === "slides") window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: row.id } })); }} onClick={() => { if (key === "slides") window.dispatchEvent(new CustomEvent("showrunner:focus-item", { detail: { id: row.id } })); }}>
-          <summary>{key === "slides" ? `Header ${index + 1}` : String(row.name || row.title || row.author || row.question || choices.find(choice => choice.id === row.categoryId)?.label || `${field.label === "Images" ? "Image" : "Item"} ${index + 1}`)}</summary>
+          <summary>{key === "slides" ? `Header ${index + 1}` : String(row.name || row.title || row.author || row.question || choices.find(choice => choice.id === (row.categoryId || row.referenceId))?.label || `${field.label === "Images" ? "Image" : "Item"} ${index + 1}`)}</summary>
           <div className={styles.groupFields}><Fields headerId={headerId} canUpload={canUpload} assetBaseUrl={assetBaseUrl} linkOptions={linkOptions} fields={field.fields!} value={row} prefix={`${id}-${row.id}`} choices={choices} onChange={next => update(rows.map((current, i) => i === index ? next : current))} />
           {!fixedRows && <Button variant="secondary" className={styles.removeItem} type="button" disabled={rows.length <= minimum} onClick={() => update(rows.filter((_, i) => i !== index))}>Remove {key === "slides" ? "header" : field.label === "Team member" ? "team member" : "item"}</Button>}</div>
         </details>)}

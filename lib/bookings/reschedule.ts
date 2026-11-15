@@ -3,10 +3,12 @@ import "server-only";
 import { BookingStatus, Prisma } from "@prisma/client";
 import { blockoutConflictWhere, bookingConflictWhere, getBufferedWindow } from "@/lib/bookings/conflicts";
 import { prisma } from "@/lib/prisma";
+import { sessionPackageSnapshotSchema } from "@/lib/scheduling/session-offering";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import { checkManualSessionTime } from "@/lib/bookings/manual";
 import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
 import { getSiteSettingsForSite } from "@/lib/site";
+import { getZonedDayBounds } from "@/lib/timezone";
 
 export async function rescheduleBookingWithAvailability(input: {
   bookingId: string;
@@ -34,10 +36,11 @@ export async function rescheduleBookingWithAvailability(input: {
     throw new Error("Choose a valid new appointment time.");
   }
 
-  if (booking.isManual) {
+  const unlimitedDuration = sessionPackageSnapshotSchema.safeParse(booking.packageSnapshot).data?.unlimitedDuration;
+  if (booking.isManual || unlimitedDuration) {
     if (input.startsAt <= new Date()) throw new Error("Choose a future date and time.");
-    const endsAt = new Date(input.startsAt.getTime() + booking.endsAt.getTime() - booking.startsAt.getTime());
     const settings = await getSiteSettingsForSite(booking.siteId);
+    const endsAt = unlimitedDuration ? getZonedDayBounds(input.startsAt, settings.timezone).end : new Date(input.startsAt.getTime() + booking.endsAt.getTime() - booking.startsAt.getTime());
     const buffered = getBufferedWindow(input.startsAt, endsAt, booking.service.bufferBeforeMinutes, booking.service.bufferAfterMinutes);
     const busy = await listGoogleBusyWindows({ siteId: booking.siteId, timeZone: settings.timezone, staffIds: booking.staffId ? [booking.staffId] : [], start: buffered.bufferedStart, end: buffered.bufferedEnd });
     if (busy.busy.some(window => window.start < buffered.bufferedEnd && window.end > buffered.bufferedStart)) throw new Error("That time is busy on your connected calendar.");
@@ -51,6 +54,8 @@ export async function rescheduleBookingWithAvailability(input: {
   }
 
   const diagnostics = await nativeSchedulingAdapter.getSlotDiagnostics(booking.serviceId, input.startsAt, {
+    siteId: booking.siteId,
+    tierId: booking.service.sessionOffering ? sessionPackageSnapshotSchema.safeParse(booking.packageSnapshot).data?.tierId : undefined,
     excludeBookingId: booking.id,
     staffId: booking.staffId || undefined
   });

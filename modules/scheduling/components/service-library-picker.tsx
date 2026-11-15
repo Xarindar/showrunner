@@ -15,7 +15,7 @@ import { ServicePricingFields } from "./service-pricing-fields";
 import { useNotify } from "@/components/ui/notifications";
 
 type IncludedItem = SessionOffering["coverageItems"][number];
-type PackageServices = Pick<SessionOffering["tiers"][number], "coverageIds">;
+type PackageServices = Pick<SessionOffering["tiers"][number], "coverageIds"> & { name?: string };
 
 export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onClose, embedded = false, rates, onRateSaved, optional = false, packageServices }: {
   rates: HourlyRate[]; onRateSaved: (rate: HourlyRate) => void;
@@ -80,11 +80,11 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
   async function save() {
     const parsed = serviceLibraryInputSchema.safeParse({ ...form, deliverables: deliverableChanges, availableAsAddOn });
     if (!parsed.success) {
-      setError(parsed.error.issues[0].message);
+      notify(parsed.error.issues[0].message, "danger");
       document.getElementById(`${id}-${String(parsed.error.issues[0].path[0])}`)?.focus();
       return;
     }
-    if (optional && !isServiceAddOn(parsed.data)) { setError("Enable Available as an add-on and set its price before adding it to Suggested Add-Ons."); return; }
+    if (optional && !isServiceAddOn(parsed.data)) { notify("Enable Available as an add-on and set its price before adding it to Suggested Add-Ons.", "danger"); return; }
     setSaving(true);
     setError("");
     try {
@@ -119,7 +119,7 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
       </div>
       <div className={`ui-dialog-scroll ${styles.results}`} aria-busy={loading} aria-label="Library services">
         {packageServices && selectedItems.length > 0 && <fieldset className={styles.sessionServices}>
-            <legend>Services in this session</legend>
+            <legend>Choose services for {packageServices.name || "this package"}</legend>
             {selectedItems.map(item => (
               <label key={item.id} className={styles.option}>
                 <input type="checkbox" checked={coverageIds.includes(item.id)}
@@ -137,10 +137,14 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
             {(q || category || tag) && <Button type="button" variant="ghost" onClick={() => { setQ(""); setCategory(""); setTag(""); setPage(1); setLoading(true); }}>Clear filters</Button>}
           </div> : results.items.map(item => {
             const unavailable = optional && !isServiceAddOn(item);
-            const added = selectedItems.some(selected => selected.libraryItemId === item.id || selected.name.toLowerCase() === item.name.toLowerCase());
-            const checked = picked.some(selected => selected.id === item.id);
+            const existing = selectedItems.find(selected => selected.libraryItemId === item.id || selected.name.toLowerCase() === item.name.toLowerCase());
+            const added = Boolean(existing && !packageServices);
+            const checked = packageServices && existing ? coverageIds.includes(existing.id) : picked.some(selected => selected.id === item.id);
             return <label key={item.id} className={styles.option} data-added={added}>
-              <input type="checkbox" aria-label={`Select ${item.name}`} checked={added || checked} disabled={loading || added || unavailable || (!checked && picked.length >= remaining)} onChange={event => setPicked(current => event.target.checked ? [...current, item] : current.filter(selected => selected.id !== item.id))} />
+              <input type="checkbox" aria-label={`Select ${item.name}`} checked={added || checked} disabled={loading || added || unavailable || (!existing && !checked && picked.length >= remaining)} onChange={event => {
+                if (packageServices && existing) setCoverageIds(current => event.target.checked ? [...current, existing.id] : current.filter(id => id !== existing.id));
+                else setPicked(current => event.target.checked ? [...current, item] : current.filter(selected => selected.id !== item.id));
+              }} />
               <span className={styles.serviceCopy}><strong>{item.name}</strong><span className={styles.description}>{item.description || "No description yet"}</span>
                 {(item.category || item.tags.length > 0) && <span className={styles.metadata}>{[item.category, ...item.tags.map(value => `#${value}`)].filter(Boolean).join(" · ")}</span>}
               </span>
@@ -176,7 +180,6 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
         </details>
         <Field label="Category" hint="For example, Weddings or Portraits."><Input id={`${id}-category`} value={form.category} maxLength={120} disabled={saving} onChange={event => setForm({ ...form, category: event.target.value })} /></Field>
         <Field label="Tags" hint="Separate tags with commas."><Input id={`${id}-tags`} value={form.tags} maxLength={1500} disabled={saving} onChange={event => setForm({ ...form, tags: event.target.value })} /></Field>
-        {error && <p id={`${id}-error`} tabIndex={-1} role="alert" className={styles.error}>{error}</p>}
       </div>
       <footer className={styles.footer}><span className={styles.hint}>Library changes are saved immediately.</span><div className="module-modal-actions">
         <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>Cancel</Button>

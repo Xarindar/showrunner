@@ -658,7 +658,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
               toolbarLabel="Email preview tools"
             />
           </div>
-          {preview?.error ? <div className="error">{preview.error}</div> : null}
+          {preview?.error ? <Notification tone="danger">{preview.error}</Notification> : null}
           {preview?.rendered ?
           <div className="subpanel stack">
               <div>

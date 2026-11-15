@@ -60,6 +60,10 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
 
   if (!booking) notFound();
   const packageSnapshot = sessionPackageSnapshotSchema.safeParse(booking.packageSnapshot);
+  const requirements = booking.bookingRequirementsSnapshot;
+  const photoConsent = requirements && typeof requirements === "object" && !Array.isArray(requirements)
+    ? requirements.photoMarketingConsent
+    : undefined;
   const formAttachments = await prisma.formAttachment.findMany({
     where: {
       siteId: settings.siteId,
@@ -146,6 +150,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
             {booking.notes ? <tr><th scope="row" data-mobile-column>Customer notes</th><td data-mobile-column>{booking.notes}</td></tr> : null}
             {booking.intakeResponse ? <tr><th scope="row" data-mobile-column>Intake response</th><td data-mobile-column>{booking.intakeResponse}</td></tr> : null}
             <tr><th scope="row" data-mobile-column>Policy accepted</th><td data-mobile-column>{booking.policyAccepted ? "Yes" : "No"}</td></tr>
+            {typeof photoConsent === "boolean" && <tr><th scope="row" data-mobile-column>Photo marketing consent</th><td data-mobile-column>{photoConsent ? "Yes" : "No"}</td></tr>}
           </tbody>
         </Table>
       </section>
