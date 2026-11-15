@@ -17,3 +17,7 @@ Before changing admin UI, read [the token developer guide](developer-docs/admin-
 All admin action feedback (save errors, form submission errors, successes, warnings, and sign-in failures) must use the single toast system in `components/ui/notifications`: `useNotify()` for client handlers or `Notification` for action-state/redirect results. Never add inline error/success paragraphs, banners, custom alerts, or another toast provider inside a module. The admin layout owns the provider. Pass `eventKey={state}` with `useActionState` so repeated failures announce again.
 
 Field-specific guidance may stay attached to its control with `aria-invalid`/`aria-describedby`. Persistent upload results, failed previews, unavailable-resource states, and their retry controls are task content, not action notifications. Do not duplicate a toast as an inline banner. When fixing feedback, search related screens for the same pattern and test repeated errors and notifications inside dialogs.
+
+## One production release source
+
+Base Showrunner, Cottage616, and Jazzr all deploy `Xarindar/showrunner` `main`. Merge verified changes into `main` before production deployment; feature branches and old worktrees are not independent release sources. Before consolidating a release, compare the current live releases and outstanding branches so existing booking, terms, editor, and delivery features are retained. Jazzr and Cottage public sites each follow their own repository's `main`.
