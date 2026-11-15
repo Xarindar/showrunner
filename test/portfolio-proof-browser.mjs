@@ -31,23 +31,13 @@ const page=await context.newPage(); const errors=[]; page.on('pageerror',e=>erro
 await context.route('**/*',async route=>{const req=route.request();const url=new URL(req.url());
 if(url.hostname==='pay.example') return route.fulfill({contentType:'text/html',body:'<h1>Synthetic payment provider</h1>'});
 if(url.pathname.startsWith('/proof-delivery/') && url.pathname.endsWith('.png')) return route.fulfill({contentType:'image/png',body:readFileSync(resolve(root,'public'+url.pathname))});
-if(url.hostname==='showrunner-production-a8f9.up.railway.app' && url.pathname==='/proof-export'){
-  assert.equal(url.searchParams.get('signature'),'synthetic-export');
-  assert(!req.url().includes('synthetic-private-token'));
-  assert(!req.headers().referer);
-  return route.fulfill({contentType:'text/html',body:`<button onclick="this.textContent='Drive save started'">Save to Google Drive</button>`});
-}
 if(url.pathname.startsWith('/api/portfolio/proofs/')) {
 if(revoked) return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({error:'This proof link is unavailable.'})});
-if(url.pathname.endsWith('/bundle') && url.searchParams.get('inline')==='1') {
-  assert.equal(purchase.bundle.state,'READY');
-  return route.fulfill({json:{path:'/proof-export?inline=1&signature=synthetic-export'}});
-}
 if(url.pathname.endsWith('/bundle') && req.method()==='POST') {
   purchase={...purchase,bundle:{state:'BUILDING',sizeBytes:null}};
   return route.fulfill({status:202});
 }
-if(req.method()==='POST'){postCount++; assert.equal(req.headers()['x-proof-request'],'1'); const {itemIds}=req.postDataJSON(); const extras=Math.max(0,itemIds.length-2); purchase={id:'synthetic-purchase',status:extras?'PENDING':'RELEASED',canRetryCheckout:extras>0,selectedItemIds:itemIds,includedCount:2,extraCount:extras,extraImagePriceCents:2500,totalCents:extras*2500,currency:'USD',checkoutUrl:extras?'https://pay.example/checkout':null,bundle:null}; await new Promise(r=>setTimeout(r,200));return route.fulfill({contentType:'application/json',body:JSON.stringify({purchaseId:purchase.id,status:purchase.status,checkoutUrl:purchase.checkoutUrl})}); }
+if(req.method()==='POST'){postCount++; assert.equal(req.headers()['x-proof-request'],'1'); const {itemIds}=req.postDataJSON(); const extras=Math.max(0,itemIds.length-2); purchase={id:'synthetic-purchase',downloadExpiresAt:new Date(Date.now()+14*86400000).toISOString(),downloadExpiresLabel:"November 28, 2026 at 1:00 PM CST",status:extras?'PENDING':'RELEASED',canRetryCheckout:extras>0,selectedItemIds:itemIds,includedCount:2,extraCount:extras,extraImagePriceCents:2500,totalCents:extras*2500,currency:'USD',checkoutUrl:extras?'https://pay.example/checkout':null,bundle:null}; await new Promise(r=>setTimeout(r,200));return route.fulfill({contentType:'application/json',body:JSON.stringify({purchaseId:purchase.id,status:purchase.status,checkoutUrl:purchase.checkoutUrl})}); }
 return route.fulfill({contentType:'application/json',body:JSON.stringify(view())}); }
 if(url.pathname.startsWith('/api/portfolio/galleries/')){const id=url.pathname.split('/').at(-1);const [w,h]=id==='photo-1'?[1200,600]:id==='photo-2'?[600,900]:id==='photo-3'?[1600,500]:[640,800];return route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="640" height="800" fill="#d4d9d1"/><text x="320" y="370" fill="#3e4b40" font-family="Arial" font-size="28" text-anchor="middle">Synthetic ${id}</text><text x="320" y="425" fill="#3e4b40" font-family="Arial" font-size="18" text-anchor="middle">WATERMARKED PROOF</text></svg>`});}
 if(url.hostname==='proof-fixture.example')return route.fulfill({contentType:'text/html',body:html()});
@@ -221,17 +211,8 @@ await page.getByRole('heading',{name:'Your photos are ready!',exact:true}).waitF
 assert.equal(await page.getByRole('link',{name:'Download ZIP',exact:true}).count(),1);
 await page.getByText('Taylor, thank you for choosing Jazzr Photography. We hope you enjoyed your shoot and love your photos!', {exact:true}).waitFor();
 assert.equal(await page.getByRole('navigation',{name:'Contact Jazzr Photography'}).getByRole('link').count(),3);
-const deliveryUrl = page.url();
-const driveFrame = page.locator('iframe[title="Save to Google Drive"]');
-const drive = driveFrame.contentFrame();
-await page.getByText('Save to Google Drive',{exact:true}).waitFor();
-const driveBounds = await driveFrame.boundingBox();
-const zipBounds = await page.getByRole('link',{name:'Download ZIP',exact:true}).boundingBox();
-assert.equal(driveBounds.width,zipBounds.width,'Drive fills the same width as Download ZIP');
-assert.equal(driveBounds.height,zipBounds.height,'Drive matches the height of Download ZIP');
-await drive.getByRole('button',{name:'Save to Google Drive',exact:true}).click();
-await drive.getByRole('button',{name:'Drive save started',exact:true}).waitFor();
-assert.equal(page.url(),deliveryUrl,'Drive save stays on the delivery page');
+assert.equal(await page.getByRole('button',{name:'Save to Google Drive',exact:true}).count(),0);
+assert.equal(await page.locator('iframe').count(),0,'Delivery does not load the Google widget');
 await page.getByRole('button',{name:'Share',exact:true}).click();
 assert.deepEqual(await page.evaluate(()=>window.sharedProof), {
   text:'Hey, the pictures from Jazzr Photography are ready! Check them out here!',

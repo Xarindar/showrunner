@@ -151,7 +151,7 @@ test("proof UI uses watermarked media routes without originals before finalizati
 });
 
 test("proof UI locks a pending selection and withholds even supplied download URLs", () => {
-  const html = clientMarkup({ ...initialView, purchase: { id: "purchase", status: "PENDING", canRetryCheckout: true, selectedItemIds: ["photo-1"], includedCount: 2, extraCount: 0, extraImagePriceCents: 2500, totalCents: 0, currency: "USD", checkoutUrl: null, bundle: null } });
+  const html = clientMarkup({ ...initialView, purchase: { id: "purchase", downloadExpiresAt: "2026-11-28T19:00:00Z", downloadExpiresLabel: "November 28, 2026 at 1:00 PM CST", status: "PENDING", canRetryCheckout: true, selectedItemIds: ["photo-1"], includedCount: 2, extraCount: 0, extraImagePriceCents: 2500, totalCents: 0, currency: "USD", checkoutUrl: null, bundle: null } });
   assert.match(html, /Awaiting payment/);
   assert.match(html, /Resume or renew checkout/);
   assert.doesNotMatch(html, /original-private|>Next</);
@@ -159,21 +159,21 @@ test("proof UI locks a pending selection and withholds even supplied download UR
 });
 
 test("finalizing replaces the gallery with preparation, then one ZIP and a share action", () => {
-  const purchase = { id: "purchase", status: "RELEASED", canRetryCheckout: false, selectedItemIds: ["photo-1"], includedCount: 2, extraCount: 0, extraImagePriceCents: 2500, totalCents: 0, currency: "USD", checkoutUrl: null };
+  const purchase = { id: "purchase", downloadExpiresAt: "2026-11-28T19:00:00Z", downloadExpiresLabel: "November 28, 2026 at 1:00 PM CST", status: "RELEASED", canRetryCheckout: false, selectedItemIds: ["photo-1"], includedCount: 2, extraCount: 0, extraImagePriceCents: 2500, totalCents: 0, currency: "USD", checkoutUrl: null };
   const preparing = clientMarkup({ ...initialView, purchase: { ...purchase, bundle: { state: "BUILDING", sizeBytes: null } } });
   assert.match(preparing, /Preparing your photos/);
   assert.doesNotMatch(preparing, /Download ZIP|Photo proofs/);
   const ready = clientMarkup({ ...initialView, purchase: { ...purchase, bundle: { state: "READY", sizeBytes: 12e6 } } });
   assert.match(ready, /Your photos are ready/);
   assert.match(ready, /Download ZIP/);
-  assert.match(ready, /Save to Google Drive/);
+  assert.doesNotMatch(ready, /Save to Google Drive|Google Drive save and status/);
   assert.match(ready, /> Share<\/button>/);
   assert.match(ready, /12\s?MB/);
   assert.doesNotMatch(ready, /Photo proofs|iCloud|Dropbox|variant=DOWNLOAD/);
 });
 
 test("checkout recovery requires server permission and an eligible immutable purchase state", () => {
-  const purchase = { id: "purchase", selectedItemIds: ["photo-1"], includedCount: 0, extraCount: 1, extraImagePriceCents: 2500, totalCents: 2500, currency: "USD", checkoutUrl: "https://provider.example/stale-checkout", bundle: null };
+  const purchase = { id: "purchase", downloadExpiresAt: "2026-11-28T19:00:00Z", downloadExpiresLabel: "November 28, 2026 at 1:00 PM CST", selectedItemIds: ["photo-1"], includedCount: 0, extraCount: 1, extraImagePriceCents: 2500, totalCents: 2500, currency: "USD", checkoutUrl: "https://provider.example/stale-checkout", bundle: null };
   for (const status of ["PENDING", "FAILED", "BLOCKED"]) {
     const retryable = clientMarkup({ ...initialView, purchase: { ...purchase, status, canRetryCheckout: true } });
     assert.match(retryable, /Resume or renew checkout/);
@@ -181,7 +181,7 @@ test("checkout recovery requires server permission and an eligible immutable pur
     const blocked = clientMarkup({ ...initialView, purchase: { ...purchase, status, canRetryCheckout: false } });
     assert.doesNotMatch(blocked, /Resume or renew checkout|>Next</);
   }
-  for (const status of ["RELEASED", "REFUNDED", "UNKNOWN"]) {
+  for (const status of ["RELEASED", "REFUNDED", "EXPIRED", "UNKNOWN"]) {
     const blocked = clientMarkup({ ...initialView, purchase: { ...purchase, status, canRetryCheckout: true } });
     assert.doesNotMatch(blocked, /Resume or renew checkout|>Next</);
   }
