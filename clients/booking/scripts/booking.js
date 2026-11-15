@@ -849,10 +849,20 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     const start = startOfDay(new Date());
     const maxAdvanceDays = Number(service.maxAdvanceDays || config.schedule?.maxAdvanceDays || 60);
 
-    for (let index = 0; index <= maxAdvanceDays; index += 1) {
+    const batchDays = config.api?.enabled ? 14 : 1;
+    for (let index = 0; index <= maxAdvanceDays; index += batchDays) {
       const next = new Date(start);
       next.setDate(start.getDate() + index);
       const candidate = dateKey(next);
+      if (config.api?.enabled) {
+        const params = new URLSearchParams({ serviceId: service.id, date: candidate, days: String(Math.min(batchDays, maxAdvanceDays - index + 1)) });
+        if (state.tierId) params.set("tierId", state.tierId);
+        const staffId = selectedStaffId(service);
+        if (staffId) params.set("staffId", staffId);
+        const response = await apiRequest(`/availability?${params.toString()}`);
+        if (response.nextAvailable) return { date: response.nextAvailable.date, slots: response.nextAvailable.slots.map(normalizeSlot) };
+        continue;
+      }
       const slots = await loadSlotsForDate(service, candidate);
       if (slots.length > 0) {
         return { date: candidate, slots };

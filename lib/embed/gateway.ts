@@ -16,7 +16,7 @@ import { getSiteSettingsForSite } from "@/lib/site";
 export class EmbedRequestError extends Error {
   status: number;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, readonly origin: string | null = null) {
     super(message);
     this.name = "EmbedRequestError";
     this.status = status;
@@ -108,7 +108,16 @@ function enforceOriginBoundary(key: SiteApiKey, parsedOrigin: ParsedOrigin) {
 
 async function resolveEmbedKeyForRequest(request: NextRequest) {
   const publicKey = readKeyFromRequest(request);
-  await enforcePreAuthKeyProtection(request, publicKey);
+  try {
+    await enforcePreAuthKeyProtection(request, publicKey);
+  } catch (error) {
+    // A limited request still needs a verified origin for the browser to read its error.
+    if (error instanceof EmbedRequestError && error.status === 429 && isPublicKeyFormatValid(publicKey)) {
+      const key = await resolveActiveSiteApiKey(publicKey);
+      if (key) throw new EmbedRequestError(error.message, 429, enforceOriginBoundary(key, parseRequestOrigin(request)));
+    }
+    throw error;
+  }
   const key = await resolveActiveSiteApiKey(publicKey);
   if (!key) throw new EmbedRequestError("Invalid or revoked API key.", 401);
   return key;
@@ -137,7 +146,7 @@ export async function authorizeEmbedRequest(request: NextRequest, options: Autho
     `embed:${options.scope || "request"}:${key.id}`,
     options.rateLimit
   );
-  if (limited) throw new EmbedRequestError(limited, 429);
+  if (limited) throw new EmbedRequestError(limited, 429, origin);
 
   void touchSiteApiKeyUsage(key.id);
 
@@ -151,7 +160,7 @@ export function embedJson(data: unknown, context: { origin: string | null }, ini
 export function embedError(error: unknown, context: { origin: string | null }) {
   const status = error instanceof EmbedRequestError ? error.status : 500;
   const message = error instanceof EmbedRequestError ? error.message : "Request failed.";
-  return Response.json({ error: message }, { status, headers: embedCorsHeaders(context.origin) });
+  return Response.json({ error: message }, { status, headers: embedCorsHeaders(context.origin ?? (error instanceof EmbedRequestError ? error.origin : null)) });
 }
 
 // CORS preflight is a browser handshake, not a security boundary. If the request supplies a key

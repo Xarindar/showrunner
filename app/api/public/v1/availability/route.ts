@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { authorizeEmbedRequest, embedError, embedJson, handleEmbedPreflight, type EmbedContext } from "@/lib/embed/gateway";
-import { getPublicSchedulingDiagnostics } from "@/lib/embed/public-scheduling";
+import { getPublicSchedulingDiagnostics, getPublicNextAvailability } from "@/lib/embed/public-scheduling";
 
 export const dynamic = "force-dynamic";
 
@@ -17,14 +17,16 @@ export async function GET(request: NextRequest) {
       rateLimit: { limit: 60, windowMinutes: 1 }
     });
     const { searchParams } = request.nextUrl;
-    const diagnostics = await getPublicSchedulingDiagnostics({
+    const input = {
       date: searchParams.get("date"),
       tierId: searchParams.get("tierId") || undefined,
       resourceId: searchParams.get("resourceId") || undefined,
       serviceId: searchParams.get("serviceId"),
       siteId: context.siteId,
       staffId: searchParams.get("staffId") || undefined
-    });
+    };
+    if (searchParams.has("days")) return embedJson({ nextAvailable: await getPublicNextAvailability(input, Number(searchParams.get("days"))) }, context);
+    const diagnostics = await getPublicSchedulingDiagnostics(input);
     return embedJson({ diagnostics }, context);
   } catch (error) {
     return embedError(error, { origin: context?.origin ?? null });

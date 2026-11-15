@@ -296,6 +296,21 @@ export async function getPublicSchedulingDiagnostics(input: {
   return serializePublicSlotDiagnostics(diagnostics);
 }
 
+export async function getPublicNextAvailability(input: Parameters<typeof getPublicSchedulingDiagnostics>[0], days: number) {
+  if (!Number.isInteger(days) || days < 1 || days > 14) throw new EmbedRequestError("Search between 1 and 14 days at a time.", 400);
+  if (!input.date || !/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new EmbedRequestError("Choose a valid date in YYYY-MM-DD format.", 400);
+  const start = new Date(`${input.date}T12:00:00Z`);
+  if (Number.isNaN(start.getTime()) || start.toISOString().slice(0, 10) !== input.date) throw new EmbedRequestError("Choose a valid date in YYYY-MM-DD format.", 400);
+  for (let offset = 0; offset < days; offset++) {
+    const day = new Date(start);
+    day.setUTCDate(start.getUTCDate() + offset);
+    const date = day.toISOString().slice(0, 10);
+    const diagnostics = await getPublicSchedulingDiagnostics({ ...input, date });
+    if (diagnostics.slots.length) return { date, slots: diagnostics.slots };
+  }
+  return null;
+}
+
 export async function createPublicSchedulingBooking(input: {
   body: unknown;
   searchParams?: Record<string, string | undefined>;
