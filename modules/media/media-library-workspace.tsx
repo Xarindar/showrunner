@@ -732,7 +732,7 @@ export function MediaLibraryWorkspace({
             )}
           </section>
           {selectionBox && <div aria-hidden="true" className={styles.selectionBox} style={selectionBox} />}
-          {drag && <div className={styles.dragPreview} style={{ left: drag.x + 16, top: drag.y + 16 }} role="status">
+          {drag && <div className={`ui-drag-lift ${styles.dragPreview}`} style={{ left: drag.x + 16, top: drag.y + 16 }} role="status">
             <AssetThumbnail asset={assets.find(asset => asset.id === drag.ids[0])!} />
             <strong>{drag.ids.length === 1 ? assets.find(asset => asset.id === drag.ids[0])?.filename : `${drag.ids.length} files`}</strong>
             <small>{dropFolder !== null ? `Move to ${dropFolder || "Media home"}` : "Drop onto a folder · Esc to cancel"}</small>

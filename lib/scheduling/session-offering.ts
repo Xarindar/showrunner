@@ -43,13 +43,19 @@ const tierSchema = z.object({
 });
 const hourlyRateSnapshot = z.object({ id: itemId, name: itemName, amountCents: z.number().int().min(0).max(999999999) });
 const addOn = z.object({ deliverables: sessionDeliverablesSchema.optional(), id: itemId, name: itemName, libraryItemId: optionalRecordId, priceCents: z.number().int().min(0).max(999999999), pricingType: addOnPricingTypeSchema.optional(), hourlyRateId: nullableRecordId, hourlyRate: hourlyRateSnapshot.optional() });
+const packageOrder = z.array(itemId).min(1).max(10).optional();
 
 export const sessionOfferingSchema = z.object({
   timeFrame: serviceTimeFrameSchema.optional(),
+  packageOrder,
   coverageItems: z.array(coverageItem).max(100),
   tiers: z.array(tierSchema).min(1, "Keep at least one package.").max(10, "Use up to 10 packages."),
   addOns: z.array(addOn).max(50)
 }).superRefine((value, ctx) => {
+  if (value.packageOrder && (new Set(value.packageOrder).size !== value.packageOrder.length ||
+    value.packageOrder.some(id => !value.tiers.some(tier => tier.id === id)))) {
+    ctx.addIssue({ code: "custom", path: ["packageOrder"], message: "Order each package in this session only once." });
+  }
   for (const items of [value.coverageItems, value.tiers, value.addOns]) {
     if (new Set(items.map(item => item.id)).size !== items.length || new Set(items.map(item => item.name.toLowerCase())).size !== items.length) {
       ctx.addIssue({ code: "custom", message: "Use different names for each included item, package, and extra." });
@@ -84,6 +90,7 @@ export const sessionOfferingSchema = z.object({
 
 export type SessionOffering = z.infer<typeof sessionOfferingSchema>;
 export type SessionOfferingDraft = {
+  packageOrder?: SessionOffering["packageOrder"];
   coverageItems: SessionOffering["coverageItems"];
   tiers: Array<Omit<SessionOffering["tiers"][number], "priceCents" | "durationMinutes"> & { price: string; durationMinutes: string }>;
   addOns: Array<Omit<SessionOffering["addOns"][number], "priceCents"> & { price: string }>;
@@ -91,6 +98,7 @@ export type SessionOfferingDraft = {
 
 const draftSchema = z.object({
   timeFrame: serviceTimeFrameSchema.optional(),
+  packageOrder,
   coverageItems: z.array(coverageItem).max(100),
   tiers: z.array(tierSchema.omit({ priceCents: true }).extend({
     durationMinutes: z.coerce.number().int().min(1).max(maxSessionMinutes),
@@ -108,6 +116,18 @@ export const sessionOfferingFormSchema = z.string().max(600000).transform((value
 export function readSessionOffering(value: unknown): SessionOffering | null {
   if (value == null) return null;
   return sessionOfferingSchema.parse(value);
+}
+
+export function packagesInDisplayOrder<T extends { id: string; unlimitedDuration?: boolean; durationMinutes: number | string }>(
+  tiers: readonly T[], order: readonly string[] | undefined, price: (tier: T) => number
+) {
+  const positions = new Map(order?.map((id, index) => [id, index]));
+  return [...tiers].sort((a, b) =>
+    (positions.get(a.id) ?? positions.size) - (positions.get(b.id) ?? positions.size) ||
+    Number(Boolean(a.unlimitedDuration)) - Number(Boolean(b.unlimitedDuration)) ||
+    Number(a.durationMinutes) - Number(b.durationMinutes) ||
+    price(a) - price(b)
+  );
 }
 
 export function priceSessionOffering(offering: SessionOffering, rates: HourlyRate[], fallback: { pricingType: PricingType; hourlyRateId: string }) {
@@ -153,6 +173,7 @@ export function sessionOfferingDraft(value: SessionOffering | null, durationMinu
   const offering = value ?? { coverageItems: [], tiers: [{ id: "standard", name: "Standard", durationMinutes, priceCents, coverageIds: [] }], addOns: [] };
   const price = (cents: number | null) => cents == null ? "" : (cents / 100).toFixed(2);
   return {
+    ...(value?.packageOrder ? { packageOrder: value.packageOrder } : {}),
     coverageItems: offering.coverageItems,
     tiers: offering.tiers.map(({ priceCents, durationMinutes, ...tier }) => ({ ...tier, price: price(priceCents), durationMinutes: String(durationMinutes) })),
     addOns: offering.addOns.map(({ priceCents, ...item }) => ({ ...item, price: price(priceCents) }))

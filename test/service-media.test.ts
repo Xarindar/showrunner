@@ -170,7 +170,7 @@ test("public services retain the booking photo and expose named crops without pu
     "@/lib/media": { mediaAssetDisplayUrl: (asset: { url: string }) => asset.url }
   };
   const source = ts.transpileModule(readFileSync("lib/embed/public-scheduling.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  const exports: { serializePublicService?: (service: object) => { imageUrl: string; media: { square: { imageZoom: number }; rectangular: { url: string; aspectRatio: number; imageZoom: number } | null } } } = {};
+  const exports: { serializePublicService?: (service: object) => { packages: Array<{ id: string }>; imageUrl: string; media: { square: { imageZoom: number }; rectangular: { url: string; aspectRatio: number; imageZoom: number } | null } } } = {};
   runInNewContext(source, { exports, URL, require: (id: string) => id in mocks ? mocks[id] : id.startsWith("@/") || id.startsWith("next/") ? {} : require(id) });
   const service = { id: "service", category: "", imageUrl: "", mediaAsset: { url: "/square.jpg" }, imageFraming: centeredFraming,
     rectangularMediaAsset: { url: "/rectangle.jpg", isPrivate: false, deletedAt: null }, rectangularImageFraming: { ...centeredFraming, imageZoom: 2 },
@@ -183,5 +183,22 @@ test("public services retain the booking photo and expose named crops without pu
   assert.equal(JSON.stringify(result).includes("future.jpg"), false);
   service.rectangularMediaAsset.isPrivate = true;
   assert.equal(exports.serializePublicService!(service).media.rectangular, null);
+  const session = sessionOffering.sessionOfferingSchema.parse({
+    coverageItems: [], addOns: [], tiers: [
+      { id: "full", name: "Full day", unlimitedDuration: true, pricingType: "FLAT_RATE", durationMinutes: 60, priceCents: 30000, coverageIds: [] },
+      { id: "standard", name: "Standard", durationMinutes: 120, priceCents: 20000, coverageIds: [] },
+      { id: "short", name: "Short", durationMinutes: 60, priceCents: 15000, coverageIds: [] },
+      { id: "mini", name: "Mini", durationMinutes: 60, priceCents: 10000, coverageIds: [] }
+    ]
+  });
+  const publicOrder = (sessionOffering: typeof session) => Array.from(exports.serializePublicService!({ ...service, sessionOffering }).packages, pack => pack.id);
+  assert.deepEqual(publicOrder(session), ["mini", "short", "standard", "full"]);
+  const draft = sessionOffering.sessionOfferingDraft({ ...session, packageOrder: ["full", "standard", "short"] }, 60, null);
+  const saved = sessionOffering.sessionOfferingFormSchema.parse(JSON.stringify(draft));
+  assert.deepEqual(publicOrder(saved), ["full", "standard", "short", "mini"]);
+  assert.deepEqual(saved.tiers, session.tiers);
+  for (const packageOrder of [["unknown"], ["full", "full"]]) {
+    assert.equal(sessionOffering.sessionOfferingFormSchema.safeParse(JSON.stringify({ ...draft, packageOrder })).success, false);
+  }
 });
 import * as bookingRules from "../lib/scheduling/booking-rules";

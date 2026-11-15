@@ -913,10 +913,6 @@ try {
     for (const name of ['Packages table','Suggested add-ons table']) {
       const table=newSession.getByRole('region',{name,exact:true});
       const header=table.getByRole('columnheader',{name:'Actions',exact:true});
-      if(await table.getAttribute('data-table-layout')==='cards') {
-        assert(await table.locator('[data-table-label]').count()>0,'Mobile rows use shared column labels');
-        continue;
-      }
       if (name==='Packages table') assert(await table.getByRole('columnheader',{name:'Duration',exact:true}).evaluate(element=>element.scrollWidth<=element.clientWidth),'Duration header fits at '+width+'px');
       assert(await header.evaluate(element=>element.scrollWidth<=element.clientWidth),'Actions header fits without clipping at '+width+'px');
       assert.equal(await header.evaluate(element=>getComputedStyle(element).whiteSpace),'nowrap');
@@ -1126,8 +1122,7 @@ try {
     const panel=page.locator('.service-catalog-folder-panel');
     const responsiveFrame=panel.locator('[data-responsive-table-frame]');
     await panel.waitFor();
-    await page.waitForFunction(()=>{const frame=document.querySelector('.service-desktop-table');return frame.dataset.tableLayout==='table'||frame.dataset.tableLayout==='cards'});
-    const cards=await responsiveFrame.getAttribute('data-table-layout')==='cards';
+    await page.waitForFunction(expected=>document.querySelector('.service-desktop-table').dataset.tableLayout===expected,width<=860?'compact':'table');
     const category=panel.getByRole('combobox',{name:'Category',exact:true});
     const label=panel.locator('label[for="services-category-filter"]');
     const cb=await category.boundingBox(),lb=await label.boundingBox();
@@ -1143,26 +1138,18 @@ try {
     await category.press('Home');
     await category.press('Escape');
 
-    if(width===677) assert.equal(cards,false,'Tablet width retains the complete table');
-    if(width===390) assert.equal(cards,true,'Narrow widths switch to cards');
     assert(await page.locator('.admin-main').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Catalog never overflows the workspace');
-    if(!cards) {
-      const frame=panel.getByRole('region',{name:'Sessions table',exact:true});
-      assert(await frame.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Table fits before falling back to cards');
-      const cells=frame.locator('thead th,td[data-label="Duration"] strong');
-      assert(await cells.evaluateAll(elements=>elements.every(el=>el.scrollWidth<=el.clientWidth+1)),'Headers and duration remain readable without truncation');
-      assert(await frame.getByRole('link',{name:'Edit Design Session',exact:true}).isVisible(),'Actions remain available in the table');
-    } else {
-      assert(await responsiveFrame.getByRole('table').isVisible(),'The same table renders the mobile layout');
-      assert.equal(await responsiveFrame.getByRole('link',{name:'Edit Design Session',exact:true}).count(),1,'Actions are never duplicated in a separate mobile tree');
-    }
+    const cells=responsiveFrame.locator('thead th:visible,td[data-label="Duration"] strong:visible');
+    assert(await cells.evaluateAll(elements=>elements.every(el=>el.scrollWidth<=el.clientWidth+1)),'Visible headers and duration remain readable');
+    assert.equal(await responsiveFrame.getByRole('link',{name:'Edit Design Session',exact:true}).count(),1,'Actions remain in the same table at every width');
     if(width===677||width===390) await page.screenshot({path:captures+'/sessions-fit-'+width+'.png'});
   }
   await page.setViewportSize({width:1440,height:844});
   await page.goto('https://design.example/catalog-workspace-fixture');
   await page.locator('.service-desktop-table[data-table-layout="table"]').waitFor();
   await page.locator('.admin-main').evaluate(el=>{el.style.width='380px';});
-  await page.locator('.service-desktop-table[data-table-layout="cards"]').waitFor();
+  const constrained=page.locator('.service-desktop-table[data-table-layout="table"]');
+  assert(await constrained.evaluate(el=>el.scrollWidth>el.clientWidth),'The full table scrolls in a narrow desktop workspace');
   await page.locator('.admin-main').evaluate(el=>{el.style.width='100%';});
   await page.locator('.service-desktop-table[data-table-layout="table"]').waitFor();
   assert.deepEqual(errors, []);

@@ -63,10 +63,12 @@ export type BookingRequest = {
   customerEmail: string;
   customerPhone?: string;
   customerCompany?: string;
+  sessionLocation?: string;
   notes?: string;
   intakeResponse?: string;
   intakeAnswers?: Record<string, string | string[]>;
   policyAccepted?: boolean;
+  photoMarketingConsent?: boolean;
   bookingRequirementsRevision?: string;
   acceptedTerms?: string;
   status?: BookingStatus;

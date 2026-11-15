@@ -43,14 +43,13 @@ export function FormsTerms({initialDocuments,initialTermsId}:{initialDocuments:B
     <header className={styles.editorHeader}>
       <Button variant="ghost" disabled={pending} onClick={()=>router.push("/admin/modules/appointments/forms-terms")}><ArrowLeft size={16}/>Forms &amp; Terms</Button>
       <h1>{draft.id?"Edit booking terms":"New booking terms"}</h1>
-      <Button disabled={pending} onClick={()=>void save()}>{pending?"Saving…":"Save terms"}</Button>
     </header>
     <div className={styles.editorContent}>
       <div className={styles.editorSettings}>
         <Field label="Terms name"><Input autoComplete="off" value={draft.name} required maxLength={100} disabled={pending} onChange={event=>setDraft({...draft,name:event.target.value})}/></Field>
-        <Switch label="Default for all bookings" description="Sessions use this unless they choose another document or none." variant="inline" checked={draft.isDefault} disabled={pending} onChange={event=>setDraft({...draft,isDefault:event.target.checked})}/>
+        <Switch label="Make default Terms and Conditions" variant="inline" checked={draft.isDefault} disabled={pending} onChange={event=>setDraft({...draft,isDefault:event.target.checked})}/>
       </div>
-          <TermsEditor disabled={pending} value={{type:"doc",content:draft.rules.length ? draft.rules.flatMap(rule=>(rule.richText||plainTermsDocument(rule.label)).content||[]) : [{type:"paragraph"}]}} onChange={(richText,label)=>setDraft({...draft,rules:[{id:draft.rules[0]?.id ?? crypto.randomUUID(),kind:"policy",category:"Booking Terms & Conditions",label,richText,type:"TEXT",required:true,placeholder:"",helpText:"",options:[]}]})}/>
+          <TermsEditor onSave={()=>void save()} disabled={pending} value={{type:"doc",content:draft.rules.length ? draft.rules.flatMap(rule=>(rule.richText||plainTermsDocument(rule.label)).content||[]) : [{type:"paragraph"}]}} onChange={(richText,label)=>setDraft({...draft,rules:[{id:draft.rules[0]?.id ?? crypto.randomUUID(),kind:"policy",category:"Booking Terms & Conditions",label,richText,type:"TEXT",required:true,placeholder:"",helpText:"",options:[]}]})}/>
     </div>
   </section>;
   return <div className={`stack ${styles.workspace}`}>

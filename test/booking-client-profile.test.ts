@@ -102,8 +102,10 @@ test("public bookings require effective document answers and acceptance, and ret
  await assert.rejects(app.book({bookingRequirementsRevision:requirements.revision,policyAccepted:true}),/Preferred style/);
  assert.equal(app.writes.length,0);
  const answers={[requirements.rules[0].id]:"Candid"};
- await app.book({bookingRequirementsRevision:requirements.revision,policyAccepted:true,intakeAnswers:answers});
- const snapshot=app.bookingWrites[0].data!.bookingRequirementsSnapshot as {documents:bookingDocuments.BookingDocument[];rules:typeof terms[];answers:Record<string,string>;acceptedAt:string};
+ await app.book({bookingRequirementsRevision:requirements.revision,policyAccepted:true,intakeAnswers:answers,photoMarketingConsent:false,sessionLocation:"12 Main St, Chicago, Illinois 60601"});
+ assert.equal(app.bookingWrites[0].data!.sessionLocation,"12 Main St, Chicago, Illinois 60601");
+ const snapshot=app.bookingWrites[0].data!.bookingRequirementsSnapshot as {documents:bookingDocuments.BookingDocument[];rules:typeof terms[];answers:Record<string,string>;acceptedAt:string;photoMarketingConsent:boolean};
+ assert.equal(snapshot.photoMarketingConsent,false);
  assert.equal(snapshot.documents[1].version,2);assert.equal(snapshot.rules[1].label,terms.label);
  assert.equal(snapshot.answers[requirements.rules[0].id],"Candid");assert(snapshot.acceptedAt);
  const changed=harness({documents,changedDocuments:true});

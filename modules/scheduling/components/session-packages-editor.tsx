@@ -4,14 +4,14 @@ import { TimeInput } from "@/components/ui/time-input";
 import { formatTimeValue } from "@/lib/format";
 import { serviceTimeFrameSchema, timeFrameMinutes, editTimeFrame } from "@/lib/scheduling/service-time-frame";
 import { ResponsiveTableFrame } from "@/components/ui/responsive-table";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 import { flushSync } from "react-dom";
-import { Copy, Pencil, Plus, X } from "lucide-react";
+import { Copy, GripVertical, Pencil, Plus, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
-import { sessionOfferingDraft, type SessionOffering, type SessionOfferingDraft } from "@/lib/scheduling/session-offering";
+import { packagesInDisplayOrder, sessionOfferingDraft, type SessionOffering, type SessionOfferingDraft } from "@/lib/scheduling/session-offering";
 import type { ServiceLibraryItem } from "@/lib/scheduling/service-library";
 import { ServiceLibraryPicker } from "./service-library-picker";
 import styles from "./session-packages-editor.module.css";
@@ -32,6 +32,17 @@ const deliverableFields = [
 function packageDurationLabel(value: string) {
   const total = Number(value), hours = Math.floor(total / 60), minutes = total % 60;
   return hours ? `${hours} hr${minutes ? ` ${minutes} min` : ""}` : `${minutes} min`;
+}
+
+function packageDropTarget(event: PointerEvent<HTMLTableRowElement>) {
+  const body = event.currentTarget.parentElement as HTMLTableSectionElement | null;
+  if (!body?.rows.length || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+  const bounds = body.getBoundingClientRect();
+  const { clientX: x, clientY: y } = event;
+  if (x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) return;
+  // Offset positions ignore the sibling row transforms used during the drag.
+  const row = Array.from(body.rows).find(row => y < bounds.top + row.offsetTop - body.rows[0].offsetTop + row.offsetHeight);
+  return row?.dataset.packageId;
 }
 
 export function SessionPackagesEditor({ initialOffering = null, durationMinutes = 60, priceCents = null, isNew = false, initialRates = [], initialPricingType = "FLAT_RATE", initialHourlyRateId = "", initialScheduling }: {
@@ -73,16 +84,47 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     catch { return ""; }
   };
   const listId = useId();
+  const gesture = useRef<{ x: number; y: number; height: number } | null>(null);
+  const [drag, setDrag] = useState<{ id: string; target?: string; height: number } | null>(null);
+  useEffect(() => {
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      gesture.current = null;
+      setDrag(null);
+    };
+    window.addEventListener("keydown", cancel);
+    return () => window.removeEventListener("keydown", cancel);
+  }, []);
+  const visibleTiers = packagesInDisplayOrder(draft.tiers.filter(tier => !newTiers.has(tier.id)), draft.packageOrder, tier => {
+    const price = tierPrice(tier);
+    return price ? Number(price) : Infinity;
+  });
   const firstTier = draft.tiers[0];
   const multi = draft.tiers.length > 1;
   const canDiscardTier = isNew || multi;
   const libraryTier = draft.tiers.find(tier => tier.id === libraryPicker?.tierId);
   const updateTier = (id: string, changes: Partial<SessionOfferingDraft["tiers"][number]>) => setDraft(current => ({ ...current, tiers: current.tiers.map(tier => tier.id === id ? { ...tier, ...changes } : tier) }));
 
+  function moveTier(id: string, targetId: string | undefined, restoreFocus = false) {
+    if (!targetId || id === targetId) return;
+    const order = visibleTiers.map(tier => tier.id);
+    const destination = order.indexOf(targetId);
+    if (destination < 0) return;
+    order.splice(order.indexOf(id), 1);
+    order.splice(destination, 0, id);
+    setDraft(current => ({ ...current, packageOrder: order }));
+    if (restoreFocus) requestAnimationFrame(() => document.getElementById(`${listId}-move-${id}`)?.focus());
+    notify(`${visibleTiers.find(tier => tier.id === id)?.name} moved to position ${destination + 1}.`);
+  }
+
+  const dragSource = visibleTiers.findIndex(tier => tier.id === drag?.id);
+  const dragTarget = visibleTiers.findIndex(tier => tier.id === drag?.target);
+
   function discardTier(id: string) {
-    setDraft(current => !isNew && current.tiers.length <= 1 ? current : {
-      ...current,
-      tiers: current.tiers.filter(tier => tier.id !== id)
+    setDraft(current => {
+      if (!isNew && current.tiers.length <= 1) return current;
+      const order = current.packageOrder?.filter(tierId => tierId !== id);
+      return { ...current, packageOrder: order?.length ? order : undefined, tiers: current.tiers.filter(tier => tier.id !== id) };
     });
     setNewTiers(current => new Set([...current].filter(tierId => tierId !== id)));
   }
@@ -154,17 +196,78 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     <input type="hidden" name="durationMinutes" value={firstTier?.durationMinutes ?? durationMinutes} />
     <input type="hidden" name="price" value={firstTier ? tierPrice(firstTier) : ""} />
     <section className="studio-panel ui-section-card ui-table-card" aria-labelledby={`${listId}-packages-title`}>
-    <div className="ui-section-header"><h2 id={`${listId}-packages-title`}>Packages</h2><Button type="button" variant="secondary" size="sm" disabled={draft.tiers.length >= 10} onClick={() => addTier()}><Plus aria-hidden="true" size={16} />Add package</Button></div>
+    <div className="ui-section-header">
+      <h2 id={`${listId}-packages-title`}>Packages</h2>
+      <div className="ui-inline-actions">
+        {draft.packageOrder && <Button type="button" variant="secondary" size="sm" onClick={() => {
+          setDraft(current => ({ ...current, packageOrder: undefined }));
+          notify("Automatic package order restored.");
+        }}>Use automatic order</Button>}
+        <Button type="button" variant="secondary" size="sm" disabled={draft.tiers.length >= 10} onClick={() => addTier()}><Plus aria-hidden="true" size={16} />Add package</Button>
+      </div>
+    </div>
+    <p id={`${listId}-order-help`} className="ui-sr-only">Drag a package to reorder it for online booking. With its handle focused, use the up and down arrow keys.</p>
     <ResponsiveTableFrame className={`catalog-table-scroll ${styles.servicesTable} ${styles.packagesTable}`} role="region" aria-label="Packages table" tabIndex={0}>
-      <table className="catalog-product-table"><thead><tr><th scope="col">Package</th><th scope="col">Price</th><th scope="col">Duration</th><th scope="col">Actions</th></tr></thead><tbody>
-        {draft.tiers.filter(tier => !newTiers.has(tier.id)).map(tier => <tr key={tier.id}>
-          <td><button type="button" className={styles.packageName} aria-haspopup="dialog" onClick={() => setExpandedTiers(new Set([tier.id]))}>{tier.name}</button></td>
-          <td>{tierPrice(tier) ? Number(tierPrice(tier)).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "—"}</td>
-          <td>{tier.pricingType === "TIME_FRAME" ? timeFrameLabel(tier) : packageDurationLabel(tier.durationMinutes)}</td>
-          <td><Button type="button" variant="ghost" size="sm" aria-label={`Edit ${tier.name}`} onClick={() => setExpandedTiers(new Set([tier.id]))}><Pencil aria-hidden="true" size={15} /></Button></td>
-        </tr>)}
+      <table className="catalog-product-table"><thead><tr><th scope="col">Package</th><th scope="col">Price</th><th scope="col">Duration</th><th scope="col">Actions</th></tr></thead><tbody data-package-dragging={Boolean(drag) || undefined}>
+        {visibleTiers.map((tier, position) => {
+          let shift = 0;
+          if (drag && dragTarget >= 0) {
+            if (position > dragSource && position <= dragTarget) shift = -drag.height;
+            if (position < dragSource && position >= dragTarget) shift = drag.height;
+          }
+          return <tr key={tier.id} data-package-id={tier.id} data-package-picked-up={drag?.id === tier.id || undefined}
+            className={drag?.id === tier.id ? "ui-drag-lift" : undefined}
+            data-package-sortable={visibleTiers.length > 1 || undefined}
+            style={shift ? { transform: `translateY(${shift}px)` } : undefined}
+            onPointerDown={event => {
+              if (!event.isPrimary || event.button !== 0 || visibleTiers.length < 2) return;
+              const button = (event.target as Element).closest("button");
+              if (button && !button.classList.contains(styles.packageHandle)) return;
+              event.preventDefault();
+              const row = event.currentTarget;
+              const focused = document.activeElement;
+              if (focused instanceof HTMLElement && focused.classList.contains(styles.packageHandle)) focused.blur();
+              gesture.current = { x: event.clientX, y: event.clientY, height: row.offsetHeight };
+              row.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={event => {
+              const start = gesture.current;
+              const row = event.currentTarget;
+              if (!start || !row.hasPointerCapture(event.pointerId)) return;
+              const y = event.clientY - start.y;
+              const x = event.clientX - start.x;
+              if (!drag && Math.abs(y) < 4) {
+                // Leave a predominantly horizontal gesture to the table's native scrollbar.
+                if (Math.abs(x) > 8) row.releasePointerCapture(event.pointerId);
+                return;
+              }
+              row.style.setProperty("--package-drag-y", `${y}px`);
+              const target = packageDropTarget(event);
+              setDrag(current => current ? current.target === target ? current : { ...current, target } : { id: tier.id, target, height: start.height });
+            }}
+            onPointerUp={event => {
+              if (drag && gesture.current) moveTier(tier.id, packageDropTarget(event));
+              gesture.current = null;
+              setDrag(null);
+            }}
+            onLostPointerCapture={() => { gesture.current = null; setDrag(null); }}>
+            <td><div className={styles.packageCell}>
+              {visibleTiers.length > 1 && <Button type="button" variant="ghost" size="sm" className={styles.packageHandle}
+                id={`${listId}-move-${tier.id}`} aria-label={`Move ${tier.name}`} aria-describedby={`${listId}-order-help`}
+                onKeyDown={event => {
+                  if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+                  event.preventDefault();
+                  moveTier(tier.id, visibleTiers[position + (event.key === "ArrowUp" ? -1 : 1)]?.id, true);
+                }}><GripVertical aria-hidden="true" size={15} /></Button>}
+              <button type="button" className={styles.packageName} aria-haspopup="dialog" onClick={() => setExpandedTiers(new Set([tier.id]))}>{tier.name}</button>
+            </div></td>
+            <td>{tierPrice(tier) ? Number(tierPrice(tier)).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "—"}</td>
+            <td>{tier.pricingType === "TIME_FRAME" ? timeFrameLabel(tier) : packageDurationLabel(tier.durationMinutes)}</td>
+            <td><Button type="button" variant="ghost" size="sm" aria-label={`Edit ${tier.name}`} onClick={() => setExpandedTiers(new Set([tier.id]))}><Pencil aria-hidden="true" size={15} /></Button></td>
+          </tr>;
+        })}
       </tbody></table>
-      {!draft.tiers.some(tier => !newTiers.has(tier.id)) && <p className={styles.servicesEmpty}>No packages added</p>}
+      {!visibleTiers.length && <p className={styles.servicesEmpty}>No packages added</p>}
     </ResponsiveTableFrame>
       {draft.tiers.map((tier, index) => {
         const services = draft.coverageItems.filter(item => tier.coverageIds.includes(item.id));

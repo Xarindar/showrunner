@@ -552,7 +552,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
               priceCents: packageSnapshot ? packageSnapshot.priceCents : servicePriceCents(service),
               ...(packageSnapshot ? { packageSnapshot: packageSnapshot as Prisma.InputJsonValue } : service.pricingType === "HOURLY" && service.hourlyRate ? { packageSnapshot: { tierId: "hourly", name: service.name, durationMinutes: service.durationMinutes, priceCents: servicePriceCents(service), coverage: [], extras: [], pricingType: "HOURLY", hourlyRate: { id: service.hourlyRate.id, name: service.hourlyRate.name, amountCents: service.hourlyRate.amountCents } } } : {}),
               sessionName: service.name,
-              sessionLocation: "",
+              sessionLocation: input.sessionLocation ?? "",
               staffId: selectedStaff?.id,
               startsAt: input.startsAt,
               endsAt,
@@ -561,7 +561,15 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
               customerPhone: input.customerPhone,
               notes: input.notes,
               intakeResponse,
-              bookingRequirementsSnapshot:{documents:requirements.documents,rules:requirements.rules,renderedTerms,answers:requirements.bookingRules ? input.intakeAnswers ?? {} : {},policyAccepted:Boolean(input.policyAccepted),acceptedAt:input.policyAccepted && requirements.policyText ? new Date().toISOString() : null},
+              bookingRequirementsSnapshot: {
+                documents: requirements.documents,
+                rules: requirements.rules,
+                renderedTerms,
+                answers: requirements.bookingRules ? input.intakeAnswers ?? {} : {},
+                policyAccepted: Boolean(input.policyAccepted),
+                acceptedAt: input.policyAccepted && requirements.policyText ? new Date().toISOString() : null,
+                ...(input.photoMarketingConsent === undefined ? {} : { photoMarketingConsent: input.photoMarketingConsent })
+              },
               policyAccepted: Boolean(input.policyAccepted),
               status: input.status || (service.requestOnly ? BookingStatus.PENDING : BookingStatus.CONFIRMED),
               resources: requiredResourceIds.length

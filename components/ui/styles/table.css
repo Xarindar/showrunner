@@ -293,33 +293,22 @@
 }
 
 /* Phones always use row cards; wider workspaces also switch when content cannot fit. */
-.showrunner-admin [data-responsive-table-frame] { position: relative; min-width: 0; }
+.showrunner-admin [data-responsive-table-frame] { position: relative; min-width: 0; max-width: 100%; overflow: auto; }
 .showrunner-admin [data-responsive-table-frame] > table { min-width: 0; table-layout: auto; }
 .showrunner-admin [data-responsive-table-frame] > table :is(th,td) { padding-inline: var(--data-table-compact-cell-x); }
 .showrunner-admin [data-responsive-table-frame] > table :is(col,th) { width: auto; }
 .showrunner-admin [data-responsive-table-frame] > table tbody td[colspan] { white-space: normal; overflow-wrap: anywhere; }
 .showrunner-admin [data-responsive-table-frame] > table .catalog-row-actions { flex-wrap: nowrap; }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) { display: block; width: 100%; }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) > :is(colgroup,thead) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) > tbody { display: grid; }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) > tbody > tr { display: grid; grid-template-columns: repeat(var(--data-table-mobile-columns),minmax(0,1fr)); border-bottom: 1px solid var(--data-table-row-divider); padding: var(--data-table-cell-x); gap: var(--data-table-mobile-gap); }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) > tbody > tr:last-child { border-bottom: 0; }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) > tbody > tr > :is(td,th) { display: block; height: auto; min-width: 0; max-width: none; width: auto; border: 0; padding: 0; white-space: normal; overflow-wrap: anywhere; overflow: visible; text-align: start; }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) > tbody > tr > :is(:first-child,:last-child,[colspan]) { grid-column: 1 / -1; }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) > tbody > tr > [data-table-label]::before { content: attr(data-table-label); display: block; color: var(--color-text-muted); font-size: var(--type-caption); margin-bottom: var(--space-1); }
 .showrunner-admin [data-responsive-table-frame] td:last-child .ui-tooltip:last-child .ui-tooltip-content { left: auto; right: 0; transform: translateY(4px); }
 .showrunner-admin [data-responsive-table-frame] td:last-child .ui-tooltip:last-child:is(:hover,:focus-visible,:focus-within) .ui-tooltip-content { transform: translateY(0); }
 .showrunner-admin [data-responsive-table-frame] td:last-child .ui-tooltip:last-child .ui-tooltip-content::after { left: auto; right: 12px; transform: rotate(45deg); }
 
-.showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) > tbody > tr > :first-child[data-table-label]::before { display: none; }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) > tbody > tr > td :is(a:not(.ui-button),span:not(.ui-tooltip):not(.ui-tooltip-content):not(.ui-badge),strong,small) { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) > tbody > tr:has(> td[colspan]) { min-height: var(--data-table-reserved-body-height,var(--data-table-empty-height)); place-items: center; }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="cards"] > table:not([data-table-probe]) > tbody > tr > td[colspan] { text-align: center; }
-
 .showrunner-admin [data-responsive-table-frame] > table th[data-table-actions] { width: 1%; }
+.showrunner-admin [data-responsive-table-frame] > table tbody > tr > :is(td,th):not([colspan]) { white-space: nowrap; }
 .showrunner-admin [data-responsive-table-frame][data-table-layout="compact"] > table :is(th,td):not([data-mobile-column]):not([colspan]) { display: none; }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="compact"] > table :is(th,td) { padding-inline: var(--sd-space-4); }
-.showrunner-admin [data-responsive-table-frame][data-table-layout="compact"] > table .catalog-cell-text { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 860px), (pointer: coarse) {
+  .showrunner-admin [data-responsive-table-frame] > table :is(th,td) { padding-inline: var(--sd-space-4); }
+}
 
 /* Keep action groups intact during both natural-width measurement and card rendering. */
 .showrunner-admin [data-responsive-table-frame][data-table-layout] > table > tbody > tr > [data-table-actions] { white-space: nowrap; overflow-wrap: normal; }

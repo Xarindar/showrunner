@@ -2,7 +2,7 @@ import "server-only";
 import { listBookingDocuments } from "@/lib/scheduling/booking-document-store";
 import { resolveBookingRequirements } from "@/lib/scheduling/booking-documents";
 import { BookingRuleAnswerError, intakeAnswersSchema, readBookingRules } from "@/lib/scheduling/booking-rules";
-import { readSessionOffering, selectSessionPackage, suggestedSessionAddOns, sessionAddOnPriceCents } from "@/lib/scheduling/session-offering";
+import { packagesInDisplayOrder, readSessionOffering, selectSessionPackage, suggestedSessionAddOns, sessionAddOnPriceCents } from "@/lib/scheduling/session-offering";
 import { addOnQuantitiesSchema } from "@/lib/scheduling/session-input";
 import { servicePriceCents } from "@/lib/scheduling/pricing";
 import { readImageFraming } from "@/modules/content/studio/image-framing";
@@ -44,6 +44,13 @@ const bookingSchema = z.object({
   intakeResponse: z.string().trim().optional(),
   intakeAnswers: intakeAnswersSchema.optional(),
   policyAccepted: z.boolean().optional(),
+  photoMarketingConsent: z.boolean().optional(),
+  sessionAddress: z.object({
+    address: z.string().trim().min(1).max(200),
+    city: z.string().trim().min(1).max(100),
+    state: z.string().trim().min(1).max(60),
+    zip: z.string().trim().min(1).max(20)
+  }).optional(),
   bookingRequirementsRevision: z.string().max(500).optional(),
   [hiddenHoneypotField]: z.string().trim().optional()
 });
@@ -134,13 +141,13 @@ export function serializePublicSlotDiagnostics(diagnostics: SlotDiagnostics) {
 
 export function serializePublicService(service: PublicService, categoryRecord?: PublicServiceCategory) {
   const offering = readSessionOffering(service.sessionOffering);
-  const packages = offering?.tiers.map(tier => {
+  const packages = offering ? packagesInDisplayOrder(offering.tiers, offering.packageOrder, tier => tier.priceCents ?? Infinity).map(tier => {
     const snapshot = selectSessionPackage(offering, tier.id)!;
     return { id: tier.id, name: tier.name, durationMinutes: tier.durationMinutes, unlimitedDuration: tier.unlimitedDuration, priceCents: snapshot.priceCents,
       deliverables: snapshot.deliverables, coverage: snapshot.coverage,
       addOns: suggestedSessionAddOns(offering, tier.id).map(item => ({ id: item.id, name: item.name,
         priceCents: sessionAddOnPriceCents(item, tier.durationMinutes), pricingType: item.pricingType, deliverables: item.deliverables })) };
-  }) || [];
+  }) : [];
   const category = cleanOptionalString(service.category);
   const fallbackCategoryId = category ? slugify(category) || "general" : "general";
   return {
@@ -324,7 +331,11 @@ export async function createPublicSchedulingBooking(input: {
       intakeResponse: parsed.data.intakeResponse,
       intakeAnswers: parsed.data.intakeAnswers,
       bookingRequirementsRevision: parsed.data.bookingRequirementsRevision,
-      policyAccepted: parsed.data.policyAccepted === true
+      policyAccepted: parsed.data.policyAccepted === true,
+      photoMarketingConsent: parsed.data.photoMarketingConsent,
+      sessionLocation: parsed.data.sessionAddress
+        ? `${parsed.data.sessionAddress.address}, ${parsed.data.sessionAddress.city}, ${parsed.data.sessionAddress.state} ${parsed.data.sessionAddress.zip}`
+        : undefined
     });
   } catch (error) {
     mapPublicBookingError(error);
