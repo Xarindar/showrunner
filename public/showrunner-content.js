@@ -103,7 +103,7 @@
       document.querySelectorAll(binding.selector).forEach(node => targets.push({ node, path: binding.path }));
     });
     if (block.presentation?.selector) document.querySelectorAll(block.presentation.selector).forEach(host => {
-      host.querySelectorAll?.("[data-sr-field]").forEach(node => {
+      [host, ...host.querySelectorAll("[data-sr-field]")].filter(node => node.matches("[data-sr-field]")).forEach(node => {
         if (node.matches("img") || node.dataset.srImage !== undefined) targets.push({ node, path: node.dataset.srField });
       });
     });

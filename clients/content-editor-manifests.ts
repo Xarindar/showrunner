@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { listPublicSchedulingCatalog } from "@/lib/embed/public-scheduling";
-import { jazzrContentManifest } from "./jazzr/content-manifest";
+import { jazzrEditorManifest } from "./jazzr/content-manifest";
 import { cottageTeamBlock } from "./cottage616/team-blocks";
 import { resolveContentManifest } from "@/clients/content-manifests";
 import { getPublicContentProfilePayload } from "@/clients/cottage616/content-profiles";
@@ -15,7 +15,8 @@ export async function getEditorManifest(settings: SiteSettingsWithModules) {
   // Installation IDs such as "site" are shared; only a registered Jazzr domain enables this adapter.
   if (manifest.id === "default" && await prisma.siteDomain.findFirst({ where: { siteId: settings.siteId, hostname: "admin.jazzrphotography.com" }, select: { id: true } })) {
     const { categories } = settings.enabledModuleIds.includes("scheduling") ? await listPublicSchedulingCatalog(settings.siteId) : { categories: [] };
-    return { ...jazzrContentManifest, blocks: jazzrContentManifest.blocks.map(block => block.source === "categories" ? ({ ...block, defaults: { ...block.defaults, items: categories.map(category => ({ id: category.id, categoryId: category.id })) } }) : block) };
+    const jazzr = jazzrEditorManifest(settings.publicContentConfig);
+    return { ...jazzr, blocks: jazzr.blocks.map(block => block.source === "categories" ? ({ ...block, defaults: { ...block.defaults, items: categories.map(category => ({ id: category.id, categoryId: category.id })) } }) : block) };
   }
   if (manifest.id !== "cottage616") return manifest;
   const profiles = await Promise.all(["cottage616", "the-hive"].map(key => getPublicContentProfilePayload(settings.siteId, key)));

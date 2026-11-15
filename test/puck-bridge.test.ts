@@ -18,6 +18,8 @@ test("showcase renderer uses safe semantic cards and selection scrolls once", as
     constructor(public tag: string) {}
     append(...nodes: Node[]) { this.children.push(...nodes); }
     replaceChildren(...nodes: Node[]) { this.children = nodes; }
+    querySelectorAll() { return []; }
+    matches() { return false; }
     setAttribute() {}
     scrollIntoView() { this.scrolls++; }
   }
@@ -64,7 +66,7 @@ test("website bridge authenticates the parent and limits preview updates to safe
   const listeners: Record<string, (event: unknown) => Promise<void>> = {};
   const messages: unknown[] = [];
   const parent = { postMessage: (message: unknown) => messages.push(message) };
-  const section = { dataset: {} as Record<string, string>, tabIndex: -1, setAttribute() {} };
+  const section = { dataset: {} as Record<string, string>, tabIndex: -1, setAttribute() {}, querySelectorAll() { return []; }, matches() { return false; } };
   const text = { textContent: "Before", style: {} };
   const link = { href: "", setAttribute(_key: string, value: string) { this.href = value; } };
   const document = {
@@ -178,13 +180,15 @@ test("preview clicks keep menus interactive, route navigation to the editor, and
 test("bound and custom website photos apply validated crops using stable row identities", () => {
   const source = readFileSync("public/showrunner-content.js", "utf8");
   const functions = source.slice(source.indexOf("  function imageTargets("), source.indexOf('  window.addEventListener("showrunner:content"'));
-  const node = { tagName: "IMG", style: {} as Record<string, string>, parentElement: { style: {} as Record<string, string> } };
+  const node = { tagName: "IMG", dataset: { srField: "images.0.url" }, querySelectorAll: () => [], matches: (selector: string) => selector === "img" || selector === "[data-sr-field]", style: {} as Record<string, string>, parentElement: { style: {} as Record<string, string> } };
   const document = { querySelectorAll: () => [node] };
   const { imageTargets, applyImageFraming } = runInNewContext(functions + "\n({ imageTargets, applyImageFraming })", { document });
   const photo = { id: "photo", imagePositionX: 20, imagePositionY: 80, imageZoom: 2 };
   const block = { id: "team", type: "strip", payload: { images: [photo] }, presentation: { bindings: [{ path: "images.0.url", selector: "img", attribute: "src" }] } };
   assert.equal(imageTargets(block)[0].key, "team-images-photo");
-  applyImageFraming([block]);
+  const standalone = { ...block, presentation: { selector: "img" } };
+  assert.equal(imageTargets(standalone)[0].key, "team-images-photo", "an editable image host measures its own framing");
+  applyImageFraming([standalone]);
   assert.equal(node.style.objectPosition, "20% 80%"); assert.equal(node.style.transformOrigin, "20% 80%"); assert.equal(node.style.transform, "scale(2)");
   assert.equal(node.parentElement.style.overflow, "hidden");
   applyImageFraming([{ ...block, payload: { images: [{ id: "photo", imageZoom: 20, imagePositionX: -1, imagePositionY: Infinity }] } }]);

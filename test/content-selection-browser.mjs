@@ -83,7 +83,7 @@ try{
    assert.equal(await caption.evaluate(e=>e.getBoundingClientRect().height),height,'Long captions keep the textarea height fixed');
    await caption.evaluate(e=>{e.scrollTop=e.scrollHeight;});
    assert(await caption.evaluate(e=>e.scrollTop>0&&e.scrollHeight>e.clientHeight),'Long captions scroll inside the field');
-   assert.deepEqual(await caption.evaluate(e=>{const s=getComputedStyle(e);return [s.borderTopWidth,s.borderBottomWidth,s.paddingTop,s.paddingBottom]}),['4px','4px','0px','0px'],'A real border keeps scrolled text clear of the inset focus ring');
+   assert.deepEqual(await caption.evaluate(e=>{const s=getComputedStyle(e);return [s.borderTopWidth,s.borderBottomWidth,s.paddingTop,s.paddingBottom]}),['0px','0px','4px','4px'],'Editor textareas use shared padding without transparent borders that offset the inset ring');
  }
  await caption.screenshot({path:'.tmp/content-caption-scroll.png'});
  assert((await page.locator('textarea').evaluateAll(nodes=>nodes.map(node=>getComputedStyle(node).resize))).every(value=>value==='none'),'Puck textareas must not resize');

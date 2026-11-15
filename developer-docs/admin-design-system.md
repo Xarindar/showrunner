@@ -297,3 +297,5 @@ Mobile navigation stays owned by the admin shell and is positioned beside the cu
 Custom `SelectMenu` labels sit to the left, outside the trigger, using the shared field typography and spacing. Triggers use the standard 30px desktop / 44px touch control heights and regular-weight selected values. Filter rows align the control bottoms. No label is embedded inside the trigger or moved there by viewport rules. Popovers align with the control itself, excluding its label.
 
 On mobile, detail/configuration screens use their existing contextual page header and back link without the global mobile bar or hamburger. `AdminMobileMenu` recognizes the existing `has-mobile-shell-header` marker and page-header back links (ArrowLeft). Module home screens keep the navigation menu; desktop navigation remains unchanged.
+
+Content editor textareas inherit the shared input border, padding and shadow recipe. Do not replace their vertical padding with transparent borders: inset rings follow the padding edge while outer shadows follow the border edge, producing a doubled field outline.

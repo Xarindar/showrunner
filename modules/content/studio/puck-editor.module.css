@@ -90,7 +90,8 @@
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
-.sectionHeader h2, .inspectorHeader h2 { font-size: var(--sd-type-heading-size); font-weight: var(--sd-type-weight-medium); margin: 0; }
+.workspace .sectionHeader h2, .workspace .inspectorHeader h2 { min-width: 0; font-size: var(--sd-type-heading-size); font-weight: var(--sd-type-weight-medium); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sectionHeader > button, .inspectorHeader > button { flex-shrink: 0; }
 .sections {
   display: grid;
   align-content: start;

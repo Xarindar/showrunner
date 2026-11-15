@@ -147,3 +147,5 @@ Client gallery links require a configured included-photo count and extra-photo p
 Production web processes deliver the persisted email outbox automatically on startup and every minute, reusing database claims, retry schedules and stable message IDs. Queued messages do not require a separately configured external worker.
 
 Package services can be removed from an individual package without deleting the reusable service. New service forms start with the library search text. Admin Back links follow browser history and retain a fallback for direct entry. Session photo batches continue during in-app navigation; closing or reloading the browser still warns while uploads remain unfinished.
+
+Jazzr featured sessions are independent fixed sections with an approved Full photo spread or Split editorial layout per session. Choose the service before its photo, framing and display copy. Headers use the shared carousel inspector; Jazzr renders subtle previous/next arrows only when multiple headers exist. Existing grouped session and header content is read through the adapter, preserving mobile overrides without rewriting publication data.

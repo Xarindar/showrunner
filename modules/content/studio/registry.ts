@@ -25,7 +25,7 @@ export const blockRegistry = {
   mailingList: { label: "Mailing-list popup", fields: { ...section, ...framing, imageUrl: url("Image URL"), submitLabel: text("Submit label"), successCopy: copy("Success message") } },
   coupon: { label: "Coupon / promo popup", fields: { ...section, code: text("Display code"), ...framing, imageUrl: url("Image URL"), ...cta } },
   cta: { label: "CTA section", fields: { ...section, ...cta } },
-  featured: { label: "Featured items", fields: { ...section, ...framing, imageUrl: url("Feature image URL"), imageAlt: text("Feature image alternative text"), items: list("Selected items", { referenceId: text("Service"), imageUrl: { ...url("Image"), optional: true }, ...framing, title: text("Heading (blank uses service name)"), description: copy("Description (blank uses service description)") }) } },
+  featured: { label: "Featured items", fields: { ...section, ...framing, imageUrl: url("Feature image URL"), imageAlt: text("Feature image alternative text"), items: list("Selected items", { referenceId: text("Service"), imageUrl: { ...url("Image"), optional: true }, ...framing, title: text("Heading (blank uses service name)"), description: copy("Description (blank uses service description)"), layout: { label: "Layout", kind: "text", options: [{ label: "Full photo spread", value: "full" }, { label: "Split editorial", value: "split" }] } }) } },
   gallery: { label: "Image gallery / slideshow", fields: { heading: text("Heading"), images: list("Images", image, 30) } },
   directory: { label: "Directory / partners", fields: { ...section, items: list("Directory entries", {
     name: text("Name"), category: text("Category"), offer: copy("Featured offer"), description: copy("Description"),
