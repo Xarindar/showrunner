@@ -11,7 +11,7 @@ import * as policy from "../lib/portfolio/selection-policy";
 function fixture() {
   const asset = { id: "asset-a", siteId: "site-a", isPrivate: true, deletedAt: null, driver: "S3", filename: "a.jpg" };
   const item = { id: "item-a", galleryId: "gallery-a", mediaAssetId: asset.id, isDownloadable: true, type: "IMAGE", mediaAsset: asset, title: "A", altText: "A" };
-  const purchase = { id: "purchase-a", galleryId: "gallery-a", siteId: "site-a", clientId: "client-a", allowance: 1, extraPriceCents: 900, extraCount: 0, totalCents: 0, currency: "USD", order: null, orderId: null, revokedAt: null as Date | null, selections: [{ itemId: item.id, mediaAssetId: asset.id, mediaAsset: asset, item }] };
+  const purchase = { id: "purchase-a", createdAt: new Date(), galleryId: "gallery-a", siteId: "site-a", clientId: "client-a", allowance: 1, extraPriceCents: 900, extraCount: 0, totalCents: 0, currency: "USD", order: null, orderId: null, revokedAt: null as Date | null, selections: [{ itemId: item.id, mediaAssetId: asset.id, mediaAsset: asset, item }] };
   const gallery = { id: "gallery-a", siteId: "site-a", clientId: "client-a", proofingEnabled: true, downloadEnabled: true, selectionAllowance: 1, extraPhotoPriceCents: 900, selectionCurrency: "USD", packageProductId: "product-a", packageProduct: { siteId: "site-a", type: "SERVICE_PACKAGE", name: "Package" }, purchasedOrder: { siteId: "site-a", clientId: "client-a", status: "PAID", items: [{ productId: "product-a" }] }, items: [item], purchase: purchase as typeof purchase | null };
   return { access: { id: "access-a", accessToken: "token-a", clientId: "client-a", galleryId: gallery.id, gallery }, asset, item, purchase, gallery };
 }
@@ -29,6 +29,7 @@ const request = { siteId: "site-a", galleryId: "gallery-a", itemId: "item-a", ac
 test("original authorization enforces client, gallery, immutable asset, tenant, controls and revoked payment", async () => {
   const cases = [
     (f: ReturnType<typeof fixture>) => { f.access.clientId = "client-other"; },
+    (f: ReturnType<typeof fixture>) => { f.purchase.createdAt = new Date(Date.now() - 14 * 86400000); },
     (f: ReturnType<typeof fixture>) => { f.purchase.revokedAt = new Date(); },
     (f: ReturnType<typeof fixture>) => { f.purchase.clientId = "client-other"; },
     (f: ReturnType<typeof fixture>) => { f.item.galleryId = "gallery-other"; },
@@ -62,9 +63,10 @@ test("expired/revoked access fails closed and query rechecks expiration and curr
 test("finalization snapshots server package values and serializes duplicate/concurrent requests", async () => {
   const f = fixture(); f.gallery.purchase = null;
   let createCount = 0;
+  const expiryWrites: any[] = [];
   let queue = Promise.resolve();
   const db: any = {
-    portfolioGalleryAccess: { findFirst: async () => f.access },
+    portfolioGalleryAccess: { findFirst: async () => f.access, updateMany: async (q: any) => { expiryWrites.push(q); return { count: 1 }; } },
     $queryRaw: async () => [],
     client: { findFirst: async () => ({ id: "client-a", name: "Synthetic client", email: "fixture@example.invalid" }) },
     portfolioSelectionPurchase: { create: async ({ data }: any) => {
@@ -78,6 +80,10 @@ test("finalization snapshots server package values and serializes duplicate/conc
   const loaded = load(db);
   const result = await Promise.all([loaded.finalizeProofSelection({ token: "token-a", expectedTermsVersion, itemIds: ["item-a"], totalCents: 1 }), loaded.finalizeProofSelection({ token: "token-a", expectedTermsVersion, itemIds: ["item-a"] })]);
   assert.equal(createCount, 1);
+  assert.equal(expiryWrites.length, 1, "Repeated finalization does not extend the window");
+  assert.equal(expiryWrites[0].data.expiresAt.getTime(), f.purchase.createdAt.getTime() + 14 * 86400000);
+  assert.equal(expiryWrites[0].where.clientId, "client-a");
+  assert.equal(expiryWrites[0].where.status, "ACTIVE");
   assert.ok(result.every(r => r.status === "RELEASED"));
   await assert.rejects(loaded.finalizeProofSelection({ token: "token-a", expectedTermsVersion, itemIds: ["other"] }), /already has a finalized/);
 });
@@ -180,4 +186,21 @@ test("session proof pricing follows the selected user-created add-on and detects
   assert.equal(await api.authorizeGalleryOriginal(request), false, "No unfinalized originals leak through the old direct delivery path");
   (f.gallery as any).extraPhotoAddOn.siteId = "other-site";
   assert.equal(await api.getProofSelection("token-a"), null);
+});
+
+
+test("the 14-day deadline gates ZIPs, originals and the delivery view", async () => {
+  const f = fixture();
+  const api = load({ portfolioGalleryAccess: { findFirst: async () => f.access }, portfolioProofBundle: { findUnique: async () => ({state:"READY", key:"proof-zips/v2/test", sizeBytes:BigInt(10)}) } });
+  f.purchase.createdAt = new Date(Date.now() - 14 * 86400000 + 60000);
+  assert.equal((await api.getProofSelection("token-a")).purchase.bundle.state, "READY");
+  assert.ok(await api.getReleasedProofBundle("token-a", "site-a"));
+  f.purchase.createdAt = new Date(Date.now() - 14 * 86400000);
+  const expired = (await api.getProofSelection("token-a")).purchase;
+  assert.equal(expired.status, "EXPIRED");
+  assert.equal(expired.bundle, null);
+  assert.equal(expired.canRetryCheckout, false);
+  assert.equal(expired.downloadExpiresAt, new Date(f.purchase.createdAt.getTime() + 14 * 86400000).toISOString());
+  assert.equal(await api.getReleasedProofBundle("token-a", "site-a"), null);
+  assert.equal(await api.authorizeGalleryOriginal(request), false);
 });

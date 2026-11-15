@@ -44,7 +44,7 @@ export async function GET(request: Request, { params }: Props) {
     const expires = Math.floor(Date.now() / 1000) + 300;
     const signature = proofExportSignature(selection.accessId, selection.purchaseId, expires);
     const query = new URLSearchParams({ access: selection.accessId, purchase: selection.purchaseId, expires: String(expires), signature });
-    if (search.get("inline") === "1") {
+    if (search.get("format") === "json" || search.get("inline") === "1") {
       query.set("inline", "1");
       return Response.json({ path: `/proof-export?${query}` }, { headers: proofBundleHeaders });
     }

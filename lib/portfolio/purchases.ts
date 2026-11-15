@@ -9,6 +9,10 @@ import { purchaseReleaseStatus, sameSelection, selectionQuote } from "./selectio
 
 export const proofArchivePrefix = "proof-zips/v2/";
 
+function downloadExpiresAt(purchase: { createdAt: Date }) {
+  return new Date(purchase.createdAt.getTime() + 14 * 24 * 60 * 60 * 1000);
+}
+
 export class ProofSelectionError extends Error {
   constructor(message: string, public status: 400 | 404 | 409 | 503 = 400) { super(message); }
 }
@@ -17,7 +21,7 @@ export type ProofSelectionView = {
   termsVersion: string;
   includedCount: number; extraImagePriceCents: number; currency: string;
   items: Array<{ id: string; title: string | null; altText: string | null }>;
-  purchase: null | { id: string; status: string; selectedItemIds: string[]; includedCount: number; extraCount: number; extraImagePriceCents: number; totalCents: number; currency: string; checkoutUrl: string | null; canRetryCheckout: boolean; bundle: null | { state: string; sizeBytes: number | null } };
+  purchase: null | { id: string; status: string; downloadExpiresAt: string; downloadExpiresLabel: string; selectedItemIds: string[]; includedCount: number; extraCount: number; extraImagePriceCents: number; totalCents: number; currency: string; checkoutUrl: string | null; canRetryCheckout: boolean; bundle: null | { state: string; sizeBytes: number | null } };
 };
 
 const purchaseInclude = { selections: { include: { mediaAsset: true, item: true } }, order: { include: { payments: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] } } } } satisfies Prisma.PortfolioSelectionPurchaseInclude;
@@ -70,6 +74,7 @@ function termsVersion(gallery: { selectionAllowance: number | null; extraPhotoPr
 function releaseStatus(purchase: Prisma.PortfolioSelectionPurchaseGetPayload<{ include: typeof purchaseInclude }>) {
   if (purchase.revokedAt) return "REFUNDED";
   if (purchase.order && (purchase.order.siteId !== purchase.siteId || purchase.order.clientId !== purchase.clientId)) return "BLOCKED";
+  if (downloadExpiresAt(purchase).getTime() <= Date.now()) return "EXPIRED";
   return purchaseReleaseStatus(purchase);
 }
 
@@ -91,9 +96,9 @@ export async function getProofSelection(token: string): Promise<ProofSelectionVi
     includedCount: gallery.selectionAllowance!, extraImagePriceCents: gallery.extraPhotoPriceCents!, currency: gallery.selectionCurrency!,
     items: gallery.items.filter(item => item.type === "IMAGE" && item.isDownloadable && item.mediaAsset?.isPrivate && !item.mediaAsset.deletedAt && item.mediaAsset.siteId === settings.siteId && ["S3", "R2", "SERVER_ASSETS"].includes(item.mediaAsset.driver)).map(item => ({ id: item.id, title: item.title, altText: item.altText })),
     purchase: purchase ? {
-      id: purchase.id, status, selectedItemIds: purchase.selections.map(s => s.itemId), includedCount: purchase.allowance, extraCount: purchase.extraCount, extraImagePriceCents: purchase.extraPriceCents, totalCents: purchase.totalCents, currency: purchase.currency,
+      id: purchase.id, status, downloadExpiresAt: downloadExpiresAt(purchase).toISOString(), downloadExpiresLabel: new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true, timeZone: settings.timezone, timeZoneName: "short" }).format(downloadExpiresAt(purchase)), selectedItemIds: purchase.selections.map(s => s.itemId), includedCount: purchase.allowance, extraCount: purchase.extraCount, extraImagePriceCents: purchase.extraPriceCents, totalCents: purchase.totalCents, currency: purchase.currency,
       checkoutUrl: status === "PENDING" ? purchase.order?.checkoutUrl || null : null,
-      canRetryCheckout: purchase.totalCents > 0 && !purchase.revokedAt && status !== "RELEASED" && status !== "REFUNDED" && Boolean(purchase.order && ["PENDING", "CANCELED"].includes(purchase.order.status) && purchase.order.siteId === settings.siteId && purchase.order.clientId === access.clientId && purchase.order.totalCents === purchase.totalCents && purchase.order.currency === purchase.currency),
+      canRetryCheckout: purchase.totalCents > 0 && !purchase.revokedAt && status !== "RELEASED" && status !== "REFUNDED" && status !== "EXPIRED" && Boolean(purchase.order && ["PENDING", "CANCELED"].includes(purchase.order.status) && purchase.order.siteId === settings.siteId && purchase.order.clientId === access.clientId && purchase.order.totalCents === purchase.totalCents && purchase.order.currency === purchase.currency),
       bundle: canBundle
         ? { state: staleArchive ? "NEW" : bundle?.state || "NEW", sizeBytes: staleArchive || bundle?.sizeBytes == null ? null : Number(bundle.sizeBytes) } : null
     } : null
@@ -158,10 +163,15 @@ export async function finalizeProofSelection(input: { token: string; itemIds: st
       items: { create: { productId: gallery.extraPhotoAddOn?.commerceProductId || gallery.packageProductId!, name: gallery.extraPhotoAddOn?.name || `${gallery.title}: extra selected photos`, quantity: quote.extraCount, unitPriceCents: gallery.extraPhotoPriceCents!, lineTotalCents: quote.totalCents } },
       payments: { create: { provider: provider!, status: "PENDING", amountCents: quote.totalCents, currency: gallery.selectionCurrency! } }
     } }) : null;
-    return tx.portfolioSelectionPurchase.create({ data: { galleryId: gallery.id, siteId: settings.siteId, clientId: client.id, packageProductId: gallery.packageProductId, extraPhotoAddOnId: gallery.extraPhotoAddOnId, packageName: gallery.extraPhotoAddOn?.name || gallery.packageProduct!.name, allowance: gallery.selectionAllowance!, extraPriceCents: gallery.extraPhotoPriceCents!, currency: gallery.selectionCurrency!, ...quote, selectedCount: selected.length, orderId: order?.id, selections: { create: selected.map(item => ({ itemId: item!.id, mediaAssetId: item!.mediaAssetId! })) } }, include: purchaseInclude });
+    const created = await tx.portfolioSelectionPurchase.create({ data: { galleryId: gallery.id, siteId: settings.siteId, clientId: client.id, packageProductId: gallery.packageProductId, extraPhotoAddOnId: gallery.extraPhotoAddOnId, packageName: gallery.extraPhotoAddOn?.name || gallery.packageProduct!.name, allowance: gallery.selectionAllowance!, extraPriceCents: gallery.extraPhotoPriceCents!, currency: gallery.selectionCurrency!, ...quote, selectedCount: selected.length, orderId: order?.id, selections: { create: selected.map(item => ({ itemId: item!.id, mediaAssetId: item!.mediaAssetId! })) } }, include: purchaseInclude });
+    await tx.portfolioGalleryAccess.updateMany({
+      where: { siteId: settings.siteId, galleryId: gallery.id, clientId: client.id, status: "ACTIVE", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+      data: { expiresAt: downloadExpiresAt(created) }
+    });
+    return created;
   }, { timeout: 15000 });
   const status = releaseStatus(purchase);
-  if (status === "RELEASED" || status === "REFUNDED" || !purchase.orderId) return { purchaseId: purchase.id, checkoutUrl: null, status };
+  if (status === "RELEASED" || status === "REFUNDED" || status === "EXPIRED" || !purchase.orderId) return { purchaseId: purchase.id, checkoutUrl: null, status };
   try {
     return await recoverGalleryCheckout({ purchaseId: purchase.id, siteId: settings.siteId });
   } catch (error) {
