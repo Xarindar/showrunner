@@ -4,8 +4,11 @@ import { renderEmailBuilderHtml } from "@/lib/email-builder/render";
 import { stringArrayFromUnknown } from "@/lib/format";
 import { sanitizeEmailHtml } from "./sanitize";
 import type { EmailTokens } from "./types";
+import { customerEmailDefault, customerEmailLayout } from "./customer-layouts";
 
 type StoredTemplate = {
+  key?: string | null;
+  version?: number;
   subject: string;
   previewText: string;
   body: string;
@@ -72,12 +75,22 @@ export async function renderEmailTemplate(template: StoredTemplate, tokens: Emai
     throw new Error(`Missing email template token: ${missing.join(", ")}`);
   }
 
-  const textSource = template.textBody || template.body;
+  let textSource = template.textBody || template.body;
+  const defaults = customerEmailDefault(template.key);
+  const useCustomerLayout = defaults && template.key && template.version === 1 && !hasBuilderJson(template.builderJson) &&
+    template.subject === defaults.subject && template.htmlBody.replaceAll("\r\n", "\n") === defaults.htmlBody &&
+    textSource.replaceAll("\r\n", "\n") === defaults.textBody;
+  if (useCustomerLayout && template.key !== "portfolio.session.ready") {
+    if (tokens.appointmentTimezone) textSource = textSource.replace("{{appointmentTime}}", "{{appointmentTime}} {{appointmentTimezone}}");
+    if (tokens.appointmentLocation) textSource += "\n\nWhere: {{appointmentLocation}}" + (tokens.mapsUrl ? "\n{{mapsUrl}}" : "");
+    if (tokens.calendarUrl) textSource += "\n\nAdd to calendar: {{calendarUrl}}";
+    if (tokens.sessionPrepNote && template.key === "booking.confirmed.customer") textSource += "\n\nBefore your appointment: {{sessionPrepNote}}";
+  }
   const htmlSource = hasBuilderJson(template.builderJson)
     ? isReactEmailBuilderDocument(template.builderJson)
       ? template.htmlBody || textToHtml(textSource)
       : await renderEmailBuilderHtml(template.builderJson)
-    : template.htmlBody || textToHtml(textSource);
+    : useCustomerLayout && template.key ? customerEmailLayout(template.key, tokens) : template.htmlBody || textToHtml(textSource);
 
   return {
     subject: renderText(template.subject, tokens),

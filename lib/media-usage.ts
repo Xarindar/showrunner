@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 export const mediaReferenceCountSelect = {
+  emailHeaderLogos: true,
   clientFiles: true,
   productMedia: true,
   serviceCategories: true,
@@ -17,6 +18,7 @@ export function mediaReferenceCount(counts: Record<keyof typeof mediaReferenceCo
 
 // Recheck references in the write, not only in a preflight/UI warning.
 export const unreferencedMediaWhere = {
+  emailHeaderLogos: { none: {} },
   clientFiles: { none: {} },
   productMedia: { none: {} },
   serviceCategories: { none: {} },

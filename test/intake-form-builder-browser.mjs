@@ -14,8 +14,9 @@ const bundle=await build({
     createRoot(document.getElementById('root')).render(<div className="showrunner-admin"><main className="admin-main" style={{height:'auto'}}><NotificationProvider><FormsTerms initialDocuments={[]}/></NotificationProvider></main></div>);
   `},bundle:true,write:false,outdir:'.tmp/intake-builder-test',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"','process.env':'{}'},logLevel:'silent',
   plugins:[{name:'local-documents',setup(build){
+    build.onResolve({filter:/^next\/navigation$/},()=>({path:'navigation',namespace:'local-documents'}));
     build.onResolve({filter:/^\.\/forms-terms-actions$/},()=>({path:'documents',namespace:'local-documents'}));
-    build.onLoad({filter:/.*/,namespace:'local-documents'},()=>({contents:'export async function saveBookingDocument(input){return {document:{...structuredClone(input),id:input.id||crypto.randomUUID(),version:(input.version||0)+1}}}',loader:'js'}));
+    build.onLoad({filter:/.*/,namespace:'local-documents'},args=>({contents:args.path==='navigation'?'export const useRouter=()=>({push(path){window.lastRoute=path},refresh(){}})':'export async function saveBookingDocument(input){return {document:{...structuredClone(input),id:input.id||crypto.randomUUID(),version:(input.version||0)+1}}}',loader:'js'}));
   }}]
 });
 const css=bundle.outputFiles.find(file=>file.path.endsWith('.css')).text;
@@ -68,9 +69,7 @@ try{
   }
   await builder.getByRole('button',{name:'Forms & Terms',exact:true}).click();
   await page.getByRole('button',{name:'New terms',exact:true}).click();
-  await page.getByRole('textbox',{name:'Terms name',exact:true}).fill('Studio terms');
-  await page.getByRole('textbox',{name:'Booking terms',exact:true}).fill('Please review before booking.');
-  await page.getByRole('dialog').getByRole('button',{name:'Save',exact:true}).click();
+  assert.equal(await page.evaluate(()=>window.lastRoute),'/admin/modules/appointments/forms-terms/terms/new');
   await page.waitForFunction(()=>Array.from(document.querySelectorAll('[data-responsive-table-frame]')).every(el=>el.dataset.tableLayout==='cards'));
   await page.screenshot({path:resolve(captures,'forms-mobile-rows.png')});
   assert.deepEqual(errors,[]);

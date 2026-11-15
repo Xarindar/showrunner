@@ -8,6 +8,8 @@ import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import sharp from "sharp";
+import { ZipArchive } from "archiver";
+import type { PutObjectCommand } from "@aws-sdk/client-s3";
 import { galleryProofMaxEdge, galleryProofObjectKey, renderGalleryProof } from "../lib/media-proofs";
 import { photoVariantKey } from "../lib/photo-variants";
 import { mediaReferenceCount, unreferencedMediaWhere } from "../lib/media-usage";
@@ -135,7 +137,7 @@ test("actual proofs shrink pixels, burn visible marks into every quadrant, strip
 });
 
 test("shared media counts and write guards include galleries and immutable purchased selections", () => {
-  assert.equal(mediaReferenceCount({ clientFiles: 1, productMedia: 2, services: 3, rectangularServices: 0, galleryServices: 0, serviceCategories: 4, portfolioItems: 5, purchasedSelections: 6 }), 21);
+  assert.equal(mediaReferenceCount({ emailHeaderLogos: 1, clientFiles: 1, productMedia: 2, services: 3, rectangularServices: 0, galleryServices: 0, serviceCategories: 4, portfolioItems: 5, purchasedSelections: 6 }), 22);
   assert.deepEqual(unreferencedMediaWhere.portfolioItems, { none: {} });
   assert.deepEqual(unreferencedMediaWhere.purchasedSelections, { none: {} });
 });
@@ -178,6 +180,29 @@ test("real private proof delivery caches separately and never returns the source
     await writeFile(path.join(directory, "broken.jpg"), Buffer.from("corrupt"));
     assert.equal(await media.galleryProofResponse({ ...source, key: "broken.jpg" }, "FULL"), null);
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("the S3 uploader accepts the Archiver stream and sends a private ZIP", async () => {
+  const uploads: PutObjectCommand["input"][] = [];
+  const media = mediaHarness(os.tmpdir(), {
+    "@aws-sdk/client-s3": {
+      ...await import("@aws-sdk/client-s3"),
+      S3Client: class {
+        config = { endpoint: async () => new URL("https://storage.example"), forcePathStyle: true };
+        async send(command: PutObjectCommand) {
+          uploads.push(command.input);
+          return {};
+        }
+      }
+    }
+  }, { S3_BUCKET: "private-photos", S3_ENDPOINT: "https://storage.example", S3_ACCESS_KEY_ID: "fixture", S3_SECRET_ACCESS_KEY: "fixture" });
+  const zip = new ZipArchive({ store: true });
+  zip.append(Buffer.from("sample original"), { name: "photo.jpg" });
+  await Promise.all([media.storeProofArchive("S3", "proof-zips/sample.zip", zip, new AbortController()), zip.finalize()]);
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].CacheControl, "private, no-store");
+  assert.equal(uploads[0].ContentType, "application/zip");
+  assert.match(Buffer.from(uploads[0].Body as Uint8Array).toString(), /sample original/);
 });
 
 test("entitled object-storage originals use short-lived exact-key signed attachment URLs", async () => {
@@ -235,7 +260,7 @@ function actionHarness(references: number, archiveWriteCount = 1, privacy?: { de
     "@/lib/media": { mediaAssetIdFromUrl: () => "", normalizeMediaFolder: (value: string) => value, mediaTagsFromInput: () => [], supportsPrivateMediaDriver: () => true },
     "@/lib/media-usage": { mediaReferenceCount, mediaReferenceCountSelect: {}, unreferencedMediaWhere },
     "@/modules/content/hero-presentation": {},
-    "@/lib/prisma": { prisma: { mediaAsset: { findFirst: async () => ({ id: "asset-a", driver: "S3", isPrivate: privacy?.existing, clientFiles: [], portfolioItems: references ? [{ id: "item-a" }] : [], purchasedSelections: privacy?.purchased ? [{ id: "purchase-a" }] : [], _count: { clientFiles: 0, productMedia: 0, services: 0, rectangularServices: 0, galleryServices: 0, serviceCategories: 0, portfolioItems: references, purchasedSelections: 0 } }), updateMany: async (query: unknown) => { writes.push(query); return { count: archiveWriteCount }; } } } }
+    "@/lib/prisma": { prisma: { mediaAsset: { findFirst: async () => ({ id: "asset-a", driver: "S3", isPrivate: privacy?.existing, clientFiles: [], portfolioItems: references ? [{ id: "item-a" }] : [], purchasedSelections: privacy?.purchased ? [{ id: "purchase-a" }] : [], _count: { emailHeaderLogos: 0, clientFiles: 0, productMedia: 0, services: 0, rectangularServices: 0, galleryServices: 0, serviceCategories: 0, portfolioItems: references, purchasedSelections: 0 } }), updateMany: async (query: unknown) => { writes.push(query); return { count: archiveWriteCount }; } } } }
   };
   // The schemas are real Zod, so use real primitive input types even though the
   // form parser is substituted to exercise only the server-side action guard.
@@ -303,6 +328,26 @@ test("server asset folders inside Next public cannot serve as private storage", 
   const publicStorage = mediaHarness(root, {}, { MEDIA_ASSET_DIR: path.join(root, "public", "uploads") });
   assert.equal(publicStorage.supportsPrivateMediaDriver("SERVER_ASSETS"), false);
   assert.equal(publicStorage.supportsPrivateMediaDriver("REPO"), false);
+});
+
+test("Drive ZIP reads stream only the requested bytes and report the archive size", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "showrunner-drive-test-"));
+  try {
+    await writeFile(path.join(directory, "photos.zip"), "PK01234567");
+    const media = mediaHarness(directory);
+    const get = (range: string) => media.deliverProofArchive("SERVER_ASSETS", "photos.zip", "photos.zip", BigInt(10), true,
+      new Request("https://example.test", { headers: { range } })) as Promise<Response>;
+    const first = await get("bytes=0-3");
+    assert.equal(first.status, 206);
+    assert.equal(first.headers.get("content-range"), "bytes 0-3/10");
+    assert.equal(first.headers.get("content-length"), "4");
+    assert.equal(await first.text(), "PK01");
+    const tail = await get("bytes=-3");
+    assert.equal(await tail.text(), "567");
+    const invalid = await get("bytes=10-");
+    assert.equal(invalid.status, 416);
+    assert.equal(invalid.headers.get("content-range"), "bytes */10");
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
 test("shoot proofs and originals reject active links assigned to a different or missing client", async () => {

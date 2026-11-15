@@ -67,6 +67,7 @@ export type ClientShootGallery = {
   imageStatus: ReturnType<typeof clientGalleryImageStatus>;
   selectionComplete?: boolean;
   selectionReady?: boolean;
+  allPhotosIncluded?: boolean;
   photosSent?: boolean;
   packageName: string;
   extraPhotoAddOnId?: string | null;
@@ -102,7 +103,7 @@ export type ClientGalleryWorkspace = {
   clientEmail: string;
   canSendEmail: boolean;
   galleries: ClientShootGallery[];
-  sessions: Array<{ id: string; name: string; date: string; includedPhotos?: number }>;
+  sessions: Array<{ id: string; name: string; date: string; includedPhotos?: number | null }>;
   today: string;
   packages: ClientGalleryPackage[];
   canUpload: boolean;

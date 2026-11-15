@@ -1,9 +1,11 @@
 import { BookingStatus, EmailCategory } from "@prisma/client";
 import type { BillingDocumentEmailInput } from "@/lib/billing/documents";
 import { formatTime, formatDateTime, formatMoney } from "@/lib/format";
+import { prisma } from "@/lib/prisma";
 import { getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
 import { queueAdminEmail, queueEmail } from "./queue";
 import type { EmailTokens } from "./types";
+import { bookingCalendarLinks } from "@/lib/email/customer-layouts";
 
 type BookingForEmail = {
   id: string;
@@ -14,9 +16,13 @@ type BookingForEmail = {
   endsAt: Date;
   status: BookingStatus;
   cancellationReason?: string | null;
+  sessionLocation?: string | null;
   service: {
     name: string;
+    category?: string;
+    location?: string | null;
   };
+  resources?: { resource: { location: string | null } }[];
 };
 
 type FormForEmail = {
@@ -59,12 +65,26 @@ function appointmentTime(booking: BookingForEmail, timeZone: string) {
   return `${formatDateTime(booking.startsAt, timeZone)} - ${endTime(booking.endsAt, timeZone)}`;
 }
 
+function appointmentTimezone(value: Date, timeZone: string) {
+  return new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "short" })
+    .formatToParts(value).find(part => part.type === "timeZoneName")?.value || timeZone;
+}
+
 async function settingsForSite(siteId?: string) {
   return siteId ? getSiteSettingsForSite(siteId) : getSiteSettings();
 }
 
 async function bookingTokens(booking: BookingForEmail): Promise<EmailTokens> {
   const settings = await settingsForSite(booking.siteId);
+  let location = booking.sessionLocation?.trim() || "";
+  if (!location && (booking.status === BookingStatus.PENDING || booking.status === BookingStatus.CONFIRMED)) {
+    const resources = booking.resources ?? await prisma.bookingResource.findMany({
+      where: { bookingId: booking.id, siteId: settings.siteId, resource: { siteId: settings.siteId } },
+      select: { resource: { select: { location: true } } }
+    });
+    const addresses = new Set(resources.map(({ resource }) => resource.location?.trim()).filter(Boolean));
+    location = (addresses.size === 1 ? [...addresses][0] : "") || booking.service.location?.trim() || "";
+  }
 
   return {
     businessName: settings.businessName,
@@ -74,6 +94,12 @@ async function bookingTokens(booking: BookingForEmail): Promise<EmailTokens> {
     appointmentStartsAt: booking.startsAt,
     appointmentEndsAt: booking.endsAt,
     appointmentTime: appointmentTime(booking, settings.timezone),
+    appointmentTimezone: appointmentTimezone(booking.startsAt, settings.timezone),
+    appointmentLocation: location,
+    ...bookingCalendarLinks({
+      startsAt: booking.startsAt, endsAt: booking.endsAt, title: booking.service.name,
+      location, confirmed: booking.status === BookingStatus.CONFIRMED
+    }),
     timezone: settings.timezone,
     bookingStatus: booking.status,
     cancellationReason: booking.cancellationReason || "No reason provided.",
@@ -91,19 +117,21 @@ async function logQueueError(label: string, callback: () => Promise<void>) {
 
 export async function queueBookingCreatedEmails(booking: BookingForEmail) {
   const tokens = await bookingTokens(booking);
+  const confirmed = booking.status === BookingStatus.CONFIRMED;
 
   await Promise.all([
     logQueueError("booking-created-customer", () =>
       queueEmail({
         siteId: booking.siteId,
-        templateKey: "booking.created.customer",
+        templateKey: confirmed ? "booking.confirmed.customer" : "booking.created.customer",
+        brandCategory: booking.service.category,
         recipientEmail: booking.customerEmail,
         recipientName: booking.customerName,
         category: EmailCategory.TRANSACTIONAL,
         relatedType: "booking",
         relatedId: booking.id,
         tokens,
-        idempotencyKey: `booking:${booking.id}:created:customer`
+        idempotencyKey: `booking:${booking.id}:${confirmed ? "confirmed" : "created"}:customer`
       })
     ),
     logQueueError("booking-created-admin", () =>
@@ -152,6 +180,7 @@ export async function queueBookingStatusEmail(
       queueEmail({
         siteId: booking.siteId,
         templateKey: "booking.confirmed.customer",
+        brandCategory: booking.service.category,
         recipientEmail: booking.customerEmail,
         recipientName: booking.customerName,
         category: EmailCategory.TRANSACTIONAL,

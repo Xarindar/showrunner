@@ -15,12 +15,14 @@ mkdirSync(captures, { recursive: true });
 await build({
   stdin: { resolveDir: process.cwd(), loader: "tsx", contents: `
     import React from 'react'; import {createRoot} from 'react-dom/client';
+    import {NotificationProvider} from './components/ui/notifications';
+    import './app/admin/notifications.css';
     import {EmailConnectionPanel} from './modules/settings/email-connection-panel';
     import {SettingsNav} from './modules/settings/settings-nav';
     import './app/globals.css'; import './app/admin/design-tokens.css'; import './app/admin/design-system.css';
     const state=new URLSearchParams(location.search).get('state'); window.actions=[];
     const connection=state==='empty'?null:{kind:'ionos',fromName:'Studio',fromEmail:'bookings@studio.example',replyToEmail:'owner@example.com',smtpHost:'smtp.ionos.com',smtpPort:465,smtpUser:'bookings@studio.example',revision:1,connectionError:state==='error'?'Check the API key and verify your sender domain.':''};
-    createRoot(document.getElementById('root')).render(<div className="showrunner-admin"><main className="admin-main"><div className="stack"><header className="page-header"><h1>Email</h1></header><div className="admin-settings-layout"><SettingsNav active="email"/><div className="stack"><EmailConnectionPanel connection={connection} businessName="Studio" contactEmail="owner@example.com"/></div></div></div></main></div>);
+    createRoot(document.getElementById('root')).render(<div className="showrunner-admin"><NotificationProvider><main className="admin-main"><div className="stack"><header className="page-header"><h1>Email</h1></header><div className="admin-settings-layout"><SettingsNav active="email"/><div className="stack"><EmailConnectionPanel connection={connection} businessName="Studio" contactEmail="owner@example.com"/></div></div></div></main></NotificationProvider></div>);
   ` }, bundle: true, outfile: output + ".js", jsx: "automatic",
   plugins: [{ name: "fixture", setup(b) {
     b.onResolve({ filter: /email-actions$/ }, () => ({ path: "actions", namespace: "fixture" }));
@@ -130,7 +132,7 @@ try {
         await page.getByRole('button',{name:'Next',exact:true}).click();
         await page.evaluate(()=>window.failTest=false);
         await page.getByRole('dialog').getByRole('button',{name:'Send test email',exact:true}).click();
-        await page.getByText('Test email sent. Check your inbox, then choose Done to save this connection.',{exact:true}).waitFor();
+        await page.getByText('Check your inbox, then choose Done to save this connection.',{exact:true}).waitFor();
         assert.equal(await page.getByRole('button',{name:'Done',exact:true}).isEnabled(),true);
         assert.deepEqual(await page.evaluate(()=>window.actions),['test','test']);
         await page.getByRole('button',{name:'Back',exact:true}).click();
@@ -138,7 +140,7 @@ try {
         await page.getByRole('button',{name:'Next',exact:true}).click();
         assert.equal(await page.getByRole('button',{name:'Done',exact:true}).isDisabled(),true);
         await page.getByRole('dialog').getByRole('button',{name:'Send test email',exact:true}).click();
-        await page.getByText('Test email sent. Check your inbox, then choose Done to save this connection.',{exact:true}).waitFor();
+        await page.getByText('Check your inbox, then choose Done to save this connection.',{exact:true}).waitFor();
         await page.getByRole('button',{name:'Done',exact:true}).click();
         await page.waitForFunction(()=>window.saved===true);
         assert.deepEqual(await page.evaluate(()=>window.actions),['test','test','test','save']);

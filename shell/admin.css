@@ -463,11 +463,6 @@
     margin-inline: calc(-1 * var(--sd-space-16));
     padding-inline: calc(var(--sd-space-16) + var(--admin-sticky-footer-inline-padding, 0));
   }
-  .showrunner-admin .admin-main > .stack > .page-header,
-.showrunner-admin .admin-main > .product-studio-page > .product-studio-header {
-    position: static;
-    top: auto;
-  }
   .showrunner-admin .admin-main > .product-studio-page > .product-studio-header {
     border-radius: 0;
     margin-inline: calc(-1 * var(--sd-space-16));
@@ -741,7 +736,6 @@
     gap: var(--sd-space-12);
     margin-inline: 0;
     padding: var(--sd-space-12) 0;
-    position: static;
   }
 }
 .showrunner-admin .admin-settings-layout {
@@ -813,6 +807,12 @@
 .showrunner-admin .admin-page-menu,
 .showrunner-admin .admin-page-menu-anchor { display: none; }
 @media (max-width: 860px) {
+  .showrunner-admin .admin-main :is(header:has(h1), .product-studio-header, [data-admin-page-header]):not(dialog *) {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    background: var(--admin-chrome-bg);
+  }
   .showrunner-admin .admin-root .admin-main :is(header:has(h1), .product-studio-header, [data-admin-page-header]):not(.appointments-subtle-header):not(:has(a[href] svg.lucide-arrow-left)):not(.has-mobile-shell-header > *) {
     min-block-size: var(--sd-layout-touch-target);
     padding-inline-end: calc(var(--space-4) + var(--sd-layout-touch-target) + var(--space-3));

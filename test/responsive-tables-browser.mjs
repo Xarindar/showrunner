@@ -46,31 +46,29 @@ try{
  await frame.getByRole('spinbutton',{name:'Quantity'}).evaluate(el=>{el.dataset.original='yes';});
  for(const width of [677,390,1440]){
   await page.setViewportSize({width,height:1000});
-  if(width!==677) await page.waitForFunction(expected=>document.querySelector('[aria-label="Editable records"]').dataset.tableLayout===expected,width===1440?'table':'cards');
-  else await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  await page.waitForFunction(expected=>document.querySelector('[aria-label="Small table"]').dataset.tableLayout===expected,width<=860?'cards':'table');
-  assert.equal(await small.getAttribute('data-table-layout'),width<=860?'cards':'table','Phones use simplified rows even when a small table would fit');
+  assert.equal(await frame.getAttribute('data-table-layout'),'table');
+  assert.equal(await small.locator('tbody tr').evaluate(el=>getComputedStyle(el).display),'table-row');
+  assert.equal(await small.getByRole('columnheader',{name:'Count'}).count(),1);
   await page.waitForFunction(expected=>document.querySelector('div[aria-label="Compact clients"]').dataset.tableLayout===expected,width<=860?'compact':'table');
   if(width<=860) {
     assert.equal(await compact.getByRole('columnheader',{name:'Email',exact:true}).count(),0);
     assert.equal(await compact.locator('tbody tr').evaluate(el=>getComputedStyle(el).display),'table-row');
     assert.equal(await compact.getByRole('button',{name:'Contact Sam'}).count(),1);
-    assert.equal(await small.locator('tbody tr').evaluate(el=>getComputedStyle(el).display),'grid');
-    assert.equal(await small.locator('td').last().getAttribute('data-table-label'),'Count');
   }
   assert.equal(await frame.getByRole('spinbutton',{name:'Quantity'}).getAttribute('data-original'),'yes','The same controls survive layout changes');
   assert.equal(await frame.getByRole('spinbutton',{name:'Quantity'}).inputValue(),'3');
-  assert.equal(await frame.locator('table').count(),1,'No separate mobile table or sizing probe remains');
-  assert(await frame.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Every display mode fits its workspace');
+  assert.equal(await frame.locator('table').count(),1,'No separate mobile table is rendered');
+  assert(await frame.evaluate(el=>el.getBoundingClientRect().right<=innerWidth),'Only the table frame can overflow horizontally');
+  if(width===390) assert(await frame.evaluate(el=>el.scrollWidth>el.clientWidth+1),'Wide tables scroll inside their frame on phones');
  }
  await page.setViewportSize({width:390,height:1000});
  await frame.getByRole('button',{name:'Save',exact:true}).click();
- assert.deepEqual(await page.evaluate(()=>window.submitted),{quantity:'3'},'Sizing probes do not add submitted fields');
+ assert.deepEqual(await page.evaluate(()=>window.submitted),{quantity:'3'});
  assert.equal(await page.getByLabel('Quantity',{exact:true}).count(),1);
  const touch=await browser.newPage({viewport:{width:932,height:430},hasTouch:true,isMobile:true});
  await touch.setContent('<style>'+css+'</style><div id="root">'+html+'</div>');await touch.addScriptTag({content:js});
- await touch.waitForFunction(()=>Array.from(document.querySelectorAll('[data-responsive-table-frame]')).every(el=>el.dataset.tableLayout===(el.getAttribute('aria-label')==='Compact clients'?'compact':'cards')));
- assert.equal(await touch.getByRole('region',{name:'Small table',exact:true}).getAttribute('data-table-layout'),'cards','Landscape touch devices also use simplified rows');
+ await touch.waitForFunction(()=>Array.from(document.querySelectorAll('[data-responsive-table-frame]')).every(el=>el.dataset.tableLayout===(el.getAttribute('aria-label')==='Compact clients'?'compact':'table')));
+ assert.equal(await touch.getByRole('region',{name:'Small table',exact:true}).getByRole('columnheader',{name:'Count'}).count(),1);
  await touch.close();
  assert.deepEqual(await page.evaluate(()=>window.recoverable),[]);
  assert.deepEqual(errors,[]);

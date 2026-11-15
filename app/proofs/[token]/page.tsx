@@ -4,6 +4,7 @@ import { findActiveGalleryAccess } from "@/lib/portfolio/access";
 import Image from "next/image";
 import styles from "@/modules/portfolio/proof-client.module.css";
 import { getClientSessionDelivery, getProofSelection } from "@/lib/portfolio/purchases";
+import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
 import { ProofClient } from "@/modules/portfolio/proof-client";
 import { proofTokenSchema } from "@/modules/portfolio/api/proof-request";
@@ -32,5 +33,11 @@ export default async function ProofPage({ params }: { params: Promise<{ token: s
       <aside aria-label="Selection summary" className={styles.summary}><strong>Photo selection is being prepared</strong></aside>
     </main>;
   }
-  return <ProofClient brand={{ name: settings.businessName, logoUrl: settings.logoImageUrl }} initialView={selection} token={token} />;
+  const jazzr = await prisma.siteDomain.findFirst({ where: { siteId: settings.siteId, hostname: "admin.jazzrphotography.com" }, select: { id: true } });
+  const client = jazzr && access.clientId && await prisma.client.findFirst({
+    where: { id: access.clientId, siteId: settings.siteId }, select: { name: true }
+  });
+  const firstName = client ? client.name.trim().split(/\s+/)[0] : undefined;
+  return <>{jazzr && <link rel="stylesheet" href="/proof-delivery/jazzr-fonts.css" />}
+    <ProofClient brand={{ name: settings.businessName, logoUrl: settings.logoImageUrl, theme: jazzr ? "jazzr" : undefined, firstName }} initialView={selection} token={token} /></>;
 }

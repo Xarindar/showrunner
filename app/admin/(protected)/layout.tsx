@@ -1,5 +1,4 @@
 import { AdminSidebar } from "@/shell/admin-sidebar";
-import { NotificationProvider } from "@/components/ui/notifications";
 import { cookies } from "next/headers";
 import { requireAuthenticatedAdmin } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site";
@@ -33,7 +32,6 @@ export default async function AdminLayout({
 
   return (
     <div className="admin-root">
-      <NotificationProvider>
       <a className="admin-skip-link" href="#admin-main">Skip to content</a>
       <AdminSidebar
         publicSiteUrl={contentWebsiteUrl(resolveContentManifest(settings.siteId, settings.publicContentConfig))}
@@ -46,7 +44,6 @@ export default async function AdminLayout({
         userRole={user.role}
       />
       <main className="admin-main" id="admin-main" tabIndex={-1}>{children}</main>
-      </NotificationProvider>
     </div>
   );
 }

@@ -1,10 +1,12 @@
 import { z } from "zod";
+import { validateTermsDocument, type TermsNode } from "../../clients/booking/scripts/booking-terms.js";
 
 export const bookingRuleSchema = z.object({
   id: z.string().min(1).max(100),
   kind: z.enum(["intake", "policy"]),
   category: z.string().trim().min(1).max(80).transform(value => /^contracts?$/i.test(value) ? "Booking Terms & Conditions" : value),
   label: z.string().trim().min(1, "Add a question or booking terms.").max(20000),
+  richText: z.custom<TermsNode>(value => { try { validateTermsDocument(value); return true; } catch { return false; } }, "Use supported terms formatting and dynamic fields.").optional(),
   type: z.enum(["TEXT", "RADIO", "SELECT", "CHECKBOX", "DATE"]),
   width: z.enum(["FULL", "HALF", "THIRD"]).optional(),
   required: z.boolean(),
@@ -13,6 +15,7 @@ export const bookingRuleSchema = z.object({
   options: z.array(z.string().trim().min(1, "Add text for each choice, or remove empty choices.").max(200)).max(30),
   contactField: z.enum(["customerName", "customerEmail", "customerPhone"]).optional()
 }).superRefine((rule, ctx) => {
+  if (rule.richText && rule.kind !== "policy") ctx.addIssue({code:"custom",message:"Rich text is available for booking terms only."});
   if (rule.kind === "intake" && rule.label.length > 2000) ctx.addIssue({code:"custom",message:"Questions must be 2,000 characters or less."});
   const minimumChoices = rule.type === "CHECKBOX" ? 1 : 2;
   if (rule.kind === "intake" && ["RADIO", "SELECT", "CHECKBOX"].includes(rule.type) && (rule.options.length < minimumChoices || new Set(rule.options.map(value => value.toLowerCase())).size !== rule.options.length)) {

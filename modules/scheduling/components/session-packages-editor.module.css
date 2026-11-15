@@ -15,6 +15,8 @@
 .tierBody, .tierFields, .tierServices { display: grid; gap: var(--sd-space-12); min-width: 0; }
 .tierNumbers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sd-space-12); }
 .duration { display: grid; align-content: start; gap: var(--sd-space-8); min-width: 0; }
+.allowance { display: grid; align-content: start; gap: var(--sd-space-12); min-width: 0; }
+.allowance :global(.ui-switch-inline) { justify-content: space-between; width: 100%; }
 .editor .tierNumbers input[type="number"] { margin-top: 0; }
 .tierBody {
   box-sizing: border-box;
@@ -74,18 +76,33 @@
 .suggestionsTable td:last-child { text-align: center; }
 :global(.showrunner-admin) .packagesTable :global(.catalog-product-table) th:last-child {  text-align: center; }
 .packagesTable td:last-child { text-align: center; }
+.packageCell { display: flex; align-items: center; gap: var(--sd-space-4); }
+.packageCell .packageHandle { flex: none; cursor: grab; touch-action: none; }
+.packageCell .packageHandle:active { cursor: grabbing; }
+.packagesTable tr[data-package-sortable] { cursor: grab; }
+.packagesTable tbody[data-package-dragging] tr { transition: transform 180ms ease-out; }
+.packagesTable tbody[data-package-dragging] tr[data-package-picked-up] {
+  position: relative;
+  z-index: 1;
+  transform: translateY(var(--package-drag-y));
+  cursor: grabbing;
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .packagesTable tbody[data-package-dragging] tr { transition: none; }
+}
 .packageName { padding: 0; border: 0; background: transparent; color: var(--color-text); font: inherit; font-weight: var(--sd-type-weight-medium); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
 .packageName:focus-visible { outline: 2px solid var(--sd-color-focus); outline-offset: 2px; }
 
-.servicesTable .serviceActions { width: var(--data-table-actions-width); text-align: center; }
+.servicesTable .serviceActions { text-align: center; }
 
 .packagesTable > .servicesEmpty, .suggestionsTable > .servicesEmpty { min-block-size: var(--data-table-empty-height); }
 :global(.showrunner-admin) .suggestionsTable :global(.catalog-product-table) :is(th, td):nth-child(2) { text-align: right; }
 
 .packagesTable :global(.catalog-product-table) td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.packageName { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.packageName { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.bookingOptions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sd-space-12); }
+.bookingOptions { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sd-space-12); }
 .unitField { position: relative; display: block; min-width: 0; }
 .editor .unitField input { padding-inline-end: var(--sd-space-12); font-variant-numeric: tabular-nums; }
 .unit { position: absolute; top: 50%; transform: translateY(-50%); color: var(--color-muted); font-size: var(--sd-type-body-size); font-variant-numeric: tabular-nums; pointer-events: none; }
@@ -99,3 +116,5 @@
 
 .timeFrame { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: var(--sd-space-12); }
 @media (max-width: 600px) { .timeFrame { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.bookingOptions :global(.ui-field-label) { white-space: nowrap; }

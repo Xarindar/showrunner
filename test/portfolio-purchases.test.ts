@@ -11,7 +11,7 @@ import * as policy from "../lib/portfolio/selection-policy";
 function fixture() {
   const asset = { id: "asset-a", siteId: "site-a", isPrivate: true, deletedAt: null, driver: "S3", filename: "a.jpg" };
   const item = { id: "item-a", galleryId: "gallery-a", mediaAssetId: asset.id, isDownloadable: true, type: "IMAGE", mediaAsset: asset, title: "A", altText: "A" };
-  const purchase = { id: "purchase-a", galleryId: "gallery-a", siteId: "site-a", clientId: "client-a", allowance: 1, extraPriceCents: 900, extraCount: 0, totalCents: 0, currency: "USD", order: null, orderId: null, revokedAt: null as Date | null, selections: [{ itemId: item.id, mediaAssetId: asset.id, mediaAsset: asset, item }] };
+  const purchase = { id: "purchase-a", createdAt: new Date(), galleryId: "gallery-a", siteId: "site-a", clientId: "client-a", allowance: 1, extraPriceCents: 900, extraCount: 0, totalCents: 0, currency: "USD", order: null, orderId: null, revokedAt: null as Date | null, selections: [{ itemId: item.id, mediaAssetId: asset.id, mediaAsset: asset, item }] };
   const gallery = { id: "gallery-a", siteId: "site-a", clientId: "client-a", proofingEnabled: true, downloadEnabled: true, selectionAllowance: 1, extraPhotoPriceCents: 900, selectionCurrency: "USD", packageProductId: "product-a", packageProduct: { siteId: "site-a", type: "SERVICE_PACKAGE", name: "Package" }, purchasedOrder: { siteId: "site-a", clientId: "client-a", status: "PAID", items: [{ productId: "product-a" }] }, items: [item], purchase: purchase as typeof purchase | null };
   return { access: { id: "access-a", accessToken: "token-a", clientId: "client-a", galleryId: gallery.id, gallery }, asset, item, purchase, gallery };
 }
@@ -29,6 +29,7 @@ const request = { siteId: "site-a", galleryId: "gallery-a", itemId: "item-a", ac
 test("original authorization enforces client, gallery, immutable asset, tenant, controls and revoked payment", async () => {
   const cases = [
     (f: ReturnType<typeof fixture>) => { f.access.clientId = "client-other"; },
+    (f: ReturnType<typeof fixture>) => { f.purchase.createdAt = new Date(Date.now() - 14 * 86400000); },
     (f: ReturnType<typeof fixture>) => { f.purchase.revokedAt = new Date(); },
     (f: ReturnType<typeof fixture>) => { f.purchase.clientId = "client-other"; },
     (f: ReturnType<typeof fixture>) => { f.item.galleryId = "gallery-other"; },
@@ -42,7 +43,11 @@ test("original authorization enforces client, gallery, immutable asset, tenant, 
   for (const change of [null, ...cases]) {
     const f = fixture(); change?.(f);
     const db = { portfolioGalleryAccess: { findFirst: async () => f.access } };
-    assert.equal(await load(db).authorizeGalleryOriginal(request), change === null);
+    const api = load(db);
+    assert.equal(await api.authorizeGalleryOriginal(request), change === null);
+    const bundle = await api.getReleasedProofBundle("token-a", "site-a");
+    assert.equal(bundle?.assets.length ?? 0, change === null ? 1 : 0);
+    if (bundle) assert.equal(bundle.assets[0].asset.id, f.asset.id);
   }
   const f = fixture();
   assert.equal(await load({ portfolioGalleryAccess: { findFirst: async () => f.access } }).authorizeGalleryOriginal({ ...request, itemId: "not-selected" }), false);
@@ -58,9 +63,10 @@ test("expired/revoked access fails closed and query rechecks expiration and curr
 test("finalization snapshots server package values and serializes duplicate/concurrent requests", async () => {
   const f = fixture(); f.gallery.purchase = null;
   let createCount = 0;
+  const expiryWrites: any[] = [];
   let queue = Promise.resolve();
   const db: any = {
-    portfolioGalleryAccess: { findFirst: async () => f.access },
+    portfolioGalleryAccess: { findFirst: async () => f.access, updateMany: async (q: any) => { expiryWrites.push(q); return { count: 1 }; } },
     $queryRaw: async () => [],
     client: { findFirst: async () => ({ id: "client-a", name: "Synthetic client", email: "fixture@example.invalid" }) },
     portfolioSelectionPurchase: { create: async ({ data }: any) => {
@@ -74,6 +80,10 @@ test("finalization snapshots server package values and serializes duplicate/conc
   const loaded = load(db);
   const result = await Promise.all([loaded.finalizeProofSelection({ token: "token-a", expectedTermsVersion, itemIds: ["item-a"], totalCents: 1 }), loaded.finalizeProofSelection({ token: "token-a", expectedTermsVersion, itemIds: ["item-a"] })]);
   assert.equal(createCount, 1);
+  assert.equal(expiryWrites.length, 1, "Repeated finalization does not extend the window");
+  assert.equal(expiryWrites[0].data.expiresAt.getTime(), f.purchase.createdAt.getTime() + 14 * 86400000);
+  assert.equal(expiryWrites[0].where.clientId, "client-a");
+  assert.equal(expiryWrites[0].where.status, "ACTIVE");
   assert.ok(result.every(r => r.status === "RELEASED"));
   await assert.rejects(loaded.finalizeProofSelection({ token: "token-a", expectedTermsVersion, itemIds: ["other"] }), /already has a finalized/);
 });
@@ -117,7 +127,7 @@ test("client shoots stay separate from public Portfolio embeds, even with a toke
   await assert.rejects(exports.getPublicGallery({ siteId: "site-a", slug: "shoot", accessToken: "valid-token" }), /Gallery not found/);
 });
 
-test("manual session delivery permits only its active client link and private session originals", async () => {
+test("legacy unconfigured links show preparation and cannot authorize individual originals or bundles", async () => {
   function deliveryFixture() {
     const f = fixture();
     Object.assign(f.gallery, { slug: "wedding", title: "Wedding", description: "Evening", proofingEnabled: false, packageProductId: null, purchasedOrderId: null, purchase: null, bookingId: "booking-a", booking: { siteId: "site-a", clientId: "client-a", status: "COMPLETED" } });
@@ -125,11 +135,13 @@ test("manual session delivery permits only its active client link and private se
   }
   const valid = deliveryFixture();
   const api = load({ portfolioGalleryAccess: { findFirst: async () => valid.access } });
-  assert.equal(await api.authorizeGalleryOriginal({ ...request, mediaAssetId: "asset-a" }), true);
+  assert.equal(await api.authorizeGalleryOriginal({ ...request, mediaAssetId: "asset-a" }), false);
+  assert.equal(await api.getReleasedProofBundle("token-a", "site-a"), null);
   assert.equal(await api.authorizeGalleryOriginal({ ...request, mediaAssetId: "wrong-asset" }), false);
   assert.equal(await api.authorizeGalleryOriginal({ ...request, itemId: "foreign-photo" }), false);
   const delivery = await api.getClientSessionDelivery("token-a");
-  assert.equal(delivery.photos.length, 1); assert.match(delivery.photos[0].download, /variant=DOWNLOAD&download=1/);
+  assert.equal(delivery.title, "Wedding");
+  assert.equal(delivery.photos, undefined);
   const changes = [
     (f: any) => { f.gallery.booking.status = "CANCELED"; },
     (f: any) => { f.gallery.booking.clientId = "other-client"; },
@@ -150,7 +162,7 @@ test("manual session delivery permits only its active client link and private se
     const f = deliveryFixture(); change(f);
     const blocked = load({ portfolioGalleryAccess: { findFirst: async () => f.access } });
     assert.equal(await blocked.authorizeGalleryOriginal(request), false);
-    assert.equal((await blocked.getClientSessionDelivery("token-a")).photos.length, 0);
+    assert.equal(await blocked.getReleasedProofBundle("token-a", "site-a"), null);
   }
   const revoked = load({ portfolioGalleryAccess: { findFirst: async () => null } });
   assert.equal(await revoked.authorizeGalleryOriginal(request), false);
@@ -174,4 +186,46 @@ test("session proof pricing follows the selected user-created add-on and detects
   assert.equal(await api.authorizeGalleryOriginal(request), false, "No unfinalized originals leak through the old direct delivery path");
   (f.gallery as any).extraPhotoAddOn.siteId = "other-site";
   assert.equal(await api.getProofSelection("token-a"), null);
+});
+
+
+test("all-photo delivery snapshots only photographer-approved private gallery photos and bypasses selection", async () => {
+  const f:any=fixture();
+  Object.assign(f.gallery,{proofingEnabled:false,packageProductId:null,purchasedOrderId:null,extraPhotoAddOnId:null,purchase:null,
+    bookingId:"booking-a",booking:{siteId:"site-a",clientId:"client-a",status:"COMPLETED",packageSnapshot:{tierId:"gold",name:"Gold",durationMinutes:60,priceCents:50000,coverage:[],extras:[],deliverables:{finalPhotos:null}}}});
+  let creates=0;
+  const db:any={portfolioGalleryAccess:{findFirst:async()=>f.access},portfolioProofBundle:{findUnique:async()=>null},portfolioSelectionPurchase:{create:async({data}:any)=>{
+    creates++; f.gallery.purchase={...f.purchase,...data,packageProductId:null,extraPhotoAddOnId:null,selections:f.purchase.selections};return f.gallery.purchase;
+  }}};
+  const api=load(db);
+  await api.releaseAllSessionPhotos(db,"token-a","site-a");
+  await api.releaseAllSessionPhotos(db,"token-a","site-a");
+  assert.equal(creates,1);
+  assert.equal(f.gallery.purchase.totalCents,0);
+  assert.equal(f.gallery.purchase.selectedCount,1);
+  assert.equal((await api.getProofSelection("token-a")).purchase.status,"RELEASED");
+  assert.equal(await api.authorizeGalleryOriginal(request),true);
+  f.gallery.booking.packageSnapshot.deliverables.finalPhotos=10;
+  assert.equal(await api.getProofSelection("token-a"),null);
+  await assert.rejects(api.releaseAllSessionPhotos(db,"token-a","site-a"),/does not include all photos/);
+  f.gallery.booking.packageSnapshot.deliverables.finalPhotos=null;
+  f.gallery.purchase=null;f.asset.siteId="other-site";
+  await assert.rejects(api.releaseAllSessionPhotos(db,"token-a","site-a"),/unavailable/);
+  assert.equal(creates,1);
+});
+
+test("the 14-day deadline gates ZIPs, originals and the delivery view", async () => {
+  const f = fixture();
+  const api = load({ portfolioGalleryAccess: { findFirst: async () => f.access }, portfolioProofBundle: { findUnique: async () => ({state:"READY", key:"proof-zips/v2/test", sizeBytes:BigInt(10)}) } });
+  f.purchase.createdAt = new Date(Date.now() - 14 * 86400000 + 60000);
+  assert.equal((await api.getProofSelection("token-a")).purchase.bundle.state, "READY");
+  assert.ok(await api.getReleasedProofBundle("token-a", "site-a"));
+  f.purchase.createdAt = new Date(Date.now() - 14 * 86400000);
+  const expired = (await api.getProofSelection("token-a")).purchase;
+  assert.equal(expired.status, "EXPIRED");
+  assert.equal(expired.bundle, null);
+  assert.equal(expired.canRetryCheckout, false);
+  assert.equal(expired.downloadExpiresAt, new Date(f.purchase.createdAt.getTime() + 14 * 86400000).toISOString());
+  assert.equal(await api.getReleasedProofBundle("token-a", "site-a"), null);
+  assert.equal(await api.authorizeGalleryOriginal(request), false);
 });

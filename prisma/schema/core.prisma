@@ -48,6 +48,7 @@ model Site {
   updatedAt                DateTime                     @updatedAt
   domains                  SiteDomain[]
   settings                 SiteSettings?
+  emailHeaderLogos         EmailHeaderLogo[]
   heroPresentations        HeroPresentation[]
   blogCategories           BlogCategory[]
   blogPosts                BlogPost[]

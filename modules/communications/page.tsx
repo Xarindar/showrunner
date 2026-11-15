@@ -10,6 +10,8 @@ import { Copy, Mail, MessageSquareText, Plus, RotateCcw, ShieldOff } from "lucid
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { hasBuilderJson, renderEmailTemplate } from "@/lib/email/render";
+import { customerEmailBrand } from "@/lib/email/customer-brand";
+import { bookingCalendarLinks, customerEmailDefault } from "@/lib/email/customer-layouts";
 import { enumLabel, formatDateTime, stringArrayCsv, stringArrayFromUnknown } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettings } from "@/lib/site";
@@ -227,7 +229,22 @@ export default async function CommunicationsPage({ searchParams }: Communication
   const preview = previewTemplate ?
   await (async () => {
     try {
-      return { rendered: await renderEmailTemplate(previewTemplate, parsePreviewTokens(previewTokensText)), error: "" };
+      const tokens = parsePreviewTokens(previewTokensText);
+      if (!params.tokensJson && customerEmailDefault(previewTemplate.key)) {
+        const brand = await customerEmailBrand(settings);
+        Object.assign(tokens, brand);
+        if (previewTemplate.key?.startsWith("booking.")) {
+          tokens.appointmentTimezone = "CDT";
+          tokens.appointmentLocation = "123 Main St, Springfield";
+          Object.assign(tokens, bookingCalendarLinks({
+            title: String(tokens.serviceName), location: tokens.appointmentLocation,
+            startsAt: new Date("2026-06-16T15:00:00Z"), endsAt: new Date("2026-06-16T16:00:00Z"),
+            confirmed: previewTemplate.key === "booking.confirmed.customer"
+          }));
+          tokens.sessionPrepNote = "";
+        }
+      }
+      return { rendered: await renderEmailTemplate(previewTemplate, tokens), error: "" };
     } catch (error) {
       return { rendered: null, error: error instanceof Error ? error.message : "Could not render preview." };
     }
@@ -641,7 +658,7 @@ export default async function CommunicationsPage({ searchParams }: Communication
               toolbarLabel="Email preview tools"
             />
           </div>
-          {preview?.error ? <div className="error">{preview.error}</div> : null}
+          {preview?.error ? <Notification tone="danger">{preview.error}</Notification> : null}
           {preview?.rendered ?
           <div className="subpanel stack">
               <div>

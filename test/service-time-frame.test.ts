@@ -47,7 +47,7 @@ function harness() {
   };
   const settings = { siteId: "site", timezone: "America/Chicago" };
   const mocks: Record<string, unknown> = {
-    "server-only": {}, "@/lib/format": format, "@/lib/timezone": timezone,
+    "server-only": {}, "@/lib/scheduling/booking-rules": {BookingRuleAnswerError: Error}, "@/lib/format": format, "@/lib/timezone": timezone,
     "./session-offering": offerings, "./service-time-frame": timeFrames,
     "@/lib/site": { getSiteSettings: async () => settings, getSiteSettingsForSite: async () => settings },
     "@/lib/scheduling/google-calendar": { listGoogleBusyWindows: async () => ({ busy: [] }) },
@@ -56,11 +56,29 @@ function harness() {
       booking: { findMany: async (query: { where: { startsAt: { lt: Date } } }) => { state.queryEnds.push(query.where.startsAt.lt); return state.bookings; } }, blockedTime: { findMany: async () => state.blocks }
     } }
   };
-  const exports: { nativeSchedulingAdapter?: { getAvailableSlots: (id: string, date: Date) => Promise<Array<{ startsAt: Date; endsAt: Date; label: string }>> } } = {};
+  const exports: { nativeSchedulingAdapter?: { getAvailableSlots: (id: string, date: Date, options?: {tierId?:string}) => Promise<Array<{ startsAt: Date; endsAt: Date; label: string }>> } } = {};
   const source = ts.transpileModule(readFileSync("lib/scheduling/native.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   runInNewContext(source, { exports, Date, require: (id: string) => id in mocks ? mocks[id] : id.startsWith("@/") || id.startsWith("./") ? {} : require(id) });
   return { state, adapter: exports.nativeSchedulingAdapter! };
 }
+
+test("overlapping hours produce unique, chronological starts and honor the configured interval", async () => {
+  const h = harness();
+  h.state.service.sessionOffering = null;
+  h.state.service.durationMinutes = 30;
+  h.state.service.slotIntervalMinutes = 30;
+  h.state.rules = [{ startMinutes: 720, endMinutes: 900 }, { startMinutes: 540, endMinutes: 780 }];
+  const date = new Date("2030-11-13T18:00:00Z");
+  const slots = await h.adapter.getAvailableSlots("service", date);
+  const starts = Array.from(slots, slot => slot.startsAt.getTime());
+  assert.equal(starts.length, 12);
+  assert.equal(new Set(starts).size, starts.length);
+  assert.ok(starts.every((start, index) => !index || start - starts[index - 1] === 30 * 60000));
+  h.state.rules = [{ startMinutes: 540, endMinutes: 780 }];
+  h.state.service.slotIntervalMinutes = 31;
+  const custom = await h.adapter.getAvailableSlots("service", date);
+  assert.equal(custom[1].startsAt.getTime() - custom[0].startsAt.getTime(), 31 * 60000);
+});
 
 test("fixed windows offer only the entire window and still obey hours, bookings and closures", async () => {
   const h = harness();
@@ -164,4 +182,29 @@ test("editing clock times automatically selects next day across midnight and pre
   assert.equal(timeFrames.editTimeFrame({ ...frame, endsNextDay: true }, { end: "23:30" }).endsNextDay, true);
   assert.equal(timeFrames.editTimeFrame({ start: "09:00", end: "17:00" }, { start: "22:00" }).endsNextDay, true);
   assert.equal(timeFrames.editTimeFrame(frame, { end: "" }).endsNextDay, false);
+});
+
+
+test("package availability uses the selected duration and rejects another service's tier",async()=>{
+  const h=harness();
+  h.state.service.sessionOffering={coverageItems:[],tiers:[{id:"short",name:"Short",durationMinutes:30,priceCents:10000,coverageIds:[]},{id:"long",name:"Long",durationMinutes:180,priceCents:20000,coverageIds:[]}],addOns:[]};
+  h.state.rules=[{startMinutes:540,endMinutes:720}];
+  const date=new Date("2030-11-13T18:00:00Z");
+  const short=await h.adapter.getAvailableSlots("service",date,{tierId:"short"});
+  const long=await h.adapter.getAvailableSlots("service",date,{tierId:"long"});
+  assert.equal(short.length,6);assert.equal(long.length,1);
+  assert.equal(long[0].endsAt.getTime()-long[0].startsAt.getTime(),180*60000);
+  await assert.rejects(h.adapter.getAvailableSlots("service",date,{tierId:"foreign"}),/Choose a package/);
+});
+
+test("unlimited duration offers available starts and reserves the rest of the business day",async()=>{
+  const h=harness();
+  h.state.service.sessionOffering={coverageItems:[],tiers:[{id:"gold",name:"Gold",durationMinutes:60,unlimitedDuration:true,pricingType:"FLAT_RATE",priceCents:20000,coverageIds:[]}],addOns:[]};
+  h.state.rules=[{startMinutes:540,endMinutes:720}];
+  const date=new Date("2030-11-13T18:00:00Z");
+  const slots=await h.adapter.getAvailableSlots("service",date,{tierId:"gold"});
+  assert.equal(slots.length,6);
+  assert(slots.every(slot=>slot.endsAt.toISOString()==="2030-11-14T06:00:00.000Z"));
+  h.state.bookings=[{startsAt:new Date("2030-11-14T02:00:00Z"),endsAt:new Date("2030-11-14T03:00:00Z"),staffId:null,resources:[],service:{resourceAssignments:[]}}];
+  assert.equal((await h.adapter.getAvailableSlots("service",date,{tierId:"gold"})).length,0,"Later appointments prevent double booking");
 });

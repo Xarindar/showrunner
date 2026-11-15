@@ -6,6 +6,8 @@ import { renderEmailTemplate } from "./render";
 import { resolveSender } from "./sender";
 import { cleanError, cleanHeaders, normalizeEmail } from "./shared";
 import type { QueueAdminEmailInput, QueueEmailInput } from "./types";
+import { customerEmailDefault } from "./customer-layouts";
+import { customerEmailBrand } from "./customer-brand";
 
 type QueueTemplateTestEmailInput = {
   siteId?: string;
@@ -115,16 +117,27 @@ export async function queueEmail(input: QueueEmailInput) {
   const siteId = settings.siteId;
 
   try {
-    const template = await prisma.messageTemplate.findFirst({
+    const defaults = customerEmailDefault(input.templateKey);
+    let template = await prisma.messageTemplate.findFirst({
       where: {
         siteId,
         key: input.templateKey,
-        channel: MessageChannel.EMAIL,
-        isActive: true
+        channel: MessageChannel.EMAIL
       }
     });
 
-    if (!template) {
+    if (!template && defaults) {
+      const { requiredTokens, optionalTokens, ...definition } = defaults;
+      template = await prisma.messageTemplate.upsert({
+        where: { siteId_key: { siteId, key: input.templateKey } }, update: {},
+        create: {
+          ...definition, siteId, key: input.templateKey, body: definition.textBody,
+          requiredTokens: [...requiredTokens], optionalTokens: [...optionalTokens],
+          tokens: [...requiredTokens, ...optionalTokens]
+        }
+      });
+    }
+    if (!template || !template.isActive || template.channel !== MessageChannel.EMAIL) {
       throw new Error(`Email template not found: ${input.templateKey}`);
     }
 
@@ -134,7 +147,8 @@ export async function queueEmail(input: QueueEmailInput) {
       senderIdentityId: input.senderIdentityId,
       templateSenderIdentityId: template.senderIdentityId
     });
-    const rendered = await renderEmailTemplate(template, input.tokens);
+    const brand = defaults ? await customerEmailBrand(settings, input.brandCategory, input.galleryCoverImageUrl) : {};
+    const rendered = await renderEmailTemplate(template, { ...input.tokens, ...brand });
     const reason = await suppressionReason(recipientEmail, input.category, template.siteId);
     const status = reason ? EmailOutboxStatus.SUPPRESSED : EmailOutboxStatus.QUEUED;
 
@@ -235,7 +249,8 @@ export async function queueTemplateTestEmail(input: QueueTemplateTestEmailInput)
     senderIdentityId: undefined,
     templateSenderIdentityId: template.senderIdentityId
   });
-  const rendered = await renderEmailTemplate(template, input.tokens);
+  const brand = customerEmailDefault(template.key) ? await customerEmailBrand(settings) : {};
+  const rendered = await renderEmailTemplate(template, { ...brand, ...input.tokens });
   const reason = await suppressionReason(recipientEmail, EmailCategory.ADMIN, siteId);
   const status = reason ? EmailOutboxStatus.SUPPRESSED : EmailOutboxStatus.QUEUED;
 

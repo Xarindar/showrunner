@@ -65,6 +65,7 @@ model MediaAsset {
   rectangularServices Service[]       @relation("ServiceRectangularMediaAsset")
   galleryServices   Service[]         @relation("ServiceGalleryAssets")
   variants          MediaAssetVariant[]
+  emailHeaderLogos  EmailHeaderLogo[]
 
   @@index([siteId, folder])
   @@index([isPrivate])

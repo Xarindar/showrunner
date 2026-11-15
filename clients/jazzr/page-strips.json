@@ -72,7 +72,7 @@
     },
     "editorGroups": [
       {
-        "label": "Client reviews",
+        "label": "Review 1",
         "fields": [
           {
             "path": "texts.0.text",
@@ -80,23 +80,33 @@
           },
           {
             "path": "texts.1.text",
-            "label": "Text"
-          },
+            "label": "Name"
+          }
+        ]
+      },
+      {
+        "label": "Review 2",
+        "fields": [
           {
             "path": "texts.2.text",
             "label": "Review"
           },
           {
             "path": "texts.3.text",
-            "label": "Text"
-          },
+            "label": "Name"
+          }
+        ]
+      },
+      {
+        "label": "Review 3",
+        "fields": [
           {
             "path": "texts.4.text",
             "label": "Review"
           },
           {
             "path": "texts.5.text",
-            "label": "Text"
+            "label": "Name"
           }
         ]
       }
@@ -170,83 +180,83 @@
       "bindings": [
         {
           "path": "links.0.label",
-          "selector": ".site-header > a:nth-child(2)"
+          "selector": ".site-header__brand"
         },
         {
           "path": "links.0.href",
-          "selector": ".site-header > a:nth-child(2)",
+          "selector": ".site-header__brand",
           "attribute": "href"
         },
         {
           "path": "links.1.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/portfolio\"]"
         },
         {
           "path": "links.1.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/portfolio\"]",
           "attribute": "href"
         },
         {
           "path": "links.2.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/sessions\"]"
         },
         {
           "path": "links.2.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/sessions\"]",
           "attribute": "href"
         },
         {
           "path": "links.3.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/about\"]"
         },
         {
           "path": "links.3.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/about\"]",
           "attribute": "href"
         },
         {
           "path": "links.4.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)"
+          "selector": ".site-header__desktop-nav .nav-cta"
         },
         {
           "path": "links.4.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)",
+          "selector": ".site-header__desktop-nav .nav-cta",
           "attribute": "href"
         },
         {
           "path": "links.5.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/portfolio\"]"
         },
         {
           "path": "links.5.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/portfolio\"]",
           "attribute": "href"
         },
         {
           "path": "links.6.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/sessions\"]"
         },
         {
           "path": "links.6.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/sessions\"]",
           "attribute": "href"
         },
         {
           "path": "links.7.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/about\"]"
         },
         {
           "path": "links.7.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/about\"]",
           "attribute": "href"
         },
         {
           "path": "links.8.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)"
+          "selector": ".mobile-nav__cta"
         },
         {
           "path": "links.8.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)",
+          "selector": ".mobile-nav__cta",
           "attribute": "href"
         }
       ]
@@ -290,6 +300,44 @@
           {
             "path": "links.8",
             "label": "Book a Session"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "home-inquiry-photo",
+    "type": "strip",
+    "label": "Booking callout photo",
+    "pageIds": [
+      "home"
+    ],
+    "editableFields": [
+      "images"
+    ],
+    "fixedRows": true,
+    "defaults": {
+      "texts": [],
+      "images": [
+        {
+          "id": "photo",
+          "url": "",
+          "alt": "",
+          "caption": ""
+        }
+      ],
+      "links": []
+    },
+    "presentation": {
+      "selector": ".home-inquiry__photo"
+    },
+    "editorGroups": [
+      {
+        "label": "Photo",
+        "fields": [
+          {
+            "path": "images.0",
+            "label": "Photo"
           }
         ]
       }
@@ -684,83 +732,83 @@
       "bindings": [
         {
           "path": "links.0.label",
-          "selector": ".site-header > a:nth-child(2)"
+          "selector": ".site-header__brand"
         },
         {
           "path": "links.0.href",
-          "selector": ".site-header > a:nth-child(2)",
+          "selector": ".site-header__brand",
           "attribute": "href"
         },
         {
           "path": "links.1.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/\"]"
         },
         {
           "path": "links.1.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/\"]",
           "attribute": "href"
         },
         {
           "path": "links.2.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/sessions\"]"
         },
         {
           "path": "links.2.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/sessions\"]",
           "attribute": "href"
         },
         {
           "path": "links.3.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/about\"]"
         },
         {
           "path": "links.3.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/about\"]",
           "attribute": "href"
         },
         {
           "path": "links.4.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)"
+          "selector": ".site-header__desktop-nav .nav-cta"
         },
         {
           "path": "links.4.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)",
+          "selector": ".site-header__desktop-nav .nav-cta",
           "attribute": "href"
         },
         {
           "path": "links.5.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/\"]"
         },
         {
           "path": "links.5.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/\"]",
           "attribute": "href"
         },
         {
           "path": "links.6.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/sessions\"]"
         },
         {
           "path": "links.6.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/sessions\"]",
           "attribute": "href"
         },
         {
           "path": "links.7.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/about\"]"
         },
         {
           "path": "links.7.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/about\"]",
           "attribute": "href"
         },
         {
           "path": "links.8.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)"
+          "selector": ".mobile-nav__cta"
         },
         {
           "path": "links.8.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)",
+          "selector": ".mobile-nav__cta",
           "attribute": "href"
         }
       ]
@@ -1518,83 +1566,83 @@
       "bindings": [
         {
           "path": "links.0.label",
-          "selector": ".site-header > a:nth-child(2)"
+          "selector": ".site-header__brand"
         },
         {
           "path": "links.0.href",
-          "selector": ".site-header > a:nth-child(2)",
+          "selector": ".site-header__brand",
           "attribute": "href"
         },
         {
           "path": "links.1.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/\"]"
         },
         {
           "path": "links.1.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/\"]",
           "attribute": "href"
         },
         {
           "path": "links.2.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/portfolio\"]"
         },
         {
           "path": "links.2.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/portfolio\"]",
           "attribute": "href"
         },
         {
           "path": "links.3.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/sessions\"]"
         },
         {
           "path": "links.3.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/sessions\"]",
           "attribute": "href"
         },
         {
           "path": "links.4.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)"
+          "selector": ".site-header__desktop-nav .nav-cta"
         },
         {
           "path": "links.4.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)",
+          "selector": ".site-header__desktop-nav .nav-cta",
           "attribute": "href"
         },
         {
           "path": "links.5.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/\"]"
         },
         {
           "path": "links.5.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/\"]",
           "attribute": "href"
         },
         {
           "path": "links.6.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/portfolio\"]"
         },
         {
           "path": "links.6.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/portfolio\"]",
           "attribute": "href"
         },
         {
           "path": "links.7.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/sessions\"]"
         },
         {
           "path": "links.7.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/sessions\"]",
           "attribute": "href"
         },
         {
           "path": "links.8.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)"
+          "selector": ".mobile-nav__cta"
         },
         {
           "path": "links.8.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)",
+          "selector": ".mobile-nav__cta",
           "attribute": "href"
         }
       ]
@@ -1887,101 +1935,101 @@
       "bindings": [
         {
           "path": "links.0.label",
-          "selector": ".site-header > a:nth-child(2)"
+          "selector": ".site-header__brand"
         },
         {
           "path": "links.0.href",
-          "selector": ".site-header > a:nth-child(2)",
+          "selector": ".site-header__brand",
           "attribute": "href"
         },
         {
           "path": "links.1.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/\"]"
         },
         {
           "path": "links.1.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(1)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/\"]",
           "attribute": "href"
         },
         {
           "path": "links.2.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/portfolio\"]"
         },
         {
           "path": "links.2.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(2)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/portfolio\"]",
           "attribute": "href"
         },
         {
           "path": "links.3.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/sessions\"]"
         },
         {
           "path": "links.3.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(3)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/sessions\"]",
           "attribute": "href"
         },
         {
           "path": "links.4.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)"
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/about\"]"
         },
         {
           "path": "links.4.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(4)",
+          "selector": ".site-header__desktop-nav [data-nav-path=\"/about\"]",
           "attribute": "href"
         },
         {
           "path": "links.5.label",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(5)"
+          "selector": ".site-header__desktop-nav .nav-cta"
         },
         {
           "path": "links.5.href",
-          "selector": ".site-header > nav:nth-child(3) > a:nth-child(5)",
+          "selector": ".site-header__desktop-nav .nav-cta",
           "attribute": "href"
         },
         {
           "path": "links.6.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/\"]"
         },
         {
           "path": "links.6.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(1)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/\"]",
           "attribute": "href"
         },
         {
           "path": "links.7.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/portfolio\"]"
         },
         {
           "path": "links.7.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(2)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/portfolio\"]",
           "attribute": "href"
         },
         {
           "path": "links.8.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/sessions\"]"
         },
         {
           "path": "links.8.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(3)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/sessions\"]",
           "attribute": "href"
         },
         {
           "path": "links.9.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)"
+          "selector": ".mobile-nav__links [data-nav-path=\"/about\"]"
         },
         {
           "path": "links.9.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(4)",
+          "selector": ".mobile-nav__links [data-nav-path=\"/about\"]",
           "attribute": "href"
         },
         {
           "path": "links.10.label",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(5)"
+          "selector": ".mobile-nav__cta"
         },
         {
           "path": "links.10.href",
-          "selector": ".site-header > div:nth-child(4) > nav:nth-child(2) > a:nth-child(5)",
+          "selector": ".mobile-nav__cta",
           "attribute": "href"
         }
       ]

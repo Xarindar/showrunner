@@ -25,6 +25,7 @@ test("header button alignment validates choices and mobile overrides leave deskt
 });
 
 test("settings put each item's image first and keep every template binding in a visual group", () => {
+  assert.deepEqual(imageFirst(blockRegistry.featured.fields.items.fields!).slice(0, 2).map(([key]) => key), ["referenceId", "imageUrl"]);
   assert.deepEqual(imageFirst(blockRegistry.team.fields.items.fields!).slice(0, 2).map(([key]) => key), ["imageUrl", "name"]);
   for (const block of cottageContentManifest.blocks.filter(block => block.type === "strip")) {
     const paths = block.editorGroups!.flatMap(group => group.fields.map(field => field.path));

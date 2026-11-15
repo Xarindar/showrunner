@@ -56,7 +56,8 @@ try {
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.route("**/*", route => route.fulfill({ contentType: "text/html", body: `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="root"></div><script>${js}</script></body></html>` }));
-  await page.clock.install();
+  await page.clock.install({ time: new Date("2030-01-01T00:00:00Z") });
+  await page.clock.pauseAt(new Date("2030-01-01T00:00:01Z"));
   await page.goto("http://notifications.example/admin?saved=updated&tab=hours#weekday");
   await page.getByText("Changes saved.", { exact: true }).waitFor();
   assert.equal(new URL(page.url()).search, "?tab=hours");

@@ -51,23 +51,29 @@ const emailHtmlOptions: sanitizeHtml.IOptions = {
   allowedStyles: {
     "*": {
       "background-color": allowedCssValue,
+      border: allowedCssValue,
+      "border-radius": allowedCssValue,
       color: allowedCssValue,
+      display: [/^(?:block|inline-block|inline|none)$/i],
       "font-family": allowedCssValue,
       "font-size": allowedCssValue,
       "font-weight": allowedCssValue,
+      height: allowedCssValue,
       "line-height": allowedCssValue,
       margin: allowedCssValue,
       "margin-bottom": allowedCssValue,
       "margin-left": allowedCssValue,
       "margin-right": allowedCssValue,
       "margin-top": allowedCssValue,
+      "max-width": allowedCssValue,
       padding: allowedCssValue,
       "padding-bottom": allowedCssValue,
       "padding-left": allowedCssValue,
       "padding-right": allowedCssValue,
       "padding-top": allowedCssValue,
       "text-align": allowedCssValue,
-      "text-decoration": allowedCssValue
+      "text-decoration": allowedCssValue,
+      width: allowedCssValue
     },
     table: {
       "border-collapse": allowedCssValue,

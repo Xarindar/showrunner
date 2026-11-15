@@ -19,6 +19,7 @@ test("session drafts warn on changed fields and package JSON, but allow unchange
   const listeners = new Map<string, (value: ReturnType<typeof event>) => void>();
   let cleanup: (() => void) | undefined;
   let prompts = 0;
+  const notices: { message: string; tone: string }[] = [];
   let discard = false;
   const events = {
     addEventListener: (name: string, callback: (value: ReturnType<typeof event>) => void) => listeners.set(name, callback),
@@ -35,7 +36,7 @@ test("session drafts warn on changed fields and package JSON, but allow unchange
     location: new URL("https://example.test/admin/modules/services/portrait"),
     window: { ...events, confirm: () => { prompts++; return discard; } },
     document: { ...events, getElementById: () => form },
-    require: (id: string) => id === "react" ? { useState: () => [false, () => {}], useRef: () => ({ current: null }), useEffect: (effect: () => (() => void) | undefined) => { const result = effect(); if (result) cleanup = result; } } : id === "react/jsx-runtime" ? { jsx: () => null, jsxs: () => null } : { useFormStatus: () => ({ pending: false }) }
+    require: (id: string) => id === "@/components/ui/notifications" ? { useNotify: () => (message: string, tone: string) => notices.push({ message, tone }) } : id === "react" ? { useState: () => [false, () => {}], useRef: () => ({ current: null }), useEffect: (effect: () => (() => void) | undefined) => { const result = effect(); if (result) cleanup = result; } } : id === "react/jsx-runtime" ? { jsx: () => null, jsxs: () => null } : { useFormStatus: () => ({ pending: false }) }
   });
   exports.SessionDraftGuard!({ formId: "service-core-form" });
   function event(href = "https://example.test/admin/modules/services") {
@@ -65,6 +66,9 @@ test("session drafts warn on changed fields and package JSON, but allow unchange
   const photo = event(); photo.target = new Form(); photo.submitter = "photo-button";
   listeners.get("submit")!(photo);
   assert.ok(photo.prevented && photo.stopped, "photo actions cannot silently discard unsaved packages");
+  assert.equal(notices.length, 1);
+  assert.equal(notices[0].tone, "danger");
+  assert.match(notices[0].message, /Save your session and package changes/);
   const save = event(); save.target = form; save.submitter = "photo-button";
   listeners.get("submit")!(save);
   assert.equal(save.prevented, false, "normal session saves remain available");

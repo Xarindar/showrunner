@@ -1,3 +1,5 @@
+import { sessionPackageSnapshotSchema } from "../scheduling/session-offering";
+
 export function supportsPhotoCurrency(currency: string) {
   try {
     return Intl.supportedValuesOf("currency").includes(currency) && new Intl.NumberFormat("en", { style: "currency", currency }).resolvedOptions().maximumFractionDigits === 2;
@@ -54,4 +56,16 @@ export function canSettleCanceledGalleryOrder(input: {
 }) {
   return input.isGallery && input.providerConfirmed && input.targetStatus === "PAID" && input.order.status === "CANCELED" && input.order.totalCents > 0 &&
     purchaseReleaseStatus({ totalCents: input.order.totalCents, currency: input.order.currency, order: { ...input.order, status: "PAID" } }) === "RELEASED";
+}
+
+/** Only a booked package explicitly promising all photos can bypass client selection. */
+export function hasAllPhotosDelivery(gallery: {
+  siteId?: string; clientId?: string | null; bookingId?: string | null; proofingEnabled?: boolean;
+  packageProductId?: string | null; purchasedOrderId?: string | null; extraPhotoAddOnId?: string | null; downloadEnabled?: boolean;
+  booking?: { siteId: string; clientId: string | null; status: string; packageSnapshot?: unknown } | null;
+}) {
+  return Boolean(gallery.bookingId && gallery.booking && gallery.booking.siteId === gallery.siteId &&
+    gallery.clientId && gallery.booking.clientId === gallery.clientId && gallery.booking.status !== "CANCELED" &&
+    !gallery.proofingEnabled && !gallery.packageProductId && !gallery.purchasedOrderId && !gallery.extraPhotoAddOnId && gallery.downloadEnabled &&
+    sessionPackageSnapshotSchema.safeParse(gallery.booking.packageSnapshot).data?.deliverables?.finalPhotos === null);
 }

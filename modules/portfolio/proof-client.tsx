@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, X, ImageOff, LoaderCircle, RefreshCw } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Share2, Mail, Phone, Camera, X, ImageOff, LoaderCircle, RefreshCw } from "lucide-react";
 import { Button, ButtonAnchor } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Modal } from "@/components/ui/modal";
@@ -27,22 +27,24 @@ function checkoutDestination(value: string | null) {
   }
 }
 
-export function ProofClient({ initialView, token, brand = { name: "Photography", logoUrl: "" } }: { initialView: ProofSelectionView; token: string; brand?: { name: string; logoUrl: string } }) {
+export function ProofClient({ initialView, token, brand = { name: "Photography", logoUrl: "" } }: { initialView: ProofSelectionView; token: string; brand?: { name: string; logoUrl: string; theme?: "jazzr"; firstName?: string } }) {
   const [view, setView] = useState(initialView);
   const [selection, setSelection] = useState<string[]>(initialView.purchase?.selectedItemIds || []);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [compactHeader, setCompactHeader] = useState(false);
   const [filter, setFilter] = useState<"all" | "selected">("all");
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingExtraId, setPendingExtraId] = useState<string | null>(null);
   const [extrasConsentVersion, setExtrasConsentVersion] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
   const [reviewedTermsVersion, setReviewedTermsVersion] = useState(initialView.termsVersion);
   const [submitting, setSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [shareText, setShareText] = useState("");
+  const [shareNotice, setShareNotice] = useState("");
   const [failedImages, setFailedImages] = useState<string[]>([]);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const swiped = useRef(false);
@@ -50,6 +52,10 @@ export function ProofClient({ initialView, token, brand = { name: "Photography",
   const refreshLock = useRef(false);
   const endpoint = `/api/portfolio/proofs/${encodeURIComponent(token)}`;
   const purchase = view.purchase;
+  const bundle = purchase?.bundle;
+  const archiveState = bundle?.state;
+  const bundleRequested = useRef(false);
+  const deliveryHeading = useRef<HTMLHeadingElement>(null);
   const locked = Boolean(purchase);
   const canRetryCheckout = Boolean(purchase?.canRetryCheckout && ["PENDING", "FAILED", "BLOCKED"].includes(purchase.status));
   const selectedIds = purchase?.selectedItemIds || selection;
@@ -65,14 +71,15 @@ export function ProofClient({ initialView, token, brand = { name: "Photography",
   const displayed = view.items.filter((item) => filter === "all" || selected.has(item.id));
 
   useEffect(() => {
-    let current = true;
-    Promise.resolve().then(() => {
-      if (!current) return;
-      try { setHelpOpen(localStorage.getItem("portfolio:proof-help:v1") !== "dismissed"); }
-      catch { setHelpOpen(true); }
-    });
-    return () => { current = false; };
-  }, []);
+    if (locked || unavailable) return;
+    const syncHeader = () => {
+      const scrollY = window.scrollY;
+      setCompactHeader(compact => scrollY > (compact ? 24 : 72));
+    };
+    window.addEventListener("scroll", syncHeader, { passive: true });
+    syncHeader();
+    return () => window.removeEventListener("scroll", syncHeader);
+  }, [locked, unavailable]);
 
   useEffect(() => {
     // Preserve Next's history state; only gallery layers add entries, not each photo.
@@ -84,7 +91,6 @@ export function ProofClient({ initialView, token, brand = { name: "Photography",
       setPreviewId(sameGallery && typeof state.previewId === "string" ? state.previewId : null);
       setPendingExtraId(null);
       setConfirmOpen(false);
-      setConfirmed(false);
     };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
@@ -106,12 +112,6 @@ export function ProofClient({ initialView, token, brand = { name: "Photography",
       window.history.pushState({ ...window.history.state, proofGallery: { id: view.gallery.id, filter: next, previewId: null } }, "");
       setFilter(next);
     }
-  }
-
-  function dismissHelp() {
-    setHelpOpen(false);
-    try { localStorage.setItem("portfolio:proof-help:v1", "dismissed"); }
-    catch { /* Instructions still dismiss for this visit when storage is unavailable. */ }
   }
 
   const refresh = useCallback(async (silent = false) => {
@@ -170,6 +170,56 @@ export function ProofClient({ initialView, token, brand = { name: "Photography",
     return () => window.clearInterval(timer);
   }, [purchase?.status, refresh, unavailable]);
 
+  const prepareBundle = useCallback(async (retry = false) => {
+    setError("");
+    try {
+      const response = await fetch(`${endpoint}/bundle${retry ? "?retry=1" : ""}`, {
+        method: "POST", headers: { "X-Proof-Request": "1" }, signal: AbortSignal.timeout(15000)
+      });
+      if (!response.ok) throw new Error(await response.text());
+      await refresh(true);
+    } catch (cause) {
+      setError(cause instanceof Error && cause.name !== "TimeoutError" ? cause.message : "We couldn’t start the ZIP. Try again.");
+    }
+  }, [endpoint, refresh]);
+
+  useEffect(() => {
+    if (bundle?.state !== "NEW" || bundleRequested.current || unavailable) return;
+    bundleRequested.current = true;
+    void Promise.resolve().then(() => prepareBundle());
+  }, [bundle?.state, prepareBundle, unavailable]);
+
+  useEffect(() => {
+    if (!archiveState || !["NEW", "QUEUED", "BUILDING"].includes(archiveState) || unavailable) return;
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void refresh(true); }, 4000);
+    return () => window.clearInterval(timer);
+  }, [archiveState, refresh, unavailable]);
+
+  useEffect(() => {
+    if (locked && !initialView.purchase) deliveryHeading.current?.focus();
+  }, [locked, initialView.purchase]);
+
+  async function shareGallery() {
+    const text = `Hey, the pictures from ${brand.name} are ready! Check them out here!`;
+    const url = new URL(`/proofs/${encodeURIComponent(token)}`, window.location.origin).href;
+    const message = `${text} ${url}`;
+    setShareNotice("");
+    try {
+      if (navigator.share) {
+        await navigator.share({ text, url });
+        return;
+      }
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === "AbortError") return;
+    }
+    try {
+      await navigator.clipboard.writeText(message);
+      setShareNotice("Message and link copied.");
+    } catch {
+      setShareText(message);
+    }
+  }
+
   function proofUrl(itemId: string, thumbnail = false) {
     return `/api/portfolio/galleries/${encodeURIComponent(view.gallery.slug)}/media/${encodeURIComponent(itemId)}?access=${encodeURIComponent(token)}&variant=${thumbnail ? "THUMBNAIL" : "CARD"}`;
   }
@@ -198,11 +248,10 @@ export function ProofClient({ initialView, token, brand = { name: "Photography",
   function closeConfirm() {
     if (submitLock.current) return;
     setConfirmOpen(false);
-    setConfirmed(false);
   }
 
   async function finalize() {
-    if (submitLock.current || (purchase && !canRetryCheckout) || (!purchase && (!confirmed || !selectedIds.length))) return;
+    if (submitLock.current || (purchase && !canRetryCheckout) || (!purchase && (!confirmOpen || !selectedIds.length))) return;
     submitLock.current = true;
     setSubmitting(true);
     setError("");
@@ -221,7 +270,6 @@ export function ProofClient({ initialView, token, brand = { name: "Photography",
         throw new Error(result.error || "We couldn’t finalize your selection. Please try again.");
       }
       setConfirmOpen(false);
-      setConfirmed(false);
       const latest = await refresh(true);
       const destination = checkoutDestination(result.checkoutUrl);
       if (destination && result.status === "PENDING" && latest?.purchase?.status === "PENDING") {
@@ -232,20 +280,17 @@ export function ProofClient({ initialView, token, brand = { name: "Photography",
         } catch { /* The original private link still works if browser storage is unavailable. */ }
         window.location.assign(destination);
       } else if (latest?.purchase?.status === "RELEASED") {
-        setNotice("Your selection is final. Your selected originals are ready below.");
+        setNotice("");
       } else {
-        setNotice("Your selection is saved. Check its status below before continuing.");
+        setNotice("Your selection is saved.");
       }
     } catch (cause) {
       // A timed-out response can still have finalized server-side. Reconcile
       // before allowing another attempt; the service also enforces idempotency.
       const latest = await refresh(true);
-      if (latest?.purchase) { setConfirmOpen(false); setConfirmed(false); }
-      else {
-        setConfirmed(false);
-        if (latest) setReviewedTermsVersion(latest.termsVersion);
-      }
-      setError(cause instanceof Error && cause.name !== "TimeoutError" ? cause.message : "The request took too long. Check your saved selection below before trying again.");
+      if (latest?.purchase) setConfirmOpen(false);
+      else if (latest) setReviewedTermsVersion(latest.termsVersion);
+      setError(cause instanceof Error && cause.name !== "TimeoutError" ? cause.message : "The request took too long. Check your saved selection before trying again.");
     } finally {
       submitLock.current = false;
       setSubmitting(false);
@@ -280,9 +325,67 @@ export function ProofClient({ initialView, token, brand = { name: "Photography",
     return <main className={styles.unavailable}><h1>This proof link is unavailable</h1><p>It may have expired or been replaced. Ask your photographer for a new private link.</p></main>;
   }
 
+  if (purchase) {
+    const ready = bundle?.state === "READY";
+    const jazzrReady = ready && brand.theme === "jazzr";
+    const released = purchase.status === "RELEASED";
+    const preparing = Boolean(bundle && ["NEW", "QUEUED", "BUILDING"].includes(bundle.state) && !error);
+    const title = ready ? (jazzrReady ? "Your photos are ready!" : "Your photos are ready") : preparing ? "Preparing your photos" :
+      released ? (bundle ? "We couldn’t prepare your ZIP" : "Download unavailable") :
+      purchase.status === "PENDING" ? "Awaiting payment confirmation" :
+      purchase.status === "EXPIRED" ? "Download window expired" :
+      purchase.status === "REFUNDED" ? "Payment refunded" : canRetryCheckout ? "Payment needs attention" : "Download unavailable";
+    const count = purchase.selectedItemIds.length;
+    const size = bundle?.sizeBytes == null ? "" : new Intl.NumberFormat("en", { maximumFractionDigits: 1, style: "unit", unitDisplay: "narrow",
+      unit: bundle.sizeBytes >= 1e9 ? "gigabyte" : "megabyte" }).format(bundle.sizeBytes / (bundle.sizeBytes >= 1e9 ? 1e9 : 1e6));
+    return <main className={`${styles.page} ${styles.deliveryPage} ${brand.theme === "jazzr" ? styles.jazzrDelivery : ""}`}>
+      {!jazzrReady && <header className={styles.header}>
+        <div className={styles.brand}>{brand.logoUrl ? <Image alt={brand.name} height={70} width={280} src={brand.logoUrl} unoptimized referrerPolicy="no-referrer" /> : <span>{brand.name}</span>}</div>
+      </header>}
+      <section className={`${styles.handoff} ${jazzrReady ? styles.jazzrReady : ""}`} aria-labelledby="delivery-heading">
+        {jazzrReady && <Image className={styles.readyIcon} src="/proof-delivery/download-folder.png" width={80} height={80} alt="" unoptimized />}
+        <div aria-live="polite" aria-atomic="true">
+          <h1 id="delivery-heading" ref={deliveryHeading} tabIndex={-1}>{title}</h1>
+          <p>{jazzrReady ? `${brand.firstName ? `${brand.firstName}, thank` : "Thank"} you for choosing Jazzr Photography. We hope you enjoyed your shoot and love your photos!` :
+            ready ? "Your full-resolution originals are packed into one ZIP." :
+            preparing ? "We’re packing your selected originals into one ZIP. You can close this page and come back to the same link." :
+            released && bundle ? "Your selection is saved. Try preparing the ZIP again." :
+            purchase.status === "PENDING" ? "Your selection is saved. We’ll prepare your ZIP as soon as payment is verified. You can return to this link later." :
+            canRetryCheckout ? "Your selection is saved. Resume checkout to complete payment for the same photos." :
+            purchase.status === "EXPIRED" ? "Your 14-day download window has ended. Contact your photographer for help." :
+            "If this persists, contact your photographer."}</p>
+        </div>
+        {ready && <p>Downloads are available for 14 days after your selections are finalized, until <time dateTime={purchase.downloadExpiresAt}>{purchase.downloadExpiresLabel}</time>.</p>}
+        {!jazzrReady && <div className={styles.handoffDetails}><strong>{view.gallery.title}</strong><span>{count} {count === 1 ? "photo" : "photos"}{size ? ` · ZIP · ${size}` : ""}</span></div>}
+        {preparing && <div className={styles.archiveProgress} aria-hidden="true" />}
+        {error && <p className={styles.error} role="alert">{error}</p>}
+        <div className={`${styles.handoffActions} ${ready ? styles.readyActions : ""}`}>
+          {ready ? <>
+            <ButtonAnchor download href={`${endpoint}/bundle`} referrerPolicy="no-referrer"><Download size={17} aria-hidden="true" /> Download ZIP</ButtonAnchor>
+            <Button onClick={() => void shareGallery()} type="button" variant="secondary"><Share2 size={17} aria-hidden="true" /> Share</Button>
+          </> : <>
+            {released && bundle && !preparing && <Button onClick={() => void prepareBundle(true)} type="button">Retry preparation</Button>}
+            {canRetryCheckout && <Button disabled={submitting} onClick={() => void finalize()} type="button">{submitting ? "Checking checkout…" : "Resume or renew checkout"}</Button>}
+            <Button disabled={refreshing || submitting} onClick={() => void refresh()} type="button" variant="secondary"><RefreshCw size={15} aria-hidden="true" />{refreshing ? "Checking…" : "Refresh status"}</Button>
+          </>}
+        </div>
+        {ready && !jazzrReady && <p className={styles.deliveryTip}>Open the ZIP to find your original photos.</p>}
+        {shareNotice && <p className={styles.deliveryTip} role="status">{shareNotice}</p>}
+        {shareText && <label className={styles.copyMessage}>Copy this message to share your photos
+          <textarea readOnly rows={3} value={shareText} onFocus={event => event.currentTarget.select()} />
+        </label>}
+        {jazzrReady && <nav className={styles.readyContacts} aria-label="Contact Jazzr Photography">
+          <ButtonAnchor href="mailto:jazzrphotography@gmail.com" variant="secondary"><Mail size={16} aria-hidden="true" /> Email</ButtonAnchor>
+          <ButtonAnchor href="tel:+15737182148" variant="secondary"><Phone size={16} aria-hidden="true" /> Call</ButtonAnchor>
+          <ButtonAnchor href="https://www.instagram.com/jazzrphotography/" target="_blank" rel="noopener noreferrer" variant="secondary"><Camera size={16} aria-hidden="true" /> Instagram</ButtonAnchor>
+        </nav>}
+      </section>
+    </main>;
+  }
+
   return (
     <main className={styles.page}>
-      <header className={styles.header}>
+      <header className={`${styles.header} ${compactHeader ? styles.compactHeader : ""}`}>
         <div className={styles.brand}>{brand.logoUrl ? <Image alt={brand.name} height={70} width={280} src={brand.logoUrl} unoptimized referrerPolicy="no-referrer" /> : <span>{brand.name}</span>}</div>
         <h1 className={styles.srOnly}>{view.gallery.title}</h1>
       </header>
@@ -294,21 +397,20 @@ export function ProofClient({ initialView, token, brand = { name: "Photography",
               <button aria-pressed={filter === "all"} onClick={() => changeFilter("all")} type="button">All photos <span>{view.items.length}</span></button>
               <button aria-pressed={filter === "selected"} onClick={() => changeFilter("selected")} type="button">Selected <span>{selectedIds.length}</span></button>
             </div>
-            <div className={styles.galleryHelp}><span className={styles.proofNotice}>{view.gallery.title}</span>{!locked && view.items.length > 0 ? <button className={styles.helpButton} onClick={() => setHelpOpen(true)} type="button">How to choose</button> : null}</div>
+            <div className={styles.galleryHelp}><span className={styles.proofNotice}>{view.gallery.title}</span>{!locked && view.items.length > 0 ? <button aria-expanded={helpOpen} className={styles.helpButton} onClick={() => setHelpOpen(open => !open)} type="button">How to choose</button> : null}</div>
           </div>
           {helpOpen && !locked && view.items.length > 0 ? <aside aria-label="How to choose photos" className={styles.helpTip} role="note">
             <p>Tap <strong>Select</strong> to choose a photo. Tap the photo to view it larger. We’ll ask before adding paid extras.</p>
-            <button aria-label="Dismiss instructions" className={styles.helpButton} onClick={dismissHelp} type="button"><X aria-hidden="true" size={18} /></button>
+            <button aria-label="Dismiss instructions" className={styles.helpButton} onClick={() => setHelpOpen(false)} type="button"><X aria-hidden="true" size={18} /></button>
           </aside> : null}
           {displayed.length ? (
             <div className={styles.grid}>
               {displayed.map((item) => {
                 const index = view.items.findIndex((candidate) => candidate.id === item.id);
                 const label = photoLabel(item, index);
-                const isSelected = selected.has(item.id);
                 const failed = failedImages.includes(item.id);
                 return (
-                  <figure className={`${styles.photo} ${isSelected ? styles.selected : ""}`} key={item.id}>
+                  <figure className={styles.photo} key={item.id}>
                     <div className={styles.photoFrame} onContextMenu={event => event.preventDefault()} onCopy={event => event.preventDefault()}>
                       <button aria-label={`View larger proof of ${label}`} className={styles.photoOpen} disabled={failed} onClick={() => openPreview(item.id)} type="button">
                         {failed ? <span className={styles.imageFailure}><ImageOff size={24} aria-hidden="true" />Preview unavailable</span> : (
@@ -327,45 +429,24 @@ export function ProofClient({ initialView, token, brand = { name: "Photography",
         </section>
 
         <aside aria-label="Selection summary" className={styles.summary}>
-          {!locked ? <>
-            <div aria-live="polite" aria-atomic="true"><strong>Select {remainingCount} {remainingCount === 1 ? "Photo" : "Photos"}</strong></div>
-            <Button disabled={!selectedIds.length || submitting} onClick={() => { setConfirmed(false); setReviewedTermsVersion(view.termsVersion); setConfirmOpen(true); }} type="button">{extraCount ? `Review cart · ${money(total, currency)}` : "Review selection"}</Button>
-          </> :             <section aria-label="Delivery status" className={styles.delivery}>
-              {purchase?.status === "RELEASED" ? (
-                <><h3><Check size={18} aria-hidden="true" /> Originals ready</h3><p>Download the original files for your final selection below.</p></>
-              ) : purchase?.status === "PENDING" ? (
-                <><h3>Awaiting payment</h3><p>Your choices are locked. The original files will appear after your payment is verified.</p></>
-              ) : canRetryCheckout ? (
-                <><h3>Payment needs attention</h3><p>Your choices are saved and locked. Resume checkout to continue with the same photos and price.</p></>
-              ) : (
-                <><h3>{purchase?.status === "REFUNDED" ? "Payment refunded" : purchase?.status === "FAILED" ? "Payment needs attention" : "Downloads unavailable"}</h3><p>Your selection is saved, but originals aren’t available. Contact your photographer for help.</p></>
-              )}
-              {canRetryCheckout ? <Button disabled={submitting} onClick={() => void finalize()} type="button">{submitting ? <><LoaderCircle className={styles.spinner} size={16} aria-hidden="true" /> Checking checkout…</> : "Resume or renew checkout"}</Button> : null}
-              <Button disabled={refreshing || submitting} onClick={() => void refresh()} type="button" variant="secondary"><RefreshCw className={refreshing ? styles.spinner : ""} size={15} aria-hidden="true" /> {refreshing ? "Checking…" : "Refresh status"}</Button>
-              {purchase?.status === "PENDING" ? <p className={styles.finePrint}>Already paid? Confirmation can take a moment. You can safely return to this link later.</p> : null}
-            </section>}
+          <div aria-live="polite" aria-atomic="true"><strong>Select {remainingCount} {remainingCount === 1 ? "Photo" : "Photos"}</strong></div>
+          <Button disabled={!selectedIds.length || submitting} onClick={() => { setReviewedTermsVersion(view.termsVersion); setConfirmOpen(true); }} type="button">{extraCount ? `Review cart · ${money(total, currency)}` : "Next"}</Button>
           {error && !confirmOpen ? <p className={styles.error} role="alert">{error}</p> : null}
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
         </aside>
       </div>
 
-      {purchase?.status === "RELEASED" ? (
-        <section aria-labelledby="originals-title" className={styles.downloads}>
-          <h2 id="originals-title">Your selected originals</h2>
-          <p>These files are available for your finalized selection only. Keep your private gallery link safe.</p>
-          {purchase.downloads.length ? <ul>{purchase.downloads.filter((download) => selected.has(download.itemId)).map((download) => (
-            <li key={download.itemId}><span>{download.filename}</span><ButtonAnchor download href={download.url} referrerPolicy="no-referrer" size="sm" variant="secondary"><Download size={15} aria-hidden="true" /> Download<span className={styles.srOnly}> {download.filename}</span></ButtonAnchor></li>
-          ))}</ul> : <p className={styles.empty}>Your originals aren’t available yet. Ask your photographer for help, or refresh the status.</p>}
-        </section>
-      ) : null}
-
-      <Modal className={styles.confirmDialog} onClose={closeConfirm} open={confirmOpen} title="Finalize your photo selection?">
+      <Modal className={styles.confirmDialog} onClose={closeConfirm} open={confirmOpen} title="Finalize Selections?">
         <div className={styles.confirmBody}>
-          <p>You’ve selected <strong>{selectedIds.length} {selectedIds.length === 1 ? "photo" : "photos"}</strong>. {extraCount ? `${extraCount} extra ${extraCount === 1 ? "photo costs" : "photos cost"} ${money(total, currency)}.` : "There’s no additional charge."}</p>
-          <p>{extraCount ? "Your selection will be locked before you continue to secure checkout. Original downloads unlock after payment is verified." : "Your selection will be locked, and the selected original files will become available."}</p>
-          <label className={styles.confirmCheckbox}><input checked={confirmed} disabled={submitting} onChange={(event) => setConfirmed(event.target.checked)} type="checkbox" /><span>I’ve checked my choices and understand this selection cannot be changed.</span></label>
+          <p>After you finalize your pics, you won’t be able to make changes.</p>
+          {extraCount > 0 && <p>You’ll pay <strong>{money(total, currency)}</strong> for {extraCount} extra {extraCount === 1 ? "photo" : "photos"} at checkout.</p>}
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
-          <div className={styles.confirmActions}><Button disabled={submitting} onClick={closeConfirm} type="button" variant="secondary">Keep choosing</Button><Button disabled={!confirmed || submitting} onClick={() => void finalize()} type="button">{submitting ? <><LoaderCircle className={styles.spinner} size={16} aria-hidden="true" /> Saving selection…</> : extraCount ? `Finalize & pay ${money(total, currency)}` : "Finalize & get originals"}</Button></div>
+          <div className={styles.confirmActions}>
+            <Button disabled={submitting} onClick={closeConfirm} type="button" variant="secondary">Cancel</Button>
+            <Button disabled={submitting || !selectedIds.length} onClick={() => void finalize()} type="button">
+              {submitting ? <><LoaderCircle className={styles.spinner} size={16} aria-hidden="true" /> Saving selection…</> : "Finalize"}
+            </Button>
+          </div>
         </div>
       </Modal>
 

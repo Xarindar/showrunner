@@ -7,6 +7,7 @@ import { blockoutConflictWhere, getBufferedWindow } from "@/lib/bookings/conflic
 import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
 import { priceSessionOffering, readSessionOffering, selectSessionPackage } from "@/lib/scheduling/session-offering";
 import { hourlyPriceCents, pricingTypeSchema } from "@/lib/scheduling/pricing";
+import { getZonedDayBounds } from "@/lib/timezone";
 
 // Manual sessions use an agreed time, independent of public booking hours.
 // They still reserve staff/resources and respect calendar conflicts and buffers.
@@ -44,9 +45,10 @@ export async function createManualSession(input: {
   tierId?: string; addOnIds?: string[]; addOnQuantities?: Record<string, number>;
 }) {
   if (!Number.isFinite(input.startsAt.getTime()) || input.startsAt <= new Date()) throw new Error("Choose a future date and time.");
-  const endsAt = new Date(input.startsAt.getTime() + input.durationMinutes * 60000);
   const selectedService = input.serviceId ? await prisma.service.findFirst({ where: { id: input.serviceId, siteId: input.siteId, isActive: true, isOneOff: false } }) : null;
   if (input.serviceId && !selectedService) throw new Error("Choose an available session type.");
+  const unlimitedDuration = readSessionOffering(selectedService?.sessionOffering)?.tiers.find(tier => tier.id === input.tierId)?.unlimitedDuration;
+  const endsAt = unlimitedDuration ? getZonedDayBounds(input.startsAt, input.timezone).end : new Date(input.startsAt.getTime() + input.durationMinutes * 60000);
   const buffered = getBufferedWindow(input.startsAt, endsAt, selectedService?.bufferBeforeMinutes || 0, selectedService?.bufferAfterMinutes || 0);
   const busy = await listGoogleBusyWindows({ siteId: input.siteId, timeZone: input.timezone,
     staffIds: input.staffId ? [input.staffId] : [], start: buffered.bufferedStart, end: buffered.bufferedEnd });
@@ -58,6 +60,7 @@ export async function createManualSession(input: {
     if (offering?.addOns.some(item => item.pricingType === "HOURLY")) offering = priceSessionOffering(offering, await tx.hourlyRate.findMany({ where: { siteId: input.siteId } }), { pricingType: pricingTypeSchema.parse(service?.pricingType ?? "FLAT_RATE"), hourlyRateId: service?.hourlyRateId ?? "" });
     let packageSnapshot = selectSessionPackage(offering, input.tierId, input.addOnIds, input.durationMinutes, input.addOnQuantities);
     const tier = readSessionOffering(service?.sessionOffering)?.tiers.find(tier => tier.id === input.tierId);
+    if (Boolean(tier?.unlimitedDuration) !== Boolean(unlimitedDuration)) throw new Error("The package duration changed. Reload and try again.");
     const hourly = (tier?.pricingType ?? service?.pricingType) === "HOURLY";
     const hourlyRate = hourly ? tier?.pricingType
       ? await tx.hourlyRate.findFirst({ where: { id: tier.hourlyRateId || "", siteId: input.siteId } })
@@ -77,7 +80,7 @@ export async function createManualSession(input: {
     const clientId = await upsertPublicClient(tx, { siteId: input.siteId, name: input.customerName, email: input.customerEmail, phone: input.customerPhone });
     return tx.booking.create({ data: { siteId: input.siteId, serviceId: service.id, clientId, isManual: true,
       sessionName: input.name, sessionLocation: input.location, priceCents,
-      ...(packageSnapshot ? { packageSnapshot: { ...packageSnapshot, priceCents, durationMinutes: input.durationMinutes,
+      ...(packageSnapshot ? { packageSnapshot: { ...packageSnapshot, priceCents, durationMinutes: (endsAt.getTime() - input.startsAt.getTime()) / 60000,
         ...(tier?.pricingType ? { pricingType: tier.pricingType } : {}),
         ...(hourlyRate ? { pricingType: "HOURLY", hourlyRate: { id: hourlyRate.id, name: hourlyRate.name, amountCents: hourlyRate.amountCents } } : {}) } } : {}),
       customerName: input.customerName, customerEmail: input.customerEmail, customerPhone: input.customerPhone,

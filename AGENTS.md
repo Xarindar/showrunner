@@ -11,3 +11,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Admin design system
 
 Before changing admin UI, read [the token developer guide](developer-docs/admin-design-system.md), [DESIGN.md](DESIGN.md), and the relevant module styles. Admin tokens live in `app/admin/design-tokens.css`; shared component recipes live in `components/ui/styles/`. Modules own task layout, not separate control skins. Keep tenant presets and client website styling outside the admin boundary. Update the guide when changing the token contract; historical UI plans are not current styling instructions.
+
+## Unified admin notifications
+
+All admin action feedback (save errors, form submission errors, successes, warnings, and sign-in failures) must use the single toast system in `components/ui/notifications`: `useNotify()` for client handlers or `Notification` for action-state/redirect results. Never add inline error/success paragraphs, banners, custom alerts, or another toast provider inside a module. The admin layout owns the provider. Pass `eventKey={state}` with `useActionState` so repeated failures announce again.
+
+Field-specific guidance may stay attached to its control with `aria-invalid`/`aria-describedby`. Persistent upload results, failed previews, unavailable-resource states, and their retry controls are task content, not action notifications. Do not duplicate a toast as an inline banner. When fixing feedback, search related screens for the same pattern and test repeated errors and notifications inside dialogs.
+
+## One production release source
+
+Base Showrunner, Cottage616, and Jazzr all deploy `Xarindar/showrunner` `main`. Merge verified changes into `main` before production deployment; feature branches and old worktrees are not independent release sources. Before consolidating a release, compare the current live releases and outstanding branches so existing booking, terms, editor, and delivery features are retained. Jazzr and Cottage public sites each follow their own repository's `main`.

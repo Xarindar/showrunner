@@ -21,7 +21,7 @@ function harness(overrides: { client?: boolean; package?: boolean; gallery?: boo
   const assets = overrides.assets || [{ id: "asset-a", filename: "portrait.jpg", alt: "Portrait", folder: "Shoots/Autumn", url: "/api/media/assets/asset-a", isPrivate: true }];
   const db: Query = {
     mediaFolder: { findMany: record("savedFolders", []), upsert: record("rootFolder", {}), findUnique: async () => null, create: async ({ data }: Query) => { calls.push({ name: "createFolder", query: { data } }); return { id: data.name, ...data }; } },
-    booking: { findFirst: record("booking", { id: "booking-a" }), findMany: record("bookings", []) },
+    booking: { findFirst: record("booking", { id: "booking-a", service: { category: "Portraits" } }), findMany: record("bookings", []) },
     client: { update: record("lockClient", { id: "client-a", name: "Example client", mediaFolder: null }), findFirst: record("client", overrides.client === false ? null : { id: "client-a", name: "Example client", email: "client@example.test" }) },
     orderItem: { findFirst: record("package", overrides.package === false ? null : { id: "purchased-item" }) },
     portfolioGallery: {
@@ -32,7 +32,6 @@ function harness(overrides: { client?: boolean; package?: boolean; gallery?: boo
     },
     portfolioGalleryItem: { findMany: record("items", overrides.existing || []), createMany: record("addItems", { count: assets.length }) },
     portfolioGalleryAccess: { findFirst: record("access", { accessToken: "private-token" }) },
-    messageTemplate: { upsert: record("template", {}) },
     emailOutbox: { findFirst: record("outbox", { status: "QUEUED" }), findMany: record("sentEmails", []) },
     serviceLibraryItem: { updateMany: record("lockAddon", { count: 1 }), findFirst: record("addon", { id: "custom-addon", siteId: "site-a", name: "User created name", pricingType: "PER_UNIT", priceCents: 1234, deliverables: { finalPhotos: 1 }, commerceProduct: null }), update: record("linkProduct", {}) },
     product: { upsert: record("product", { id: "internal-digital-product" }) },
@@ -50,6 +49,7 @@ function harness(overrides: { client?: boolean; package?: boolean; gallery?: boo
       getAccessibleMediaWhere: async (_user: unknown, siteId: string, extra: unknown) => ({ AND: [{ siteId }, extra, { uploadedByStaffId: "staff-a" }] }),
       getOwnerStaffIds: async () => ["staff-a"], resolveDataScopeMode: async () => "OWN", hasAdminPermission: () => true
     },
+    "@/lib/portfolio/purchases": { releaseAllSessionPhotos: async (_tx: unknown, token: string, siteId: string) => { calls.push({ name: "releaseAll", query: {token,siteId} }); } },
     "@/lib/email": { queueEmail: record("email", undefined) },
     "@/lib/env": { publicAppBaseUrl: () => "https://admin.example.test" },
     "@/lib/prisma": { prisma: db },
@@ -329,7 +329,8 @@ test("session email is scoped, uses the stored recipient and private link, and q
   assert.equal(email.relatedType, "client"); assert.equal(email.relatedId, "client-a");
   assert.equal(email.tokens.galleryUrl, "https://admin.example.test/proofs/private-token");
   assert.equal(email.idempotencyKey, `gallery-ready:gallery-a:${createInput.requestId}`);
-  assert.equal(Object.keys(calls.find(call => call.name === "template")!.query.update).length, 0, "Never overwrite a customized template");
+  assert.equal(email.templateKey, "portfolio.session.ready");
+  assert.equal(email.brandCategory, "Portraits");
   const booking = calls.find(call => call.name === "booking")!.query.where;
   assert.equal(booking.AND[0].siteId, "site-a");
   assert.equal(booking.AND[1].clientId, "client-a");
@@ -464,4 +465,14 @@ test("sharing and emailing a gallery require configured selection terms", async 
     assert.equal(result.ok, false); assert.match(result.error, /Photo selection settings/);
   }
   assert.equal(calls.some(call => call.name === "email" || call.name === "access"), false);
+});
+
+
+test("unlimited booked packages skip selection setup and prepare private delivery when sharing",async()=>{
+  const h=harness();
+  h.db.portfolioGallery.findFirst=async()=>({id:"gallery-a",siteId:"site-a",clientId:"client-a",bookingId:"booking-a",downloadEnabled:true,proofingEnabled:false,
+    booking:{siteId:"site-a",clientId:"client-a",status:"COMPLETED",packageSnapshot:{tierId:"gold",name:"Gold",durationMinutes:60,priceCents:50000,coverage:[],extras:[],deliverables:{finalPhotos:null}}}});
+  const result=await h.actions.createClientGalleryLinkAction({clientId:"client-a",galleryId:"gallery-a"});
+  assert.equal(result.ok,true);
+  assert.deepEqual(h.calls.find(call=>call.name==="releaseAll")?.query,{token:"private-token",siteId:"site-a"});
 });

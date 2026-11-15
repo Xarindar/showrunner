@@ -23,6 +23,9 @@ export function ContentFields(props: Parameters<typeof BaseContentFields>[0]) {
 function BaseContentFields({ block, value, onChange, ...props }: { block: ContentBlockConfig; value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void; canUpload: boolean; assetBaseUrl?: string; choices: Choice[]; linkOptions: LinkOptions }) {
   const fields = Object.fromEntries(Object.entries(blockRegistry[block.type].fields).filter(([key]) => block.editableFields.includes(key)));
   if (block.type === "showcase" && fields.items) fields.items = { ...fields.items, fields: { ...fields.items.fields, variant: { ...fields.items.fields!.variant, options: block.cardVariants || [] } } };
+  if (block.type === "featured" && fields.items && !block.cardVariants) {
+    fields.items = { ...fields.items, fields: Object.fromEntries(Object.entries(fields.items.fields!).filter(([key]) => key !== "layout")) };
+  }
   if (!block.editorGroups) return <Fields {...props} headerId={block.type === "slideshow" ? block.id : undefined} fields={fields} value={value} onChange={onChange} prefix={block.id} fixedRows={block.fixedRows} limits={block.limits} minimums={block.minimums} />;
   return <>{block.editorGroups.map((group, index) => <details className={styles.contentGroup} key={index} open><summary>{group.label}</summary><div className={styles.groupFields}>{group.fields.map(item => {
     const [list, position, key] = item.path.split(".");

@@ -4,13 +4,14 @@ import { TimeInput } from "@/components/ui/time-input";
 import { formatTimeValue } from "@/lib/format";
 import { serviceTimeFrameSchema, timeFrameMinutes, editTimeFrame } from "@/lib/scheduling/service-time-frame";
 import { ResponsiveTableFrame } from "@/components/ui/responsive-table";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 import { flushSync } from "react-dom";
-import { Copy, Pencil, Plus, X } from "lucide-react";
+import { Copy, GripVertical, Pencil, Plus, X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
-import { sessionOfferingDraft, type SessionOffering, type SessionOfferingDraft } from "@/lib/scheduling/session-offering";
+import { packagesInDisplayOrder, sessionOfferingDraft, type SessionOffering, type SessionOfferingDraft } from "@/lib/scheduling/session-offering";
 import type { ServiceLibraryItem } from "@/lib/scheduling/service-library";
 import { ServiceLibraryPicker } from "./service-library-picker";
 import styles from "./session-packages-editor.module.css";
@@ -31,6 +32,17 @@ const deliverableFields = [
 function packageDurationLabel(value: string) {
   const total = Number(value), hours = Math.floor(total / 60), minutes = total % 60;
   return hours ? `${hours} hr${minutes ? ` ${minutes} min` : ""}` : `${minutes} min`;
+}
+
+function packageDropTarget(event: PointerEvent<HTMLTableRowElement>) {
+  const body = event.currentTarget.parentElement as HTMLTableSectionElement | null;
+  if (!body?.rows.length || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+  const bounds = body.getBoundingClientRect();
+  const { clientX: x, clientY: y } = event;
+  if (x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) return;
+  // Offset positions ignore the sibling row transforms used during the drag.
+  const row = Array.from(body.rows).find(row => y < bounds.top + row.offsetTop - body.rows[0].offsetTop + row.offsetHeight);
+  return row?.dataset.packageId;
 }
 
 export function SessionPackagesEditor({ initialOffering = null, durationMinutes = 60, priceCents = null, isNew = false, initialRates = [], initialPricingType = "FLAT_RATE", initialHourlyRateId = "", initialScheduling }: {
@@ -72,16 +84,47 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     catch { return ""; }
   };
   const listId = useId();
+  const gesture = useRef<{ x: number; y: number; height: number } | null>(null);
+  const [drag, setDrag] = useState<{ id: string; target?: string; height: number } | null>(null);
+  useEffect(() => {
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      gesture.current = null;
+      setDrag(null);
+    };
+    window.addEventListener("keydown", cancel);
+    return () => window.removeEventListener("keydown", cancel);
+  }, []);
+  const visibleTiers = packagesInDisplayOrder(draft.tiers.filter(tier => !newTiers.has(tier.id)), draft.packageOrder, tier => {
+    const price = tierPrice(tier);
+    return price ? Number(price) : Infinity;
+  });
   const firstTier = draft.tiers[0];
   const multi = draft.tiers.length > 1;
   const canDiscardTier = isNew || multi;
   const libraryTier = draft.tiers.find(tier => tier.id === libraryPicker?.tierId);
   const updateTier = (id: string, changes: Partial<SessionOfferingDraft["tiers"][number]>) => setDraft(current => ({ ...current, tiers: current.tiers.map(tier => tier.id === id ? { ...tier, ...changes } : tier) }));
 
+  function moveTier(id: string, targetId: string | undefined, restoreFocus = false) {
+    if (!targetId || id === targetId) return;
+    const order = visibleTiers.map(tier => tier.id);
+    const destination = order.indexOf(targetId);
+    if (destination < 0) return;
+    order.splice(order.indexOf(id), 1);
+    order.splice(destination, 0, id);
+    setDraft(current => ({ ...current, packageOrder: order }));
+    if (restoreFocus) requestAnimationFrame(() => document.getElementById(`${listId}-move-${id}`)?.focus());
+    notify(`${visibleTiers.find(tier => tier.id === id)?.name} moved to position ${destination + 1}.`);
+  }
+
+  const dragSource = visibleTiers.findIndex(tier => tier.id === drag?.id);
+  const dragTarget = visibleTiers.findIndex(tier => tier.id === drag?.target);
+
   function discardTier(id: string) {
-    setDraft(current => !isNew && current.tiers.length <= 1 ? current : {
-      ...current,
-      tiers: current.tiers.filter(tier => tier.id !== id)
+    setDraft(current => {
+      if (!isNew && current.tiers.length <= 1) return current;
+      const order = current.packageOrder?.filter(tierId => tierId !== id);
+      return { ...current, packageOrder: order?.length ? order : undefined, tiers: current.tiers.filter(tier => tier.id !== id) };
     });
     setNewTiers(current => new Set([...current].filter(tierId => tierId !== id)));
   }
@@ -104,7 +147,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     const id = crypto.randomUUID();
     flushSync(() => {
       setExpandedTiers(new Set());
-      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? String(durationMinutes), pricingType: source?.pricingType ?? "FLAT_RATE", timeFrame: source?.timeFrame, hourlyRateId: source?.hourlyRateId || null, deliverables: source?.deliverables, coverageIds: [...(source?.coverageIds ?? [])] }] });
+      setDraft({ ...draft, tiers: [...draft.tiers, { id, name, price: source?.price ?? "", durationMinutes: source?.durationMinutes ?? String(durationMinutes), unlimitedDuration: source?.unlimitedDuration, pricingType: source?.pricingType ?? "FLAT_RATE", timeFrame: source?.timeFrame, hourlyRateId: source?.hourlyRateId || null, deliverables: source?.deliverables, coverageIds: [...(source?.coverageIds ?? [])] }] });
       setNewTiers(current => new Set([...current, id]));
     });
   }
@@ -153,17 +196,78 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     <input type="hidden" name="durationMinutes" value={firstTier?.durationMinutes ?? durationMinutes} />
     <input type="hidden" name="price" value={firstTier ? tierPrice(firstTier) : ""} />
     <section className="studio-panel ui-section-card ui-table-card" aria-labelledby={`${listId}-packages-title`}>
-    <div className="ui-section-header"><h2 id={`${listId}-packages-title`}>Packages</h2><Button type="button" variant="secondary" size="sm" disabled={draft.tiers.length >= 10} onClick={() => addTier()}><Plus aria-hidden="true" size={16} />Add package</Button></div>
+    <div className="ui-section-header">
+      <h2 id={`${listId}-packages-title`}>Packages</h2>
+      <div className="ui-inline-actions">
+        {draft.packageOrder && <Button type="button" variant="secondary" size="sm" onClick={() => {
+          setDraft(current => ({ ...current, packageOrder: undefined }));
+          notify("Automatic package order restored.");
+        }}>Use automatic order</Button>}
+        <Button type="button" variant="secondary" size="sm" disabled={draft.tiers.length >= 10} onClick={() => addTier()}><Plus aria-hidden="true" size={16} />Add package</Button>
+      </div>
+    </div>
+    <p id={`${listId}-order-help`} className="ui-sr-only">Drag a package to reorder it for online booking. With its handle focused, use the up and down arrow keys.</p>
     <ResponsiveTableFrame className={`catalog-table-scroll ${styles.servicesTable} ${styles.packagesTable}`} role="region" aria-label="Packages table" tabIndex={0}>
-      <table className="catalog-product-table"><thead><tr><th scope="col">Package</th><th scope="col">Price</th><th scope="col">Duration</th><th scope="col">Actions</th></tr></thead><tbody>
-        {draft.tiers.filter(tier => !newTiers.has(tier.id)).map(tier => <tr key={tier.id}>
-          <td><button type="button" className={styles.packageName} aria-haspopup="dialog" onClick={() => setExpandedTiers(new Set([tier.id]))}>{tier.name}</button></td>
-          <td>{tierPrice(tier) ? Number(tierPrice(tier)).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "—"}</td>
-          <td>{tier.pricingType === "TIME_FRAME" ? timeFrameLabel(tier) : packageDurationLabel(tier.durationMinutes)}</td>
-          <td><Button type="button" variant="ghost" size="sm" aria-label={`Edit ${tier.name}`} onClick={() => setExpandedTiers(new Set([tier.id]))}><Pencil aria-hidden="true" size={15} /></Button></td>
-        </tr>)}
+      <table className="catalog-product-table"><thead><tr><th scope="col">Package</th><th scope="col">Price</th><th scope="col">Duration</th><th scope="col">Actions</th></tr></thead><tbody data-package-dragging={Boolean(drag) || undefined}>
+        {visibleTiers.map((tier, position) => {
+          let shift = 0;
+          if (drag && dragTarget >= 0) {
+            if (position > dragSource && position <= dragTarget) shift = -drag.height;
+            if (position < dragSource && position >= dragTarget) shift = drag.height;
+          }
+          return <tr key={tier.id} data-package-id={tier.id} data-package-picked-up={drag?.id === tier.id || undefined}
+            className={drag?.id === tier.id ? "ui-drag-lift" : undefined}
+            data-package-sortable={visibleTiers.length > 1 || undefined}
+            style={shift ? { transform: `translateY(${shift}px)` } : undefined}
+            onPointerDown={event => {
+              if (!event.isPrimary || event.button !== 0 || visibleTiers.length < 2) return;
+              const button = (event.target as Element).closest("button");
+              if (button && !button.classList.contains(styles.packageHandle)) return;
+              event.preventDefault();
+              const row = event.currentTarget;
+              const focused = document.activeElement;
+              if (focused instanceof HTMLElement && focused.classList.contains(styles.packageHandle)) focused.blur();
+              gesture.current = { x: event.clientX, y: event.clientY, height: row.offsetHeight };
+              row.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={event => {
+              const start = gesture.current;
+              const row = event.currentTarget;
+              if (!start || !row.hasPointerCapture(event.pointerId)) return;
+              const y = event.clientY - start.y;
+              const x = event.clientX - start.x;
+              if (!drag && Math.abs(y) < 4) {
+                // Leave a predominantly horizontal gesture to the table's native scrollbar.
+                if (Math.abs(x) > 8) row.releasePointerCapture(event.pointerId);
+                return;
+              }
+              row.style.setProperty("--package-drag-y", `${y}px`);
+              const target = packageDropTarget(event);
+              setDrag(current => current ? current.target === target ? current : { ...current, target } : { id: tier.id, target, height: start.height });
+            }}
+            onPointerUp={event => {
+              if (drag && gesture.current) moveTier(tier.id, packageDropTarget(event));
+              gesture.current = null;
+              setDrag(null);
+            }}
+            onLostPointerCapture={() => { gesture.current = null; setDrag(null); }}>
+            <td><div className={styles.packageCell}>
+              {visibleTiers.length > 1 && <Button type="button" variant="ghost" size="sm" className={styles.packageHandle}
+                id={`${listId}-move-${tier.id}`} aria-label={`Move ${tier.name}`} aria-describedby={`${listId}-order-help`}
+                onKeyDown={event => {
+                  if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+                  event.preventDefault();
+                  moveTier(tier.id, visibleTiers[position + (event.key === "ArrowUp" ? -1 : 1)]?.id, true);
+                }}><GripVertical aria-hidden="true" size={15} /></Button>}
+              <button type="button" className={styles.packageName} aria-haspopup="dialog" onClick={() => setExpandedTiers(new Set([tier.id]))}>{tier.name}</button>
+            </div></td>
+            <td>{tierPrice(tier) ? Number(tierPrice(tier)).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "—"}</td>
+            <td>{tier.pricingType === "TIME_FRAME" ? timeFrameLabel(tier) : packageDurationLabel(tier.durationMinutes)}</td>
+            <td><Button type="button" variant="ghost" size="sm" aria-label={`Edit ${tier.name}`} onClick={() => setExpandedTiers(new Set([tier.id]))}><Pencil aria-hidden="true" size={15} /></Button></td>
+          </tr>;
+        })}
       </tbody></table>
-      {!draft.tiers.some(tier => !newTiers.has(tier.id)) && <p className={styles.servicesEmpty}>No packages added</p>}
+      {!visibleTiers.length && <p className={styles.servicesEmpty}>No packages added</p>}
     </ResponsiveTableFrame>
       {draft.tiers.map((tier, index) => {
         const services = draft.coverageItems.filter(item => tier.coverageIds.includes(item.id));
@@ -179,7 +283,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
           <Field label="Package name"><Input id={`${listId}-${tier.id}`} aria-label={`Package ${index + 1} name`} value={tier.name} autoFocus required maxLength={120} onChange={event => updateTier(tier.id, { name: event.target.value })} /></Field>
           <div className={styles.tierNumbers}>
             <ServicePricingFields allowTimeFrame pricingType={tier.pricingType ?? "FLAT_RATE"} hourlyRateId={tier.hourlyRateId ?? ""} rates={rates}
-              onChange={(pricingType, hourlyRateId) => updateTier(tier.id, { pricingType, hourlyRateId: hourlyRateId || null, timeFrame: pricingType === "TIME_FRAME" ? tier.timeFrame ?? { start: "13:00", end: "15:00", endsNextDay: false } : undefined })} onRateSaved={onRateSaved}
+              onChange={(pricingType, hourlyRateId) => updateTier(tier.id, { pricingType, unlimitedDuration: pricingType === "FLAT_RATE" ? tier.unlimitedDuration : undefined, hourlyRateId: hourlyRateId || null, timeFrame: pricingType === "TIME_FRAME" ? tier.timeFrame ?? { start: "13:00", end: "15:00", endsNextDay: false } : undefined })} onRateSaved={onRateSaved}
               priceField={<Field label="Price (USD)">
                 <Input aria-label={`${tier.name} price (USD)`} type="number" inputMode="decimal" min="0" max="9999999.99" step="0.01"
                   required={isNew || multi}
@@ -198,27 +302,28 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
               </Select></Field>
               <Field label="Start Time"><TimeInput className="ui-input" required value={tier.timeFrame?.start ?? ""} onValueChange={start => updateTier(tier.id, { timeFrame: editTimeFrame(tier.timeFrame ?? { start: "", end: "" }, { start }) })} /></Field>
               <Field label="End Time"><TimeInput className="ui-input" required value={tier.timeFrame?.end ?? ""} onValueChange={end => updateTier(tier.id, { timeFrame: editTimeFrame(tier.timeFrame ?? { start: "", end: "" }, { end }) })} /></Field>
-            </div> : <div className={styles.duration} role="group" aria-labelledby={durationLabelId}>
+            </div> : <div className={styles.allowance}><div className={styles.duration} role="group" aria-labelledby={durationLabelId}>
               <span className="ui-field-label" id={durationLabelId}>Duration</span>
               <div className={styles.durationControls}>
-                <Select compact aria-label="Hours" value={hours} onChange={event => {
+                <Select compact aria-label="Hours" disabled={tier.unlimitedDuration} value={hours} onChange={event => {
                   const nextHours = Number(event.target.value);
                   const nextMinutes = nextHours === maxDurationHours ? 0 : minutes;
                   updateTier(tier.id, { durationMinutes: String(nextHours * 60 + nextMinutes) });
                 }}>
                   {durationHours.map(hour => <option key={hour} value={hour}>{hour} H</option>)}
                 </Select>
-                <Select compact aria-label="Minutes" required disabled={hours === maxDurationHours}
+                <Select compact aria-label="Minutes" required disabled={tier.unlimitedDuration || hours === maxDurationHours}
                   value={totalMinutes === 0 ? "" : minutes}
                   onChange={event => updateTier(tier.id, { durationMinutes: String(hours * 60 + Number(event.target.value)) })}>
                   <option value={hours === 0 ? "" : 0}>{hours === 0 ? "— M" : "0 M"}</option>
                   {durationMinutesOfHour.slice(1).map(minute => <option key={minute} value={minute}>{minute} M</option>)}
                 </Select>
               </div>
-            </div>}
+            </div><Switch label="Unlimited" aria-label="Unlimited duration" variant="inline" checked={Boolean(tier.unlimitedDuration)} onChange={event => updateTier(tier.id, { unlimitedDuration: event.target.checked, ...(event.target.checked ? { pricingType: "FLAT_RATE", hourlyRateId: null, timeFrame: undefined, durationMinutes: tier.durationMinutes === "0" ? "60" : tier.durationMinutes } : {}) })} /></div>}
             {deliverableFields.map(([key, label]) => (
-              <Field key={key} label={label}>
-                <Input type="number" inputMode="numeric" min="0" max={Number.MAX_SAFE_INTEGER} step="1"
+              <div className={styles.allowance} key={key}>
+              <Field label={label}>
+                <Input type="number" inputMode="numeric" min="0" max={10000} step="1" disabled={tier.deliverables?.[key] === null}
                   value={tier.deliverables?.[key] ?? ""}
                   onChange={event => {
                     const counts = { ...tier.deliverables };
@@ -227,8 +332,16 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
                     updateTier(tier.id, { deliverables: Object.keys(counts).length ? counts : undefined });
                   }} />
               </Field>
+              <Switch label="Unlimited" aria-label={`Unlimited ${label.toLowerCase()}`} variant="inline" checked={tier.deliverables?.[key] === null} onChange={event => {
+                const counts = { ...tier.deliverables };
+                if (event.target.checked) counts[key] = null;
+                else delete counts[key];
+                updateTier(tier.id, { deliverables: Object.keys(counts).length ? counts : undefined });
+              }} />
+              </div>
             ))}
           </div>
+          {tier.unlimitedDuration && <p className="muted-text">Reserves the rest of the day from the appointment start time.</p>}
           </section>
           <section className={styles.packageSection} aria-labelledby={`${listId}-booking-${tier.id}`}>
           <h3 className="ui-zero" id={`${listId}-booking-${tier.id}`}>Booking settings</h3>
@@ -237,7 +350,8 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
               ["bufferBeforeMinutes", "Time Before", "min", "minutes", 0, 1440],
               ["bufferAfterMinutes", "Time After", "min", "minutes", 0, 1440],
               ["minimumNoticeHours", "Minimum Notice", "hr", "hours", 0, 8760],
-              ["maxAdvanceDays", "Book Ahead", "days", "days", 1, 3650]
+              ["maxAdvanceDays", "Book Ahead", "days", "days", 1, 3650],
+              ["slotIntervalMinutes", "Start Interval", "min", "minutes", 1, 1440]
             ] as const).map(([key, label, unit, accessibleUnit, min, max]) => <Field key={key} label={label}>
               <span className={styles.unitField}>
                 <Input aria-label={`${label} (${accessibleUnit})`} type="number" min={min} max={max} required value={scheduling[key]} onChange={event => setScheduling(current => ({ ...current, [key]: event.target.value }))} />

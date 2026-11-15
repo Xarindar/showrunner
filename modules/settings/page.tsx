@@ -12,10 +12,14 @@ import { isRequiredModule } from "@/shell/modules";
 import type { ModuleStatus } from "@/shell/module-types";
 import { getPlatformStatus, platformFoundationItems } from "@/lib/platform-status";
 import { getSiteSettings } from "@/lib/site";
+import { emailBrandProfiles } from "@/lib/email/brand-profiles";
+import { publicEmailImage } from "@/lib/email/customer-brand";
 import {
+  attachEmailHeaderLogoAction,
   attachSiteLogoAction,
   createSiteApiKeyAction,
   removeSiteLogoAction,
+  removeEmailHeaderLogoAction,
   revokeSiteApiKeyAction,
   updateSettingsAction,
   updateSiteApiKeyOriginsAction,
@@ -35,7 +39,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   await requireAdmin("settings:update");
   const [{ saved, error }, settings] = await Promise.all([searchParams, getSiteSettings()]);
   const currentLogoAssetId = mediaAssetIdFromUrl(settings.logoImageUrl);
-  const [platformStatus, apiKeys, logoAssets, currentLogoAsset] = await Promise.all([
+  const [platformStatus, apiKeys, logoAssets, currentLogoAsset, emailLogos] = await Promise.all([
     getPlatformStatus(settings),
     listSiteApiKeys(settings.siteId),
     prisma.mediaAsset.findMany({
@@ -48,7 +52,11 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           where: { id: currentLogoAssetId, siteId: settings.siteId, deletedAt: null, isPrivate: false },
           select: { alt: true, driver: true, filename: true, id: true, isPrivate: true, key: true, storageProviderId: true, url: true }
         })
-      : Promise.resolve(null)
+      : Promise.resolve(null),
+    prisma.emailHeaderLogo.findMany({
+      where: { siteId: settings.siteId, mediaAsset: { ...publicEmailImage, siteId: settings.siteId } },
+      include: { mediaAsset: true }
+    })
   ]);
   const dataScopeConfig = parseDataScopeConfig(settings.dataScopeConfig);
   const dataScopeModules = scopableModules();
@@ -73,6 +81,14 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   const logoUploadFormId = "settings-logo-upload-form";
   const logoAttachFormId = "settings-logo-attach-form";
   const logoRemoveFormId = "settings-logo-remove-form";
+  const emailLogoFields = emailBrandProfiles(settings).map(brand => {
+    const asset = emailLogos.find(logo => logo.profile === brand.key)?.mediaAsset;
+    const formId = `settings-email-logo-${brand.key}`;
+    return {
+      ...brand, formId,
+      logo: asset ? { url: mediaAssetDisplayUrl(asset, MediaVariantType.FULL), alt: asset.alt || `${brand.name} logo` } : null
+    };
+  });
 
   return (
     <div className="stack">
@@ -106,6 +122,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <BusinessSettings
           attachFormId={logoAttachFormId}
           canUploadLogo={canUploadWithDriver(settings.mediaDriver)}
+          emailLogoFields={emailLogoFields}
           logo={activeLogo}
           logoAssets={logoAssetOptions}
           removeFormId={logoRemoveFormId}
@@ -265,6 +282,12 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       <form action={uploadSiteLogoAction} id={logoUploadFormId} />
       <form action={attachSiteLogoAction} id={logoAttachFormId} />
       <form action={removeSiteLogoAction} id={logoRemoveFormId} />
+      {emailLogoFields.map(({ key, formId }) => (
+        <div key={key}>
+          <form action={attachEmailHeaderLogoAction.bind(null, key)} id={formId} />
+          <form action={removeEmailHeaderLogoAction.bind(null, key)} id={`${formId}-remove`} />
+        </div>
+      ))}
 
       <Card aria-label="Embeds and public API" as="section" minHeight="none" bodyClassName="form-grid">
         <div>

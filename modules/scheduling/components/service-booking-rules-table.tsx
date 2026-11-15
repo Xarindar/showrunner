@@ -37,8 +37,6 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
   const [setName, setSetName] = useState("");
   const [sets, setSets] = useState<BookingRuleSet[]>([]);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const [setsError, setSetsError] = useState("");
   const modalBody = useRef<HTMLDivElement>(null);
   const notify = useNotify();
   const policyText = rules.filter(rule => rule.kind === "policy").map(rule => rule.label).join("\n\n");
@@ -52,33 +50,33 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
     modalBody.current?.parentElement?.scrollTo(0, 0);
     if (mode !== "library") return;
     let active = true;
-    listBookingRuleSets().then(result => { if (active) { setSets(result.map(set => ({ ...set, rules: set.rules.filter(rule => !rule.contactField) })).filter(set => set.rules.length > 0)); setSetsError(""); } }).catch(() => { if (active) setSetsError("Saved sets could not be loaded. Close and reopen to retry."); });
+    listBookingRuleSets().then(result => { if (active) { setSets(result.map(set => ({ ...set, rules: set.rules.filter(rule => !rule.contactField) })).filter(set => set.rules.length > 0)); } }).catch(() => { if (active) notify("Saved sets could not be loaded. Close and reopen to retry.", "danger"); });
     return () => { active = false; };
-  }, [mode]);
-  function open(mode: "library" | "save-set") { setError(""); setSearch(""); setMode(mode); }
+  }, [mode, notify]);
+  function open(mode: "library" | "save-set") { setSearch(""); setMode(mode); }
   function edit(rule?: BookingRule) {
     const value: BookingRule = rule ?? { id: crypto.randomUUID(), kind: "intake", category: "General", label: "", type: "TEXT", required: false, placeholder: "", helpText: "", options: [] };
-    setDraft(value); setChoices(value.options.length ? [...value.options] : [""]); setError(""); setMode("edit");
+    setDraft(value); setChoices(value.options.length ? [...value.options] : [""]); setMode("edit");
   }
   function add(incoming: BookingRule[]) {
     const parsed = bookingRulesSchema.safeParse([...rules, ...incoming.filter(rule => !rule.contactField && !alreadyAdded(rule)).map(rule => ({ ...rule, id: rule.contactField ? rule.id : crypto.randomUUID() }))]);
-    if (!parsed.success) { setError(parsed.error.issues[0].message); return; }
+    if (!parsed.success) { notify(parsed.error.issues[0].message, "danger"); return; }
     setRules(parsed.data); setMode(null); notify("Rules added to this draft. Save the session to keep them.");
   }
   function saveRule() {
     const parsed = bookingRuleSchema.safeParse({ ...draft, options: draft && ["RADIO", "SELECT", "CHECKBOX"].includes(draft.type) ? choices.map(value => value.trim()).filter(Boolean) : [] });
-    if (!parsed.success) { setError(parsed.error.issues[0].message); return; }
+    if (!parsed.success) { notify(parsed.error.issues[0].message, "danger"); return; }
     const next = bookingRulesSchema.safeParse(rules.some(rule => rule.id === parsed.data.id) ? rules.map(rule => rule.id === parsed.data.id ? parsed.data : rule) : [...rules, parsed.data]);
-    if (!next.success) { setError(next.error.issues[0].message); return; }
+    if (!next.success) { notify(next.error.issues[0].message, "danger"); return; }
     setRules(next.data); setMode(null);
   }
   async function saveSet() {
-    setPending(true); setError("");
+    setPending(true);
     try {
       const result = await saveBookingRuleSet({ name: setName, rules: rules.filter(rule => !rule.contactField) });
-      if (result.error) { setError(result.error); return; }
+      if (result.error) { notify(result.error, "danger"); return; }
       if (result.set) { setSets(current => [...current, result.set!]); setSetName(""); setMode(null); notify("Rule set saved. Apply it from Add rule on another service."); }
-    } catch { setError("The rule set could not be saved. Your rules are still here; please try again."); }
+    } catch { notify("The rule set could not be saved. Your rules are still here; please try again.", "danger"); }
     finally { setPending(false); }
   }
   return <section className="studio-panel ui-section-card ui-table-card service-booking-rules" id={`${idPrefix}-booking-rules`} aria-labelledby={`${idPrefix}-rules-title`}>
@@ -131,7 +129,6 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
         <p className="ui-field-hint">Contact details belong to the booking flow. Add questions and terms specific to this session.</p>
         <Field label="Search rules"><Input type="search" value={search} onChange={event => setSearch(event.target.value)} /></Field>
         {sets.length > 0 && <section className="booking-rule-category"><h3>Saved rule sets</h3>{sets.filter(set => set.name.toLowerCase().includes(search.toLowerCase())).map(set => <div className="booking-rule-set" key={set.id}><span><strong>{set.name}</strong><small>{set.rules.length} rules</small></span><Button type="button" variant="secondary" onClick={() => add(set.rules)}>Apply {set.name}</Button></div>)}</section>}
-        {setsError && <p role="alert">{setsError}</p>}
         {categories.map(category => {
           const categoryRules = library.filter(rule => rule.category === category);
           const entries = categoryRules.filter(rule => `${category} ${rule.label}`.toLowerCase().includes(search.toLowerCase()));
@@ -155,7 +152,6 @@ export function ServiceBookingRulesTable({ documents = [], initialSelection, def
         <div className="module-modal-actions"><Button type="button" variant="ghost" onClick={() => setMode(null)}>Cancel</Button><Button type="button" onClick={saveRule}>Apply rule</Button></div>
       </>}
       {mode === "save-set" && <><p>Save these {rules.filter(rule => !rule.contactField).length} rules for reuse on other services. Applying a set adds copies to that service’s draft.</p><Field label="Set name"><Input value={setName} maxLength={100} disabled={pending} onChange={event => setSetName(event.target.value)} /></Field><div className="module-modal-actions"><Button type="button" variant="ghost" disabled={pending} onClick={() => setMode(null)}>Cancel</Button><Button type="button" disabled={pending} onClick={saveSet}>{pending ? "Saving…" : "Save set"}</Button></div></>}
-      {error && <p role="alert">{error}</p>}
       </div>
     </Modal>
   </section>;

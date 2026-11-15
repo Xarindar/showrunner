@@ -1301,3 +1301,8 @@ p {
 @media (max-width: 600px) {
   .booking-rule-fields [data-booking-rule-width] { grid-column: 1 / -1; }
 }
+
+.booking-rich-terms { white-space: normal; }
+.booking-rich-terms p { margin: 0 0 .75rem; min-height: 1em; }
+.booking-rich-terms :is(h2,h3) { font: inherit; font-weight: 700; margin: 1rem 0 .5rem; }
+.booking-rich-terms :is(ul,ol) { padding-left: 1.5rem; }

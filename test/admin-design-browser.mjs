@@ -913,10 +913,6 @@ try {
     for (const name of ['Packages table','Suggested add-ons table']) {
       const table=newSession.getByRole('region',{name,exact:true});
       const header=table.getByRole('columnheader',{name:'Actions',exact:true});
-      if(await table.getAttribute('data-table-layout')==='cards') {
-        assert(await table.locator('[data-table-label]').count()>0,'Mobile rows use shared column labels');
-        continue;
-      }
       if (name==='Packages table') assert(await table.getByRole('columnheader',{name:'Duration',exact:true}).evaluate(element=>element.scrollWidth<=element.clientWidth),'Duration header fits at '+width+'px');
       assert(await header.evaluate(element=>element.scrollWidth<=element.clientWidth),'Actions header fits without clipping at '+width+'px');
       assert.equal(await header.evaluate(element=>getComputedStyle(element).whiteSpace),'nowrap');
@@ -980,11 +976,13 @@ try {
   assert(await settingsRow.isVisible(),'Booking settings are visible without expanding a dropdown');
   assert.equal(await bookingPackage.getByRole('heading',{name:'Booking availability',exact:true}).count(),0);
   assert.equal(await bookingPackage.getByRole('button',{name:'Business hours',exact:true}).count(),0);
-  assert.equal(await settingsRow.getByRole('spinbutton').count(),4,'Only the four compact booking fields are displayed');
-  assert.deepEqual(await settingsRow.locator('[aria-hidden="true"]').allTextContents(),['min','min','hr','days'],'Units are shown inside the inputs');
+  assert.equal(await settingsRow.getByRole('spinbutton').count(),5,'Start interval is editable alongside the booking fields');
+  assert.deepEqual(await settingsRow.locator('[aria-hidden="true"]').allTextContents(),['min','min','hr','days','min'],'Units are shown inside the inputs');
   await settingsRow.getByRole('spinbutton',{name:'Minimum Notice (hours)',exact:true}).fill('24');
+  await settingsRow.getByRole('spinbutton',{name:'Start Interval (minutes)',exact:true}).fill('30');
   await bookingPackage.getByRole('button',{name:'Cancel',exact:true}).click();
   assert.equal(await builder.locator('input[name="minimumNoticeHours"]').inputValue(),'24','Booking settings submit even after the package modal closes');
+  assert.equal(await builder.locator('input[name=slotIntervalMinutes]').inputValue(),'30');
 
 
   const editBuilder=page.getByRole('region',{name:'Edit session builder fixture',exact:true});
@@ -1001,7 +999,7 @@ try {
     await page.setViewportSize({width,height:844});
     assert.equal(await savedPackage.evaluate(element=>element.scrollWidth>element.clientWidth),false,'Package booking settings fit '+width+'px');
     const bookingTops=await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).getByRole('spinbutton').evaluateAll(elements=>elements.map(element=>Math.round(element.getBoundingClientRect().top)));
-    assert.equal(new Set(bookingTops).size,width===1440?1:2,'Booking fields use one desktop row and two mobile rows');
+    assert.equal(new Set(bookingTops).size,width===1440?2:3,'Booking fields use two desktop rows and three mobile rows');
     assert(await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).locator('[aria-hidden="true"]').evaluateAll(elements=>elements.every(unit=>unit.getBoundingClientRect().right<=unit.previousElementSibling.getBoundingClientRect().right-28)),'Unit hints leave room for native number steppers');
     assert(await savedPackage.getByRole('group',{name:'Booking settings',exact:true}).locator('[aria-hidden="true"]').evaluateAll(elements=>elements.every(unit=>unit.getBoundingClientRect().left-unit.previousElementSibling.getBoundingClientRect().left<60)),'Units sit beside their number instead of at the end of the input');
 
@@ -1124,8 +1122,7 @@ try {
     const panel=page.locator('.service-catalog-folder-panel');
     const responsiveFrame=panel.locator('[data-responsive-table-frame]');
     await panel.waitFor();
-    await page.waitForFunction(()=>{const frame=document.querySelector('.service-desktop-table');return frame.dataset.tableLayout==='table'||frame.dataset.tableLayout==='cards'});
-    const cards=await responsiveFrame.getAttribute('data-table-layout')==='cards';
+    await page.waitForFunction(expected=>document.querySelector('.service-desktop-table').dataset.tableLayout===expected,width<=860?'compact':'table');
     const category=panel.getByRole('combobox',{name:'Category',exact:true});
     const label=panel.locator('label[for="services-category-filter"]');
     const cb=await category.boundingBox(),lb=await label.boundingBox();
@@ -1141,26 +1138,18 @@ try {
     await category.press('Home');
     await category.press('Escape');
 
-    if(width===677) assert.equal(cards,false,'Tablet width retains the complete table');
-    if(width===390) assert.equal(cards,true,'Narrow widths switch to cards');
     assert(await page.locator('.admin-main').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Catalog never overflows the workspace');
-    if(!cards) {
-      const frame=panel.getByRole('region',{name:'Sessions table',exact:true});
-      assert(await frame.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Table fits before falling back to cards');
-      const cells=frame.locator('thead th,td[data-label="Duration"] strong');
-      assert(await cells.evaluateAll(elements=>elements.every(el=>el.scrollWidth<=el.clientWidth+1)),'Headers and duration remain readable without truncation');
-      assert(await frame.getByRole('link',{name:'Edit Design Session',exact:true}).isVisible(),'Actions remain available in the table');
-    } else {
-      assert(await responsiveFrame.getByRole('table').isVisible(),'The same table renders the mobile layout');
-      assert.equal(await responsiveFrame.getByRole('link',{name:'Edit Design Session',exact:true}).count(),1,'Actions are never duplicated in a separate mobile tree');
-    }
+    const cells=responsiveFrame.locator('thead th:visible,td[data-label="Duration"] strong:visible');
+    assert(await cells.evaluateAll(elements=>elements.every(el=>el.scrollWidth<=el.clientWidth+1)),'Visible headers and duration remain readable');
+    assert.equal(await responsiveFrame.getByRole('link',{name:'Edit Design Session',exact:true}).count(),1,'Actions remain in the same table at every width');
     if(width===677||width===390) await page.screenshot({path:captures+'/sessions-fit-'+width+'.png'});
   }
   await page.setViewportSize({width:1440,height:844});
   await page.goto('https://design.example/catalog-workspace-fixture');
   await page.locator('.service-desktop-table[data-table-layout="table"]').waitFor();
   await page.locator('.admin-main').evaluate(el=>{el.style.width='380px';});
-  await page.locator('.service-desktop-table[data-table-layout="cards"]').waitFor();
+  const constrained=page.locator('.service-desktop-table[data-table-layout="table"]');
+  assert(await constrained.evaluate(el=>el.scrollWidth>el.clientWidth),'The full table scrolls in a narrow desktop workspace');
   await page.locator('.admin-main').evaluate(el=>{el.style.width='100%';});
   await page.locator('.service-desktop-table[data-table-layout="table"]').waitFor();
   assert.deepEqual(errors, []);

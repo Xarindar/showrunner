@@ -92,6 +92,17 @@ enum EmailCampaignStatus {
   CANCELED
 }
 
+model EmailHeaderLogo {
+  siteId       String
+  site         Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  profile      String
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@id([siteId, profile])
+  @@index([mediaAssetId])
+}
+
 model MessageTemplate {
   id               String                 @id @default(cuid())
   siteId           String

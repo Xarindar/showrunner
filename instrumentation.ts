@@ -4,5 +4,7 @@ export async function register() {
     startSquareMaintenance();
     const { startEmailOutbox } = await import("./lib/email/maintenance");
     startEmailOutbox();
+    const { startProofBundles } = await import("./lib/portfolio/proof-bundles");
+    startProofBundles();
   }
 }
