@@ -239,17 +239,16 @@ function MetadataForm({ asset, folders, tags, onDelete }: { asset: MediaLibraryA
   const [decorative, setDecorative] = useState(asset.isDecorative);
   const [selectedTags, setSelectedTags] = useState(asset.tags);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
   const notify = useNotify();
   return <form onSubmit={async event => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    setSaving(true); setError("");
+    setSaving(true);
     try {
       const result = await updateMediaAssetAction(data);
-      if (result.error) { setError(result.error); return; }
+      if (result.error) { notify(result.error, "danger"); return; }
       notify("File details saved.");
-    } catch { setError("The file could not be saved. Try again."); }
+    } catch { notify("The file could not be saved. Try again.", "danger"); }
     finally { setSaving(false); }
   }} className={styles.metadataForm}>
     <input name="id" type="hidden" value={asset.id} />
@@ -273,7 +272,6 @@ function MetadataForm({ asset, folders, tags, onDelete }: { asset: MediaLibraryA
         <small>{decorative ? "Alt text is cleared when the image is decorative." : "Describe the image’s purpose, not every visual detail."}</small></label>
       <label className={styles.checkRow}><span><strong>Decorative image</strong><small>Screen readers will skip this asset.</small></span><input checked={decorative} name="isDecorative" onChange={event => setDecorative(event.currentTarget.checked)} type="checkbox" /></label>
     </details>
-    {error && <p role="alert">{error}</p>}
     <div className={`module-modal-actions ${styles.inspectorActions}`}>
       <Button onClick={onDelete} size="sm" type="button" variant="danger"><Trash2 aria-hidden="true" size={14} />Delete</Button>
       <Button disabled={saving} size="sm" type="submit">{saving ? "Saving…" : "Save changes"}</Button>
@@ -285,7 +283,6 @@ function AssetInspector({ asset, archived, folders, tags, onClose }: { asset: Me
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState("");
   const inUse = Boolean(asset.usageCount || asset.isHero || asset.isLogo);
   const router = useRouter();
   const notify = useNotify();
@@ -300,20 +297,19 @@ function AssetInspector({ asset, archived, folders, tags, onClose }: { asset: Me
       <div className={styles.inspectorOptions}>
         {archived ? <div className={styles.restoreCard}><h2>{asset.filename}</h2><p>This file is archived.</p><form action={restoreMediaAssetAction}><input name="id" type="hidden" value={asset.id} /><Button size="sm" type="submit" variant="secondary"><RotateCcw size={14} />Restore asset</Button></form></div>
           : asset.builtIn ? <div><h2>{asset.filename}</h2><p>Built-in assets cannot be edited or deleted.</p></div>
-          : <MetadataForm folders={folders} tags={tags} asset={asset} onDelete={() => { setError(""); setConfirmDelete(true); }} />}
+          : <MetadataForm folders={folders} tags={tags} asset={asset} onDelete={() => { setConfirmDelete(true); }} />}
       </div>
     </div>
     <MediaInfoDialog asset={asset} open={infoOpen} onClose={() => setInfoOpen(false)} />
     <Modal open={confirmDelete} onClose={() => { if (!deleting) setConfirmDelete(false); }} title="Delete file" className={styles.folderModal}>
       <p>{inUse ? "This file is in use. Remove its references before deleting it." : `Delete “${asset.filename}”? You can restore it from Archived.`}</p>
-      {error && <p role="alert">{error}</p>}
       <div className="module-modal-actions"><Button type="button" variant="secondary" disabled={deleting} onClick={() => setConfirmDelete(false)}>Cancel</Button>
         <Button type="button" variant="danger" disabled={deleting || inUse} onClick={async () => {
-          setDeleting(true); setError("");
+          setDeleting(true);
           try { const data = new FormData(); data.set("id", asset.id); data.set("confirmArchive", "on"); const result = await deleteMediaAsset(data);
-            if (result.error) { setError(result.error); return; }
+            if (result.error) { notify(result.error, "danger"); return; }
             notify("File moved to Archived."); onClose(); router.refresh();
-          } catch { setError("The file could not be deleted. Try again."); } finally { setDeleting(false); }
+          } catch { notify("The file could not be deleted. Try again.", "danger"); } finally { setDeleting(false); }
         }}>{deleting ? "Deleting…" : "Delete"}</Button></div>
     </Modal>
   </Modal>;
@@ -351,10 +347,9 @@ export function MediaLibraryWorkspace({
   const actionAsset = cardAction?.kind === "file" ? assets.find(asset => asset.id === cardAction.id) : null;
   const actionInUse = Boolean(actionAsset && (actionAsset.usageCount || actionAsset.isHero || actionAsset.isLogo));
   const [cardBusy, setCardBusy] = useState(false);
-  const [cardError, setCardError] = useState("");
   const [needsDestination, setNeedsDestination] = useState(false);
   const migrateContents = cardAction?.kind === "folder" && cardAction.operation === "delete" && (needsDestination || folders.some(folder => (folder.name === cardAction.id && folder.count > 0) || folder.name.startsWith(`${cardAction.id}/`)));
-  function openCardAction(action: CardAction) { setCardError(""); setNeedsDestination(false); setCardAction(action); }
+  function openCardAction(action: CardAction) { setNeedsDestination(false); setCardAction(action); }
   const notify = useNotify();
   const [folderBusy, setFolderBusy] = useState(false);
   const [moveBusy, setMoveBusy] = useState(false);
@@ -525,13 +520,13 @@ export function MediaLibraryWorkspace({
           onSubmit={async event => {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
-            setCardBusy(true); setCardError("");
+            setCardBusy(true);
             try {
               const result = cardAction.kind === "folder" ? await changeMediaFolder(data) : cardAction.operation === "rename" ? await renameMediaAsset(data) : cardAction.operation === "delete" ? await deleteMediaAsset(data) : await moveMediaAssetToFolder(data);
-              if (result.error) { setCardError(result.error); if ("needsDestination" in result && result.needsDestination) setNeedsDestination(true); return; }
+              if (result.error) { notify(result.error, "danger"); if ("needsDestination" in result && result.needsDestination) setNeedsDestination(true); return; }
               notify(cardAction.operation === "rename" ? "Name updated." : cardAction.operation === "move" ? "Moved successfully." : cardAction.kind === "folder" ? "Folder deleted." : "File moved to Archived.");
               setCardAction(null); setSelectedIds([]); router.refresh();
-            } catch { setCardError("The change could not be saved. Please try again."); }
+            } catch { notify("The change could not be saved. Please try again.", "danger"); }
             finally { setCardBusy(false); }
           }}>
           <input type="hidden" name="id" value={cardAction.id} />
@@ -548,7 +543,6 @@ export function MediaLibraryWorkspace({
             <input type="hidden" name="confirmArchive" value="on" /><input type="hidden" name="value" value="" />
             <p>{actionInUse ? "This file is in use. Remove its references before deleting it." : `Delete “${cardAction.name}”? ${cardAction.kind === "file" ? "You can restore it from Archived." : migrateContents ? "Its files and subfolders will be moved to the destination you choose." : ""}`}</p>
           </>}
-          {cardError && <p role="alert">{cardError}</p>}
           <div className="module-modal-actions">
             <Button type="button" variant="secondary" disabled={cardBusy} onClick={() => setCardAction(null)}>Cancel</Button>
             <Button type="submit" variant={cardAction.operation === "delete" ? "danger" : "primary"} disabled={cardBusy || (cardAction.operation === "delete" && actionInUse)}>{cardBusy ? "Saving…" : cardAction.operation === "rename" ? "Save name" : cardAction.operation === "move" ? "Move" : "Delete"}</Button>

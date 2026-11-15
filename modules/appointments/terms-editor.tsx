@@ -21,7 +21,11 @@ export function TermsEditor({value,disabled,onChange}:{value:TermsNode;disabled:
   const [,refresh]=useState(0);
   const editor=useEditor({extensions,content:value,immediatelyRender:false,editable:!disabled,
     editorProps:{attributes:{role:"textbox","aria-label":"Booking terms","aria-multiline":"true",class:styles.document}},
-    onUpdate:({editor})=>{const document=editor.getJSON();let label;try{label=renderTermsDocument(document).text;}catch{label=editor.getText()||"Invalid terms";}onChange(document,label);},
+    onUpdate:({editor})=>{
+      // ProseMirror attributes have null prototypes, which React server actions cannot serialize.
+      const document:TermsNode=JSON.parse(JSON.stringify(editor.getJSON()));
+      let label;try{label=renderTermsDocument(document).text;}catch{label=editor.getText()||"Invalid terms";}onChange(document,label);
+    },
     onTransaction:()=>refresh(value=>value+1)
   });
   useEffect(()=>{editor?.setEditable(!disabled);},[editor,disabled]);

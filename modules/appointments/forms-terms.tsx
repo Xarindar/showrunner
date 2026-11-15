@@ -19,27 +19,26 @@ export function FormsTerms({initialDocuments,initialTermsId}:{initialDocuments:B
   const router=useRouter();
   const [documents,setDocuments]=useState(initialDocuments);
   const [draft,setDraft]=useState<Draft|null>(()=>initialTermsId ? initialTermsId==="new" ? {kind:"TERMS",name:"",isDefault:false,rules:[]} : initialDocuments.find(document=>document.id===initialTermsId)||null : null);
-  const [error,setError]=useState("");
   const [pending,setPending]=useState(false);
   const notify=useNotify();
   function open(kind:BookingDocumentKind,document?:BookingDocument) {
     if(kind==="TERMS"){router.push(`/admin/modules/appointments/forms-terms/terms/${document?.id||"new"}`);return;}
-    setDraft(document?{...document,rules:document.rules.filter(rule=>!rule.contactField)}:{kind,name:"",isDefault:false,rules:[]});setError("");
+    setDraft(document?{...document,rules:document.rules.filter(rule=>!rule.contactField)}:{kind,name:"",isDefault:false,rules:[]});
   }
   async function save() {
     const parsed=bookingDocumentInputSchema.safeParse(draft);
-    if (!parsed.success) {setError(parsed.error.issues[0].message);return;}
-    setPending(true);setError("");
+    if (!parsed.success) {notify(parsed.error.issues[0].message, "danger");return;}
+    setPending(true);
     try {
       const result=await saveBookingDocument(parsed.data);
-      if (result.error || !result.document) {setError(result.error || "Could not save this document.");return;}
+      if (result.error || !result.document) {notify(result.error || "Could not save this document.", "danger");return;}
       const saved=result.document;
       setDocuments(current=>[...current.filter(item=>item.id!==saved.id).map(item=>saved.isDefault&&item.kind===saved.kind?{...item,isDefault:false}:item),saved].sort((a,b)=>a.name.localeCompare(b.name)));
       if(saved.kind==="TERMS"){router.push("/admin/modules/appointments/forms-terms");router.refresh();}
       setDraft(null);notify(saved.kind==="INTAKE"?"Intake form saved.":"Booking terms saved.");
-    } catch {setError("Could not save. Your changes are still here; please retry.");} finally {setPending(false);}
+    } catch {notify("Could not save. Your changes are still here; please retry.", "danger");} finally {setPending(false);}
   }
-  if (draft?.kind === "INTAKE") return <IntakeFormBuilder value={draft} onChange={value => setDraft({ ...draft, ...value })} onSave={() => void save()} onCancel={() => setDraft(null)} pending={pending} error={error} />;
+  if (draft?.kind === "INTAKE") return <IntakeFormBuilder value={draft} onChange={value => setDraft({ ...draft, ...value })} onSave={() => void save()} onCancel={() => setDraft(null)} pending={pending} />;
   if(draft?.kind==="TERMS") return <section className={styles.termsPage} aria-label="Booking terms editor">
     <header className={styles.editorHeader}>
       <Button variant="ghost" disabled={pending} onClick={()=>router.push("/admin/modules/appointments/forms-terms")}><ArrowLeft size={16}/>Forms &amp; Terms</Button>
@@ -51,7 +50,6 @@ export function FormsTerms({initialDocuments,initialTermsId}:{initialDocuments:B
         <Field label="Terms name"><Input autoComplete="off" value={draft.name} required maxLength={100} disabled={pending} onChange={event=>setDraft({...draft,name:event.target.value})}/></Field>
         <Switch label="Default for all bookings" description="Sessions use this unless they choose another document or none." variant="inline" checked={draft.isDefault} disabled={pending} onChange={event=>setDraft({...draft,isDefault:event.target.checked})}/>
       </div>
-      {error&&<p role="alert" className="error">{error}</p>}
           <TermsEditor disabled={pending} value={{type:"doc",content:draft.rules.length ? draft.rules.flatMap(rule=>(rule.richText||plainTermsDocument(rule.label)).content||[]) : [{type:"paragraph"}]}} onChange={(richText,label)=>setDraft({...draft,rules:[{id:draft.rules[0]?.id ?? crypto.randomUUID(),kind:"policy",category:"Booking Terms & Conditions",label,richText,type:"TEXT",required:true,placeholder:"",helpText:"",options:[]}]})}/>
     </div>
   </section>;

@@ -43,7 +43,6 @@
 .empty { display: grid; justify-items: start; align-content: center; gap: var(--sd-space-12); min-height: 240px; }
 .empty h4, .empty p { margin: 0; }
 .empty p { color: var(--color-muted); }
-.error { color: var(--color-danger); margin: 0; }
 @media (max-width: 1100px) {
   .layout { grid-template-columns: minmax(0, 1fr) 260px; gap: var(--sd-space-16); }
   .palette { grid-column: 1 / -1; }

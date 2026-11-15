@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { LogIn } from "lucide-react";
 import { loginAction, type LoginState } from "./actions";
+import { Notification } from "@/components/ui/notifications";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -21,7 +22,7 @@ export function LoginForm() {
         </p>
       </div>
 
-      {state.error ? <div className="error">{state.error}</div> : null}
+      {state.error ? <Notification tone="danger" eventKey={state}>{state.error}</Notification> : null}
 
       <div className="field">
         <label htmlFor="username">Username</label>

@@ -80,11 +80,11 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
   async function save() {
     const parsed = serviceLibraryInputSchema.safeParse({ ...form, deliverables: deliverableChanges, availableAsAddOn });
     if (!parsed.success) {
-      setError(parsed.error.issues[0].message);
+      notify(parsed.error.issues[0].message, "danger");
       document.getElementById(`${id}-${String(parsed.error.issues[0].path[0])}`)?.focus();
       return;
     }
-    if (optional && !isServiceAddOn(parsed.data)) { setError("Enable Available as an add-on and set its price before adding it to Suggested Add-Ons."); return; }
+    if (optional && !isServiceAddOn(parsed.data)) { notify("Enable Available as an add-on and set its price before adding it to Suggested Add-Ons.", "danger"); return; }
     setSaving(true);
     setError("");
     try {
@@ -180,7 +180,6 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
         </details>
         <Field label="Category" hint="For example, Weddings or Portraits."><Input id={`${id}-category`} value={form.category} maxLength={120} disabled={saving} onChange={event => setForm({ ...form, category: event.target.value })} /></Field>
         <Field label="Tags" hint="Separate tags with commas."><Input id={`${id}-tags`} value={form.tags} maxLength={1500} disabled={saving} onChange={event => setForm({ ...form, tags: event.target.value })} /></Field>
-        {error && <p id={`${id}-error`} tabIndex={-1} role="alert" className={styles.error}>{error}</p>}
       </div>
       <footer className={styles.footer}><span className={styles.hint}>Library changes are saved immediately.</span><div className="module-modal-actions">
         <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>Cancel</Button>

@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft, Mail } from "lucide-react";
+import { Notification } from "@/components/ui/notifications";
 import { Button, ButtonAnchor } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
 import { EqualGrid } from "@/components/ui/layout";
@@ -163,10 +164,10 @@ function EmailSetupForm({ connection, businessName, contactEmail, onPendingChang
     <fieldset className={styles.step} data-email-step="test" hidden={step !== "test"} aria-label={stepTitles.test}>
       <p>Send a test email to <strong>{values.fromEmail}</strong>. Customer replies will go to this address too.</p>
       <Button type="submit" name="intent" value="test" variant="secondary" disabled={pending}>{pending && submitting === "test" ? "Sending test…" : "Send test email"}</Button>
-      {testPassed ? <p role="status">Test email sent. Check your inbox, then choose Done to save this connection.</p> : null}
+      {testPassed ? <><Notification eventKey={state}>Test email sent.</Notification><p>Check your inbox, then choose Done to save this connection.</p></> : null}
       {connection ? <p>Your current connection keeps working until this test succeeds.</p> : null}
     </fieldset>
-    {state.error && step === "test" ? <p className={styles.error} role="alert">{state.error}</p> : null}
+    {state.error ? <Notification tone="danger" eventKey={state}>{state.error}</Notification> : null}
     {step !== "provider" ? <div className="module-modal-actions">
       {step === "security" ? <>
         <Button type="button" variant="secondary" onClick={event => { event.preventDefault(); setNeedsTwoFactor(true); setStep("twoFactor"); }}>No</Button>
