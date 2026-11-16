@@ -479,7 +479,7 @@
         },
         {
           "path": "links.1.label",
-          "selector": ".site-footer > address > a:nth-child(1)"
+          "selector": ".site-footer > address > a:nth-child(1) > span"
         },
         {
           "path": "links.1.href",
@@ -488,7 +488,7 @@
         },
         {
           "path": "links.2.label",
-          "selector": ".site-footer > address > a:nth-child(2)"
+          "selector": ".site-footer > address > a:nth-child(2) > span"
         },
         {
           "path": "links.2.href",
@@ -497,7 +497,7 @@
         },
         {
           "path": "links.3.label",
-          "selector": ".site-footer > address > a:nth-child(3)"
+          "selector": ".site-footer > address > a:nth-child(3) > span"
         },
         {
           "path": "links.3.href",
@@ -506,7 +506,7 @@
         },
         {
           "path": "links.4.label",
-          "selector": ".site-footer > address > a:nth-child(4)"
+          "selector": ".site-footer > address > a:nth-child(4) > span"
         },
         {
           "path": "links.4.href",
