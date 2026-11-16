@@ -217,7 +217,12 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
 
     const { start, end: dayEnd } = getZonedDayBounds(date, settings.timezone);
     const frameEnd = timeFrame?.endsNextDay && fixedWindow ? addMinutesToZonedDay(start, fixedWindow.end, settings.timezone) : null;
-    const end = frameEnd ?? dayEnd;
+    const allowClosingOverflow = !timeFrame && !tier?.unlimitedDuration && Boolean(await prisma.siteDomain.findFirst({
+      where: { siteId: service.siteId, hostname: "admin.jazzrphotography.com" }, select: { id: true }
+    }));
+    const lastRuleEnd = allowClosingOverflow ? Math.max(...rules.map(rule => rule.endMinutes)) : 0;
+    const latestSessionEnd = allowClosingOverflow ? addMinutesToZonedDay(start, lastRuleEnd, settings.timezone).getTime() + service.durationMinutes * 60000 : 0;
+    const end = frameEnd ?? new Date(Math.max(dayEnd.getTime(), latestSessionEnd));
     const queryStart = new Date(start.getTime() - service.bufferBeforeMinutes * 60000);
     const queryEnd = new Date(end.getTime() + service.bufferAfterMinutes * 60000);
     const slotOwners = slotStaff.length ? slotStaff : [{ id: "", name: "" }];
@@ -275,17 +280,23 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
       const rulesForOwner = frameDays.length && fixedWindow
         ? timeFrameCovered(frameDays, ownerRules) ? [{ startMinutes: fixedWindow.start, endMinutes: fixedWindow.end }] : []
         : ownerRules;
+      const closing = Math.max(...ownerRules.map(rule => rule.endMinutes));
 
       for (const rule of rulesForOwner) {
         for (
           let minutes = fixedWindow?.start ?? rule.startMinutes;
-          minutes >= rule.startMinutes && (tier?.unlimitedDuration ? minutes < rule.endMinutes : minutes + service.durationMinutes <= rule.endMinutes) && (!fixedWindow || minutes === fixedWindow.start);
+          minutes >= rule.startMinutes && (tier?.unlimitedDuration || allowClosingOverflow ? minutes < rule.endMinutes : minutes + service.durationMinutes <= rule.endMinutes) && (!fixedWindow || minutes === fixedWindow.start);
           minutes += slotInterval
         ) {
         const startsAt = addMinutesToZonedDay(start, minutes, settings.timezone);
         if (seenStarts.has(startsAt.getTime())) continue;
         seenStarts.add(startsAt.getTime());
-        const endsAt = tier?.unlimitedDuration ? dayEnd : frameEnd ?? (fixedWindow ? addMinutesToZonedDay(start, fixedWindow.end, settings.timezone) : new Date(startsAt.getTime() + service.durationMinutes * 60000));
+        const sessionEnd = new Date(startsAt.getTime() + service.durationMinutes * 60000);
+        const runsPastClosing = allowClosingOverflow && sessionEnd > addMinutesToZonedDay(start, closing, settings.timezone);
+        if (allowClosingOverflow && !runsPastClosing && !ownerRules.some(window =>
+          minutes >= window.startMinutes && minutes < window.endMinutes && sessionEnd <= addMinutesToZonedDay(start, window.endMinutes, settings.timezone)
+        )) continue;
+        const endsAt = tier?.unlimitedDuration ? dayEnd : frameEnd ?? (fixedWindow ? addMinutesToZonedDay(start, fixedWindow.end, settings.timezone) : runsPastClosing && sessionEnd < dayEnd ? dayEnd : sessionEnd);
         const { bufferedStart, bufferedEnd } = getBufferedWindow(
           startsAt,
           endsAt,
@@ -310,7 +321,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
         }
 
         for (const resource of requiredResources) {
-          if (!(frameDays.length ? timeFrameCovered(frameDays, rules.filter(rule => rule.resourceId === resource.id)) : resourceRuleCoversSlot(rules, resource.id, minutes, tier?.unlimitedDuration ? 1 : service.durationMinutes))) {
+          if (!(frameDays.length ? timeFrameCovered(frameDays, rules.filter(rule => rule.resourceId === resource.id)) : resourceRuleCoversSlot(rules, resource.id, minutes, tier?.unlimitedDuration || runsPastClosing ? 1 : service.durationMinutes))) {
             reasons.push({
               code: "blockout_conflict",
               message: `${resource.name} is not available for this full time window.`
@@ -369,6 +380,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
         slots.push({
           startsAt,
           endsAt,
+          ...(runsPastClosing && endsAt > sessionEnd ? { sessionEndsAt: sessionEnd } : {}),
           label: `${timeFrame ? makeTimeRangeLabel(startsAt, endsAt, settings.timezone) : makeSlotLabel(startsAt, settings.timezone)}${timeFrame?.endsNextDay ? " (next day)" : ""}${owner.id ? ` with ${owner.name}` : ""}`,
           resourceIds,
           resourceNames: requiredResources.map((resource) => resource.name),

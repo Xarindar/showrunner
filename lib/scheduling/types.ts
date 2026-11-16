@@ -16,6 +16,7 @@ export type SlotDiagnosticReason = {
 };
 
 export type SlotDiagnostic = Slot & {
+  sessionEndsAt?: Date;
   available: boolean;
   reasons: SlotDiagnosticReason[];
 };

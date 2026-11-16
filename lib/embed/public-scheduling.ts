@@ -124,7 +124,8 @@ export function serializePublicSlot(slot: Slot) {
 }
 
 export function serializePublicSlotDiagnostics(diagnostics: SlotDiagnostics) {
-  const slots = diagnostics.slots.filter((slot) => slot.available).map(serializePublicSlot);
+  const slots = diagnostics.slots.filter((slot) => slot.available).map(slot =>
+    serializePublicSlot(slot.sessionEndsAt ? { ...slot, endsAt: slot.sessionEndsAt } : slot));
   return {
     serviceId: diagnostics.serviceId,
     serviceName: diagnostics.serviceName,

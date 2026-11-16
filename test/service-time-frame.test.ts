@@ -41,6 +41,7 @@ function harness() {
       minimumNoticeHours: 0, maxAdvanceDays: 3650, bufferBeforeMinutes: 0, bufferAfterMinutes: 0,
       staffAssignments: [], resourceAssignments: [], sessionOffering: offerings.sessionOfferingFormSchema.parse(JSON.stringify(offering)) as unknown },
     rules: [{ startMinutes: 540, endMinutes: 1020 }] as Array<{ weekday?: number; startMinutes: number; endMinutes: number }>,
+    closingOverflow: false,
     queryEnds: [] as Date[],
     bookings: [] as Array<{ startsAt: Date; endsAt: Date; staffId: null; resources: []; service: { resourceAssignments: [] } }>,
     blocks: [] as Array<{ startsAt: Date; endsAt: Date; staffId: null; resourceId: null }>
@@ -52,6 +53,7 @@ function harness() {
     "@/lib/site": { getSiteSettings: async () => settings, getSiteSettingsForSite: async () => settings },
     "@/lib/scheduling/google-calendar": { listGoogleBusyWindows: async () => ({ busy: [] }) },
     "@/lib/prisma": { prisma: {
+      siteDomain: { findFirst: async () => state.closingOverflow ? { id: "jazzr-domain" } : null },
       service: { findFirst: async () => state.service }, availabilityRule: { findMany: async () => state.rules },
       booking: { findMany: async (query: { where: { startsAt: { lt: Date } } }) => { state.queryEnds.push(query.where.startsAt.lt); return state.bookings; } }, blockedTime: { findMany: async () => state.blocks }
     } }
@@ -207,4 +209,30 @@ test("unlimited duration offers available starts and reserves the rest of the bu
   assert(slots.every(slot=>slot.endsAt.toISOString()==="2030-11-14T06:00:00.000Z"));
   h.state.bookings=[{startsAt:new Date("2030-11-14T02:00:00Z"),endsAt:new Date("2030-11-14T03:00:00Z"),staffId:null,resources:[],service:{resourceAssignments:[]}}];
   assert.equal((await h.adapter.getAvailableSlots("service",date,{tierId:"gold"})).length,0,"Later appointments prevent double booking");
+});
+
+test("Jazzr offers sessions past closing only if the rest of the day and any overnight time are clear", async () => {
+  const h = harness();
+  h.state.service.sessionOffering = null;
+  h.state.service.durationMinutes = 600;
+  h.state.rules = [{ startMinutes: 660, endMinutes: 1200 }];
+  const date = new Date("2030-11-13T18:00:00Z");
+  assert.equal((await h.adapter.getAvailableSlots("service", date)).length, 0);
+  h.state.closingOverflow = true;
+  const slots = await h.adapter.getAvailableSlots("service", date);
+  assert.equal(slots.length, 18);
+  assert.equal(slots[0].startsAt.toISOString(), "2030-11-13T17:00:00.000Z");
+  assert.equal(slots[0].endsAt.toISOString(), "2030-11-14T06:00:00.000Z");
+  assert.equal(slots.at(-1)?.endsAt.toISOString(), "2030-11-14T11:30:00.000Z");
+  assert(h.state.queryEnds.at(-1)! > slots.at(-1)!.endsAt);
+  h.state.bookings = [{ startsAt: new Date("2030-11-14T04:00:00Z"), endsAt: new Date("2030-11-14T05:00:00Z"), staffId: null, resources: [], service: { resourceAssignments: [] } }];
+  assert.equal((await h.adapter.getAvailableSlots("service", date)).length, 0, "A booking after the actual session end still conflicts with the reservation");
+  h.state.bookings[0].startsAt = new Date("2030-11-14T08:00:00Z");
+  h.state.bookings[0].endsAt = new Date("2030-11-14T09:00:00Z");
+  const remaining = await h.adapter.getAvailableSlots("service", date);
+  assert(remaining.length > 0 && remaining.length < slots.length);
+  assert(remaining.every(slot => slot.endsAt <= h.state.bookings[0].startsAt));
+  h.state.bookings = [{ ...h.state.bookings[0], startsAt: slots[0].startsAt, endsAt: slots[0].endsAt }];
+  h.state.service.durationMinutes = 30;
+  assert.equal((await h.adapter.getAvailableSlots("service", date)).length, 0, "The stored reservation blocks subsequent bookings");
 });
