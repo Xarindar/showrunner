@@ -1,5 +1,6 @@
 "use client";
 
+import { packageFieldNames, type PackageField } from "@/lib/scheduling/package-fields";
 import { TimeInput } from "@/components/ui/time-input";
 import { formatTimeValue } from "@/lib/format";
 import { serviceTimeFrameSchema, timeFrameMinutes, editTimeFrame } from "@/lib/scheduling/service-time-frame";
@@ -15,7 +16,7 @@ import { packagesInDisplayOrder, sessionOfferingDraft, type SessionOffering, typ
 import type { ServiceLibraryItem } from "@/lib/scheduling/service-library";
 import { ServiceLibraryPicker } from "./service-library-picker";
 import styles from "./session-packages-editor.module.css";
-import { hourlyPriceCents, type HourlyRate, type PricingType } from "@/lib/scheduling/pricing";
+import { type HourlyRate, type PricingType } from "@/lib/scheduling/pricing";
 import { ServicePricingFields } from "./service-pricing-fields";
 import { useNotify } from "@/components/ui/notifications";
 
@@ -45,7 +46,8 @@ function packageDropTarget(event: PointerEvent<HTMLTableRowElement>) {
   return row?.dataset.packageId;
 }
 
-export function SessionPackagesEditor({ initialOffering = null, durationMinutes = 60, priceCents = null, isNew = false, initialRates = [], initialPricingType = "FLAT_RATE", initialHourlyRateId = "", initialScheduling }: {
+export function SessionPackagesEditor({ packageFields = [...packageFieldNames], initialOffering = null, durationMinutes = 60, priceCents = null, isNew = false, initialRates = [], initialPricingType = "FLAT_RATE", initialHourlyRateId = "", initialScheduling }: {
+  packageFields?: PackageField[];
   initialOffering?: SessionOffering | null; durationMinutes?: number; priceCents?: number | null; isNew?: boolean;
   initialRates?: HourlyRate[]; initialPricingType?: PricingType; initialHourlyRateId?: string;
   initialScheduling?: { bufferBeforeMinutes: number; bufferAfterMinutes: number; minimumNoticeHours: number; maxAdvanceDays: number; slotIntervalMinutes: number };
@@ -79,9 +81,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
   const tierPrice = (tier: SessionOfferingDraft["tiers"][number]) => {
     if (tier.pricingType !== "HOURLY") return tier.price;
     const hourlyRate = rates.find(rate => rate.id === tier.hourlyRateId);
-    if (!hourlyRate || !tier.durationMinutes) return "";
-    try { return (hourlyPriceCents(hourlyRate.amountCents, Number(tier.durationMinutes)) / 100).toFixed(2); }
-    catch { return ""; }
+    return hourlyRate ? (hourlyRate.amountCents / 100).toFixed(2) : "";
   };
   const listId = useId();
   const gesture = useRef<{ x: number; y: number; height: number } | null>(null);
@@ -171,7 +171,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
     notify(editingId ? "Service updated in this draft." : "Services added to this draft.");
   }
 
-  const packagePicker = libraryTier && <ServiceLibraryPicker embedded rates={rates} onRateSaved={onRateSaved} selectedItems={draft.coverageItems}
+  const packagePicker = libraryTier && <ServiceLibraryPicker packageFields={packageFields} embedded rates={rates} onRateSaved={onRateSaved} selectedItems={draft.coverageItems}
       editingItem={libraryPicker?.editingItem} packageServices={libraryPicker?.editingItem ? undefined : libraryTier} onClose={closeLibrary}
       onChoose={(items, details) => {
         if (libraryPicker?.editingItem) { chooseLibraryItems(items, libraryPicker.editingItem.id); return; }
@@ -261,8 +261,8 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
                 }}><GripVertical aria-hidden="true" size={15} /></Button>}
               <button type="button" className={styles.packageName} aria-haspopup="dialog" onClick={() => setExpandedTiers(new Set([tier.id]))}>{tier.name}</button>
             </div></td>
-            <td>{tierPrice(tier) ? Number(tierPrice(tier)).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "—"}</td>
-            <td>{tier.pricingType === "TIME_FRAME" ? timeFrameLabel(tier) : packageDurationLabel(tier.durationMinutes)}</td>
+            <td>{tierPrice(tier) ? Number(tierPrice(tier)).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "—"}{tier.pricingType === "HOURLY" ? " / hour" : ""}</td>
+            <td>{tier.pricingType === "HOURLY" ? "Customer chooses" : tier.pricingType === "TIME_FRAME" ? timeFrameLabel(tier) : packageDurationLabel(tier.durationMinutes)}</td>
             <td><Button type="button" variant="ghost" size="sm" aria-label={`Edit ${tier.name}`} onClick={() => setExpandedTiers(new Set([tier.id]))}><Pencil aria-hidden="true" size={15} /></Button></td>
           </tr>;
         })}
@@ -294,9 +294,9 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
           </section>
           <section className={styles.packageSection} aria-labelledby={`${listId}-coverage-${tier.id}`}>
           <h3 className="ui-zero" id={`${listId}-coverage-${tier.id}`}>Session coverage</h3>
-          <p className="muted-text">Base counts below are increased by any included services and selected add-ons.</p>
+          {packageFields.length > 0 && <p className="muted-text">Base counts below are increased by any included services and selected add-ons.</p>}
           <div className={styles.deliverables}>
-            {tier.pricingType === "TIME_FRAME" ? <div className={styles.timeFrame}>
+            {tier.pricingType === "HOURLY" ? <p className="muted-text">The customer chooses the booking length before viewing available times. Hourly add-ons use the same length.</p> : tier.pricingType === "TIME_FRAME" ? <div className={styles.timeFrame}>
               <Field label="Ends"><Select aria-label="End day" value={tier.timeFrame?.endsNextDay ? "NEXT_DAY" : "SAME_DAY"} onChange={event => updateTier(tier.id, { timeFrame: { start: tier.timeFrame?.start ?? "", end: tier.timeFrame?.end ?? "", ...tier.timeFrame, endsNextDay: event.target.value === "NEXT_DAY" } })}>
                 <option value="SAME_DAY">Same Day</option><option value="NEXT_DAY">Next Day</option>
               </Select></Field>
@@ -320,7 +320,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
                 </Select>
               </div>
             </div><Switch label="Unlimited" aria-label="Unlimited duration" variant="inline" checked={Boolean(tier.unlimitedDuration)} onChange={event => updateTier(tier.id, { unlimitedDuration: event.target.checked, ...(event.target.checked ? { pricingType: "FLAT_RATE", hourlyRateId: null, timeFrame: undefined, durationMinutes: tier.durationMinutes === "0" ? "60" : tier.durationMinutes } : {}) })} /></div>}
-            {deliverableFields.map(([key, label]) => (
+            {deliverableFields.filter(([key]) => packageFields.includes(key)).map(([key, label]) => (
               <div className={styles.allowance} key={key}>
               <Field label={label}>
                 <Input type="number" inputMode="numeric" min="0" max={10000} step="1" disabled={tier.deliverables?.[key] === null}
@@ -414,7 +414,7 @@ export function SessionPackagesEditor({ initialOffering = null, durationMinutes 
         {!draft.addOns.length && <p className={styles.servicesEmpty}>No suggested add-ons</p>}
       </ResponsiveTableFrame>
     </section>
-    {libraryPicker && !libraryPicker.tierId && <ServiceLibraryPicker optional={libraryPicker.optional} rates={rates} onRateSaved={onRateSaved} selectedItems={libraryPicker.optional ? draft.addOns : draft.coverageItems} editingItem={libraryPicker.editingItem} onChoose={items => chooseLibraryItems(items)} onClose={closeLibrary} />}
+    {libraryPicker && !libraryPicker.tierId && <ServiceLibraryPicker packageFields={packageFields} optional={libraryPicker.optional} rates={rates} onRateSaved={onRateSaved} selectedItems={libraryPicker.optional ? draft.addOns : draft.coverageItems} editingItem={libraryPicker.editingItem} onChoose={items => chooseLibraryItems(items)} onClose={closeLibrary} />}
     {removal && <Modal open title={`Remove "${removal.name}"?`} onClose={() => setRemoval(null)}>
       <p>{removal.kind === "package" ? "This removes the package and its selections. Your included services stay in this session and the library." : "This removes the optional extra from this session."}</p>
       <div className="module-modal-actions"><Button type="button" variant="secondary" autoFocus onClick={() => setRemoval(null)}>Cancel</Button><Button type="button" variant="danger" onClick={() => {

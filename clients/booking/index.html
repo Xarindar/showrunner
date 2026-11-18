@@ -105,6 +105,20 @@
               <button class="booking-button button button--primary" type="button" data-continue-extras>Skip extras</button>
             </section>
 
+            <section class="booking-panel" data-step-panel="duration" aria-labelledby="duration-title" hidden>
+              <div class="booking-panel-head">
+                <h2 id="duration-title">How long would you like to book?</h2>
+                <button class="button button--secondary button--small" type="button" data-back-from-duration>Back</button>
+              </div>
+              <form class="booking-form" data-duration-form>
+                <p data-duration-rate></p>
+                <label><span>Hours</span><input name="hours" type="number" min="0" max="24" step="1" inputmode="numeric" placeholder="e.g. 2" required /></label>
+                <label><span>Minutes</span><input name="minutes" type="number" min="0" max="59" step="1" inputmode="numeric" value="0" required /></label>
+                <p data-duration-total aria-live="polite"></p>
+                <div class="booking-form-actions"><button class="booking-button button button--primary" type="submit">See available times</button></div>
+              </form>
+            </section>
+
             <section class="booking-panel" data-step-panel="time" aria-labelledby="time-title" hidden>
               <div class="booking-panel-head">
                 <div>

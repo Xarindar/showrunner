@@ -6,6 +6,7 @@ import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { serviceTimeFrameSchema } from "../lib/scheduling/service-time-frame";
 import * as timeFrames from "../lib/scheduling/service-time-frame";
+import * as pricing from "../lib/scheduling/pricing";
 import * as offerings from "../lib/scheduling/session-offering";
 import * as format from "../lib/format";
 
@@ -49,7 +50,7 @@ function harness() {
   const settings = { siteId: "site", timezone: "America/Chicago" };
   const mocks: Record<string, unknown> = {
     "server-only": {}, "@/lib/scheduling/booking-rules": {BookingRuleAnswerError: Error}, "@/lib/format": format, "@/lib/timezone": timezone,
-    "./session-offering": offerings, "./service-time-frame": timeFrames,
+    "@/lib/scheduling/pricing": pricing, "./session-offering": offerings, "./service-time-frame": timeFrames,
     "@/lib/site": { getSiteSettings: async () => settings, getSiteSettingsForSite: async () => settings },
     "@/lib/scheduling/google-calendar": { listGoogleBusyWindows: async () => ({ busy: [] }) },
     "@/lib/prisma": { prisma: {
@@ -58,7 +59,7 @@ function harness() {
       booking: { findMany: async (query: { where: { startsAt: { lt: Date } } }) => { state.queryEnds.push(query.where.startsAt.lt); return state.bookings; } }, blockedTime: { findMany: async () => state.blocks }
     } }
   };
-  const exports: { nativeSchedulingAdapter?: { getAvailableSlots: (id: string, date: Date, options?: {tierId?:string}) => Promise<Array<{ startsAt: Date; endsAt: Date; label: string }>> } } = {};
+  const exports: { nativeSchedulingAdapter?: { getAvailableSlots: (id: string, date: Date, options?: {tierId?:string;durationMinutes?:number;requireDuration?:boolean}) => Promise<Array<{ startsAt: Date; endsAt: Date; label: string }>> } } = {};
   const source = ts.transpileModule(readFileSync("lib/scheduling/native.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   runInNewContext(source, { exports, Date, require: (id: string) => id in mocks ? mocks[id] : id.startsWith("@/") || id.startsWith("./") ? {} : require(id) });
   return { state, adapter: exports.nativeSchedulingAdapter! };
@@ -197,6 +198,20 @@ test("package availability uses the selected duration and rejects another servic
   assert.equal(short.length,6);assert.equal(long.length,1);
   assert.equal(long[0].endsAt.getTime()-long[0].startsAt.getTime(),180*60000);
   await assert.rejects(h.adapter.getAvailableSlots("service",date,{tierId:"foreign"}),/Choose a package/);
+});
+
+test("hourly availability uses the requested length and rejects missing, forged and out-of-range lengths", async () => {
+  const h = harness();
+  h.state.service.sessionOffering = { coverageItems: [], tiers: [{ id: "hourly", name: "Hourly", pricingType: "HOURLY", durationMinutes: 60, priceCents: 10000, coverageIds: [] }], addOns: [] };
+  h.state.rules = [{ startMinutes: 540, endMinutes: 720 }];
+  const date = new Date("2030-11-13T18:00:00Z");
+  const slots = await h.adapter.getAvailableSlots("service", date, { tierId: "hourly", durationMinutes: 150 });
+  assert.equal(slots.length, 2);
+  assert(slots.every(slot => slot.endsAt.getTime() - slot.startsAt.getTime() === 150 * 60000));
+  assert.equal((await h.adapter.getAvailableSlots("service", date, { tierId: "hourly" })).length, 5, "Internal diagnostics retain a default length");
+  for (const durationMinutes of [undefined, 0, NaN, 1441]) await assert.rejects(h.adapter.getAvailableSlots("service", date, { tierId: "hourly", durationMinutes, requireDuration: true }));
+  h.state.service.sessionOffering = null;
+  await assert.rejects(h.adapter.getAvailableSlots("service", date, { durationMinutes: 30 }));
 });
 
 test("unlimited duration offers available starts and reserves the rest of the business day",async()=>{

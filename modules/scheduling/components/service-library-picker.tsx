@@ -1,5 +1,6 @@
 "use client";
 
+import { packageFieldNames, type PackageField } from "@/lib/scheduling/package-fields";
 import { useEffect, useId, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,8 @@ import { useNotify } from "@/components/ui/notifications";
 type IncludedItem = SessionOffering["coverageItems"][number];
 type PackageServices = Pick<SessionOffering["tiers"][number], "coverageIds"> & { name?: string };
 
-export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onClose, embedded = false, rates, onRateSaved, optional = false, packageServices }: {
+export function ServiceLibraryPicker({ packageFields = [...packageFieldNames], selectedItems, editingItem, onChoose, onClose, embedded = false, rates, onRateSaved, optional = false, packageServices }: {
+  packageFields?: PackageField[];
   rates: HourlyRate[]; onRateSaved: (rate: HourlyRate) => void;
   embedded?: boolean;
   optional?: boolean;
@@ -172,12 +174,13 @@ export function ServiceLibraryPicker({ selectedItems, editingItem, onChoose, onC
         {availableAsAddOn && <div className={styles.addOnPricing}>
           <ServicePricingFields allowPerUnit pricingType={form.pricingType} hourlyRateId={form.hourlyRateId} rates={rates} onRateSaved={onRateSaved} onChange={(pricingType, hourlyRateId) => setForm({ ...form, pricingType, hourlyRateId })}
             priceField={<Field label={form.pricingType === "PER_UNIT" ? "Price per unit (USD)" : "Add-on price (USD)"}><Input id={`${id}-price`} required type="number" min="0" max="9999999.99" step="0.01" inputMode="decimal" value={form.price} disabled={saving} onChange={event => setForm({ ...form, price: event.target.value })} /></Field>} />
+          {form.pricingType === "HOURLY" && <p className={styles.hint}>Uses the booking’s selected duration.</p>}
         </div>}
-        <details>
+        {packageFields.length > 0 && <details>
           <summary>Adds to the session</summary>
           <p className={styles.hint}>Add these amounts when this service is included or selected. Per-unit add-ons multiply them by the chosen quantity.</p>
-          {([ ["finalPhotos", "Additional photos"], ["locations", "Additional locations"], ["outfitChanges", "Additional outfit changes"] ] as const).map(([key, label]) => <Field key={key} label={label}><Input type="number" min={0} max={10000} step={1} disabled={saving} value={deliverableChanges[key] ?? ""} onChange={event => setDeliverableChanges({ ...deliverableChanges, [key]: event.target.value === "" ? undefined : Number(event.target.value) })} /></Field>)}
-        </details>
+          {([ ["finalPhotos", "Additional photos"], ["locations", "Additional locations"], ["outfitChanges", "Additional outfit changes"] ] as const).filter(([key]) => packageFields.includes(key)).map(([key, label]) => <Field key={key} label={label}><Input type="number" min={0} max={10000} step={1} disabled={saving} value={deliverableChanges[key] ?? ""} onChange={event => setDeliverableChanges({ ...deliverableChanges, [key]: event.target.value === "" ? undefined : Number(event.target.value) })} /></Field>)}
+        </details>}
         <Field label="Category" hint="For example, Weddings or Portraits."><Input id={`${id}-category`} value={form.category} maxLength={120} disabled={saving} onChange={event => setForm({ ...form, category: event.target.value })} /></Field>
         <Field label="Tags" hint="Separate tags with commas."><Input id={`${id}-tags`} value={form.tags} maxLength={1500} disabled={saving} onChange={event => setForm({ ...form, tags: event.target.value })} /></Field>
       </div>

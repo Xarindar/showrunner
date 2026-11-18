@@ -19,6 +19,7 @@ export type ServiceCatalogTableService = {
   category: string;
   description: string;
   durationMinutes: number;
+  hasHourlyPricing?: boolean;
   id: string;
   isActive: boolean;
   location: string;
@@ -227,7 +228,7 @@ export function ServiceCatalogTable({
                     <span className="catalog-cell-text" title={tagsLabel}>{tagsLabel}</span>
                   </td>
                   <td data-label="Duration">
-                    <strong className="catalog-price-cell">{serviceDurationLabel(service.durationMinutes)}</strong>
+                    <strong className="catalog-price-cell">{service.hasHourlyPricing ? "Choose at booking" : serviceDurationLabel(service.durationMinutes)}</strong>
                   </td>
                   <td data-label="Price">
                     <span className="catalog-cell-text" title={service.pricing === "-" ? "Price not set" : service.pricing}>{service.pricing}</span>

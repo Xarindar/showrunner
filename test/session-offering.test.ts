@@ -3,6 +3,22 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { priceSessionOffering, sessionOfferingFormSchema, sessionOfferingDraft, sessionOfferingSchema, selectSessionPackage, sessionPackageSnapshotSchema } from "../lib/scheduling/session-offering";
+import { publicBookingDuration } from "../lib/scheduling/pricing";
+
+test("hourly bookings choose their length and hourly extras inherit it with server-calculated snapshots", () => {
+  const rates = [{ id: "venue", name: "Venue", amountCents: 10000 }, { id: "assistant", name: "Assistant", amountCents: 2000 }];
+  const hourly = priceSessionOffering({ coverageItems: [], tiers: [{ id: "hourly", name: "Hourly", pricingType: "HOURLY", hourlyRateId: "venue", durationMinutes: 60, priceCents: 0, coverageIds: [] }], addOns: [{ id: "help", name: "Assistant", pricingType: "HOURLY", hourlyRateId: "assistant", priceCents: 0 }] }, rates, { pricingType: "FLAT_RATE", hourlyRateId: "" });
+  for (const durationMinutes of [1, 90, 150, 1440]) {
+    assert.equal(publicBookingDuration(hourly.tiers[0], durationMinutes), durationMinutes);
+    const snapshot = sessionPackageSnapshotSchema.parse(selectSessionPackage(hourly, "hourly", ["help"], durationMinutes));
+    assert.equal(snapshot.durationMinutes, durationMinutes);
+    assert.equal(snapshot.priceCents, Math.round(10000 * durationMinutes / 60) + Math.round(2000 * durationMinutes / 60));
+    assert.equal(snapshot.hourlyRate?.amountCents, 10000);
+    assert.equal(snapshot.extras[0].hourlyRate?.amountCents, 2000);
+  }
+  for (const duration of [undefined, 0, -1, 1.5, NaN, 1441]) assert.throws(() => publicBookingDuration(hourly.tiers[0], duration));
+  assert.throws(() => publicBookingDuration({ pricingType: "FLAT_RATE", durationMinutes: 60 }, 120), /fixed booking length/);
+});
 
 test("blank optional hourly-rate selections round-trip for packages, included services and add-ons", () => {
   const saved = sessionOfferingFormSchema.parse(JSON.stringify({

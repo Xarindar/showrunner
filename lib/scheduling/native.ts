@@ -3,8 +3,8 @@ import { BookingRuleAnswerError, validateBookingRuleAnswers } from "@/lib/schedu
 import "server-only";
 import { listBookingDocuments } from "./booking-document-store";
 import { resolveBookingRequirements, validateBookingRequirementsRevision } from "./booking-documents";
-import { servicePriceCents } from "@/lib/scheduling/pricing";
-import { readSessionOffering, selectSessionPackage } from "./session-offering";
+import { servicePriceCents, publicBookingDuration } from "@/lib/scheduling/pricing";
+import { readSessionOffering, selectSessionPackage, priceSessionOffering } from "./session-offering";
 import { bookingTermsValues, renderBookingTerms } from "@/clients/booking/scripts/booking-terms.js";
 import { timeFrameMinutes, timeFrameDays, timeFrameCovered } from "./service-time-frame";
 
@@ -82,7 +82,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
   async getAvailableSlots(
     serviceId: string,
     date: Date,
-    options?: { tierId?: string; resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
+    options?: { requireDuration?: boolean; durationMinutes?: number; tierId?: string; resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
   ): Promise<Slot[]> {
     const diagnostics = await nativeSchedulingAdapter.getSlotDiagnostics(serviceId, date, options);
     if (!diagnostics) return [];
@@ -103,7 +103,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
   async getSlotDiagnostics(
     serviceId: string,
     date: Date,
-    options?: { tierId?: string; resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
+    options?: { requireDuration?: boolean; durationMinutes?: number; tierId?: string; resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
   ) {
     const settings = options?.siteId ? await getSiteSettingsForSite(options.siteId) : await getSiteSettings();
     const service = await prisma.service.findFirst({
@@ -128,7 +128,10 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     const offering = readSessionOffering(service.sessionOffering);
     const tier = options?.tierId ? offering?.tiers.find(tier => tier.id === options.tierId) : offering?.tiers[0];
     if (options?.tierId && !tier) throw new BookingRuleAnswerError("Choose a package from this session type.");
-    if (tier) service.durationMinutes = tier.durationMinutes;
+    const selectedPackage = tier ?? service;
+    const requestedDuration = options?.durationMinutes ?? (options?.requireDuration ? undefined : selectedPackage.durationMinutes);
+    try { service.durationMinutes = publicBookingDuration(selectedPackage, requestedDuration); }
+    catch (error) { throw new BookingRuleAnswerError(error instanceof Error ? error.message : "Choose a valid booking length."); }
     const timeFrame = tier?.timeFrame;
     const fixedWindow = timeFrame ? timeFrameMinutes(timeFrame) : null;
 
@@ -435,10 +438,17 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     if (!service || !service.isActive) {
       throw new Error("That service is not available.");
     }
-    const offering = readSessionOffering(service.sessionOffering);
+    let offering = readSessionOffering(service.sessionOffering);
+    if (offering && (offering.tiers.some(tier => tier.pricingType === "HOURLY") || offering.addOns.some(extra => extra.pricingType === "HOURLY"))) {
+      offering = priceSessionOffering(offering, await prisma.hourlyRate.findMany({ where: { siteId } }), { pricingType: service.pricingType === "HOURLY" ? "HOURLY" : "FLAT_RATE", hourlyRateId: service.hourlyRateId ?? "" });
+    }
     const tierId = input.tierId || (offering?.tiers.length === 1 ? offering.tiers[0].id : undefined);
     let packageSnapshot;
-    try { packageSnapshot = selectSessionPackage(offering, tierId, input.addOnIds, undefined, input.addOnQuantities); }
+    try {
+      const tier = offering?.tiers.find(tier => tier.id === tierId);
+      service.durationMinutes = publicBookingDuration(tier ?? service, input.durationMinutes);
+      packageSnapshot = selectSessionPackage(offering, tierId, input.addOnIds, service.durationMinutes, input.addOnQuantities);
+    }
     catch (error) { throw new BookingRuleAnswerError(error instanceof Error ? error.message : "Choose a valid package."); }
     if (input.serviceRevision && input.serviceRevision !== service.updatedAt.toISOString()) throw new BookingRuleAnswerError("The session packages changed. Reload and review the current price before booking.");
     const assignedStaff = service.staffAssignments.map((assignment) => assignment.staff);
@@ -473,6 +483,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     const offeredSlots = await nativeSchedulingAdapter.getAvailableSlots(input.serviceId, input.startsAt, {
       siteId,
       tierId,
+      durationMinutes: input.durationMinutes,
       staffId: selectedStaff?.id
     });
     const matchingSlot = offeredSlots.find(

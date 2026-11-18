@@ -1,4 +1,5 @@
 "use client";
+import type { PackageField } from "@/lib/scheduling/package-fields";
 import { BackLink } from "@/components/ui/back-link";
 
 import { useActionState, type ComponentProps } from "react";
@@ -25,7 +26,8 @@ import styles from "../service-editor.module.css";
 
 type InitialSession = Pick<Service, "bookingDocumentSelection" | "id" | "updatedAt" | "name" | "description" | "category" | "tags" | "isActive" | "location" | "durationMinutes" | "priceCents" | "pricingType" | "hourlyRateId" | "bufferBeforeMinutes" | "bufferAfterMinutes" | "minimumNoticeHours" | "maxAdvanceDays" | "slotIntervalMinutes" | "bookingRules" | "intakePrompt" | "policyText" | "requirePolicy" | "requestOnly" | "waitlistEnabled">;
 
-export function SessionTypeForm({ canUpload, rates, tags, bookingDocuments = [], categoryOptions = [], availableRules, intakeOptions, policyOptions, initialService, initialOffering, initialMedia }: {
+export function SessionTypeForm({ packageFields, canUpload, rates, tags, bookingDocuments = [], categoryOptions = [], availableRules, intakeOptions, policyOptions, initialService, initialOffering, initialMedia }: {
+  packageFields?: PackageField[];
   bookingDocuments?: BookingDocument[]; canUpload: boolean; rates: HourlyRate[]; tags: string[]; categoryOptions?: string[];
   availableRules?: BookingRule[]; intakeOptions?: string[]; policyOptions?: string[];
   initialService?: InitialSession; initialOffering?: SessionOffering | null; initialMedia?: Omit<ComponentProps<typeof ServiceMediaFields>, "canUpload">;
@@ -59,7 +61,7 @@ export function SessionTypeForm({ canUpload, rates, tags, bookingDocuments = [],
             <ServiceTagsField tags={tags} initialTags={nonEmptyStringArrayFromUnknown(initialService?.tags)} />
           </div>
         </section>
-        <SessionPackagesEditor initialRates={rates} isNew={!initialService} initialOffering={initialOffering} durationMinutes={initialService?.durationMinutes} priceCents={initialService?.priceCents} initialPricingType={pricingTypeSchema.parse(initialService?.pricingType ?? "FLAT_RATE")} initialHourlyRateId={initialService?.hourlyRateId ?? ""} initialScheduling={initialService} />
+        <SessionPackagesEditor packageFields={packageFields} initialRates={rates} isNew={!initialService} initialOffering={initialOffering} durationMinutes={initialService?.durationMinutes} priceCents={initialService?.priceCents} initialPricingType={pricingTypeSchema.parse(initialService?.pricingType ?? "FLAT_RATE")} initialHourlyRateId={initialService?.hourlyRateId ?? ""} initialScheduling={initialService} />
         <ServiceBookingRulesTable documents={bookingDocuments} initialSelection={initialService?.bookingDocumentSelection} idPrefix={initialService ? "service" : "new-session"} availableRules={availableRules} intakeOptions={intakeOptions} policyOptions={policyOptions}
           defaultRules={initialService?.bookingRules} defaultIntakePrompt={initialService?.intakePrompt} defaultPolicyText={initialService?.policyText} defaultRequirePolicy={initialService?.requirePolicy} defaultRequestOnly={initialService?.requestOnly} defaultWaitlistEnabled={initialService?.waitlistEnabled} />
       </main>

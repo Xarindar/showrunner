@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Libre+Baskerville:wght@400;700&family=Raleway:wght@400;500;600;700&display=swap');
+* { box-sizing: border-box; }
+:root { color-scheme: light; }
+body { --preview-paper: #fffdf8; --preview-ink: #173f5f; --preview-line: #d5dce0; --preview-display: 'Libre Baskerville', Georgia, serif; margin: 0; min-height: 100svh; background: var(--preview-paper); color: var(--preview-ink); font: 400 1rem/1.6 Raleway, sans-serif; }
+body[data-brand="jazzr"] { --preview-paper: #f7f8f7; --preview-ink: #304f48; --preview-line: #cbd5d1; --preview-display: 'DM Serif Display', Georgia, serif; }
+button, input { font: inherit; }
+button { min-height: 44px; padding: .65rem 1.2rem; border: 1px solid var(--preview-ink); border-radius: 3px; color: var(--preview-paper); background: var(--preview-ink); cursor: pointer; }
+button:hover { filter: brightness(.86); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--preview-ink); outline-offset: 4px; }
+::selection { background: var(--preview-ink); color: var(--preview-paper); }
+.preview-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: clamp(1rem, 3vw, 2rem) clamp(1rem, 5vw, 4rem); }
+.preview-site-name { font: 400 clamp(1rem, 2.2vw, 1.5rem)/1.3 var(--preview-display); }
+.preview-login { color: var(--preview-ink); background: transparent; }
+.preview-main { display: grid; align-content: center; justify-items: center; text-align: center; min-height: calc(100svh - 10rem); padding: 3rem 1.5rem 6rem; }
+h1 { font: 400 clamp(3rem, 9vw, 6rem)/1.1 var(--preview-display); margin: 0 0 1.5rem; text-wrap: balance; }
+.preview-main p { max-width: 38ch; margin: 0; }
+dialog { width: min(28rem, calc(100% - 2rem)); max-height: calc(100svh - 2rem); overflow: auto; border: 1px solid var(--preview-line); border-radius: 12px; padding: 1.5rem; color: var(--preview-ink); background: var(--preview-paper); box-shadow: 0 20px 60px #0002; }
+dialog::backdrop { background: #0006; }
+.preview-dialog-header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+h2 { margin: 0; font: 400 1.55rem/1.3 var(--preview-display); }
+.preview-close { display: grid; place-items: center; padding: 0; width: 44px; flex: none; margin-top: -.5rem; background: transparent; color: var(--preview-ink); border: 0; }
+.preview-close svg { width: 20px; height: 20px; }
+dialog form { display: grid; gap: 1rem; }
+dialog label { display: grid; gap: .4rem; font-weight: 600; }
+dialog input { min-width: 0; width: 100%; min-height: 48px; padding: .65rem .8rem; border: 1px solid var(--preview-line); border-radius: 3px; background: #fff; color: var(--preview-ink); font-size: 16px; }
+.preview-error { margin: 0; color: #a72a20; }
+.preview-error:empty { display: none; }

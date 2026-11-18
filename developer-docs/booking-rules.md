@@ -1,5 +1,38 @@
 # Booking rules
 
+## Customer-selected hourly duration
+
+Hourly packages expose a named rate without an admin-set booking length. Public
+booking asks for hours/minutes before requesting available slots. Both daily and
+bounded availability requests send `durationMinutes`; booking submission sends
+the same field. The server accepts whole minutes from 1 through 1440, requires a
+length for hourly packages, and rejects attempts to override fixed durations.
+Existing flat-rate and Fixed Time Slot packages retain their configured lengths.
+
+Hourly add-ons use that chosen duration and never extend it. The public catalog
+exposes `pricingType` and `hourlyRateCents` for packages/add-ons. Final prices and
+rate snapshots are computed on the server; changing duration clears the selected
+slot and renews terms acceptance, including static terms. Hourly metadata is
+additive JSON, so existing package data requires no schema migration.
+
+## Site-specific package fields
+
+The scheduling `ModuleInstallation.settings.packageFields` list controls package
+allowances in the session editor, reusable service picker and public booking
+comparison. Allowed values are `locations`, `outfitChanges` and `finalPhotos`.
+An absent setting preserves all fields; `[]` hides all three. This uses the
+existing settings JSON and needs no migration. Keep unrelated installation
+settings intact when configuring a site.
+
+The public `/services` catalog exposes `packageFields` alongside `services` and
+`categories`. The shared booking client, Cottage and Jazzr all consume it.
+Stored deliverables, booking snapshots and dynamic agreement values remain intact;
+this setting changes which allowances are offered/displayed. Service images,
+appointment addresses, pricing and duration are independent.
+
+Checks: `test/package-fields.test.ts`, `test/package-fields-browser.mjs`, and
+Cottage's fixture-based `test/booking-browser.mjs`.
+
 `Service.bookingRules` stores validated question/policy definitions. A null value
 keeps the legacy single-question/policy behavior; an empty array explicitly
 removes rules. Saving structured rules also derives the legacy text fields for

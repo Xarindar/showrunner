@@ -54,6 +54,7 @@ export type BookingRequest = {
   siteId?: string;
   serviceId: string;
   tierId?: string;
+  durationMinutes?: number;
   addOnIds?: string[];
   addOnQuantities?: Record<string, number>;
   serviceRevision?: string;
@@ -95,12 +96,12 @@ export type SchedulingAdapter = {
   getAvailableSlots(
     serviceId: string,
     date: Date,
-    options?: { tierId?: string; resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
+    options?: { requireDuration?: boolean; durationMinutes?: number; tierId?: string; resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
   ): Promise<Slot[]>;
   getSlotDiagnostics(
     serviceId: string,
     date: Date,
-    options?: { tierId?: string; resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
+    options?: { requireDuration?: boolean; durationMinutes?: number; tierId?: string; resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
   ): Promise<SlotDiagnostics | null>;
   createBooking(input: BookingRequest): Promise<Booking>;
 };

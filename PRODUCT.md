@@ -8,11 +8,18 @@ Showrunner is the reusable administration product. Client websites integrate wit
 
 ## Session packages
 
+Each site's scheduling module may set `packageFields` to a list of enabled
+package allowances (`locations`, `outfitChanges`, `finalPhotos`). An empty list
+hides photography counts in package/service editors and public booking comparisons;
+an absent setting retains all existing fields. Pricing, duration, service photos,
+appointment addresses and booking validation remain shared. Hidden counts remain
+stored when saving a package or reusable service.
+
 User-facing agreement labels use **Booking Terms & Conditions**, shortened to **Booking T&C** in compact rows and controls. Existing stored agreement text, billing document types/numbers and booking acceptance behavior stay intact.
 
 Jazzr sessions may start during published hours and run past closing when the remaining calendar is clear. The appointment reserves the calendar through local midnight or the scheduled end, whichever is later. The public time picker retains the purchased session length. Fixed time packages keep their configured windows.
 
-Session packages each choose Flat rate or Hourly pricing and their own named hourly rate. Hourly packages replace the flat price input with a saved hourly-rate selector beside Pricing type. Hourly totals use package duration; manual bookings recalculate with the booked duration and snapshot the rate. Existing packages retain their prior session pricing until edited. Session organization tags reuse the media tag picker, including search, selection and new tags, with suggestions from accessible media and session types in the same site.
+Session packages choose Flat rate, Hourly or Fixed Time Slot pricing. Hourly packages select a named rate and let the customer choose a booking length before available slots load; the admin does not set their booking length or fixed time window. Hourly add-ons inherit the booked length. The server validates duration, calculates each charge and snapshots the rates. Manual bookings use their booked duration. Existing flat packages and fixed windows retain their behavior. Session organization tags reuse the media tag picker, including search, selection and new tags, with suggestions from accessible media and session types in the same site.
 
 ## Content editing
 

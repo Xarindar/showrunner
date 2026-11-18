@@ -78,6 +78,7 @@ function savedServiceMessage(saved?: string) {
 
 function toServiceCatalogTableService(service: ServiceCatalogItem): ServiceCatalogTableService {
   const offering = readSessionOffering(service.sessionOffering);
+  const hasHourlyPricing = offering ? offering.tiers.some(tier => tier.pricingType === "HOURLY") : service.pricingType === "HOURLY";
   const prices = offering?.tiers.map(tier => tier.priceCents) ?? [
     service.hourlyRate ? servicePriceCents(service) : service.priceCents
   ];
@@ -86,11 +87,12 @@ function toServiceCatalogTableService(service: ServiceCatalogItem): ServiceCatal
     category: serviceCategory(service) || "Uncategorized",
     description: service.description || "",
     durationMinutes: service.durationMinutes,
+    hasHourlyPricing,
     id: service.id,
     isActive: service.isActive,
     location: service.location || "",
     name: service.name,
-    pricing: sessionCatalogPriceLabel(prices),
+    pricing: hasHourlyPricing ? "By booking length" : sessionCatalogPriceLabel(prices),
     packageCount: offering?.tiers.length ?? 1,
     tags: serviceTags(service)
   };

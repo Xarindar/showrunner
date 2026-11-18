@@ -3,7 +3,7 @@ import "server-only";
 import { BookingStatus, Prisma } from "@prisma/client";
 import { blockoutConflictWhere, bookingConflictWhere, getBufferedWindow } from "@/lib/bookings/conflicts";
 import { prisma } from "@/lib/prisma";
-import { sessionPackageSnapshotSchema } from "@/lib/scheduling/session-offering";
+import { readSessionOffering, sessionPackageSnapshotSchema } from "@/lib/scheduling/session-offering";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import { checkManualSessionTime } from "@/lib/bookings/manual";
 import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
@@ -36,7 +36,8 @@ export async function rescheduleBookingWithAvailability(input: {
     throw new Error("Choose a valid new appointment time.");
   }
 
-  const unlimitedDuration = sessionPackageSnapshotSchema.safeParse(booking.packageSnapshot).data?.unlimitedDuration;
+  const snapshot = sessionPackageSnapshotSchema.safeParse(booking.packageSnapshot).data;
+  const unlimitedDuration = snapshot?.unlimitedDuration;
   if (booking.isManual || unlimitedDuration) {
     if (input.startsAt <= new Date()) throw new Error("Choose a future date and time.");
     const settings = await getSiteSettingsForSite(booking.siteId);
@@ -53,9 +54,12 @@ export async function rescheduleBookingWithAvailability(input: {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
+  const bookedTier = readSessionOffering(booking.service.sessionOffering)?.tiers.find(tier => tier.id === snapshot?.tierId);
+  const hourly = (snapshot?.pricingType ?? bookedTier?.pricingType ?? booking.service.pricingType) === "HOURLY";
   const diagnostics = await nativeSchedulingAdapter.getSlotDiagnostics(booking.serviceId, input.startsAt, {
     siteId: booking.siteId,
-    tierId: booking.service.sessionOffering ? sessionPackageSnapshotSchema.safeParse(booking.packageSnapshot).data?.tierId : undefined,
+    tierId: booking.service.sessionOffering ? snapshot?.tierId : undefined,
+    durationMinutes: hourly ? snapshot?.durationMinutes ?? (booking.endsAt.getTime() - booking.startsAt.getTime()) / 60000 : undefined,
     excludeBookingId: booking.id,
     staffId: booking.staffId || undefined
   });
