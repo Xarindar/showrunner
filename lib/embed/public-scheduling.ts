@@ -1,4 +1,5 @@
 import "server-only";
+import { getPackageFields } from "@/lib/scheduling/package-fields-store";
 import { listBookingDocuments } from "@/lib/scheduling/booking-document-store";
 import { resolveBookingRequirements } from "@/lib/scheduling/booking-documents";
 import { BookingRuleAnswerError, intakeAnswersSchema, readBookingRules } from "@/lib/scheduling/booking-rules";
@@ -227,10 +228,11 @@ async function listPublicSchedulingCategoryRows(siteId: string) {
 }
 
 export async function listPublicSchedulingCatalog(siteId: string) {
-  const [services, serviceCategories, documents] = await Promise.all([
+  const [services, serviceCategories, documents, packageFields] = await Promise.all([
     nativeSchedulingAdapter.listActiveServices({ siteId }),
     listPublicSchedulingCategoryRows(siteId),
-    listBookingDocuments(siteId)
+    listBookingDocuments(siteId),
+    getPackageFields(siteId)
   ]);
   const categoriesByName = new Map(serviceCategories.map((category) => [categoryKey(category.name), category]));
   const serializedServices = services.map(service=>{
@@ -262,7 +264,8 @@ export async function listPublicSchedulingCatalog(siteId: string) {
 
   return {
     categories,
-    services: serializedServices
+    services: serializedServices,
+    packageFields
   };
 }
 

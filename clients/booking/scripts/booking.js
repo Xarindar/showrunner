@@ -5,6 +5,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
 
   const state = {
     activeStep: "categories",
+    packageFields: ["locations", "outfitChanges", "finalPhotos"],
     categories: [],
     services: [],
     categoryId: null,
@@ -33,6 +34,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
 
     try {
       const catalog = await loadServices();
+      state.packageFields = Array.isArray(catalog.packageFields) ? catalog.packageFields : state.packageFields;
       state.services = catalog.services;
       state.categories = normalizeCategories([...(catalog.categories || []), ...(config.categories || [])], state.services);
       setStatus("");
@@ -354,7 +356,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
   }
 
   function packageDetails(pack) {
-    return [...(pack.coverage || []), ...Object.entries(pack.deliverables || {}).map(([key, count]) => {
+    return [...(pack.coverage || []), ...Object.entries(pack.deliverables || {}).filter(([key]) => state.packageFields.includes(key)).map(([key, count]) => {
       const label = { finalPhotos: "photos", locations: "locations", outfitChanges: "outfit changes" }[key];
       return label ? `${count === null ? "Unlimited" : count} ${label}` : "";
     })].filter(Boolean).map(escapeHtml).join("<br>");
@@ -794,6 +796,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     const liveCategories = Array.isArray(response.categories) ? response.categories : [];
     const liveServices = response.services || [];
     return {
+      packageFields: response.packageFields,
       categories: liveCategories,
       services: normalizeServices(liveServices.map(mergeServicePresentation))
     };

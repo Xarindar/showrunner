@@ -1,5 +1,23 @@
 # Booking rules
 
+## Site-specific package fields
+
+The scheduling `ModuleInstallation.settings.packageFields` list controls package
+allowances in the session editor, reusable service picker and public booking
+comparison. Allowed values are `locations`, `outfitChanges` and `finalPhotos`.
+An absent setting preserves all fields; `[]` hides all three. This uses the
+existing settings JSON and needs no migration. Keep unrelated installation
+settings intact when configuring a site.
+
+The public `/services` catalog exposes `packageFields` alongside `services` and
+`categories`. The shared booking client, Cottage and Jazzr all consume it.
+Stored deliverables, booking snapshots and dynamic agreement values remain intact;
+this setting changes which allowances are offered/displayed. Service images,
+appointment addresses, pricing and duration are independent.
+
+Checks: `test/package-fields.test.ts`, `test/package-fields-browser.mjs`, and
+Cottage's fixture-based `test/booking-browser.mjs`.
+
 `Service.bookingRules` stores validated question/policy definitions. A null value
 keeps the legacy single-question/policy behavior; an empty array explicitly
 removes rules. Saving structured rules also derives the legacy text fields for
