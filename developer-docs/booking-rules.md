@@ -1,5 +1,20 @@
 # Booking rules
 
+## Customer-selected hourly duration
+
+Hourly packages expose a named rate without an admin-set booking length. Public
+booking asks for hours/minutes before requesting available slots. Both daily and
+bounded availability requests send `durationMinutes`; booking submission sends
+the same field. The server accepts whole minutes from 1 through 1440, requires a
+length for hourly packages, and rejects attempts to override fixed durations.
+Existing flat-rate and Fixed Time Slot packages retain their configured lengths.
+
+Hourly add-ons use that chosen duration and never extend it. The public catalog
+exposes `pricingType` and `hourlyRateCents` for packages/add-ons. Final prices and
+rate snapshots are computed on the server; changing duration clears the selected
+slot and renews terms acceptance, including static terms. Hourly metadata is
+additive JSON, so existing package data requires no schema migration.
+
 ## Site-specific package fields
 
 The scheduling `ModuleInstallation.settings.packageFields` list controls package

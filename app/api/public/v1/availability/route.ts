@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const input = {
       date: searchParams.get("date"),
       tierId: searchParams.get("tierId") || undefined,
+      durationMinutes: searchParams.has("durationMinutes") ? Number(searchParams.get("durationMinutes")) : undefined,
       resourceId: searchParams.get("resourceId") || undefined,
       serviceId: searchParams.get("serviceId"),
       siteId: context.siteId,

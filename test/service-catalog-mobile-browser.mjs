@@ -8,7 +8,7 @@ const bundle=await build({stdin:{resolveDir:process.cwd(),loader:'tsx',contents:
   import React from 'react';import {createRoot} from 'react-dom/client';
   import {ServiceCatalogTable} from './modules/scheduling/components/service-catalog-table';
   import './app/globals.css';import './app/admin/design-tokens.css';import './app/admin/design-system.css';
-  const services=['Design Session','Portrait Session','Family Session','Wedding Session','Creative Session'].map((name,index)=>({id:'session-'+index,name,bookingPath:'session-'+index,category:'Photography',description:'',durationMinutes:120,location:'',isActive:true,pricing:'$150',packageCount:1,tags:[]}));
+  const services=['Design Session','Portrait Session','Family Session','Wedding Session','Creative Session'].map((name,index)=>({id:'session-'+index,name,bookingPath:'session-'+index,category:'Photography',description:'',durationMinutes:120,hasHourlyPricing:index===0,location:'',isActive:true,pricing:index===0?'By booking length':'$150',packageCount:1,tags:[]}));
   createRoot(document.getElementById('root')).render(<div className="showrunner-admin"><main className="admin-main" style={{height:'100vh',padding:16}}><ServiceCatalogTable services={services} initialCategory="all" initialTag="all" initialSearch="" categoryOptions={[{value:'all',label:'All categories'}]} tagOptions={[{value:'all',label:'All tags'}]} createAction={<a href="/admin/modules/services/new">New session</a>} toggleServiceAction={()=>{}}/></main></div>);
 `},bundle:true,write:false,outdir:'.tmp/session-mobile-test',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"','process.env':'{}'},logLevel:'silent',plugins:[{name:'local-router',setup(build){
   build.onResolve({filter:/^next\/navigation$/},()=>({path:'router',namespace:'local-router'}));
@@ -40,6 +40,7 @@ try{
   await page.getByRole('region',{name:'Sessions table',exact:true}).waitFor();
   await page.waitForFunction(()=>document.querySelector('[aria-label="Sessions table"]').dataset.tableLayout==='table');
   assert.equal(await page.getByRole('region',{name:'Sessions table',exact:true}).locator('thead th').count(),8,'Desktop retains its full columns');
+  assert.match(await table.locator('tbody tr').first().innerText(), /Choose at booking/);
   assert.deepEqual(errors,[]);
   console.log('Passed: compact Session/Status/Packages/Actions headers, multiple mobile rows, pencil/eye actions, search and full desktop columns.');
 }finally{await browser.close();}

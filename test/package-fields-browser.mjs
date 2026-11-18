@@ -16,7 +16,7 @@ await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
   import './app/globals.css'; import './app/admin/design-tokens.css'; import './app/admin/design-system.css';
   const params = new URLSearchParams(location.search), packageFields = params.has('cottage') ? [] : undefined;
   createRoot(document.getElementById('root')).render(<div className="showrunner-admin"><NotificationProvider><main className="admin-main">
-    {params.has('library') ? <ServiceLibraryPicker packageFields={packageFields} editingItem={{id:'extra',name:'Extra',deliverables:${JSON.stringify(counts)}}} selectedItems={[]} rates={[]} onRateSaved={()=>{}} onChoose={item=>window.savedLibrary=item} onClose={()=>{}} /> : <form><SessionPackagesEditor packageFields={packageFields} initialOffering={${JSON.stringify(offering)}} /></form>}
+    {params.has('library') ? <ServiceLibraryPicker packageFields={packageFields} editingItem={params.has('new') ? undefined : {id:'extra',name:'Extra',deliverables:${JSON.stringify(counts)}}} selectedItems={[]} rates={[{id:'venue',name:'Venue',amountCents:10000}]} onRateSaved={()=>{}} onChoose={item=>window.savedLibrary=item} onClose={()=>{}} /> : <form><SessionPackagesEditor initialRates={[{id:'venue',name:'Venue',amountCents:10000}]} packageFields={packageFields} initialOffering={${JSON.stringify(offering)}} /></form>}
   </main></NotificationProvider></div>);
 ` }, bundle: true, outfile: `${output}.js`, jsx: 'automatic', loader: { '.woff2': 'dataurl', '.woff': 'dataurl' },
 define: { 'process.env.NODE_ENV': '"production"', 'process.env': '{}' }, logLevel: 'silent', plugins: [{ name: 'server-fixtures', setup(builder) {
@@ -30,6 +30,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } }), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => route.fulfill({ contentType: 'text/html', body: html }));
+  await page.route('**/api/scheduling/service-library?*', route => route.fulfill({ json: { items: [], categories: [], tags: [], total: 0, page: 1, pageCount: 1 } }));
   for (const cottage of [false, true]) {
     await page.goto(`https://fixture.example/?${cottage ? 'cottage=1' : ''}`);
     await page.getByRole('button', { name: 'Edit Standard', exact: true }).click();
@@ -40,14 +41,31 @@ try {
     const draft = JSON.parse(await page.locator('[name=sessionOffering]').inputValue());
     assert.deepEqual(draft.tiers[0].deliverables, counts, 'Editing duration preserves hidden allowances');
   }
+  for (const cottage of [false, true]) {
+    await page.goto(`https://fixture.example/?library=1&new=1${cottage ? '&cottage=1' : ''}`);
+    await page.getByRole('button', { name: 'New service', exact: true }).click();
+    assert.equal(await page.getByLabel('Additional photos', { exact: true }).count(), cottage ? 0 : 1);
+    assert.equal(await page.getByLabel('Additional locations', { exact: true }).count(), cottage ? 0 : 1);
+    assert.equal(await page.getByLabel('Additional outfit changes', { exact: true }).count(), cottage ? 0 : 1);
+  }
   await page.goto('https://fixture.example/?cottage=1&library=1');
   const library = page.getByRole('dialog');
   await library.waitFor();
   assert.equal(await library.getByText('Adds to the session', { exact: true }).count(), 0);
+  await library.getByRole('switch', { name: /^Available as an add-on/ }).check();
+  await library.getByRole('combobox', { name: 'Pricing type', exact: true }).selectOption('HOURLY');
+  await library.getByRole('combobox', { name: 'Hourly rate', exact: true }).selectOption('venue');
   await library.getByRole('button', { name: 'Save changes', exact: true }).click();
   assert.deepEqual(await page.evaluate(() => window.savedLibraryInput.deliverables), counts, 'Saving a reusable service retains hidden allowances');
+  assert.equal(await page.evaluate(() => window.savedLibraryInput.pricingType), 'HOURLY');
+  assert.equal(await page.evaluate(() => window.savedLibraryInput.hourlyRateId), 'venue');
   await page.goto('https://fixture.example/?cottage=1');
   await page.getByRole('button', { name: 'Edit Standard', exact: true }).click();
+  const hourlyDialog = page.getByRole('dialog', { name: 'Edit Standard', exact: true });
+  await hourlyDialog.getByRole('combobox', { name: 'Pricing type', exact: true }).selectOption('HOURLY');
+  await hourlyDialog.getByRole('combobox', { name: 'Hourly rate', exact: true }).selectOption('venue');
+  assert.equal(await hourlyDialog.getByRole('combobox', { name: 'Hours', exact: true }).count(), 0);
+  assert.equal(await hourlyDialog.getByRole('combobox', { name: 'End day', exact: true }).count(), 0);
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.screenshot({ path: `.tmp/package-fields/cottage-${width}.png`, fullPage: true });

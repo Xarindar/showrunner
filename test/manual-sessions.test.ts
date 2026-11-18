@@ -143,6 +143,31 @@ test("manual rescheduling preserves the agreed duration without requiring public
   const unlimited=await api.rescheduleBookingWithAvailability({bookingId:"booking",siteId:"site-a",startsAt:new Date("2099-01-02T20:00:00Z")});
   assert.equal(unlimited.endsAt.toISOString(),"2099-01-03T06:00:00.000Z");
 });
+
+test("rescheduling an hourly public booking retains its purchased length and price", async () => {
+  const startsAt = new Date("2099-01-02T14:00:00Z");
+  const booking: RecordData = { id: "hourly", siteId: "site-a", serviceId: "service", isManual: false, status: "CONFIRMED", staffId: null,
+    startsAt: new Date("2099-01-01T10:00:00Z"), endsAt: new Date("2099-01-01T18:00:00Z"), priceCents: 30000, resources: [],
+    service: { pricingType: "HOURLY", durationMinutes: 60, bufferBeforeMinutes: 0, bufferAfterMinutes: 0 },
+    packageSnapshot: { tierId: "hourly", name: "Hourly", durationMinutes: 150, priceCents: 30000, pricingType: "HOURLY", coverage: [], extras: [] } };
+  const db = { booking: { findFirst: async ({ where }: RecordData) => typeof where.id === "string" ? booking : null, update: async ({ data }: RecordData) => ({ ...booking, ...data }) }, blockedTime: { findFirst: async () => null }, bookingResource: { deleteMany: async () => ({ count: 0 }) } };
+  const api = load("lib/bookings/reschedule.ts", {
+    "@/lib/prisma": { prisma: { ...db, $transaction: (fn: (tx: typeof db) => unknown) => fn(db) } },
+    "@/lib/bookings/conflicts": load("lib/bookings/conflicts.ts", {}),
+    "@/lib/bookings/manual": {},
+    "@/lib/scheduling/google-calendar": {},
+    "@/lib/site": {},
+    "@/lib/scheduling/native": { nativeSchedulingAdapter: { getSlotDiagnostics: async (_id: string, _date: Date, options: RecordData) => {
+      assert.equal(options.durationMinutes, 150);
+      assert.equal(options.excludeBookingId, "hourly");
+      return { slots: [{ available: true, startsAt, endsAt: new Date(startsAt.getTime() + 150 * 60000), resourceIds: [] }] };
+    } } }
+  });
+  const updated = await api.rescheduleBookingWithAvailability({ bookingId: "hourly", siteId: "site-a", startsAt });
+  assert.equal(updated.endsAt.getTime() - updated.startsAt.getTime(), 150 * 60000);
+  assert.equal(updated.priceCents, 30000);
+  assert.deepEqual(updated.packageSnapshot, booking.packageSnapshot);
+});
 test("additive session migration preserves existing links and unknown historical prices", async () => {
   const db = new PGlite();
   try {

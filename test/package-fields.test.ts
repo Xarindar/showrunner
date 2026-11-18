@@ -43,7 +43,7 @@ test("the public catalog exposes its site's package field list even with no serv
     "@/lib/scheduling/package-fields-store": { getPackageFields: async (siteId: string) => { assert.equal(siteId, "cottage"); return []; } },
     "@/lib/scheduling/booking-document-store": { listBookingDocuments: async () => [] },
     "@/lib/scheduling/native": { nativeSchedulingAdapter: { listActiveServices: async () => [] } },
-    "@/lib/prisma": { prisma: { serviceCategory: { findMany: async () => [] } } }
+    "@/lib/prisma": { prisma: { serviceCategory: { findMany: async () => [] }, hourlyRate: { findMany: async () => [] } } }
   });
   assert.deepEqual(Array.from((await api.listPublicSchedulingCatalog("cottage")).packageFields), []);
 });

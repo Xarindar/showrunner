@@ -12,7 +12,7 @@ import { normalizeClientStatusSettings } from "../lib/clients/status-settings";
 import { isRecord } from "../lib/objects";
 
 type Query = { where?: Record<string, unknown>; data?: Record<string, unknown> };
-function harness(options: { existing?: boolean; existingCompany?: string; failBooking?: boolean; conflict?: boolean; documents?: bookingDocuments.BookingDocument[]; changedDocuments?: boolean } = {}) {
+function harness(options: { hourly?: boolean; existing?: boolean; existingCompany?: string; failBooking?: boolean; conflict?: boolean; documents?: bookingDocuments.BookingDocument[]; changedDocuments?: boolean } = {}) {
   const committed: Query[] = [];
   const writes: Query[] = [];
   const bookingWrites: Query[] = [];
@@ -20,6 +20,11 @@ function harness(options: { existing?: boolean; existingCompany?: string; failBo
   const serviceQueries: Query[] = [];
   const existing = { id: "client-a", name: "Saved name", phone: "Saved phone", companyName: options.existingCompany || "", preferences: { notes: "Keep notes", serviceId: "old-service" } };
   const service = { id: "portrait", siteId: "jazzr", name: "Portrait session", isActive: true, durationMinutes: 60, slotIntervalMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, resourceAssignments: [], staffAssignments: [] };
+  const rates = [{ id: "venue", name: "Venue", amountCents: 10000 }, { id: "help", name: "Assistant", amountCents: 2000 }];
+  if (options.hourly) Object.assign(service, { pricingType: "HOURLY", hourlyRateId: "venue", hourlyRate: rates[0], sessionOffering: {
+    coverageItems: [], tiers: [{ id: "hourly", name: "Hourly", pricingType: "HOURLY", hourlyRateId: "venue", durationMinutes: 60, priceCents: 10000, coverageIds: [] }],
+    addOns: [{ id: "assistant", name: "Assistant", pricingType: "HOURLY", hourlyRateId: "help", priceCents: 2000 }]
+  } });
   const tx = {
     service: {findFirst:async()=>service},
     client: {
@@ -35,6 +40,7 @@ function harness(options: { existing?: boolean; existingCompany?: string; failBo
     blockedTime: { findFirst: async () => null }
   };
   const db = {
+    hourlyRate: { findMany: async () => rates },
     service: { findFirst: async (query: Query) => { serviceQueries.push(query); return service; } },
     $transaction: async (callback: (db: typeof tx) => Promise<unknown>) => { const result = await callback(tx); committed.push(...writes); return result; }
   };
@@ -49,10 +55,23 @@ function harness(options: { existing?: boolean; existingCompany?: string; failBo
   const native = load("../lib/scheduling/native.ts", { "./session-offering": sessionOffering, "./service-time-frame": timeFrames, "./booking-documents": bookingDocuments, "./booking-document-store": {listBookingDocuments:async(_siteId:string,transaction?:unknown)=>transaction&&options.changedDocuments ? (options.documents??[]).map(doc=>({...doc,version:doc.version+1})) : options.documents??[]}, "server-only": {}, "@/lib/clients/public-client": client, "@/lib/email": { queueBookingCreatedEmails: async () => {} }, "@/lib/prisma": { prisma: db }, "@/lib/scheduling/google-calendar": {}, "@/lib/site": {getSiteSettingsForSite:async()=>({timezone:"America/Chicago"})}, "@/lib/timezone": {} });
   const adapter = native.nativeSchedulingAdapter as { getAvailableSlots: () => Promise<unknown[]>; createBooking: (input: unknown) => Promise<{ clientId: string; serviceId: string }> };
   const startsAt = new Date("2030-05-01T15:00:00Z");
-  adapter.getAvailableSlots = async () => [{ startsAt, endsAt: new Date("2030-05-01T16:00:00Z"), resourceIds: [] }];
+  adapter.getAvailableSlots = async (...args: unknown[]) => [{ startsAt, endsAt: new Date(startsAt.getTime() + ((args[2] as { durationMinutes?: number } | undefined)?.durationMinutes ?? 60) * 60000), resourceIds: [] }];
   const book = (extra:Record<string,unknown>={}) => adapter.createBooking({ siteId: "jazzr", serviceId: "portrait", startsAt, customerName: "New client", customerEmail: "CLIENT@EXAMPLE.COM", customerPhone: "12345", ...extra });
   return { book, service, committed, writes, settingQueries, serviceQueries, bookingWrites };
 }
+
+test("public hourly bookings validate customer duration and price hourly add-ons for the full reserved length", async () => {
+  const app = harness({ hourly: true });
+  await assert.rejects(app.book({ tierId: "hourly" }));
+  assert.equal(app.bookingWrites.length, 0);
+  await app.book({ tierId: "hourly", durationMinutes: 150, addOnIds: ["assistant"] });
+  const data = app.bookingWrites[0].data as { priceCents: number; startsAt: Date; endsAt: Date; packageSnapshot: { durationMinutes: number; hourlyRate: { amountCents: number }; extras: Array<{ priceCents: number }> } };
+  assert.equal(data.priceCents, 30000);
+  assert.equal(data.endsAt.getTime() - data.startsAt.getTime(), 150 * 60000);
+  assert.equal(data.packageSnapshot.durationMinutes, 150);
+  assert.equal(data.packageSnapshot.hourlyRate.amountCents, 10000);
+  assert.equal(data.packageSnapshot.extras[0].priceCents, 5000);
+});
 
 test("session booking creates a site-scoped profile with collected details, service and configured status", async () => {
   const app = harness();

@@ -3,7 +3,7 @@ import { getPackageFields } from "@/lib/scheduling/package-fields-store";
 import { listBookingDocuments } from "@/lib/scheduling/booking-document-store";
 import { resolveBookingRequirements } from "@/lib/scheduling/booking-documents";
 import { BookingRuleAnswerError, intakeAnswersSchema, readBookingRules } from "@/lib/scheduling/booking-rules";
-import { packagesInDisplayOrder, readSessionOffering, selectSessionPackage, suggestedSessionAddOns, sessionAddOnPriceCents } from "@/lib/scheduling/session-offering";
+import { packagesInDisplayOrder, readSessionOffering, selectSessionPackage, suggestedSessionAddOns, sessionAddOnPriceCents, priceSessionOffering } from "@/lib/scheduling/session-offering";
 import { addOnQuantitiesSchema } from "@/lib/scheduling/session-input";
 import { servicePriceCents } from "@/lib/scheduling/pricing";
 import { readImageFraming } from "@/modules/content/studio/image-framing";
@@ -30,6 +30,7 @@ const hiddenHoneypotField = "companyWebsite";
 const bookingSchema = z.object({
   serviceId: z.string().min(1, "Choose a service."),
   tierId: z.string().min(1).max(100).optional(),
+  durationMinutes: z.number().int().min(1).max(1440).optional(),
   addOnIds: z.array(z.string().min(1).max(100)).max(50).optional(),
   addOnQuantities: addOnQuantitiesSchema.optional(),
   serviceRevision: z.string().max(100).optional(),
@@ -145,10 +146,10 @@ export function serializePublicService(service: PublicService, categoryRecord?: 
   const offering = readSessionOffering(service.sessionOffering);
   const packages = offering ? packagesInDisplayOrder(offering.tiers, offering.packageOrder, tier => tier.priceCents ?? Infinity).map(tier => {
     const snapshot = selectSessionPackage(offering, tier.id)!;
-    return { id: tier.id, name: tier.name, durationMinutes: tier.durationMinutes, unlimitedDuration: tier.unlimitedDuration, priceCents: snapshot.priceCents,
+    return { id: tier.id, name: tier.name, durationMinutes: tier.durationMinutes, unlimitedDuration: tier.unlimitedDuration, priceCents: snapshot.priceCents, pricingType: tier.pricingType, hourlyRateCents: tier.hourlyRate?.amountCents,
       deliverables: snapshot.deliverables, coverage: snapshot.coverage,
       addOns: suggestedSessionAddOns(offering, tier.id).map(item => ({ id: item.id, name: item.name,
-        priceCents: sessionAddOnPriceCents(item, tier.durationMinutes), pricingType: item.pricingType, deliverables: item.deliverables })) };
+        priceCents: sessionAddOnPriceCents(item, tier.durationMinutes), pricingType: item.pricingType, hourlyRateCents: item.hourlyRate?.amountCents, deliverables: item.deliverables })) };
   }) : [];
   const category = cleanOptionalString(service.category);
   const fallbackCategoryId = category ? slugify(category) || "general" : "general";
@@ -228,14 +229,17 @@ async function listPublicSchedulingCategoryRows(siteId: string) {
 }
 
 export async function listPublicSchedulingCatalog(siteId: string) {
-  const [services, serviceCategories, documents, packageFields] = await Promise.all([
+  const [services, serviceCategories, documents, packageFields, hourlyRates] = await Promise.all([
     nativeSchedulingAdapter.listActiveServices({ siteId }),
     listPublicSchedulingCategoryRows(siteId),
     listBookingDocuments(siteId),
-    getPackageFields(siteId)
+    getPackageFields(siteId),
+    prisma.hourlyRate.findMany({ where: { siteId }, select: { id: true, name: true, amountCents: true } })
   ]);
   const categoriesByName = new Map(serviceCategories.map((category) => [categoryKey(category.name), category]));
   const serializedServices = services.map(service=>{
+    const offering = readSessionOffering(service.sessionOffering);
+    if (offering) service = { ...service, sessionOffering: priceSessionOffering(offering, hourlyRates, { pricingType: service.pricingType === "HOURLY" ? "HOURLY" : "FLAT_RATE", hourlyRateId: service.hourlyRateId ?? "" }) };
     const requirements=resolveBookingRequirements(service,documents);
     return {...serializePublicService(service,categoriesByName.get(categoryKey(service.category))),bookingRules:requirements.bookingRules,policyText:requirements.policyText || null,requirePolicy:requirements.requirePolicy,bookingRequirementsRevision:requirements.revision,
       bookingFormTitle:requirements.documents.find(document=>document.kind==="INTAKE")?.name || "Session details",
@@ -277,6 +281,7 @@ export async function listPublicSchedulingServices(siteId: string) {
 export async function getPublicSchedulingDiagnostics(input: {
   date: string | null;
   tierId?: string;
+  durationMinutes?: number;
   resourceId?: string;
   serviceId: string | null;
   siteId: string;
@@ -291,6 +296,8 @@ export async function getPublicSchedulingDiagnostics(input: {
 
   const diagnostics = await nativeSchedulingAdapter.getSlotDiagnostics(input.serviceId, day, {
     tierId: input.tierId,
+    requireDuration: true,
+    durationMinutes: input.durationMinutes,
     resourceId: input.resourceId,
     siteId: input.siteId,
     staffId: input.staffId
@@ -335,6 +342,7 @@ export async function createPublicSchedulingBooking(input: {
       siteId: input.siteId,
       serviceId: parsed.data.serviceId,
       tierId: parsed.data.tierId,
+      durationMinutes: parsed.data.durationMinutes,
       addOnIds: parsed.data.addOnIds,
       addOnQuantities: parsed.data.addOnQuantities,
       serviceRevision: parsed.data.serviceRevision,

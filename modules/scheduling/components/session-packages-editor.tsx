@@ -16,7 +16,7 @@ import { packagesInDisplayOrder, sessionOfferingDraft, type SessionOffering, typ
 import type { ServiceLibraryItem } from "@/lib/scheduling/service-library";
 import { ServiceLibraryPicker } from "./service-library-picker";
 import styles from "./session-packages-editor.module.css";
-import { hourlyPriceCents, type HourlyRate, type PricingType } from "@/lib/scheduling/pricing";
+import { type HourlyRate, type PricingType } from "@/lib/scheduling/pricing";
 import { ServicePricingFields } from "./service-pricing-fields";
 import { useNotify } from "@/components/ui/notifications";
 
@@ -81,9 +81,7 @@ export function SessionPackagesEditor({ packageFields = [...packageFieldNames], 
   const tierPrice = (tier: SessionOfferingDraft["tiers"][number]) => {
     if (tier.pricingType !== "HOURLY") return tier.price;
     const hourlyRate = rates.find(rate => rate.id === tier.hourlyRateId);
-    if (!hourlyRate || !tier.durationMinutes) return "";
-    try { return (hourlyPriceCents(hourlyRate.amountCents, Number(tier.durationMinutes)) / 100).toFixed(2); }
-    catch { return ""; }
+    return hourlyRate ? (hourlyRate.amountCents / 100).toFixed(2) : "";
   };
   const listId = useId();
   const gesture = useRef<{ x: number; y: number; height: number } | null>(null);
@@ -263,8 +261,8 @@ export function SessionPackagesEditor({ packageFields = [...packageFieldNames], 
                 }}><GripVertical aria-hidden="true" size={15} /></Button>}
               <button type="button" className={styles.packageName} aria-haspopup="dialog" onClick={() => setExpandedTiers(new Set([tier.id]))}>{tier.name}</button>
             </div></td>
-            <td>{tierPrice(tier) ? Number(tierPrice(tier)).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "—"}</td>
-            <td>{tier.pricingType === "TIME_FRAME" ? timeFrameLabel(tier) : packageDurationLabel(tier.durationMinutes)}</td>
+            <td>{tierPrice(tier) ? Number(tierPrice(tier)).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "—"}{tier.pricingType === "HOURLY" ? " / hour" : ""}</td>
+            <td>{tier.pricingType === "HOURLY" ? "Customer chooses" : tier.pricingType === "TIME_FRAME" ? timeFrameLabel(tier) : packageDurationLabel(tier.durationMinutes)}</td>
             <td><Button type="button" variant="ghost" size="sm" aria-label={`Edit ${tier.name}`} onClick={() => setExpandedTiers(new Set([tier.id]))}><Pencil aria-hidden="true" size={15} /></Button></td>
           </tr>;
         })}
@@ -298,7 +296,7 @@ export function SessionPackagesEditor({ packageFields = [...packageFieldNames], 
           <h3 className="ui-zero" id={`${listId}-coverage-${tier.id}`}>Session coverage</h3>
           {packageFields.length > 0 && <p className="muted-text">Base counts below are increased by any included services and selected add-ons.</p>}
           <div className={styles.deliverables}>
-            {tier.pricingType === "TIME_FRAME" ? <div className={styles.timeFrame}>
+            {tier.pricingType === "HOURLY" ? <p className="muted-text">The customer chooses the booking length before viewing available times. Hourly add-ons use the same length.</p> : tier.pricingType === "TIME_FRAME" ? <div className={styles.timeFrame}>
               <Field label="Ends"><Select aria-label="End day" value={tier.timeFrame?.endsNextDay ? "NEXT_DAY" : "SAME_DAY"} onChange={event => updateTier(tier.id, { timeFrame: { start: tier.timeFrame?.start ?? "", end: tier.timeFrame?.end ?? "", ...tier.timeFrame, endsNextDay: event.target.value === "NEXT_DAY" } })}>
                 <option value="SAME_DAY">Same Day</option><option value="NEXT_DAY">Next Day</option>
               </Select></Field>

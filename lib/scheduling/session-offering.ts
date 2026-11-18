@@ -38,6 +38,7 @@ const tierSchema = z.object({
   pricingType: packagePricingTypeSchema.optional(),
   timeFrame: serviceTimeFrameSchema.optional(),
   hourlyRateId: nullableRecordId,
+  hourlyRate: z.object({ id: itemId, name: itemName, amountCents: z.number().int().min(0).max(999999999) }).optional(),
   deliverables,
   coverageIds: z.array(itemId).max(100)
 });
@@ -133,11 +134,11 @@ export function packagesInDisplayOrder<T extends { id: string; unlimitedDuration
 export function priceSessionOffering(offering: SessionOffering, rates: HourlyRate[], fallback: { pricingType: PricingType; hourlyRateId: string }) {
   return { ...offering, tiers: offering.tiers.map(tier => {
     const pricingType = tier.pricingType ?? fallback.pricingType;
-    if (pricingType !== "HOURLY") return { ...tier, pricingType, hourlyRateId: null };
+    if (pricingType !== "HOURLY") return { ...tier, pricingType, hourlyRateId: null, hourlyRate: undefined };
     const hourlyRateId = tier.pricingType ? tier.hourlyRateId : fallback.hourlyRateId;
     const rate = rates.find(rate => rate.id === hourlyRateId);
     if (!rate) throw new Error("Choose an hourly rate from this business for each hourly package.");
-    return { ...tier, pricingType, hourlyRateId: rate.id, priceCents: hourlyPriceCents(rate.amountCents, tier.durationMinutes) };
+    return { ...tier, pricingType, hourlyRateId: rate.id, hourlyRate: rate, priceCents: hourlyPriceCents(rate.amountCents, tier.durationMinutes) };
   }), addOns: offering.addOns.map(item => {
     if (item.pricingType !== "HOURLY") return item;
     const rate = rates.find(rate => rate.id === item.hourlyRateId);
@@ -192,7 +193,7 @@ export const sessionPackageSnapshotSchema = z.object({
   deliverables,
   coverage: z.array(z.string()),
   includedItems: z.array(coverageItem.omit({ id: true, libraryItemId: true, category: true, tags: true }).extend({ description: z.string().max(2000) })).max(100).optional(),
-  extras: z.array(z.object({ libraryItemId: optionalRecordId, deliverables: sessionDeliverablesSchema.optional(), name: itemName, priceCents: z.number().int().nonnegative(), pricingType: z.literal("PER_UNIT").optional(), quantity: z.number().int().min(1).max(10000).optional(), unitPriceCents: z.number().int().nonnegative().optional() }))
+  extras: z.array(z.object({ libraryItemId: optionalRecordId, deliverables: sessionDeliverablesSchema.optional(), name: itemName, priceCents: z.number().int().nonnegative(), pricingType: z.enum(["PER_UNIT", "HOURLY"]).optional(), hourlyRate: hourlyRateSnapshot.optional(), quantity: z.number().int().min(1).max(10000).optional(), unitPriceCents: z.number().int().nonnegative().optional() }))
 });
 
 function sessionPriceTotal(base: number, extras: Array<{ priceCents: number }>) {
@@ -211,6 +212,8 @@ export function selectSessionPackage(value: unknown, tierId?: string, addOnIds: 
   }
   const tier = offering.tiers.find(item => item.id === tierId);
   if (!tier) throw new Error("Choose a package from this session type.");
+  const bookedDuration = durationMinutes ?? tier.durationMinutes;
+  const basePrice = tier.pricingType === "HOURLY" && tier.hourlyRate ? hourlyPriceCents(tier.hourlyRate.amountCents, bookedDuration) : tier.priceCents;
   const extras = suggestedSessionAddOns(offering, tierId).filter(item => addOnIds.includes(item.id)).map(item => ({ ...item, priceCents: sessionAddOnPriceCents(item, durationMinutes ?? tier.durationMinutes, quantities[item.id] ?? 1) }));
   const included = offering.coverageItems.filter(item => tier.coverageIds.includes(item.id));
   if (extras.length !== addOnIds.length) throw new Error("Choose available extras from this session type.");
@@ -229,13 +232,14 @@ export function selectSessionPackage(value: unknown, tierId?: string, addOnIds: 
   return {
     tierId: tier.id,
     name: tier.name,
-    durationMinutes: tier.durationMinutes,
+    durationMinutes: tier.pricingType === "HOURLY" ? bookedDuration : tier.durationMinutes,
     ...(tier.unlimitedDuration ? { unlimitedDuration: true } : {}),
-    priceCents: tier.priceCents == null ? null : sessionPriceTotal(tier.priceCents, extras),
+    priceCents: basePrice == null ? null : sessionPriceTotal(basePrice, extras),
+    ...(tier.pricingType === "HOURLY" ? { pricingType: tier.pricingType, hourlyRate: tier.hourlyRate } : {}),
     ...(tier.pricingType === "TIME_FRAME" ? { pricingType: tier.pricingType, timeFrame: tier.timeFrame } : {}),
     ...(Object.keys(resolvedDeliverables).length ? { deliverables: resolvedDeliverables } : {}),
     coverage: included.map(item => item.name),
     ...(included.some(item => item.description !== undefined || item.pricingType !== undefined || item.deliverables !== undefined) ? { includedItems: included.map(item => ({ name: item.name, description: item.description || "", ...(item.deliverables ? { deliverables: item.deliverables } : {}), ...(item.pricingType ? { pricingType: item.pricingType, priceCents: item.priceCents, hourlyRateId: item.hourlyRateId } : {}) })) } : {}),
-    extras: extras.map(item => ({ ...(item.libraryItemId ? { libraryItemId: item.libraryItemId } : {}), ...(item.deliverables ? { deliverables: item.deliverables } : {}), name: item.name, priceCents: item.priceCents, ...(item.pricingType === "PER_UNIT" ? { pricingType: "PER_UNIT" as const, quantity: quantities[item.id] ?? 1, unitPriceCents: offering.addOns.find(extra => extra.id === item.id)!.priceCents } : {}) }))
+    extras: extras.map(item => ({ ...(item.libraryItemId ? { libraryItemId: item.libraryItemId } : {}), ...(item.deliverables ? { deliverables: item.deliverables } : {}), name: item.name, priceCents: item.priceCents, ...(item.pricingType === "HOURLY" ? { pricingType: "HOURLY" as const, hourlyRate: item.hourlyRate } : {}), ...(item.pricingType === "PER_UNIT" ? { pricingType: "PER_UNIT" as const, quantity: quantities[item.id] ?? 1, unitPriceCents: offering.addOns.find(extra => extra.id === item.id)!.priceCents } : {}) }))
   };
 }

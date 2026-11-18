@@ -174,6 +174,7 @@ export function ServiceLibraryPicker({ packageFields = [...packageFieldNames], s
         {availableAsAddOn && <div className={styles.addOnPricing}>
           <ServicePricingFields allowPerUnit pricingType={form.pricingType} hourlyRateId={form.hourlyRateId} rates={rates} onRateSaved={onRateSaved} onChange={(pricingType, hourlyRateId) => setForm({ ...form, pricingType, hourlyRateId })}
             priceField={<Field label={form.pricingType === "PER_UNIT" ? "Price per unit (USD)" : "Add-on price (USD)"}><Input id={`${id}-price`} required type="number" min="0" max="9999999.99" step="0.01" inputMode="decimal" value={form.price} disabled={saving} onChange={event => setForm({ ...form, price: event.target.value })} /></Field>} />
+          {form.pricingType === "HOURLY" && <p className={styles.hint}>Uses the booking’s selected duration.</p>}
         </div>}
         {packageFields.length > 0 && <details>
           <summary>Adds to the session</summary>

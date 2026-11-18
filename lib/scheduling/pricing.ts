@@ -10,6 +10,13 @@ export const addOnPricingTypeSchema = z.enum(["FLAT_RATE", "HOURLY", "PER_UNIT"]
 export type AddOnPricingType = z.infer<typeof addOnPricingTypeSchema>;
 export type PricingType = z.infer<typeof pricingTypeSchema>;
 export type HourlyRate = { id: string; name: string; amountCents: number };
+export const hourlyBookingDurationSchema = z.number().int().min(1, "Choose how long you want to book.").max(1440, "Choose a booking length of up to 24 hours.");
+
+export function publicBookingDuration(service: { pricingType?: string; durationMinutes: number }, requested?: number) {
+  if (service.pricingType === "HOURLY") return hourlyBookingDurationSchema.parse(requested);
+  if (requested !== undefined && requested !== service.durationMinutes) throw new Error("This package has a fixed booking length.");
+  return service.durationMinutes;
+}
 export const hourlyRateInputSchema = z.object({
   id: optionalRecordId,
   name: z.string().trim().min(1, "Enter a rate name.").max(120),

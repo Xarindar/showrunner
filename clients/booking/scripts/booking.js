@@ -12,6 +12,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     categoryFocusId: "",
     serviceId: null,
     tierId: null,
+    durationMinutes: null,
     addOnIds: [],
     addOnQuantities: {},
     earliestRequested: false,
@@ -109,8 +110,18 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
   }
 
   function bindEvents() {
+    const durationForm = document.querySelector("[data-duration-form]");
+    durationForm?.addEventListener("input", updateDurationQuote);
+    durationForm?.addEventListener("submit", event => {
+      event.preventDefault();
+      const duration = updateDurationQuote();
+      if (!durationForm.reportValidity()) return;
+      state.durationMinutes = duration;
+      startServiceTime(state.earliestRequested);
+    });
+    document.querySelector("[data-back-from-duration]")?.addEventListener("click", () => goToStep((serviceById(state.serviceId)?.packages.length || 0) > 1 ? "packages" : "services"));
     document.querySelector("[data-back-to-categories]")?.addEventListener("click", () => goToStep("categories"));
-    document.querySelector("[data-back-to-services]")?.addEventListener("click", () => goToStep((serviceById(state.serviceId)?.packages.length || 0) > 1 ? "packages" : "services"));
+    document.querySelector("[data-back-to-services]")?.addEventListener("click", () => { if (requiresDuration()) { renderDuration(); goToStep("duration"); } else goToStep((serviceById(state.serviceId)?.packages.length || 0) > 1 ? "packages" : "services"); });
     document.querySelector("[data-back-from-packages]")?.addEventListener("click", () => goToStep("services"));
     document.querySelector("[data-back-from-extras]")?.addEventListener("click", () => goToStep("time"));
     document.querySelector("[data-continue-extras]")?.addEventListener("click", () => {
@@ -316,8 +327,8 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
                 </span>
               </span>
             </td>
-            <td><span class="booking-service-meta">${service.durationMinutes || 0} min</span></td>
-            <td><span class="booking-service-meta">${formatPrice(service.priceCents)}</span></td>
+            <td><span class="booking-service-meta">${service.pricingType === "HOURLY" ? "Choose length" : `${service.durationMinutes || 0} min`}</span></td>
+            <td><span class="booking-service-meta">${formatPrice(service.pricingType === "HOURLY" ? service.hourlyRateCents : service.priceCents)}${service.pricingType === "HOURLY" ? " / hour" : ""}</span></td>
             <td><span class="booking-service-detail">${escapeHtml(detail)}</span></td>
             <td><button class="booking-row-button" type="button" data-service-id="${escapeAttribute(service.id)}">Select</button></td>
           </tr>
@@ -332,7 +343,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
 
   function selectService(serviceId) {
     state.serviceId = serviceId;
-    state.tierId = null; state.addOnIds = []; state.addOnQuantities = {};
+    state.durationMinutes = null; state.tierId = null; state.addOnIds = []; state.addOnQuantities = {};
     state.selectedSlot = null;
     const packages = serviceById(serviceId)?.packages || [];
     if (packages.length > 1) { renderPackages(); goToStep("packages"); return; }
@@ -340,7 +351,32 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     startServiceTime();
   }
 
+  function requiresDuration() {
+    const service = serviceById(state.serviceId);
+    const pack = service?.packages.find(pack => pack.id === state.tierId);
+    return (pack?.pricingType || service?.pricingType) === "HOURLY";
+  }
+
+  function renderDuration() {
+    const form = document.querySelector("[data-duration-form]");
+    form.elements.hours.value = state.durationMinutes == null ? "" : Math.floor(state.durationMinutes / 60);
+    form.elements.minutes.value = state.durationMinutes == null ? 0 : state.durationMinutes % 60;
+    const service = selectedService();
+    document.querySelector("[data-duration-rate]").textContent = `${service.name} — ${formatPrice(service.hourlyRateCents)} / hour`;
+    updateDurationQuote();
+  }
+
+  function updateDurationQuote() {
+    const form = document.querySelector("[data-duration-form]");
+    const duration = Number(form.elements.hours.value) * 60 + Number(form.elements.minutes.value);
+    form.elements.hours.setCustomValidity(duration >= 1 && duration <= 1440 ? "" : "Choose a booking length between 1 minute and 24 hours.");
+    document.querySelector("[data-duration-total]").textContent = form.checkValidity()
+      ? `Total before extras: ${formatPrice(Math.round(selectedService().hourlyRateCents * duration / 60))}` : "";
+    return duration;
+  }
+
   function startServiceTime() {
+    if (requiresDuration() && state.durationMinutes == null) { renderDuration(); goToStep("duration"); return; }
     state.selectedSlot = null;
     state.staffId = "";
     state.dateRailStart = null;
@@ -365,10 +401,11 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
   function renderPackages() {
     const service = serviceById(state.serviceId);
     document.querySelector("[data-package-list]").innerHTML = (service?.packages || []).map(pack => `<tr>
-      <td>${escapeHtml(pack.name)}</td><td>${pack.unlimitedDuration ? "Unlimited" : `${pack.durationMinutes} min`}</td><td>${escapeHtml(formatPrice(pack.priceCents))}</td>
+      <td>${escapeHtml(pack.name)}</td><td>${pack.pricingType === "HOURLY" ? "Choose at booking" : pack.unlimitedDuration ? "Unlimited" : `${pack.durationMinutes} min`}</td><td>${escapeHtml(formatPrice(pack.pricingType === "HOURLY" ? pack.hourlyRateCents : pack.priceCents) + (pack.pricingType === "HOURLY" ? " / hour" : ""))}</td>
       <td>${packageDetails(pack)}</td><td><button class="booking-button button button--primary" type="button" data-package-id="${escapeAttribute(pack.id)}">Select ${escapeHtml(pack.name)}</button></td></tr>`).join("");
     document.querySelectorAll("[data-package-id]").forEach(button => button.addEventListener("click", () => {
       state.tierId = button.dataset.packageId;
+      state.durationMinutes = null;
       state.addOnIds = []; state.addOnQuantities = {}; state.selectedSlot = null;
       startServiceTime(state.earliestRequested);
     }));
@@ -635,7 +672,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
       if(rich) els.policyText.innerHTML=rendered.html; else els.policyText.textContent=rendered.text;
       els.policyText.dataset.acceptedTerms=rich?rendered.text:"";
       const checkbox = els.policyField.querySelector("input");
-      const policyKey = service.id + ":" + state.tierId + ":" + JSON.stringify(state.addOnIds) + ":" + (service.bookingRequirementsRevision || "") + ":" + rendered.text;
+      const policyKey = JSON.stringify([service.id, state.tierId, state.addOnIds, state.addOnQuantities, service.durationMinutes, service.priceCents, state.selectedSlot?.startsAt, service.bookingRequirementsRevision, rendered.text]);
       if (els.policyField.dataset.policyKey !== policyKey) checkbox.checked = false;
       els.policyField.dataset.policyKey = policyKey;
       checkbox.required = Boolean(service.requirePolicy);
@@ -732,7 +769,8 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     if (stepId === "services") return Boolean(state.categoryId);
     if (stepId === "packages") return Boolean(state.serviceId);
     if (stepId === "extras") return Boolean(state.serviceId && state.selectedSlot);
-    if (stepId === "time") return Boolean(state.serviceId && (!serviceById(state.serviceId)?.packages.length || state.tierId));
+    if (stepId === "duration") return Boolean(state.serviceId) && requiresDuration();
+    if (stepId === "time") return (!requiresDuration() || state.durationMinutes != null) && Boolean(state.serviceId && (!serviceById(state.serviceId)?.packages.length || state.tierId));
     if (stepId === "confirm") return Boolean(state.serviceId && state.selectedSlot);
     return false;
   }
@@ -747,6 +785,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     const payload = {
       serviceId: service.id,
       tierId: state.tierId || undefined,
+      durationMinutes: requiresDuration() ? state.durationMinutes : undefined,
       addOnIds: state.addOnIds,
       addOnQuantities: state.addOnQuantities,
       serviceRevision: service.serviceRevision,
@@ -839,6 +878,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     if (config.api?.enabled) {
       const params = new URLSearchParams({ serviceId: service.id, date });
       if (state.tierId) params.set("tierId", state.tierId);
+      if (requiresDuration()) params.set("durationMinutes", String(state.durationMinutes));
       const staffId = selectedStaffId(service);
       if (staffId) params.set("staffId", staffId);
       const response = await apiRequest(`/availability?${params.toString()}`);
@@ -860,6 +900,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
       if (config.api?.enabled) {
         const params = new URLSearchParams({ serviceId: service.id, date: candidate, days: String(Math.min(batchDays, maxAdvanceDays - index + 1)) });
         if (state.tierId) params.set("tierId", state.tierId);
+        if (requiresDuration()) params.set("durationMinutes", String(state.durationMinutes));
         const staffId = selectedStaffId(service);
         if (staffId) params.set("staffId", staffId);
         const response = await apiRequest(`/availability?${params.toString()}`);
@@ -946,6 +987,8 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
       .map((service, index) => ({
         id: String(service.id || service.slug || `service-${index}`),
         slug: service.slug || "",
+        pricingType: service.pricingType,
+        hourlyRateCents: service.hourlyRateCents,
         packages: Array.isArray(service.packages) ? service.packages : [],
         serviceRevision: service.serviceRevision,
         categoryId: service.categoryId || "general",
@@ -1087,14 +1130,20 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
   function selectedService() {
     const service = serviceById(state.serviceId);
     const pack = service?.packages.find(pack => pack.id === state.tierId);
-    if (!pack) return service;
-    const extras = (pack.addOns || []).filter(extra => state.addOnIds.includes(extra.id));
-    const priceCents = pack.priceCents == null ? null : pack.priceCents + extras.reduce((total, extra) => total + extra.priceCents * (state.addOnQuantities[extra.id] || 1), 0);
-    const deliverables={...pack.deliverables};
-    for(const extra of extras) for(const [key,count] of Object.entries(extra.deliverables||{})) if(deliverables[key]!==null) deliverables[key]=(deliverables[key]||0)+count*(state.addOnQuantities[extra.id]||1);
-    const selectedExtras=extras.map(extra=>({...extra,quantity:state.addOnQuantities[extra.id]||1}));
-    return { ...service, name: `${service.name} — ${pack.name}`, durationMinutes: pack.durationMinutes, unlimitedDuration: pack.unlimitedDuration, priceCents, addOns: pack.addOns, extras:selectedExtras, deliverables, coverage: pack.coverage };
-
+    if (!pack) {
+      if (service?.pricingType !== "HOURLY") return service;
+      const durationMinutes = state.durationMinutes ?? service.durationMinutes;
+      return { ...service, durationMinutes, priceCents: Math.round(service.hourlyRateCents * durationMinutes / 60) };
+    }
+    const durationMinutes = pack.pricingType === "HOURLY" ? state.durationMinutes ?? pack.durationMinutes : pack.durationMinutes;
+    const basePriceCents = pack.pricingType === "HOURLY" ? Math.round(pack.hourlyRateCents * durationMinutes / 60) : pack.priceCents;
+    const addOns = (pack.addOns || []).map(extra => extra.pricingType === "HOURLY" ? { ...extra, priceCents: Math.round(extra.hourlyRateCents * durationMinutes / 60) } : extra);
+    const extras = addOns.filter(extra => state.addOnIds.includes(extra.id));
+    const priceCents = basePriceCents == null ? null : basePriceCents + extras.reduce((total, extra) => total + extra.priceCents * (state.addOnQuantities[extra.id] || 1), 0);
+    const deliverables = { ...pack.deliverables };
+    for (const extra of extras) for (const [key, count] of Object.entries(extra.deliverables || {})) if (deliverables[key] !== null) deliverables[key] = (deliverables[key] || 0) + count * (state.addOnQuantities[extra.id] || 1);
+    const selectedExtras = extras.map(extra => ({ ...extra, quantity: state.addOnQuantities[extra.id] || 1 }));
+    return { ...service, name: `${service.name} — ${pack.name}`, pricingType: pack.pricingType, hourlyRateCents: pack.hourlyRateCents, durationMinutes, unlimitedDuration: pack.unlimitedDuration, priceCents, basePriceCents, addOns, extras: selectedExtras, deliverables, coverage: pack.coverage };
   }
 
   function selectedStaffId(service) {

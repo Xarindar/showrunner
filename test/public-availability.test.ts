@@ -49,7 +49,8 @@ test("availability batches stop at the first opening, cross months, and bound wo
     "@/lib/embed/gateway": { EmbedRequestError: RequestError },
     "@/lib/site": { getSiteSettingsForSite: async () => ({ timezone: "America/Chicago" }) },
     "@/lib/timezone": { parseZonedDateKey: (value: string) => new Date(`${value}T12:00:00Z`) },
-    "@/lib/scheduling/native": { nativeSchedulingAdapter: { getSlotDiagnostics: async (_id: string, day: Date, options: { tierId?: string; siteId?: string }) => {
+    "@/lib/scheduling/native": { nativeSchedulingAdapter: { getSlotDiagnostics: async (_id: string, day: Date, options: { tierId?: string; siteId?: string; requireDuration?: boolean }) => {
+      assert.equal(options.requireDuration, true);
       assert.equal(options.tierId, "classic"); assert.equal(options.siteId, "site");
       const key = day.toISOString().slice(0, 10); seen.push(key);
       return { slots: key === available ? [{ available: true, startsAt: day, endsAt: day }] : [] };
