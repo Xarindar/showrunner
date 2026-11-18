@@ -28,7 +28,3 @@ redirects, sessions, private files, throttling and media ranges.
 and mobile with fixture-only booking APIs. Set `SITE_PREVIEW_TEST_PASSWORD` to
 the configured password. Its defaults are Cottage port 4180
 and Jazzr port 4181; override `COTTAGE_PREVIEW_URL`/`JAZZR_PREVIEW_URL` as needed.
-
-Release hold: this work must stay on review branches until the user explicitly
-authorizes a live push. Do not merge main, deploy, or apply Cottage's pending
-`packageFields: []` production setting before that authorization.
