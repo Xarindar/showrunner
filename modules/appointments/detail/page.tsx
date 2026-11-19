@@ -52,6 +52,7 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
     include: {
       resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
       staffNotes: { orderBy: { createdAt: "desc" } },
+      billingDocument: { select: { status: true } },
       service: true,
       staff: true,
       client: true
@@ -130,7 +131,9 @@ export default async function AppointmentDetailPage({ params, searchParams }: Ap
         <aside className="ui-data-table-shell" aria-labelledby="appointment-actions-title">
           <div className="ui-data-table-titlebar"><h2 id="appointment-actions-title">Actions</h2></div>
           <div className="ui-section-body">
-          <AppointmentActions bookingId={booking.id} cancellationReason={booking.cancellationReason} />
+            {booking.billingDocument?.status === "SENT" && booking.status === "PENDING" && <p className="ui-help">Awaiting payment</p>}
+            <AppointmentActions bookingId={booking.id} cancellationReason={booking.cancellationReason}
+              bookingStatus={booking.status} paymentStatus={booking.billingDocument?.status} />
           </div>
         </aside>
       </div>

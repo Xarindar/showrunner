@@ -13,7 +13,7 @@ import {
   SquareWebhookEventStatus
 } from "@prisma/client";
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
-import { getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
+import { assertBookingCheckout, getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
 import { publicAppBaseUrl } from "@/lib/env";
 import { isSquareCredentialUsable } from "@/lib/payments/connect/square-refresh";
 import { getConnectedGatewayCredential, getConnectedSquareWebhookSignatureKeys, getSquareAccessToken } from "@/lib/payments/credentials";
@@ -329,6 +329,7 @@ export async function createSquareCheckoutSessionForBillingDocument(input: {
       throw new Error("Finalized billing documents cannot receive another payment.");
     }
 
+    await assertBookingCheckout(tx, document, input.amountCents);
     const summary = await getBillingPaymentSummary(tx, document.id, { reservePending: true });
     const availableCents = Math.max(0, document.totalCents - summary.reservedCents);
     if (availableCents <= 0) throw new Error("This document has no remaining balance.");

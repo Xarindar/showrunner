@@ -301,6 +301,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
   prisma.booking.findMany({
     where: calendarWhere,
     include: {
+      billingDocument: { select: { status: true } },
       client: true,
       resources: { include: { resource: true }, orderBy: { resource: { name: "asc" } } },
       service: { include: { resourceAssignments: { select: { resourceId: true } } } },
@@ -363,6 +364,7 @@ export default async function AppointmentsPage({ searchParams }: AppointmentsPag
       staffName: booking.staff?.name || "",
       startsAt: booking.startsAt.toISOString(),
       status: booking.status,
+      paymentStatus: booking.billingDocument?.status,
       timeLabel: parts.timeLabel,
       warnings: warningsByBookingId.get(booking.id) || []
     };

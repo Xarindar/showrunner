@@ -13,7 +13,7 @@ import {
   Prisma
 } from "@prisma/client";
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
-import { getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
+import { assertBookingCheckout, getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
 import { publicAppBaseUrl } from "@/lib/env";
 import { getConnectedPayPalCredentials, getPayPalCredentialsForSite, type PayPalSiteCredentials } from "@/lib/payments/credentials";
 import { paypalApiBaseUrl } from "@/lib/payments/provider-onboarding";
@@ -359,6 +359,7 @@ export async function createPayPalCheckoutSessionForBillingDocument(input: {
       throw new Error("Finalized billing documents cannot receive another payment.");
     }
 
+    await assertBookingCheckout(tx, document, input.amountCents);
     const summary = await getBillingPaymentSummary(tx, document.id, { reservePending: true });
     const availableCents = Math.max(0, document.totalCents - summary.reservedCents);
     if (availableCents <= 0) throw new Error("This document has no remaining balance.");
@@ -654,6 +655,7 @@ async function captureApprovedPayPalOrder(event: PayPalWebhookEvent) {
   const billingPayment = orderPayment ? null : await findPayPalBillingPayment({ orderId });
   const siteId = orderPayment?.order.siteId || billingPayment?.billingDocument.siteId || "";
   if (!siteId) throw new Error("PayPal payment record not found for approved order.");
+  if (billingPayment?.billingDocument.bookingId && billingPayment.billingDocument.status !== BillingDocumentStatus.SENT) return;
   const credentials = await requirePayPalCredentials(siteId);
 
   const captured = await paypalFetch<PayPalCaptureResponse>(credentials, `/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, {

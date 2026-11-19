@@ -74,6 +74,7 @@ export type BookingRequest = {
   bookingRequirementsRevision?: string;
   acceptedTerms?: string;
   status?: BookingStatus;
+  onlinePayment?: { checkoutSupported: boolean };
 };
 
 export type CalendarFeedScope = {
@@ -103,5 +104,5 @@ export type SchedulingAdapter = {
     date: Date,
     options?: { requireDuration?: boolean; durationMinutes?: number; tierId?: string; resourceId?: string; siteId?: string; staffId?: string; excludeBookingId?: string }
   ): Promise<SlotDiagnostics | null>;
-  createBooking(input: BookingRequest): Promise<Booking>;
+  createBooking(input: BookingRequest): Promise<Booking & { paymentToken?: string; paymentAfterApproval?: boolean }>;
 };

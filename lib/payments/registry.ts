@@ -14,16 +14,25 @@ export function getPaymentGateway(provider: PaymentProvider = PaymentProvider.ST
   throw new Error(`${provider} payment gateway is not implemented yet.`);
 }
 
-export async function resolvePaymentProviderForSite(siteId: string, provider?: PaymentProvider) {
+export class PaymentProviderUnavailable extends Error {}
+
+function canSettleOnlineBooking(provider: PaymentProvider, metadata: unknown, encryptedWebhookSecret: string) {
+  const config = metadata as { environment?: string; webhookId?: string; keyMode?: string } | null;
+  if (provider === PaymentProvider.PAYPAL) return config?.environment === "live" && Boolean(config.webhookId);
+  if (provider === PaymentProvider.SQUARE) return config?.environment !== "sandbox";
+  return config?.keyMode !== "test" && Boolean(encryptedWebhookSecret || process.env.STRIPE_WEBHOOK_SECRET);
+}
+
+export async function resolvePaymentProviderForSite(siteId: string, provider?: PaymentProvider, onlineBooking = false) {
   const settings = await prisma.siteSettings.findUnique({
     where: { siteId },
     select: { checkoutProvider: true }
   });
-  const selectedProvider = provider || settings?.checkoutProvider || PaymentProvider.STRIPE;
-
-  if (selectedProvider !== PaymentProvider.STRIPE && selectedProvider !== PaymentProvider.SQUARE && selectedProvider !== PaymentProvider.PAYPAL) {
-    return selectedProvider;
-  }
+  const preferredProvider = provider || settings?.checkoutProvider || PaymentProvider.STRIPE;
+  const supported = preferredProvider === PaymentProvider.STRIPE || preferredProvider === PaymentProvider.SQUARE || preferredProvider === PaymentProvider.PAYPAL;
+  if (!supported && !onlineBooking) return preferredProvider;
+  if (!supported && provider) throw new PaymentProviderUnavailable("Connect a payment provider before creating hosted checkout.");
+  const selectedProvider = supported ? preferredProvider : PaymentProvider.STRIPE;
 
   const credential = await prisma.paymentGatewayCredential.findUnique({
     where: {
@@ -37,6 +46,7 @@ export async function resolvePaymentProviderForSite(siteId: string, provider?: P
       externalAccountId: true,
       expiresAt: true,
       merchantId: true,
+      encryptedWebhookSecret: true,
       metadata: true,
       status: true
     }
@@ -49,8 +59,8 @@ export async function resolvePaymentProviderForSite(siteId: string, provider?: P
       ? Boolean(credential?.externalAccountId.trim())
       : Boolean(credential?.merchantId.trim()));
 
-  if (connected) return selectedProvider;
-  if (provider) throw new Error(`${selectedProvider} checkout is not connected for this site.`);
+  if (connected && credential && (!onlineBooking || canSettleOnlineBooking(selectedProvider, credential.metadata, credential.encryptedWebhookSecret))) return selectedProvider;
+  if (provider) throw new PaymentProviderUnavailable(`${selectedProvider} checkout is not connected for this site.`);
 
   const fallbackCredentials = await prisma.paymentGatewayCredential.findMany({
     where: {
@@ -67,15 +77,17 @@ export async function resolvePaymentProviderForSite(siteId: string, provider?: P
       expiresAt: true,
       metadata: true,
       provider: true,
+      encryptedWebhookSecret: true,
       status: true
     }
   });
   const connectedFallback = fallbackCredentials.find((candidate) =>
-    candidate.provider === PaymentProvider.SQUARE
+    (!onlineBooking || canSettleOnlineBooking(candidate.provider, candidate.metadata, candidate.encryptedWebhookSecret)) &&
+    (candidate.provider === PaymentProvider.SQUARE
       ? isSquareCredentialUsable(candidate)
-      : candidate.status === PaymentGatewayConnectionStatus.CONNECTED
+      : candidate.status === PaymentGatewayConnectionStatus.CONNECTED)
   );
 
   if (connectedFallback) return connectedFallback.provider;
-  throw new Error("Connect a payment provider before creating hosted checkout.");
+  throw new PaymentProviderUnavailable("Connect a payment provider before creating hosted checkout.");
 }

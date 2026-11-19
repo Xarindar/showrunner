@@ -39,6 +39,7 @@ test("rule-set actions require scheduling permission and scope every read and sa
 
 test("public bookings forward structured answers and report rule validation as a client error before writing", async () => {
   class RequestError extends Error { constructor(message: string, readonly status: number) { super(message); } }
+  let processorConnected = false;
   const rule = bookingRules.bookingRuleSchema.parse({ id: "style", kind: "intake", category: "Session", label: "Style", type: "SELECT", required: true, options: ["Candid", "Posed"] });
   const require = createRequire(import.meta.url);
   const mocks: Record<string, unknown> = {
@@ -47,6 +48,7 @@ test("public bookings forward structured answers and report rule validation as a
     "@/lib/scheduling/session-input": sessionInput,
     "@/lib/scheduling/session-offering": sessionOffering,
     "@/lib/embed/gateway": { EmbedRequestError: RequestError },
+    "@/lib/bookings/payment": { bookingPaymentProvider: async () => processorConnected ? "PAYPAL" : null, releaseUnpaidBookingHolds: async () => {}, onlineBookingUnavailable: "Online booking is unavailable." },
     "@/lib/scheduling/native": { nativeSchedulingAdapter: { createBooking: async (input: { siteId: string; customerName: string; customerEmail: string; intakeAnswers?: Record<string, string> }) => {
       assert.equal(input.siteId, "site-a");
       assert.equal((input as { customerCompany?: string }).customerCompany, "Client Studio");
@@ -65,6 +67,8 @@ test("public bookings forward structured answers and report rule validation as a
   }
   for (const customerCompany of [123, "x".repeat(201)]) await assert.rejects(exports.createPublicSchedulingBooking({ siteId: "site-a", body: { ...body, customerCompany } }), error => error instanceof RequestError && error.status === 400);
   await assert.rejects(exports.createPublicSchedulingBooking({ siteId: "site-a", body: { ...body, sessionAddress: { ...body.sessionAddress, address: " " } } }), error => error instanceof RequestError && error.status === 400);
+  await assert.rejects(exports.createPublicSchedulingBooking({ siteId: "site-a", body }), error => error instanceof RequestError && error.status === 503);
+  processorConnected = true;
   for (const intakeAnswers of [{}, { style: "Forged" }]) await assert.rejects(exports.createPublicSchedulingBooking({ siteId: "site-a", body: { ...body, intakeAnswers } }), error => error instanceof RequestError && error.status === 400);
   await assert.rejects(exports.createPublicSchedulingBooking({ siteId: "site-a", body: { ...body, intakeAnswers: { style: "Candid" } } }), /Reached booking transaction/);
 });

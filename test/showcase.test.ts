@@ -137,6 +137,8 @@ test("cancellation saves its reason with the status before queuing the customer 
   const writes: Record<string, unknown>[] = [];
   const loaded = loadMocked("lib/bookings/status.ts", {
     "server-only": {},
+    "./payment": {},
+    "@/lib/billing/documents": {},
     "@/lib/email": { queueBookingStatusEmail: async (booking: Record<string, unknown>) => { emails.push(booking); } },
     "@/lib/events/emit": { emitModuleEvent: async () => {} },
     "@/lib/site": {},

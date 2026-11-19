@@ -20,6 +20,9 @@ model BillingDocument {
   siteId                   String
   site                     Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
   documentNumber           String
+  bookingId                String?               @unique
+  bookingApprovalRequired  Boolean               @default(false)
+  booking                  Booking?              @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   type                     BillingDocumentType   @default(INVOICE)
   status                   BillingDocumentStatus @default(DRAFT)
   publicAccessToken        String?
@@ -50,6 +53,7 @@ model BillingDocument {
 
   @@unique([siteId, documentNumber])
   @@unique([siteId, publicAccessToken])
+  @@index([publicAccessToken])
   @@index([clientId])
   @@index([siteId, type, status])
   @@index([customerEmail])

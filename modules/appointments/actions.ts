@@ -42,7 +42,11 @@ export async function updateBookingStatusAction(formData: FormData) {
     redirect("/admin/modules/appointments?error=Appointment%20not%20found.");
   }
 
-  await updateBookingStatus({ bookingId: input.id, status: input.status as BookingStatus, siteId: settings.siteId, cancellationReason: input.cancellationReason });
+  try {
+    await updateBookingStatus({ bookingId: input.id, status: input.status as BookingStatus, siteId: settings.siteId, cancellationReason: input.cancellationReason });
+  } catch (error) {
+    redirect(`/admin/appointments/${input.id}?error=${encodeURIComponent(error instanceof Error ? error.message : "Unable to update appointment.")}`);
+  }
 
   refreshAppointments();
   revalidatePath(`/admin/appointments/${input.id}`);
@@ -55,11 +59,15 @@ export async function updateBookingDetailAction(formData: FormData) {
   const bookingWhere = await getAccessibleBookingWhere(user, settings.siteId, { id: input.id });
   const booking = await prisma.booking.findFirst({
     where: bookingWhere,
-    select: { id: true, startsAt: true, endsAt: true }
+    select: { id: true, startsAt: true, endsAt: true, priceCents: true, billingDocument: { select: { id: true } } }
   });
 
   if (!booking) {
     redirect("/admin/modules/appointments?error=Appointment%20not%20found.");
+  }
+
+  if (booking.billingDocument && input.agreedPrice !== undefined && input.agreedPrice !== booking.priceCents) {
+    redirect(`/admin/appointments/${input.id}?error=${encodeURIComponent("The agreed price is tied to the booking payment.")}`);
   }
 
   const data = {

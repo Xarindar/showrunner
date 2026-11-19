@@ -51,6 +51,7 @@ export type AppointmentCalendarBooking = {
   minute: number;
   notes: string;
   policyAccepted: boolean;
+  paymentStatus?: string;
   resourceIds: string[];
   resourceNames: string[];
   serviceName: string;
@@ -149,7 +150,10 @@ function canDrag(booking: AppointmentCalendarBooking) {
 }
 
 function quickStatuses(booking: AppointmentCalendarBooking) {
-  if (booking.status === "PENDING") return [{ icon: Check, label: "Confirm", status: "CONFIRMED" }];
+  if (booking.status === "PENDING") {
+    if (booking.paymentStatus === "SENT") return [{ icon: Ban, label: "Cancel", status: "CANCELED" }];
+    return [{ icon: Check, label: booking.paymentStatus === "DRAFT" ? "Approve and request payment" : "Confirm", status: "CONFIRMED" }];
+  }
   if (booking.status === "CONFIRMED") {
     return [
       { icon: Check, label: "Complete", status: "COMPLETED" },
@@ -197,7 +201,7 @@ function AppointmentExpandedDetails({ booking, dayLabel }: { booking: Appointmen
     { label: "Duration", value: booking.durationLabel },
     { label: "Staff", value: booking.staffName || "Any staff" },
     { label: "Resources", value: booking.resourceNames.length ? booking.resourceNames.join(", ") : "None" },
-    { label: "Status", value: booking.status.toLowerCase() },
+    { label: "Status", value: booking.status === "PENDING" && booking.paymentStatus === "SENT" ? "Awaiting payment" : booking.status.toLowerCase() },
     { label: "Policy", value: booking.policyAccepted ? "Accepted" : "Not accepted" },
     { label: "Client notes", value: booking.notes || "None" },
     { label: "Internal notes", value: booking.adminNotes || "None" }

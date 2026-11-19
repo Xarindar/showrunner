@@ -13,7 +13,7 @@ import {
   StripeWebhookEventStatus
 } from "@prisma/client";
 import Stripe from "stripe";
-import { getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
+import { assertBookingCheckout, getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
 import { publicAppBaseUrl } from "@/lib/env";
 import { getConnectedGatewayCredential, getConnectedStripeWebhookSecrets, getStripeApiKeyForSite } from "@/lib/payments/credentials";
@@ -368,6 +368,7 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
       throw new Error("Finalized billing documents cannot receive another payment.");
     }
 
+    await assertBookingCheckout(tx, document, input.amountCents);
     const summary = await getBillingPaymentSummary(tx, document.id, { reservePending: true });
     const availableCents = Math.max(0, document.totalCents - summary.reservedCents);
     if (availableCents <= 0) throw new Error("This document has no remaining balance.");
