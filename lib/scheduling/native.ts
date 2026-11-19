@@ -440,7 +440,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
       throw new Error("That service is not available.");
     }
     let offering = readSessionOffering(service.sessionOffering);
-    if (offering && (offering.tiers.some(tier => tier.pricingType === "HOURLY") || offering.addOns.some(extra => extra.pricingType === "HOURLY"))) {
+    if (offering) {
       offering = priceSessionOffering(offering, await prisma.hourlyRate.findMany({ where: { siteId } }), { pricingType: service.pricingType === "HOURLY" ? "HOURLY" : "FLAT_RATE", hourlyRateId: service.hourlyRateId ?? "" });
     }
     const tierId = input.tierId || (offering?.tiers.length === 1 ? offering.tiers[0].id : undefined);
@@ -562,9 +562,24 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
             throw new Error("That time was just booked or blocked. Please choose another time.");
           }
 
-          const currentService=await tx.service.findFirst({where:{id:service.id,siteId}});
+          const currentService=await tx.service.findFirst({where:{id:service.id,siteId}, include: { hourlyRate: true } });
           if (!currentService || !currentService.isActive) throw new Error("That service is not available.");
           if (JSON.stringify(currentService.sessionOffering) !== JSON.stringify(service.sessionOffering)) throw new BookingRuleAnswerError("The session packages changed. Reload and review the current price before booking.");
+          if (currentService.updatedAt.getTime() !== service.updatedAt.getTime()) {
+            throw new BookingRuleAnswerError("The service changed. Reload and review the current price before booking.");
+          }
+          if (packageSnapshot && offering) {
+            const currentOffering = priceSessionOffering(
+              readSessionOffering(currentService.sessionOffering)!, await tx.hourlyRate.findMany({ where: { siteId } }),
+              { pricingType: currentService.pricingType === "HOURLY" ? "HOURLY" : "FLAT_RATE", hourlyRateId: currentService.hourlyRateId ?? "" }
+            );
+            const currentPackage = selectSessionPackage(currentOffering, tierId, input.addOnIds, service.durationMinutes, input.addOnQuantities);
+            if (JSON.stringify(packageSnapshot) !== JSON.stringify(currentPackage)) {
+              throw new BookingRuleAnswerError("The package price changed. Reload and review the current price before booking.");
+            }
+          } else if (priceCents !== servicePriceCents({ ...currentService, durationMinutes: service.durationMinutes })) {
+            throw new BookingRuleAnswerError("The service price changed. Reload and review the current price before booking.");
+          }
           const currentRequirements=resolveBookingRequirements(currentService,await listBookingDocuments(siteId,tx));
           if (currentRequirements.revision !== requirements.revision) throw new BookingRuleAnswerError("The booking form or terms changed. Reload and review them before booking.");
           const clientId = await upsertPublicClient(tx, {
@@ -590,6 +605,8 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
               endsAt,
               customerName: input.customerName,
               customerEmail: input.customerEmail.toLowerCase(),
+              publicSubmissionKeyHash: input.onlinePayment?.submission?.keyHash,
+              publicSubmissionFingerprint: input.onlinePayment?.submission?.fingerprint,
               customerPhone: input.customerPhone,
               notes: input.notes,
               intakeResponse,

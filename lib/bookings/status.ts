@@ -2,8 +2,9 @@ import "server-only";
 
 import { BillingDocumentStatus, BookingStatus, Prisma } from "@prisma/client";
 import { snapshotBillingDocument } from "@/lib/billing/documents";
-import { bookingPaymentProvider, bookingPaymentUrl } from "./payment";
-import { queueBillingDocumentEmail, queueBookingStatusEmail } from "@/lib/email";
+import { bookingPaymentProvider } from "./payment";
+import { enqueueBookingPaymentNotification } from "./payment-notifications";
+import { queueBookingStatusEmail } from "@/lib/email";
 import { emitModuleEvent } from "@/lib/events/emit";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
@@ -24,23 +25,17 @@ export async function updateBookingStatus(input: { bookingId: string; status: Bo
     }
     if (document.bookingApprovalRequired) {
       if (!await bookingPaymentProvider(siteId)) throw new Error("Connect a payment processor before approving this request.");
-      const approved = await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx) => {
         const changed = await tx.billingDocument.updateMany({
           where: { id: document.id, status: BillingDocumentStatus.DRAFT, booking: { status: BookingStatus.PENDING } },
           data: { status: BillingDocumentStatus.SENT }
         });
         if (changed.count) await snapshotBillingDocument(tx, document.id);
-        return tx.billingDocument.findUniqueOrThrow({ where: { id: document.id } });
+        const approved = await tx.billingDocument.findUniqueOrThrow({ where: { id: document.id } });
+        if (approved.status === BillingDocumentStatus.SENT && approved.publicAccessToken) {
+          await enqueueBookingPaymentNotification(tx, approved.id, "approval");
+        }
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-      if (approved.status === BillingDocumentStatus.SENT && approved.publicAccessToken) {
-        const paymentUrl = bookingPaymentUrl(approved.publicAccessToken);
-        await queueBillingDocumentEmail({
-          document: { ...approved, checkoutUrl: paymentUrl },
-          siteId,
-          publicUrl: paymentUrl,
-          idempotencyKey: `booking-payment:${document.id}:approved`
-        });
-      }
       return current;
     }
     throw new Error("The booking will be confirmed after the customer pays.");
@@ -66,6 +61,7 @@ export async function updateBookingStatus(input: { bookingId: string; status: Bo
 
   if (current.status === BookingStatus.PENDING && updated.status === BookingStatus.CONFIRMED) {
     await emitModuleEvent("booking.request.approved", {
+      siteId: updated.siteId,
       actorEmail: updated.customerEmail,
       metadata: {
         serviceId: updated.serviceId,
@@ -78,6 +74,7 @@ export async function updateBookingStatus(input: { bookingId: string; status: Bo
 
   if (current.status !== BookingStatus.CANCELED && updated.status === BookingStatus.CANCELED) {
     await emitModuleEvent("booking.canceled", {
+      siteId: updated.siteId,
       actorEmail: updated.customerEmail,
       metadata: {
         serviceId: updated.serviceId,

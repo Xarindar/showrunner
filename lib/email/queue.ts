@@ -179,6 +179,7 @@ export async function queueEmail(input: QueueEmailInput) {
       lastError: reason
     });
   } catch (error) {
+    if (input.retryOnError) throw error;
     await recordQueueFailure({
       siteId,
       templateKey: input.templateKey,
@@ -223,6 +224,7 @@ export async function queueAdminEmail(input: QueueAdminEmailInput) {
         relatedType: input.relatedType,
         relatedId: input.relatedId,
         tokens: input.tokens,
+        retryOnError: input.retryOnError,
         idempotencyKey: `${input.idempotencyKeyBase}:admin:${recipient.email}`
       })
     )

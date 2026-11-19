@@ -183,6 +183,10 @@ export async function sweepBookingReminders(now = new Date()): Promise<BookingRe
       where: {
         siteId: site.id,
         status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
+        AND: [{ OR: [
+          { billingDocument: null },
+          { status: BookingStatus.CONFIRMED, billingDocument: { status: "PAID" } }
+        ] }],
         startsAt: {
           gt: now,
           lte: windowEnd

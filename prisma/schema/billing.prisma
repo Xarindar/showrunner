@@ -50,6 +50,7 @@ model BillingDocument {
   lineItems                BillingLineItem[]
   attachments              BillingAttachment[]
   payments                 BillingPayment[]
+  notifications            BookingPaymentNotification[]
 
   @@unique([siteId, documentNumber])
   @@unique([siteId, publicAccessToken])
@@ -57,6 +58,18 @@ model BillingDocument {
   @@index([clientId])
   @@index([siteId, type, status])
   @@index([customerEmail])
+}
+
+model BookingPaymentNotification {
+  id                String          @id
+  billingDocumentId String
+  billingDocument   BillingDocument @relation(fields: [billingDocumentId], references: [id], onDelete: Cascade)
+  kind              String
+  createdAt         DateTime        @default(now())
+  nextAttemptAt     DateTime        @default(now())
+  completedAt       DateTime?
+
+  @@index([completedAt, nextAttemptAt])
 }
 
 model BillingPayment {
@@ -67,19 +80,52 @@ model BillingPayment {
   status                  PaymentStatus   @default(PENDING)
   amountCents             Int
   refundedCents           Int             @default(0)
+  legacyRefundedCents     Int             @default(0)
+  refundLedgerStartedAt   DateTime        @default(now())
+  captureRejectionReason  String          @default("")
+  checkoutOperation       Boolean         @default(false)
+  checkoutAccountKey      String          @default("")
+  captureStartedAt        DateTime?
   currency                String          @default("USD")
+  externalOrderId         String?
   externalPaymentId       String?
   externalCheckoutSession String?
   hostedReceiptUrl        String?
   rawSummary              Json            @default("{}")
   createdAt               DateTime        @default(now())
   updatedAt               DateTime        @updatedAt
+  refunds                 BillingRefund[]
 
   @@index([billingDocumentId])
   @@index([provider])
   @@index([status])
   @@index([externalCheckoutSession])
   @@index([externalPaymentId])
+  @@index([provider, externalOrderId])
+}
+
+enum BillingRefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+model BillingRefund {
+  id                 String              @id
+  billingPaymentId   String
+  billingPayment     BillingPayment      @relation(fields: [billingPaymentId], references: [id], onDelete: Cascade)
+  requested          Boolean
+  externalRefundId   String?
+  amountCents        Int
+  currency           String
+  status             BillingRefundStatus @default(PENDING)
+  providerCreatedAt  DateTime?
+  nextAttemptAt      DateTime            @default(now())
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@unique([billingPaymentId, externalRefundId])
+  @@index([requested, status, nextAttemptAt])
 }
 
 model BillingLineItem {

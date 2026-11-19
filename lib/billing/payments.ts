@@ -1,10 +1,9 @@
 import "server-only";
 
-import { BillingDocumentStatus, BookingStatus, PaymentStatus, Prisma } from "@prisma/client";
+import { BillingDocumentStatus, BookingStatus, type BillingPayment, type PaymentProvider, PaymentStatus, Prisma } from "@prisma/client";
 import { snapshotBillingDocument } from "@/lib/billing/documents";
+import { enqueueBookingPaymentNotification } from "@/lib/bookings/payment-notifications";
 import { prisma } from "@/lib/prisma";
-import { queueBookingCreatedEmails, queueBookingStatusEmail } from "@/lib/email";
-import { emitModuleEvent } from "@/lib/events/emit";
 
 const PAID_STATUSES = [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] satisfies PaymentStatus[];
 const PENDING_PAYMENT_RESERVATION_MS = 30 * 60 * 1000;
@@ -14,6 +13,71 @@ export type BillingPaymentSummary = {
   reservedCents: number;
   remainingCents: number;
 };
+
+export async function persistBillingCheckout(
+  document: { id: string; siteId: string; bookingId: string | null; status: BillingDocumentStatus; totalCents: number },
+  paymentId: string,
+  checkout: Pick<Prisma.BillingDocumentUpdateManyMutationInput, "checkoutProvider" | "checkoutUrl" | "paymentExternalReference">,
+  attempt: Pick<Prisma.BillingPaymentUpdateManyMutationInput, "externalCheckoutSession" | "externalOrderId" | "rawSummary">,
+  recoveryOnly = false
+) {
+  const available = await prisma.$transaction(async (tx) => {
+    const savedAttempt = await tx.billingPayment.updateMany({
+      where: { id: paymentId, billingDocumentId: document.id, status: PaymentStatus.PENDING, externalCheckoutSession: null },
+      data: attempt
+    });
+    if (!savedAttempt.count) {
+      const current = await tx.billingPayment.findUnique({ where: { id: paymentId } });
+      if (current?.status !== PaymentStatus.PENDING || !attempt.externalCheckoutSession ||
+          current.externalCheckoutSession !== attempt.externalCheckoutSession) return false;
+    }
+    if (recoveryOnly) return true;
+    const savedDocument = await tx.billingDocument.updateMany({
+      where: {
+        id: document.id,
+        siteId: document.siteId,
+        status: document.status,
+        totalCents: document.totalCents,
+        ...(document.bookingId ? {
+          booking: { status: BookingStatus.PENDING, startsAt: { gt: new Date() } },
+          OR: [{ dueAt: null }, { dueAt: { gt: new Date() } }]
+        } : {})
+      },
+      data: checkout
+    });
+    return Boolean(savedDocument.count);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  if (!available) throw new Error("The billing checkout is no longer available.");
+}
+
+export async function reserveBillingCheckout(
+  tx: Prisma.TransactionClient,
+  document: { id: string; bookingId: string | null; dueAt: Date | null; totalCents: number; currency: string; payments: BillingPayment[] },
+  amountCents: number,
+  provider: PaymentProvider,
+  checkoutAccountKey: string,
+  recoveryOnly = false
+) {
+  if (!recoveryOnly) await assertBookingCheckout(tx, document, amountCents);
+  if (document.bookingId) {
+    const pending = document.payments.find((payment) => payment.status === PaymentStatus.PENDING);
+    if (pending?.checkoutOperation && !pending.externalCheckoutSession) {
+      if (pending.provider !== provider || pending.amountCents !== amountCents || pending.checkoutAccountKey !== checkoutAccountKey ||
+          pending.createdAt.getTime() < Date.now() - 4 * 60 * 60_000) {
+        throw new Error("The existing checkout requires reconciliation.");
+      }
+      return pending;
+    }
+  }
+  if (recoveryOnly) throw new Error("The pending checkout operation changed.");
+  const summary = await getBillingPaymentSummary(tx, document.id, { reservePending: true });
+  if (amountCents <= 0 || amountCents > document.totalCents - summary.reservedCents) {
+    throw new Error("Payment amount must be greater than zero and no more than the remaining balance.");
+  }
+  return tx.billingPayment.create({
+    data: { billingDocumentId: document.id, provider, amountCents, currency: document.currency, checkoutOperation: Boolean(document.bookingId), checkoutAccountKey }
+  });
+}
 
 export async function assertBookingCheckout(
   tx: Prisma.TransactionClient,
@@ -76,8 +140,10 @@ export async function getBillingPaymentSummary(
 export async function settleBillingPayment(input: {
   billingPaymentId: string;
   externalCheckoutSession?: string;
+  externalOrderId?: string;
   externalPaymentId?: string;
   hostedReceiptUrl?: string;
+  capturedAt?: Date;
   rawSummary?: Prisma.InputJsonValue;
   siteId: string;
 }) {
@@ -91,31 +157,38 @@ export async function settleBillingPayment(input: {
     });
 
     if (!payment) throw new Error("Billing payment target not found.");
+    if ((input.externalCheckoutSession && payment.externalCheckoutSession && input.externalCheckoutSession !== payment.externalCheckoutSession) ||
+      (input.externalOrderId && payment.externalOrderId && input.externalOrderId !== payment.externalOrderId) ||
+      (input.externalPaymentId && payment.externalPaymentId && input.externalPaymentId !== payment.externalPaymentId &&
+        payment.externalPaymentId !== input.externalOrderId)) {
+      throw new Error("Billing payment identity changed.");
+    }
     if (payment.status === PaymentStatus.PAID || payment.status === PaymentStatus.AUTHORIZED) {
       return {
         rejected: false,
-        booking: payment.billingDocument.booking,
-        requestOnly: payment.billingDocument.bookingApprovalRequired,
         summary: await getBillingPaymentSummary(tx, payment.billingDocumentId)
       };
     }
-    if (payment.status === PaymentStatus.REFUNDED || payment.status === PaymentStatus.FAILED) {
-      throw new Error("Billing payment cannot be settled from its current state.");
+    if (payment.status === PaymentStatus.REFUNDED || isRejectedCapturedPayment(payment)) {
+      return { rejected: true, summary: await getBillingPaymentSummary(tx, payment.billingDocumentId) };
     }
 
     const beforeSettle = await getBillingPaymentSummary(tx, payment.billingDocumentId);
     const booking = payment.billingDocument.booking;
+    const capturedAfterStart = booking && input.capturedAt && Number.isFinite(input.capturedAt.getTime()) && input.capturedAt >= booking.startsAt;
     const closedBooking = payment.billingDocument.bookingId && (
       !booking || booking.status !== BookingStatus.PENDING ||
-      payment.billingDocument.status !== BillingDocumentStatus.SENT
+      payment.billingDocument.status !== BillingDocumentStatus.SENT || capturedAfterStart
     );
     if (closedBooking || beforeSettle.remainingCents <= 0 || payment.amountCents > beforeSettle.remainingCents) {
       await tx.billingPayment.update({
         where: { id: payment.id },
         data: {
           externalCheckoutSession: input.externalCheckoutSession || payment.externalCheckoutSession,
+          externalOrderId: input.externalOrderId || payment.externalOrderId,
           externalPaymentId: input.externalPaymentId || payment.externalPaymentId,
           hostedReceiptUrl: input.hostedReceiptUrl || payment.hostedReceiptUrl,
+          captureRejectionReason: capturedAfterStart ? "captured_after_start" : closedBooking ? "booking_closed" : REJECTED_OVERPAYMENT_REASON,
           rawSummary: {
             ...(typeof input.rawSummary === "object" && input.rawSummary && !Array.isArray(input.rawSummary) ? input.rawSummary : {}),
             rejectedReason: "payment_would_exceed_remaining_balance",
@@ -137,6 +210,7 @@ export async function settleBillingPayment(input: {
       where: { id: payment.id },
       data: {
         externalCheckoutSession: input.externalCheckoutSession || payment.externalCheckoutSession,
+        externalOrderId: input.externalOrderId || payment.externalOrderId,
         externalPaymentId: input.externalPaymentId || payment.externalPaymentId,
         hostedReceiptUrl: input.hostedReceiptUrl || payment.hostedReceiptUrl,
         ...(input.rawSummary === undefined ? {} : { rawSummary: input.rawSummary }),
@@ -156,6 +230,7 @@ export async function settleBillingPayment(input: {
           where: { id: booking.id },
           data: { status: BookingStatus.CONFIRMED }
         });
+        await enqueueBookingPaymentNotification(tx, payment.billingDocumentId, "confirmation");
       }
       await tx.billingDocument.update({
         where: { id: payment.billingDocumentId },
@@ -173,30 +248,11 @@ export async function settleBillingPayment(input: {
 
     return {
       rejected: false,
-      requestOnly: payment.billingDocument.bookingApprovalRequired,
-      booking: booking && shouldMarkPaid ? { ...booking, status: BookingStatus.CONFIRMED } : null,
       summary
     };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
-  if (result.rejected) {
-    throw new Error("Billing payment would exceed the remaining document balance.");
-  }
 
-  if (result.booking?.status === BookingStatus.CONFIRMED) {
-    const booking = result.booking;
-    if (result.requestOnly) await queueBookingStatusEmail(booking, BookingStatus.PENDING);
-    else await queueBookingCreatedEmails(booking);
-    const event = result.requestOnly ? "booking.request.approved" : "booking.created";
-    await emitModuleEvent(event, {
-      idempotencyKey: `${event}:${booking.id}`,
-      actorEmail: booking.customerEmail,
-      metadata: { serviceId: booking.serviceId, startsAt: booking.startsAt.toISOString(), status: booking.status },
-      relatedId: booking.id,
-      relatedType: "booking",
-      siteId: booking.siteId
-    });
-  }
 
   return result.summary;
 }
@@ -204,14 +260,15 @@ export async function settleBillingPayment(input: {
 export const REJECTED_OVERPAYMENT_REASON = "payment_would_exceed_remaining_balance";
 
 export function isRejectedCapturedPayment(payment: {
+  captureRejectionReason?: string;
   externalPaymentId: string | null;
   rawSummary: Prisma.JsonValue;
   refundedCents: number;
   status: PaymentStatus;
 }) {
   if (payment.status !== PaymentStatus.FAILED) return false;
-  if (payment.refundedCents !== 0) return false;
   if (!payment.externalPaymentId) return false;
+  if (payment.captureRejectionReason) return true;
 
   const rawSummary = payment.rawSummary;
   return (
@@ -233,11 +290,11 @@ export async function markBillingPaymentFailed(input: {
     where: {
       id: input.billingPaymentId,
       billingDocument: { siteId: input.siteId },
-      status: { notIn: [PaymentStatus.PAID, PaymentStatus.REFUNDED] }
+      status: PaymentStatus.PENDING,
+      ...(input.externalCheckoutSession ? { externalCheckoutSession: input.externalCheckoutSession } : {})
     },
     data: {
       externalCheckoutSession: input.externalCheckoutSession,
-      externalPaymentId: input.externalPaymentId,
       rawSummary: input.rawSummary ?? {},
       status: PaymentStatus.FAILED
     }

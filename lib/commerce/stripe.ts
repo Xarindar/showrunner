@@ -13,11 +13,15 @@ import {
   StripeWebhookEventStatus
 } from "@prisma/client";
 import Stripe from "stripe";
-import { assertBookingCheckout, getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
+import { reserveBillingCheckout, markBillingPaymentFailed, persistBillingCheckout, settleBillingPayment } from "@/lib/billing/payments";
+import { recordBillingRefund, type BillingRefundObservation } from "@/lib/billing/refund-ledger";
+import type { GatewayBillingRefundInput } from "@/lib/payments/types";
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
 import { publicAppBaseUrl } from "@/lib/env";
-import { getConnectedGatewayCredential, getConnectedStripeWebhookSecrets, getStripeApiKeyForSite } from "@/lib/payments/credentials";
+import { getConnectedGatewayCredential, getWebhookSigningCredentials, getStripeApiKeyForSite } from "@/lib/payments/credentials";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 import { resolveStripeCheckoutPaymentMethods } from "@/lib/payments/methods";
+import { PaymentWebhookRejected } from "@/lib/payments/webhook-auth";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
 import type { PaymentGateway, PaymentGatewayCheckoutInput, PaymentWallet } from "@/lib/payments/types";
@@ -346,8 +350,12 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
   amountCents: number;
   billingDocumentId: string;
   siteId?: string;
+  recoveryOnly?: boolean;
 }) {
   const currentSiteId = input.siteId || (await getCurrentSiteId());
+  const apiKey = await getStripeApiKeyForSite(currentSiteId);
+  const credential = await getConnectedGatewayCredential(currentSiteId, PaymentProvider.STRIPE);
+  if (!apiKey || !credential?.externalAccountId) throw new Error("Connect Stripe before creating Stripe checkout.");
 
   const result = await prisma.$transaction(async (tx) => {
     const document = await tx.billingDocument.findFirst({
@@ -368,27 +376,15 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
       throw new Error("Finalized billing documents cannot receive another payment.");
     }
 
-    await assertBookingCheckout(tx, document, input.amountCents);
-    const summary = await getBillingPaymentSummary(tx, document.id, { reservePending: true });
-    const availableCents = Math.max(0, document.totalCents - summary.reservedCents);
-    if (availableCents <= 0) throw new Error("This document has no remaining balance.");
-    if (input.amountCents <= 0 || input.amountCents > availableCents) {
-      throw new Error("Payment amount must be greater than zero and no more than the remaining balance.");
-    }
-
+    const payment = await reserveBillingCheckout(tx, document, input.amountCents, PaymentProvider.STRIPE,
+      `${apiKey.includes("_live_") ? "live" : "test"}:${credential.externalAccountId}`, input.recoveryOnly);
     const publicAccessToken = await ensureBillingPublicToken(tx, document.id);
-    const payment = await tx.billingPayment.create({
-      data: {
-        billingDocumentId: document.id,
-        provider: PaymentProvider.STRIPE,
-        status: PaymentStatus.PENDING,
-        amountCents: input.amountCents,
-        currency: document.currency
-      }
-    });
 
     return {
       document: {
+        bookingId: document.bookingId,
+        status: document.status,
+        totalCents: document.totalCents,
         id: document.id,
         customerEmail: document.customerEmail,
         currency: document.currency,
@@ -406,7 +402,7 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
     documentNumber: result.document.documentNumber,
     siteId: result.document.siteId
   });
-  const stripe = await getStripeForSite(result.document.siteId);
+  const stripe = new Stripe(apiKey);
   const methodSelection = await resolveStripeCheckoutPaymentMethods(result.document.siteId);
   const session = await createResilientCheckoutSession(stripe, {
     client_reference_id: result.document.id,
@@ -424,7 +420,7 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
     },
     success_url: publicBillingUrl(result.document.publicAccessToken, "success"),
     cancel_url: publicBillingUrl(result.document.publicAccessToken, "cancel")
-  });
+  }, `billing_${result.payment.id}`);
 
   if (!session.url) throw new Error("Stripe did not return a hosted Checkout URL.");
 
@@ -444,24 +440,14 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
     pciScope: "Hosted/tokenized collection only. No raw card data is stored."
   } satisfies Prisma.InputJsonObject;
 
-  await prisma.$transaction([
-    prisma.billingDocument.update({
-      where: { id: result.document.id },
-      data: {
-        checkoutProvider: PaymentProvider.STRIPE,
-        checkoutUrl: session.url,
-        paymentExternalReference: session.id
-      }
-    }),
-    prisma.billingPayment.update({
-      where: { id: result.payment.id },
-      data: {
-        externalCheckoutSession: session.id,
-        rawSummary,
-        status: PaymentStatus.PENDING
-      }
-    })
-  ]);
+  await persistBillingCheckout(result.document, result.payment.id, {
+    checkoutProvider: PaymentProvider.STRIPE,
+    checkoutUrl: session.url,
+    paymentExternalReference: session.id
+  }, {
+    externalCheckoutSession: session.id,
+    rawSummary
+  }, input.recoveryOnly);
 
   return {
     checkoutUrl: session.url,
@@ -470,22 +456,30 @@ export async function createStripeCheckoutSessionForBillingDocument(input: {
 }
 
 export async function constructStripeWebhookEvent(rawBody: string, signature: string | null) {
-  if (!signature) throw new Error("Missing Stripe-Signature header.");
+  if (!signature) throw new PaymentWebhookRejected("Missing Stripe-Signature header.");
 
-  const secrets = [...(await getConnectedStripeWebhookSecrets()), process.env.STRIPE_WEBHOOK_SECRET || ""].filter(Boolean);
-  if (!secrets.length) throw new Error("No Stripe webhook signing secret is configured. Add it in Settings → Payments.");
-
-  const client = stripeWebhookClient();
-  let lastError: unknown;
-  for (const secret of secrets) {
-    try {
-      return client.webhooks.constructEvent(rawBody, signature, secret);
-    } catch (error) {
-      lastError = error;
-    }
+  const credentials = await getWebhookSigningCredentials("STRIPE");
+  const fallback = process.env.STRIPE_WEBHOOK_SECRET;
+  if (fallback && !credentials.some(({ siteId, secret }) => siteId === DEFAULT_SITE_ID && secret === fallback)) {
+    const apiKey = process.env.STRIPE_SECRET_KEY || "";
+    credentials.push({ siteId: DEFAULT_SITE_ID, secret: fallback, merchantId: "", environment: apiKey.includes("_test_") ? "test" : apiKey.includes("_live_") ? "live" : "" });
   }
 
-  throw lastError instanceof Error ? lastError : new Error("Stripe webhook signature is invalid.");
+  const client = stripeWebhookClient();
+  const verified = credentials.flatMap(({ secret, ...binding }) => {
+    try {
+      return [{ ...binding, event: client.webhooks.constructEvent(rawBody, signature, secret) }];
+    } catch {
+      return [];
+    }
+  });
+  const match = verified[0];
+  if (verified.length !== 1 || !match ||
+    (match.environment && match.event.livemode !== (match.environment === "live")) ||
+    (match.event.account && match.event.account !== match.merchantId)) {
+    throw new PaymentWebhookRejected("Stripe webhook merchant could not be verified.");
+  }
+  return { event: match.event, siteId: match.siteId, environment: match.event.livemode ? "live" : "test" };
 }
 
 function stripeEventSummary(event: Stripe.Event): Prisma.InputJsonObject {
@@ -544,11 +538,18 @@ function stripeEventSummary(event: Stripe.Event): Prisma.InputJsonObject {
   return base;
 }
 
-async function claimStripeEvent(event: Stripe.Event) {
+async function claimStripeEvent(event: Stripe.Event, siteId: string) {
+  const eventId = event.id;
+  const historical = await prisma.stripeWebhookEvent.findFirst({
+    where: { siteId: "", eventId, status: StripeWebhookEventStatus.PROCESSED },
+    select: { id: true }
+  });
+  if (historical) return false;
   try {
     await prisma.stripeWebhookEvent.create({
       data: {
-        eventId: event.id,
+        siteId,
+        eventId,
         type: event.type,
         livemode: event.livemode,
         status: StripeWebhookEventStatus.PROCESSING,
@@ -563,7 +564,8 @@ async function claimStripeEvent(event: Stripe.Event) {
 
     const reclaimed = await prisma.stripeWebhookEvent.updateMany({
       where: {
-        eventId: event.id,
+        siteId,
+        eventId,
         OR: [
           { status: StripeWebhookEventStatus.FAILED },
           {
@@ -586,9 +588,9 @@ async function claimStripeEvent(event: Stripe.Event) {
   }
 }
 
-async function markStripeEventProcessed(eventId: string) {
+async function markStripeEventProcessed(siteId: string, eventId: string) {
   await prisma.stripeWebhookEvent.update({
-    where: { eventId },
+    where: { siteId_eventId: { siteId, eventId } },
     data: {
       error: "",
       processedAt: new Date(),
@@ -597,11 +599,11 @@ async function markStripeEventProcessed(eventId: string) {
   });
 }
 
-async function markStripeEventFailed(eventId: string, error: unknown) {
+async function markStripeEventFailed(siteId: string, eventId: string) {
   await prisma.stripeWebhookEvent.update({
-    where: { eventId },
+    where: { siteId_eventId: { siteId, eventId } },
     data: {
-      error: error instanceof Error ? error.message.slice(0, 1000) : "Stripe webhook handling failed.",
+      error: "Stripe webhook handling failed.",
       processedAt: null,
       status: StripeWebhookEventStatus.FAILED
     }
@@ -612,7 +614,7 @@ function metadataValue(value: string | null | undefined) {
   return String(value || "").trim();
 }
 
-async function findStripePayment(input: { checkoutSessionId?: string; orderId?: string; paymentId?: string; paymentIntentId?: string }) {
+async function findStripePayment(siteId: string, input: { checkoutSessionId?: string; orderId?: string; paymentId?: string; paymentIntentId?: string }) {
   const candidates: Prisma.PaymentWhereInput[] = [];
   if (input.paymentId) candidates.push({ id: input.paymentId });
   if (input.checkoutSessionId) candidates.push({ externalCheckoutSession: input.checkoutSessionId });
@@ -623,6 +625,7 @@ async function findStripePayment(input: { checkoutSessionId?: string; orderId?: 
     const payment = await prisma.payment.findFirst({
       where: {
         provider: PaymentProvider.STRIPE,
+        order: { siteId },
         ...candidate
       },
       include: { order: { include: { gallerySelectionPurchase: { select: { id: true } } } } },
@@ -634,41 +637,39 @@ async function findStripePayment(input: { checkoutSessionId?: string; orderId?: 
   return null;
 }
 
-async function findStripeBillingPayment(input: {
+async function findStripeBillingPayment(siteId: string, input: {
   billingDocumentId?: string;
   billingPaymentId?: string;
   checkoutSessionId?: string;
   paymentIntentId?: string;
 }) {
-  const candidates: Prisma.BillingPaymentWhereInput[] = [];
-  if (input.billingPaymentId) candidates.push({ id: input.billingPaymentId });
-  if (input.checkoutSessionId) candidates.push({ externalCheckoutSession: input.checkoutSessionId });
-  if (input.paymentIntentId) candidates.push({ externalPaymentId: input.paymentIntentId });
-  if (input.billingDocumentId) candidates.push({ billingDocumentId: input.billingDocumentId });
-
-  for (const candidate of candidates) {
-    const payment = await prisma.billingPayment.findFirst({
-      where: {
-        provider: PaymentProvider.STRIPE,
-        ...candidate
-      },
-      include: { billingDocument: true },
-      orderBy: { createdAt: "asc" }
-    });
-    if (payment) return payment;
-  }
-
-  return null;
+  if (!input.checkoutSessionId && !input.paymentIntentId) return null;
+  return prisma.billingPayment.findFirst({
+    where: {
+      provider: PaymentProvider.STRIPE,
+      billingDocument: { siteId },
+      id: input.billingPaymentId || undefined,
+      billingDocumentId: input.billingDocumentId || undefined,
+      externalCheckoutSession: input.checkoutSessionId || undefined,
+      ...(input.paymentIntentId ? {
+        OR: [
+          { externalPaymentId: input.paymentIntentId },
+          ...(input.checkoutSessionId ? [{ externalPaymentId: null }] : [])
+        ]
+      } : {})
+    },
+    include: { billingDocument: true }
+  });
 }
 
-async function handleCheckoutSessionCompleted(event: Stripe.Event, session: Stripe.Checkout.Session) {
+async function handleCheckoutSessionCompleted(event: Stripe.Event, siteId: string, session: Stripe.Checkout.Session) {
   if (session.payment_status !== "paid") return;
   if (metadataValue(session.metadata?.targetType) === "billing_document") {
-    await handleBillingCheckoutSessionCompleted(event, session);
+    await handleBillingCheckoutSessionCompleted(event, siteId, session);
     return;
   }
 
-  const payment = await findStripePayment({
+  const payment = await findStripePayment(siteId, {
     checkoutSessionId: session.id,
     orderId: metadataValue(session.metadata?.orderId),
     paymentId: metadataValue(session.metadata?.paymentId),
@@ -709,8 +710,8 @@ async function handleCheckoutSessionCompleted(event: Stripe.Event, session: Stri
   });
 }
 
-async function handleBillingCheckoutSessionCompleted(event: Stripe.Event, session: Stripe.Checkout.Session) {
-  const payment = await findStripeBillingPayment({
+async function handleBillingCheckoutSessionCompleted(event: Stripe.Event, siteId: string, session: Stripe.Checkout.Session) {
+  const payment = await findStripeBillingPayment(siteId, {
     billingDocumentId: metadataValue(session.metadata?.billingDocumentId),
     billingPaymentId: metadataValue(session.metadata?.billingPaymentId),
     checkoutSessionId: session.id,
@@ -730,6 +731,7 @@ async function handleBillingCheckoutSessionCompleted(event: Stripe.Event, sessio
 
   await settleBillingPayment({
     billingPaymentId: payment.id,
+    capturedAt: new Date(event.created * 1000),
     externalCheckoutSession: session.id,
     externalPaymentId: typeof session.payment_intent === "string" ? session.payment_intent : payment.externalPaymentId || undefined,
     rawSummary: stripeEventSummary(event),
@@ -737,9 +739,20 @@ async function handleBillingCheckoutSessionCompleted(event: Stripe.Event, sessio
   });
 }
 
-async function handleCheckoutSessionFailure(event: Stripe.Event, session: Stripe.Checkout.Session) {
+export async function closeStripeBookingCheckout(siteId: string, checkoutSessionId: string) {
+  const stripe = await getStripeForSite(siteId);
+  const options = { timeout: 10_000, maxNetworkRetries: 0 };
+  let session = await stripe.checkout.sessions.retrieve(checkoutSessionId, {}, options);
+  if (session.id !== checkoutSessionId || session.metadata?.siteId !== siteId || session.metadata?.targetType !== "billing_document") {
+    throw new Error("Stripe checkout identity changed.");
+  }
+  if (session.status === "open") session = await stripe.checkout.sessions.expire(checkoutSessionId, {}, options);
+  return session.status === "expired" && session.payment_status === "unpaid";
+}
+
+async function handleCheckoutSessionFailure(event: Stripe.Event, siteId: string, session: Stripe.Checkout.Session) {
   if (metadataValue(session.metadata?.targetType) === "billing_document") {
-    const billingPayment = await findStripeBillingPayment({
+    const billingPayment = await findStripeBillingPayment(siteId, {
       billingDocumentId: metadataValue(session.metadata?.billingDocumentId),
       billingPaymentId: metadataValue(session.metadata?.billingPaymentId),
       checkoutSessionId: session.id,
@@ -757,7 +770,7 @@ async function handleCheckoutSessionFailure(event: Stripe.Event, session: Stripe
     return;
   }
 
-  const payment = await findStripePayment({
+  const payment = await findStripePayment(siteId, {
     checkoutSessionId: session.id,
     orderId: metadataValue(session.metadata?.orderId),
     paymentId: metadataValue(session.metadata?.paymentId),
@@ -804,25 +817,11 @@ async function handleCheckoutSessionFailure(event: Stripe.Event, session: Stripe
   }
 }
 
-async function handlePaymentIntentFailure(event: Stripe.Event, intent: Stripe.PaymentIntent) {
-  if (metadataValue(intent.metadata.targetType) === "billing_document") {
-    const billingPayment = await findStripeBillingPayment({
-      billingDocumentId: metadataValue(intent.metadata.billingDocumentId),
-      billingPaymentId: metadataValue(intent.metadata.billingPaymentId),
-      paymentIntentId: intent.id
-    });
-    if (!billingPayment) throw new Error("Stripe billing payment record not found for failed PaymentIntent.");
+async function handlePaymentIntentFailure(event: Stripe.Event, siteId: string, intent: Stripe.PaymentIntent) {
+  // Checkout remains payable after a failed card authorization.
+  if (metadataValue(intent.metadata.targetType) === "billing_document") return;
 
-    await markBillingPaymentFailed({
-      billingPaymentId: billingPayment.id,
-      externalPaymentId: intent.id,
-      rawSummary: stripeEventSummary(event),
-      siteId: billingPayment.billingDocument.siteId
-    });
-    return;
-  }
-
-  const payment = await findStripePayment({
+  const payment = await findStripePayment(siteId, {
     orderId: metadataValue(intent.metadata.orderId),
     paymentId: metadataValue(intent.metadata.paymentId),
     paymentIntentId: intent.id
@@ -864,7 +863,7 @@ async function handlePaymentIntentFailure(event: Stripe.Event, intent: Stripe.Pa
   }
 }
 
-async function handleRefundEvent(event: Stripe.Event) {
+async function handleRefundEvent(event: Stripe.Event, siteId: string) {
   const object = event.data.object;
   const paymentIntentId =
     object.object === "charge"
@@ -876,24 +875,24 @@ async function handleRefundEvent(event: Stripe.Event) {
         : "";
   if (!paymentIntentId) return;
 
-  const payment = await findStripePayment({ paymentIntentId });
+  const payment = await findStripePayment(siteId, { paymentIntentId });
   if (!payment) {
-    const billingPayment = await findStripeBillingPayment({ paymentIntentId });
+    const billingPayment = await findStripeBillingPayment(siteId, { paymentIntentId });
     if (!billingPayment) throw new Error("Stripe payment record not found for refund event.");
 
-    await prisma.billingPayment.update({
-      where: { id: billingPayment.id },
-      data: {
-        rawSummary: stripeEventSummary(event),
-        status:
-          object.object === "charge" && (object.refunded || object.amount_refunded >= billingPayment.amountCents)
-            ? PaymentStatus.REFUNDED
-            : billingPayment.status
+    if (object.object === "refund") {
+      await recordBillingRefund(siteId, billingPayment.id, paymentIntentId, stripeRefundObservation(object));
+    } else if (object.object === "charge") {
+      const stripe = await getStripeForSite(siteId);
+      for await (const refund of stripe.refunds.list({ charge: object.id, limit: 100 }, { timeout: 10_000, maxNetworkRetries: 0 })) {
+        if (refund.payment_intent !== paymentIntentId) throw new Error("Stripe refund capture does not match.");
+        await recordBillingRefund(siteId, billingPayment.id, paymentIntentId, stripeRefundObservation(refund));
       }
-    });
+    }
     return;
   }
 
+  if (object.object === "refund" && object.status !== "succeeded") return;
   if ((object.object === "charge" && object.amount_refunded > 0) || (object.object === "refund" && object.status === "succeeded" && object.amount > 0)) {
     await revokeGalleryPurchaseForRefund({ orderId: payment.orderId, siteId: payment.order.siteId,
       amountCents: object.object === "charge" ? object.amount_refunded : object.amount,
@@ -921,16 +920,16 @@ async function handleRefundEvent(event: Stripe.Event) {
   }
 }
 
-async function dispatchStripeEvent(event: Stripe.Event) {
+async function dispatchStripeEvent(event: Stripe.Event, siteId: string) {
   const object = event.data.object;
 
   if (event.type === "checkout.session.completed" && object.object === "checkout.session") {
-    await handleCheckoutSessionCompleted(event, object);
+    await handleCheckoutSessionCompleted(event, siteId, object);
     return;
   }
 
   if (event.type === "checkout.session.async_payment_succeeded" && object.object === "checkout.session") {
-    await handleCheckoutSessionCompleted(event, object);
+    await handleCheckoutSessionCompleted(event, siteId, object);
     return;
   }
 
@@ -938,36 +937,36 @@ async function dispatchStripeEvent(event: Stripe.Event) {
     (event.type === "checkout.session.expired" || event.type === "checkout.session.async_payment_failed") &&
     object.object === "checkout.session"
   ) {
-    await handleCheckoutSessionFailure(event, object);
+    await handleCheckoutSessionFailure(event, siteId, object);
     return;
   }
 
   if (event.type === "payment_intent.payment_failed" && object.object === "payment_intent") {
-    await handlePaymentIntentFailure(event, object);
+    await handlePaymentIntentFailure(event, siteId, object);
     return;
   }
 
-  if ((event.type === "refund.created" || event.type === "refund.updated") && object.object === "refund" && object.status === "succeeded") {
-    await handleRefundEvent(event);
+  if ((event.type === "refund.created" || event.type === "refund.updated" || event.type === "refund.failed") && object.object === "refund") {
+    await handleRefundEvent(event, siteId);
     return;
   }
 
   if (event.type === "charge.refunded" && object.object === "charge") {
-    await handleRefundEvent(event);
+    await handleRefundEvent(event, siteId);
     return;
   }
 }
 
-export async function handleStripeWebhookEvent(event: Stripe.Event) {
-  const claimed = await claimStripeEvent(event);
+export async function handleStripeWebhookEvent(event: Stripe.Event, siteId: string) {
+  const claimed = await claimStripeEvent(event, siteId);
   if (!claimed) return { duplicate: true };
 
   try {
-    await dispatchStripeEvent(event);
-    await markStripeEventProcessed(event.id);
+    await dispatchStripeEvent(event, siteId);
+    await markStripeEventProcessed(siteId, event.id);
     return { duplicate: false };
   } catch (error) {
-    await markStripeEventFailed(event.id, error);
+    await markStripeEventFailed(siteId, event.id);
     throw error;
   }
 }
@@ -985,6 +984,7 @@ async function createStripeGatewayCheckoutSession(input: PaymentGatewayCheckoutI
   const result = await createStripeCheckoutSessionForBillingDocument({
     amountCents: input.amountCents,
     billingDocumentId: input.billingDocumentId,
+    recoveryOnly: input.recoveryOnly,
     siteId: input.siteId
   });
 
@@ -1045,48 +1045,34 @@ async function refundStripeGatewayPayment(input: { amountCents?: number; payment
     return refund;
   }
 
-  const billingPayment = await prisma.billingPayment.findFirst({
-    where: {
-      id: input.paymentId,
-      provider: PaymentProvider.STRIPE,
-      billingDocument: { siteId: input.siteId }
-    },
-    include: { billingDocument: true }
-  });
+  throw new Error("Stripe order payment not found for refund.");
+}
 
-  if (!billingPayment) throw new Error("Stripe payment record not found for refund.");
-  if (!billingPayment.externalPaymentId) throw new Error("Stripe payment intent is missing for this billing payment.");
+function stripeRefundObservation(refund: Stripe.Refund): BillingRefundObservation {
+  return {
+    externalRefundId: refund.id, amountCents: refund.amount, currency: refund.currency,
+    providerCreatedAt: new Date(refund.created * 1000), requestId: refund.metadata?.showrunnerRefundId,
+    status: refund.status === "succeeded" ? "SUCCEEDED" : refund.status === "failed" || refund.status === "canceled" ? "FAILED" : "PENDING"
+  };
+}
 
-  const stripe = await getStripeForSite(billingPayment.billingDocument.siteId);
-  const refund = await stripe.refunds.create({
-    amount: input.amountCents,
-    payment_intent: billingPayment.externalPaymentId
-  });
-  const isFullRefund = !input.amountCents || input.amountCents >= billingPayment.amountCents;
-
-  await prisma.billingPayment.update({
-    where: { id: billingPayment.id },
-    data: {
-      rawSummary: {
-        refund: {
-          amount: refund.amount,
-          id: refund.id,
-          paymentIntent: typeof refund.payment_intent === "string" ? refund.payment_intent : refund.payment_intent?.id || "",
-          status: refund.status || ""
-        },
-        strategy: "stripe_refund_billing_document"
-      },
-      status: isFullRefund ? PaymentStatus.REFUNDED : billingPayment.status
-    }
-  });
-
-  return refund;
+async function refundStripeBilling(input: GatewayBillingRefundInput) {
+  const stripe = await getStripeForSite(input.siteId);
+  const options = { timeout: 10_000, maxNetworkRetries: 0 };
+  const refund = input.externalRefundId
+    ? await stripe.refunds.retrieve(input.externalRefundId, {}, options)
+    : await stripe.refunds.create({
+      amount: input.amountCents, payment_intent: input.captureId, metadata: { showrunnerRefundId: input.requestId }
+    }, { ...options, idempotencyKey: input.requestId });
+  if (refund.payment_intent !== input.captureId) throw new Error("Stripe refund capture does not match.");
+  return stripeRefundObservation(refund);
 }
 
 export const stripePaymentGateway: PaymentGateway = {
   provider: PaymentProvider.STRIPE,
   createCheckoutSession: createStripeGatewayCheckoutSession,
-  handleWebhookEvent: async (event: unknown) => handleStripeWebhookEvent(event as Stripe.Event),
+  handleWebhookEvent: ({ event, siteId }) => handleStripeWebhookEvent(event as Stripe.Event, siteId),
+  refundBilling: refundStripeBilling,
   refund: async (input) => {
     return refundStripeGatewayPayment(input);
   },

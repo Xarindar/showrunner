@@ -719,13 +719,58 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     els.flowSummary.textContent = parts.join(" | ");
   }
 
+  let previousSubmission;
+  async function submissionKey(payload) {
+    if (!window.crypto?.subtle || !window.crypto.randomUUID) return undefined;
+    const digest = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(payload)));
+    const fingerprint = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const storageKey = "showrunner-booking-submission";
+    if (previousSubmission?.fingerprint === fingerprint) return previousSubmission.key;
+    const candidate = { fingerprint, key: window.crypto.randomUUID() };
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(storageKey) || "null");
+      if (saved?.fingerprint === fingerprint && typeof saved.key === "string") candidate.key = saved.key;
+      sessionStorage.setItem(storageKey, JSON.stringify(candidate));
+    } catch {
+      // The current page can still retry when session storage is blocked.
+    }
+    previousSubmission = candidate;
+    return candidate.key;
+  }
+
+  function bookingDestination(value, kind) {
+    if (typeof value !== "string" || !value.trim()) return "";
+    try {
+      const url = new URL(value);
+      const api = makeApiUrl("/");
+      const billingOrigin = config.api?.billingOrigin ? new URL(config.api.billingOrigin).origin : api.origin;
+      if (url.username || url.password) return "";
+      const firstParty = [api.origin, billingOrigin].includes(url.origin);
+      const localPreview = firstParty && location.protocol === "http:" && url.protocol === "http:"
+        && ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)
+        && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+      if (url.protocol !== "https:" && !localPreview) return "";
+      if (kind === "calendar") {
+        return firstParty && url.pathname === "/api/calendar/booking.ics" && url.searchParams.has("token") ? url.href : "";
+      }
+      if (firstParty && /^\/billing\/bdoc_[A-Za-z0-9_-]{32}$/.test(url.pathname)) return url.href;
+      const hostedOrigins = [
+        "https://checkout.stripe.com", "https://square.link", "https://checkout.square.site",
+        "https://www.paypal.com", "https://www.sandbox.paypal.com", ...(config.api?.checkoutOrigins || [])
+      ];
+      return hostedOrigins.includes(url.origin) ? url.href : "";
+    } catch {
+      return "";
+    }
+  }
+
   function renderSuccess(bookingResult) {
     const service = selectedService();
     const slot = state.selectedSlot;
     if (!service || !slot) return;
 
     els.successSummary.innerHTML = summaryMarkup(service, slot, bookingResult?.booking?.id);
-    const pending = bookingResult?.booking?.status === "PENDING" || service.requestOnly;
+    const pending = bookingResult.booking.status === "PENDING";
     document.querySelector("#success-title").textContent = pending ? "Request received" : "You're booked";
     document.querySelector(".booking-success .booking-kicker").textContent = pending ? "Awaiting approval" : "Confirmed";
     els.successCopy.textContent = "Your appointment is confirmed.";
@@ -736,16 +781,9 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     }
 
     const links = [];
-    if (bookingResult?.booking?.calendarUrl) {
-      links.push(`<a class="booking-button booking-button-secondary" href="${escapeAttribute(bookingResult.booking.calendarUrl)}">Add to calendar</a>`);
-    }
-    if (bookingResult?.booking?.manageUrl) {
-      links.push(`<a class="booking-button booking-button-secondary" href="${escapeAttribute(bookingResult.booking.manageUrl)}">Manage booking</a>`);
-    }
-    if (bookingResult?.booking?.formLinks?.length) {
-      bookingResult.booking.formLinks.forEach((form) => {
-        links.push(`<a class="booking-button booking-button-secondary" href="${escapeAttribute(form.href)}">${escapeHtml(form.name)}</a>`);
-      });
+    const calendarUrl = pending ? "" : bookingDestination(bookingResult.booking.calendarUrl, "calendar");
+    if (calendarUrl) {
+      links.push(`<a class="booking-button booking-button-secondary" href="${escapeAttribute(calendarUrl)}">Add to calendar</a>`);
     }
     els.successLinks.innerHTML = links.join("");
   }
@@ -820,10 +858,19 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     els.submitBooking.disabled = true;
 
     try {
-      const result = await createBooking(payload);
-      if (result.paymentUrl) {
-        window.location.assign(result.paymentUrl);
+      const result = await createBooking({ ...payload, submissionKey: await submissionKey(payload) });
+      const recovery = "We couldn’t verify the booking response. Check your email or contact us before submitting again.";
+      if (result?.ok !== true) throw new Error(recovery);
+      if (Object.hasOwn(result, "paymentUrl")) {
+        const url = bookingDestination(result.paymentUrl, "checkout");
+        if (!url) throw new Error(recovery);
+        window.location.assign(url);
         return;
+      }
+      if (result.booking === null && payload.companyWebsite.trim()) return;
+      if (typeof result.booking?.id !== "string" || !result.booking.id.trim() ||
+        !["PENDING", "CONFIRMED"].includes(result.booking.status)) {
+        throw new Error(recovery);
       }
       state.lastBooking = result;
       renderSuccess(result);
@@ -976,9 +1023,9 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(payload.error || "Request failed.");
+      throw new Error(payload?.error || "Request failed.");
     }
-    return payload.data || payload;
+    return payload?.data || payload;
   }
 
   function makeApiUrl(path) {

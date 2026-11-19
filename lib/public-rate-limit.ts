@@ -42,40 +42,19 @@ export async function publicRateLimitForSite(siteId: string, scope: string, opti
   const windowMinutes = options.windowMinutes ?? 10;
   const identifier = options.identifier || (await publicIdentifier());
   const key = rateLimitKey(scope, identifier, siteId);
-  const now = new Date();
-  const windowMs = windowMinutes * 60 * 1000;
-  const existing = await prisma.publicRateLimit.findUnique({ where: { siteId_key: { siteId, key } } });
-
-  if (!existing || now.getTime() - existing.windowStart.getTime() >= windowMs) {
-    await prisma.publicRateLimit.upsert({
-      where: { siteId_key: { siteId, key } },
-      update: {
-        count: 1,
-        windowStart: now,
-        scope,
-        identifier
-      },
-      create: {
-        siteId,
-        key,
-        scope,
-        identifier,
-        count: 1,
-        windowStart: now
-      }
-    });
-    return "";
-  }
-
-  if (existing.count >= limit) {
-    return `Too many submissions. Try again in ${windowMinutes} minutes.`;
-  }
-
-  await prisma.publicRateLimit.update({
-    where: { siteId_key: { siteId, key } },
-    data: { count: { increment: 1 } }
-  });
-  return "";
+  const changed = await prisma.$executeRaw`
+    INSERT INTO "PublicRateLimit" ("id", "siteId", "key", "scope", "identifier", "count", "windowStart", "updatedAt")
+    VALUES (${crypto.randomUUID()}, ${siteId}, ${key}, ${scope}, ${identifier}, 1, timezone('UTC', statement_timestamp()), timezone('UTC', statement_timestamp()))
+    ON CONFLICT ("siteId", "key") DO UPDATE
+    SET "count" = CASE WHEN "PublicRateLimit"."windowStart" <= timezone('UTC', statement_timestamp()) - ${windowMinutes} * interval '1 minute'
+                       THEN 1 ELSE "PublicRateLimit"."count" + 1 END,
+        "windowStart" = CASE WHEN "PublicRateLimit"."windowStart" <= timezone('UTC', statement_timestamp()) - ${windowMinutes} * interval '1 minute'
+                             THEN timezone('UTC', statement_timestamp()) ELSE "PublicRateLimit"."windowStart" END,
+        "updatedAt" = timezone('UTC', statement_timestamp())
+    WHERE "PublicRateLimit"."count" < ${limit}
+       OR "PublicRateLimit"."windowStart" <= timezone('UTC', statement_timestamp()) - ${windowMinutes} * interval '1 minute'
+  `;
+  return changed ? "" : `Too many submissions. Try again in ${windowMinutes} minutes.`;
 }
 
 export async function publicRateLimitMessage(scope: string, options: PublicRateLimitOptions = {}) {

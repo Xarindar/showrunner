@@ -17,6 +17,7 @@ export type QueueEmailInput = {
   galleryCoverImageUrl?: string;
   senderIdentityId?: string;
   idempotencyKey: string;
+  retryOnError?: boolean;
   headers?: EmailHeaders;
   unsubscribeUrl?: string;
   preferencesUrl?: string;
@@ -33,6 +34,7 @@ export type QueueAdminEmailInput = {
   relatedId?: string;
   tokens: EmailTokens;
   idempotencyKeyBase: string;
+  retryOnError?: boolean;
 };
 
 export type SendEmailInput = {

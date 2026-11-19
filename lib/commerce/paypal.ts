@@ -12,19 +12,22 @@ import {
   PaymentStatus,
   Prisma
 } from "@prisma/client";
+import { recordBillingRefund, type BillingRefundObservation } from "@/lib/billing/refund-ledger";
+import type { GatewayBillingRefundInput } from "@/lib/payments/types";
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
-import { assertBookingCheckout, getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
+import { reserveBillingCheckout, markBillingPaymentFailed, persistBillingCheckout, settleBillingPayment } from "@/lib/billing/payments";
 import { publicAppBaseUrl } from "@/lib/env";
 import { getConnectedPayPalCredentials, getPayPalCredentialsForSite, type PayPalSiteCredentials } from "@/lib/payments/credentials";
 import { paypalApiBaseUrl } from "@/lib/payments/provider-onboarding";
 import type { PaymentGateway, PaymentGatewayCheckoutInput } from "@/lib/payments/types";
+import { PaymentWebhookRejected, paypalTransmissionHeaders } from "@/lib/payments/webhook-auth";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
 import { updateOrderStatus } from "./orders";
 
 // First-party PayPal: orders are created on the account that owns the pasted REST app credentials, so
 // there is no partner auth-assertion and no payee.merchant_id. Each call resolves the site's own creds.
-async function getPayPalAccessToken(credentials: PayPalSiteCredentials) {
+async function getPayPalAccessToken(credentials: PayPalSiteCredentials, signal: AbortSignal) {
   const basic = Buffer.from(`${credentials.clientId}:${credentials.clientSecret}`).toString("base64");
   const response = await fetch(`${paypalApiBaseUrl(credentials.environment)}/v1/oauth2/token`, {
     body: "grant_type=client_credentials",
@@ -33,7 +36,8 @@ async function getPayPalAccessToken(credentials: PayPalSiteCredentials) {
       Authorization: `Basic ${basic}`,
       "Content-Type": "application/x-www-form-urlencoded"
     },
-    method: "POST"
+    method: "POST",
+    signal
   });
   const text = await response.text();
   const body = text ? (JSON.parse(text) as { access_token?: string }) : {};
@@ -46,14 +50,15 @@ async function paypalFetch<T>(
   path: string,
   init: RequestInit & { requestId?: string } = {}
 ) {
-  const accessToken = await getPayPalAccessToken(credentials);
+  const signal = init.signal || AbortSignal.timeout(15_000);
+  const accessToken = await getPayPalAccessToken(credentials, signal);
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   headers.set("Authorization", `Bearer ${accessToken}`);
   headers.set("Content-Type", "application/json");
   if (init.requestId) headers.set("PayPal-Request-Id", init.requestId);
 
-  const response = await fetch(`${paypalApiBaseUrl(credentials.environment)}${path}`, { ...init, headers });
+  const response = await fetch(`${paypalApiBaseUrl(credentials.environment)}${path}`, { ...init, headers, signal });
   const text = await response.text();
   const body = text ? JSON.parse(text) : {};
   if (!response.ok) {
@@ -89,6 +94,8 @@ type PayPalOrderResponse = {
 };
 
 type PayPalCapture = {
+  create_time?: string;
+  payee?: { merchant_id?: string };
   amount?: PayPalMoney;
   custom_id?: string;
   id?: string;
@@ -120,6 +127,7 @@ type PayPalWebhookEvent = {
   event_type?: string;
   id?: string;
   resource?: {
+    payee?: { merchant_id?: string };
     amount?: PayPalMoney;
     custom_id?: string;
     id?: string;
@@ -141,11 +149,7 @@ type PayPalWebhookEvent = {
   summary?: string;
 };
 
-type PayPalRefundResponse = {
-  amount?: PayPalMoney;
-  id?: string;
-  status?: string;
-};
+type PayPalRefundResponse = Pick<PayPalCapture, "amount" | "id" | "status" | "custom_id" | "links"> & { create_time?: string };
 
 const payPalEventStaleProcessingMs = 5 * 60 * 1000;
 
@@ -345,6 +349,7 @@ export async function createPayPalCheckoutSessionForBillingDocument(input: {
   amountCents: number;
   billingDocumentId: string;
   siteId?: string;
+  recoveryOnly?: boolean;
 }) {
   const currentSiteId = input.siteId || (await getCurrentSiteId());
   const credentials = await requirePayPalCredentials(currentSiteId);
@@ -363,27 +368,15 @@ export async function createPayPalCheckoutSessionForBillingDocument(input: {
       throw new Error("Finalized billing documents cannot receive another payment.");
     }
 
-    await assertBookingCheckout(tx, document, input.amountCents);
-    const summary = await getBillingPaymentSummary(tx, document.id, { reservePending: true });
-    const availableCents = Math.max(0, document.totalCents - summary.reservedCents);
-    if (availableCents <= 0) throw new Error("This document has no remaining balance.");
-    if (input.amountCents <= 0 || input.amountCents > availableCents) {
-      throw new Error("Payment amount must be greater than zero and no more than the remaining balance.");
-    }
-
+    const payment = await reserveBillingCheckout(tx, document, input.amountCents, PaymentProvider.PAYPAL,
+      `${credentials.environment}:${credentials.merchantId}:${credentials.clientId}`, input.recoveryOnly);
     const publicAccessToken = await ensureBillingPublicToken(tx, document.id);
-    const payment = await tx.billingPayment.create({
-      data: {
-        amountCents: input.amountCents,
-        billingDocumentId: document.id,
-        currency: document.currency,
-        provider: PaymentProvider.PAYPAL,
-        status: PaymentStatus.PENDING
-      }
-    });
 
     return {
       document: {
+        bookingId: document.bookingId,
+        status: document.status,
+        totalCents: document.totalCents,
         currency: document.currency,
         documentNumber: document.documentNumber,
         id: document.id,
@@ -408,28 +401,18 @@ export async function createPayPalCheckoutSessionForBillingDocument(input: {
   const checkoutUrl = approveUrl(paypalOrder);
   if (!paypalOrder.id || !checkoutUrl) throw new Error("PayPal did not return a hosted checkout URL.");
 
-  await prisma.$transaction([
-    prisma.billingDocument.update({
-      where: { id: result.document.id },
-      data: {
-        checkoutProvider: PaymentProvider.PAYPAL,
-        checkoutUrl,
-        paymentExternalReference: paypalOrder.id
-      }
-    }),
-    prisma.billingPayment.update({
-      where: { id: result.payment.id },
-      data: {
-        externalCheckoutSession: paypalOrder.id,
-        rawSummary: orderRawSummary({
-          merchantId: credentials.merchantId,
-          order: paypalOrder,
-          strategy: "paypal_order_billing_document"
-        }),
-        status: PaymentStatus.PENDING
-      }
+  await persistBillingCheckout(result.document, result.payment.id, {
+    checkoutProvider: PaymentProvider.PAYPAL,
+    checkoutUrl,
+    paymentExternalReference: paypalOrder.id
+  }, {
+    externalCheckoutSession: paypalOrder.id,
+    rawSummary: orderRawSummary({
+      merchantId: credentials.merchantId,
+      order: paypalOrder,
+      strategy: "paypal_order_billing_document"
     })
-  ]);
+  }, input.recoveryOnly);
 
   return {
     checkoutUrl,
@@ -438,32 +421,28 @@ export async function createPayPalCheckoutSessionForBillingDocument(input: {
 }
 
 export async function constructPayPalWebhookEvent(rawBody: string, headers: Headers) {
+  const transmission = Object.fromEntries(Object.entries(paypalTransmissionHeaders).map(([key, header]) => [key, headers.get(header)]));
+  if (Object.values(transmission).some((value) => !value)) throw new PaymentWebhookRejected("Missing PayPal transmission headers.");
   const event = JSON.parse(rawBody) as PayPalWebhookEvent;
-  const connected = (await getConnectedPayPalCredentials()).filter((credentials) => credentials.webhookId);
-  if (!connected.length) throw new Error("No PayPal webhook ID is configured. Add it in Settings → Payments.");
-
-  const transmission = {
-    auth_algo: headers.get("paypal-auth-algo") || "",
-    cert_url: headers.get("paypal-cert-url") || "",
-    transmission_id: headers.get("paypal-transmission-id") || "",
-    transmission_sig: headers.get("paypal-transmission-sig") || "",
-    transmission_time: headers.get("paypal-transmission-time") || ""
-  };
-
-  for (const credentials of connected) {
-    try {
-      const verification = await paypalFetch<{ verification_status?: string }>(credentials, "/v1/notifications/verify-webhook-signature", {
-        body: JSON.stringify({ ...transmission, webhook_event: event, webhook_id: credentials.webhookId }),
-        method: "POST",
-        requestId: `paypal_webhook_verify_${event.id || crypto.randomUUID()}`
-      });
-      if (verification.verification_status === "SUCCESS") return event;
-    } catch {
-      // Try the next connected PayPal account.
-    }
+  if (!event?.id || !event.event_type) throw new PaymentWebhookRejected("Missing PayPal event identity.");
+  const connected = await getConnectedPayPalCredentials();
+  const results = await Promise.allSettled(connected.map(async (credentials) => {
+    const verification = await paypalFetch<{ verification_status?: string }>(credentials, "/v1/notifications/verify-webhook-signature", {
+      body: JSON.stringify({ ...transmission, webhook_event: event, webhook_id: credentials.webhookId }),
+      method: "POST",
+      signal: AbortSignal.timeout(4000)
+    });
+    return verification.verification_status === "SUCCESS" ? credentials : null;
+  }));
+  const verified = results.flatMap((result) => result.status === "fulfilled" && result.value ? [result.value] : []);
+  const match = verified[0];
+  if (!match && results.some((result) => result.status === "rejected")) throw new Error("PayPal verification unavailable.");
+  if (!match || verified.length !== 1 ||
+    connected.some((entry) => entry.siteId !== match.siteId && entry.webhookId === match.webhookId && entry.environment === match.environment) ||
+    (event.resource?.payee?.merchant_id && event.resource.payee.merchant_id !== match.merchantId)) {
+    throw new PaymentWebhookRejected("PayPal webhook merchant could not be verified.");
   }
-
-  throw new Error("PayPal webhook signature is invalid.");
+  return { event, environment: match.environment, siteId: match.siteId };
 }
 
 function payPalEventSummary(event: PayPalWebhookEvent): Prisma.InputJsonObject {
@@ -486,11 +465,17 @@ function payPalEventSummary(event: PayPalWebhookEvent): Prisma.InputJsonObject {
   };
 }
 
-async function claimPayPalEvent(event: PayPalWebhookEvent) {
+async function claimPayPalEvent(event: PayPalWebhookEvent, siteId: string) {
   const eventId = event.id || crypto.randomUUID();
+  const historical = await prisma.payPalWebhookEvent.findFirst({
+    where: { siteId: "", eventId, status: PayPalWebhookEventStatus.PROCESSED },
+    select: { id: true }
+  });
+  if (historical) return { claimed: false, eventId };
   try {
     await prisma.payPalWebhookEvent.create({
       data: {
+        siteId,
         eventId,
         status: PayPalWebhookEventStatus.PROCESSING,
         summary: payPalEventSummary(event),
@@ -505,6 +490,7 @@ async function claimPayPalEvent(event: PayPalWebhookEvent) {
 
     const reclaimed = await prisma.payPalWebhookEvent.updateMany({
       where: {
+        siteId,
         eventId,
         OR: [
           { status: PayPalWebhookEventStatus.FAILED },
@@ -529,9 +515,9 @@ async function claimPayPalEvent(event: PayPalWebhookEvent) {
   }
 }
 
-async function markPayPalEventProcessed(eventId: string) {
+async function markPayPalEventProcessed(siteId: string, eventId: string) {
   await prisma.payPalWebhookEvent.update({
-    where: { eventId },
+    where: { siteId_eventId: { siteId, eventId } },
     data: {
       error: "",
       processedAt: new Date(),
@@ -540,18 +526,18 @@ async function markPayPalEventProcessed(eventId: string) {
   });
 }
 
-async function markPayPalEventFailed(eventId: string, error: unknown) {
+async function markPayPalEventFailed(siteId: string, eventId: string) {
   await prisma.payPalWebhookEvent.update({
-    where: { eventId },
+    where: { siteId_eventId: { siteId, eventId } },
     data: {
-      error: error instanceof Error ? error.message.slice(0, 1000) : "PayPal webhook handling failed.",
+      error: "PayPal webhook handling failed.",
       processedAt: null,
       status: PayPalWebhookEventStatus.FAILED
     }
   });
 }
 
-async function findPayPalPayment(input: { captureId?: string; customId?: string; orderId?: string }) {
+async function findPayPalPayment(siteId: string, input: { captureId?: string; customId?: string; orderId?: string }) {
   const candidates: Prisma.PaymentWhereInput[] = [];
   if (input.customId) candidates.push({ id: input.customId });
   if (input.captureId) candidates.push({ externalPaymentId: input.captureId });
@@ -561,6 +547,7 @@ async function findPayPalPayment(input: { captureId?: string; customId?: string;
     const payment = await prisma.payment.findFirst({
       where: {
         provider: PaymentProvider.PAYPAL,
+        order: { siteId },
         ...candidate
       },
       include: { order: { include: { gallerySelectionPurchase: { select: { id: true } } } } },
@@ -572,34 +559,32 @@ async function findPayPalPayment(input: { captureId?: string; customId?: string;
   return null;
 }
 
-async function findPayPalBillingPayment(input: { captureId?: string; customId?: string; orderId?: string }) {
-  const candidates: Prisma.BillingPaymentWhereInput[] = [];
-  if (input.customId) candidates.push({ id: input.customId });
-  if (input.captureId) candidates.push({ externalPaymentId: input.captureId });
-  if (input.orderId) candidates.push({ externalCheckoutSession: input.orderId });
-
-  for (const candidate of candidates) {
-    const payment = await prisma.billingPayment.findFirst({
-      where: {
-        provider: PaymentProvider.PAYPAL,
-        ...candidate
-      },
-      include: { billingDocument: true },
-      orderBy: { createdAt: "asc" }
-    });
-    if (payment) return payment;
-  }
-
-  return null;
+async function findPayPalBillingPayment(siteId: string, input: { captureId?: string; customId?: string; orderId?: string }) {
+  if (!input.orderId && !input.captureId) return null;
+  return prisma.billingPayment.findFirst({
+    where: {
+      provider: PaymentProvider.PAYPAL,
+      billingDocument: { siteId },
+      id: input.customId || undefined,
+      externalCheckoutSession: input.orderId || undefined,
+      ...(input.captureId ? {
+        OR: [
+          { externalPaymentId: input.captureId },
+          ...(input.orderId ? [{ externalPaymentId: null }] : [])
+        ]
+      } : {})
+    },
+    include: { billingDocument: true }
+  });
 }
 
-async function settlePayPalCapture(event: PayPalWebhookEvent, capture: PayPalCapture) {
+async function settlePayPalCapture(event: PayPalWebhookEvent, siteId: string, capture: PayPalCapture) {
   if (capture.status !== "COMPLETED") return;
   const orderId = capture.supplementary_data?.related_ids?.order_id || "";
   const capturedAmount = amountValueCents(capture.amount?.value || capture.seller_receivable_breakdown?.gross_amount?.value);
   const currency = capture.amount?.currency_code || capture.seller_receivable_breakdown?.gross_amount?.currency_code || "";
 
-  const orderPayment = await findPayPalPayment({
+  const orderPayment = await findPayPalPayment(siteId, {
     captureId: capture.id,
     customId: capture.custom_id,
     orderId
@@ -631,7 +616,7 @@ async function settlePayPalCapture(event: PayPalWebhookEvent, capture: PayPalCap
     return;
   }
 
-  const billingPayment = await findPayPalBillingPayment({
+  const billingPayment = await findPayPalBillingPayment(siteId, {
     captureId: capture.id,
     customId: capture.custom_id,
     orderId
@@ -646,6 +631,7 @@ async function settlePayPalCapture(event: PayPalWebhookEvent, capture: PayPalCap
 
   await settleBillingPayment({
     billingPaymentId: billingPayment.id,
+    capturedAt: new Date(capture.create_time || event.create_time || ""),
     externalCheckoutSession: orderId || billingPayment.externalCheckoutSession || undefined,
     externalPaymentId: capture.id || billingPayment.externalPaymentId || undefined,
     hostedReceiptUrl: capture.links?.find((link) => link.rel === "up")?.href || billingPayment.hostedReceiptUrl || undefined,
@@ -654,15 +640,29 @@ async function settlePayPalCapture(event: PayPalWebhookEvent, capture: PayPalCap
   });
 }
 
-async function captureApprovedPayPalOrder(event: PayPalWebhookEvent) {
+async function captureApprovedPayPalOrder(event: PayPalWebhookEvent, siteId: string) {
   const orderId = event.resource?.id || "";
   if (!orderId) return;
-  const orderPayment = await findPayPalPayment({ orderId });
-  const billingPayment = orderPayment ? null : await findPayPalBillingPayment({ orderId });
-  const siteId = orderPayment?.order.siteId || billingPayment?.billingDocument.siteId || "";
-  if (!siteId) throw new Error("PayPal payment record not found for approved order.");
-  if (billingPayment?.billingDocument.bookingId && billingPayment.billingDocument.status !== BillingDocumentStatus.SENT) return;
+  const orderPayment = await findPayPalPayment(siteId, { orderId });
+  const billingPayment = orderPayment ? null : await findPayPalBillingPayment(siteId, { orderId });
+  if (!orderPayment && !billingPayment) throw new Error("PayPal payment record not found for approved order.");
   const credentials = await requirePayPalCredentials(siteId);
+  if (billingPayment?.checkoutAccountKey &&
+      billingPayment.checkoutAccountKey !== `${credentials.environment}:${credentials.merchantId}:${credentials.clientId}`) {
+    throw new Error("PayPal checkout merchant changed.");
+  }
+  if (billingPayment?.billingDocument.bookingId) {
+    const now = new Date();
+    const started = await prisma.billingPayment.updateMany({
+      where: {
+        id: billingPayment.id, status: PaymentStatus.PENDING, externalCheckoutSession: orderId,
+        billingDocument: { siteId, status: BillingDocumentStatus.SENT, booking: { status: "PENDING", startsAt: { gt: now } } },
+        OR: [{ checkoutOperation: false }, { billingDocument: { OR: [{ dueAt: null }, { dueAt: { gt: now } }] } }]
+      },
+      data: { captureStartedAt: billingPayment.captureStartedAt || now }
+    });
+    if (!started.count) return;
+  }
 
   const captured = await paypalFetch<PayPalCaptureResponse>(credentials, `/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, {
     body: JSON.stringify({}),
@@ -679,15 +679,30 @@ async function captureApprovedPayPalOrder(event: PayPalWebhookEvent) {
         event_type: "PAYMENT.CAPTURE.COMPLETED",
         resource: boundCapture
       },
+      siteId,
       boundCapture
     );
   }
 }
 
-async function handlePayPalPaymentFailed(event: PayPalWebhookEvent) {
+export async function closePayPalBookingCheckout(siteId: string, orderId: string, locallyUncapturable: boolean) {
+  const credentials = await requirePayPalCredentials(siteId);
+  const order = await paypalFetch<PayPalCaptureResponse>(credentials, `/v2/checkout/orders/${encodeURIComponent(orderId)}`);
+  if (order.id !== orderId) throw new Error("PayPal checkout identity changed.");
+  const capture = order.purchase_units?.flatMap((unit) => unit.payments?.captures || []).find(({ status }) => status === "COMPLETED");
+  if (capture) {
+    const boundCapture = { ...capture, supplementary_data: { ...capture.supplementary_data, related_ids: { order_id: orderId } } };
+    await settlePayPalCapture({ event_type: "PAYMENT.CAPTURE.COMPLETED", resource: boundCapture }, siteId, boundCapture);
+    return false;
+  }
+  if (order.purchase_units?.some((unit) => unit.payments?.captures?.some(({ status }) => status === "PENDING"))) return false;
+  return order.status === "VOIDED" || (locallyUncapturable && ["CREATED", "PAYER_ACTION_REQUIRED", "APPROVED"].includes(order.status || ""));
+}
+
+async function handlePayPalPaymentFailed(event: PayPalWebhookEvent, siteId: string) {
   const resource = event.resource || {};
   const orderId = resource.supplementary_data?.related_ids?.order_id || "";
-  const billingPayment = await findPayPalBillingPayment({
+  const billingPayment = await findPayPalBillingPayment(siteId, {
     captureId: resource.id,
     customId: resource.custom_id,
     orderId
@@ -703,7 +718,7 @@ async function handlePayPalPaymentFailed(event: PayPalWebhookEvent) {
     return;
   }
 
-  const orderPayment = await findPayPalPayment({
+  const orderPayment = await findPayPalPayment(siteId, {
     captureId: resource.id,
     customId: resource.custom_id,
     orderId
@@ -731,35 +746,39 @@ async function handlePayPalPaymentFailed(event: PayPalWebhookEvent) {
   }
 }
 
-async function revokeRefundedPayPalGallery(event: PayPalWebhookEvent) {
+async function handlePayPalRefund(event: PayPalWebhookEvent, siteId: string) {
   const resource = event.resource;
-  if (!resource || resource.status !== "COMPLETED" || amountValueCents(resource.amount?.value) <= 0) return;
+  if (!resource || amountValueCents(resource.amount?.value) <= 0) return;
   // The refund resource id/custom_id is not the original capture/payment id.
   const captureId = payPalRefundCaptureId(resource);
   if (!captureId) throw new Error("PayPal refund is missing its original capture identity.");
-  const payment = await prisma.payment.findFirst({ where: { provider: PaymentProvider.PAYPAL, externalPaymentId: captureId }, include: { order: true } });
+  const payment = await prisma.payment.findFirst({ where: { provider: PaymentProvider.PAYPAL, externalPaymentId: captureId, order: { siteId } }, include: { order: true } });
   if (!payment) {
-    const billingPayment = await prisma.billingPayment.findFirst({ where: { provider: PaymentProvider.PAYPAL, externalPaymentId: captureId }, select: { id: true } });
-    if (billingPayment) return;
+    const billingPayment = await prisma.billingPayment.findFirst({ where: { provider: PaymentProvider.PAYPAL, externalPaymentId: captureId, billingDocument: { siteId } }, select: { id: true } });
+    if (billingPayment) {
+      await recordBillingRefund(siteId, billingPayment.id, captureId, payPalRefundObservation(resource));
+      return;
+    }
     throw new Error("PayPal capture payment not yet recorded for refund; retry the event.");
   }
+  if (resource.status !== "COMPLETED") return;
   await revokeGalleryPurchaseForRefund({ orderId: payment.orderId, siteId: payment.order.siteId,
     amountCents: amountValueCents(resource.amount?.value), currency: resource.amount?.currency_code || "", paymentCurrency: payment.currency });
 }
 
-async function dispatchPayPalEvent(event: PayPalWebhookEvent) {
+async function dispatchPayPalEvent(event: PayPalWebhookEvent, siteId: string) {
   if (event.event_type === "PAYMENT.CAPTURE.REFUNDED") {
-    await revokeRefundedPayPalGallery(event);
+    await handlePayPalRefund(event, siteId);
     return;
   }
 
   if (event.event_type === "CHECKOUT.ORDER.APPROVED") {
-    await captureApprovedPayPalOrder(event);
+    await captureApprovedPayPalOrder(event, siteId);
     return;
   }
 
   if (event.event_type === "PAYMENT.CAPTURE.COMPLETED" && event.resource) {
-    await settlePayPalCapture(event, event.resource);
+    await settlePayPalCapture(event, siteId, event.resource);
     return;
   }
 
@@ -768,20 +787,20 @@ async function dispatchPayPalEvent(event: PayPalWebhookEvent) {
     event.event_type === "PAYMENT.CAPTURE.DECLINED" ||
     event.event_type === "CHECKOUT.ORDER.VOIDED"
   ) {
-    await handlePayPalPaymentFailed(event);
+    await handlePayPalPaymentFailed(event, siteId);
   }
 }
 
-export async function handlePayPalWebhookEvent(event: PayPalWebhookEvent) {
-  const claim = await claimPayPalEvent(event);
+export async function handlePayPalWebhookEvent(event: PayPalWebhookEvent, siteId: string) {
+  const claim = await claimPayPalEvent(event, siteId);
   if (!claim.claimed) return { duplicate: true };
 
   try {
-    await dispatchPayPalEvent(event);
-    await markPayPalEventProcessed(claim.eventId);
+    await dispatchPayPalEvent(event, siteId);
+    await markPayPalEventProcessed(siteId, claim.eventId);
     return { duplicate: false };
   } catch (error) {
-    await markPayPalEventFailed(claim.eventId, error);
+    await markPayPalEventFailed(siteId, claim.eventId);
     throw error;
   }
 }
@@ -799,6 +818,7 @@ async function createPayPalGatewayCheckoutSession(input: PaymentGatewayCheckoutI
   const result = await createPayPalCheckoutSessionForBillingDocument({
     amountCents: input.amountCents,
     billingDocumentId: input.billingDocumentId,
+    recoveryOnly: input.recoveryOnly,
     siteId: input.siteId
   });
 
@@ -856,48 +876,36 @@ async function refundPayPalGatewayPayment(input: { amountCents?: number; payment
     return refund;
   }
 
-  const billingPayment = await prisma.billingPayment.findFirst({
-    where: {
-      billingDocument: { siteId: input.siteId },
-      id: input.paymentId,
-      provider: PaymentProvider.PAYPAL
-    },
-    include: { billingDocument: true }
-  });
-  if (!billingPayment) throw new Error("PayPal payment record not found for refund.");
-  if (!billingPayment.externalPaymentId) throw new Error("PayPal capture id is missing for this billing payment.");
+  throw new Error("PayPal order payment not found for refund.");
+}
 
-  const amountCents = input.amountCents || billingPayment.amountCents;
-  const credentials = await requirePayPalCredentials(billingPayment.billingDocument.siteId);
-  const refund = await paypalFetch<PayPalRefundResponse>(credentials, `/v2/payments/captures/${encodeURIComponent(billingPayment.externalPaymentId)}/refund`, {
-    body: JSON.stringify({
-      amount: {
-        currency_code: assertPayPalCurrency(billingPayment.currency),
-        value: payPalAmount(amountCents)
-      }
-    }),
-    method: "POST",
-    requestId: `paypal_refund_${billingPayment.id}_${amountCents}`
-  });
-  const isFullRefund = amountCents >= billingPayment.amountCents;
-  await prisma.billingPayment.update({
-    where: { id: billingPayment.id },
-    data: {
-      rawSummary: {
-        refund,
-        strategy: "paypal_refund_billing_document"
-      },
-      status: isFullRefund ? PaymentStatus.REFUNDED : billingPayment.status
-    }
-  });
+function payPalRefundObservation(refund: PayPalRefundResponse): BillingRefundObservation {
+  return {
+    externalRefundId: refund.id || "", amountCents: amountValueCents(refund.amount?.value),
+    currency: refund.amount?.currency_code || "", providerCreatedAt: new Date(refund.create_time || ""), requestId: refund.custom_id,
+    status: refund.status === "COMPLETED" ? "SUCCEEDED" : refund.status === "FAILED" || refund.status === "CANCELLED" ? "FAILED" : "PENDING"
+  };
+}
 
-  return refund;
+async function refundPayPalBilling(input: GatewayBillingRefundInput) {
+  const credentials = await requirePayPalCredentials(input.siteId);
+  const refund = input.externalRefundId
+    ? await paypalFetch<PayPalRefundResponse>(credentials, `/v2/payments/refunds/${encodeURIComponent(input.externalRefundId)}`)
+    : await paypalFetch<PayPalRefundResponse>(credentials, `/v2/payments/captures/${encodeURIComponent(input.captureId)}/refund`, {
+      body: JSON.stringify({
+        amount: { currency_code: assertPayPalCurrency(input.currency), value: payPalAmount(input.amountCents) },
+        custom_id: input.requestId
+      }), method: "POST", requestId: input.requestId
+    });
+  if (payPalRefundCaptureId(refund) !== input.captureId) throw new Error("PayPal refund capture does not match.");
+  return payPalRefundObservation(refund);
 }
 
 export const paypalPaymentGateway: PaymentGateway = {
   provider: PaymentProvider.PAYPAL,
   createCheckoutSession: createPayPalGatewayCheckoutSession,
-  handleWebhookEvent: async (event: unknown) => handlePayPalWebhookEvent(event as PayPalWebhookEvent),
+  handleWebhookEvent: ({ event, siteId }) => handlePayPalWebhookEvent(event as PayPalWebhookEvent, siteId),
+  refundBilling: refundPayPalBilling,
   refund: async (input) => refundPayPalGatewayPayment(input),
   supportedWallets: async () => [],
   verifyWebhook: ({ headers, rawBody }) => constructPayPalWebhookEvent(rawBody, headers || new Headers())

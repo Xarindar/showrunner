@@ -29,6 +29,7 @@ function harness(failRefunds = false, localStatus = "PENDING") {
           : query.where.externalPaymentId.in.includes("payment-local") ? { id: "local", status: "PAID" } : null;
       } },
       billingPayment: { findFirst: async (query: any) => { assert.equal(query.where.billingDocument.siteId, "site-a"); return null; } },
+      squareReconciliationItem: { findMany: async () => [], upsert: async () => {}, deleteMany: async () => {} },
       $executeRaw: async () => { checkpoint = true; }
     } },
     "@/lib/objects": { isRecord: (value: unknown) => typeof value === "object" && value !== null && !Array.isArray(value) },

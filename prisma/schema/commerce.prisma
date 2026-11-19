@@ -554,6 +554,7 @@ model PaymentGatewayCredential {
 
 model StripeWebhookEvent {
   id          String                   @id @default(cuid())
+  siteId      String                   @default("")
   eventId     String
   type        String
   status      StripeWebhookEventStatus @default(PROCESSING)
@@ -564,13 +565,14 @@ model StripeWebhookEvent {
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
 
-  @@unique([eventId])
+  @@unique([siteId, eventId])
   @@index([status])
   @@index([type])
 }
 
 model SquareWebhookEvent {
   id          String                   @id @default(cuid())
+  siteId      String                   @default("")
   eventId     String
   merchantId  String                   @default("")
   type        String
@@ -581,7 +583,7 @@ model SquareWebhookEvent {
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
 
-  @@unique([eventId])
+  @@unique([siteId, eventId])
   @@index([status])
   @@index([type])
   @@index([merchantId])
@@ -589,6 +591,7 @@ model SquareWebhookEvent {
 
 model PayPalWebhookEvent {
   id          String                   @id @default(cuid())
+  siteId      String                   @default("")
   eventId     String
   type        String
   status      PayPalWebhookEventStatus @default(PROCESSING)
@@ -598,7 +601,17 @@ model PayPalWebhookEvent {
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
 
-  @@unique([eventId])
+  @@unique([siteId, eventId])
   @@index([status])
   @@index([type])
+}
+
+model SquareReconciliationItem {
+  siteId    String
+  eventId   String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@id([siteId, eventId])
+  @@index([siteId, createdAt])
 }

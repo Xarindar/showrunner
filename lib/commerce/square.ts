@@ -12,13 +12,17 @@ import {
   Prisma,
   SquareWebhookEventStatus
 } from "@prisma/client";
+import { recordBillingRefund, type BillingRefundObservation } from "@/lib/billing/refund-ledger";
+import type { GatewayBillingRefundInput } from "@/lib/payments/types";
 import { ensureBillingPublicToken } from "@/lib/billing/documents";
-import { assertBookingCheckout, getBillingPaymentSummary, markBillingPaymentFailed, settleBillingPayment } from "@/lib/billing/payments";
+import { reserveBillingCheckout, persistBillingCheckout, settleBillingPayment } from "@/lib/billing/payments";
 import { publicAppBaseUrl } from "@/lib/env";
 import { isSquareCredentialUsable } from "@/lib/payments/connect/square-refresh";
-import { getConnectedGatewayCredential, getConnectedSquareWebhookSignatureKeys, getSquareAccessToken } from "@/lib/payments/credentials";
+import { getConnectedGatewayCredential, getWebhookSigningCredentials, getSquareAccessToken } from "@/lib/payments/credentials";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 import { squareApiBaseUrl } from "@/lib/payments/provider-onboarding";
 import type { PaymentGateway, PaymentGatewayCheckoutInput, PaymentWallet } from "@/lib/payments/types";
+import { PaymentWebhookRejected } from "@/lib/payments/webhook-auth";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
 import { updateOrderStatus } from "./orders";
@@ -30,6 +34,7 @@ type SquareMoney = {
 
 type SquarePayment = {
   amount_money?: SquareMoney;
+  created_at?: string;
   id?: string;
   order_id?: string;
   receipt_url?: string;
@@ -38,6 +43,7 @@ type SquarePayment = {
 };
 
 type SquareRefund = {
+  created_at?: string;
   amount_money?: SquareMoney;
   id?: string;
   payment_id?: string;
@@ -307,10 +313,11 @@ export async function createSquareCheckoutSessionForBillingDocument(input: {
   amountCents: number;
   billingDocumentId: string;
   siteId?: string;
+  recoveryOnly?: boolean;
 }) {
   const currentSiteId = input.siteId || (await getCurrentSiteId());
   const credential = await getConnectedGatewayCredential(currentSiteId, PaymentProvider.SQUARE);
-  if (!isSquareCredentialUsable(credential)) throw new Error("Connect Square before creating Square checkout.");
+  if (!credential || !isSquareCredentialUsable(credential)) throw new Error("Connect Square before creating Square checkout.");
 
   const result = await prisma.$transaction(async (tx) => {
     const document = await tx.billingDocument.findFirst({
@@ -329,27 +336,15 @@ export async function createSquareCheckoutSessionForBillingDocument(input: {
       throw new Error("Finalized billing documents cannot receive another payment.");
     }
 
-    await assertBookingCheckout(tx, document, input.amountCents);
-    const summary = await getBillingPaymentSummary(tx, document.id, { reservePending: true });
-    const availableCents = Math.max(0, document.totalCents - summary.reservedCents);
-    if (availableCents <= 0) throw new Error("This document has no remaining balance.");
-    if (input.amountCents <= 0 || input.amountCents > availableCents) {
-      throw new Error("Payment amount must be greater than zero and no more than the remaining balance.");
-    }
-
+    const payment = await reserveBillingCheckout(tx, document, input.amountCents, PaymentProvider.SQUARE,
+      `${metadataObject(credential.metadata).environment || "production"}:${credential.merchantId}:${squareLocationId(credential)}`, input.recoveryOnly);
     const publicAccessToken = await ensureBillingPublicToken(tx, document.id);
-    const payment = await tx.billingPayment.create({
-      data: {
-        amountCents: input.amountCents,
-        billingDocumentId: document.id,
-        currency: document.currency,
-        provider: PaymentProvider.SQUARE,
-        status: PaymentStatus.PENDING
-      }
-    });
 
     return {
       document: {
+        bookingId: document.bookingId,
+        status: document.status,
+        totalCents: document.totalCents,
         currency: document.currency,
         customerEmail: document.customerEmail,
         documentNumber: document.documentNumber,
@@ -403,25 +398,15 @@ export async function createSquareCheckoutSessionForBillingDocument(input: {
     strategy: "square_payment_link_billing_document"
   } satisfies Prisma.InputJsonObject;
 
-  await prisma.$transaction([
-    prisma.billingDocument.update({
-      where: { id: result.document.id },
-      data: {
-        checkoutProvider: PaymentProvider.SQUARE,
-        checkoutUrl: paymentLink.url,
-        paymentExternalReference: paymentLink.order_id || paymentLink.id
-      }
-    }),
-    prisma.billingPayment.update({
-      where: { id: result.payment.id },
-      data: {
-        externalCheckoutSession: paymentLink.id,
-        externalPaymentId: paymentLink.order_id || result.payment.externalPaymentId,
-        rawSummary,
-        status: PaymentStatus.PENDING
-      }
-    })
-  ]);
+  await persistBillingCheckout(result.document, result.payment.id, {
+    checkoutProvider: PaymentProvider.SQUARE,
+    checkoutUrl: paymentLink.url,
+    paymentExternalReference: paymentLink.order_id || paymentLink.id
+  }, {
+    externalCheckoutSession: paymentLink.id,
+    externalOrderId: paymentLink.order_id || null,
+    rawSummary
+  }, input.recoveryOnly);
 
   return {
     checkoutUrl: paymentLink.url,
@@ -440,15 +425,22 @@ function signatureMatches(signatureKey: string, rawBody: string, signature: stri
 }
 
 export async function constructSquareWebhookEvent(rawBody: string, signature: string | null) {
-  if (!signature) throw new Error("Missing x-square-hmacsha256-signature header.");
+  if (!signature) throw new PaymentWebhookRejected("Missing x-square-hmacsha256-signature header.");
 
-  const signatureKeys = [...(await getConnectedSquareWebhookSignatureKeys()), process.env.SQUARE_WEBHOOK_SIGNATURE_KEY || ""].filter(Boolean);
-  if (!signatureKeys.length) throw new Error("No Square webhook signature key is configured. Add it in Settings → Payments.");
-  if (!signatureKeys.some((key) => signatureMatches(key, rawBody, signature))) {
-    throw new Error("Square webhook signature is invalid.");
+  const credentials = await getWebhookSigningCredentials("SQUARE");
+  const fallback = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
+  if (fallback && !credentials.some(({ siteId, secret }) => siteId === DEFAULT_SITE_ID && secret === fallback)) {
+    const credential = await getConnectedGatewayCredential(DEFAULT_SITE_ID, PaymentProvider.SQUARE);
+    const metadata = metadataObject(credential?.metadata ?? null);
+    credentials.push({ siteId: DEFAULT_SITE_ID, secret: fallback, merchantId: credential?.merchantId || "", environment: metadata.environment === "sandbox" ? "sandbox" : "production" });
   }
-
-  return JSON.parse(rawBody) as SquareWebhookEvent;
+  const verified = credentials.filter(({ secret }) => signatureMatches(secret, rawBody, signature));
+  const match = verified[0];
+  const event = JSON.parse(rawBody) as SquareWebhookEvent;
+  if (verified.length !== 1 || !match || !event?.event_id || !event.merchant_id || event.merchant_id !== match.merchantId) {
+    throw new PaymentWebhookRejected("Square webhook merchant could not be verified.");
+  }
+  return { event, siteId: match.siteId, environment: match.environment || "production" };
 }
 
 function squareEventSummary(event: SquareWebhookEvent): Prisma.InputJsonObject {
@@ -483,11 +475,17 @@ function squareEventSummary(event: SquareWebhookEvent): Prisma.InputJsonObject {
   };
 }
 
-async function claimSquareEvent(event: SquareWebhookEvent) {
+async function claimSquareEvent(event: SquareWebhookEvent, siteId: string) {
   const eventId = event.event_id || event.data?.id || crypto.randomUUID();
+  const historical = await prisma.squareWebhookEvent.findFirst({
+    where: { siteId: "", eventId, status: SquareWebhookEventStatus.PROCESSED },
+    select: { id: true }
+  });
+  if (historical) return { claimed: false, eventId };
   try {
     await prisma.squareWebhookEvent.create({
       data: {
+        siteId,
         eventId,
         merchantId: event.merchant_id || "",
         status: SquareWebhookEventStatus.PROCESSING,
@@ -503,6 +501,7 @@ async function claimSquareEvent(event: SquareWebhookEvent) {
 
     const reclaimed = await prisma.squareWebhookEvent.updateMany({
       where: {
+        siteId,
         eventId,
         OR: [
           { status: SquareWebhookEventStatus.FAILED },
@@ -528,9 +527,9 @@ async function claimSquareEvent(event: SquareWebhookEvent) {
   }
 }
 
-async function markSquareEventProcessed(eventId: string) {
+async function markSquareEventProcessed(siteId: string, eventId: string) {
   await prisma.squareWebhookEvent.update({
-    where: { eventId },
+    where: { siteId_eventId: { siteId, eventId } },
     data: {
       error: "",
       processedAt: new Date(),
@@ -539,25 +538,25 @@ async function markSquareEventProcessed(eventId: string) {
   });
 }
 
-async function markSquareEventFailed(eventId: string, error: unknown) {
+async function markSquareEventFailed(siteId: string, eventId: string) {
   await prisma.squareWebhookEvent.update({
-    where: { eventId },
+    where: { siteId_eventId: { siteId, eventId } },
     data: {
-      error: error instanceof Error ? error.message.slice(0, 1000) : "Square webhook handling failed.",
+      error: "Square webhook handling failed.",
       processedAt: null,
       status: SquareWebhookEventStatus.FAILED
     }
   });
 }
 
-async function findSquarePayment(payment: SquarePayment, siteId?: string) {
+async function findSquarePayment(payment: SquarePayment, siteId: string) {
   const identifiers = [payment.id, payment.order_id].filter(Boolean) as string[];
   if (!identifiers.length) return null;
 
   return prisma.payment.findFirst({
     where: {
       provider: PaymentProvider.SQUARE,
-      ...(siteId ? { order: { siteId } } : {}),
+      order: { siteId },
       OR: [
         { externalPaymentId: { in: identifiers } },
         { externalCheckoutSession: { in: identifiers } }
@@ -568,39 +567,37 @@ async function findSquarePayment(payment: SquarePayment, siteId?: string) {
   });
 }
 
-async function findSquareBillingPayment(payment: SquarePayment, siteId?: string) {
-  const identifiers = [payment.id, payment.order_id].filter(Boolean) as string[];
-  if (!identifiers.length) return null;
-
-  return prisma.billingPayment.findFirst({
+async function findSquareBillingPayment(payment: SquarePayment, siteId: string) {
+  if (!payment.id) return null;
+  const matches = await prisma.billingPayment.findMany({
     where: {
       provider: PaymentProvider.SQUARE,
-      ...(siteId ? { billingDocument: { siteId } } : {}),
+      billingDocument: { siteId },
       OR: [
-        { externalPaymentId: { in: identifiers } },
-        { externalCheckoutSession: { in: identifiers } }
+        { externalPaymentId: payment.id },
+        ...(payment.order_id ? [
+          { externalOrderId: payment.order_id },
+          { externalOrderId: null, externalPaymentId: payment.order_id, externalCheckoutSession: { not: null } }
+        ] : [])
       ]
     },
     include: { billingDocument: true },
-    orderBy: { createdAt: "asc" }
+    take: 2
   });
+  const match = matches[0];
+  if (matches.length !== 1 || !match) return null;
+  const orderId = match.externalOrderId ||
+    metadataObject(metadataObject(match.rawSummary).payment ?? null).orderId ||
+    metadataObject(metadataObject(match.rawSummary).checkoutSession ?? null).orderId;
+  if (orderId && payment.order_id && orderId !== payment.order_id) return null;
+  if (match.externalPaymentId && match.externalPaymentId !== payment.id &&
+      (match.externalOrderId || match.externalPaymentId !== payment.order_id)) return null;
+  return match;
 }
 
-async function handleSquarePaymentUpdated(event: SquareWebhookEvent, payment: SquarePayment, siteId?: string) {
-  if (payment.status !== "COMPLETED") {
-    if (payment.status === "FAILED" || payment.status === "CANCELED") {
-      const billingPayment = await findSquareBillingPayment(payment, siteId);
-      if (billingPayment) {
-        await markBillingPaymentFailed({
-          billingPaymentId: billingPayment.id,
-          externalPaymentId: payment.id || billingPayment.externalPaymentId || undefined,
-          rawSummary: squareEventSummary(event),
-          siteId: billingPayment.billingDocument.siteId
-        });
-      }
-    }
-    return;
-  }
+async function handleSquarePaymentUpdated(event: SquareWebhookEvent, payment: SquarePayment, siteId: string) {
+  // A failed card attempt does not close its reusable Square payment link.
+  if (payment.status !== "COMPLETED") return;
 
   const orderPayment = await findSquarePayment(payment, siteId);
   if (orderPayment) {
@@ -650,25 +647,43 @@ async function handleSquarePaymentUpdated(event: SquareWebhookEvent, payment: Sq
 
   await settleBillingPayment({
     billingPaymentId: billingPayment.id,
-    externalPaymentId: payment.id || billingPayment.externalPaymentId || undefined,
+    capturedAt: new Date(payment.created_at || event.created_at || ""),
+    externalOrderId: payment.order_id,
+    externalPaymentId: payment.id,
     hostedReceiptUrl: payment.receipt_url || billingPayment.hostedReceiptUrl || undefined,
     rawSummary: squareEventSummary(event),
     siteId: billingPayment.billingDocument.siteId
   });
 }
 
-async function handleSquareRefundUpdated(event: SquareWebhookEvent, refund: SquareRefund, siteId?: string) {
-  if (refund.status !== "COMPLETED" || !refund.payment_id) return;
+export async function closeSquareBookingCheckout(siteId: string, linkId: string, orderId: string) {
+  const { credential } = await getSquareAccessToken(siteId);
+  const { order } = await squareFetch<{ order?: { id?: string; state?: string; location_id?: string; tenders?: unknown[] } }>(
+    siteId, `/v2/orders/${encodeURIComponent(orderId)}`, { signal: AbortSignal.timeout(10_000) }
+  );
+  if (order?.id !== orderId || order.location_id !== squareLocationId(credential)) throw new Error("Square checkout identity changed.");
+  if (order.tenders?.length || order.state === "COMPLETED") return false;
+  if (order.state === "CANCELED") return true;
+  if (order.state !== "OPEN") return false;
+  const closed = await squareFetch<{ id?: string; cancelled_order_id?: string }>(
+    siteId, `/v2/online-checkout/payment-links/${encodeURIComponent(linkId)}`, { method: "DELETE", signal: AbortSignal.timeout(10_000) }
+  );
+  return closed.id === linkId && closed.cancelled_order_id === orderId;
+}
+
+async function handleSquareRefundUpdated(event: SquareWebhookEvent, refund: SquareRefund, siteId: string) {
+  if (!refund.payment_id) return;
 
   const orderPayment = await prisma.payment.findFirst({
     where: {
       externalPaymentId: refund.payment_id,
-      ...(siteId ? { order: { siteId } } : {}),
+      order: { siteId },
       provider: PaymentProvider.SQUARE
     },
     include: { order: { include: { gallerySelectionPurchase: { select: { id: true } } } } }
   });
   if (orderPayment) {
+    if (refund.status !== "COMPLETED") return;
     await revokeGalleryPurchaseForRefund({ orderId: orderPayment.orderId, siteId: orderPayment.order.siteId,
       amountCents: refund.amount_money?.amount || 0, currency: refund.amount_money?.currency || "", paymentCurrency: orderPayment.currency });
     const isFullRefund = (refund.amount_money?.amount || 0) >= orderPayment.amountCents;
@@ -693,24 +708,17 @@ async function handleSquareRefundUpdated(event: SquareWebhookEvent, refund: Squa
   const billingPayment = await prisma.billingPayment.findFirst({
     where: {
       externalPaymentId: refund.payment_id,
-      ...(siteId ? { billingDocument: { siteId } } : {}),
+      billingDocument: { siteId },
       provider: PaymentProvider.SQUARE
     }
   });
   // Refunds can precede the paid event that binds Square payment ID to the local attempt.
   // Keep this event retryable rather than acknowledging and losing revocation evidence.
   if (!billingPayment) throw new Error("Square refund payment record not found; retry after payment reconciliation.");
-  const isFullRefund = (refund.amount_money?.amount || 0) >= billingPayment.amountCents;
-  await prisma.billingPayment.update({
-    where: { id: billingPayment.id },
-    data: {
-      rawSummary: squareEventSummary(event),
-      status: isFullRefund ? PaymentStatus.REFUNDED : billingPayment.status
-    }
-  });
+  await recordBillingRefund(siteId, billingPayment.id, refund.payment_id, squareRefundObservation(refund));
 }
 
-async function dispatchSquareEvent(event: SquareWebhookEvent, siteId?: string) {
+async function dispatchSquareEvent(event: SquareWebhookEvent, siteId: string) {
   const payment = event.data?.object?.payment;
   if ((event.type === "payment.updated" || event.type === "payment.created") && payment) {
     await handleSquarePaymentUpdated(event, payment, siteId);
@@ -723,16 +731,16 @@ async function dispatchSquareEvent(event: SquareWebhookEvent, siteId?: string) {
   }
 }
 
-export async function handleSquareWebhookEvent(event: SquareWebhookEvent, siteId?: string) {
-  const claim = await claimSquareEvent(event);
+export async function handleSquareWebhookEvent(event: SquareWebhookEvent, siteId: string) {
+  const claim = await claimSquareEvent(event, siteId);
   if (!claim.claimed) return { duplicate: true };
 
   try {
     await dispatchSquareEvent(event, siteId);
-    await markSquareEventProcessed(claim.eventId);
+    await markSquareEventProcessed(siteId, claim.eventId);
     return { duplicate: false };
   } catch (error) {
-    await markSquareEventFailed(claim.eventId, error);
+    await markSquareEventFailed(siteId, claim.eventId);
     throw error;
   }
 }
@@ -750,6 +758,7 @@ async function createSquareGatewayCheckoutSession(input: PaymentGatewayCheckoutI
   const result = await createSquareCheckoutSessionForBillingDocument({
     amountCents: input.amountCents,
     billingDocumentId: input.billingDocumentId,
+    recoveryOnly: input.recoveryOnly,
     siteId: input.siteId
   });
 
@@ -807,48 +816,36 @@ async function refundSquareGatewayPayment(input: { amountCents?: number; payment
     return response.refund;
   }
 
-  const billingPayment = await prisma.billingPayment.findFirst({
-    where: {
-      billingDocument: { siteId: input.siteId },
-      id: input.paymentId,
-      provider: PaymentProvider.SQUARE
-    },
-    include: { billingDocument: true }
-  });
-  if (!billingPayment) throw new Error("Square payment record not found for refund.");
-  if (!billingPayment.externalPaymentId) throw new Error("Square payment id is missing for this billing payment.");
+  throw new Error("Square order payment not found for refund.");
+}
 
-  const amountCents = input.amountCents || billingPayment.amountCents;
-  const response = await squareFetch<{ refund?: SquareRefund }>(billingPayment.billingDocument.siteId, "/v2/refunds", {
-    body: JSON.stringify({
-      amount_money: {
-        amount: amountCents,
-        currency: assertSquareCurrency(billingPayment.currency)
-      },
-      idempotency_key: `refund_${billingPayment.id}_${amountCents}`,
-      payment_id: billingPayment.externalPaymentId
-    }),
-    method: "POST"
-  });
-  const isFullRefund = amountCents >= billingPayment.amountCents;
-  await prisma.billingPayment.update({
-    where: { id: billingPayment.id },
-    data: {
-      rawSummary: {
-        refund: response.refund || {},
-        strategy: "square_refund_billing_document"
-      },
-      status: isFullRefund ? PaymentStatus.REFUNDED : billingPayment.status
-    }
-  });
+function squareRefundObservation(refund: SquareRefund): BillingRefundObservation {
+  return {
+    externalRefundId: refund.id || "", amountCents: refund.amount_money?.amount || 0,
+    currency: refund.amount_money?.currency || "", providerCreatedAt: new Date(refund.created_at || ""),
+    status: refund.status === "COMPLETED" ? "SUCCEEDED" : refund.status === "FAILED" || refund.status === "REJECTED" ? "FAILED" : "PENDING"
+  };
+}
 
-  return response.refund;
+async function refundSquareBilling(input: GatewayBillingRefundInput) {
+  const signal = AbortSignal.timeout(10_000);
+  const response = input.externalRefundId
+    ? await squareFetch<{ refund?: SquareRefund }>(input.siteId, `/v2/refunds/${encodeURIComponent(input.externalRefundId)}`, { signal })
+    : await squareFetch<{ refund?: SquareRefund }>(input.siteId, "/v2/refunds", {
+      body: JSON.stringify({
+        amount_money: { amount: input.amountCents, currency: assertSquareCurrency(input.currency) },
+        idempotency_key: input.requestId, payment_id: input.captureId
+      }), method: "POST", signal
+    });
+  if (!response.refund || response.refund.payment_id !== input.captureId) throw new Error("Square refund capture does not match.");
+  return squareRefundObservation(response.refund);
 }
 
 export const squarePaymentGateway: PaymentGateway = {
   provider: PaymentProvider.SQUARE,
   createCheckoutSession: createSquareGatewayCheckoutSession,
-  handleWebhookEvent: async (event: unknown) => handleSquareWebhookEvent(event as SquareWebhookEvent),
+  handleWebhookEvent: ({ event, siteId }) => handleSquareWebhookEvent(event as SquareWebhookEvent, siteId),
+  refundBilling: refundSquareBilling,
   refund: async (input) => refundSquareGatewayPayment(input),
   supportedWallets: async () => ["APPLE_PAY", "GOOGLE_PAY", "CASH_APP_PAY"] satisfies PaymentWallet[],
   verifyWebhook: ({ rawBody, signature }) => constructSquareWebhookEvent(rawBody, signature)

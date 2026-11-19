@@ -1,4 +1,5 @@
 import type { PaymentProvider } from "@prisma/client";
+import type { BillingRefundObservation } from "@/lib/billing/refund-ledger";
 
 export type PaymentWallet = "APPLE_PAY" | "GOOGLE_PAY" | "CASH_APP_PAY";
 
@@ -13,6 +14,7 @@ export type PaymentGatewayCheckoutInput =
       billingDocumentId: string;
       kind: "billing_document";
       siteId?: string;
+      recoveryOnly?: boolean;
     };
 
 export type PaymentGatewayCheckoutSession = {
@@ -29,17 +31,33 @@ export type PaymentGatewayWebhookInput = {
   siteId?: string;
 };
 
+export type VerifiedPaymentWebhook = {
+  event: unknown;
+  siteId: string;
+  environment: string;
+};
+
 export type PaymentGatewayRefundInput = {
   amountCents?: number;
   paymentId: string;
   siteId: string;
 };
 
+export type GatewayBillingRefundInput = {
+  amountCents: number;
+  captureId: string;
+  currency: string;
+  externalRefundId: string | null;
+  requestId: string;
+  siteId: string;
+};
+
 export type PaymentGateway = {
   provider: PaymentProvider;
   createCheckoutSession(input: PaymentGatewayCheckoutInput): Promise<PaymentGatewayCheckoutSession>;
-  handleWebhookEvent(event: unknown): Promise<unknown>;
+  handleWebhookEvent(input: VerifiedPaymentWebhook): Promise<unknown>;
   refund(input: PaymentGatewayRefundInput): Promise<unknown>;
+  refundBilling(input: GatewayBillingRefundInput): Promise<BillingRefundObservation>;
   supportedWallets(siteId?: string): Promise<PaymentWallet[]>;
-  verifyWebhook(input: PaymentGatewayWebhookInput): Promise<unknown> | unknown;
+  verifyWebhook(input: PaymentGatewayWebhookInput): Promise<VerifiedPaymentWebhook>;
 };

@@ -12,7 +12,7 @@ function load(file: string, mocks: Record<string, unknown>, extra = "", globals:
   const code = ts.transpileModule(readFileSync(file, "utf8") + extra, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
   const exports: any = {};
   const realRequire = createRequire(import.meta.url);
-  runInNewContext(code, { exports, console, Date, URL, URLSearchParams, Buffer, process, Headers, structuredClone,
+  runInNewContext(code, { exports, console, Date, URL, URLSearchParams, Buffer, AbortSignal, process, Headers, structuredClone,
     fetch: () => { throw new Error("Real provider calls are forbidden in tests"); }, ...globals,
     require: (name: string) => name in mocks ? mocks[name] : name === "server-only" || name.startsWith("@/") || name === "./orders" ? {} : realRequire(name) });
   return exports;

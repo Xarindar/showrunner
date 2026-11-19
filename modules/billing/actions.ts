@@ -10,7 +10,7 @@ import {
   generateBillingPublicToken,
   snapshotBillingDocument
 } from "@/lib/billing/documents";
-import { isRejectedCapturedPayment } from "@/lib/billing/payments";
+import { reserveBillingRefund } from "@/lib/billing/refund-ledger";
 import { updateBillingDocumentStatus } from "@/lib/billing/status";
 import {
   currencyCode,
@@ -24,7 +24,6 @@ import {
   zeroableMoneyCents
 } from "@/lib/admin-validation";
 import { requireAdmin } from "@/lib/auth";
-import { refundPaymentGatewayPayment } from "@/lib/payments/refunds";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
 
@@ -131,6 +130,7 @@ const billingCheckoutClearSchema = z.object({
 
 const billingRefundSchema = z.object({
   paymentId: requiredText,
+  requestId: z.uuid(),
   amount: moneyCents
 });
 
@@ -557,20 +557,6 @@ function billingPaymentAuditSnapshot(payment: {
   };
 }
 
-async function rollbackBillingRefundReservation(input: {
-  amountCents: number;
-  paymentId: string;
-  status: PaymentStatus;
-}) {
-  await prisma.billingPayment.update({
-    where: { id: input.paymentId },
-    data: {
-      refundedCents: { decrement: input.amountCents },
-      status: input.status
-    }
-  });
-}
-
 export async function refundBillingPaymentAction(formData: FormData) {
   const user = await requireAdmin("billing:manage");
   const input = await parseForm(billingRefundSchema, formData, "/admin/modules/billing");
@@ -578,78 +564,17 @@ export async function refundBillingPaymentAction(formData: FormData) {
   let documentId = "";
 
   try {
-    const payment = await prisma.billingPayment.findFirst({
-      where: {
-        id: input.paymentId,
-        billingDocument: { siteId }
-      },
-      include: { billingDocument: true }
+    const { payment, created } = await reserveBillingRefund({
+      siteId, paymentId: input.paymentId, requestId: input.requestId, amountCents: input.amount
     });
-
-    if (!payment) throw new Error("Billing payment not found.");
     documentId = payment.billingDocumentId;
-    const rejectedButCaptured = isRejectedCapturedPayment(payment);
-    if (payment.status !== PaymentStatus.PAID && payment.status !== PaymentStatus.AUTHORIZED && !rejectedButCaptured) {
-      throw new Error("Only paid billing payments can be refunded.");
-    }
-
-    const remainingCents = rejectedButCaptured ? payment.amountCents : Math.max(0, payment.amountCents - payment.refundedCents);
-    if (input.amount <= 0 || input.amount > remainingCents) {
-      throw new Error("Refund amount must be greater than zero and no more than the refundable balance.");
-    }
-
-    const before = billingPaymentAuditSnapshot(payment);
-    const reserved = await prisma.billingPayment.updateMany({
-      where: {
-        id: payment.id,
-        billingDocument: { siteId },
-        status: rejectedButCaptured ? PaymentStatus.FAILED : { in: [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] },
-        refundedCents: { lte: payment.amountCents - input.amount }
-      },
-      data: {
-        refundedCents: { increment: input.amount }
-      }
-    });
-    if (reserved.count !== 1) {
-      throw new Error("Refund amount is no longer available. Reload and try again.");
-    }
-
-    try {
-      await refundPaymentGatewayPayment({
-        amountCents: input.amount,
-        paymentId: payment.id,
-        provider: payment.provider,
-        siteId
-      });
-    } catch (refundError) {
-      await rollbackBillingRefundReservation({
-        amountCents: input.amount,
-        paymentId: payment.id,
-        status: payment.status
-      });
-      throw refundError;
-    }
-
-    await prisma.billingPayment.updateMany({
-      where: {
-        id: payment.id,
-        refundedCents: { gte: payment.amountCents },
-        status: rejectedButCaptured ? PaymentStatus.FAILED : { in: [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] }
-      },
-      data: { status: PaymentStatus.REFUNDED }
-    });
-
-    const afterPayment = await prisma.billingPayment.findUniqueOrThrow({
-      where: { id: payment.id },
-      include: { billingDocument: true }
-    });
-    await recordAuditLog({
-      action: "billing.payment_refunded",
+    if (created) await recordAuditLog({
+      action: "billing.payment_refund_requested",
       actor: user,
       metadata: {
         amountCents: input.amount,
-        after: billingPaymentAuditSnapshot(afterPayment),
-        before,
+        requestId: input.requestId,
+        before: billingPaymentAuditSnapshot(payment),
         currency: payment.currency,
         provider: payment.provider
       },
@@ -659,7 +584,8 @@ export async function refundBillingPaymentAction(formData: FormData) {
       targetType: "billing_payment"
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not refund that billing payment.";
+    const message = error instanceof Error && !(error instanceof Prisma.PrismaClientKnownRequestError)
+      ? error.message : "Could not queue that billing refund.";
     redirect(`/admin/modules/billing${documentId ? `?document=${documentId}&` : "?"}error=${encodeURIComponent(message)}`);
   }
 

@@ -1,3 +1,4 @@
+import { readBoundedText, RequestBodyTooLarge } from "@/lib/api/bounded-body";
 import type { NextRequest } from "next/server";
 import { authorizeEmbedRequest, embedError, embedJson, EmbedRequestError, handleEmbedPreflight, type EmbedContext } from "@/lib/embed/gateway";
 import { createPublicSchedulingBooking, hasPublicSchedulingBookingHoneypot } from "@/lib/embed/public-scheduling";
@@ -20,8 +21,9 @@ export async function POST(request: NextRequest) {
 
     let body: unknown;
     try {
-      body = await request.json();
-    } catch {
+      body = JSON.parse(await readBoundedText(request, 256 * 1024));
+    } catch (error) {
+      if (error instanceof RequestBodyTooLarge) throw new EmbedRequestError("Booking request is too large.", 413);
       throw new EmbedRequestError("Send a valid JSON booking request.", 400);
     }
 

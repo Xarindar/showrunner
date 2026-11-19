@@ -25,6 +25,7 @@ export async function createPaymentCheckoutSessionForBillingDocument(input: {
   billingDocumentId: string;
   provider?: PaymentProvider;
   siteId?: string;
+  recoveryOnly?: boolean;
 }) {
   const provider = input.siteId ? await resolvePaymentProviderForSite(input.siteId, input.provider) : input.provider || PaymentProvider.STRIPE;
   const gateway = getPaymentGateway(provider);
@@ -32,6 +33,7 @@ export async function createPaymentCheckoutSessionForBillingDocument(input: {
     amountCents: input.amountCents,
     billingDocumentId: input.billingDocumentId,
     kind: "billing_document",
+    recoveryOnly: input.recoveryOnly,
     siteId: input.siteId
   });
 

@@ -4,7 +4,8 @@ import { publicAppBaseUrl } from "@/lib/env";
 
 const events: Stripe.WebhookEndpointCreateParams.EnabledEvent[] = [
   "checkout.session.completed", "checkout.session.async_payment_succeeded",
-  "checkout.session.expired", "payment_intent.payment_failed", "charge.refunded"
+  "checkout.session.expired", "checkout.session.async_payment_failed", "payment_intent.payment_failed",
+  "charge.refunded", "refund.created", "refund.updated", "refund.failed"
 ];
 
 export async function provisionStripeWebhook(stripe: Stripe, previous: { id: string; secret: string } | null) {

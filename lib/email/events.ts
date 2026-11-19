@@ -54,6 +54,7 @@ type OrderForEmail = {
 type BookingStatusEmailOptions = {
   idempotencyKey?: string;
   logLabel?: string;
+  retryOnError?: boolean;
   templateKey?: string;
 };
 
@@ -107,7 +108,8 @@ async function bookingTokens(booking: BookingForEmail): Promise<EmailTokens> {
   };
 }
 
-async function logQueueError(label: string, callback: () => Promise<void>) {
+async function logQueueError(label: string, callback: () => Promise<void>, retryOnError?: boolean) {
+  if (retryOnError) return callback();
   try {
     await callback();
   } catch (error) {
@@ -115,7 +117,7 @@ async function logQueueError(label: string, callback: () => Promise<void>) {
   }
 }
 
-export async function queueBookingCreatedEmails(booking: BookingForEmail) {
+export async function queueBookingCreatedEmails(booking: BookingForEmail, retryOnError?: boolean) {
   const tokens = await bookingTokens(booking);
   const confirmed = booking.status === BookingStatus.CONFIRMED;
 
@@ -131,8 +133,9 @@ export async function queueBookingCreatedEmails(booking: BookingForEmail) {
         relatedType: "booking",
         relatedId: booking.id,
         tokens,
+        retryOnError,
         idempotencyKey: `booking:${booking.id}:${confirmed ? "confirmed" : "created"}:customer`
-      })
+      }), retryOnError
     ),
     logQueueError("booking-created-admin", () =>
       queueAdminEmail({
@@ -142,8 +145,9 @@ export async function queueBookingCreatedEmails(booking: BookingForEmail) {
         relatedType: "booking",
         relatedId: booking.id,
         tokens,
+        retryOnError,
         idempotencyKeyBase: `booking:${booking.id}:created`
-      })
+      }), retryOnError
     )
   ]);
 }
@@ -187,8 +191,9 @@ export async function queueBookingStatusEmail(
         relatedType: "booking",
         relatedId: booking.id,
         tokens,
+        retryOnError: options.retryOnError,
         idempotencyKey: `booking:${booking.id}:confirmed:customer`
-      })
+      }), options.retryOnError
     );
   }
 
@@ -266,6 +271,7 @@ export async function queueBillingDocumentEmail(input: {
   siteId?: string;
   publicUrl: string;
   idempotencyKey: string;
+  retryOnError?: boolean;
 }) {
   const settings = await settingsForSite(input.siteId);
   const dueAt = input.document.dueAt ? formatDateTime(input.document.dueAt, settings.timezone) : "No due date";
@@ -294,8 +300,9 @@ export async function queueBillingDocumentEmail(input: {
       relatedType: "billingDocument",
       relatedId: input.document.id,
       tokens,
+      retryOnError: input.retryOnError,
       idempotencyKey: input.idempotencyKey
-    })
+    }), input.retryOnError
   );
 }
 
