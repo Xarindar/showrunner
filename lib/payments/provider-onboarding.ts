@@ -216,10 +216,13 @@ async function paypalVerify(environment: PayPalEnvironment, clientId: string, cl
     method: "POST",
     signal: AbortSignal.timeout(10_000)
   });
-  const text = await response.text();
-  const body = text ? (JSON.parse(text) as { access_token?: string; error_description?: string }) : {};
-  if (!response.ok || !body.access_token) {
-    throw new Error(body.error_description || "PayPal rejected that client ID / secret pair.");
+  const body = await response.json().catch(() => null) as { access_token?: string; error?: string } | null;
+  if (body?.error === "invalid_client" || response.status === 401) {
+    const mode = environment === "live" ? "Live" : "Sandbox";
+    throw new Error(`PayPal rejected these credentials. Copy the Client ID and Secret from the same ${mode} app and try again.`);
+  }
+  if (!response.ok || !body?.access_token) {
+    throw new Error("PayPal could not verify this connection. Try again in a moment.");
   }
   return body.access_token;
 }
