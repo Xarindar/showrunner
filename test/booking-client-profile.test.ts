@@ -25,7 +25,10 @@ function harness(options: { hourly?: boolean; existing?: boolean; existingCompan
     coverageItems: [], tiers: [{ id: "hourly", name: "Hourly", pricingType: "HOURLY", hourlyRateId: "venue", durationMinutes: 60, priceCents: 10000, coverageIds: [] }],
     addOns: [{ id: "assistant", name: "Assistant", pricingType: "HOURLY", hourlyRateId: "help", priceCents: 2000 }]
   } });
+  const invoices: Query[] = [];
+  let emails = 0;
   const tx = {
+    billingDocument: { create: async (query: Query) => { invoices.push(query); } },
     service: {findFirst:async()=>service},
     client: {
       findUnique: async () => options.existing ? existing : null,
@@ -52,12 +55,12 @@ function harness(options: { hourly?: boolean; existing?: boolean; existingCompan
     return exports;
   }
   const client = load("../lib/clients/public-client.ts", { "server-only": {}, "@/lib/objects": { isRecord }, "@/lib/clients/status-settings": { normalizeClientStatusSettings } });
-  const native = load("../lib/scheduling/native.ts", { "./session-offering": sessionOffering, "./service-time-frame": timeFrames, "./booking-documents": bookingDocuments, "./booking-document-store": {listBookingDocuments:async(_siteId:string,transaction?:unknown)=>transaction&&options.changedDocuments ? (options.documents??[]).map(doc=>({...doc,version:doc.version+1})) : options.documents??[]}, "server-only": {}, "@/lib/clients/public-client": client, "@/lib/email": { queueBookingCreatedEmails: async () => {} }, "@/lib/prisma": { prisma: db }, "@/lib/scheduling/google-calendar": {}, "@/lib/site": {getSiteSettingsForSite:async()=>({timezone:"America/Chicago"})}, "@/lib/timezone": {} });
-  const adapter = native.nativeSchedulingAdapter as { getAvailableSlots: () => Promise<unknown[]>; createBooking: (input: unknown) => Promise<{ clientId: string; serviceId: string }> };
+  const native = load("../lib/scheduling/native.ts", { "./session-offering": sessionOffering, "./service-time-frame": timeFrames, "./booking-documents": bookingDocuments, "./booking-document-store": {listBookingDocuments:async(_siteId:string,transaction?:unknown)=>transaction&&options.changedDocuments ? (options.documents??[]).map(doc=>({...doc,version:doc.version+1})) : options.documents??[]}, "server-only": {}, "@/lib/clients/public-client": client, "@/lib/email": { queueBookingCreatedEmails: async () => { emails++; } }, "@/lib/billing/documents": { generateBillingPublicToken: () => "payment-token" }, "@/lib/prisma": { prisma: db }, "@/lib/scheduling/google-calendar": {}, "@/lib/site": {getSiteSettingsForSite:async()=>({timezone:"America/Chicago"})}, "@/lib/timezone": {} });
+  const adapter = native.nativeSchedulingAdapter as { getAvailableSlots: () => Promise<unknown[]>; createBooking: (input: unknown) => Promise<{ clientId: string; serviceId: string; paymentToken?: string }> };
   const startsAt = new Date("2030-05-01T15:00:00Z");
   adapter.getAvailableSlots = async (...args: unknown[]) => [{ startsAt, endsAt: new Date(startsAt.getTime() + ((args[2] as { durationMinutes?: number } | undefined)?.durationMinutes ?? 60) * 60000), resourceIds: [] }];
   const book = (extra:Record<string,unknown>={}) => adapter.createBooking({ siteId: "jazzr", serviceId: "portrait", startsAt, customerName: "New client", customerEmail: "CLIENT@EXAMPLE.COM", customerPhone: "12345", ...extra });
-  return { book, service, committed, writes, settingQueries, serviceQueries, bookingWrites };
+  return { book, service, committed, writes, settingQueries, serviceQueries, bookingWrites, invoices, get emails() { return emails; } };
 }
 
 test("public hourly bookings validate customer duration and price hourly add-ons for the full reserved length", async () => {
@@ -71,6 +74,28 @@ test("public hourly bookings validate customer duration and price hourly add-ons
   assert.equal(data.packageSnapshot.durationMinutes, 150);
   assert.equal(data.packageSnapshot.hourlyRate.amountCents, 10000);
   assert.equal(data.packageSnapshot.extras[0].priceCents, 5000);
+});
+
+test("paid booking reserves a slot with the computed total and defers confirmation and request checkout", async () => {
+  const app = harness({ hourly: true });
+  const booking = { tierId: "hourly", durationMinutes: 150, addOnIds: ["assistant"] };
+  await assert.rejects(app.book({ ...booking, onlinePayment: { checkoutSupported: false } }), /current checkout/);
+  assert.equal(app.bookingWrites.length, 0);
+
+  const onlinePayment = { checkoutSupported: true };
+  assert.equal((await app.book({ ...booking, onlinePayment })).paymentToken, "payment-token");
+  assert.equal(app.bookingWrites[0].data?.status, "PENDING");
+  assert.equal(app.invoices[0].data?.totalCents, 30000);
+  assert.equal(app.invoices[0].data?.bookingId, "booking-a");
+  assert.equal(app.invoices[0].data?.status, "SENT");
+  assert.equal(app.emails, 0);
+
+  const request = harness({ hourly: true });
+  Object.assign(request.service, { requestOnly: true });
+  assert.equal((await request.book({ ...booking, onlinePayment })).paymentToken, undefined);
+  assert.equal(request.invoices[0].data?.status, "DRAFT");
+  assert.equal(request.invoices[0].data?.bookingApprovalRequired, true);
+  assert.equal(request.emails, 1);
 });
 
 test("session booking creates a site-scoped profile with collected details, service and configured status", async () => {

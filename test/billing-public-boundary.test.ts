@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
-test("billing cannot queue customer links when the public document route is absent", () => {
-  if (existsSync("app/billing/[token]/page.tsx")) return;
+test("public checkout links are scoped to booking invoices", () => {
+  const route = readFileSync("lib/bookings/payment.ts", "utf8");
+  assert.match(route, /where: \{ publicAccessToken: token, bookingId: \{ not: null \}, status: \{ not: "DRAFT" \} \}/);
   const actions = readFileSync("modules/billing/actions.ts", "utf8");
   const page = readFileSync("modules/billing/page.tsx", "utf8");
   assert(!actions.includes("queueBillingDocumentEmail"), "Do not email links to a retired route");

@@ -1,8 +1,10 @@
 import "server-only";
 
-import { BillingDocumentStatus, PaymentStatus, Prisma } from "@prisma/client";
+import { BillingDocumentStatus, BookingStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { snapshotBillingDocument } from "@/lib/billing/documents";
 import { prisma } from "@/lib/prisma";
+import { queueBookingCreatedEmails, queueBookingStatusEmail } from "@/lib/email";
+import { emitModuleEvent } from "@/lib/events/emit";
 
 const PAID_STATUSES = [PaymentStatus.PAID, PaymentStatus.AUTHORIZED] satisfies PaymentStatus[];
 const PENDING_PAYMENT_RESERVATION_MS = 30 * 60 * 1000;
@@ -12,6 +14,23 @@ export type BillingPaymentSummary = {
   reservedCents: number;
   remainingCents: number;
 };
+
+export async function assertBookingCheckout(
+  tx: Prisma.TransactionClient,
+  document: { bookingId: string | null; dueAt: Date | null; totalCents: number; payments: { status: PaymentStatus; externalCheckoutSession: string | null }[] },
+  amountCents: number
+) {
+  if (!document.bookingId) return;
+  const booking = await tx.booking.findUnique({ where: { id: document.bookingId }, select: { status: true, startsAt: true } });
+  const now = new Date();
+  if (booking?.status !== BookingStatus.PENDING || booking.startsAt <= now || (document.dueAt && document.dueAt <= now)) {
+    throw new Error("This booking hold expired.");
+  }
+  if (amountCents !== document.totalCents) throw new Error("Booking payments must cover the total due.");
+  if (document.payments.some((payment) => payment.status === PaymentStatus.PENDING && payment.externalCheckoutSession)) {
+    throw new Error("This booking already has an active checkout.");
+  }
+}
 
 export async function getBillingPaymentSummary(
   tx: Prisma.TransactionClient,
@@ -68,13 +87,15 @@ export async function settleBillingPayment(input: {
         id: input.billingPaymentId,
         billingDocument: { siteId: input.siteId }
       },
-      include: { billingDocument: true }
+      include: { billingDocument: { include: { booking: { include: { service: true } } } } }
     });
 
     if (!payment) throw new Error("Billing payment target not found.");
     if (payment.status === PaymentStatus.PAID || payment.status === PaymentStatus.AUTHORIZED) {
       return {
         rejected: false,
+        booking: payment.billingDocument.booking,
+        requestOnly: payment.billingDocument.bookingApprovalRequired,
         summary: await getBillingPaymentSummary(tx, payment.billingDocumentId)
       };
     }
@@ -83,7 +104,12 @@ export async function settleBillingPayment(input: {
     }
 
     const beforeSettle = await getBillingPaymentSummary(tx, payment.billingDocumentId);
-    if (beforeSettle.remainingCents <= 0 || payment.amountCents > beforeSettle.remainingCents) {
+    const booking = payment.billingDocument.booking;
+    const closedBooking = payment.billingDocument.bookingId && (
+      !booking || booking.status !== BookingStatus.PENDING ||
+      payment.billingDocument.status !== BillingDocumentStatus.SENT
+    );
+    if (closedBooking || beforeSettle.remainingCents <= 0 || payment.amountCents > beforeSettle.remainingCents) {
       await tx.billingPayment.update({
         where: { id: payment.id },
         data: {
@@ -93,6 +119,7 @@ export async function settleBillingPayment(input: {
           rawSummary: {
             ...(typeof input.rawSummary === "object" && input.rawSummary && !Array.isArray(input.rawSummary) ? input.rawSummary : {}),
             rejectedReason: "payment_would_exceed_remaining_balance",
+            ...(closedBooking ? { bookingClosed: true } : {}),
             remainingCentsBeforeSettle: beforeSettle.remainingCents,
             attemptedAmountCents: payment.amountCents
           },
@@ -124,6 +151,12 @@ export async function settleBillingPayment(input: {
       payment.billingDocument.status !== BillingDocumentStatus.VOID;
 
     if (shouldMarkPaid) {
+      if (booking) {
+        await tx.booking.update({
+          where: { id: booking.id },
+          data: { status: BookingStatus.CONFIRMED }
+        });
+      }
       await tx.billingDocument.update({
         where: { id: payment.billingDocumentId },
         data: {
@@ -140,12 +173,29 @@ export async function settleBillingPayment(input: {
 
     return {
       rejected: false,
+      requestOnly: payment.billingDocument.bookingApprovalRequired,
+      booking: booking && shouldMarkPaid ? { ...booking, status: BookingStatus.CONFIRMED } : null,
       summary
     };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
   if (result.rejected) {
     throw new Error("Billing payment would exceed the remaining document balance.");
+  }
+
+  if (result.booking?.status === BookingStatus.CONFIRMED) {
+    const booking = result.booking;
+    if (result.requestOnly) await queueBookingStatusEmail(booking, BookingStatus.PENDING);
+    else await queueBookingCreatedEmails(booking);
+    const event = result.requestOnly ? "booking.request.approved" : "booking.created";
+    await emitModuleEvent(event, {
+      idempotencyKey: `${event}:${booking.id}`,
+      actorEmail: booking.customerEmail,
+      metadata: { serviceId: booking.serviceId, startsAt: booking.startsAt.toISOString(), status: booking.status },
+      relatedId: booking.id,
+      relatedType: "booking",
+      siteId: booking.siteId
+    });
   }
 
   return result.summary;

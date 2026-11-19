@@ -11,6 +11,7 @@ import { timeFrameMinutes, timeFrameDays, timeFrameCovered } from "./service-tim
 import { BookingStatus, Prisma, SchedulingCalendarOwnerType } from "@prisma/client";
 import { upsertPublicClient } from "@/lib/clients/public-client";
 import { queueBookingCreatedEmails } from "@/lib/email";
+import { generateBillingPublicToken } from "@/lib/billing/documents";
 import { prisma } from "@/lib/prisma";
 import { listGoogleBusyWindows } from "@/lib/scheduling/google-calendar";
 import { getCurrentSiteId, getSiteSettings, getSiteSettingsForSite } from "@/lib/site";
@@ -451,6 +452,14 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
     }
     catch (error) { throw new BookingRuleAnswerError(error instanceof Error ? error.message : "Choose a valid package."); }
     if (input.serviceRevision && input.serviceRevision !== service.updatedAt.toISOString()) throw new BookingRuleAnswerError("The session packages changed. Reload and review the current price before booking.");
+    const priceCents = packageSnapshot ? packageSnapshot.priceCents : servicePriceCents(service);
+    if (input.onlinePayment && (priceCents == null || priceCents < 0)) {
+      throw new BookingRuleAnswerError("This service does not have a bookable price. Contact us to schedule.");
+    }
+    const needsPayment = Boolean(input.onlinePayment && priceCents && priceCents > 0);
+    if (needsPayment && !input.onlinePayment?.checkoutSupported) {
+      throw new BookingRuleAnswerError("Reload the booking page to use the current checkout.");
+    }
     const assignedStaff = service.staffAssignments.map((assignment) => assignment.staff);
     const assignedResources = service.resourceAssignments.map((assignment) => assignment.resource);
     const selectedStaff = input.staffId ? assignedStaff.find((staff) => staff.id === input.staffId) : null;
@@ -567,12 +576,12 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
             serviceId: service.id
           });
 
-          return tx.booking.create({
+          const booking = await tx.booking.create({
             data: {
               siteId: service.siteId,
               clientId,
               serviceId: input.serviceId,
-              priceCents: packageSnapshot ? packageSnapshot.priceCents : servicePriceCents(service),
+              priceCents,
               ...(packageSnapshot ? { packageSnapshot: packageSnapshot as Prisma.InputJsonValue } : service.pricingType === "HOURLY" && service.hourlyRate ? { packageSnapshot: { tierId: "hourly", name: service.name, durationMinutes: service.durationMinutes, priceCents: servicePriceCents(service), coverage: [], extras: [], pricingType: "HOURLY", hourlyRate: { id: service.hourlyRate.id, name: service.hourlyRate.name, amountCents: service.hourlyRate.amountCents } } } : {}),
               sessionName: service.name,
               sessionLocation: input.sessionLocation ?? "",
@@ -594,7 +603,7 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
                 ...(input.photoMarketingConsent === undefined ? {} : { photoMarketingConsent: input.photoMarketingConsent })
               },
               policyAccepted: Boolean(input.policyAccepted),
-              status: input.status || (service.requestOnly ? BookingStatus.PENDING : BookingStatus.CONFIRMED),
+              status: input.status || (service.requestOnly || needsPayment ? BookingStatus.PENDING : BookingStatus.CONFIRMED),
               resources: requiredResourceIds.length
                 ? {
                     create: requiredResourceIds.map((resourceId) => ({
@@ -605,6 +614,28 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
                 : undefined
             }
           });
+          const paymentToken = needsPayment ? generateBillingPublicToken() : undefined;
+          if (paymentToken && priceCents != null) {
+            await tx.billingDocument.create({
+              data: {
+                siteId,
+                clientId,
+                bookingId: booking.id,
+                bookingApprovalRequired: service.requestOnly,
+                publicMemo: service.requestOnly ? "Your request was approved. Complete payment to confirm your booking." : undefined,
+                documentNumber: `BK-${booking.id}`,
+                publicAccessToken: paymentToken,
+                status: service.requestOnly ? "DRAFT" : "SENT",
+                dueAt: service.requestOnly ? undefined : new Date(Date.now() + 15 * 60 * 1000),
+                customerName: booking.customerName,
+                customerEmail: booking.customerEmail,
+                subtotalCents: priceCents,
+                totalCents: priceCents,
+                lineItems: { create: { description: packageSnapshot?.name || service.name, unitPriceCents: priceCents, lineTotalCents: priceCents } }
+              }
+            });
+          }
+          return { ...booking, paymentToken: service.requestOnly ? undefined : paymentToken, paymentAfterApproval: service.requestOnly && needsPayment };
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
       );
@@ -615,6 +646,8 @@ export const nativeSchedulingAdapter: SchedulingAdapter = {
       if (error instanceof Error) throw error;
       throw new Error("That time was just booked or blocked. Please choose another time.");
     }
+
+    if (booking.paymentToken) return booking;
 
     try {
       await queueBookingCreatedEmails({

@@ -47,6 +47,7 @@ test("availability batches stop at the first opening, cross months, and bound wo
     "@/lib/scheduling/booking-rules": bookingRules,
     "@/lib/scheduling/session-input": sessionInput,
     "@/lib/embed/gateway": { EmbedRequestError: RequestError },
+    "@/lib/bookings/payment": { bookingPaymentProvider: async () => "PAYPAL", releaseUnpaidBookingHolds: async () => {} },
     "@/lib/site": { getSiteSettingsForSite: async () => ({ timezone: "America/Chicago" }) },
     "@/lib/timezone": { parseZonedDateKey: (value: string) => new Date(`${value}T12:00:00Z`) },
     "@/lib/scheduling/native": { nativeSchedulingAdapter: { getSlotDiagnostics: async (_id: string, day: Date, options: { tierId?: string; siteId?: string; requireDuration?: boolean }) => {

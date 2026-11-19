@@ -188,10 +188,11 @@ async function recomputeDocumentTotals(tx: Prisma.TransactionClient, billingDocu
 async function requireDraftDocument(tx: Prisma.TransactionClient, billingDocumentId: string, siteId: string) {
   const document = await tx.billingDocument.findFirst({
     where: { id: billingDocumentId, siteId },
-    select: { status: true }
+    select: { status: true, bookingId: true }
   });
 
   if (!document) throw new Error("Billing document not found.");
+  if (document.bookingId) throw new Error("Manage this payment from the booking.");
   if (document.status !== BillingDocumentStatus.DRAFT) {
     throw new Error("Finalized billing documents cannot be edited.");
   }
@@ -327,10 +328,11 @@ export async function setBillingCheckoutLinkAction(formData: FormData) {
     await prisma.$transaction(async (tx) => {
       const document = await tx.billingDocument.findFirst({
         where: { id: input.id, siteId },
-        select: { status: true }
+        select: { bookingId: true, status: true }
       });
 
       if (!document) throw new Error("Billing document not found.");
+      if (document.bookingId) throw new Error("Manage this payment from the booking.");
       if (document.status === BillingDocumentStatus.DRAFT) {
         throw new Error("Send the document before attaching a hosted payment link.");
       }
@@ -366,10 +368,11 @@ export async function clearBillingCheckoutLinkAction(formData: FormData) {
     await prisma.$transaction(async (tx) => {
       const document = await tx.billingDocument.findFirst({
         where: { id: input.id, siteId },
-        select: { status: true }
+        select: { bookingId: true, status: true }
       });
 
       if (!document) throw new Error("Billing document not found.");
+      if (document.bookingId) throw new Error("Manage this payment from the booking.");
       if (document.status === BillingDocumentStatus.PAID || document.status === BillingDocumentStatus.VOID) {
         throw new Error("Finalized billing documents cannot be changed.");
       }

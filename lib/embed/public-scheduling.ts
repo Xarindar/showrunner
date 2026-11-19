@@ -1,4 +1,5 @@
 import "server-only";
+import { bookingPaymentProvider, bookingPaymentUrl, onlineBookingUnavailable, releaseUnpaidBookingHolds } from "@/lib/bookings/payment";
 import { getPackageFields } from "@/lib/scheduling/package-fields-store";
 import { listBookingDocuments } from "@/lib/scheduling/booking-document-store";
 import { resolveBookingRequirements } from "@/lib/scheduling/booking-documents";
@@ -28,6 +29,7 @@ import { parseZonedDateKey } from "@/lib/timezone";
 const hiddenHoneypotField = "companyWebsite";
 
 const bookingSchema = z.object({
+  checkoutSupported: z.literal(true).optional(),
   serviceId: z.string().min(1, "Choose a service."),
   tierId: z.string().min(1).max(100).optional(),
   durationMinutes: z.number().int().min(1).max(1440).optional(),
@@ -229,12 +231,13 @@ async function listPublicSchedulingCategoryRows(siteId: string) {
 }
 
 export async function listPublicSchedulingCatalog(siteId: string) {
-  const [services, serviceCategories, documents, packageFields, hourlyRates] = await Promise.all([
+  const [services, serviceCategories, documents, packageFields, hourlyRates, paymentProvider] = await Promise.all([
     nativeSchedulingAdapter.listActiveServices({ siteId }),
     listPublicSchedulingCategoryRows(siteId),
     listBookingDocuments(siteId),
     getPackageFields(siteId),
-    prisma.hourlyRate.findMany({ where: { siteId }, select: { id: true, name: true, amountCents: true } })
+    prisma.hourlyRate.findMany({ where: { siteId }, select: { id: true, name: true, amountCents: true } }),
+    bookingPaymentProvider(siteId)
   ]);
   const categoriesByName = new Map(serviceCategories.map((category) => [categoryKey(category.name), category]));
   const serializedServices = services.map(service=>{
@@ -269,7 +272,8 @@ export async function listPublicSchedulingCatalog(siteId: string) {
   return {
     categories,
     services: serializedServices,
-    packageFields
+    packageFields,
+    onlineBookingEnabled: Boolean(paymentProvider)
   };
 }
 
@@ -278,7 +282,7 @@ export async function listPublicSchedulingServices(siteId: string) {
   return catalog.services;
 }
 
-export async function getPublicSchedulingDiagnostics(input: {
+type PublicAvailabilityInput = {
   date: string | null;
   tierId?: string;
   durationMinutes?: number;
@@ -286,7 +290,19 @@ export async function getPublicSchedulingDiagnostics(input: {
   serviceId: string | null;
   siteId: string;
   staffId?: string;
-}) {
+};
+
+async function preparePublicAvailability(siteId: string) {
+  if (!await bookingPaymentProvider(siteId)) throw new EmbedRequestError(onlineBookingUnavailable, 503);
+  await releaseUnpaidBookingHolds(siteId);
+}
+
+export async function getPublicSchedulingDiagnostics(input: PublicAvailabilityInput) {
+  await preparePublicAvailability(input.siteId);
+  return readPublicAvailability(input);
+}
+
+async function readPublicAvailability(input: PublicAvailabilityInput) {
   if (!input.serviceId) throw new EmbedRequestError("serviceId is required.", 400);
   if (!input.date) throw new EmbedRequestError("date is required.", 400);
 
@@ -307,16 +323,17 @@ export async function getPublicSchedulingDiagnostics(input: {
   return serializePublicSlotDiagnostics(diagnostics);
 }
 
-export async function getPublicNextAvailability(input: Parameters<typeof getPublicSchedulingDiagnostics>[0], days: number) {
+export async function getPublicNextAvailability(input: PublicAvailabilityInput, days: number) {
   if (!Number.isInteger(days) || days < 1 || days > 14) throw new EmbedRequestError("Search between 1 and 14 days at a time.", 400);
   if (!input.date || !/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new EmbedRequestError("Choose a valid date in YYYY-MM-DD format.", 400);
   const start = new Date(`${input.date}T12:00:00Z`);
   if (Number.isNaN(start.getTime()) || start.toISOString().slice(0, 10) !== input.date) throw new EmbedRequestError("Choose a valid date in YYYY-MM-DD format.", 400);
+  await preparePublicAvailability(input.siteId);
   for (let offset = 0; offset < days; offset++) {
     const day = new Date(start);
     day.setUTCDate(start.getUTCDate() + offset);
     const date = day.toISOString().slice(0, 10);
-    const diagnostics = await getPublicSchedulingDiagnostics({ ...input, date });
+    const diagnostics = await readPublicAvailability({ ...input, date });
     if (diagnostics.slots.length) return { date, slots: diagnostics.slots };
   }
   return null;
@@ -336,10 +353,14 @@ export async function createPublicSchedulingBooking(input: {
     return { ok: true, booking: null };
   }
 
+  if (!await bookingPaymentProvider(input.siteId)) throw new EmbedRequestError(onlineBookingUnavailable, 503);
+
+  await releaseUnpaidBookingHolds(input.siteId);
   let booking: Awaited<ReturnType<typeof nativeSchedulingAdapter.createBooking>>;
   try {
     booking = await nativeSchedulingAdapter.createBooking({
       siteId: input.siteId,
+      onlinePayment: { checkoutSupported: parsed.data.checkoutSupported === true },
       serviceId: parsed.data.serviceId,
       tierId: parsed.data.tierId,
       durationMinutes: parsed.data.durationMinutes,
@@ -367,6 +388,8 @@ export async function createPublicSchedulingBooking(input: {
   } catch (error) {
     mapPublicBookingError(error);
   }
+
+  if (booking.paymentToken) return { ok: true, paymentUrl: bookingPaymentUrl(booking.paymentToken) };
 
   await emitModuleEvent("booking.created", {
     ...(await requestAttribution(input.searchParams, "/api/public/v1/bookings")),
@@ -401,11 +424,12 @@ export async function createPublicSchedulingBooking(input: {
     booking: {
       id: booking.id,
       status: booking.status,
+      paymentAfterApproval: booking.paymentAfterApproval,
       serviceId: booking.serviceId,
       staffId: booking.staffId || null,
       startsAt: booking.startsAt.toISOString(),
       endsAt: booking.endsAt.toISOString(),
-      calendarUrl: icsCalendarAdapter.bookingPath({ bookingId: booking.id, siteId: booking.siteId }),
+      calendarUrl: booking.paymentAfterApproval ? null : icsCalendarAdapter.bookingPath({ bookingId: booking.id, siteId: booking.siteId }),
       manageUrl: bookingSelfServicePath({
         bookingId: booking.id,
         customerEmail: booking.customerEmail,

@@ -36,12 +36,15 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     try {
       const catalog = await loadServices();
       state.packageFields = Array.isArray(catalog.packageFields) ? catalog.packageFields : state.packageFields;
+      state.onlineBookingEnabled = catalog.onlineBookingEnabled !== false;
+      state.checkoutEnabled = catalog.onlineBookingEnabled === true;
       state.services = catalog.services;
       state.categories = normalizeCategories([...(catalog.categories || []), ...(config.categories || [])], state.services);
-      setStatus("");
+      setStatus(state.onlineBookingEnabled ? "" : "Online booking is unavailable. Contact us to schedule.", !state.onlineBookingEnabled);
     } catch (error) {
       if (config.api?.demoFallback !== false) {
         const fallbackCatalog = await loadServices(false);
+        state.onlineBookingEnabled = !config.api?.enabled;
         state.services = fallbackCatalog.services;
         state.categories = normalizeCategories(config.categories || [], state.services);
         setStatus("Using demo services because live services could not load.");
@@ -342,6 +345,10 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
   }
 
   function selectService(serviceId) {
+    if (!state.onlineBookingEnabled) {
+      setStatus("Online booking is unavailable. Contact us to schedule.", true);
+      return;
+    }
     state.serviceId = serviceId;
     state.durationMinutes = null; state.tierId = null; state.addOnIds = []; state.addOnQuantities = {};
     state.selectedSlot = null;
@@ -649,7 +656,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     if (!service || !slot) return;
 
     els.confirmSummary.innerHTML = summaryMarkup(service, slot);
-    els.submitBooking.textContent = service.requestOnly ? "Send request" : "Confirm booking";
+    els.submitBooking.textContent = service.requestOnly ? "Send request" : state.checkoutEnabled && service.priceCents > 0 ? "Continue to payment" : "Confirm booking";
 
     window.ShowrunnerBookingRules.render(els.form, service.bookingRules, service.id, {title:service.bookingFormTitle,revision:service.bookingRequirementsRevision});
     if (service.intakePrompt && !Array.isArray(service.bookingRules)) {
@@ -721,9 +728,12 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     const pending = bookingResult?.booking?.status === "PENDING" || service.requestOnly;
     document.querySelector("#success-title").textContent = pending ? "Request received" : "You're booked";
     document.querySelector(".booking-success .booking-kicker").textContent = pending ? "Awaiting approval" : "Confirmed";
-    els.successCopy.textContent = pending
-      ? "Your appointment request has been sent. The team will follow up with confirmation."
-      : "Your appointment is confirmed.";
+    els.successCopy.textContent = "Your appointment is confirmed.";
+    if (pending) {
+      els.successCopy.textContent = bookingResult?.booking?.paymentAfterApproval
+        ? "The team will review your request and email a payment link if it’s approved."
+        : "Your appointment request has been sent. The team will follow up with confirmation.";
+    }
 
     const links = [];
     if (bookingResult?.booking?.calendarUrl) {
@@ -783,6 +793,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
 
     const formData = new FormData(els.form);
     const payload = {
+      checkoutSupported: true,
       serviceId: service.id,
       tierId: state.tierId || undefined,
       durationMinutes: requiresDuration() ? state.durationMinutes : undefined,
@@ -810,6 +821,10 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
 
     try {
       const result = await createBooking(payload);
+      if (result.paymentUrl) {
+        window.location.assign(result.paymentUrl);
+        return;
+      }
       state.lastBooking = result;
       renderSuccess(result);
       state.activeStep = "success";
@@ -835,6 +850,7 @@ import { bookingTermsValues, renderBookingTerms, renderTermsText } from "./booki
     const liveCategories = Array.isArray(response.categories) ? response.categories : [];
     const liveServices = response.services || [];
     return {
+      onlineBookingEnabled: response.onlineBookingEnabled,
       packageFields: response.packageFields,
       categories: liveCategories,
       services: normalizeServices(liveServices.map(mergeServicePresentation))

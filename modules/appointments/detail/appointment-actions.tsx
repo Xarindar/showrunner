@@ -5,20 +5,25 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { updateBookingStatusAction } from "../actions";
 
-export function AppointmentActions({ bookingId, cancellationReason }: { bookingId: string; cancellationReason: string | null }) {
+export function AppointmentActions({ bookingId, cancellationReason, bookingStatus, paymentStatus }: {
+  bookingId: string;
+  cancellationReason: string | null;
+  bookingStatus: string;
+  paymentStatus?: string;
+}) {
   const [dialog, setDialog] = useState<"cancel" | null>(null);
   return <>
     <div className="ui-inline-actions" aria-label="Appointment actions">
-      <form action={updateBookingStatusAction}>
+      {(!paymentStatus || paymentStatus === "PAID") && <form action={updateBookingStatusAction}>
         <input type="hidden" name="id" value={bookingId} />
         <input type="hidden" name="status" value="COMPLETED" />
         <Button size="sm" type="submit" variant="secondary">Complete</Button>
-      </form>
-      <form action={updateBookingStatusAction}>
+      </form>}
+      {(!paymentStatus || (paymentStatus === "DRAFT" && bookingStatus === "PENDING")) && <form action={updateBookingStatusAction}>
         <input type="hidden" name="id" value={bookingId} />
         <input type="hidden" name="status" value="CONFIRMED" />
-        <Button size="sm" type="submit" variant="secondary">Confirm</Button>
-      </form>
+        <Button size="sm" type="submit" variant="secondary">{paymentStatus === "DRAFT" ? "Approve and request payment" : "Confirm"}</Button>
+      </form>}
       <Button size="sm" type="button" variant="danger" onClick={() => setDialog("cancel")}>Cancel</Button>
     </div>
     <Modal open={dialog === "cancel"} title="Cancel appointment" onClose={() => setDialog(null)}>

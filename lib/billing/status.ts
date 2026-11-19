@@ -86,10 +86,11 @@ export async function updateBillingDocumentStatus(input: {
   return prisma.$transaction(async (tx) => {
     const document = await tx.billingDocument.findFirst({
       where: { id: input.billingDocumentId, siteId },
-      select: { acceptedAt: true, currency: true, status: true, totalCents: true }
+      select: { bookingId: true, acceptedAt: true, currency: true, status: true, totalCents: true }
     });
 
     if (!document) throw new Error("Billing document target not found.");
+    if (document.bookingId) throw new Error("Manage this payment from the booking.");
     assertAllowedBillingStatusTransition(document.status, input.status);
 
     if (input.status === BillingDocumentStatus.PAID && document.status !== BillingDocumentStatus.PAID) {
