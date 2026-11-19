@@ -40,6 +40,7 @@ test("rule-set actions require scheduling permission and scope every read and sa
 test("public bookings forward structured answers and report rule validation as a client error before writing", async () => {
   class RequestError extends Error { constructor(message: string, readonly status: number) { super(message); } }
   let processorConnected = false;
+  const checkout: { paymentToken?: string } = {};
   const rule = bookingRules.bookingRuleSchema.parse({ id: "style", kind: "intake", category: "Session", label: "Style", type: "SELECT", required: true, options: ["Candid", "Posed"] });
   const require = createRequire(import.meta.url);
   const mocks: Record<string, unknown> = {
@@ -48,7 +49,9 @@ test("public bookings forward structured answers and report rule validation as a
     "@/lib/scheduling/session-input": sessionInput,
     "@/lib/scheduling/session-offering": sessionOffering,
     "@/lib/embed/gateway": { EmbedRequestError: RequestError },
-    "@/lib/bookings/payment": { bookingPaymentProvider: async () => processorConnected ? "PAYPAL" : null, releaseUnpaidBookingHolds: async () => {}, onlineBookingUnavailable: "Online booking is unavailable." },
+    "@/lib/bookings/payment": { bookingPaymentProvider: async () => processorConnected ? "PAYPAL" : null, releaseUnpaidBookingHolds: async () => {},
+      onlineBookingUnavailable: "Online booking is unavailable.",
+      startBookingCheckout: async (token: string) => { assert.equal(token, checkout.paymentToken); return "https://www.paypal.com/checkoutnow?token=fixture"; } },
     "@/lib/scheduling/native": { nativeSchedulingAdapter: { createBooking: async (input: { siteId: string; customerName: string; customerEmail: string; intakeAnswers?: Record<string, string> }) => {
       assert.equal(input.siteId, "site-a");
       assert.equal((input as { customerCompany?: string }).customerCompany, "Client Studio");
@@ -56,6 +59,7 @@ test("public bookings forward structured answers and report rule validation as a
       assert.equal((input as { sessionLocation?: string }).sessionLocation, "12 Main St, Chicago, Illinois 60601");
       assert.equal((input as { photoMarketingConsent?: boolean }).photoMarketingConsent, true);
       bookingRules.validateBookingRuleAnswers([rule], input.intakeAnswers, input);
+      if (checkout.paymentToken) return { paymentToken: checkout.paymentToken };
       throw new Error("Reached booking transaction");
     } } }
   };
@@ -71,4 +75,7 @@ test("public bookings forward structured answers and report rule validation as a
   processorConnected = true;
   for (const intakeAnswers of [{}, { style: "Forged" }]) await assert.rejects(exports.createPublicSchedulingBooking({ siteId: "site-a", body: { ...body, intakeAnswers } }), error => error instanceof RequestError && error.status === 400);
   await assert.rejects(exports.createPublicSchedulingBooking({ siteId: "site-a", body: { ...body, intakeAnswers: { style: "Candid" } } }), /Reached booking transaction/);
+  checkout.paymentToken = "booking-payment-fixture";
+  const result = await exports.createPublicSchedulingBooking({ siteId: "site-a", body: { ...body, checkoutSupported: true, intakeAnswers: { style: "Candid" } } });
+  assert.equal((result as { paymentUrl: string }).paymentUrl, "https://www.paypal.com/checkoutnow?token=fixture");
 });

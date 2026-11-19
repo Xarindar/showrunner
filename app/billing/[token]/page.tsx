@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import { FormAttachmentTargetType } from "@prisma/client";
 import styles from "./payment.module.css";
 import { notFound, redirect } from "next/navigation";
-import { bookingPaymentProvider, findBookingPayment } from "@/lib/bookings/payment";
+import { findBookingPayment, startBookingCheckout } from "@/lib/bookings/payment";
 import { publicBillingPath } from "@/lib/billing/documents";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { bookingSelfServicePath } from "@/lib/bookings/self-service";
 import { getPublicFormAttachments, publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { icsCalendarAdapter } from "@/lib/scheduling/calendar";
-import { createPaymentCheckoutSessionForBillingDocument } from "@/lib/payments/checkout";
 
 export const metadata: Metadata = {
   title: "Booking payment",
@@ -40,34 +39,7 @@ export default async function BookingPaymentPage({ params, searchParams }: {
 
   async function pay() {
     "use server";
-    const current = await findBookingPayment(token);
-    if (!current?.booking || current.status !== "SENT" || current.booking.status !== "PENDING" || current.booking.startsAt <= new Date()) {
-      redirect(path);
-    }
-    const attempt = current.payments[0];
-    const provider = await bookingPaymentProvider(current.siteId, attempt?.externalCheckoutSession ? attempt.provider : undefined);
-    if (!provider) redirect(`${path}?checkout=unavailable`);
-
-    let checkoutUrl;
-    try {
-      if (attempt?.externalCheckoutSession) {
-        const reference = attempt.provider === "SQUARE" ? attempt.externalPaymentId || attempt.externalCheckoutSession : attempt.externalCheckoutSession;
-        if (reference !== current.paymentExternalReference) throw new Error("Checkout link is not ready.");
-        checkoutUrl = current.checkoutUrl;
-      } else {
-        ({ checkoutUrl } = await createPaymentCheckoutSessionForBillingDocument({
-          amountCents: current.totalCents,
-          billingDocumentId: current.id,
-          siteId: current.siteId,
-          provider
-        }));
-      }
-      if (!checkoutUrl || new URL(checkoutUrl).protocol !== "https:") throw new Error("Checkout link is unavailable.");
-    } catch (error) {
-      console.error("[booking:checkout]", error instanceof Error ? error.name : "unknown");
-      redirect(`${path}?checkout=error`);
-    }
-    redirect(checkoutUrl);
+    redirect(await startBookingCheckout(token));
   }
 
   return <main className={styles.payment}>
