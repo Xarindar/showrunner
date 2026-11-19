@@ -1,5 +1,5 @@
 import "server-only";
-import { bookingPaymentProvider, bookingPaymentUrl, onlineBookingUnavailable, releaseUnpaidBookingHolds } from "@/lib/bookings/payment";
+import { bookingPaymentProvider, onlineBookingUnavailable, releaseUnpaidBookingHolds, startBookingCheckout } from "@/lib/bookings/payment";
 import { getPackageFields } from "@/lib/scheduling/package-fields-store";
 import { listBookingDocuments } from "@/lib/scheduling/booking-document-store";
 import { resolveBookingRequirements } from "@/lib/scheduling/booking-documents";
@@ -389,7 +389,7 @@ export async function createPublicSchedulingBooking(input: {
     mapPublicBookingError(error);
   }
 
-  if (booking.paymentToken) return { ok: true, paymentUrl: bookingPaymentUrl(booking.paymentToken) };
+  if (booking.paymentToken) return { ok: true, paymentUrl: await startBookingCheckout(booking.paymentToken) };
 
   await emitModuleEvent("booking.created", {
     ...(await requestAttribution(input.searchParams, "/api/public/v1/bookings")),

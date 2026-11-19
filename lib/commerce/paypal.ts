@@ -184,7 +184,7 @@ function amountValueCents(value?: string) {
 }
 
 function approveUrl(order: PayPalOrderResponse) {
-  return order.links?.find((link) => link.rel === "approve")?.href || "";
+  return order.links?.find((link) => link.rel === "approve" || link.rel === "payer-action")?.href || "";
 }
 
 function orderRawSummary(input: {
@@ -228,15 +228,19 @@ async function createPayPalOrder(input: {
   customId: string;
   description: string;
   returnUrl: string;
+  guestCheckout?: boolean;
 }) {
+  const experience = {
+    cancel_url: input.cancelUrl,
+    return_url: input.returnUrl,
+    shipping_preference: "NO_SHIPPING",
+    user_action: "PAY_NOW"
+  };
   return paypalFetch<PayPalOrderResponse>(input.credentials, "/v2/checkout/orders", {
     body: JSON.stringify({
-      application_context: {
-        cancel_url: input.cancelUrl,
-        return_url: input.returnUrl,
-        shipping_preference: "NO_SHIPPING",
-        user_action: "PAY_NOW"
-      },
+      ...(input.guestCheckout
+        ? { payment_source: { paypal: { experience_context: { ...experience, landing_page: "GUEST_CHECKOUT" } } } }
+        : { application_context: experience }),
       intent: "CAPTURE",
       purchase_units: [
         payPalPurchaseUnit({
@@ -384,7 +388,8 @@ export async function createPayPalCheckoutSessionForBillingDocument(input: {
         documentNumber: document.documentNumber,
         id: document.id,
         publicAccessToken,
-        siteId: document.siteId
+        siteId: document.siteId,
+        guestCheckout: Boolean(document.bookingId)
       },
       payment
     };
@@ -397,6 +402,7 @@ export async function createPayPalCheckoutSessionForBillingDocument(input: {
     currency: result.payment.currency,
     customId: result.payment.id,
     description: `Payment for ${result.document.documentNumber}`,
+    guestCheckout: result.document.guestCheckout,
     returnUrl: publicBillingUrl(result.document.publicAccessToken, "success")
   });
   const checkoutUrl = approveUrl(paypalOrder);
