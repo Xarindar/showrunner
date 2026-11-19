@@ -9,7 +9,7 @@ import ts from "typescript";
 function harness() {
   const saved: any[] = [], deleted: string[] = [], requests: any[] = [];
   let previous: any = null, failSave = false, failWebhook = false, chargesEnabled = true;
-  let paypalWebhooks: any[] = [];
+  let paypalWebhooks: any[] = [], paypalTokenResponse: Response | undefined;
   let locations = [{ id: "one", merchant_id: "merchant", status: "ACTIVE", name: "Studio" }];
   const endpoints = new Map<string, any>();
   class StripeError extends Error { statusCode = 404; }
@@ -38,7 +38,7 @@ function harness() {
   const fetch = async (url: string, init: any = {}) => {
     requests.push({ url, ...init });
     if (url.includes("square")) return Response.json({ locations });
-    if (url.endsWith("/token")) return Response.json({ access_token: "client-only-token" });
+    if (url.endsWith("/token")) return paypalTokenResponse ?? Response.json({ access_token: "client-only-token" });
     if (init.method === "DELETE") { deleted.push(url); return new Response(null, { status: 204 }); }
     if (init.method === "PATCH") return new Response(null, { status: 204 });
     if (init.method === "POST") return failWebhook ? new Response("{}", { status: 403 }) : Response.json({ id: "owned-webhook" });
@@ -55,6 +55,7 @@ function harness() {
   return { api: load("lib/payments/provider-onboarding.ts"), saved, deleted, endpoints, requests,
     previous: (value: any) => { previous = value; }, failSave: () => { failSave = true; }, failWebhook: () => { failWebhook = true; },
     chargesEnabled: (value: boolean) => { chargesEnabled = value; }, paypalWebhooks: (value: any[]) => { paypalWebhooks = value; },
+    paypalTokenResponse: (value: Response) => { paypalTokenResponse = value; },
     locations: (value: typeof locations) => { locations = value; } };
 }
 
@@ -126,6 +127,19 @@ test("PayPal registers notifications with the client's app token and never needs
   const db = harness(); db.failSave();
   await assert.rejects(db.api.savePayPalCredentials({ clientId: "app", clientSecret: "secret", environment: "live", siteId: "client" }), /Database unavailable/);
   assert.equal(db.deleted[0], "https://api-m.paypal.com/v1/notifications/webhooks/owned-webhook");
+});
+
+test("PayPal explains a credential mismatch without returning provider response text or saving anything", async () => {
+  for (const [environment, label] of [["live", "Live"], ["sandbox", "Sandbox"]] as const) {
+    const h = harness();
+    h.paypalTokenResponse(Response.json({ error: "invalid_client", error_description: "Contains owned-secret" }, { status: 401 }));
+    await assert.rejects(
+      h.api.savePayPalCredentials({ clientId: "owned-app", clientSecret: "owned-secret", environment, siteId: "client" }),
+      { message: `PayPal rejected these credentials. Copy the Client ID and Secret from the same ${label} app and try again.` }
+    );
+    assert.equal(h.saved.length, 0);
+    assert.equal(h.requests.length, 1);
+  }
 });
 
 test("PayPal repairs a matching webhook's events without duplicating it or removing unrelated subscriptions", async () => {

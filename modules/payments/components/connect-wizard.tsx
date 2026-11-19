@@ -24,7 +24,7 @@ export type WizardConfig = {
 
 export function buildConnectWizards(): Record<WizardConfig["provider"], WizardConfig> {
   const squareLink = { href: "https://developer.squareup.com/apps", label: "Open Square Developer" };
-  const paypalLink = { href: "https://developer.paypal.com/dashboard/applications", label: "Open PayPal apps" };
+  const paypalLink = { href: "https://developer.paypal.com/dashboard/applications/live", label: "Open PayPal apps" };
   const environment = (name: string, live: string): WizardStep => ({ kind: "field", title: "Choose live payments or testing",
     lead: "Choose Live to accept real payments. Sandbox is for testing with your processor's test account.",
     field: { name, label: "Payment environment", options: [{ value: live, label: "Live payments" }, { value: "sandbox", label: "Sandbox (testing)" }] } });
@@ -55,7 +55,7 @@ export function buildConnectWizards(): Record<WizardConfig["provider"], WizardCo
         instructions: ["Open Apps & Credentials. Create a REST app named Showrunner if you need one.", "Keep the app open in the new tab, then return here."], link: paypalLink },
       environment("paypalEnvironment", "live"),
       { kind: "field", title: "Copy your PayPal client ID", lead: "Open your Showrunner REST app in the environment you chose. Copy its Client ID and paste it here.", link: paypalLink,
-        field: { name: "paypalClientId", label: "PayPal client ID", placeholder: "Paste your client ID" } },
+        field: { name: "paypalClientId", label: "PayPal client ID", secret: true, placeholder: "Paste your client ID" } },
       { kind: "field", title: "Copy your PayPal secret", lead: "On the same app page, reveal the Secret. Copy the full value and paste it below.", link: paypalLink,
         field: { name: "paypalClientSecret", label: "PayPal secret", secret: true, placeholder: "Paste your secret", hint: "Use the secret from the same app and environment as your client ID." } },
       { kind: "review", title: "Connect your PayPal account", lead: "Showrunner will verify your credentials and set up payment notifications directly with PayPal. No charge will be made." }
@@ -68,20 +68,41 @@ export function ConnectWizard({ config, defaultUseForCheckout, onClose, open }: 
 }) {
   const router = useRouter();
   const formId = useId();
-  const [state, formAction, pending] = useActionState(config.action, initialPaymentActionState);
-  const [locationState, locationAction, checking] = useActionState<SquareLocationState, FormData>(inspectSquareLocationsAction, initialPaymentActionState);
   const [stepIndex, setStepIndex] = useState(0);
   const [values, setValues] = useState<Record<string, string>>({ squareEnvironment: "production", paypalEnvironment: "live" });
   const [inspectionVersion, setInspectionVersion] = useState(0);
+  const fields = config.steps.flatMap((item) => item.kind === "field" ? [item.field] : []);
+  // Credentials stay out of review markup. Attach them only when the user submits.
+  const [state, formAction, pending] = useActionState(async (previous: PaymentActionState, data: FormData) => {
+    for (const field of fields) data.set(field.name, values[field.name] || "");
+    const result = await config.action(previous, data);
+    if (result.status === "success") setValues({});
+    return result;
+  }, initialPaymentActionState);
+  const [locationState, locationAction, checking] = useActionState<SquareLocationState, FormData>(async (previous, data) => {
+    data.set("squareAccessToken", values.squareAccessToken || "");
+    return inspectSquareLocationsAction(previous, data);
+  }, initialPaymentActionState);
   const locations = locationState.inspectionVersion === String(inspectionVersion) ? locationState.locations : undefined;
   const [useForCheckout, setUseForCheckout] = useState(defaultUseForCheckout);
   const step = config.steps[stepIndex];
-  const fields = config.steps.flatMap((item) => item.kind === "field" ? [item.field] : []);
   const validField = step.kind !== "field" || Boolean(values[step.field.name]?.trim() && (!step.field.pattern || step.field.pattern.test(values[step.field.name].trim())));
   const locationId = values.squareLocationId || (locations?.length === 1 ? locations[0].id : "");
   const busy = pending || checking;
   function close() { if (!busy) { router.refresh(); onClose(); } }
-  function update(name: string, value: string) { setInspectionVersion((current) => current + 1); setValues((current) => ({ ...current, [name]: value, squareLocationId: "" })); }
+  function update(name: string, value: string) {
+    setInspectionVersion((current) => current + 1);
+    setValues((current) => ({
+      ...current,
+      ...(name === "paypalEnvironment" ? { paypalClientId: "", paypalClientSecret: "" } : {}),
+      ...(name === "squareEnvironment" ? { squareAccessToken: "" } : {}),
+      [name]: value,
+      squareLocationId: ""
+    }));
+  }
+  const link = step.link && config.provider === "PAYPAL" && values.paypalEnvironment === "sandbox"
+    ? { ...step.link, href: "https://developer.paypal.com/dashboard/applications/sandbox" }
+    : step.link;
   return (
     <Modal className="pay-dialog" onClose={close} open={open} title={`Set up ${config.name}`}>
       {state.status === "success" ? (
@@ -101,17 +122,16 @@ export function ConnectWizard({ config, defaultUseForCheckout, onClose, open }: 
             <h3 className="ui-zero">{step.title}</h3>
             <p className="pay-step-lead">{step.lead}</p>
             {step.instructions ? <ol className="pay-instructions">{step.instructions.map((item) => <li key={item}>{item}</li>)}</ol> : null}
-            {step.link ? <a className="ui-button ui-button-secondary" href={step.link.href} rel="noreferrer" target="_blank">{step.link.label}<ExternalLink size={15} /><span className="ui-sr-only"> (opens a new tab)</span></a> : null}
+            {link ? <a className="ui-button ui-button-secondary" href={link.href} rel="noreferrer" target="_blank">{link.label}<ExternalLink size={15} /><span className="ui-sr-only"> (opens a new tab)</span></a> : null}
             {step.kind === "field" ? <Field hint={step.field.hint} label={step.field.label}>
               {step.field.options ? <Select aria-label={step.field.label} onChange={(event) => update(step.field.name, event.target.value)} value={values[step.field.name] ?? ""}>
                 {step.field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </Select> : <Input aria-label={step.field.label} autoComplete="off" name={step.field.name} onChange={(event) => update(step.field.name, event.target.value)} placeholder={step.field.placeholder}
+              </Select> : <Input aria-label={step.field.label} autoComplete={step.field.secret ? "new-password" : "off"} name={step.field.name} onChange={(event) => update(step.field.name, event.target.value)} placeholder={step.field.placeholder}
                 spellCheck={false} type={step.field.secret ? "password" : "text"} value={values[step.field.name] ?? ""} />}
             </Field> : null}
             {step.kind === "locations" ? <form action={locationAction} className="pay-step">
               <input name="inspectionVersion" type="hidden" value={inspectionVersion} />
               <input name="squareEnvironment" type="hidden" value={values.squareEnvironment} />
-              <input name="squareAccessToken" type="hidden" value={values.squareAccessToken || ""} />
               <Button aria-busy={checking} disabled={checking} type="submit" variant="secondary">{checking ? "Checking…" : "Check token and load locations"}</Button>
               {locationState.status === "error" ? <Notification tone="danger" eventKey={locationState}>{locationState.message}</Notification> : null}
               {locationState.status === "success" && locations ? <Field label="Square location"><Select aria-label="Square location" name="squareLocationId" onChange={(event) => setValues((current) => ({ ...current, squareLocationId: event.target.value }))} value={locationId}>
@@ -123,7 +143,6 @@ export function ConnectWizard({ config, defaultUseForCheckout, onClose, open }: 
               <dl className="pay-review-list">{fields.map((field) => <div key={field.name}><dt>{field.label}</dt><dd>{field.secret ? "Entered" : field.options?.find((item) => item.value === values[field.name])?.label || values[field.name]}</dd></div>)}
                 {config.provider === "SQUARE" ? <div><dt>Square location</dt><dd>{locations?.find((item) => item.id === locationId)?.name}</dd></div> : null}
               </dl>
-              {fields.map((field) => <input key={field.name} name={field.name} type="hidden" value={values[field.name] || ""} />)}
               <input name="squareLocationId" type="hidden" value={locationId} />
               <label className="ui-checkbox-row"><input checked={useForCheckout} name="useForCheckout" onChange={(event) => setUseForCheckout(event.target.checked)} type="checkbox" />Use this account for new checkouts</label>
               <p className="pay-secure-note"><ShieldCheck size={16} />Verified with {config.name}, then stored encrypted.</p>
