@@ -25,6 +25,8 @@ function harness(provider: string) {
   };
   const helpers = load("lib/portfolio/refunds.ts", { "@/lib/prisma": { prisma: db } });
   const api = load(`lib/commerce/${provider}.ts`, { "@/lib/prisma": { prisma: db }, "@/lib/portfolio/refunds": helpers, "./orders": { updateOrderStatus: async () => {} } }, `\nexports.dispatch = dispatch${provider === "stripe" ? "Stripe" : provider === "square" ? "Square" : "PayPal"}Event;`);
+  const dispatch = api.dispatch;
+  api.dispatch = (event: unknown) => dispatch(event, "site");
   return { api, helpers, writes, lookups, get revokedAt() { return revokedAt; } };
 }
 
@@ -57,7 +59,7 @@ test("PayPal refund binds original capture, never refund id or merchant custom i
   const h = harness("paypal");
   await h.api.dispatch({ event_type: "PAYMENT.CAPTURE.REFUNDED", resource: { id: "REFUND123", custom_id: "wrong-local-payment", status: "COMPLETED", amount: { value: "1.00", currency_code: "USD" }, supplementary_data: { related_ids: { capture_id: "CAPTURE123" } } } });
   assert.equal(h.writes.length, 1);
-  assert.deepEqual(JSON.parse(JSON.stringify(h.lookups[0].where)), { provider: "PAYPAL", externalPaymentId: "CAPTURE123" });
+  assert.deepEqual(JSON.parse(JSON.stringify(h.lookups[0].where)), { provider: "PAYPAL", externalPaymentId: "CAPTURE123", order: { siteId: "site" } });
   const missing = harness("paypal");
   await assert.rejects(missing.api.dispatch({ event_type: "PAYMENT.CAPTURE.REFUNDED", resource: { id: "REFUND123", status: "COMPLETED", amount: { value: "1.00", currency_code: "USD" } } }), /capture identity/);
   assert.equal(missing.writes.length, 0);

@@ -19,7 +19,7 @@ function harness(options: { hourly?: boolean; existing?: boolean; existingCompan
   const settingQueries: Query[] = [];
   const serviceQueries: Query[] = [];
   const existing = { id: "client-a", name: "Saved name", phone: "Saved phone", companyName: options.existingCompany || "", preferences: { notes: "Keep notes", serviceId: "old-service" } };
-  const service = { id: "portrait", siteId: "jazzr", name: "Portrait session", isActive: true, durationMinutes: 60, slotIntervalMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, resourceAssignments: [], staffAssignments: [] };
+  const service = { id: "portrait", siteId: "jazzr", name: "Portrait session", isActive: true, durationMinutes: 60, slotIntervalMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, resourceAssignments: [], staffAssignments: [], updatedAt: new Date(0) };
   const rates = [{ id: "venue", name: "Venue", amountCents: 10000 }, { id: "help", name: "Assistant", amountCents: 2000 }];
   if (options.hourly) Object.assign(service, { pricingType: "HOURLY", hourlyRateId: "venue", hourlyRate: rates[0], sessionOffering: {
     coverageItems: [], tiers: [{ id: "hourly", name: "Hourly", pricingType: "HOURLY", hourlyRateId: "venue", durationMinutes: 60, priceCents: 10000, coverageIds: [] }],
@@ -28,6 +28,7 @@ function harness(options: { hourly?: boolean; existing?: boolean; existingCompan
   const invoices: Query[] = [];
   let emails = 0;
   const tx = {
+    hourlyRate: { findMany: async () => rates },
     billingDocument: { create: async (query: Query) => { invoices.push(query); } },
     service: {findFirst:async()=>service},
     client: {
@@ -139,8 +140,8 @@ test("public bookings require effective document answers and acceptance, and ret
  const question={id:"style",kind:"intake" as const,category:"Portraits",label:"Preferred style",type:"RADIO" as const,required:true,placeholder:"",helpText:"",options:["Candid","Posed"]};
  const terms={...question,id:"terms",kind:"policy" as const,label:"Accepted studio terms",type:"TEXT" as const,options:[]};
  const documents:bookingDocuments.BookingDocument[]=[{id:"form",name:"Portrait preparation",kind:"INTAKE",version:1,isDefault:true,rules:[question]},{id:"terms",name:"Studio terms",kind:"TERMS",version:2,isDefault:true,rules:[terms]}];
- const requirements=bookingDocuments.resolveBookingRequirements({},documents);
  const app=harness({documents});
+ const requirements=bookingDocuments.resolveBookingRequirements(app.service,documents);
  await assert.rejects(app.book(),/changed/);
  await assert.rejects(app.book({bookingRequirementsRevision:requirements.revision}),/agree/);
  await assert.rejects(app.book({bookingRequirementsRevision:requirements.revision,policyAccepted:true}),/Preferred style/);

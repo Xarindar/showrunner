@@ -1,3 +1,4 @@
+import { readBoundedText } from "@/lib/api/bounded-body";
 import { z } from "zod";
 
 export const proofSelectionSchema = z.object({
@@ -34,32 +35,5 @@ export async function readProofRequestBody(request: Request) {
   if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") || "")) {
     throw new Error("JSON_REQUIRED");
   }
-  const length = Number(request.headers.get("content-length"));
-  if (Number.isFinite(length) && length > limit) throw new Error("BODY_TOO_LARGE");
-  if (!request.body) throw new Error("INVALID_BODY");
-
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > limit) {
-        await reader.cancel();
-        throw new Error("BODY_TOO_LARGE");
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const body = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return JSON.parse(new TextDecoder().decode(body)) as unknown;
+  return JSON.parse(await readBoundedText(request, limit)) as unknown;
 }

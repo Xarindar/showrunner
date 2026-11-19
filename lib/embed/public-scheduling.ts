@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { bookingPaymentProvider, onlineBookingUnavailable, releaseUnpaidBookingHolds, startBookingCheckout } from "@/lib/bookings/payment";
 import { getPackageFields } from "@/lib/scheduling/package-fields-store";
 import { listBookingDocuments } from "@/lib/scheduling/booking-document-store";
@@ -10,25 +11,25 @@ import { servicePriceCents } from "@/lib/scheduling/pricing";
 import { readImageFraming } from "@/modules/content/studio/image-framing";
 
 import { revalidatePath } from "next/cache";
-import { FormAttachmentTargetType, MediaVariantType } from "@prisma/client";
+import { MediaVariantType } from "@prisma/client";
 import { z } from "zod";
-import { bookingSelfServicePath } from "@/lib/bookings/self-service";
 import { EmbedRequestError } from "@/lib/embed/gateway";
 import { publicAppBaseUrl } from "@/lib/env";
 import { emitModuleEvent, requestAttribution } from "@/lib/events/emit";
-import { getPublicFormAttachments, publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { mediaAssetDisplayUrl } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
 import { icsCalendarAdapter } from "@/lib/scheduling/calendar";
 import { nativeSchedulingAdapter } from "@/lib/scheduling/native";
 import type { Slot, SlotDiagnostics } from "@/lib/scheduling/types";
 import { getSiteSettingsForSite } from "@/lib/site";
+import { DEFAULT_SITE_ID } from "@/lib/site-boundary";
 import { slugify } from "@/lib/slug";
 import { parseZonedDateKey } from "@/lib/timezone";
 
 const hiddenHoneypotField = "companyWebsite";
 
 const bookingSchema = z.object({
+  submissionKey: z.uuid().optional(),
   checkoutSupported: z.literal(true).optional(),
   serviceId: z.string().min(1, "Choose a service."),
   tierId: z.string().min(1).max(100).optional(),
@@ -38,14 +39,14 @@ const bookingSchema = z.object({
   serviceRevision: z.string().max(100).optional(),
   acceptedTerms: z.string().max(100000).optional(),
   staffId: z.string().trim().optional(),
-  resourceIds: z.array(z.string().trim().min(1)).optional(),
+  resourceIds: z.array(z.string().trim().min(1).max(128)).max(50).optional(),
   startsAt: z.string().min(1).refine((value) => !Number.isNaN(new Date(value).getTime()), "Choose a valid appointment time."),
   customerName: z.string().trim().min(2, "Add your name."),
   customerEmail: z.email("Add a valid email.").transform((value) => value.trim().toLowerCase()),
   customerPhone: z.string({ error: "Add your phone number." }).trim().min(1, "Add your phone number."),
   customerCompany: z.string().trim().max(200, "Company must be 200 characters or fewer.").optional(),
-  notes: z.string().trim().optional(),
-  intakeResponse: z.string().trim().optional(),
+  notes: z.string().trim().max(5000).optional(),
+  intakeResponse: z.string().trim().max(5000).optional(),
   intakeAnswers: intakeAnswersSchema.optional(),
   policyAccepted: z.boolean().optional(),
   photoMarketingConsent: z.boolean().optional(),
@@ -353,6 +354,30 @@ export async function createPublicSchedulingBooking(input: {
     return { ok: true, booking: null };
   }
 
+  const { submissionKey, ...submittedFields } = parsed.data;
+  const submission = submissionKey ? {
+    keyHash: createHash("sha256").update(submissionKey).digest("hex"),
+    fingerprint: createHash("sha256").update(JSON.stringify(submittedFields)).digest("hex")
+  } : undefined;
+  const recover = async () => {
+    if (!submission) return null;
+    const booking = await prisma.booking.findUnique({
+      where: { siteId_publicSubmissionKeyHash: { siteId: input.siteId, publicSubmissionKeyHash: submission.keyHash } },
+      include: { billingDocument: { select: { bookingApprovalRequired: true, publicAccessToken: true } } }
+    });
+    if (!booking) return null;
+    if (booking.publicSubmissionFingerprint !== submission.fingerprint) {
+      throw new EmbedRequestError("This submission already belongs to a different booking request.", 409);
+    }
+    return {
+      ...booking,
+      paymentToken: booking.billingDocument?.bookingApprovalRequired ? undefined : booking.billingDocument?.publicAccessToken || undefined,
+      paymentAfterApproval: booking.billingDocument?.bookingApprovalRequired ?? false
+    };
+  };
+  const existing = await recover();
+  if (existing) return publicBookingResponse(existing);
+
   if (!await bookingPaymentProvider(input.siteId)) throw new EmbedRequestError(onlineBookingUnavailable, 503);
 
   await releaseUnpaidBookingHolds(input.siteId);
@@ -360,7 +385,7 @@ export async function createPublicSchedulingBooking(input: {
   try {
     booking = await nativeSchedulingAdapter.createBooking({
       siteId: input.siteId,
-      onlinePayment: { checkoutSupported: parsed.data.checkoutSupported === true },
+      onlinePayment: { checkoutSupported: parsed.data.checkoutSupported === true, submission },
       serviceId: parsed.data.serviceId,
       tierId: parsed.data.tierId,
       durationMinutes: parsed.data.durationMinutes,
@@ -386,10 +411,12 @@ export async function createPublicSchedulingBooking(input: {
         : undefined
     });
   } catch (error) {
+    const committed = await recover();
+    if (committed) return publicBookingResponse(committed);
     mapPublicBookingError(error);
   }
 
-  if (booking.paymentToken) return { ok: true, paymentUrl: await startBookingCheckout(booking.paymentToken) };
+  if (booking.paymentToken) return publicBookingResponse(booking);
 
   await emitModuleEvent("booking.created", {
     ...(await requestAttribution(input.searchParams, "/api/public/v1/bookings")),
@@ -413,11 +440,24 @@ export async function createPublicSchedulingBooking(input: {
   revalidatePath("/admin/modules/scheduling");
   revalidatePath("/book");
 
-  const formAttachments = await getPublicFormAttachments({
-    siteId: booking.siteId,
-    targetId: booking.id,
-    targetType: FormAttachmentTargetType.BOOKING
-  });
+  return publicBookingResponse(booking);
+}
+
+async function publicBookingResponse(booking: Awaited<ReturnType<typeof nativeSchedulingAdapter.createBooking>>) {
+  if (booking.paymentToken) return { ok: true, paymentUrl: await startBookingCheckout(booking.paymentToken) };
+  if (booking.status !== "CONFIRMED" && booking.status !== "PENDING") {
+    throw new EmbedRequestError("This booking request is closed. Contact us for help.", 409);
+  }
+  const calendarHost = booking.status !== "CONFIRMED" ? null : booking.siteId === DEFAULT_SITE_ID
+    ? publicAppBaseUrl()
+    : await prisma.siteDomain.findFirst({
+      where: { siteId: booking.siteId, isPrimary: true },
+      orderBy: { hostname: "asc" },
+      select: { hostname: true }
+    }).then((domain) => domain ? `https://${domain.hostname}` : null);
+  const calendarUrl = calendarHost ? new URL(
+    icsCalendarAdapter.bookingPath({ bookingId: booking.id, siteId: booking.siteId }), calendarHost
+  ).href : null;
 
   return {
     ok: true,
@@ -429,22 +469,9 @@ export async function createPublicSchedulingBooking(input: {
       staffId: booking.staffId || null,
       startsAt: booking.startsAt.toISOString(),
       endsAt: booking.endsAt.toISOString(),
-      calendarUrl: booking.paymentAfterApproval ? null : icsCalendarAdapter.bookingPath({ bookingId: booking.id, siteId: booking.siteId }),
-      manageUrl: bookingSelfServicePath({
-        bookingId: booking.id,
-        customerEmail: booking.customerEmail,
-        siteId: booking.siteId
-      }),
-      formLinks: formAttachments.map((attachment) => ({
-        description: attachment.form.description,
-        href: publicFormAttachmentHref({
-          formSlug: attachment.form.slug,
-          targetId: attachment.targetId,
-          targetType: attachment.targetType
-        }),
-        isRequired: attachment.isRequired,
-        name: attachment.form.name
-      }))
+      calendarUrl,
+      manageUrl: null,
+      formLinks: []
     }
   };
 }

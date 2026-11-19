@@ -31,8 +31,8 @@ function deliveryPayload(value: Prisma.JsonValue) {
   return JSON.parse(JSON.stringify(value || {})) as Record<string, unknown>;
 }
 
-export async function queueWebhookDelivery(input: QueueWebhookDeliveryInput) {
-  return prisma.webhookDelivery.create({
+export async function queueWebhookDelivery(input: QueueWebhookDeliveryInput, db: Prisma.TransactionClient = prisma) {
+  return db.webhookDelivery.create({
     data: {
       automationId: input.automationId,
       event: input.event,

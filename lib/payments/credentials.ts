@@ -123,31 +123,16 @@ export async function getStripeApiKeyForSite(siteId: string) {
   return "";
 }
 
-// Every connected site's Stripe webhook signing secret. The webhook route tries each (plus the env
-// fallback) so signature verification works without first knowing which site an event belongs to.
-export async function getConnectedStripeWebhookSecrets() {
+export async function getWebhookSigningCredentials(provider: "STRIPE" | "SQUARE") {
   const credentials = await prisma.paymentGatewayCredential.findMany({
-    where: {
-      provider: PaymentProvider.STRIPE,
-      status: PaymentGatewayConnectionStatus.CONNECTED,
-      encryptedWebhookSecret: { not: "" }
-    },
-    select: { encryptedWebhookSecret: true }
+    where: { provider, status: PaymentGatewayConnectionStatus.CONNECTED, encryptedWebhookSecret: { not: "" } }
   });
-  return credentials.map((credential) => decryptGatewaySecret(credential.encryptedWebhookSecret)).filter(Boolean);
-}
-
-// Every connected site's Square webhook signature key, for the same try-each verification approach.
-export async function getConnectedSquareWebhookSignatureKeys() {
-  const credentials = await prisma.paymentGatewayCredential.findMany({
-    where: {
-      provider: PaymentProvider.SQUARE,
-      status: PaymentGatewayConnectionStatus.CONNECTED,
-      encryptedWebhookSecret: { not: "" }
-    },
-    select: { encryptedWebhookSecret: true }
-  });
-  return credentials.map((credential) => decryptGatewaySecret(credential.encryptedWebhookSecret)).filter(Boolean);
+  return credentials.map((credential) => ({
+    siteId: credential.siteId,
+    secret: decryptGatewaySecret(credential.encryptedWebhookSecret),
+    merchantId: (provider === "STRIPE" ? credential.externalAccountId : credential.merchantId).trim(),
+    environment: metadataString(credentialMetadata(credential.metadata), provider === "STRIPE" ? "keyMode" : "environment")
+  })).filter(({ secret }) => Boolean(secret));
 }
 
 function toPayPalSiteCredentials(credential: {
@@ -204,7 +189,12 @@ export async function getConnectedPayPalCredentials() {
     where: {
       provider: PaymentProvider.PAYPAL,
       status: PaymentGatewayConnectionStatus.CONNECTED
-    }
+    },
+    take: 17
   });
-  return credentials.map((credential) => toPayPalSiteCredentials(credential)).filter((value): value is PayPalSiteCredentials => Boolean(value));
+  if (credentials.length > 16) throw new Error("PayPal webhook credential limit exceeded.");
+  return credentials.flatMap((credential) => {
+    const connected = toPayPalSiteCredentials(credential);
+    return connected?.webhookId ? [{ ...connected, siteId: credential.siteId }] : [];
+  });
 }

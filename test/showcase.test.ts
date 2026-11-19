@@ -138,9 +138,10 @@ test("cancellation saves its reason with the status before queuing the customer 
   const loaded = loadMocked("lib/bookings/status.ts", {
     "server-only": {},
     "./payment": {},
+    "./payment-notifications": {},
     "@/lib/billing/documents": {},
     "@/lib/email": { queueBookingStatusEmail: async (booking: Record<string, unknown>) => { emails.push(booking); } },
-    "@/lib/events/emit": { emitModuleEvent: async () => {} },
+    "@/lib/events/emit": { emitModuleEvent: async (_name: string, event: { siteId?: string }) => { assert.equal(event.siteId, current.siteId); } },
     "@/lib/site": {},
     "@/lib/prisma": { prisma: { booking: {
       findFirst: async () => current,

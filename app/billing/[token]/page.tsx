@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
-import { FormAttachmentTargetType } from "@prisma/client";
 import styles from "./payment.module.css";
 import { notFound, redirect } from "next/navigation";
 import { findBookingPayment, startBookingCheckout } from "@/lib/bookings/payment";
 import { publicBillingPath } from "@/lib/billing/documents";
 import { formatDateTime, formatMoney } from "@/lib/format";
-import { bookingSelfServicePath } from "@/lib/bookings/self-service";
-import { getPublicFormAttachments, publicFormAttachmentHref } from "@/lib/forms/attachments";
 import { icsCalendarAdapter } from "@/lib/scheduling/calendar";
 
 export const metadata: Metadata = {
@@ -26,11 +23,6 @@ export default async function BookingPaymentPage({ params, searchParams }: {
   const paid = document.status === "PAID";
   const confirmed = paid && document.booking.status === "CONFIRMED";
   const bookingTarget = { bookingId: document.booking.id, siteId: document.siteId };
-  const forms = confirmed ? await getPublicFormAttachments({
-    siteId: document.siteId,
-    targetId: document.booking.id,
-    targetType: FormAttachmentTargetType.BOOKING
-  }) : [];
   const closed = document.status === "VOID" || document.booking.status !== "PENDING" || document.booking.startsAt <= new Date() ||
     Boolean(document.dueAt && document.dueAt <= new Date() && !document.payments[0]?.externalCheckoutSession);
   const path = publicBillingPath(token);
@@ -49,10 +41,6 @@ export default async function BookingPaymentPage({ params, searchParams }: {
     {paid && <p>Payment received. Check your email for the booking details.</p>}
     {confirmed && <ul>
       <li><a href={icsCalendarAdapter.bookingPath(bookingTarget)}>Add to calendar</a></li>
-      <li><a href={bookingSelfServicePath({ ...bookingTarget, customerEmail: document.booking.customerEmail })}>Manage booking</a></li>
-      {forms.map(({ form, targetId, targetType }) => <li key={form.slug}>
-        <a href={publicFormAttachmentHref({ formSlug: form.slug, targetId, targetType })}>{form.name}</a>
-      </li>)}
     </ul>}
     {!paid && closed && <p>This booking can no longer be paid online. Contact us for help.</p>}
     {!paid && !closed && (checkout === "success" ?

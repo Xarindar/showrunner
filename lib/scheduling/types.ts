@@ -74,7 +74,7 @@ export type BookingRequest = {
   bookingRequirementsRevision?: string;
   acceptedTerms?: string;
   status?: BookingStatus;
-  onlinePayment?: { checkoutSupported: boolean };
+  onlinePayment?: { checkoutSupported: boolean; submission?: { keyHash: string; fingerprint: string } };
 };
 
 export type CalendarFeedScope = {

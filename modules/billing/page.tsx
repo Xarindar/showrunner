@@ -61,18 +61,17 @@ function paidCents(payments: {amountCents: number;refundedCents?: number;status:
 
 function refundablePaymentCents(payment: {
   amountCents: number;
+  captureRejectionReason: string;
   externalPaymentId: string | null;
   rawSummary: Prisma.JsonValue;
   refundedCents: number;
+  refunds: { amountCents: number; status: string }[];
   status: PaymentStatus | string;
 }) {
-  if (payment.status === PaymentStatus.PAID || payment.status === PaymentStatus.AUTHORIZED) {
-    return Math.max(0, payment.amountCents - payment.refundedCents);
-  }
-  if (isRejectedCapturedPayment({ ...payment, status: payment.status as PaymentStatus })) {
-    return payment.amountCents;
-  }
-  return 0;
+  if (!payment.externalPaymentId || (payment.status !== PaymentStatus.PAID &&
+      !isRejectedCapturedPayment({ ...payment, status: payment.status as PaymentStatus }))) return 0;
+  const reserved = payment.refunds.filter(({ status }) => status === "PENDING").reduce((sum, { amountCents }) => sum + amountCents, 0);
+  return Math.max(0, payment.amountCents - payment.refundedCents - reserved);
 }
 
 function openBalanceTotalsLabel(documents: {
@@ -172,11 +171,11 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       client: true,
       lineItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
       attachments: { orderBy: { createdAt: "desc" } },
-      payments: { orderBy: { createdAt: "desc" } }
+      payments: { orderBy: { createdAt: "desc" }, include: { refunds: { orderBy: { createdAt: "desc" } } } }
     }
   }) :
   null;
-  const savedMessage = params.saved ? "Billing changes saved." : null;
+  const savedMessage = params.saved === "refund" ? "Refund queued." : params.saved ? "Billing changes saved." : null;
   const errorMessage = params.error || null;
   const selectedDocumentIsDraft = selectedDocument?.status === BillingDocumentStatus.DRAFT;
   const selectedDocumentIsFinal =
@@ -525,6 +524,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                   <tbody>
                     {selectedDocument.payments.map((payment) => {
                   const refundableCents = refundablePaymentCents(payment);
+                  const unresolved = payment.refunds.filter(({ status }) => status === "PENDING" || status === "FAILED");
 
                   return (
                     <tr key={payment.id}>
@@ -538,11 +538,17 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                               </> :
                         null}
                           </td>
-                          <td>{formatDateTime(payment.createdAt, settings.timezone)}</td>
+                          <td>{formatDateTime(payment.createdAt, settings.timezone)}
+                            {unresolved.map((refund) => <p className="muted-text" key={refund.id}>
+                              {formatMoney(refund.amountCents, refund.currency)} refund {refund.status === "FAILED" ? "failed" :
+                                !refund.externalRefundId && Date.now() - refund.createdAt.getTime() >= 4 * 60 * 60_000 ? "needs reconciliation" : "pending"}
+                            </p>)}
+                          </td>
                           <td>
                             {refundableCents > 0 ?
                         <form action={refundBillingPaymentAction} className="form-grid ui-zero">
                                 <input type="hidden" name="paymentId" value={payment.id} />
+                              <input type="hidden" name="requestId" value={crypto.randomUUID()} />
                                 <div className="ui-field">
                                   <label htmlFor={`billing-refund-${payment.id}`}>Amount</label>
                                   <input

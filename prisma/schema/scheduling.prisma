@@ -356,6 +356,8 @@ model Booking {
   priceCents         Int?
   isManual           Boolean       @default(false)
   customerEmail      String
+  publicSubmissionKeyHash String?
+  publicSubmissionFingerprint String?
   customerPhone      String?
   notes              String?
   bookingRequirementsSnapshot Json?
@@ -374,6 +376,7 @@ model Booking {
   promotedWaitlistEntries BookingWaitlistEntry[]
 
   @@index([siteId, startsAt, endsAt])
+  @@unique([siteId, publicSubmissionKeyHash])
   @@index([serviceId, startsAt])
   @@index([staffId, startsAt])
   @@index([clientId])

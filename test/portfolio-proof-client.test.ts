@@ -125,6 +125,23 @@ test("private proof and media URLs bypass attribution and send no-referrer", () 
   }
 });
 
+test("billing returns and legacy attribution cookies keep capabilities out of forwarded landing state", () => {
+  const { proxy } = mockedModule("proxy.ts", {}) as { proxy: (request: NextRequest) => Response };
+  const billing = "/billing/synthetic-capability";
+  for (const checkout of ["success", "cancel", ""]) {
+    const response = proxy(new NextRequest(`${origin}${billing}?checkout=${checkout}`));
+    assert.equal(response.headers.get("x-middleware-request-x-showrunner-landing"), null);
+    assert.equal(response.headers.get("set-cookie"), null);
+    assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  }
+  const response = proxy(new NextRequest(`${origin}/booking`, {
+    headers: { cookie: `sr_visitor=visitor; sr_session=session; sr_landing_page=${encodeURIComponent(billing)}`, referer: `${origin}${billing}` }
+  }));
+  assert.equal(response.headers.get("x-middleware-request-referer"), null);
+  assert.equal(response.headers.get("x-middleware-request-x-showrunner-landing"), "/booking");
+  assert.match(response.headers.get("set-cookie") || "", /sr_landing_page=%2Fbooking/);
+});
+
 const initialView: ProofSelectionView = {
   termsVersion: expectedTermsVersion,
   gallery: { id: "gallery", slug: "shoot", title: "Autumn portrait shoot", description: "Choose your photos." },

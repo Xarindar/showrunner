@@ -11,6 +11,7 @@ import {
 } from "@prisma/client";
 import { cookies, headers } from "next/headers";
 import { moduleEventCatalog, type ModuleEventName } from "@/lib/events/catalog";
+import { safeAttributionUrl } from "@/lib/events/capability-path";
 import { queueWebhookDelivery } from "@/lib/events/webhook-delivery";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSiteId } from "@/lib/site";
@@ -103,9 +104,10 @@ function sourceFromReferrer(referrer: string) {
 }
 
 export async function requestAttribution(searchParams?: SearchParams, pathname = ""): Promise<EventAttribution> {
+  pathname = safeAttributionUrl(pathname);
   const headerStore = await headers();
   const cookieStore = await cookies();
-  const referrer = headerStore.get("referer") || "";
+  const referrer = safeAttributionUrl(headerStore.get("referer") || "");
   const trackingConsent = headerStore.get("x-showrunner-consent") || cookieStore.get("sr_tracking_consent")?.value || "unset";
 
   if (trackingConsent === "denied") {
@@ -139,9 +141,9 @@ export async function requestAttribution(searchParams?: SearchParams, pathname =
       cookieStore.get("sr_first_campaign")?.value ||
       "",
     landingPage:
-      firstParam(searchParams, "utm_landing") ||
-      headerStore.get("x-showrunner-landing") ||
-      cookieStore.get("sr_landing_page")?.value ||
+      safeAttributionUrl(firstParam(searchParams, "utm_landing")) ||
+      safeAttributionUrl(headerStore.get("x-showrunner-landing") || "") ||
+      safeAttributionUrl(cookieStore.get("sr_landing_page")?.value) ||
       pathname,
     medium,
     pathname,
@@ -170,7 +172,7 @@ function matchesConditions(conditions: Prisma.JsonValue, envelope: EventEnvelope
   return true;
 }
 
-async function recordAnalyticsEvent(envelope: EventEnvelope, definition: AnalyticsEventDefinition, dedupeWindowMinutes = 0) {
+async function recordAnalyticsEvent(envelope: EventEnvelope, definition: AnalyticsEventDefinition, dedupeWindowMinutes = 0, db: Prisma.TransactionClient = prisma) {
   if (dedupeWindowMinutes > 0) {
     const occurredAfter = new Date(Date.now() - dedupeWindowMinutes * 60 * 1000);
     const identityWhere = envelope.visitorId
@@ -182,7 +184,7 @@ async function recordAnalyticsEvent(envelope: EventEnvelope, definition: Analyti
           : undefined;
 
     if (identityWhere) {
-      const existing = await prisma.analyticsEvent.findFirst({
+      const existing = await db.analyticsEvent.findFirst({
         where: {
           siteId: envelope.siteId,
           ...identityWhere,
@@ -200,7 +202,7 @@ async function recordAnalyticsEvent(envelope: EventEnvelope, definition: Analyti
     }
   }
 
-  await prisma.analyticsEvent.create({
+  await db.analyticsEvent.create({
     data: {
       siteId: envelope.siteId,
       eventType: definition.analyticsEventType,
@@ -239,11 +241,11 @@ function automationRunSummary(action: AutomationAction, eventName: ModuleEventNa
     : `Matched ${eventName}. ${action.toLowerCase()} action was not queued.`;
 }
 
-async function ensureAutomationWebhookSecret(automation: { id: string; webhookSigningSecret: string }) {
+async function ensureAutomationWebhookSecret(automation: { id: string; webhookSigningSecret: string }, db: Prisma.TransactionClient) {
   if (automation.webhookSigningSecret) return automation.webhookSigningSecret;
 
   const webhookSigningSecret = `whsec_${crypto.randomBytes(24).toString("base64url")}`;
-  await prisma.automation.update({
+  await db.automation.update({
     where: { id: automation.id },
     data: { webhookSigningSecret }
   });
@@ -251,9 +253,10 @@ async function ensureAutomationWebhookSecret(automation: { id: string; webhookSi
   return webhookSigningSecret;
 }
 
-async function recordMatchedAutomationRuns(eventName: ModuleEventName, envelope: EventEnvelope) {
+async function recordMatchedAutomationRuns(eventName: ModuleEventName, envelope: EventEnvelope, db?: Prisma.TransactionClient) {
+  const transact = (run: (tx: Prisma.TransactionClient) => Promise<void>) => db ? run(db) : prisma.$transaction(run);
   const definition = moduleEventCatalog[eventName];
-  const automations = await prisma.automation.findMany({
+  const automations = await (db || prisma).automation.findMany({
     where: {
       siteId: envelope.siteId,
       status: AutomationStatus.ACTIVE,
@@ -269,11 +272,11 @@ async function recordMatchedAutomationRuns(eventName: ModuleEventName, envelope:
       await ensureAutomationWebhookSecret({
         id: automation.id,
         webhookSigningSecret: automation.webhookSigningSecret
-      });
+      }, db || prisma);
       const body = JSON.stringify(envelope);
       const payload = JSON.parse(body) as Prisma.InputJsonObject;
 
-      await prisma.$transaction(async (tx) => {
+      await transact(async (tx) => {
         await tx.automationRun.create({
           data: {
             automationId: automation.id,
@@ -302,7 +305,7 @@ async function recordMatchedAutomationRuns(eventName: ModuleEventName, envelope:
     }
 
     const payload = JSON.parse(JSON.stringify(envelope)) as Prisma.InputJsonObject;
-    await prisma.$transaction(async (tx) => {
+    await transact(async (tx) => {
       await tx.automationRun.create({
         data: {
           automationId: automation.id,
@@ -327,8 +330,8 @@ function endpointEvents(value: Prisma.JsonValue) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
-async function queueSubscribedWebhookEndpoints(envelope: EventEnvelope) {
-  const endpoints = await prisma.webhookEndpoint.findMany({
+async function queueSubscribedWebhookEndpoints(envelope: EventEnvelope, db: Prisma.TransactionClient = prisma) {
+  const endpoints = await db.webhookEndpoint.findMany({
     where: { siteId: envelope.siteId, status: AutomationStatus.ACTIVE }
   });
   const subscribed = endpoints.filter((endpoint) => endpointEvents(endpoint.events).includes(envelope.name));
@@ -342,12 +345,12 @@ async function queueSubscribedWebhookEndpoints(envelope: EventEnvelope) {
         targetUrl: endpoint.url,
         payload,
         webhookEndpointId: endpoint.id
-      })
+      }, db)
     )
   );
 }
 
-export async function emitModuleEvent(name: ModuleEventName, input: EmitModuleEventInput = {}) {
+export async function emitModuleEvent(name: ModuleEventName, input: EmitModuleEventInput = {}, tx?: Prisma.TransactionClient) {
   const definition = moduleEventCatalog[name];
   const siteId = input.siteId || (await getCurrentSiteId());
   const envelope: EventEnvelope = {
@@ -355,13 +358,13 @@ export async function emitModuleEvent(name: ModuleEventName, input: EmitModuleEv
     campaign: input.campaign || "",
     currency: input.currency || "USD",
     eventId: input.idempotencyKey || crypto.randomUUID(),
-    landingPage: input.landingPage || "",
+    landingPage: safeAttributionUrl(input.landingPage),
     medium: input.medium || "",
     metadata: compactMetadata(input.metadata),
     name,
     occurredAt: new Date().toISOString(),
-    pathname: input.pathname || "",
-    referrer: input.referrer || "",
+    pathname: safeAttributionUrl(input.pathname),
+    referrer: safeAttributionUrl(input.referrer),
     relatedId: input.relatedId || "",
     relatedType: input.relatedType || definition.relatedType,
     siteId,
@@ -371,6 +374,13 @@ export async function emitModuleEvent(name: ModuleEventName, input: EmitModuleEv
     valueCents: input.valueCents,
     visitorId: input.visitorId || ""
   };
+
+  if (tx) {
+    await recordAnalyticsEvent(envelope, definition, input.dedupeWindowMinutes, tx);
+    await recordMatchedAutomationRuns(name, envelope, tx);
+    await queueSubscribedWebhookEndpoints(envelope, tx);
+    return;
+  }
 
   const results = await Promise.allSettled([
     recordAnalyticsEvent(envelope, definition, input.dedupeWindowMinutes),
@@ -393,13 +403,13 @@ export async function emitAnalyticsEvent(input: EmitAnalyticsEventInput) {
     campaign: input.campaign || "",
     currency: input.currency || "USD",
     eventId: input.idempotencyKey || crypto.randomUUID(),
-    landingPage: input.landingPage || "",
+    landingPage: safeAttributionUrl(input.landingPage),
     medium: input.medium || "",
     metadata: compactMetadata(input.metadata),
     name: input.eventName,
     occurredAt: new Date().toISOString(),
-    pathname: input.pathname || "",
-    referrer: input.referrer || "",
+    pathname: safeAttributionUrl(input.pathname),
+    referrer: safeAttributionUrl(input.referrer),
     relatedId: input.relatedId || "",
     relatedType: input.relatedType || "",
     siteId,

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isSensitiveCapabilityPath, safeAttributionUrl } from "@/lib/events/capability-path";
 
 const visitorCookie = "sr_visitor";
 const sessionCookie = "sr_session";
@@ -11,15 +12,6 @@ function shouldSkip(pathname: string) {
   if (pathname.startsWith("/_next") || pathname.startsWith("/api/internal")) return true;
   if (pathname === "/favicon.ico" || pathname === "/robots.txt" || pathname === "/sitemap.xml") return true;
   return /\.[a-z0-9]{2,8}$/i.test(pathname);
-}
-
-function isSensitiveCapabilityPath(pathname: string) {
-  if (pathname.startsWith("/uploads") || pathname.startsWith("/api/uploads/")) return true;
-  return pathname.startsWith("/api/payments/connect/")
-    || pathname === "/proof-export"
-    || pathname === "/proofs"
-    || pathname.startsWith("/proofs/")
-    || pathname.startsWith("/api/portfolio/");
 }
 
 function cleanValue(value: string | null) {
@@ -43,8 +35,15 @@ function setAttributionCookie(response: NextResponse, request: NextRequest, name
 }
 
 export function proxy(request: NextRequest) {
+  const savedLanding = request.cookies.get(landingCookie)?.value;
+  const safeLanding = safeAttributionUrl(savedLanding);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.delete("x-showrunner-landing");
+  if (!safeAttributionUrl(requestHeaders.get("referer") || "")) requestHeaders.delete("referer");
+
   if (isSensitiveCapabilityPath(request.nextUrl.pathname)) {
-    const response = NextResponse.next();
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    if (savedLanding && !safeLanding) response.cookies.delete(landingCookie);
     response.headers.set("Cache-Control", "no-store, max-age=0");
     response.headers.set("Pragma", "no-cache");
     response.headers.set("Referrer-Policy", "no-referrer");
@@ -53,17 +52,18 @@ export function proxy(request: NextRequest) {
 
   if (shouldSkip(request.nextUrl.pathname)) return NextResponse.next();
 
-  const requestHeaders = new Headers(request.headers);
   const consent = request.cookies.get(consentCookie)?.value || "unset";
   requestHeaders.set("x-showrunner-consent", consent);
 
   if (consent === "denied") {
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    if (savedLanding && !safeLanding) response.cookies.delete(landingCookie);
+    return response;
   }
 
   const visitorId = request.cookies.get(visitorCookie)?.value || crypto.randomUUID();
   const sessionId = request.cookies.get(sessionCookie)?.value || crypto.randomUUID();
-  const landingPage = request.cookies.get(landingCookie)?.value || `${request.nextUrl.pathname}${request.nextUrl.search}`;
+  const landingPage = safeLanding || safeAttributionUrl(`${request.nextUrl.pathname}${request.nextUrl.search}`);
   const utmSource = cleanValue(request.nextUrl.searchParams.get("utm_source"));
   const utmMedium = cleanValue(request.nextUrl.searchParams.get("utm_medium"));
   const utmCampaign = cleanValue(request.nextUrl.searchParams.get("utm_campaign"));
@@ -81,7 +81,8 @@ export function proxy(request: NextRequest) {
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.cookies.set(visitorCookie, visitorId, cookieOptions(request, cookieMaxAge));
   response.cookies.set(sessionCookie, sessionId, cookieOptions(request, sessionMaxAge));
-  setAttributionCookie(response, request, landingCookie, landingPage, true);
+  if (!safeLanding && landingPage) setAttributionCookie(response, request, landingCookie, landingPage);
+  else if (savedLanding && !safeLanding) response.cookies.delete(landingCookie);
   setAttributionCookie(response, request, "sr_last_source", utmSource);
   setAttributionCookie(response, request, "sr_last_medium", utmMedium);
   setAttributionCookie(response, request, "sr_last_campaign", utmCampaign);
